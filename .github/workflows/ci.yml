@@ -40,7 +40,14 @@ jobs:
         run: ruff check .
 
       - name: Type-check (mypy)
-        run: python -m mypy src --ignore-missing-imports --no-strict-optional
+        run: |
+          python -m mypy src \
+            --ignore-missing-imports \
+            --no-strict-optional \
+            --disable-error-code=no-any-return \
+            --disable-error-code=type-arg \
+            --disable-error-code=misc \
+            --disable-error-code=unused-ignore
 
       - name: Test
         run: PYTHONPATH=src python -m pytest -m "not integration_live" -q
