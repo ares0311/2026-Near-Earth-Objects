@@ -1,0 +1,81 @@
+name: "[HAZARD-ALERT] High-confidence PHA candidate"
+description: File a hazard alert for a pipeline-detected PHA candidate requiring MPC/CNEOS follow-up.
+title: "[HAZARD-ALERT] <object_id>"
+labels: ["HAZARD-ALERT"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **GUARDRAIL**: This template is for pipeline-detected candidates only.
+        Do NOT assert an impact probability — all impact assessment is deferred to NASA CNEOS Scout/Sentry.
+
+  - type: input
+    id: object_id
+    attributes:
+      label: Object ID
+      description: Pipeline tracklet identifier (e.g. T001)
+    validations:
+      required: true
+
+  - type: input
+    id: moid_au
+    attributes:
+      label: MOID (AU)
+      description: Minimum Orbit Intersection Distance computed by pipeline
+    validations:
+      required: true
+
+  - type: input
+    id: abs_mag
+    attributes:
+      label: Absolute magnitude H
+      description: Pipeline-estimated H magnitude
+    validations:
+      required: true
+
+  - type: input
+    id: neo_class
+    attributes:
+      label: NEO class
+      description: amor / apollo / aten / ieo / unknown
+    validations:
+      required: true
+
+  - type: input
+    id: orbit_quality
+    attributes:
+      label: Orbit quality code
+      description: "1=<1 day arc, 2=multi-night, 3=multi-week, 4=opposition"
+    validations:
+      required: true
+
+  - type: textarea
+    id: mpc_report
+    attributes:
+      label: MPC observation report (80-column)
+      description: Paste the formatted MPC observation lines here.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: provenance
+    attributes:
+      label: Provenance
+      description: Pipeline run ID, scorer version, scored_at_jd, and any relevant notes.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: protocol_checklist
+    attributes:
+      label: Alert protocol checklist
+      options:
+        - label: "Step 1: MPC report submitted (or queued for dry-run review)"
+          required: true
+        - label: "Step 2: NEOCP monitoring initiated (≥24 hr or ≥2 independent confirmations required)"
+          required: true
+        - label: "Step 3: CNEOS Scout/Sentry assessment pending — NASA PDCO notification only if impact probability ≥ 0.01%"
+          required: true
+        - label: "No public impact probability has been stated or implied"
+          required: true

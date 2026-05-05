@@ -3,6 +3,7 @@
 from alert import (
     _format_dec,
     _format_ra,
+    _generate_pdco_alert_package,
     _jd_to_mpc_date,
     format_mpc_observation,
     format_mpc_report,
@@ -212,3 +213,44 @@ class TestAlertProtocol:
             or "alert_pathway" in summary.lower()
             or "Alert pathway" in summary
         )
+
+
+class TestPDCOAlertPackage:
+    def test_pdco_package_required_keys(self):
+        neo = make_scored_neo(
+            alert_pathway="nasa_pdco_notify", rb=0.95, orbit_quality=2, moid_au=0.03
+        )
+        pkg = _generate_pdco_alert_package(neo)
+        required = {
+            "object_id", "hazard_flag", "moid_au", "absolute_magnitude_h",
+            "estimated_diameter_m", "neo_class", "neo_candidate_probability",
+            "orbit_quality_code", "arc_days", "n_observations",
+            "scorer_version", "pipeline_run_id", "impact_probability",
+        }
+        assert required <= pkg.keys()
+
+    def test_pdco_package_no_numeric_impact_probability(self):
+        neo = make_scored_neo(
+            alert_pathway="nasa_pdco_notify", rb=0.95, orbit_quality=2, moid_au=0.03
+        )
+        pkg = _generate_pdco_alert_package(neo)
+        assert not isinstance(pkg.get("impact_probability"), float)
+
+    def test_pdco_package_object_fields(self):
+        neo = make_scored_neo(
+            alert_pathway="nasa_pdco_notify", rb=0.95, orbit_quality=2, moid_au=0.03
+        )
+        pkg = _generate_pdco_alert_package(neo)
+        assert pkg["object_id"] == "T001"
+        assert pkg["neo_class"] == "apollo"
+        assert pkg["orbit_quality_code"] == 2
+
+    def test_pdco_deferred_without_cneos_injection(self, tmp_path, monkeypatch):
+        import alert as alert_mod
+        monkeypatch.setattr(alert_mod, "_LOG_DIR", tmp_path)
+        neo = make_scored_neo(
+            alert_pathway="nasa_pdco_notify", rb=0.95, orbit_quality=2, moid_au=0.03
+        )
+        result = process_alert(neo, dry_run=True)
+        assert "pdco_package" not in result
+        assert any("deferred" in a.lower() for a in result["actions"])

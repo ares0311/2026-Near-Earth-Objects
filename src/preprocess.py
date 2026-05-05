@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+__all__ = ["preprocess"]
+
 import base64
 import math
 
