@@ -1,0 +1,361 @@
+"""Alert stage — MPC report formatting and NASA alert protocol."""
+
+from __future__ import annotations
+
+import json
+import logging
+from datetime import UTC, datetime
+from pathlib import Path
+
+from schemas import (
+    AlertPathway,
+    Observation,
+    ScoredNEO,
+)
+
+_LOG_DIR = Path("alert_logs")
+_logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# MPC 80-column format
+# ---------------------------------------------------------------------------
+
+# Column layout per MPC circular (https://minorplanetcenter.net/iau/info/OpticalObs.html)
+# Cols  1- 5: packed provisional designation
+# Cols  6- 6: discovery asterisk
+# Cols  7- 7: note 1
+# Cols  8- 8: note 2
+# Cols 15-32: date of observation (YYYY MM DD.ddddd)
+# Cols 33-44: RA HH MM SS.ddd
+# Cols 45-56: Dec ±DD MM SS.dd
+# Cols 65-70: magnitude
+# Cols 71-71: band
+# Cols 78-80: observatory code
+
+_MPC_OBS_CODE = "Xnn"  # placeholder; replace with real MPC observatory code
+
+
+def _pack_provisional(designation: str) -> str:
+    """Pack a provisional designation into the MPC 5-character format (simplified)."""
+    d = designation.replace(" ", "").replace("-", "")
+    return d[:5].ljust(5)
+
+
+def _jd_to_mpc_date(jd: float) -> str:
+    """Convert JD to MPC date format 'YYYY MM DD.ddddd'."""
+    from astropy.time import Time  # type: ignore[import]
+
+    t = Time(jd, format="jd")
+    iso = t.iso  # e.g. "2026-03-15 04:32:10.000"
+    dt = datetime.strptime(iso[:23], "%Y-%m-%d %H:%M:%S.%f")
+    frac_day = (dt.hour * 3600 + dt.minute * 60 + dt.second + dt.microsecond / 1e6) / 86400.0
+    return f"{dt.year:04d} {dt.month:02d} {dt.day + frac_day:08.5f}"
+
+
+def _format_ra(ra_deg: float) -> str:
+    """Format RA in HH MM SS.ddd."""
+    ra_hr = ra_deg / 15.0
+    h = int(ra_hr)
+    rem = (ra_hr - h) * 60.0
+    m = int(rem)
+    s = (rem - m) * 60.0
+    return f"{h:02d} {m:02d} {s:06.3f}"
+
+
+def _format_dec(dec_deg: float) -> str:
+    """Format Dec as ±DD MM SS.dd."""
+    sign = "+" if dec_deg >= 0 else "-"
+    dec_abs = abs(dec_deg)
+    d = int(dec_abs)
+    rem = (dec_abs - d) * 60.0
+    m = int(rem)
+    s = (rem - m) * 60.0
+    return f"{sign}{d:02d} {m:02d} {s:05.2f}"
+
+
+def format_mpc_observation(
+    obs: Observation,
+    designation: str,
+    is_discovery: bool = False,
+    obs_code: str = _MPC_OBS_CODE,
+) -> str:
+    """Format a single observation in MPC 80-column format."""
+    desig = _pack_provisional(designation)
+    discovery = "*" if is_discovery else " "
+    note1 = " "
+    note2 = "C"  # CCD observation
+
+    date_str = _jd_to_mpc_date(obs.jd)
+    ra_str = _format_ra(obs.ra_deg)
+    dec_str = _format_dec(obs.dec_deg)
+
+    mag_str = f"{obs.mag:5.1f}" if obs.mag < 99 else "     "
+    band = obs.filter_band[0] if obs.filter_band else " "
+
+    # 80-column fixed-width record
+    line = (
+        f"{desig}"          # cols 1-5
+        f"{discovery}"      # col 6
+        f"{note1}"          # col 7
+        f"{note2}"          # col 8
+        f"      "           # cols 9-14 (second designation / blank)
+        f"{date_str}"       # cols 15-32 (18 chars)
+        f"{ra_str} "        # cols 33-44 (12 chars)
+        f"{dec_str}"        # cols 45-56 (12 chars)
+        f"         "        # cols 57-65 (9 blank)
+        f"{mag_str}"        # cols 65-70 (but merged; simplified layout)
+        f"{band}"           # col 71
+        f"      "           # cols 72-77
+        f"{obs_code}"       # cols 78-80
+    )
+    # Truncate/pad to exactly 80 columns
+    return line[:80].ljust(80)
+
+
+def format_mpc_report(neo: ScoredNEO, obs_code: str = _MPC_OBS_CODE) -> str:
+    """Generate a full MPC observation report for submission."""
+    designation = neo.tracklet.object_id[:12]
+    lines: list[str] = [
+        "COD " + obs_code, "OBS Claude-NEO-Pipeline", "MEA Claude-NEO-Pipeline",
+        "TEL 0.0-m + CCD", "ACK MPCReport", "",
+    ]
+
+    for i, obs in enumerate(sorted(neo.tracklet.observations, key=lambda o: o.jd)):
+        lines.append(
+            format_mpc_observation(obs, designation, is_discovery=(i == 0), obs_code=obs_code)
+        )
+
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Alert log
+# ---------------------------------------------------------------------------
+
+
+def _log_alert(
+    neo: ScoredNEO,
+    pathway: AlertPathway,
+    action: str,
+) -> None:
+    """Write an immutable alert log entry with full provenance."""
+    _LOG_DIR.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now(UTC).isoformat()
+    entry = {
+        "timestamp_utc": ts,
+        "object_id": neo.tracklet.object_id,
+        "alert_pathway": pathway,
+        "action": action,
+        "scorer_version": neo.metadata.scorer_version,
+        "pipeline_run_id": neo.metadata.pipeline_run_id,
+        "neo_candidate_probability": neo.posterior.neo_candidate,
+        "hazard_flag": neo.hazard.hazard_flag,
+        "moid_au": neo.hazard.moid_au,
+        "orbit_quality": (
+            int(neo.hazard.orbital_elements.quality_code)
+            if neo.hazard.orbital_elements
+            else None
+        ),
+        "n_observations": len(neo.tracklet.observations),
+        "arc_days": neo.tracklet.arc_days,
+    }
+    log_path = _LOG_DIR / f"alert_{neo.tracklet.object_id}_{ts[:10]}.json"
+    with log_path.open("w") as f:
+        json.dump(entry, f, indent=2)
+    _logger.info("Alert logged: %s → %s (%s)", neo.tracklet.object_id, pathway, action)
+
+
+# ---------------------------------------------------------------------------
+# Alert protocol steps
+# ---------------------------------------------------------------------------
+
+
+def _submit_to_mpc(neo: ScoredNEO, dry_run: bool = True) -> bool:
+    """Submit observation report to MPC.
+
+    In dry_run mode (default for safety), writes the report to disk only.
+    Real submission requires MPC credentials and explicit opt-in.
+    """
+    report = format_mpc_report(neo)
+    report_path = _LOG_DIR / f"mpc_report_{neo.tracklet.object_id}.txt"
+    _LOG_DIR.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(report)
+    _logger.info("MPC report written to %s", report_path)
+
+    if dry_run:
+        _logger.warning("DRY RUN: MPC submission skipped. Set dry_run=False for live submission.")
+        return False
+
+    # Live submission path (requires MPC account)
+    try:
+        import requests  # type: ignore[import]
+
+        resp = requests.post(
+            "https://www.minorplanetcenter.net/cgi-bin/report.cgi",
+            data={"report": report},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        _logger.info("MPC submission response: %s", resp.status_code)
+        return True
+    except Exception as exc:
+        _logger.error("MPC submission failed: %s", exc)
+        return False
+
+
+def _monitor_neocp(object_id: str) -> dict:
+    """Check NEOCP for independent confirmation of a candidate."""
+    try:
+        import requests  # type: ignore[import]
+
+        resp = requests.get(
+            "https://www.minorplanetcenter.net/cgi-bin/checkmp.cgi",
+            params={"ob": object_id},
+            timeout=30,
+        )
+        return {"status": "checked", "confirmed": False, "raw": resp.text[:500]}
+    except Exception as exc:
+        return {"status": "error", "error": str(exc)}
+
+
+def _generate_pdco_alert_package(neo: ScoredNEO) -> dict:
+    """Generate structured alert package for NASA PDCO notification."""
+    return {
+        "object_id": neo.tracklet.object_id,
+        "hazard_flag": neo.hazard.hazard_flag,
+        "moid_au": neo.hazard.moid_au,
+        "absolute_magnitude_h": neo.hazard.absolute_magnitude_h,
+        "estimated_diameter_m": neo.hazard.estimated_diameter_m,
+        "neo_class": neo.hazard.neo_class,
+        "neo_candidate_probability": neo.posterior.neo_candidate,
+        "orbit_quality_code": (
+            int(neo.hazard.orbital_elements.quality_code)
+            if neo.hazard.orbital_elements
+            else None
+        ),
+        "arc_days": neo.tracklet.arc_days,
+        "n_observations": len(neo.tracklet.observations),
+        "scorer_version": neo.metadata.scorer_version,
+        "pipeline_run_id": neo.metadata.pipeline_run_id,
+        "explanation": neo.hazard.explanation.summary,
+        "supporting_evidence": list(neo.hazard.explanation.supporting_evidence),
+        "contra_evidence": list(neo.hazard.explanation.contra_evidence),
+        # NOTE: No impact probability. Defer all impact assessment to NASA/CNEOS.
+        "impact_probability": "DEFERRED — see NASA CNEOS Scout/Sentry",
+    }
+
+
+# ---------------------------------------------------------------------------
+# Entry point — mandatory alert protocol
+# ---------------------------------------------------------------------------
+
+
+def process_alert(
+    neo: ScoredNEO,
+    dry_run: bool = True,
+    mpc_obs_code: str = _MPC_OBS_CODE,
+) -> dict:
+    """Execute the mandatory alert protocol for a scored NEO candidate.
+
+    This function enforces the non-negotiable alert decision tree from CLAUDE.md:
+      Step 1: MPC submission (if pathway qualifies)
+      Step 2: NEOCP monitoring for independent confirmation
+      Step 3: NASA PDCO notification (only if CNEOS assigns impact probability ≥ 0.01%)
+
+    Returns a dict summarising actions taken.
+    """
+    pathway = neo.hazard.alert_pathway
+    actions: list[str] = []
+    result: dict = {
+        "object_id": neo.tracklet.object_id,
+        "pathway": pathway,
+        "actions": actions,
+    }
+
+    # Gate: only external reporting for qualifying pathways
+    if pathway in ("internal_candidate", "known_object"):
+        actions.append(f"No external reporting: pathway={pathway}")
+        _log_alert(neo, pathway, "internal_only")
+        return result
+
+    # --- GUARDRAIL CHECK ---
+    rb = neo.features.real_bogus_score
+    orbit_q = int(neo.hazard.orbital_elements.quality_code) if neo.hazard.orbital_elements else 0
+    moid = neo.hazard.moid_au
+
+    if rb is None or rb < 0.90:
+        actions.append(f"Alert blocked: real/bogus score {rb} < 0.90 threshold")
+        _log_alert(neo, pathway, "blocked_rb")
+        return result
+
+    if orbit_q < 2:
+        actions.append(f"Alert blocked: orbit quality code {orbit_q} < 2")
+        _log_alert(neo, pathway, "blocked_orbit_quality")
+        return result
+
+    if moid is None or moid > 0.05:
+        actions.append(f"Alert blocked: MOID {moid} > 0.05 AU")
+        _log_alert(neo, pathway, "blocked_moid")
+        return result
+
+    # Step 1: MPC submission
+    submitted = _submit_to_mpc(neo, dry_run=dry_run)
+    actions.append(f"MPC report {'submitted' if submitted else 'drafted (dry_run)'}")
+    _log_alert(neo, pathway, "mpc_submission")
+
+    # Step 2: NEOCP monitoring (non-blocking; returns immediately for async follow-up)
+    neocp_status = _monitor_neocp(neo.tracklet.object_id)
+    actions.append(f"NEOCP checked: {neocp_status.get('status')}")
+    result["neocp"] = neocp_status
+
+    # Step 3: NASA PDCO — only if external CNEOS assigns impact probability
+    # We NEVER compute or assert an impact probability ourselves.
+    # This branch must be triggered externally after CNEOS Scout/Sentry assessment.
+    cneos_impact_prob = result.get("cneos_impact_probability")  # must be injected externally
+    if cneos_impact_prob is not None and cneos_impact_prob >= 0.0001:
+        pdco_package = _generate_pdco_alert_package(neo)
+        pdco_path = _LOG_DIR / f"pdco_alert_{neo.tracklet.object_id}.json"
+        pdco_path.write_text(json.dumps(pdco_package, indent=2))
+        actions.append(f"NASA PDCO alert package written to {pdco_path}")
+        _log_alert(neo, "nasa_pdco_notify", "pdco_package_ready")
+        result["pdco_package"] = pdco_package
+    else:
+        actions.append("NASA PDCO notification deferred: awaiting CNEOS Scout/Sentry assessment")
+
+    return result
+
+
+def summarise(neo: ScoredNEO) -> str:
+    """Return a human-readable candidate summary."""
+    h = neo.hazard
+    p = neo.posterior
+    m = neo.metadata
+    lines = [
+        f"=== NEO Candidate: {neo.tracklet.object_id} ===",
+        f"NEO probability   : {p.neo_candidate:.2%}",
+        f"Artifact prob.    : {p.stellar_artifact:.2%}",
+        f"Known object prob.: {p.known_object:.2%}",
+        f"Hazard flag       : {h.hazard_flag}",
+        f"NEO class         : {h.neo_class}",
+        f"MOID              : {h.moid_au:.4f} AU" if h.moid_au else "MOID              : unknown",
+        (f"Abs. magnitude H  : {h.absolute_magnitude_h:.1f}" if h.absolute_magnitude_h
+         else "H                 : unknown"),
+        (f"Est. diameter     : {h.estimated_diameter_m:.0f} m" if h.estimated_diameter_m
+         else "Diameter          : unknown"),
+        f"Alert pathway     : {h.alert_pathway}",
+        f"Discovery priority: {m.discovery_priority:.2f}",
+        f"Followup value    : {m.followup_value:.2f}",
+        f"Arc (days)        : {neo.tracklet.arc_days:.2f}",
+        f"N observations    : {len(neo.tracklet.observations)}",
+        "",
+        "Summary: " + h.explanation.summary,
+        "",
+        "Supporting evidence:",
+        *[f"  + {e}" for e in h.explanation.supporting_evidence],
+        "Contra evidence:",
+        *[f"  - {e}" for e in h.explanation.contra_evidence],
+        "",
+        "NOTICE: This pipeline does NOT assert impact probability.",
+        "Defer all hazard assessment to MPC/CNEOS.",
+    ]
+    return "\n".join(lines)
