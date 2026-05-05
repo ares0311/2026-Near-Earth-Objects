@@ -148,8 +148,8 @@ class PlattCalibrator:
             fApB = f * A + B
             np.where(
                 fApB >= 0,
-                t * fApB + np.log1p(np.exp(-fApB)),
-                (t - 1) * fApB + np.log1p(np.exp(fApB)),
+                t * fApB + np.logaddexp(0, -fApB),
+                (t - 1) * fApB + np.logaddexp(0, fApB),
             ).sum()  # log-likelihood (not stored; drives convergence check)
 
             # Numerically stable sigmoid via scipy

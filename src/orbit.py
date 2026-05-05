@@ -216,7 +216,7 @@ def _state_to_elements(
         om = math.degrees(math.atan2(e_vec[1], e_vec[0])) % 360.0
 
     # True anomaly → mean anomaly
-    cos_nu = float(np.dot(e_vec, pos) / (e * r))
+    cos_nu = float(np.dot(e_vec, pos) / (e * r)) if e > 1e-10 else 0.0
     cos_nu = max(-1.0, min(1.0, cos_nu))
     nu = math.degrees(math.acos(cos_nu))
     if float(np.dot(pos, vel)) < 0:
