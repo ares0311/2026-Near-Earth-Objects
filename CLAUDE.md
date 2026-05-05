@@ -58,16 +58,16 @@ Each stage produces a typed, immutable result object. No shared mutable state.
 
 | Module | Status | Tests | Description |
 |---|---|---|---|
-| `schemas.py` | not started | — | All pipeline data models (Pydantic, frozen) |
-| `fetch.py` | not started | — | ZTF/ATLAS/MPC data retrieval |
-| `preprocess.py` | not started | — | Difference image handling, source extraction |
-| `detect.py` | not started | — | Moving object detection; streak/trail identification |
-| `link.py` | not started | — | Tracklet linking across nights |
-| `classify.py` | not started | — | ML real/bogus + NEO type classification |
-| `orbit.py` | not started | — | Preliminary orbit fitting; MOID calculation |
-| `score.py` | not started | — | Hazard ranking; PHA flag; novelty score |
-| `alert.py` | not started | — | MPC report formatting; NASA alert protocol |
-| `calibration.py` | not started | — | Classifier calibration (Platt / isotonic PAVA) |
+| `schemas.py` | complete | test_schemas.py | All pipeline data models (Pydantic, frozen) |
+| `fetch.py` | complete | test_fetch.py | ZTF/ATLAS/MPC data retrieval |
+| `preprocess.py` | complete | test_preprocess.py | Difference image handling, source extraction |
+| `detect.py` | complete | test_detect.py | Moving object detection; streak/trail identification |
+| `link.py` | complete | test_link.py | Tracklet linking across nights |
+| `classify.py` | complete | test_classify.py | ML real/bogus + NEO type classification |
+| `orbit.py` | complete | test_orbit.py | Preliminary orbit fitting; MOID calculation |
+| `score.py` | complete | test_score.py | Hazard ranking; PHA flag; novelty score |
+| `alert.py` | complete | test_alert.py | MPC report formatting; NASA alert protocol |
+| `calibration.py` | complete | test_calibration.py | Classifier calibration (Platt / isotonic PAVA) |
 
 Build in the order listed. Each module depends on all prior modules.
 

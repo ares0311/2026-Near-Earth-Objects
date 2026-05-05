@@ -1,9 +1,5 @@
 """Tests for detect.py."""
 
-import sys
-
-sys.path.insert(0, "src")
-
 import pytest
 
 from detect import (

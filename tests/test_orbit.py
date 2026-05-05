@@ -1,9 +1,5 @@
 """Tests for orbit.py."""
 
-import sys
-
-sys.path.insert(0, "src")
-
 import math
 
 import numpy as np

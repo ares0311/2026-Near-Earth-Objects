@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import base64
 import math
-from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -13,9 +12,6 @@ from schemas import (
     PreprocessProvenance,
     PreprocessResult,
 )
-
-if TYPE_CHECKING:
-    pass
 
 _CUTOUT_SIZE = 63  # pixels; ZTF standard
 

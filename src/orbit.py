@@ -273,7 +273,7 @@ def _differential_correction(
     residuals: list[float] = []
     for jd, _ra, _dec in observations:
         # Predict position from elements (placeholder: use mean motion)
-        n = math.sqrt(_GM_SUN / (2 * math.pi) ** 2 * 365.25**2 / elements.semi_major_axis_au**3)
+        n = math.sqrt(_GM_SUN / 365.25**2 / elements.semi_major_axis_au**3)
         dt = (jd - elements.epoch_jd) / 365.25
         # M_pred computed but not used — full ephemeris propagation goes here
         (elements.mean_anomaly_deg + math.degrees(n) * dt) % 360.0

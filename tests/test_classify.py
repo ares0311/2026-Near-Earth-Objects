@@ -1,9 +1,5 @@
 """Tests for classify.py."""
 
-import sys
-
-sys.path.insert(0, "src")
-
 import pytest
 
 from classify import (

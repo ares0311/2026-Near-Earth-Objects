@@ -1,9 +1,5 @@
 """Tests for alert.py — MPC formatting and alert protocol guardrails."""
 
-import sys
-
-sys.path.insert(0, "src")
-
 from alert import (
     _format_dec,
     _format_ra,
@@ -178,6 +174,29 @@ class TestAlertProtocol:
         neo = make_scored_neo(rb=0.95, orbit_quality=2, moid_au=0.03)
         result = process_alert(neo, dry_run=True)
         assert any("MPC" in a for a in result["actions"])
+
+    def test_dry_run_writes_report_file(self, tmp_path, monkeypatch):
+        import alert as alert_mod
+        monkeypatch.setattr(alert_mod, "_LOG_DIR", tmp_path)
+        neo = make_scored_neo(rb=0.95, orbit_quality=2, moid_au=0.03)
+        process_alert(neo, dry_run=True)
+        report_files = list(tmp_path.glob("mpc_report_*.txt"))
+        assert len(report_files) == 1
+        content = report_files[0].read_text()
+        assert "COD" in content
+        assert len(content.splitlines()) >= 6  # header + observations
+
+    def test_dry_run_writes_alert_log(self, tmp_path, monkeypatch):
+        import alert as alert_mod
+        monkeypatch.setattr(alert_mod, "_LOG_DIR", tmp_path)
+        neo = make_scored_neo(rb=0.95, orbit_quality=2, moid_au=0.03)
+        process_alert(neo, dry_run=True)
+        log_files = list(tmp_path.glob("alert_*.json"))
+        assert len(log_files) >= 1
+        import json
+        entry = json.loads(log_files[0].read_text())
+        assert entry["object_id"] == "T001"
+        assert "moid_au" in entry
 
     def test_no_impact_probability_assertion(self):
         neo = make_scored_neo()

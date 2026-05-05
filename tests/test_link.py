@@ -1,9 +1,5 @@
 """Tests for link.py."""
 
-import sys
-
-sys.path.insert(0, "src")
-
 import pytest
 
 from link import (
