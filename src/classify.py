@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+__all__ = ["extract_features", "classify"]
+
 import base64
 import math
 from pathlib import Path

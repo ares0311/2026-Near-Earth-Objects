@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+__all__ = ["link"]
+
 import math
 import uuid
 from collections import defaultdict

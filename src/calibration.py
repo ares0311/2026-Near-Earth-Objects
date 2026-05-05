@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+__all__ = [
+    "IsotonicCalibrator", "PlattCalibrator",
+    "brier_score", "reliability_diagram_data", "expected_calibration_error", "calibrate",
+]
+
 import math
 from pathlib import Path
 
