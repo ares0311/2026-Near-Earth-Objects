@@ -1,17 +1,19 @@
 """Tests for detect.py."""
 
 import sys
+
 sys.path.insert(0, "src")
 
 import pytest
-from schemas import Observation
+
 from detect import (
     _angular_sep_arcsec,
+    _group_by_night,
     _motion_rate_and_pa,
     _passes_real_bogus,
-    _group_by_night,
     detect,
 )
+from schemas import Observation
 
 
 def make_obs(**kwargs) -> Observation:

@@ -28,8 +28,9 @@ def _decode_cutout(b64: str) -> np.ndarray:
     """Decode a base64 FITS/PNG cutout to a float32 numpy array."""
     raw = base64.b64decode(b64)
     try:
-        from astropy.io.fits import open as fits_open  # type: ignore[import]
         import io
+
+        from astropy.io.fits import open as fits_open  # type: ignore[import]
 
         with fits_open(io.BytesIO(raw)) as hdul:
             data = hdul[0].data.astype(np.float32)  # type: ignore[union-attr]
@@ -133,9 +134,9 @@ def _query_gaia_sources(
 ) -> list[dict]:
     """Fetch Gaia DR3 reference stars near a position."""
     try:
-        from astroquery.gaia import Gaia  # type: ignore[import]
         import astropy.units as u
         from astropy.coordinates import SkyCoord
+        from astroquery.gaia import Gaia  # type: ignore[import]
 
         coord = SkyCoord(ra=ra_deg, dec=dec_deg, unit="deg")
         Gaia.ROW_LIMIT = 50

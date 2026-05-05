@@ -1,6 +1,7 @@
 """Tests for calibration.py — Platt and isotonic PAVA."""
 
 import sys
+
 sys.path.insert(0, "src")
 
 import numpy as np

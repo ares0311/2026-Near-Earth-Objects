@@ -1,21 +1,21 @@
 """Tests for classify.py."""
 
 import sys
+
 sys.path.insert(0, "src")
 
 import pytest
-from schemas import Observation, Tracklet, CandidateFeatures
+
 from classify import (
-    extract_features,
-    _mean_real_bogus,
-    _color_index,
     _arc_coverage,
-    _nights_score,
-    _motion_consistency,
     _brightness_score,
+    _mean_real_bogus,
+    _nights_score,
     _tier1_predict,
     classify,
+    extract_features,
 )
+from schemas import CandidateFeatures, Observation, Tracklet
 
 
 def make_obs(**kwargs) -> Observation:

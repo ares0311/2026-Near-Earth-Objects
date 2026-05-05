@@ -1,31 +1,25 @@
 """Tests for schemas.py — data model construction and immutability."""
 
+import sys
+
 import pytest
 from pydantic import ValidationError
 
-import sys
 sys.path.insert(0, "src")
 
 from schemas import (
     CandidateFeatures,
+    DetectProvenance,
+    DetectResult,
     FetchProvenance,
     FetchResult,
-    HazardAssessment,
-    KnownMatch,
+    LinkProvenance,
     LinkResult,
     NEOPosterior,
     Observation,
     OrbitalElements,
     RawCandidate,
-    ScoredNEO,
-    ScoringMetadata,
     Tracklet,
-    CandidateExplanation,
-    DetectResult,
-    DetectProvenance,
-    LinkProvenance,
-    PreprocessProvenance,
-    PreprocessResult,
 )
 
 

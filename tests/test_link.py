@@ -1,17 +1,19 @@
 """Tests for link.py."""
 
 import sys
+
 sys.path.insert(0, "src")
 
 import pytest
-from schemas import Observation, RawCandidate
+
 from link import (
-    _sep_arcsec,
-    _motion,
     _fit_linear_motion,
     _make_tracklet,
+    _motion,
+    _sep_arcsec,
     link,
 )
+from schemas import Observation, RawCandidate
 
 
 def make_obs(**kwargs) -> Observation:
@@ -125,7 +127,11 @@ class TestLinkPipeline:
             jd_base = 2460000.5 + night
             obs_pair = (
                 make_obs(obs_id=f"n{night}_a", jd=jd_base, ra_deg=180.0 + night * dra_hr * 24),
-                make_obs(obs_id=f"n{night}_b", jd=jd_base + 1 / 24, ra_deg=180.0 + night * dra_hr * 24 + dra_hr),
+                make_obs(
+                    obs_id=f"n{night}_b",
+                    jd=jd_base + 1 / 24,
+                    ra_deg=180.0 + night * dra_hr * 24 + dra_hr,
+                ),
             )
             candidates.append(make_candidate(obs_pair, rate=1.0))
 

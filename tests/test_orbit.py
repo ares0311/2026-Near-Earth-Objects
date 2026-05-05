@@ -1,16 +1,18 @@
 """Tests for orbit.py."""
 
 import sys
+
 sys.path.insert(0, "src")
 
 import math
-import pytest
+
 import numpy as np
+import pytest
 
 from orbit import (
     _equatorial_to_ecliptic,
-    _sun_position_ecliptic,
     _state_to_elements,
+    _sun_position_ecliptic,
     classify_neo,
     compute_moid,
     fit_orbit,

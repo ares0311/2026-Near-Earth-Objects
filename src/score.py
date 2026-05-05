@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import math
 import uuid
-from datetime import datetime, timezone
 
+from orbit import classify_neo, compute_moid
 from schemas import (
     AlertPathway,
     CandidateExplanation,
@@ -19,7 +19,6 @@ from schemas import (
     ScoringMetadata,
     Tracklet,
 )
-from orbit import classify_neo, compute_moid
 
 _SCORER_VERSION = "0.1.0"
 
@@ -158,10 +157,12 @@ def _build_explanation(
         supporting.append(f"Multi-night arc (nights score: {features.nights_observed_score:.2f})")
 
     if features.motion_consistency_score is not None and features.motion_consistency_score > 0.7:
-        supporting.append(f"Consistent linear motion (score: {features.motion_consistency_score:.2f})")
+        mc = features.motion_consistency_score
+        supporting.append(f"Consistent linear motion (score: {mc:.2f})")
 
     if features.orbit_quality_score is not None and features.orbit_quality_score > 0.5:
-        supporting.append(f"Reliable orbital solution (quality: {features.orbit_quality_score:.2f})")
+        oq = features.orbit_quality_score
+        supporting.append(f"Reliable orbital solution (quality: {oq:.2f})")
 
     if moid_au is not None and moid_au <= _PHA_MOID_AU:
         supporting.append(f"MOID ≤ 0.05 AU: {moid_au:.4f} AU")
@@ -280,7 +281,11 @@ def score(
     # Update feature scores from orbit
     moid_score: float | None = None
     if moid_au is not None:
-        moid_score = float(max(0.0, 1.0 - moid_au / _PHA_MOID_AU)) if moid_au <= _PHA_MOID_AU else 0.0
+        moid_score = (
+            float(max(0.0, 1.0 - moid_au / _PHA_MOID_AU))
+            if moid_au <= _PHA_MOID_AU
+            else 0.0
+        )
 
     orbit_quality_score: float | None = None
     if orbital:

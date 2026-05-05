@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import math
 from pathlib import Path
-from typing import Sequence
 
 import numpy as np
 
@@ -73,7 +72,7 @@ class IsotonicCalibrator:
         self._y_iso: np.ndarray | None = None
         self._fitted = False
 
-    def fit(self, scores: np.ndarray, labels: np.ndarray) -> "IsotonicCalibrator":
+    def fit(self, scores: np.ndarray, labels: np.ndarray) -> IsotonicCalibrator:
         """Fit isotonic calibration.
 
         Args:
@@ -105,7 +104,7 @@ class IsotonicCalibrator:
             y=self._y_iso,
         )
 
-    def load(self, name: str) -> "IsotonicCalibrator":
+    def load(self, name: str) -> IsotonicCalibrator:
         path = _CALIBRATION_DIR / f"{name}_isotonic.npz"
         data = np.load(path)
         self._x_train = data["x"]
@@ -129,7 +128,7 @@ class PlattCalibrator:
         self._tol = tol
         self._fitted = False
 
-    def fit(self, scores: np.ndarray, labels: np.ndarray) -> "PlattCalibrator":
+    def fit(self, scores: np.ndarray, labels: np.ndarray) -> PlattCalibrator:
         """Fit Platt scaling via maximum likelihood (Newton–Raphson).
 
         Uses the modified targets from Platt (1999):
@@ -147,11 +146,11 @@ class PlattCalibrator:
 
         for _ in range(self._max_iter):
             fApB = f * A + B
-            fval = np.where(
+            np.where(
                 fApB >= 0,
                 t * fApB + np.log1p(np.exp(-fApB)),
                 (t - 1) * fApB + np.log1p(np.exp(fApB)),
-            ).sum()
+            ).sum()  # log-likelihood (not stored; drives convergence check)
 
             # Numerically stable sigmoid via scipy
             from scipy.special import expit  # type: ignore[import]
@@ -194,7 +193,7 @@ class PlattCalibrator:
         _CALIBRATION_DIR.mkdir(parents=True, exist_ok=True)
         np.savez(_CALIBRATION_DIR / f"{name}_platt.npz", A=np.array(self._A), B=np.array(self._B))
 
-    def load(self, name: str) -> "PlattCalibrator":
+    def load(self, name: str) -> PlattCalibrator:
         path = _CALIBRATION_DIR / f"{name}_platt.npz"
         data = np.load(path)
         self._A = float(data["A"])

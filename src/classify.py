@@ -164,7 +164,10 @@ def _tier1_predict(
         x = _features_to_array(features).reshape(1, -1)
         proba = model.predict_proba(x)[0]
         # Assume classes: [neo_candidate, known_object, main_belt, artifact, other]
-        labels = ["neo_candidate", "known_object", "main_belt_asteroid", "stellar_artifact", "other_solar_system"]
+        labels = [
+            "neo_candidate", "known_object", "main_belt_asteroid",
+            "stellar_artifact", "other_solar_system",
+        ]
         return {k: float(v) for k, v in zip(labels, proba)}
 
     # Heuristic fallback when no model is trained yet
@@ -245,7 +248,9 @@ def _build_cnn_model() -> Any:
                 )
 
             def forward(self, sci: Any, ref: Any, diff: Any) -> Any:
-                f = torch.cat([self.branch_sci(sci), self.branch_ref(ref), self.branch_diff(diff)], dim=1)
+                f = torch.cat(
+                    [self.branch_sci(sci), self.branch_ref(ref), self.branch_diff(diff)], dim=1
+                )
                 return self.head(f)
 
         return TripleCNN()
@@ -304,7 +309,10 @@ def _tier2_predict(
             proba = model(to_tensor(triplet[0]), to_tensor(triplet[1]), to_tensor(triplet[2]))
             proba_np = proba.squeeze().numpy()
 
-        labels = ["neo_candidate", "known_object", "main_belt_asteroid", "stellar_artifact", "other_solar_system"]
+        labels = [
+            "neo_candidate", "known_object", "main_belt_asteroid",
+            "stellar_artifact", "other_solar_system",
+        ]
         return {k: float(v) for k, v in zip(labels, proba_np)}
     except Exception:
         return None
@@ -318,9 +326,10 @@ def _tier2_predict(
 def _build_transformer_model() -> Any:
     """Build BERT-style encoder for tracklet sequence classification."""
     try:
+        import math as _math
+
         import torch
         import torch.nn as nn
-        import math as _math
 
         class PositionalEncoding(nn.Module):
             def __init__(self, d_model: int, max_len: int = 512) -> None:
@@ -427,7 +436,10 @@ def _tier3_predict(
         with torch.no_grad():
             proba = model(x).squeeze().numpy()
 
-        labels = ["neo_candidate", "known_object", "main_belt_asteroid", "stellar_artifact", "other_solar_system"]
+        labels = [
+            "neo_candidate", "known_object", "main_belt_asteroid",
+            "stellar_artifact", "other_solar_system",
+        ]
         return {k: float(v) for k, v in zip(labels, proba)}
     except Exception:
         return None
@@ -444,7 +456,10 @@ def _stack_predictions(
     t3: dict[str, OptScore] | None,
 ) -> dict[str, float]:
     """Simple weighted average ensemble; weights reflect tier reliability."""
-    labels = ["neo_candidate", "known_object", "main_belt_asteroid", "stellar_artifact", "other_solar_system"]
+    labels = [
+        "neo_candidate", "known_object", "main_belt_asteroid",
+        "stellar_artifact", "other_solar_system",
+    ]
     weights: list[float] = []
     preds: list[dict[str, OptScore]] = []
 

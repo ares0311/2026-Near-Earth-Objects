@@ -4,10 +4,8 @@ from __future__ import annotations
 
 import json
 import logging
-import textwrap
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Sequence
 
 from schemas import (
     AlertPathway,
@@ -117,10 +115,15 @@ def format_mpc_observation(
 def format_mpc_report(neo: ScoredNEO, obs_code: str = _MPC_OBS_CODE) -> str:
     """Generate a full MPC observation report for submission."""
     designation = neo.tracklet.object_id[:12]
-    lines: list[str] = ["COD " + obs_code, "OBS Claude-NEO-Pipeline", "MEA Claude-NEO-Pipeline", "TEL 0.0-m + CCD", "ACK MPCReport", ""]
+    lines: list[str] = [
+        "COD " + obs_code, "OBS Claude-NEO-Pipeline", "MEA Claude-NEO-Pipeline",
+        "TEL 0.0-m + CCD", "ACK MPCReport", "",
+    ]
 
     for i, obs in enumerate(sorted(neo.tracklet.observations, key=lambda o: o.jd)):
-        lines.append(format_mpc_observation(obs, designation, is_discovery=(i == 0), obs_code=obs_code))
+        lines.append(
+            format_mpc_observation(obs, designation, is_discovery=(i == 0), obs_code=obs_code)
+        )
 
     return "\n".join(lines)
 
@@ -137,7 +140,7 @@ def _log_alert(
 ) -> None:
     """Write an immutable alert log entry with full provenance."""
     _LOG_DIR.mkdir(parents=True, exist_ok=True)
-    ts = datetime.now(timezone.utc).isoformat()
+    ts = datetime.now(UTC).isoformat()
     entry = {
         "timestamp_utc": ts,
         "object_id": neo.tracklet.object_id,
@@ -148,7 +151,11 @@ def _log_alert(
         "neo_candidate_probability": neo.posterior.neo_candidate,
         "hazard_flag": neo.hazard.hazard_flag,
         "moid_au": neo.hazard.moid_au,
-        "orbit_quality": int(neo.hazard.orbital_elements.quality_code) if neo.hazard.orbital_elements else None,
+        "orbit_quality": (
+            int(neo.hazard.orbital_elements.quality_code)
+            if neo.hazard.orbital_elements
+            else None
+        ),
         "n_observations": len(neo.tracklet.observations),
         "arc_days": neo.tracklet.arc_days,
     }
@@ -221,7 +228,11 @@ def _generate_pdco_alert_package(neo: ScoredNEO) -> dict:
         "estimated_diameter_m": neo.hazard.estimated_diameter_m,
         "neo_class": neo.hazard.neo_class,
         "neo_candidate_probability": neo.posterior.neo_candidate,
-        "orbit_quality_code": int(neo.hazard.orbital_elements.quality_code) if neo.hazard.orbital_elements else None,
+        "orbit_quality_code": (
+            int(neo.hazard.orbital_elements.quality_code)
+            if neo.hazard.orbital_elements
+            else None
+        ),
         "arc_days": neo.tracklet.arc_days,
         "n_observations": len(neo.tracklet.observations),
         "scorer_version": neo.metadata.scorer_version,
@@ -327,8 +338,10 @@ def summarise(neo: ScoredNEO) -> str:
         f"Hazard flag       : {h.hazard_flag}",
         f"NEO class         : {h.neo_class}",
         f"MOID              : {h.moid_au:.4f} AU" if h.moid_au else "MOID              : unknown",
-        f"Abs. magnitude H  : {h.absolute_magnitude_h:.1f}" if h.absolute_magnitude_h else "H                 : unknown",
-        f"Est. diameter     : {h.estimated_diameter_m:.0f} m" if h.estimated_diameter_m else "Diameter          : unknown",
+        (f"Abs. magnitude H  : {h.absolute_magnitude_h:.1f}" if h.absolute_magnitude_h
+         else "H                 : unknown"),
+        (f"Est. diameter     : {h.estimated_diameter_m:.0f} m" if h.estimated_diameter_m
+         else "Diameter          : unknown"),
         f"Alert pathway     : {h.alert_pathway}",
         f"Discovery priority: {m.discovery_priority:.2f}",
         f"Followup value    : {m.followup_value:.2f}",

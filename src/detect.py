@@ -121,14 +121,13 @@ def _load_mpc_ephemerides(
 ) -> list[dict]:
     """Query MPC for known object ephemerides at a given epoch near a sky position."""
     try:
-        from astroquery.mpc import MPC  # type: ignore[import]
-        import astropy.units as u
         from astropy.coordinates import SkyCoord
         from astropy.time import Time
+        from astroquery.mpc import MPC  # type: ignore[import]
 
-        coord = SkyCoord(ra=ra_deg, dec=dec_deg, unit="deg")
+        SkyCoord(ra=ra_deg, dec=dec_deg, unit="deg")  # field centre (unused in placeholder)
         epoch = Time(jd, format="jd")
-        result = MPC.get_ephemeris(
+        MPC.get_ephemeris(
             target="Ceres",  # placeholder — real impl queries the region
             location="500",
             start=epoch,

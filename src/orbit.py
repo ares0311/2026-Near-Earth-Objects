@@ -271,13 +271,13 @@ def _differential_correction(
 
     # Compute fit residuals (placeholder; full implementation requires ephemeris integration)
     residuals: list[float] = []
-    for jd, ra, dec in observations:
+    for jd, _ra, _dec in observations:
         # Predict position from elements (placeholder: use mean motion)
         n = math.sqrt(_GM_SUN / (2 * math.pi) ** 2 * 365.25**2 / elements.semi_major_axis_au**3)
         dt = (jd - elements.epoch_jd) / 365.25
-        M_pred = (elements.mean_anomaly_deg + math.degrees(n) * dt) % 360.0
-        # Residual estimate: use 0.5 arcsec as placeholder
-        residuals.append(0.5)
+        # M_pred computed but not used — full ephemeris propagation goes here
+        (elements.mean_anomaly_deg + math.degrees(n) * dt) % 360.0
+        residuals.append(0.5)  # placeholder residual (arcsec)
 
     mean_resid = float(np.mean(residuals)) if residuals else 0.5
 
@@ -304,7 +304,6 @@ def _differential_correction(
 def classify_neo(elements: OrbitalElements) -> NEOClass:
     """Classify a solar system body into NEO dynamical class."""
     a = elements.semi_major_axis_au
-    e = elements.eccentricity
     q = elements.perihelion_au
     Q = elements.aphelion_au
 
@@ -377,7 +376,10 @@ def compute_moid(elements: OrbitalElements) -> float | None:
 
 def fit_orbit(tracklet: Tracklet) -> OrbitalElements | None:
     """Fit a preliminary orbit to a tracklet using Gauss's method."""
-    obs_tuples = [(o.jd, o.ra_deg, o.dec_deg) for o in sorted(tracklet.observations, key=lambda o: o.jd)]
+    obs_tuples = [
+        (o.jd, o.ra_deg, o.dec_deg)
+        for o in sorted(tracklet.observations, key=lambda o: o.jd)
+    ]
 
     if len(obs_tuples) < 3:
         return None

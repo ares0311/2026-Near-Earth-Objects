@@ -262,9 +262,9 @@ def fetch_mpc_known(
     if cached is not None:
         return [Observation(**row) for row in cached]
 
-    from astroquery.mpc import MPC  # type: ignore[import]
     import astropy.units as u
     from astropy.coordinates import SkyCoord
+    from astroquery.mpc import MPC  # type: ignore[import]
 
     center = SkyCoord(ra=ra_deg, dec=dec_deg, unit="deg")
     result = MPC.query_objects_in_region(center, radius_deg * u.deg)
@@ -312,12 +312,15 @@ def fetch_horizons(
     if cached is not None:
         return [Observation(**row) for row in cached]
 
-    from astroquery.jplhorizons import Horizons  # type: ignore[import]
     from astropy.time import Time
+    from astroquery.jplhorizons import Horizons  # type: ignore[import]
 
     start_iso = Time(start_jd, format="jd").iso
     end_iso = Time(end_jd, format="jd").iso
-    obj = Horizons(id=target, location="500@399", epochs={"start": start_iso, "stop": end_iso, "step": step})
+    obj = Horizons(
+        id=target, location="500@399",
+        epochs={"start": start_iso, "stop": end_iso, "step": step},
+    )
     eph = obj.ephemerides()
 
     obs: list[Observation] = []

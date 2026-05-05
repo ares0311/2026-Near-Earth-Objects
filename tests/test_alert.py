@@ -1,9 +1,18 @@
 """Tests for alert.py — MPC formatting and alert protocol guardrails."""
 
 import sys
+
 sys.path.insert(0, "src")
 
-import pytest
+from alert import (
+    _format_dec,
+    _format_ra,
+    _jd_to_mpc_date,
+    format_mpc_observation,
+    format_mpc_report,
+    process_alert,
+    summarise,
+)
 from schemas import (
     CandidateExplanation,
     CandidateFeatures,
@@ -14,15 +23,6 @@ from schemas import (
     ScoredNEO,
     ScoringMetadata,
     Tracklet,
-)
-from alert import (
-    _jd_to_mpc_date,
-    _format_ra,
-    _format_dec,
-    format_mpc_observation,
-    format_mpc_report,
-    process_alert,
-    summarise,
 )
 
 
@@ -188,4 +188,8 @@ class TestAlertProtocol:
     def test_summarise_contains_pathway(self):
         neo = make_scored_neo()
         summary = summarise(neo)
-        assert "mpc_submission" in summary or "alert_pathway" in summary.lower() or "Alert pathway" in summary
+        assert (
+            "mpc_submission" in summary
+            or "alert_pathway" in summary.lower()
+            or "Alert pathway" in summary
+        )

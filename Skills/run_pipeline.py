@@ -17,14 +17,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from fetch import fetch
-from preprocess import preprocess
-from detect import detect
-from link import link
-from classify import classify, extract_features
-from orbit import fit_orbit
-from score import score
 from alert import process_alert, summarise
+from classify import classify
+from detect import detect
+from fetch import fetch
+from link import link
+from orbit import fit_orbit
+from preprocess import preprocess
+from score import score
 
 
 def run_pipeline(
@@ -49,11 +49,15 @@ def run_pipeline(
 
     print("[preprocess] Validating and normalising sources")
     prep_result = preprocess(fetch_result.alerts, apply_astrometry=False)
-    print(f"[preprocess] {prep_result.provenance.n_sources_out}/{prep_result.provenance.n_sources_in} sources passed")
+    n_out = prep_result.provenance.n_sources_out
+    n_in = prep_result.provenance.n_sources_in
+    print(f"[preprocess] {n_out}/{n_in} sources passed")
 
     print("[detect] Identifying moving object candidates")
     det_result = detect(prep_result.sources)
-    print(f"[detect] {det_result.provenance.n_candidates} candidates, {det_result.provenance.n_known_matches} known matches")
+    n_cands = det_result.provenance.n_candidates
+    n_known = det_result.provenance.n_known_matches
+    print(f"[detect] {n_cands} candidates, {n_known} known matches")
 
     print("[link] Linking candidates across nights")
     link_result = link(det_result.candidates)
