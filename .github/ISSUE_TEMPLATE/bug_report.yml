@@ -1,0 +1,86 @@
+name: Bug Report
+description: Report a bug or incorrect pipeline behaviour
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please fill in as much detail as possible.
+        **Do not report potential NEO impact probabilities here — defer all hazard assessment to MPC/CNEOS.**
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear and concise description of the bug.
+      placeholder: "When I call detect() with ..., the output is ..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Minimal code or commands to reproduce the issue.
+      render: python
+      placeholder: |
+        from detect import detect
+        from schemas import Observation
+        obs = Observation(...)
+        result = detect((obs,))
+        # Expected: ...
+        # Got: ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behaviour
+      description: What should happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behaviour
+      description: What actually happens? Include full traceback if applicable.
+    validations:
+      required: true
+
+  - type: input
+    id: python_version
+    attributes:
+      label: Python Version
+      placeholder: "3.11.5"
+    validations:
+      required: true
+
+  - type: input
+    id: package_version
+    attributes:
+      label: Pipeline Version
+      placeholder: "0.3.0"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: module
+    attributes:
+      label: Affected Module
+      options:
+        - schemas
+        - fetch
+        - preprocess
+        - detect
+        - link
+        - classify
+        - orbit
+        - score
+        - alert
+        - calibration
+        - multiple
+        - unknown
+    validations:
+      required: false

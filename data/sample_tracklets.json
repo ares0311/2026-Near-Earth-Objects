@@ -1,0 +1,86 @@
+[
+  {
+    "object_id": "SAMPLE_001",
+    "observations": [
+      {
+        "obs_id": "s001_a",
+        "ra_deg": 180.000,
+        "dec_deg": 10.000,
+        "jd": 2460000.5,
+        "mag": 19.5,
+        "mag_err": 0.05,
+        "filter_band": "r",
+        "mission": "ZTF",
+        "real_bogus": 0.93
+      },
+      {
+        "obs_id": "s001_b",
+        "ra_deg": 180.010,
+        "dec_deg": 10.001,
+        "jd": 2460001.5,
+        "mag": 19.4,
+        "mag_err": 0.05,
+        "filter_band": "r",
+        "mission": "ZTF",
+        "real_bogus": 0.91
+      },
+      {
+        "obs_id": "s001_c",
+        "ra_deg": 180.020,
+        "dec_deg": 10.002,
+        "jd": 2460002.5,
+        "mag": 19.6,
+        "mag_err": 0.06,
+        "filter_band": "r",
+        "mission": "ZTF",
+        "real_bogus": 0.88
+      }
+    ],
+    "arc_days": 2.0,
+    "motion_rate_arcsec_per_hour": 0.417,
+    "motion_pa_degrees": 89.8,
+    "neo_class_hint": "apollo"
+  },
+  {
+    "object_id": "SAMPLE_002",
+    "observations": [
+      {
+        "obs_id": "s002_a",
+        "ra_deg": 270.000,
+        "dec_deg": -5.000,
+        "jd": 2460010.5,
+        "mag": 20.1,
+        "mag_err": 0.08,
+        "filter_band": "g",
+        "mission": "ZTF",
+        "real_bogus": 0.87
+      },
+      {
+        "obs_id": "s002_b",
+        "ra_deg": 270.015,
+        "dec_deg": -5.002,
+        "jd": 2460011.5,
+        "mag": 20.0,
+        "mag_err": 0.07,
+        "filter_band": "r",
+        "mission": "ZTF",
+        "real_bogus": 0.85
+      },
+      {
+        "obs_id": "s002_c",
+        "ra_deg": 270.030,
+        "dec_deg": -5.004,
+        "jd": 2460012.5,
+        "mag": 20.2,
+        "mag_err": 0.09,
+        "filter_band": "r",
+        "mission": "ATLAS",
+        "real_bogus": 0.82
+      }
+    ],
+    "arc_days": 2.0,
+    "motion_rate_arcsec_per_hour": 0.625,
+    "motion_pa_degrees": 90.5,
+    "neo_class_hint": "amor"
+  }
+]
