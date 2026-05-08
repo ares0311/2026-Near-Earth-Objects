@@ -9,6 +9,7 @@ from schemas import (
     Tracklet,
 )
 from score import (
+    _build_explanation,
     _compute_hazard_flag,
     _compute_log_score_neo,
     _determine_alert_pathway,
@@ -214,6 +215,80 @@ class TestScoreFunction:
             inclination_deg=5.0,
         )
         result = score(t, f, p, orbital)
-        # moid_score should be set if MOID was computed
         if result.features.moid_score is not None:
             assert 0.0 <= result.features.moid_score <= 1.0
+
+    def test_pha_flag_confidence_set_when_pha_candidate(self):
+        # Orbit with MOID ≤ 0.05 AU (a=1.0, e=0.05 gives MOID≈0.033)
+        t = make_tracklet()
+        f = make_features(real_bogus_score=0.95)
+        p = make_posterior(neo_candidate=0.8)
+        orbital = make_orbital(
+            semi_major_axis_au=1.0, eccentricity=0.05,
+            perihelion_au=0.95, aphelion_au=1.05,
+            inclination_deg=1.0, quality_code=3,
+            longitude_ascending_node_deg=0.0,
+            argument_perihelion_deg=0.0,
+        )
+        result = score(t, f, p, orbital)
+        if result.hazard.hazard_flag == "pha_candidate":
+            assert result.features.pha_flag_confidence is not None
+
+
+class TestAlertPathwayLowNeoCandidateProb:
+    def test_low_neo_prob_returns_internal(self):
+        f = make_features(real_bogus_score=0.95)
+        p = make_posterior(neo_candidate=0.4)  # < 0.5
+        pathway = _determine_alert_pathway(p, f, 0.03, 2)
+        assert pathway == "internal_candidate"
+
+
+class TestBuildExplanation:
+    def test_low_rb_adds_contra(self):
+        f = make_features(real_bogus_score=0.5)
+        p = make_posterior(stellar_artifact=0.0, main_belt_asteroid=0.0)
+        ex = _build_explanation(f, p, "nominal", None)
+        assert any("real/bogus" in e.lower() for e in ex.contra_evidence)
+
+    def test_nights_score_adds_supporting(self):
+        f = make_features(real_bogus_score=None, nights_observed_score=0.5)
+        p = make_posterior(stellar_artifact=0.0, main_belt_asteroid=0.0)
+        ex = _build_explanation(f, p, "nominal", None)
+        assert any("night" in e.lower() or "arc" in e.lower() for e in ex.supporting_evidence)
+
+    def test_motion_consistency_adds_supporting(self):
+        f = make_features(motion_consistency_score=0.8)
+        p = make_posterior(stellar_artifact=0.0, main_belt_asteroid=0.0)
+        ex = _build_explanation(f, p, "nominal", None)
+        assert any("motion" in e.lower() for e in ex.supporting_evidence)
+
+    def test_orbit_quality_adds_supporting(self):
+        f = make_features(orbit_quality_score=0.7)
+        p = make_posterior(stellar_artifact=0.0, main_belt_asteroid=0.0)
+        ex = _build_explanation(f, p, "nominal", None)
+        assert any("orbit" in e.lower() or "quality" in e.lower() for e in ex.supporting_evidence)
+
+    def test_low_moid_adds_supporting(self):
+        f = make_features()
+        p = make_posterior(stellar_artifact=0.0, main_belt_asteroid=0.0)
+        ex = _build_explanation(f, p, "pha_candidate", 0.03)
+        assert any("MOID" in e for e in ex.supporting_evidence)
+
+    def test_high_artifact_prob_adds_contra(self):
+        f = make_features(real_bogus_score=None)
+        p = make_posterior(stellar_artifact=0.4, main_belt_asteroid=0.0)
+        ex = _build_explanation(f, p, "nominal", None)
+        assert any("artifact" in e.lower() for e in ex.contra_evidence)
+
+    def test_high_mba_prob_adds_contra(self):
+        f = make_features(real_bogus_score=None)
+        p = make_posterior(stellar_artifact=0.0, main_belt_asteroid=0.5)
+        ex = _build_explanation(f, p, "nominal", None)
+        assert any("main-belt" in e.lower() or "main_belt" in e.lower() or "belt" in e.lower()
+                   for e in ex.contra_evidence)
+
+    def test_known_object_adds_contra(self):
+        f = make_features(real_bogus_score=None, known_object_score=0.7)
+        p = make_posterior(stellar_artifact=0.0, main_belt_asteroid=0.0)
+        ex = _build_explanation(f, p, "nominal", None)
+        assert any("known" in e.lower() for e in ex.contra_evidence)

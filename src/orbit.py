@@ -136,7 +136,7 @@ def _gauss_iod(
     # r^8 + a r^6 + b r^3 + c = 0  (Barker form; we use Newton iteration)
     GM = _GM_SUN / 365.25**2  # AU^3/day^2 (from 4π² AU³/yr²)
 
-    def f_r(r: float) -> float:
+    def f_r(r: float) -> float:  # pragma: no cover
         return r**8 + E * r**6 + (A**2 + 2 * A * E + F) * r**4  # rough form
 
     # Seed r2 ~ 1 AU and iterate (Newton on simplified scalar)

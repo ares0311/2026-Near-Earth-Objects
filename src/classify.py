@@ -256,7 +256,7 @@ def _build_cnn_model() -> Any:
                 return self.head(f)
 
         return TripleCNN()
-    except ImportError:
+    except ImportError:  # pragma: no cover
         return None
 
 
@@ -346,7 +346,7 @@ def _build_transformer_model() -> Any:
                 self.register_buffer("pe", pe.unsqueeze(0))
 
             def forward(self, x: Any) -> Any:
-                return x + self.pe[:, : x.size(1)]
+                return x + self.pe[:, : x.size(1)]  # type: ignore[index]
 
         class TrackletTransformer(nn.Module):
             def __init__(
@@ -378,7 +378,7 @@ def _build_transformer_model() -> Any:
                 return self.head(x[:, 0])
 
         return TrackletTransformer()
-    except ImportError:
+    except ImportError:  # pragma: no cover
         return None
 
 

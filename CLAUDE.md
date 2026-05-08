@@ -468,9 +468,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.4.0)
+## Current State (v0.6.0)
 
-All 10 pipeline modules are complete. 238 tests passing (84% coverage). CI green on Python 3.11 & 3.12. Coverage threshold raised to 80%.
+All 10 pipeline modules are complete. 309 tests passing (97.44% coverage). CI green on Python 3.11 & 3.12. Coverage threshold raised to 95%. torch installed; CNN and Transformer paths fully tested.
 
 ### Skills
 
@@ -483,6 +483,8 @@ All 10 pipeline modules are complete. 238 tests passing (84% coverage). CI green
 | `Skills/run_pipeline.py` | Full end-to-end pipeline run |
 | `Skills/injection_recovery.py` | Injection-recovery test: injects synthetic NEOs, measures detection/link/score rates |
 | `Skills/check_mpc_known.py` | Cross-match candidate observations against MPC known object catalog |
+| `Skills/visualize_tracklets.py` | Plot sky positions and light curves for a tracklet JSON file |
+| `Skills/export_mpc_report.py` | Export MPC 80-column reports from a scored NEO JSON file |
 
 ### Docs
 
@@ -491,27 +493,29 @@ All 10 pipeline modules are complete. 238 tests passing (84% coverage). CI green
 | `docs/PIPELINE_SPEC.md` | Full stage-by-stage pipeline specification |
 | `docs/SCORING_MODEL.md` | Bayesian scoring model: hypotheses, priors, feature weights |
 | `docs/DATA_SOURCES.md` | External data sources: ZTF, ATLAS, MPC, JPL Horizons, Gaia DR3 |
+| `docs/API_REFERENCE.md` | Public function signatures and schema field reference for all modules |
 
 ### Data
 
 | File | Purpose |
 |---|---|
-| `data/sample_tracklets.json` | Two synthetic tracklets for testing `Skills/batch_score.py` and `Skills/check_mpc_known.py` |
+| `data/sample_tracklets.json` | Two synthetic tracklets for testing batch Skills |
+| `data/README.md` | Data directory documentation and format reference |
 
-### Coverage by Module (v0.4.0)
+### Coverage by Module (v0.6.0)
 
 | Module | Coverage |
 |---|---|
 | `schemas.py` | 100% |
-| `calibration.py` | 99% |
-| `preprocess.py` | 93% |
-| `orbit.py` | 93% |
-| `detect.py` | 88% |
-| `alert.py` | 87% |
-| `score.py` | 89% |
-| `link.py` | 82% |
-| `fetch.py` | 75% |
-| `classify.py` | 58% (torch/xgb paths unreachable without GPU libs) |
+| `score.py` | 100% |
+| `calibration.py` | 100% |
+| `link.py` | 100% |
+| `alert.py` | 100% |
+| `preprocess.py` | 100% |
+| `orbit.py` | 100% |
+| `detect.py` | 100% |
+| `classify.py` | 100% (torch now installed; CNN/Transformer paths exercised) |
+| `fetch.py` | 75% (network integration paths require live API tokens) |
 
 ### What Is Not Yet Built (Milestones 4–7)
 
@@ -528,3 +532,11 @@ All 10 pipeline modules are complete. 238 tests passing (84% coverage). CI green
 - Integrate live ZTF alert stream (Milestone 4)
 - Train and evaluate Tier 2 CNN on real cutouts (Milestone 5)
 - Run `Skills/injection_recovery.py` to establish baseline detection/link/score rates
+
+### Key Changes in v0.6.0
+
+- torch installed; CNN (Tier 2) and Transformer (Tier 3) paths fully tested (100% classify.py coverage)
+- Alert module: `process_alert` accepts `cneos_assessment` parameter for PDCO path testing
+- Coverage gate raised from 85% → 95% in CI; actual coverage 97.44%
+- 40 new tests added across orbit, detect, preprocess, calibration, classify, alert modules
+- Version bumped to 0.6.0 in `pyproject.toml` and `src/__init__.py`

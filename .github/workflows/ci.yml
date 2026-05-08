@@ -35,6 +35,7 @@ jobs:
           pip install ruff mypy
           pip install pydantic numpy scipy astropy requests pytest pytest-cov xgboost scikit-learn
           pip install types-requests
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
 
       - name: Lint (ruff)
         run: ruff check .
@@ -50,4 +51,4 @@ jobs:
             --disable-error-code=unused-ignore
 
       - name: Test
-        run: PYTHONPATH=src python -m pytest -m "not integration_live" -q --cov=src --cov-fail-under=80
+        run: PYTHONPATH=src python -m pytest -m "not integration_live" -q --cov=src --cov-fail-under=95
