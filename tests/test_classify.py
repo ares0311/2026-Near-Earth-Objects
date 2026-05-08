@@ -330,6 +330,7 @@ class TestLoadXgbModel:
 
     def test_returns_model_when_xgb_available(self, tmp_path, monkeypatch):
         from unittest.mock import MagicMock
+
         import classify as cls_mod
         monkeypatch.setattr(cls_mod, "_MODEL_DIR", tmp_path)
         (tmp_path / "tier1_xgb.json").write_text("{}")
