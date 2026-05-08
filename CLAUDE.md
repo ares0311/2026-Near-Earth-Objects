@@ -468,9 +468,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.7.0)
+## Current State (v0.8.0)
 
-All 10 pipeline modules are complete. 316 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold raised to 100%. fetch.py fully mocked (ztfquery, astroquery, JPL Horizons paths all covered).
+All 10 pipeline modules are complete. 324 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Logistic regression ensemble meta-learner added to classify.py. Injection-recovery baseline saved to `data/injection_recovery_baseline.json`.
 
 ### Skills
 
@@ -504,8 +504,9 @@ All 10 pipeline modules are complete. 316 tests passing (100% coverage). CI gree
 |---|---|
 | `data/sample_tracklets.json` | Two synthetic tracklets for testing batch Skills |
 | `data/README.md` | Data directory documentation and format reference |
+| `data/injection_recovery_baseline.json` | Baseline injection-recovery results (n=50, seed=42): 100% detection, 2% link, 2% score |
 
-### Coverage by Module (v0.7.0)
+### Coverage by Module (v0.8.0)
 
 | Module | Coverage |
 |---|---|
@@ -534,7 +535,15 @@ All 10 pipeline modules are complete. 316 tests passing (100% coverage). CI gree
 - Collect labeled training data via `Skills/generate_training_labels.py`
 - Integrate live ZTF alert stream (Milestone 4)
 - Train and evaluate Tier 2 CNN on real cutouts (Milestone 5)
-- Run `Skills/injection_recovery.py` to establish baseline detection/link/score rates
+- Improve link rate in injection-recovery (baseline: 2%; link.py tuning needed for synthetic tracklets)
+
+### Key Changes in v0.8.0
+
+- `classify.py`: added `_build_ensemble` (sklearn LogisticRegression meta-learner) + `ensemble_predict` public API
+- `Skills/injection_recovery.py`: added `--json PATH` flag to save results
+- Baseline injection-recovery run saved to `data/injection_recovery_baseline.json`
+- 8 new tests; 324 total; 100% coverage maintained
+- Version bumped to 0.8.0
 
 ### Key Changes in v0.7.0
 

@@ -132,9 +132,12 @@ def run_injection_recovery(n_inject: int = 20, seed: int = 0) -> dict:
 
 
 def main() -> None:
+    import json
+
     parser = argparse.ArgumentParser(description="NEO injection-recovery test")
     parser.add_argument("--n-inject", type=int, default=20, help="Number of NEOs to inject")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
+    parser.add_argument("--json", metavar="PATH", help="Save results as JSON to this path")
     args = parser.parse_args()
 
     print(f"Injection-recovery test: {args.n_inject} synthetic NEOs (seed={args.seed})")
@@ -154,6 +157,13 @@ def main() -> None:
 
     print("-" * 50)
     print("Done.")
+
+    if args.json:
+        out_path = Path(args.json)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        with out_path.open("w") as f:
+            json.dump(results, f, indent=2)
+        print(f"Results saved → {args.json}")
 
 
 if __name__ == "__main__":
