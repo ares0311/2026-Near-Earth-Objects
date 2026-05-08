@@ -31,13 +31,15 @@ Near-Earth Objects (NEOs) — small solar system bodies with perihelion distance
 7. [Alert Protocol & Guardrails](#7-alert-protocol--guardrails)
 8. [Data Sources](#8-data-sources)
 9. [Repository Layout](#9-repository-layout)
-10. [Installation](#10-installation)
-11. [Quick Start](#11-quick-start)
-12. [Quality Control](#12-quality-control)
-13. [Current Status & Roadmap](#13-current-status--roadmap)
-14. [Important Disclaimer](#14-important-disclaimer)
-15. [License](#15-license)
-16. [Works Cited](#16-works-cited)
+10. [End-User Guide (Layperson)](#10-end-user-guide-layperson)
+11. [Recalibration Guide](#11-recalibration-guide)
+12. [Installation](#12-installation)
+13. [Quick Start](#13-quick-start)
+14. [Quality Control](#14-quality-control)
+15. [Current Status & Roadmap](#15-current-status--roadmap)
+16. [Important Disclaimer](#16-important-disclaimer)
+17. [License](#17-license)
+18. [Works Cited](#18-works-cited)
 
 ---
 
@@ -454,6 +456,67 @@ The following constraints are hard-coded into pipeline logic and may not be over
 
 ## 9. Repository Layout
 
+### 9.1 Data-Flow Schema
+
+The diagram below shows how data and artifacts move between the repository's top-level directories during a complete pipeline run. Arrows represent the direction of data flow; labels on arrows identify the artifact type being passed.
+
+```
+ ┌─────────────────────────────────────────────────────────────────────────┐
+ │                        REPOSITORY DATA FLOW                             │
+ └─────────────────────────────────────────────────────────────────────────┘
+
+  External APIs                   src/ (pipeline logic)
+  ┌──────────────────┐            ┌──────────────────────────────────────┐
+  │ ZTF IRSA         │──alerts──▶ │ fetch.py → preprocess.py → detect.py │
+  │ ATLAS REST API   │──phot.──▶  │     ↓               ↓           ↓    │
+  │ MPC catalog      │──catalog─▶ │  link.py → classify.py → orbit.py    │
+  │ JPL Horizons     │──ephem.──▶ │     ↓               ↓           ↓    │
+  └──────────────────┘            │  score.py → alert.py → calibration   │
+                                  └──────────────┬───────────────────────┘
+                                                 │
+            ┌────────────────────────────────────┼──────────────────────┐
+            │                                    │                      │
+            ▼                                    ▼                      ▼
+   data/                              Skills/ (utilities)         models/
+   ├─ sample_tracklets.json ◀──────── batch_score.py             ├─ tier2_cnn.pt
+   ├─ injection_recovery_            ├─ run_pipeline.py           └─ tier3_transformer.pt
+   │    baseline.json ◀─────────────  injection_recovery.py            ▲
+   └─ (cached raw alerts)            ├─ train_tier2_cnn.py ────────────┘
+                                     ├─ train_tier3_transformer.py ─────┘
+                                     ├─ export_mpc_report.py
+                                     └─ evaluate_calibration.py
+                                                 │
+                                                 ▼
+                                        reports/ (user output)
+                                        ├─ mpc_report.txt        ← MPC submission
+                                        ├─ scored_neos.json      ← ranked candidates
+                                        └─ calibration_curves/   ← QC diagnostics
+                                                 │
+                                  ┌──────────────┘
+                                  ▼
+                          External Reporting
+                          ├─ minorplanetcenter.net  (Step 1 — always)
+                          ├─ NEOCP monitoring       (Step 2 — confirmation)
+                          └─ NASA PDCO / IAU CBAT   (Step 3 — if triggered)
+```
+
+**Key relationships:**
+
+| From | To | Artifact |
+|---|---|---|
+| `fetch.py` | `preprocess.py` | `FetchResult` — raw alerts + provenance |
+| `preprocess.py` | `detect.py` | `PreprocessResult` — calibrated source catalog |
+| `detect.py` | `link.py` | `DetectResult` — moving-source candidates |
+| `link.py` | `classify.py` | `LinkResult` — multi-night tracklets |
+| `classify.py` | `orbit.py` | `ClassifyResult` — posterior + feature scores |
+| `orbit.py` | `score.py` | `OrbitResult` — elements, MOID, quality code |
+| `score.py` | `alert.py` | `ScoredNEO` — ranked candidate with hazard flag |
+| `alert.py` | `calibration.py` | Raw classifier scores for calibration fitting |
+| `models/` | `classify.py` | Trained weights loaded at runtime |
+| `data/` | `Skills/` | Input JSON / CSV for batch and training scripts |
+
+### 9.2 Directory Tree
+
 ```
 2026-Near-Earth-Objects/
 │
@@ -533,7 +596,269 @@ The following constraints are hard-coded into pipeline logic and may not be over
 
 ---
 
-## 10. Installation
+## 10. End-User Guide (Layperson)
+
+This section explains how to use the pipeline in plain language — no astronomy or software-engineering background required. The goal is to get from a sky region and a date range to a ranked list of NEO candidates and, if warranted, a formatted report ready to submit to the Minor Planet Center.
+
+### 10.1 What the Pipeline Does, In Plain Terms
+
+Think of the pipeline as a five-step process:
+
+1. **Download** — it fetches all the astronomical alerts that were triggered in your chosen patch of sky during your chosen dates. These alerts are generated automatically when a telescope notices something that changed or moved compared to a reference image.
+2. **Filter** — it discards the vast majority of alerts that are camera artefacts, cosmic rays, or satellite trails, keeping only those that look like real moving objects.
+3. **Connect the dots** — it checks whether the same moving object was seen on multiple nights, and if so, links those sightings into a *tracklet* (a short arc of the object's path across the sky).
+4. **Characterise** — from the tracklet it computes a preliminary orbit and estimates how close the object comes to Earth (the Minimum Orbit Intersection Distance, or MOID).
+5. **Rank and report** — it scores every candidate by how likely it is to be a genuine new NEO, flags any that meet the criteria for a Potentially Hazardous Asteroid (MOID ≤ 0.05 AU and estimated diameter ≥ 140 m), and produces a report in the format required by the Minor Planet Center.
+
+### 10.2 Before You Begin
+
+You need three things:
+
+| Item | Where to get it | Notes |
+|---|---|---|
+| **Python 3.11 or 3.12** | python.org/downloads | Free; install the version for your operating system |
+| **A ZTF IRSA account** | irsa.ipac.caltech.edu (free registration) | Needed for live sky data; not needed for the sample data bundled with the repo |
+| **This repository** | See §11 Installation | ~50 MB including test suite |
+
+If you only want to explore the pipeline with the bundled synthetic data — without connecting to any telescope feed — you do **not** need a ZTF account.
+
+### 10.3 Your First Run (No Account Needed)
+
+After installing (see §11), run the following two commands from the repository root. Each line is explained in plain English below it.
+
+```bash
+# Step 1 — confirm every module is working correctly
+PYTHONPATH=src python Skills/smoke_test.py
+```
+*This takes about 10 seconds. If you see "All modules OK — smoke test passed." the installation is healthy.*
+
+```bash
+# Step 2 — score the two bundled example tracklets
+PYTHONPATH=src python Skills/batch_score.py data/sample_tracklets.json
+```
+*This runs the classification and scoring pipeline on two synthetic NEO candidates that are included with the repository. It prints a ranked table showing the posterior probability that each candidate is a genuine NEO, its hazard flag, and its estimated size.*
+
+**Reading the output table:**
+
+| Column | What it means |
+|---|---|
+| `object_id` | Internal identifier for this candidate |
+| `neo_candidate` | Probability (0–1) that this is a genuine new NEO. Values above 0.5 are worth human review. |
+| `hazard_flag` | `pha_candidate` = potentially hazardous; `close_approach` = comes near Earth but below PHA threshold; `nominal` = no special concern; `unknown` = insufficient data |
+| `moid_au` | Closest the object's orbit comes to Earth's orbit, in Astronomical Units. Below 0.05 AU triggers the PHA check. |
+| `estimated_diameter_m` | Rough size estimate in metres, assuming a typical rocky asteroid reflectivity. Treat as order-of-magnitude only. |
+| `alert_pathway` | What the pipeline recommends doing next (see §10.5 below). |
+
+### 10.4 Running on a Real Sky Region
+
+Once you have a ZTF IRSA token, a full live pipeline run looks like this:
+
+```bash
+# Set your API token (do this once per terminal session)
+export ZTF_IRSA_TOKEN="paste_your_token_here"
+
+# Run the pipeline on a 5-degree radius around RA=180°, Dec=0° for one week
+PYTHONPATH=src python Skills/run_pipeline.py \
+    --ra 180.0 \
+    --dec 0.0 \
+    --radius 5.0 \
+    --start 2026-05-01 \
+    --end 2026-05-07
+```
+
+**Parameters you can change:**
+
+| Parameter | What it controls | Example values |
+|---|---|---|
+| `--ra` | Right Ascension of field centre (degrees, 0–360) | `180.0`, `45.5` |
+| `--dec` | Declination of field centre (degrees, −90 to +90) | `0.0`, `−30.0` |
+| `--radius` | Search radius in degrees | `1.0` to `10.0` |
+| `--start` / `--end` | Date range in YYYY-MM-DD format | `2026-05-01` |
+
+The pipeline writes its output to `results/scored_neos.json`. The file contains the full ranked candidate list in machine-readable form.
+
+### 10.5 Understanding the Alert Pathway Column
+
+The `alert_pathway` value in the output tells you exactly what action, if any, is warranted:
+
+| Value | Plain-English meaning | What you should do |
+|---|---|---|
+| `internal_candidate` | Interesting but below external-reporting thresholds | Review manually; watch for repeat detections on subsequent nights |
+| `mpc_submission` | Strong enough for formal reporting to the Minor Planet Center | Run `export_mpc_report.py` (§10.6) and submit the output |
+| `neocp_followup` | Object is already on the MPC's Confirmation Page; independent follow-up requested | Request follow-up observations if you have telescope access |
+| `nasa_pdco_notify` | High-confidence PHA candidate with CNEOS-confirmed impact probability | Follow the mandatory three-step protocol in §7 exactly — do not skip steps |
+| `known_object` | Matches a catalogued asteroid or comet | No action needed; note the MPC designation in your records |
+
+### 10.6 Generating an MPC Submission Report
+
+If any candidates carry `alert_pathway = mpc_submission`, generate the formatted report with:
+
+```bash
+PYTHONPATH=src python Skills/export_mpc_report.py \
+    results/scored_neos.json \
+    --out reports/mpc_report.txt
+```
+
+The output file (`reports/mpc_report.txt`) is in the MPC 80-column observation format. Submit it by following the instructions at [minorplanetcenter.net/iau/MPC_Documentation.html](https://minorplanetcenter.net/iau/MPC_Documentation.html). You will need a free MPC observer account and your assigned observatory code.
+
+### 10.7 Visualising a Candidate
+
+To plot the sky positions and light curve of a candidate for visual inspection:
+
+```bash
+PYTHONPATH=src python Skills/visualize_tracklets.py data/sample_tracklets.json
+```
+
+This opens a matplotlib window showing:
+- **Left panel**: sky-plane positions across all nights, with the expected motion direction overlaid
+- **Right panel**: apparent magnitude vs. time (light curve), coloured by filter band
+
+---
+
+## 11. Recalibration Guide
+
+Classifier recalibration is necessary when (a) the pipeline is deployed on a new survey or telescope, (b) a statistically significant drift in Brier score or ECE is detected on recent labeled data, or (c) new confirmed NEO labels become available from the MPC. This section walks through the full recalibration workflow from label generation to production deployment.
+
+### 11.1 When to Recalibrate
+
+| Trigger | Recommended Action |
+|---|---|
+| Brier score increases by > 0.05 relative to baseline | Full Tier 1 recalibration + isotonic refitting |
+| ECE exceeds 0.10 on recent holdout | Platt or isotonic recalibration only (no retraining needed) |
+| ≥ 500 new confirmed NEO labels available from MPC | Retrain Tier 1 XGBoost; refit calibrator |
+| New survey or filter system (e.g. Rubin/LSST) | Full three-tier retraining |
+| Link rate drops > 10% from injection-recovery baseline | Retune linker (§11.6) before recalibrating classifiers |
+
+### 11.2 Step 1 — Generate Fresh Training Labels
+
+Download the current MPC confirmed NEO catalog and a main-belt asteroid sample as a labeled CSV:
+
+```bash
+PYTHONPATH=src python Skills/generate_training_labels.py \
+    --output data/training_labels.csv \
+    --n-mba 5000
+```
+
+This script queries `astroquery.mpc`, downloads all numbered NEOs (high-confidence positive labels) and a random sample of `--n-mba` numbered MBAs (negative labels), and writes a CSV with columns: `object_id`, `designation`, `neo_class`, `label` (1 = NEO, 0 = non-NEO), `H`, `a`, `e`, `i`.
+
+**Important**: Only MPC-numbered objects are used as positive labels. Provisional designations receive a weight of 0.5 in all training runs.
+
+### 11.3 Step 2 — Retrain the Tier 1 XGBoost Classifier
+
+Tier 1 retraining uses only tabular features (no images required, no GPU needed):
+
+```bash
+# Retraining is handled inside classify.py via its public API.
+# Use the following one-liner to trigger a retrain from the labels CSV:
+PYTHONPATH=src python -c "
+from classify import retrain_tier1
+retrain_tier1(
+    labels_csv='data/training_labels.csv',
+    output_model='models/tier1_xgb.json',
+    test_fraction=0.2,
+    random_seed=42,
+)
+"
+```
+
+The script prints a classification report (precision, recall, F1 per class) and saves the new model weights to `models/tier1_xgb.json`.
+
+### 11.4 Step 3 — Fine-Tune the Tier 2 CNN (Requires GPU)
+
+Tier 2 requires a labeled dataset of ZTF image cutlet triplets. Prepare a CSV with columns `object_id`, `cutout_path`, `label` (1 = real, 0 = bogus):
+
+```bash
+PYTHONPATH=src python Skills/train_tier2_cnn.py \
+    --labels data/cutout_labels.csv \
+    --cutout-dir data/cutouts/ \
+    --output models/tier2_cnn.pt \
+    --epochs 20 \
+    --batch-size 64 \
+    --learning-rate 1e-4
+```
+
+Fine-tuning from the pre-trained ZTF real/bogus weights (Duev et al. 2019) converges in approximately 10–20 epochs on a modern GPU. Start from `models/tier2_cnn.pt` if it exists; the script initialises randomly otherwise.
+
+### 11.5 Step 4 — Retrain the Tier 3 Transformer (Requires GPU + Multi-Night Data)
+
+Tier 3 requires a CSV of MPC multi-night observation sequences with columns `object_id`, `ra`, `dec`, `mag`, `jd`, `filter`, `label`:
+
+```bash
+PYTHONPATH=src python Skills/train_tier3_transformer.py \
+    --labels data/tracklet_sequences.csv \
+    --output models/tier3_transformer.pt \
+    --epochs 30 \
+    --batch-size 32
+```
+
+### 11.6 Step 5 — Refit the Probability Calibrator
+
+After retraining any tier, refit the Platt or isotonic calibrator on the held-out validation set. This step adjusts raw classifier scores to produce well-calibrated probabilities (i.e., a score of 0.8 should correspond to an 80% true-positive rate):
+
+```bash
+PYTHONPATH=src python Skills/evaluate_calibration.py \
+    --scores results/validation_scores.json \
+    --method isotonic \
+    --output models/calibrator_isotonic.pkl \
+    --plot reports/calibration_curves/
+```
+
+The script outputs:
+
+- Brier score before and after calibration
+- Expected Calibration Error (ECE) before and after
+- Reliability diagram saved to `reports/calibration_curves/`
+- Fitted calibrator saved to `models/calibrator_isotonic.pkl`
+
+**Choosing between Platt scaling and isotonic regression:**
+
+| Method | When to use |
+|---|---|
+| **Platt scaling** | Validation set < 1,000 examples; score distribution is roughly sigmoid-shaped |
+| **Isotonic (PAVA)** | Validation set ≥ 1,000 examples; no assumption about score distribution shape; generally lower ECE on larger datasets |
+
+### 11.7 Step 6 — Retune the Linker (Optional)
+
+If the recalibration is triggered by a drop in link rate, run a parametric sweep of the two most sensitive linker parameters before refitting the classifier:
+
+```bash
+PYTHONPATH=src python Skills/tune_linker.py \
+    --tol-min 0.5 --tol-max 5.0 --tol-steps 10 \
+    --chi2-min 4.0 --chi2-max 16.0 --chi2-steps 7
+```
+
+This prints a grid table of (tolerance, chi2_threshold) → link rate. Choose the parameter combination that maximises link rate while keeping the false-link rate (measured by injection-recovery on known-orbit test objects) below 5%.
+
+### 11.8 Step 7 — Validate with Injection-Recovery
+
+After any retraining or recalibration, run the injection-recovery benchmark to confirm that end-to-end pipeline performance has not regressed:
+
+```bash
+PYTHONPATH=src python Skills/injection_recovery.py \
+    --n 100 \
+    --seed 42 \
+    --json results/ir_post_recal.json
+```
+
+Compare the output against the baseline in `data/injection_recovery_baseline.json`. A regression is defined as a drop of more than 5 percentage points in link rate or score rate relative to baseline. If a regression is detected, review the recalibrated model weights before deploying.
+
+### 11.9 Deployment Checklist
+
+| Step | Command / Action | Pass Criterion |
+|---|---|---|
+| 1. Labels generated | `generate_training_labels.py` | CSV contains ≥ 500 confirmed NEOs |
+| 2. Tier 1 retrained | `retrain_tier1(...)` | F1 ≥ 0.85 on held-out set |
+| 3. Tier 2 fine-tuned | `train_tier2_cnn.py` | Validation accuracy ≥ 90% |
+| 4. Tier 3 retrained | `train_tier3_transformer.py` | Validation accuracy ≥ 85% |
+| 5. Calibrator refit | `evaluate_calibration.py` | ECE ≤ 0.05; Brier ≤ 0.10 |
+| 6. Linker tuned (if needed) | `tune_linker.py` | Link rate ≥ baseline − 5% |
+| 7. Injection-recovery passed | `injection_recovery.py` | Link + score rate ≥ baseline − 5% |
+| 8. Full test suite passes | `pytest` | 328 / 328 tests pass |
+| 9. Models committed | `git add models/` | New weights in version control |
+
+---
+
+## 12. Installation
 
 ### 10.1 Prerequisites
 
@@ -588,7 +913,7 @@ pip install ztfquery
 
 ---
 
-## 11. Quick Start
+## 13. Quick Start
 
 ### 11.1 Verify Installation
 
@@ -646,7 +971,7 @@ PYTHONPATH=src python Skills/run_pipeline.py \
 
 ---
 
-## 12. Quality Control
+## 14. Quality Control
 
 ### 12.1 Continuous Integration
 
@@ -709,7 +1034,7 @@ The 38% unlinked fraction is under active investigation; preliminary analysis in
 
 ---
 
-## 13. Current Status & Roadmap
+## 15. Current Status & Roadmap
 
 ### 13.1 Completed Milestones
 
@@ -740,7 +1065,7 @@ The 38% unlinked fraction is under active investigation; preliminary analysis in
 
 ---
 
-## 14. Important Disclaimer
+## 16. Important Disclaimer
 
 This repository implements a **candidate identification and ranking system**. It is not an authoritative source of hazard assessments.
 
@@ -753,14 +1078,14 @@ Any use of this software for real-time hazard assessment requires independent va
 
 ---
 
-## 15. License
+## 17. License
 
 - **Code**: Apache License 2.0 — see [`LICENSE`](LICENSE)
 - **Documentation**: Creative Commons Attribution 4.0 International (CC BY 4.0)
 
 ---
 
-## 16. Works Cited
+## 18. Works Cited
 
 Bellm, Eric C., et al. "The Zwicky Transient Facility: System Overview, Performance, and First Results." *Publications of the Astronomical Society of the Pacific*, vol. 131, no. 995, 2019, p. 018002. DOI: 10.1088/1538-3873/ab0c2a.
 
