@@ -468,10 +468,63 @@ and excluded from CI.
 
 ---
 
-## What Is Not Yet Built
+## Current State (v0.4.0)
 
-All modules are planned. Build in the order listed in the module table.
+All 10 pipeline modules are complete. 238 tests passing (84% coverage). CI green on Python 3.11 & 3.12. Coverage threshold raised to 80%.
 
-### Immediate Next Step
+### Skills
 
-Begin with `schemas.py` — define all frozen data models before writing any pipeline code. This establishes the contracts that all other modules implement against.
+| Script | Purpose |
+|---|---|
+| `Skills/smoke_test.py` | Happy-path check for all modules; exits 0 on success |
+| `Skills/evaluate_calibration.py` | Brier/ECE evaluation for Platt and isotonic calibrators |
+| `Skills/generate_training_labels.py` | Download MPC NEO + MBA catalog as training label CSV |
+| `Skills/batch_score.py` | Score a list of tracklets from a JSON file; print ranked table |
+| `Skills/run_pipeline.py` | Full end-to-end pipeline run |
+| `Skills/injection_recovery.py` | Injection-recovery test: injects synthetic NEOs, measures detection/link/score rates |
+| `Skills/check_mpc_known.py` | Cross-match candidate observations against MPC known object catalog |
+
+### Docs
+
+| File | Purpose |
+|---|---|
+| `docs/PIPELINE_SPEC.md` | Full stage-by-stage pipeline specification |
+| `docs/SCORING_MODEL.md` | Bayesian scoring model: hypotheses, priors, feature weights |
+| `docs/DATA_SOURCES.md` | External data sources: ZTF, ATLAS, MPC, JPL Horizons, Gaia DR3 |
+
+### Data
+
+| File | Purpose |
+|---|---|
+| `data/sample_tracklets.json` | Two synthetic tracklets for testing `Skills/batch_score.py` and `Skills/check_mpc_known.py` |
+
+### Coverage by Module (v0.4.0)
+
+| Module | Coverage |
+|---|---|
+| `schemas.py` | 100% |
+| `calibration.py` | 99% |
+| `preprocess.py` | 93% |
+| `orbit.py` | 93% |
+| `detect.py` | 88% |
+| `alert.py` | 87% |
+| `score.py` | 89% |
+| `link.py` | 82% |
+| `fetch.py` | 75% |
+| `classify.py` | 58% (torch/xgb paths unreachable without GPU libs) |
+
+### What Is Not Yet Built (Milestones 4–7)
+
+| Milestone | Description |
+|---|---|
+| 4 | Live ZTF/ATLAS data integration (requires network + API tokens) |
+| 5 | CNN image classifier Tier 2 (requires GPU + labeled cutouts) |
+| 6 | Transformer tracklet model Tier 3 (requires multi-night training set) |
+| 7 | Ensemble calibration + injection-recovery testing |
+
+### Immediate Next Steps
+
+- Collect labeled training data via `Skills/generate_training_labels.py`
+- Integrate live ZTF alert stream (Milestone 4)
+- Train and evaluate Tier 2 CNN on real cutouts (Milestone 5)
+- Run `Skills/injection_recovery.py` to establish baseline detection/link/score rates

@@ -8,6 +8,7 @@ from calibration import (
     PlattCalibrator,
     _pava,
     brier_score,
+    calibrate,
     expected_calibration_error,
     reliability_diagram_data,
 )
@@ -150,3 +151,95 @@ class TestECE:
         proba = rng.uniform(0, 1, 200)
         labels = rng.binomial(1, 0.5, 200).astype(float)
         assert expected_calibration_error(proba, labels) >= 0.0
+
+
+class TestIsotonicSaveLoad:
+    def _make_data(self):
+        rng = np.random.default_rng(7)
+        scores = rng.uniform(0, 1, 100)
+        labels = (scores > 0.5).astype(float)
+        return scores, labels
+
+    def test_save_and_load(self, tmp_path, monkeypatch):
+        import calibration as cal_mod
+        monkeypatch.setattr(cal_mod, "_CALIBRATION_DIR", tmp_path / "calibration")
+
+        scores, labels = self._make_data()
+        cal = IsotonicCalibrator().fit(scores, labels)
+        cal.save("test_iso")
+
+        cal2 = IsotonicCalibrator().load("test_iso")
+        out = cal2.predict(scores)
+        assert out.shape == scores.shape
+        assert out.min() >= 0.0
+
+    def test_save_unfitted_raises(self, tmp_path, monkeypatch):
+        import calibration as cal_mod
+        monkeypatch.setattr(cal_mod, "_CALIBRATION_DIR", tmp_path / "calibration")
+        with pytest.raises(RuntimeError):
+            IsotonicCalibrator().save("x")
+
+
+class TestPlattSaveLoad:
+    def _make_data(self):
+        rng = np.random.default_rng(8)
+        scores = rng.uniform(0, 1, 100)
+        labels = (scores > 0.5).astype(float)
+        return scores, labels
+
+    def test_save_and_load(self, tmp_path, monkeypatch):
+        import calibration as cal_mod
+        monkeypatch.setattr(cal_mod, "_CALIBRATION_DIR", tmp_path / "calibration")
+
+        scores, labels = self._make_data()
+        cal = PlattCalibrator().fit(scores, labels)
+        cal.save("test_platt")
+
+        cal2 = PlattCalibrator().load("test_platt")
+        out = cal2.predict(scores)
+        assert out.shape == scores.shape
+
+    def test_save_unfitted_raises(self, tmp_path, monkeypatch):
+        import calibration as cal_mod
+        monkeypatch.setattr(cal_mod, "_CALIBRATION_DIR", tmp_path / "calibration")
+        with pytest.raises(RuntimeError):
+            PlattCalibrator().save("x")
+
+
+class TestCalibrateFunction:
+    def _make_data(self):
+        rng = np.random.default_rng(9)
+        scores = rng.uniform(0, 1, 150)
+        labels = (scores + rng.normal(0, 0.1, 150) > 0.5).astype(float)
+        return scores, labels
+
+    def test_isotonic_with_labels(self, tmp_path, monkeypatch):
+        import calibration as cal_mod
+        monkeypatch.setattr(cal_mod, "_CALIBRATION_DIR", tmp_path / "calibration")
+
+        scores, labels = self._make_data()
+        out = calibrate(scores, labels, method="isotonic", model_name="test_cal")
+        assert out.shape == scores.shape
+        assert out.min() >= 0.0
+
+    def test_platt_with_labels(self, tmp_path, monkeypatch):
+        import calibration as cal_mod
+        monkeypatch.setattr(cal_mod, "_CALIBRATION_DIR", tmp_path / "calibration")
+
+        scores, labels = self._make_data()
+        out = calibrate(scores, labels, method="platt", model_name="test_cal_p")
+        assert out.shape == scores.shape
+
+    def test_unknown_method_raises(self):
+        scores = np.array([0.1, 0.9])
+        with pytest.raises(ValueError, match="Unknown calibration method"):
+            calibrate(scores, method="bad_method")
+
+    def test_load_saved_model(self, tmp_path, monkeypatch):
+        import calibration as cal_mod
+        monkeypatch.setattr(cal_mod, "_CALIBRATION_DIR", tmp_path / "calibration")
+
+        scores, labels = self._make_data()
+        calibrate(scores, labels, method="isotonic", model_name="reload_test")
+        out2 = calibrate(scores, labels=None, method="isotonic", model_name="reload_test")
+        assert out2.shape == scores.shape

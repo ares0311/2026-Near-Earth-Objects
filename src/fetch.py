@@ -212,7 +212,9 @@ def fetch_atlas(
 
 
 def _parse_atlas_photometry(lines: list[str]) -> list[Observation]:
-    if not lines or lines[0].startswith("#"):
+    if not lines:
+        return []
+    if lines[0].startswith("#"):
         header = [h.strip() for h in lines[0].lstrip("#").split()]
         data_lines = lines[1:]
     else:

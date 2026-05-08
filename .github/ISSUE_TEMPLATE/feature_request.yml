@@ -1,0 +1,67 @@
+name: Feature Request
+description: Propose a new feature or improvement to the pipeline
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for proposing an improvement to the NEO pipeline.
+        Please check existing issues and the roadmap in README.md before submitting.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: One-sentence summary of the proposed feature.
+      placeholder: "Add support for Pan-STARRS photometry as a data source."
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: Why is this feature needed? What problem does it solve?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Solution
+      description: How should this feature be implemented? Which module(s) would change?
+    validations:
+      required: false
+
+  - type: dropdown
+    id: milestone
+    attributes:
+      label: Relevant Milestone
+      options:
+        - "Milestone 4: Live ZTF/ATLAS integration"
+        - "Milestone 5: CNN image classifier (Tier 2)"
+        - "Milestone 6: Transformer tracklet model (Tier 3)"
+        - "Milestone 7: Ensemble calibration + injection-recovery"
+        - "Other / none"
+    validations:
+      required: false
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Any alternative approaches you have considered?
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have searched existing issues for duplicates
+          required: true
+        - label: This feature does not violate the alert protocol (CLAUDE.md §Alert Protocol)
+          required: true
+        - label: This feature does not assert impact probabilities without MPC/CNEOS confirmation
+          required: true

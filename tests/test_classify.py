@@ -1,13 +1,23 @@
 """Tests for classify.py."""
 
+import base64
+
+import numpy as np
 import pytest
 
 from classify import (
     _arc_coverage,
     _brightness_score,
+    _color_index,
+    _decode_cutout_f32,
+    _features_to_array,
+    _lightcurve_variability,
     _mean_real_bogus,
+    _motion_consistency,
     _nights_score,
+    _stack_predictions,
     _tier1_predict,
+    _tracklet_to_sequence,
     classify,
     extract_features,
 )
@@ -129,3 +139,173 @@ class TestClassifyPipeline:
         for field in ("neo_candidate", "known_object", "main_belt_asteroid",
                       "stellar_artifact", "other_solar_system"):
             assert getattr(posterior, field) >= 0.0
+
+
+class TestColorIndex:
+    def test_both_bands_present(self):
+        obs_g = make_obs(obs_id="g1", filter_band="g", mag=19.0)
+        obs_r = make_obs(obs_id="r1", filter_band="r", mag=18.6)
+        t = Tracklet("T", (obs_g, obs_r), 1.0, 1.0, 0.0)
+        score = _color_index(t)
+        assert score is not None
+        assert 0.0 <= score <= 1.0
+
+    def test_single_band_returns_none(self):
+        t = make_tracklet()  # all r-band
+        score = _color_index(t)
+        assert score is None
+
+
+class TestLightcurveVariability:
+    def test_stable_returns_low(self):
+        obs = tuple(make_obs(obs_id=f"s{i}", mag=19.5) for i in range(3))
+        t = Tracklet("T", obs, 2.0, 1.0, 0.0)
+        score = _lightcurve_variability(t)
+        assert score is not None
+        assert score == pytest.approx(0.0, abs=1e-6)
+
+    def test_variable_returns_nonzero(self):
+        mags = [18.0, 19.5, 21.0]
+        obs = tuple(make_obs(obs_id=f"v{i}", mag=m) for i, m in enumerate(mags))
+        t = Tracklet("T", obs, 2.0, 1.0, 0.0)
+        score = _lightcurve_variability(t)
+        assert score is not None
+        assert score > 0.0
+
+    def test_too_few_obs_returns_none(self):
+        obs1 = make_obs(obs_id="a")
+        obs2 = make_obs(obs_id="b")
+        t = Tracklet("T", (obs1, obs2), 1.0, 1.0, 0.0)
+        assert _lightcurve_variability(t) is None
+
+
+class TestMotionConsistency:
+    def test_linear_motion_high_score(self):
+        t = make_tracklet(n_obs=4)
+        score = _motion_consistency(t)
+        assert score is not None
+        assert score > 0.5
+
+    def test_two_obs_returns_none(self):
+        obs1 = make_obs(obs_id="a")
+        obs2 = make_obs(obs_id="b")
+        t = Tracklet("T", (obs1, obs2), 1.0, 1.0, 0.0)
+        assert _motion_consistency(t) is None
+
+
+class TestFeaturesToArray:
+    def test_shape(self):
+        f = CandidateFeatures(real_bogus_score=0.9)
+        arr = _features_to_array(f)
+        assert arr.shape == (10,)
+        assert arr.dtype == np.float32
+
+    def test_none_becomes_zero(self):
+        f = CandidateFeatures()
+        arr = _features_to_array(f)
+        assert arr[0] == pytest.approx(0.0)  # real_bogus_score is None → 0
+
+    def test_values_passed_through(self):
+        f = CandidateFeatures(real_bogus_score=0.88, brightness_score=0.75)
+        arr = _features_to_array(f)
+        assert arr[0] == pytest.approx(0.88, abs=1e-5)
+
+
+class TestDecodeCutoutF32:
+    def test_valid_cutout(self):
+        arr = np.zeros((63, 63), dtype=np.float32)
+        arr[31, 31] = 1.0
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        result = _decode_cutout_f32(b64)
+        assert result is not None
+        assert result.shape == (63, 63)
+
+    def test_wrong_size_returns_none(self):
+        arr = np.zeros((10, 10), dtype=np.float32)
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        result = _decode_cutout_f32(b64)
+        assert result is None
+
+    def test_invalid_base64_returns_none(self):
+        result = _decode_cutout_f32("not!valid!base64")
+        assert result is None
+
+
+class TestTrackletToSequence:
+    def test_returns_array(self):
+        t = make_tracklet(n_obs=4)
+        seq = _tracklet_to_sequence(t)
+        assert seq is not None
+        assert seq.shape == (4, 5)
+        assert seq.dtype == np.float32
+
+    def test_single_obs_returns_none(self):
+        obs = make_obs()
+        t = Tracklet("T", (obs,), 0.0, 0.0, 0.0)
+        assert _tracklet_to_sequence(t) is None
+
+
+class TestBrightnessScoreNone:
+    def test_all_mag_above_99_returns_none(self):
+        obs = tuple(make_obs(obs_id=f"b{i}", mag=99.5) for i in range(3))
+        t = Tracklet("T", obs, 2.0, 1.0, 0.0)
+        from classify import _brightness_score
+        assert _brightness_score(t) is None
+
+
+class TestTier1WithMockModel:
+    def test_uses_model_predict_proba(self):
+        from unittest.mock import MagicMock
+
+        import numpy as np
+
+        mock_model = MagicMock()
+        proba = np.array([0.5, 0.2, 0.1, 0.1, 0.1])
+        mock_model.predict_proba.return_value = [proba]
+
+        f = CandidateFeatures(real_bogus_score=0.9)
+        result = _tier1_predict(f, model=mock_model)
+        assert set(result.keys()) == {
+            "neo_candidate", "known_object", "main_belt_asteroid",
+            "stellar_artifact", "other_solar_system",
+        }
+        assert result["neo_candidate"] == pytest.approx(0.5, abs=1e-5)
+
+
+
+class TestTier2And3NullModel:
+    def test_tier2_returns_none_when_no_model(self):
+        from classify import _tier2_predict
+        t = make_tracklet()
+        # No model and no model file → returns None
+        assert _tier2_predict(t, model=None) is None
+
+    def test_tier3_returns_none_when_no_model(self):
+        from classify import _tier3_predict
+        t = make_tracklet()
+        assert _tier3_predict(t, model=None) is None
+
+
+class TestStackPredictions:
+    def _base_t1(self):
+        return {
+            "neo_candidate": 0.6,
+            "known_object": 0.1,
+            "main_belt_asteroid": 0.1,
+            "stellar_artifact": 0.1,
+            "other_solar_system": 0.1,
+        }
+
+    def test_t1_only(self):
+        result = _stack_predictions(self._base_t1(), None, None)
+        assert abs(sum(result.values()) - 1.0) < 1e-6
+
+    def test_t1_t2(self):
+        t2 = self._base_t1()
+        result = _stack_predictions(self._base_t1(), t2, None)
+        assert abs(sum(result.values()) - 1.0) < 1e-6
+
+    def test_all_tiers(self):
+        t = self._base_t1()
+        result = _stack_predictions(t, t, t)
+        assert abs(sum(result.values()) - 1.0) < 1e-6

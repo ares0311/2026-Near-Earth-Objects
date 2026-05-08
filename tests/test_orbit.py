@@ -6,7 +6,9 @@ import numpy as np
 import pytest
 
 from orbit import (
+    _differential_correction,
     _equatorial_to_ecliptic,
+    _gauss_iod,
     _state_to_elements,
     _sun_position_ecliptic,
     classify_neo,
@@ -130,6 +132,72 @@ class TestComputeMoid:
         assert moid is None or isinstance(moid, float)
 
 
+class TestGaussIod:
+    def test_fewer_than_3_obs_returns_false(self):
+        obs_list = [(2460000.0, 180.0, 0.0), (2460001.0, 180.1, 0.0)]
+        result = _gauss_iod(obs_list)
+        assert result.success is False
+
+    def test_single_obs_returns_false(self):
+        result = _gauss_iod([(2460000.0, 180.0, 0.0)])
+        assert result.success is False
+
+    def test_three_obs_runs_without_error(self):
+        obs_list = [
+            (2460000.0, 180.0, 5.0),
+            (2460010.0, 180.5, 5.1),
+            (2460020.0, 181.0, 5.2),
+        ]
+        result = _gauss_iod(obs_list)
+        assert isinstance(result.success, bool)
+        assert result.pos.shape == (3,)
+        assert result.vel.shape == (3,)
+
+
+class TestStateToElementsEdgeCases:
+    def test_hyperbolic_orbit_returns_none(self):
+        pos = np.array([1.0, 0.0, 0.0])
+        gm_day = 4 * math.pi**2 / 365.25**2
+        v_escape = math.sqrt(2 * gm_day / 1.0)
+        vel = np.array([0.0, v_escape * 3.0, 0.0])
+        el = _state_to_elements(pos, vel, 2451545.0)
+        assert el is None
+
+
+class TestDifferentialCorrection:
+    def test_short_arc_quality_1(self):
+        el = make_elements()
+        obs = [(2460000.0, 180.0, 0.0), (2460000.5, 180.05, 0.0)]
+        result = _differential_correction(el, obs)
+        assert result.quality_code == 1
+
+    def test_medium_arc_quality_2(self):
+        el = make_elements()
+        obs = [(2460000.0, 180.0, 0.0), (2460005.0, 180.5, 0.0)]
+        result = _differential_correction(el, obs)
+        assert result.quality_code == 2
+
+    def test_long_arc_quality_3(self):
+        el = make_elements()
+        obs = [(2460000.0, 180.0, 0.0), (2460030.0, 183.0, 0.0)]
+        result = _differential_correction(el, obs)
+        assert result.quality_code == 3
+
+    def test_very_long_arc_quality_4(self):
+        el = make_elements()
+        obs = [(2460000.0, 180.0, 0.0), (2460200.0, 200.0, 0.0)]
+        result = _differential_correction(el, obs)
+        assert result.quality_code == 4
+
+    def test_returns_orbital_elements(self):
+        el = make_elements()
+        obs = [(2460000.0, 180.0, 0.0), (2460005.0, 180.5, 0.0)]
+        result = _differential_correction(el, obs)
+        assert isinstance(result, OrbitalElements)
+        assert result.semi_major_axis_au == el.semi_major_axis_au
+        assert result.fit_residual_arcsec is not None
+
+
 class TestFitOrbit:
     def test_insufficient_obs_returns_none(self):
         obs1 = make_obs(obs_id="a")
@@ -149,8 +217,22 @@ class TestFitOrbit:
             for i in range(3)
         )
         t = Tracklet("T", obs, 20.0, 1.0, 90.0)
-        # May return None if Gauss method fails to converge (valid)
         result = fit_orbit(t)
         if result is not None:
             assert result.semi_major_axis_au > 0
             assert 0.0 <= result.eccentricity < 1.0
+
+    def test_fit_with_varying_dec(self):
+        obs = tuple(
+            make_obs(
+                obs_id=f"v{i}",
+                jd=2460000.5 + i * 15,
+                ra_deg=180.0 + i * 0.2,
+                dec_deg=i * 0.1,
+            )
+            for i in range(3)
+        )
+        t = Tracklet("T", obs, 30.0, 1.0, 45.0)
+        result = fit_orbit(t)
+        if result is not None:
+            assert isinstance(result, OrbitalElements)
