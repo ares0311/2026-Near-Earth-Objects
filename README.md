@@ -10,7 +10,17 @@
 
 ---
 
+## Abstract
+
+Near-Earth Objects (NEOs) — small solar system bodies with perihelion distances $q < 1.3$ AU — represent both a premier target for planetary science and the only known category of natural disaster that is, in principle, preventable. Despite three decades of systematic survey effort, population completeness models estimate that the majority of NEOs larger than 140 meters remain undetected, sustaining the need for automated, high-throughput discovery pipelines capable of operating at the cadence and scale of modern wide-field photometric surveys. This work presents a complete, research-grade automated pipeline for the detection, multi-night linking, orbital characterization, and hazard ranking of NEO candidates derived from the Zwicky Transient Facility (ZTF) alert stream, ATLAS forced photometry, and the Minor Planet Center (MPC) catalog. The system implements a seven-stage directed acyclic processing graph — fetch, preprocess, detect, link, classify, orbit, score — followed by a mandatory three-step alert protocol governing all external communications. Classification employs a three-tier ensemble architecture: a gradient-boosted tree classifier on tabular features (Tier 1), a convolutional neural network operating on 63×63-pixel ZTF image triplets following the architecture of Duev et al. (2019) (Tier 2), and a BERT-style Transformer trained on multi-night observation sequences following Lin et al. (2022) (Tier 3), with outputs combined by a logistic regression meta-learner and calibrated via Platt scaling or isotonic regression. Hazard assessment follows a Bayesian log-score model over five competing hypotheses with deliberately pessimistic priors for new NEO candidates. Preliminary orbit determination uses Gauss's method with differential correction, and Potentially Hazardous Asteroid (PHA) flags are gated on orbit quality code ≥ 2 and independently confirmed MOID ≤ 0.05 AU. As of version 0.9.0, all ten pipeline modules are complete with 328 unit and integration tests at 100% code coverage. Injection-recovery validation on $n = 50$ synthetic NEO tracklets yields a detection rate of 100% and a multi-night link rate of 62%, with the unlinked fraction attributed to high-motion candidates exceeding the linear-prediction $\chi^2$ threshold. The pipeline produces MPC-compatible 80-column and JSON observation reports and implements a non-negotiable three-step pathway — MPC submission, independent observatory confirmation, and conditional NASA PDCO notification — ensuring that no autonomous impact claim is ever issued.
+
+**Keywords:** near-Earth objects, planetary defense, asteroid detection, automated pipeline, machine learning, real/bogus classification, orbit determination, Bayesian scoring, ZTF, Minor Planet Center
+
+---
+
 ## Table of Contents
+
+- [Abstract](#abstract)
 
 1. [Introduction](#1-introduction)
 2. [Scientific Background](#2-scientific-background)
