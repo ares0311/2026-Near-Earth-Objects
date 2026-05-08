@@ -1,15 +1,15 @@
 {
   "n_injected": 50,
   "n_detected": 50,
-  "n_linked": 1,
-  "n_scored": 1,
+  "n_linked": 31,
+  "n_scored": 31,
   "detection_rate": 1.0,
-  "link_rate": 0.02,
-  "score_rate": 0.02,
+  "link_rate": 0.62,
+  "score_rate": 0.62,
   "hazard_flag_counts": {
     "close_approach": 0,
+    "unknown": 31,
     "nominal": 0,
-    "unknown": 1,
     "pha_candidate": 0
   }
 }

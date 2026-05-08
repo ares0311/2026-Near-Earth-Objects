@@ -215,10 +215,10 @@ def _link_candidates(
                     for night_c in sorted_nights:
                         if night_c in (night_a, night_b):
                             continue
-                        pred_ra, pred_dec = _predict_position(obs_a, dra, ddec, float(night_c))
                         for obs_c in nights[night_c]:
                             if obs_c.obs_id in used_obs_ids:
                                 continue
+                            pred_ra, pred_dec = _predict_position(obs_a, dra, ddec, obs_c.jd)
                             sep = _sep_arcsec(obs_c.ra_deg, obs_c.dec_deg, pred_ra, pred_dec)
                             if sep <= tolerance_arcsec:
                                 arc_obs.append(obs_c)

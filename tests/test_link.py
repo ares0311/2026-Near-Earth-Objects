@@ -252,3 +252,45 @@ class TestLinkPipeline:
             chi2_threshold=0.001,
         )
         assert len(result.tracklets) == 0
+
+    def test_arc_below_min_obs_skipped(self):
+        # Seed pair found (2 obs, valid motion) but min_observations=3 → arc rejected at line 228
+        dra_deg_per_hr = 1.0 / 3600.0
+        obs_a = make_obs(obs_id="ao_a", jd=2460000.5, ra_deg=180.0, dec_deg=5.0)
+        obs_b = make_obs(obs_id="ao_b", jd=2460001.5,
+                         ra_deg=180.0 + dra_deg_per_hr * 24, dec_deg=5.0)
+        cand_a = make_candidate((obs_a,), rate=1.0)
+        cand_b = make_candidate((obs_b,), rate=1.0)
+        # Only 2 nights, no third → arc_obs stays at 2 < min_observations=3
+        result = link((cand_a, cand_b), min_nights=2, min_observations=3,
+                      position_tolerance_arcsec=10.0)
+        assert len(result.tracklets) == 0
+
+    def test_mid_jd_observations_link_correctly(self):
+        # Regression test for predict_position bug: observations at JD .5 (noon)
+        # were not linked because prediction used integer night key (midnight).
+        # Fix: predict at obs_c.jd, not float(night_c).
+        motion_arcsec_hr = 2.0  # would have failed pre-fix (24 arcsec error > 10 arcsec tol)
+        dra_deg_per_hr = motion_arcsec_hr / 3600.0
+        candidates = []
+        for night in range(3):
+            jd_base = 2460000.5 + night  # noon each night
+            obs_pair = (
+                make_obs(
+                    obs_id=f"mid_{night}_a",
+                    jd=jd_base,
+                    ra_deg=180.0 + night * dra_deg_per_hr * 24,
+                    dec_deg=5.0,
+                ),
+                make_obs(
+                    obs_id=f"mid_{night}_b",
+                    jd=jd_base + 1.0 / 24,
+                    ra_deg=180.0 + night * dra_deg_per_hr * 24 + dra_deg_per_hr,
+                    dec_deg=5.0,
+                ),
+            )
+            candidates.append(make_candidate(obs_pair, rate=motion_arcsec_hr))
+
+        result = link(tuple(candidates), min_nights=2, min_observations=3,
+                      position_tolerance_arcsec=10.0)
+        assert len(result.tracklets) >= 1, "mid-JD observations must link after prediction fix"
