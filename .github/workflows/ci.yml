@@ -35,6 +35,7 @@ jobs:
           pip install ruff mypy
           pip install pydantic numpy scipy astropy requests pytest pytest-cov xgboost scikit-learn
           pip install types-requests
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
 
       - name: Lint (ruff)
         run: ruff check .
