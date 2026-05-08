@@ -468,9 +468,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.8.0)
+## Current State (v0.9.0)
 
-All 10 pipeline modules are complete. 324 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Logistic regression ensemble meta-learner added to classify.py. Injection-recovery baseline saved to `data/injection_recovery_baseline.json`.
+All 10 pipeline modules are complete. 328 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. link.py prediction bug fixed (62% link rate, up from 2%). Injection-recovery baseline updated.
 
 ### Skills
 
@@ -488,6 +488,7 @@ All 10 pipeline modules are complete. 324 tests passing (100% coverage). CI gree
 | `Skills/benchmark_pipeline.py` | Time classify + score on N synthetic tracklets; print throughput table |
 | `Skills/train_tier2_cnn.py` | Fine-tune CNN on labeled ZTF cutout CSV; saves `models/tier2_cnn.pt` |
 | `Skills/train_tier3_transformer.py` | Train Transformer on MPC tracklet CSV; saves `models/tier3_transformer.pt` |
+| `Skills/tune_linker.py` | Parametric sweep of `position_tolerance_arcsec` × `chi2_threshold` vs link/score rate |
 
 ### Docs
 
@@ -504,9 +505,9 @@ All 10 pipeline modules are complete. 324 tests passing (100% coverage). CI gree
 |---|---|
 | `data/sample_tracklets.json` | Two synthetic tracklets for testing batch Skills |
 | `data/README.md` | Data directory documentation and format reference |
-| `data/injection_recovery_baseline.json` | Baseline injection-recovery results (n=50, seed=42): 100% detection, 2% link, 2% score |
+| `data/injection_recovery_baseline.json` | Injection-recovery results (n=50, seed=42): 100% detection, 62% link, 62% score |
 
-### Coverage by Module (v0.8.0)
+### Coverage by Module (v0.9.0)
 
 | Module | Coverage |
 |---|---|
@@ -535,7 +536,15 @@ All 10 pipeline modules are complete. 324 tests passing (100% coverage). CI gree
 - Collect labeled training data via `Skills/generate_training_labels.py`
 - Integrate live ZTF alert stream (Milestone 4)
 - Train and evaluate Tier 2 CNN on real cutouts (Milestone 5)
-- Improve link rate in injection-recovery (baseline: 2%; link.py tuning needed for synthetic tracklets)
+- Investigate remaining 38% of unlinked synthetic tracklets (likely high-motion or chi² outliers)
+
+### Key Changes in v0.9.0
+
+- `link.py`: fixed prediction bug — `_predict_position` now uses `obs_c.jd` instead of integer night key; link rate 2% → 62%
+- `Skills/tune_linker.py`: parametric sweep of tolerance × chi² vs link/score rate
+- 4 new tests (regression test for prediction fix + arc_below_min_obs + tune_linker smoke); 328 total; 100% coverage
+- Injection-recovery baseline updated: 62% link rate (n=50, seed=42)
+- Version bumped to 0.9.0
 
 ### Key Changes in v0.8.0
 

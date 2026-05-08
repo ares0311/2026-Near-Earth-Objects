@@ -87,3 +87,18 @@ class TestEndToEndSynthetic:
         link_result = link(tuple(detect_result.candidates), min_nights=2, min_observations=3)
         assert link_result.provenance is not None
         assert link_result.provenance.n_tracklets == len(link_result.tracklets)
+
+
+class TestTuneLinkerSkill:
+    """Smoke test: tune_linker.py runs without error."""
+
+    def test_run_one_returns_rates(self):
+        import sys
+        from pathlib import Path
+
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from tune_linker import _run_one
+
+        link_rate, score_rate = _run_one(n=3, seed=0, tol=10.0, chi2=5.0)
+        assert 0.0 <= link_rate <= 1.0
+        assert 0.0 <= score_rate <= 1.0
