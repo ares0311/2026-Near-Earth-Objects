@@ -346,7 +346,7 @@ def _build_transformer_model() -> Any:
                 self.register_buffer("pe", pe.unsqueeze(0))
 
             def forward(self, x: Any) -> Any:
-                return x + self.pe[:, : x.size(1)]
+                return x + self.pe[:, : x.size(1)]  # type: ignore[index]
 
         class TrackletTransformer(nn.Module):
             def __init__(
