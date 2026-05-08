@@ -1,6 +1,7 @@
 """Tests for fetch.py — cache round-trip and fallback behaviour."""
 
 import hashlib
+import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -289,6 +290,25 @@ class TestFetchAtlasCached:
         result = fetch_atlas(180.0, 10.0, 1.0, 2460000.0, 2460010.0)
         assert result == []
 
+    def test_atlas_token_sets_auth_header(self, tmp_path, monkeypatch):
+        # atlas_token → line 180: headers["Authorization"] = f"Token ..."
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        monkeypatch.setattr(fetch_mod.time, "sleep", lambda _: None)
+
+        queue_resp = MagicMock()
+        queue_resp.json.return_value = {"url": "http://fake-task/1/"}
+        queue_resp.raise_for_status = MagicMock()
+        poll_resp = MagicMock()
+        poll_resp.json.return_value = {"finishtimestamp": "2024-01-01", "result_url": ""}
+        poll_resp.raise_for_status = MagicMock()
+
+        with patch("requests.post", return_value=queue_resp) as mock_post:
+            with patch("requests.get", return_value=poll_resp):
+                from fetch import fetch_atlas
+                fetch_atlas(90.0, 0.0, 0.5, 2460000.0, 2460010.0, atlas_token="my_secret")
+        call_kwargs = mock_post.call_args[1]
+        assert call_kwargs["headers"].get("Authorization") == "Token my_secret"
+
     def test_network_path_no_result_url(self, tmp_path, monkeypatch):
         monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
         monkeypatch.setattr(fetch_mod.time, "sleep", lambda _: None)
@@ -399,3 +419,187 @@ class TestFetchTopLevel:
         assert prov.search_dec_deg == pytest.approx(-30.0)
         assert prov.start_jd == pytest.approx(2460000.0)
         assert prov.end_jd == pytest.approx(2460005.0)
+
+
+class TestFetchZtfQuery:
+    """Cover lines 64-73 (ztfquery path) and 83-102 (_parse_ztf_metatable)."""
+
+    def _make_mock_row(self, **kwargs):
+        """Return a dict-like row for _parse_ztf_metatable."""
+        defaults = {
+            "pid": "111", "ra": 180.0, "dec": 10.0, "obsjd": 2460005.0,
+            "magpsf": 19.5, "sigmapsf": 0.05, "fid": 2, "rb": 0.9, "drb": 0.95,
+        }
+        defaults.update(kwargs)
+        return defaults
+
+    def _make_mock_meta(self, rows):
+        """Fake a pandas DataFrame with iterrows()."""
+        mock_df = MagicMock()
+        mock_df.iterrows.return_value = iter(enumerate(rows))
+        return mock_df
+
+    def test_ztfquery_path(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        row = self._make_mock_row()
+        mock_meta = self._make_mock_meta([row])
+
+        mock_zquery = MagicMock()
+        mock_zquery.metatable = mock_meta
+        mock_zq_module = MagicMock()
+        mock_zq_module.ZTFQuery.return_value = mock_zquery
+
+        # Python resolves `import ztfquery.query as zq` via parent.query attribute
+        mock_ztfquery_pkg = MagicMock()
+        mock_ztfquery_pkg.query = mock_zq_module
+        mock_pd = MagicMock()
+
+        with patch.dict(sys.modules, {
+            "ztfquery": mock_ztfquery_pkg,
+            "ztfquery.query": mock_zq_module,
+            "pandas": mock_pd,
+        }):
+            result = fetch_mod.fetch_ztf(180.0, 10.0, 1.0, 2460000.0, 2460010.0)
+        assert len(result) == 1
+        assert result[0].filter_band == "r"
+        assert result[0].real_bogus == pytest.approx(0.9)
+
+    def test_parse_ztf_metatable_no_rb(self):
+        import sys
+
+        from fetch import _parse_ztf_metatable
+
+        row = {
+            "candid": "999", "ra": 181.0, "dec": 11.0, "obsjd": 2460006.0,
+            "mag": 20.0, "sigmapsf": 0.1, "fid": 1,
+        }
+        mock_meta = MagicMock()
+        mock_meta.iterrows.return_value = iter([(0, row)])
+        mock_pd = MagicMock()
+        with patch.dict(sys.modules, {"pandas": mock_pd}):
+            obs = _parse_ztf_metatable(mock_meta)
+        assert len(obs) == 1
+        assert obs[0].real_bogus is None
+        assert obs[0].filter_band == "g"
+
+
+class TestFetchAtlasResultUrl:
+    """Cover lines 206-211 (ATLAS result_url path)."""
+
+    def test_network_path_with_result_url(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        monkeypatch.setattr(fetch_mod.time, "sleep", lambda _: None)
+
+        queue_resp = MagicMock()
+        queue_resp.json.return_value = {"url": "http://fake-task/1/"}
+        queue_resp.raise_for_status = MagicMock()
+
+        poll_resp = MagicMock()
+        poll_resp.json.return_value = {
+            "finishtimestamp": "2024-01-01",
+            "result_url": "http://fake-result/data.txt",
+        }
+        poll_resp.raise_for_status = MagicMock()
+
+        data_resp = MagicMock()
+        data_resp.text = "#MJD F m dm RA Dec\n60000.0 o 18.5 0.1 180.0 10.0"
+        data_resp.raise_for_status = MagicMock()
+
+        def mock_get(url, **kwargs):
+            if "result" in url:
+                return data_resp
+            return poll_resp
+
+        with patch("requests.post", return_value=queue_resp):
+            with patch("requests.get", side_effect=mock_get):
+                from fetch import fetch_atlas
+                result = fetch_atlas(90.0, 0.0, 0.5, 2460000.0, 2460010.0)
+        assert len(result) == 1
+        assert result[0].filter_band == "o"
+
+
+class TestFetchMpcKnownNetwork:
+    """Cover lines 269-293 (astroquery.mpc path in fetch_mpc_known)."""
+
+    def test_mpc_query_with_rows(self, tmp_path, monkeypatch):
+        import sys
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        mock_row = {"designation": "Ceres", "RA": 180.0, "Dec": 10.0,
+                    "epoch": 2460000.0, "H": 3.4}
+        mock_result = [mock_row]
+
+        mock_mpc_cls = MagicMock()
+        mock_mpc_cls.query_objects_in_region.return_value = mock_result
+        mock_mpc_mod = MagicMock()
+        mock_mpc_mod.MPC = mock_mpc_cls
+        monkeypatch.setitem(sys.modules, "astroquery.mpc", mock_mpc_mod)
+
+        import importlib
+
+        import fetch as fm
+        importlib.reload(fm)
+        monkeypatch.setattr(fm, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        result = fm.fetch_mpc_known(180.0, 10.0, 1.0)
+        assert len(result) == 1
+        assert result[0].obs_id == "mpc_Ceres"
+
+    def test_mpc_query_returns_none(self, tmp_path, monkeypatch):
+        import sys
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        mock_mpc_cls = MagicMock()
+        mock_mpc_cls.query_objects_in_region.return_value = None
+        mock_mpc_mod = MagicMock()
+        mock_mpc_mod.MPC = mock_mpc_cls
+        monkeypatch.setitem(sys.modules, "astroquery.mpc", mock_mpc_mod)
+
+        import importlib
+
+        import fetch as fm
+        importlib.reload(fm)
+        monkeypatch.setattr(fm, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        result = fm.fetch_mpc_known(181.0, 11.0, 0.5)
+        assert result == []
+
+
+class TestFetchHorizonsNetwork:
+    """Cover lines 319-345 (astroquery.jplhorizons path in fetch_horizons)."""
+
+    def test_horizons_query(self, tmp_path, monkeypatch):
+        import sys
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        mock_row = {
+            "RA": 180.0, "DEC": 10.0,
+            "datetime_jd": 2460005.0, "V": 19.0,
+        }
+        mock_eph = [mock_row]
+
+        mock_horizons_inst = MagicMock()
+        mock_horizons_inst.ephemerides.return_value = mock_eph
+        mock_horizons_cls = MagicMock(return_value=mock_horizons_inst)
+        mock_jpl_mod = MagicMock()
+        mock_jpl_mod.Horizons = mock_horizons_cls
+
+        mock_time_cls = MagicMock()
+        mock_time_cls.return_value.iso = "2024-01-01 00:00:00"
+        mock_astropy_time = MagicMock()
+        mock_astropy_time.Time = mock_time_cls
+
+        monkeypatch.setitem(sys.modules, "astroquery.jplhorizons", mock_jpl_mod)
+        monkeypatch.setitem(sys.modules, "astropy.time", mock_astropy_time)
+
+        import importlib
+
+        import fetch as fm
+        importlib.reload(fm)
+        monkeypatch.setattr(fm, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        result = fm.fetch_horizons("433", 180.0, 10.0, 2460000.0, 2460010.0)
+        assert len(result) == 1
+        assert result[0].jd == pytest.approx(2460005.0)
+        assert result[0].filter_band == "V"

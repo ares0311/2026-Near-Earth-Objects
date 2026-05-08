@@ -468,9 +468,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.6.0)
+## Current State (v0.7.0)
 
-All 10 pipeline modules are complete. 309 tests passing (97.44% coverage). CI green on Python 3.11 & 3.12. Coverage threshold raised to 95%. torch installed; CNN and Transformer paths fully tested.
+All 10 pipeline modules are complete. 316 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold raised to 100%. fetch.py fully mocked (ztfquery, astroquery, JPL Horizons paths all covered).
 
 ### Skills
 
@@ -485,6 +485,9 @@ All 10 pipeline modules are complete. 309 tests passing (97.44% coverage). CI gr
 | `Skills/check_mpc_known.py` | Cross-match candidate observations against MPC known object catalog |
 | `Skills/visualize_tracklets.py` | Plot sky positions and light curves for a tracklet JSON file |
 | `Skills/export_mpc_report.py` | Export MPC 80-column reports from a scored NEO JSON file |
+| `Skills/benchmark_pipeline.py` | Time classify + score on N synthetic tracklets; print throughput table |
+| `Skills/train_tier2_cnn.py` | Fine-tune CNN on labeled ZTF cutout CSV; saves `models/tier2_cnn.pt` |
+| `Skills/train_tier3_transformer.py` | Train Transformer on MPC tracklet CSV; saves `models/tier3_transformer.pt` |
 
 ### Docs
 
@@ -502,7 +505,7 @@ All 10 pipeline modules are complete. 309 tests passing (97.44% coverage). CI gr
 | `data/sample_tracklets.json` | Two synthetic tracklets for testing batch Skills |
 | `data/README.md` | Data directory documentation and format reference |
 
-### Coverage by Module (v0.6.0)
+### Coverage by Module (v0.7.0)
 
 | Module | Coverage |
 |---|---|
@@ -514,8 +517,8 @@ All 10 pipeline modules are complete. 309 tests passing (97.44% coverage). CI gr
 | `preprocess.py` | 100% |
 | `orbit.py` | 100% |
 | `detect.py` | 100% |
-| `classify.py` | 100% (torch now installed; CNN/Transformer paths exercised) |
-| `fetch.py` | 75% (network integration paths require live API tokens) |
+| `classify.py` | 100% |
+| `fetch.py` | 100% (ztfquery, ATLAS, astroquery.mpc, jplhorizons all mocked) |
 
 ### What Is Not Yet Built (Milestones 4–7)
 
@@ -532,6 +535,14 @@ All 10 pipeline modules are complete. 309 tests passing (97.44% coverage). CI gr
 - Integrate live ZTF alert stream (Milestone 4)
 - Train and evaluate Tier 2 CNN on real cutouts (Milestone 5)
 - Run `Skills/injection_recovery.py` to establish baseline detection/link/score rates
+
+### Key Changes in v0.7.0
+
+- fetch.py: 75% → 100% via mocks for ztfquery, ATLAS network, astroquery.mpc, jplhorizons
+- CI coverage gate raised from 95% → 100%; actual coverage 100.00%
+- New Skills: `benchmark_pipeline.py`, `train_tier2_cnn.py`, `train_tier3_transformer.py`
+- New infra: `.github/ISSUE_TEMPLATE/` (bug + feature request templates), `models/` directory
+- Version bumped to 0.7.0 in `pyproject.toml` and `src/__init__.py`
 
 ### Key Changes in v0.6.0
 
