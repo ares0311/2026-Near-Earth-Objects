@@ -9,6 +9,7 @@ import pytest
 from classify import (
     _arc_coverage,
     _brightness_score,
+    _build_ensemble,
     _color_index,
     _decode_cutout_f32,
     _features_to_array,
@@ -21,6 +22,7 @@ from classify import (
     _tier1_predict,
     _tracklet_to_sequence,
     classify,
+    ensemble_predict,
     extract_features,
 )
 from schemas import CandidateFeatures, Observation, Tracklet
@@ -468,6 +470,95 @@ class TestTier3PredictWithModel:
         t = make_tracklet(n_obs=1)
         result = _tier3_predict(t, model=model)
         assert result is None
+
+
+class TestBuildEnsemble:
+    def _make_probs(self, neo: float = 0.6) -> dict[str, float]:
+        rest = (1.0 - neo) / 4
+        return {
+            "neo_candidate": neo,
+            "known_object": rest,
+            "main_belt_asteroid": rest,
+            "stellar_artifact": rest,
+            "other_solar_system": rest,
+        }
+
+    def test_returns_model_with_two_classes(self):
+        tier1s = [self._make_probs(0.8), self._make_probs(0.2)]
+        labels = [{"label": 0}, {"label": 2}]
+        model = _build_ensemble(tier1s, labels)
+        assert model is not None
+
+    def test_returns_none_with_single_class(self):
+        tier1s = [self._make_probs(0.8)] * 5
+        labels = [{"label": 0}] * 5
+        result = _build_ensemble(tier1s, labels)
+        assert result is None
+
+    def test_returns_none_on_bad_input(self):
+        result = _build_ensemble([], [])
+        assert result is None
+
+    def test_returns_none_when_sklearn_raises(self, monkeypatch):
+        from unittest.mock import MagicMock
+        bad_clf = MagicMock()
+        bad_clf.fit.side_effect = RuntimeError("simulated sklearn error")
+        mock_lr_cls = MagicMock(return_value=bad_clf)
+        mock_sklearn_mod = MagicMock()
+        mock_sklearn_mod.LogisticRegression = mock_lr_cls
+        monkeypatch.setitem(sys.modules, "sklearn.linear_model", mock_sklearn_mod)
+        tier1s = [self._make_probs(0.9), self._make_probs(0.1)] * 3
+        labels = [{"label": 0}, {"label": 2}] * 3
+        result = _build_ensemble(tier1s, labels)
+        assert result is None
+
+
+class TestEnsemblePredict:
+    def _base_probs(self, neo: float = 0.5) -> dict[str, float]:
+        rest = (1.0 - neo) / 4
+        return {
+            "neo_candidate": neo,
+            "known_object": rest,
+            "main_belt_asteroid": rest,
+            "stellar_artifact": rest,
+            "other_solar_system": rest,
+        }
+
+    def test_no_meta_model_returns_weighted_avg(self):
+        t1 = self._base_probs(0.6)
+        result = ensemble_predict(t1)
+        assert abs(sum(result.values()) - 1.0) < 1e-6
+
+    def test_with_meta_model(self):
+        tier1s = [self._base_probs(0.8), self._base_probs(0.2)] * 5
+        labels = [{"label": 0}, {"label": 2}] * 5
+        model = _build_ensemble(tier1s, labels)
+        assert model is not None
+        t1 = self._base_probs(0.7)
+        result = ensemble_predict(t1, meta_model=model)
+        assert abs(sum(result.values()) - 1.0) < 1e-6
+        assert set(result.keys()) == {
+            "neo_candidate", "known_object", "main_belt_asteroid",
+            "stellar_artifact", "other_solar_system",
+        }
+
+    def test_with_meta_model_and_t2_t3(self):
+        tier1s = [self._base_probs(0.9), self._base_probs(0.1)] * 5
+        labels = [{"label": 0}, {"label": 3}] * 5
+        model = _build_ensemble(tier1s, labels)
+        t1 = self._base_probs(0.6)
+        t2 = self._base_probs(0.7)
+        t3 = self._base_probs(0.8)
+        result = ensemble_predict(t1, t2, t3, meta_model=model)
+        assert abs(sum(result.values()) - 1.0) < 1e-6
+
+    def test_meta_model_exception_falls_back(self, monkeypatch):
+        from unittest.mock import MagicMock
+        bad_model = MagicMock()
+        bad_model.predict_proba.side_effect = RuntimeError("boom")
+        t1 = self._base_probs(0.5)
+        result = ensemble_predict(t1, meta_model=bad_model)
+        assert abs(sum(result.values()) - 1.0) < 1e-6
 
 
 class TestClassifyErrorPaths:

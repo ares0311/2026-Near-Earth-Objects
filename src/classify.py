@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__all__ = ["extract_features", "classify"]
+__all__ = ["extract_features", "classify", "ensemble_predict", "_build_ensemble"]
 
 import base64
 import math
@@ -448,8 +448,60 @@ def _tier3_predict(
 
 
 # ---------------------------------------------------------------------------
-# Stacking ensemble
+# Stacking ensemble — logistic regression meta-learner
 # ---------------------------------------------------------------------------
+
+_LABELS = [
+    "neo_candidate", "known_object", "main_belt_asteroid",
+    "stellar_artifact", "other_solar_system",
+]
+
+
+def _build_ensemble(tier1_outputs: list[dict[str, float]], labels: list[dict[str, float]]) -> Any:
+    """Train a logistic regression meta-learner on stacked tier outputs.
+
+    tier1_outputs: list of tier1 probability dicts (one per training example)
+    labels: list of one-hot or integer label dicts with key 'label' (int 0-4)
+
+    Returns a fitted sklearn LogisticRegression, or None on failure.
+    """
+    try:
+        import numpy as np
+        from sklearn.linear_model import LogisticRegression  # type: ignore[import]
+
+        X = np.array([[d[lbl] for lbl in _LABELS] for d in tier1_outputs], dtype=np.float32)
+        y = np.array([int(d["label"]) for d in labels], dtype=np.int32)
+        if len(np.unique(y)) < 2:
+            return None
+        clf = LogisticRegression(max_iter=500, solver="lbfgs")
+        clf.fit(X, y)
+        return clf
+    except Exception:
+        return None
+
+
+def ensemble_predict(
+    tier1: dict[str, float],
+    tier2: dict[str, float] | None = None,
+    tier3: dict[str, float] | None = None,
+    meta_model: Any = None,
+) -> dict[str, float]:
+    """Produce final ensemble probabilities.
+
+    If meta_model is provided, it is used to re-weight tier1 outputs (logistic
+    regression meta-learner). Falls back to weighted average when no meta_model.
+    """
+    if meta_model is not None:
+        try:
+            import numpy as np
+
+            x = np.array([[tier1[lbl] for lbl in _LABELS]], dtype=np.float32)
+            proba = meta_model.predict_proba(x)[0]
+            meta_out = {lbl: float(p) for lbl, p in zip(_LABELS, proba)}
+            return _stack_predictions(meta_out, tier2, tier3)
+        except Exception:
+            pass
+    return _stack_predictions(tier1, tier2, tier3)
 
 
 def _stack_predictions(
