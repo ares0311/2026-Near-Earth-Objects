@@ -1,6 +1,7 @@
 """Tests for classify.py."""
 
 import base64
+import sys
 
 import numpy as np
 import pytest
@@ -12,6 +13,7 @@ from classify import (
     _decode_cutout_f32,
     _features_to_array,
     _lightcurve_variability,
+    _load_xgb_model,
     _mean_real_bogus,
     _motion_consistency,
     _nights_score,
@@ -309,3 +311,34 @@ class TestStackPredictions:
         t = self._base_t1()
         result = _stack_predictions(t, t, t)
         assert abs(sum(result.values()) - 1.0) < 1e-6
+
+
+class TestLoadXgbModel:
+    def test_returns_none_when_no_file(self):
+        # Default model dir has no model file → returns None
+        result = _load_xgb_model()
+        assert result is None
+
+    def test_returns_none_when_xgb_unavailable(self, tmp_path, monkeypatch):
+        import classify as cls_mod
+        monkeypatch.setattr(cls_mod, "_MODEL_DIR", tmp_path)
+        (tmp_path / "tier1_xgb.json").write_text("{}")
+        # xgboost not installed → ImportError caught → returns None
+        monkeypatch.setitem(sys.modules, "xgboost", None)
+        result = _load_xgb_model()
+        assert result is None
+
+    def test_returns_model_when_xgb_available(self, tmp_path, monkeypatch):
+        from unittest.mock import MagicMock
+        import classify as cls_mod
+        monkeypatch.setattr(cls_mod, "_MODEL_DIR", tmp_path)
+        (tmp_path / "tier1_xgb.json").write_text("{}")
+
+        mock_xgb = MagicMock()
+        mock_clf = MagicMock()
+        mock_xgb.XGBClassifier.return_value = mock_clf
+        monkeypatch.setitem(sys.modules, "xgboost", mock_xgb)
+
+        result = _load_xgb_model()
+        assert result is mock_clf
+        mock_clf.load_model.assert_called_once()

@@ -468,9 +468,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.4.0)
+## Current State (v0.5.0)
 
-All 10 pipeline modules are complete. 238 tests passing (84% coverage). CI green on Python 3.11 & 3.12. Coverage threshold raised to 80%.
+All 10 pipeline modules are complete. 269 tests passing (87% coverage). CI green on Python 3.11 & 3.12. Coverage threshold raised to 85%.
 
 ### Skills
 
@@ -483,6 +483,8 @@ All 10 pipeline modules are complete. 238 tests passing (84% coverage). CI green
 | `Skills/run_pipeline.py` | Full end-to-end pipeline run |
 | `Skills/injection_recovery.py` | Injection-recovery test: injects synthetic NEOs, measures detection/link/score rates |
 | `Skills/check_mpc_known.py` | Cross-match candidate observations against MPC known object catalog |
+| `Skills/visualize_tracklets.py` | Plot sky positions and light curves for a tracklet JSON file |
+| `Skills/export_mpc_report.py` | Export MPC 80-column reports from a scored NEO JSON file |
 
 ### Docs
 
@@ -491,27 +493,29 @@ All 10 pipeline modules are complete. 238 tests passing (84% coverage). CI green
 | `docs/PIPELINE_SPEC.md` | Full stage-by-stage pipeline specification |
 | `docs/SCORING_MODEL.md` | Bayesian scoring model: hypotheses, priors, feature weights |
 | `docs/DATA_SOURCES.md` | External data sources: ZTF, ATLAS, MPC, JPL Horizons, Gaia DR3 |
+| `docs/API_REFERENCE.md` | Public function signatures and schema field reference for all modules |
 
 ### Data
 
 | File | Purpose |
 |---|---|
-| `data/sample_tracklets.json` | Two synthetic tracklets for testing `Skills/batch_score.py` and `Skills/check_mpc_known.py` |
+| `data/sample_tracklets.json` | Two synthetic tracklets for testing batch Skills |
+| `data/README.md` | Data directory documentation and format reference |
 
-### Coverage by Module (v0.4.0)
+### Coverage by Module (v0.5.0)
 
 | Module | Coverage |
 |---|---|
 | `schemas.py` | 100% |
+| `score.py` | 100% |
 | `calibration.py` | 99% |
+| `link.py` | 98% |
+| `alert.py` | 95% |
 | `preprocess.py` | 93% |
 | `orbit.py` | 93% |
 | `detect.py` | 88% |
-| `alert.py` | 87% |
-| `score.py` | 89% |
-| `link.py` | 82% |
 | `fetch.py` | 75% |
-| `classify.py` | 58% (torch/xgb paths unreachable without GPU libs) |
+| `classify.py` | 60% (torch/xgb paths unreachable without GPU libs) |
 
 ### What Is Not Yet Built (Milestones 4–7)
 

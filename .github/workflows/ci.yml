@@ -50,4 +50,4 @@ jobs:
             --disable-error-code=unused-ignore
 
       - name: Test
-        run: PYTHONPATH=src python -m pytest -m "not integration_live" -q --cov=src --cov-fail-under=80
+        run: PYTHONPATH=src python -m pytest -m "not integration_live" -q --cov=src --cov-fail-under=85

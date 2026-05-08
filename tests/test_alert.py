@@ -1,10 +1,14 @@
 """Tests for alert.py — MPC formatting and alert protocol guardrails."""
 
+from unittest.mock import MagicMock, patch
+
 from alert import (
     _format_dec,
     _format_ra,
     _generate_pdco_alert_package,
     _jd_to_mpc_date,
+    _monitor_neocp,
+    _submit_to_mpc,
     format_mpc_observation,
     format_mpc_report,
     process_alert,
@@ -213,6 +217,42 @@ class TestAlertProtocol:
             or "alert_pathway" in summary.lower()
             or "Alert pathway" in summary
         )
+
+
+class TestSubmitToMpc:
+    def test_dry_run_returns_false(self, tmp_path, monkeypatch):
+        import alert as alert_mod
+        monkeypatch.setattr(alert_mod, "_LOG_DIR", tmp_path)
+        neo = make_scored_neo(rb=0.95, orbit_quality=2, moid_au=0.03)
+        result = _submit_to_mpc(neo, dry_run=True)
+        assert result is False
+
+    def test_live_submission_success(self, tmp_path, monkeypatch):
+        import alert as alert_mod
+        monkeypatch.setattr(alert_mod, "_LOG_DIR", tmp_path)
+        neo = make_scored_neo(rb=0.95, orbit_quality=2, moid_au=0.03)
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status = MagicMock()
+        mock_resp.status_code = 200
+        with patch("requests.post", return_value=mock_resp):
+            result = _submit_to_mpc(neo, dry_run=False)
+        assert result is True
+
+    def test_live_submission_failure(self, tmp_path, monkeypatch):
+        import alert as alert_mod
+        monkeypatch.setattr(alert_mod, "_LOG_DIR", tmp_path)
+        neo = make_scored_neo(rb=0.95, orbit_quality=2, moid_au=0.03)
+        with patch("requests.post", side_effect=Exception("network error")):
+            result = _submit_to_mpc(neo, dry_run=False)
+        assert result is False
+
+
+class TestMonitorNeocp:
+    def test_error_path_on_exception(self):
+        with patch("requests.get", side_effect=ConnectionError("unreachable")):
+            result = _monitor_neocp("TEST001")
+        assert result["status"] == "error"
+        assert "error" in result
 
 
 class TestPDCOAlertPackage:
