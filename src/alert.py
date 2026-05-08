@@ -256,6 +256,7 @@ def process_alert(
     neo: ScoredNEO,
     dry_run: bool = True,
     mpc_obs_code: str = _MPC_OBS_CODE,
+    cneos_assessment: dict | None = None,
 ) -> dict:
     """Execute the mandatory alert protocol for a scored NEO candidate.
 
@@ -313,7 +314,7 @@ def process_alert(
     # Step 3: NASA PDCO — only if external CNEOS assigns impact probability
     # We NEVER compute or assert an impact probability ourselves.
     # This branch must be triggered externally after CNEOS Scout/Sentry assessment.
-    cneos_impact_prob = result.get("cneos_impact_probability")  # must be injected externally
+    cneos_impact_prob = (cneos_assessment or {}).get("cneos_impact_probability")
     if cneos_impact_prob is not None and cneos_impact_prob >= 0.0001:
         pdco_package = _generate_pdco_alert_package(neo)
         pdco_path = _LOG_DIR / f"pdco_alert_{neo.tracklet.object_id}.json"

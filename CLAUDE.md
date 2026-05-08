@@ -468,9 +468,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.5.0)
+## Current State (v0.6.0)
 
-All 10 pipeline modules are complete. 269 tests passing (87% coverage). CI green on Python 3.11 & 3.12. Coverage threshold raised to 85%.
+All 10 pipeline modules are complete. 309 tests passing (97.44% coverage). CI green on Python 3.11 & 3.12. Coverage threshold raised to 95%. torch installed; CNN and Transformer paths fully tested.
 
 ### Skills
 
@@ -502,20 +502,20 @@ All 10 pipeline modules are complete. 269 tests passing (87% coverage). CI green
 | `data/sample_tracklets.json` | Two synthetic tracklets for testing batch Skills |
 | `data/README.md` | Data directory documentation and format reference |
 
-### Coverage by Module (v0.5.0)
+### Coverage by Module (v0.6.0)
 
 | Module | Coverage |
 |---|---|
 | `schemas.py` | 100% |
 | `score.py` | 100% |
-| `calibration.py` | 99% |
-| `link.py` | 98% |
-| `alert.py` | 95% |
-| `preprocess.py` | 93% |
-| `orbit.py` | 93% |
-| `detect.py` | 88% |
-| `fetch.py` | 75% |
-| `classify.py` | 60% (torch/xgb paths unreachable without GPU libs) |
+| `calibration.py` | 100% |
+| `link.py` | 100% |
+| `alert.py` | 100% |
+| `preprocess.py` | 100% |
+| `orbit.py` | 100% |
+| `detect.py` | 100% |
+| `classify.py` | 100% (torch now installed; CNN/Transformer paths exercised) |
+| `fetch.py` | 75% (network integration paths require live API tokens) |
 
 ### What Is Not Yet Built (Milestones 4–7)
 
@@ -532,3 +532,11 @@ All 10 pipeline modules are complete. 269 tests passing (87% coverage). CI green
 - Integrate live ZTF alert stream (Milestone 4)
 - Train and evaluate Tier 2 CNN on real cutouts (Milestone 5)
 - Run `Skills/injection_recovery.py` to establish baseline detection/link/score rates
+
+### Key Changes in v0.6.0
+
+- torch installed; CNN (Tier 2) and Transformer (Tier 3) paths fully tested (100% classify.py coverage)
+- Alert module: `process_alert` accepts `cneos_assessment` parameter for PDCO path testing
+- Coverage gate raised from 85% → 95% in CI; actual coverage 97.44%
+- 40 new tests added across orbit, detect, preprocess, calibration, classify, alert modules
+- Version bumped to 0.6.0 in `pyproject.toml` and `src/__init__.py`

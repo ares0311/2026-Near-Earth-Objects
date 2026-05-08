@@ -294,3 +294,18 @@ class TestPDCOAlertPackage:
         result = process_alert(neo, dry_run=True)
         assert "pdco_package" not in result
         assert any("deferred" in a.lower() for a in result["actions"])
+
+    def test_pdco_triggered_with_cneos_injection(self, tmp_path, monkeypatch):
+        # Inject cneos_assessment → lines 318-323 reached
+        import alert as alert_mod
+        monkeypatch.setattr(alert_mod, "_LOG_DIR", tmp_path)
+        neo = make_scored_neo(
+            alert_pathway="nasa_pdco_notify", rb=0.95, orbit_quality=2, moid_au=0.03
+        )
+        result = process_alert(
+            neo,
+            dry_run=True,
+            cneos_assessment={"cneos_impact_probability": 0.001},
+        )
+        assert "pdco_package" in result
+        assert any("PDCO" in a for a in result["actions"])

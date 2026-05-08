@@ -27,7 +27,7 @@ jobs:
           pip install pydantic numpy scipy astropy requests pytest pytest-cov xgboost scikit-learn
 
       - name: Run tests
-        run: PYTHONPATH=src python -m pytest -m "not integration_live" -q --cov=src --cov-fail-under=85
+        run: PYTHONPATH=src python -m pytest -m "not integration_live" -q --cov=src --cov-fail-under=95
 
       - name: Build distribution
         run: python -m build --sdist --wheel

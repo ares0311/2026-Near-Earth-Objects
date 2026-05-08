@@ -243,3 +243,25 @@ class TestCalibrateFunction:
         calibrate(scores, labels, method="isotonic", model_name="reload_test")
         out2 = calibrate(scores, labels=None, method="isotonic", model_name="reload_test")
         assert out2.shape == scores.shape
+
+
+class TestPlattSingularHessian:
+    def test_singular_hessian_breaks_newton(self):
+        # All scores identical → d²A*d²B - d²AB² = 0 → det < 1e-15 → break
+        scores = np.full(20, 0.5, dtype=float)
+        labels = np.array([0, 1] * 10)
+        cal = PlattCalibrator()
+        cal.fit(scores, labels)
+        # Should complete without error; A and B settle at initial values
+        out = cal.predict(scores)
+        assert out.shape == scores.shape
+        assert np.all((out >= 0.0) & (out <= 1.0))
+
+    def test_newton_converges_with_loose_tol(self):
+        # tol=1e10 → first Newton step always satisfies |ΔA + ΔB| < tol → lines 179-180
+        rng = np.random.default_rng(7)
+        scores = rng.uniform(0.0, 1.0, 40)
+        labels = (scores > 0.5).astype(int)
+        cal = PlattCalibrator(tol=1e10).fit(scores, labels)
+        out = cal.predict(scores)
+        assert out.shape == scores.shape

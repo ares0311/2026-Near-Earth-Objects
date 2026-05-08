@@ -343,3 +343,220 @@ class TestLoadXgbModel:
         result = _load_xgb_model()
         assert result is mock_clf
         mock_clf.load_model.assert_called_once()
+
+
+class TestBuildCnnModel:
+    def test_returns_model_with_torch(self):
+        from classify import _build_cnn_model
+        model = _build_cnn_model()
+        assert model is not None
+
+    def test_cnn_model_forward_pass(self):
+        import torch
+
+        from classify import _build_cnn_model
+        model = _build_cnn_model()
+        assert model is not None
+        x = torch.zeros(1, 1, 63, 63)
+        with torch.no_grad():
+            out = model(x, x, x)
+        assert out.shape == (1, 5)
+
+    def test_load_cnn_model_saves_and_loads(self, tmp_path, monkeypatch):
+        import torch
+
+        import classify as cls_mod
+        monkeypatch.setattr(cls_mod, "_MODEL_DIR", tmp_path)
+        model = cls_mod._build_cnn_model()
+        assert model is not None
+        torch.save(model.state_dict(), str(tmp_path / "tier2_cnn.pt"))
+        loaded = cls_mod._load_cnn_model()
+        assert loaded is not None
+
+
+class TestBuildTransformerModel:
+    def test_returns_model_with_torch(self):
+        from classify import _build_transformer_model
+        model = _build_transformer_model()
+        assert model is not None
+
+    def test_transformer_forward_pass(self):
+        import torch
+
+        from classify import _build_transformer_model
+        model = _build_transformer_model()
+        assert model is not None
+        x = torch.zeros(1, 4, 5)  # batch=1, seq_len=4, features=5
+        with torch.no_grad():
+            out = model(x)
+        assert out.shape == (1, 5)
+
+    def test_load_transformer_model_saves_and_loads(self, tmp_path, monkeypatch):
+        import torch
+
+        import classify as cls_mod
+        monkeypatch.setattr(cls_mod, "_MODEL_DIR", tmp_path)
+        model = cls_mod._build_transformer_model()
+        assert model is not None
+        torch.save(model.state_dict(), str(tmp_path / "tier3_transformer.pt"))
+        loaded = cls_mod._load_transformer_model()
+        assert loaded is not None
+
+
+class TestTier2PredictWithCutouts:
+    def _make_cutout_b64(self) -> str:
+        import base64
+
+        import numpy as np
+        arr = np.random.rand(63, 63).astype(np.float32)
+        return base64.b64encode(arr.tobytes()).decode()
+
+    def test_tier2_with_real_model_and_cutouts(self):
+        from classify import _build_cnn_model, _tier2_predict
+        from schemas import Tracklet
+        model = _build_cnn_model()
+        assert model is not None
+        b64 = self._make_cutout_b64()
+        obs = make_obs(
+            obs_id="t2_obs",
+            cutout_science=b64,
+            cutout_reference=b64,
+            cutout_difference=b64,
+        )
+        t = Tracklet("T2", (obs,), 0.0, 0.0, 0.0)
+        result = _tier2_predict(t, model=model)
+        assert result is not None
+        assert set(result.keys()) == {
+            "neo_candidate", "known_object", "main_belt_asteroid",
+            "stellar_artifact", "other_solar_system",
+        }
+
+    def test_tier2_no_cutouts_returns_none(self):
+        from classify import _build_cnn_model, _tier2_predict
+        model = _build_cnn_model()
+        t = make_tracklet(n_obs=2)
+        result = _tier2_predict(t, model=model)
+        assert result is None
+
+
+class TestTier3PredictWithModel:
+    def test_tier3_with_real_model(self):
+        from classify import _build_transformer_model, _tier3_predict
+        model = _build_transformer_model()
+        assert model is not None
+        t = make_tracklet(n_obs=4)
+        result = _tier3_predict(t, model=model)
+        assert result is not None
+        assert set(result.keys()) == {
+            "neo_candidate", "known_object", "main_belt_asteroid",
+            "stellar_artifact", "other_solar_system",
+        }
+
+    def test_tier3_probabilities_sum_to_one(self):
+        from classify import _build_transformer_model, _tier3_predict
+        model = _build_transformer_model()
+        t = make_tracklet(n_obs=5, arc_days=4.0)
+        result = _tier3_predict(t, model=model)
+        if result is not None:
+            assert abs(sum(result.values()) - 1.0) < 1e-4
+
+    def test_tier3_single_obs_seq_none(self):
+        # tracklet with 1 obs → _tracklet_to_sequence returns None → line 432
+        from classify import _build_transformer_model, _tier3_predict
+        model = _build_transformer_model()
+        assert model is not None
+        t = make_tracklet(n_obs=1)
+        result = _tier3_predict(t, model=model)
+        assert result is None
+
+
+class TestClassifyErrorPaths:
+    def test_load_cnn_model_returns_none_when_build_fails(self, monkeypatch):
+        # _build_cnn_model returns None → line 272 in _load_cnn_model
+        import pathlib
+        import tempfile
+
+        import classify as cls_mod
+        with tempfile.TemporaryDirectory() as td:
+            fake_dir = pathlib.Path(td)
+            (fake_dir / "tier2_cnn.pt").write_bytes(b"dummy")
+            monkeypatch.setattr(cls_mod, "_MODEL_DIR", fake_dir)
+            monkeypatch.setattr(cls_mod, "_build_cnn_model", lambda: None)
+            result = cls_mod._load_cnn_model()
+            assert result is None
+
+    def test_load_cnn_model_exception_path(self, monkeypatch):
+        # torch.load raises → except Exception → lines 276-277
+        import pathlib
+        import tempfile
+
+        import classify as cls_mod
+        with tempfile.TemporaryDirectory() as td:
+            fake_dir = pathlib.Path(td)
+            (fake_dir / "tier2_cnn.pt").write_bytes(b"corrupted")
+            monkeypatch.setattr(cls_mod, "_MODEL_DIR", fake_dir)
+            result = cls_mod._load_cnn_model()
+            assert result is None
+
+    def test_tier2_exception_path(self, monkeypatch):
+        # Force model(...)to raise → except Exception → lines 319-320
+        import base64
+
+        import numpy as np
+
+        import classify as cls_mod
+        from classify import _build_cnn_model
+        model = _build_cnn_model()
+        assert model is not None
+
+        def boom(*args, **kwargs):
+            raise RuntimeError("forced error")
+
+        monkeypatch.setattr(model, "forward", boom)
+        b64 = base64.b64encode(np.zeros((63, 63), dtype=np.float32).tobytes()).decode()
+        obs = make_obs(obs_id="ex", cutout_science=b64, cutout_reference=b64, cutout_difference=b64)
+        t = Tracklet("TX", (obs,), 0.0, 0.0, 0.0)
+        result = cls_mod._tier2_predict(t, model=model)
+        assert result is None
+
+    def test_load_transformer_model_returns_none_when_build_fails(self, monkeypatch):
+        # _build_transformer_model returns None → line 413
+        import pathlib
+        import tempfile
+
+        import classify as cls_mod
+        with tempfile.TemporaryDirectory() as td:
+            fake_dir = pathlib.Path(td)
+            (fake_dir / "tier3_transformer.pt").write_bytes(b"dummy")
+            monkeypatch.setattr(cls_mod, "_MODEL_DIR", fake_dir)
+            monkeypatch.setattr(cls_mod, "_build_transformer_model", lambda: None)
+            result = cls_mod._load_transformer_model()
+            assert result is None
+
+    def test_load_transformer_model_exception_path(self, monkeypatch):
+        # corrupted weights file → torch.load raises → lines 417-418
+        import pathlib
+        import tempfile
+
+        import classify as cls_mod
+        with tempfile.TemporaryDirectory() as td:
+            fake_dir = pathlib.Path(td)
+            (fake_dir / "tier3_transformer.pt").write_bytes(b"corrupted")
+            monkeypatch.setattr(cls_mod, "_MODEL_DIR", fake_dir)
+            result = cls_mod._load_transformer_model()
+            assert result is None
+
+    def test_tier3_exception_path(self, monkeypatch):
+        # Force model(x) to raise → except Exception → lines 446-447
+        import classify as cls_mod
+        from classify import _build_transformer_model
+        model = _build_transformer_model()
+        assert model is not None
+
+        def boom(*args, **kwargs):
+            raise RuntimeError("forced error")
+
+        monkeypatch.setattr(model, "forward", boom)
+        t = make_tracklet(n_obs=4)
+        result = cls_mod._tier3_predict(t, model=model)
+        assert result is None

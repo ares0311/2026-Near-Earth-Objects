@@ -192,3 +192,71 @@ class TestPreprocessPipeline:
         obs = make_obs(obs_id="zero_mag", mag=0.0)
         result = preprocess((obs,), apply_astrometry=False)
         assert result.provenance.n_sources_out == 0
+
+
+class TestDecodeAsFits:
+    def test_valid_fits_bytes_decode(self):
+        # Cover FITS path (line 34): encode a 63×63 FITS image
+        import base64
+        import io
+
+        import numpy as np
+        from astropy.io import fits
+        arr = np.ones((63, 63), dtype=np.float32)
+        hdu = fits.PrimaryHDU(arr)
+        buf = io.BytesIO()
+        hdu.writeto(buf)
+        b64 = base64.b64encode(buf.getvalue()).decode()
+        result = _decode_cutout(b64)
+        assert result.shape == (63, 63)
+
+
+class TestGaiaMock:
+    def test_gaia_query_returns_stars(self, monkeypatch):
+        import sys
+        from unittest.mock import MagicMock
+
+        import preprocess as pp_mod
+        # Mock astroquery.gaia → covers lines 139-143
+        mock_gaia = MagicMock()
+        mock_job = MagicMock()
+        mock_job.get_results.return_value = [{"ra": 180.0, "dec": 10.0}]
+        mock_gaia.cone_search_async.return_value = mock_job
+        mock_astroquery_gaia = MagicMock()
+        mock_astroquery_gaia.Gaia = mock_gaia
+        monkeypatch.setitem(sys.modules, "astroquery.gaia", mock_astroquery_gaia)
+        result = pp_mod._query_gaia_sources(180.0, 10.0)
+        assert isinstance(result, list)
+
+
+class TestPreprocessQualityCuts:
+    def test_rejects_invalid_ra(self):
+        # ra_deg = -1.0 → fails range check → continue (line 194)
+        # Use model_construct to bypass Pydantic validation
+        from schemas import Observation
+        obs = Observation.model_construct(
+            obs_id="badra", ra_deg=-1.0, dec_deg=10.0, jd=2460000.5,
+            mag=19.5, mag_err=0.05, filter_band="r", mission="ZTF",
+        )
+        result = preprocess((obs,), apply_astrometry=False)
+        assert result.provenance.n_sources_out == 0
+
+    def test_rejects_nan_ra(self):
+        # NaN ra_deg → fails the float-comparison check at line 193 (NaN <= 360 is False)
+        from schemas import Observation
+        obs = Observation.model_construct(
+            obs_id="nanra", ra_deg=float("nan"), dec_deg=10.0, jd=2460000.5,
+            mag=19.5, mag_err=0.05, filter_band="r", mission="ZTF",
+        )
+        result = preprocess((obs,), apply_astrometry=False)
+        assert result.provenance.n_sources_out == 0
+
+    def test_rejects_nan_jd(self):
+        # NaN jd passes ra/dec/mag checks but math.isnan(jd) → continue (line 198)
+        from schemas import Observation
+        obs = Observation.model_construct(
+            obs_id="nanjd", ra_deg=180.0, dec_deg=10.0, jd=float("nan"),
+            mag=19.5, mag_err=0.05, filter_band="r", mission="ZTF",
+        )
+        result = preprocess((obs,), apply_astrometry=False)
+        assert result.provenance.n_sources_out == 0

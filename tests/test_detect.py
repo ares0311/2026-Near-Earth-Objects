@@ -219,3 +219,77 @@ class TestFindMovingSources:
         result = _find_moving_sources([obs1, obs2])
         assert len(result) == 1
         assert result[0].apparent_motion_arcsec_per_hr is not None
+
+
+class TestIsStreakEdgeCases:
+    def test_uniform_cutout_singular_moments(self):
+        # Horizontal-line cutout → myy=0, det=0 → return False at line 103
+        import base64
+        arr = np.zeros((63, 63), dtype=np.float32)
+        arr[31, :] = 1.0  # single row → myy=0 → det = mxx*0 - 0 = 0
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        obs = make_obs(cutout_difference=b64)
+        from detect import _is_streak
+        assert _is_streak(obs) is False
+
+    def test_exception_path_returns_false(self):
+        # Invalid base64 length → reshape fails → except → return False
+        import base64
+        b64 = base64.b64encode(b"\x00" * 10).decode()
+        obs = make_obs(cutout_difference=b64)
+        from detect import _is_streak
+        assert _is_streak(obs) is False
+
+
+class TestDetectMpcCrossMatch:
+    def _two_obs_moving(self):
+        # Two obs per night with valid 1.8 arcsec/hr motion to form a candidate
+        obs1 = make_obs(obs_id="mpc1a", jd=2460000.5, ra_deg=180.0, dec_deg=10.0, real_bogus=0.9)
+        obs2 = make_obs(
+            obs_id="mpc1b", jd=2460000.5 + 2 / 24,
+            ra_deg=180.001, dec_deg=10.0, real_bogus=0.9,
+        )
+        return (obs1, obs2)
+
+    def test_mpc_cross_match_true_covers_load_path(self, monkeypatch):
+        import detect as detect_mod
+        # Mock _load_mpc_ephemerides → empty → covers lines 253-255
+        monkeypatch.setattr(detect_mod, "_load_mpc_ephemerides", lambda *a, **kw: [])
+        obs = self._two_obs_moving()
+        result = detect(obs, real_bogus_threshold=0.5, mpc_cross_match=True)
+        # Candidate formed (no MPC match) → survives
+        assert result.provenance.n_known_matches == 0
+
+    def test_mpc_match_found_sets_known(self, monkeypatch):
+        import detect as detect_mod
+        # Mock to return matching ephemeris → covers lines 266-267
+        ephem = [{"designation": "Ceres", "ra": 180.0, "dec": 10.0}]
+        monkeypatch.setattr(detect_mod, "_load_mpc_ephemerides", lambda *a, **kw: ephem)
+        obs = self._two_obs_moving()
+        result = detect(obs, real_bogus_threshold=0.5, mpc_cross_match=True)
+        assert result.provenance.n_known_matches >= 1
+
+
+class TestLoadMpcEphemerides:
+    def test_exception_returns_empty_list(self, monkeypatch):
+        # astroquery.mpc raises → except Exception → lines 141-142
+        import sys
+        from unittest.mock import MagicMock
+
+        mock_mpc = MagicMock()
+        mock_mpc.MPC.get_ephemeris.side_effect = RuntimeError("network error")
+        monkeypatch.setitem(sys.modules, "astroquery.mpc", mock_mpc)
+        from detect import _load_mpc_ephemerides
+        result = _load_mpc_ephemerides(180.0, 10.0, 0.5, 2460000.5)
+        assert result == []
+
+    def test_success_returns_empty_list(self, monkeypatch):
+        # astroquery.mpc import and get_ephemeris succeed → line 140 (return [])
+        import sys
+        from unittest.mock import MagicMock
+        mock_mpc = MagicMock()
+        mock_mpc.MPC.get_ephemeris.return_value = MagicMock()
+        monkeypatch.setitem(sys.modules, "astroquery.mpc", mock_mpc)
+        from detect import _load_mpc_ephemerides
+        result = _load_mpc_ephemerides(180.0, 10.0, 0.5, 2460000.5)
+        assert result == []

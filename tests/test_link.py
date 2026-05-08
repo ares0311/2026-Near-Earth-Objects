@@ -224,3 +224,31 @@ class TestLinkPipeline:
             min_nights=2, min_observations=3,
         )
         assert len(result.tracklets) == 0
+
+    def test_insufficient_nights_coverage_skipped(self):
+        # 3 sorted nights, but night_c obs is far → arc only spans 2 nights < min_nights=3
+        dra = 1.0 * 24 / 3600  # 1 arcsec/hr in deg/day
+        obs_a = make_obs(obs_id="nc_a", jd=2460000.0, ra_deg=180.0, dec_deg=5.0)
+        obs_b = make_obs(obs_id="nc_b", jd=2460001.0, ra_deg=180.0 + dra, dec_deg=5.0)
+        obs_c = make_obs(obs_id="nc_c", jd=2460002.0, ra_deg=0.0, dec_deg=5.0)  # far
+        result = link(
+            (make_candidate((obs_a,)), make_candidate((obs_b,)), make_candidate((obs_c,))),
+            min_nights=3,
+            min_observations=2,
+        )
+        assert len(result.tracklets) == 0
+
+    def test_high_chi2_arc_rejected(self):
+        # Valid 3-night arc with non-linear dec motion → chi2 > tight threshold
+        dra = 1.0 * 24 / 3600
+        obs_a = make_obs(obs_id="chi_a", jd=2460000.0, ra_deg=180.0, dec_deg=5.0)
+        obs_b = make_obs(obs_id="chi_b", jd=2460001.0, ra_deg=180.0 + dra, dec_deg=5.0)
+        obs_c = make_obs(obs_id="chi_c", jd=2460002.0, ra_deg=180.0 + 2 * dra, dec_deg=5.2)
+        result = link(
+            (make_candidate((obs_a,)), make_candidate((obs_b,)), make_candidate((obs_c,))),
+            min_nights=2,
+            min_observations=3,
+            position_tolerance_arcsec=800.0,
+            chi2_threshold=0.001,
+        )
+        assert len(result.tracklets) == 0

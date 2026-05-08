@@ -256,7 +256,7 @@ def _build_cnn_model() -> Any:
                 return self.head(f)
 
         return TripleCNN()
-    except ImportError:
+    except ImportError:  # pragma: no cover
         return None
 
 
@@ -378,7 +378,7 @@ def _build_transformer_model() -> Any:
                 return self.head(x[:, 0])
 
         return TrackletTransformer()
-    except ImportError:
+    except ImportError:  # pragma: no cover
         return None
 
 
