@@ -1,11 +1,9 @@
 """End-to-end pipeline integration tests (no network required)."""
 
-import pytest
 
 from alert import format_mpc_report, process_alert
-from classify import classify, extract_features
+from classify import classify
 from link import link
-from orbit import fit_orbit
 from schemas import Observation, RawCandidate
 from score import score
 
@@ -80,7 +78,8 @@ class TestLinkToScore:
         p = make_posterior(neo_candidate=0.75)
         orb = make_orbital()
         result = score(t, f, p, orb)
-        assert result.hazard.hazard_flag in {"pha_candidate", "close_approach", "nominal", "unknown"}
+        valid = {"pha_candidate", "close_approach", "nominal", "unknown"}
+        assert result.hazard.hazard_flag in valid
         assert result.metadata.scorer_version == "0.1.0"
 
     def test_alert_format_on_scored_neo(self):
@@ -102,9 +101,8 @@ class TestLinkToScore:
         """Smoke test: link → classify → score → alert without errors."""
         import alert as alert_mod
         monkeypatch.setattr(alert_mod, "_LOG_DIR", tmp_path)
-        from tests.test_alert import make_scored_neo
         from tests.test_classify import make_tracklet
-        from tests.test_score import make_features, make_orbital, make_posterior
+        from tests.test_score import make_orbital
 
         t = make_tracklet(n_obs=5, arc_days=4.0)
         features, posterior = classify(t)

@@ -90,8 +90,9 @@ class TestFitLinearMotion:
         assert chi2 == pytest.approx(0.0, abs=1e-6)
 
     def test_singular_matrix_fallback(self, monkeypatch):
-        import numpy as np
         from unittest.mock import patch
+
+        import numpy as np
 
         obs_list = [
             make_obs(obs_id=f"x{i}", jd=2460000.0 + i, ra_deg=180.0 + i * 0.01)
@@ -192,7 +193,11 @@ class TestLinkPipeline:
         # Nights 40 days apart → seed loop breaks at dt_days > 30
         obs_a = make_obs(obs_id="far_a", jd=2460000.0, ra_deg=180.0)
         obs_b = make_obs(obs_id="far_b", jd=2460040.0, ra_deg=181.0)
-        result = link((make_candidate((obs_a,)), make_candidate((obs_b,))), min_nights=2, min_observations=2)
+        result = link(
+            (make_candidate((obs_a,)), make_candidate((obs_b,))),
+            min_nights=2,
+            min_observations=2,
+        )
         assert len(result.tracklets) == 0
 
     def test_exact_integer_jd_linking_forms_tracklet(self):
@@ -200,7 +205,7 @@ class TestLinkPipeline:
         dra_per_day = 1.0 * 24 / 3600  # 1 arcsec/hr → degrees/day
         cands = tuple(
             make_candidate(
-                (make_obs(obs_id=f"e{i}", jd=float(2460000 + i), ra_deg=180.0 + i * dra_per_day, dec_deg=0.0),),
+                (make_obs(obs_id=f"e{i}", jd=float(2460000 + i), ra_deg=180.0 + i * dra_per_day, dec_deg=0.0),),  # noqa: E501
                 rate=1.0,
             )
             for i in range(3)

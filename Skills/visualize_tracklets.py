@@ -12,7 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from schemas import Tracklet, Observation
+from schemas import Observation, Tracklet
 
 
 def _load_tracklets(path: str) -> list[dict]:
@@ -69,7 +69,9 @@ def visualize(path: str, output: str | None = None) -> None:
         dt_hr = [(j - jds[0]) * 24 for j in jds]
         mags = [o.mag for o in t.observations if o.mag is not None]
         if len(mags) == len(jds):
-            ax_motion.plot(dt_hr, mags, "s-", color=color, label=t.object_id, linewidth=1.5, markersize=5)
+            ax_motion.plot(
+                dt_hr, mags, "s-", color=color, label=t.object_id, linewidth=1.5, markersize=5
+            )
 
     ax_sky.set_xlabel("RA (deg)")
     ax_sky.set_ylabel("Dec (deg)")
