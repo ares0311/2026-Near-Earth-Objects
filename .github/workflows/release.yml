@@ -28,7 +28,7 @@ jobs:
           pip install torch --index-url https://download.pytorch.org/whl/cpu
 
       - name: Run tests
-        run: PYTHONPATH=src python -m pytest -m "not integration_live" -q --cov=src --cov-fail-under=95
+        run: PYTHONPATH=src python -m pytest -m "not integration_live" -q --cov=src --cov-fail-under=100
 
       - name: Build distribution
         run: python -m build --sdist --wheel
