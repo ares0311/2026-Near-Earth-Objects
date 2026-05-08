@@ -468,9 +468,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.3.0)
+## Current State (v0.4.0)
 
-All 10 pipeline modules are complete. 205 tests passing (77% coverage). CI green on Python 3.11 & 3.12. Coverage threshold raised to 75%.
+All 10 pipeline modules are complete. 238 tests passing (84% coverage). CI green on Python 3.11 & 3.12. Coverage threshold raised to 80%.
 
 ### Skills
 
@@ -497,6 +497,21 @@ All 10 pipeline modules are complete. 205 tests passing (77% coverage). CI green
 | File | Purpose |
 |---|---|
 | `data/sample_tracklets.json` | Two synthetic tracklets for testing `Skills/batch_score.py` and `Skills/check_mpc_known.py` |
+
+### Coverage by Module (v0.4.0)
+
+| Module | Coverage |
+|---|---|
+| `schemas.py` | 100% |
+| `calibration.py` | 99% |
+| `preprocess.py` | 93% |
+| `orbit.py` | 93% |
+| `detect.py` | 88% |
+| `alert.py` | 87% |
+| `score.py` | 89% |
+| `link.py` | 82% |
+| `fetch.py` | 75% |
+| `classify.py` | 58% (torch/xgb paths unreachable without GPU libs) |
 
 ### What Is Not Yet Built (Milestones 4–7)
 

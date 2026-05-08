@@ -1,11 +1,16 @@
 """Tests for preprocess.py."""
 
+import base64
+
 import numpy as np
 import pytest
 
 from preprocess import (
+    _apply_astrometric_correction,
     _background_rms,
+    _decode_cutout,
     _normalize_cutout,
+    _preprocess_observation,
     _psf_elongation,
     _psf_quality,
     preprocess,
@@ -87,6 +92,72 @@ class TestPsfElongation:
         assert elong > 2.0
 
 
+class TestDecodeCutout:
+    def test_raw_numpy_fallback(self):
+        arr = np.zeros((63, 63), dtype=np.float32)
+        arr[31, 31] = 1.0
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        result = _decode_cutout(b64)
+        assert result.shape == (63, 63)
+        assert result[31, 31] == pytest.approx(1.0)
+
+
+class TestPsfQualityEdgeCases:
+    def test_zero_rms_constant_array(self):
+        arr = np.ones((63, 63), dtype=np.float32) * 500.0
+        score = _psf_quality(arr)
+        assert score == pytest.approx(0.0)
+
+
+class TestPsfElongationEdgeCases:
+    def test_zero_array_returns_one(self):
+        arr = np.zeros((63, 63), dtype=np.float32)
+        result = _psf_elongation(arr)
+        assert result == pytest.approx(1.0)
+
+    def test_det_zero_returns_one(self):
+        arr = np.zeros((63, 63), dtype=np.float32)
+        arr[31, :] = 100.0  # horizontal line → myy=0, det=0
+        result = _psf_elongation(arr)
+        assert result == pytest.approx(1.0)
+
+
+class TestApplyAstrometricCorrection:
+    def test_none_gaia_returns_unchanged(self):
+        obs = make_obs(ra_deg=180.0, dec_deg=10.0)
+        result = _apply_astrometric_correction(obs, gaia_sources=None)
+        assert result.ra_deg == pytest.approx(180.0)
+
+    def test_empty_gaia_list_returns_unchanged(self):
+        obs = make_obs(ra_deg=180.0, dec_deg=10.0)
+        result = _apply_astrometric_correction(obs, gaia_sources=[])
+        assert result.ra_deg == pytest.approx(180.0)
+
+    def test_with_gaia_sources_applies_offset(self):
+        obs = make_obs(ra_deg=180.0, dec_deg=10.0)
+        gaia_sources = [{"obs_ra": 180.1, "gaia_ra": 180.0, "obs_dec": 10.1, "gaia_dec": 10.0}]
+        result = _apply_astrometric_correction(obs, gaia_sources=gaia_sources)
+        assert result.ra_deg == pytest.approx(179.9, abs=1e-9)
+        assert result.dec_deg == pytest.approx(9.9, abs=1e-9)
+
+
+class TestPreprocessObservation:
+    def test_with_cutout_normalizes(self):
+        arr = np.zeros((63, 63), dtype=np.float32)
+        arr[31, 31] = 1.0
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        obs = make_obs(cutout_science=b64)
+        result = _preprocess_observation(obs)
+        assert result.cutout_science is not None
+        assert result.cutout_science != b64  # normalized to [0,1]
+
+    def test_no_cutout_returns_same(self):
+        obs = make_obs()
+        result = _preprocess_observation(obs)
+        assert result.obs_id == obs.obs_id
+        assert result.cutout_science is None
+
+
 class TestPreprocessPipeline:
     def test_rejects_bad_magnitude(self):
         # Pydantic validates RA/Dec bounds at construction — test mag filtering
@@ -105,3 +176,19 @@ class TestPreprocessPipeline:
         obs = make_obs()
         result = preprocess((obs,), apply_astrometry=False)
         assert len(result.sources) == 1
+
+    def test_apply_astrometry_path(self):
+        obs = make_obs(mission="ZTF")
+        result = preprocess((obs,), apply_astrometry=True)
+        assert len(result.sources) == 1
+        assert result.provenance.astrometric_reference == "Gaia DR3"
+
+    def test_astrometry_off_reference_label(self):
+        obs = make_obs()
+        result = preprocess((obs,), apply_astrometry=False)
+        assert result.provenance.astrometric_reference == "none"
+
+    def test_rejects_zero_magnitude(self):
+        obs = make_obs(obs_id="zero_mag", mag=0.0)
+        result = preprocess((obs,), apply_astrometry=False)
+        assert result.provenance.n_sources_out == 0
