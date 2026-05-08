@@ -33,7 +33,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install ruff mypy
-          pip install pydantic numpy scipy astropy pytest pytest-cov xgboost scikit-learn
+          pip install pydantic numpy scipy astropy requests pytest pytest-cov xgboost scikit-learn
           pip install types-requests
 
       - name: Lint (ruff)
