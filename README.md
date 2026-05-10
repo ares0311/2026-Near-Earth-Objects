@@ -562,7 +562,22 @@ The diagram below shows how data and artifacts move between the repository's top
 │   ├── export_mpc_report.py      # Export MPC 80-column reports from scored JSON
 │   ├── benchmark_pipeline.py     # Time classify + score on N synthetic tracklets
 │   ├── train_tier2_cnn.py        # Fine-tune CNN on labeled ZTF cutout CSV
-│   └── train_tier3_transformer.py # Train Transformer on MPC tracklet CSV
+│   ├── train_tier3_transformer.py # Train Transformer on MPC tracklet CSV
+│   ├── background_run_once.py    # One bounded background cycle
+│   ├── background_ledger_summary.py
+│   ├── background_reviewed_summary.py
+│   ├── background_needs_follow_up_summary.py
+│   ├── background_target_priority_summary.py
+│   ├── background_follow_up_test_summary.py
+│   ├── background_submission_recommendation_summary.py
+│   ├── background_validation_summary.py
+│   ├── background_record_signoff.py
+│   ├── background_human_signoff_summary.py
+│   └── background.py              # Unified CLI with subcommands
+│
+├── Logs/                         # Top-level SQLite background automation logs
+│   ├── background.sqlite         # Created by background_run_once.py
+│   └── reports/                  # Internal needs-follow-up report drafts
 │
 ├── data/                         # Reference data and baselines
 │   ├── README.md                 # Data format reference
@@ -573,7 +588,12 @@ The diagram below shows how data and artifacts move between the repository's top
 │   ├── PIPELINE_SPEC.md          # Stage-by-stage pipeline specification
 │   ├── SCORING_MODEL.md          # Full Bayesian scoring model documentation
 │   ├── DATA_SOURCES.md           # External data source reference
-│   └── API_REFERENCE.md          # Public function signatures and schema fields
+│   ├── API_REFERENCE.md          # Public function signatures and schema fields
+│   └── BACKGROUND_SEARCH_AUTOMATION.md
+│
+├── background/                    # Manual-first background automation config
+│   ├── config.json
+│   └── targets.json
 │
 ├── models/                       # Trained model weights (gitignored if large)
 │   └── .gitkeep
@@ -952,14 +972,30 @@ PYTHONPATH=src python Skills/injection_recovery.py --n 50 --seed 42 --json resul
 PYTHONPATH=src python Skills/tune_linker.py
 ```
 
-### 11.6 Export MPC 80-Column Report
+### 11.6 Run One Background Search Cycle
+
+```bash
+PYTHONPATH=src python Skills/background.py run-once
+PYTHONPATH=src python Skills/background.py ledger-summary
+PYTHONPATH=src python Skills/background.py needs-follow-up-summary
+PYTHONPATH=src python Skills/background.py validation-summary
+PYTHONPATH=src python Skills/background.py signoff-readiness
+```
+
+Background automation writes top-level SQLite logs to `Logs/background.sqlite`.
+Each invocation writes one durable ledger row and exactly one reviewed or
+needs-follow-up outcome row. The command is offline by default and does not make
+external submissions. Manual reviewer signoff can be recorded with
+`Skills/background.py record-signoff`; multiple signoffs per run are supported.
+
+### 11.7 Export MPC 80-Column Report
 
 ```bash
 # Export MPC-formatted observation reports from a scored NEO JSON file
 PYTHONPATH=src python Skills/export_mpc_report.py results/scored_neos.json --out reports/mpc_report.txt
 ```
 
-### 11.7 End-to-End Pipeline Run
+### 11.8 End-to-End Pipeline Run
 
 ```bash
 # Full pipeline run (requires ZTF API credentials in environment)

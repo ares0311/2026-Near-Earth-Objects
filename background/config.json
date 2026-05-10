@@ -1,0 +1,10 @@
+{
+  "input_path": "background/targets.json",
+  "db_path": "Logs/background.sqlite",
+  "report_dir": "Logs/reports",
+  "follow_up_threshold": 0.45,
+  "run_mode": "manual",
+  "live_network_enabled": false,
+  "require_human_signoff": true,
+  "required_approval_count": 1
+}

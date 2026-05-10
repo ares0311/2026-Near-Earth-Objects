@@ -9,6 +9,11 @@ __all__ = [
     "RawCandidate", "KnownMatch",
     "FetchProvenance", "PreprocessProvenance", "DetectProvenance", "LinkProvenance",
     "FetchResult", "PreprocessResult", "DetectResult", "LinkResult",
+    "BackgroundOutcome", "BackgroundRunMode", "FollowUpTestStatus", "HumanReviewStatus",
+    "RecommendationAction", "SignoffDecision",
+    "PriorityFactors", "BackgroundTarget", "FollowUpTestResult",
+    "SubmissionRecommendation", "BackgroundRunLedgerEntry", "ReviewedLogEntry",
+    "NeedsFollowUpLogEntry", "BackgroundConfig", "HumanSignoffEntry", "BackgroundRunResult",
 ]
 
 from dataclasses import dataclass
@@ -43,6 +48,18 @@ AlertPathway = Literal[
 
 OrbitQualityCode = Literal[1, 2, 3, 4]
 # 1=arc<1day, 2=multi-night, 3=multi-week, 4=opposition
+
+BackgroundOutcome = Literal["reviewed", "needs_follow_up"]
+
+BackgroundRunMode = Literal["manual"]
+
+FollowUpTestStatus = Literal["pass", "fail", "blocked", "uncertain"]
+
+HumanReviewStatus = Literal["ready", "blocked"]
+
+RecommendationAction = Literal["internal_review", "request_more_tests", "do_not_submit_yet"]
+
+SignoffDecision = Literal["approved_for_internal_review", "needs_more_work", "rejected"]
 
 
 # ---------------------------------------------------------------------------
@@ -324,3 +341,129 @@ class LinkResult(BaseModel):
 
     tracklets: tuple[Tracklet, ...]
     provenance: LinkProvenance
+
+
+# ---------------------------------------------------------------------------
+# Background search automation models
+# ---------------------------------------------------------------------------
+
+
+class PriorityFactors(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    scientific_interest: float = Field(ge=0.0, le=1.0)
+    prior_review_penalty: float = Field(ge=0.0, le=1.0)
+    never_reviewed_boost: float = Field(ge=0.0, le=1.0)
+    data_completeness: float = Field(ge=0.0, le=1.0)
+    false_positive_risk: float = Field(ge=0.0, le=1.0)
+    followup_feasibility: float = Field(ge=0.0, le=1.0)
+    calibration_confidence: float = Field(ge=0.0, le=1.0)
+    blocking_issue_penalty: float = Field(ge=0.0, le=1.0)
+    composite_score: float = Field(ge=0.0, le=1.0)
+
+
+class BackgroundTarget(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    target_id: str
+    scored_neo: ScoredNEO
+    priority: PriorityFactors
+    skipped_reason_codes: tuple[str, ...] = ()
+
+
+class FollowUpTestResult(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+    status: FollowUpTestStatus | HumanReviewStatus
+    reason_code: str
+    summary: str
+
+
+class SubmissionRecommendation(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    destination: str
+    rank: int = Field(ge=1, le=3)
+    suitability_rationale: str
+    risks: tuple[str, ...]
+    prerequisites: tuple[str, ...]
+    recommended_action: RecommendationAction
+
+
+class BackgroundRunLedgerEntry(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    run_id: str
+    started_at_utc: str
+    completed_at_utc: str
+    code_version: str
+    schema_version: str
+    input_path: str
+    target_id: str
+    outcome: BackgroundOutcome
+    selected_score: float = Field(ge=0.0, le=1.0)
+    reason_codes: tuple[str, ...]
+    run_mode: BackgroundRunMode = "manual"
+    config_path: str | None = None
+    failure_reason: str | None = None
+    live_network_enabled: bool = False
+
+
+class ReviewedLogEntry(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    run_id: str
+    reviewed_at_utc: str
+    target_id: str
+    priority: PriorityFactors | None
+    negative_evidence: tuple[str, ...]
+    rationale: str
+
+
+class NeedsFollowUpLogEntry(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    run_id: str
+    recorded_at_utc: str
+    target_id: str
+    priority: PriorityFactors
+    trigger_reason_codes: tuple[str, ...]
+    required_tests: tuple[FollowUpTestResult, ...]
+    report_path: str | None
+    recommendations: tuple[SubmissionRecommendation, ...]
+    human_approval_required: bool = True
+
+
+class BackgroundConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    input_path: str
+    db_path: str
+    report_dir: str
+    follow_up_threshold: float = Field(ge=0.0, le=1.0)
+    run_mode: BackgroundRunMode = "manual"
+    live_network_enabled: bool = False
+    require_human_signoff: bool = True
+    required_approval_count: int = Field(ge=1, default=1)
+
+
+class HumanSignoffEntry(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    signoff_id: str
+    run_id: str
+    target_id: str
+    reviewer: str
+    signed_at_utc: str
+    decision: SignoffDecision
+    scope: str
+    notes: str = ""
+
+
+class BackgroundRunResult(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    ledger: BackgroundRunLedgerEntry
+    reviewed: ReviewedLogEntry | None = None
+    needs_follow_up: NeedsFollowUpLogEntry | None = None

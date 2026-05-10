@@ -1,0 +1,444 @@
+from __future__ import annotations
+
+import json
+import sqlite3
+from pathlib import Path
+
+import background
+from schemas import (
+    BackgroundConfig,
+    CandidateExplanation,
+    CandidateFeatures,
+    HazardAssessment,
+    NEOPosterior,
+    ScoredNEO,
+    ScoringMetadata,
+)
+from score import score
+
+from .conftest import build_orbital_elements, build_tracklet
+
+
+def write_fixture(path: Path, object_ids: tuple[str, ...] = ("T001",)) -> None:
+    rows = []
+    for object_id in object_ids:
+        tracklet = build_tracklet(n_obs=3, arc_days=2.0)
+        rows.append({
+            "object_id": object_id,
+            "arc_days": tracklet.arc_days,
+            "motion_rate_arcsec_per_hour": tracklet.motion_rate_arcsec_per_hour,
+            "motion_pa_degrees": tracklet.motion_pa_degrees,
+            "observations": [obs.model_dump() for obs in tracklet.observations],
+        })
+    path.write_text(json.dumps(rows))
+
+
+def make_scored(
+    object_id: str = "T001",
+    neo_prob: float = 0.65,
+    artifact_prob: float = 0.05,
+    known_object_score: float | None = 0.0,
+    followup_value: float = 0.8,
+    discovery_priority: float = 0.4,
+) -> ScoredNEO:
+    tracklet = build_tracklet(n_obs=4, arc_days=3.0)
+    tracklet = type(tracklet)(
+        object_id=object_id,
+        observations=tracklet.observations,
+        arc_days=tracklet.arc_days,
+        motion_rate_arcsec_per_hour=tracklet.motion_rate_arcsec_per_hour,
+        motion_pa_degrees=tracklet.motion_pa_degrees,
+    )
+    features = CandidateFeatures(
+        real_bogus_score=0.92,
+        motion_consistency_score=0.9,
+        arc_coverage_score=0.2,
+        nights_observed_score=0.4,
+        brightness_score=0.6,
+        known_object_score=known_object_score,
+    )
+    posterior = NEOPosterior(
+        neo_candidate=neo_prob,
+        known_object=0.05,
+        main_belt_asteroid=0.2,
+        stellar_artifact=artifact_prob,
+        other_solar_system=0.05,
+    )
+    scored = score(tracklet, features, posterior, build_orbital_elements(), pipeline_run_id="run")
+    return scored.model_copy(
+        update={
+            "metadata": ScoringMetadata(
+                scorer_version="test",
+                scored_at_jd=2460000.5,
+                pipeline_run_id="run",
+                discovery_priority=discovery_priority,
+                followup_value=followup_value,
+                scientific_interest=0.3,
+            )
+        }
+    )
+
+
+def table_count(db_path: Path, table: str) -> int:
+    with sqlite3.connect(db_path) as conn:
+        return int(conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0])
+
+
+def test_background_run_once_writes_one_ledger_and_followup(monkeypatch, tmp_path):
+    fixture = tmp_path / "targets.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
+    report_dir = tmp_path / "Logs" / "reports"
+    write_fixture(fixture)
+
+    def fake_score(tracklet, run_id):
+        return make_scored(tracklet.object_id)
+
+    monkeypatch.setattr(background, "score_tracklet", fake_score)
+    result = background.background_run_once(fixture, db_path, report_dir)
+
+    assert result.ledger.outcome == "needs_follow_up"
+    assert result.needs_follow_up is not None
+    assert result.reviewed is None
+    assert table_count(db_path, "run_ledger") == 1
+    assert table_count(db_path, "needs_follow_up_log") == 1
+    assert table_count(db_path, "reviewed_log") == 0
+    assert result.needs_follow_up.human_approval_required is True
+    assert result.needs_follow_up.report_path is not None
+
+    report = Path(result.needs_follow_up.report_path).read_text().lower()
+    assert "confirmed neo" not in report
+    assert "impact probability" not in report
+    assert "explicit human approval" in report
+
+
+def test_load_config_defaults_to_manual_and_one_approval(tmp_path):
+    cfg = background.load_config(tmp_path / "missing.json")
+
+    assert isinstance(cfg, BackgroundConfig)
+    assert cfg.run_mode == "manual"
+    assert cfg.live_network_enabled is False
+    assert cfg.required_approval_count == 1
+
+
+def test_gitignore_excludes_generated_background_artifacts():
+    text = Path(".gitignore").read_text()
+
+    assert ".venv/" in text
+    assert "Logs/*.sqlite" in text
+    assert "Logs/*.sqlite-*" in text
+    assert "Logs/*.log" in text
+    assert "Logs/reports/*.md" in text
+
+
+def test_background_run_once_empty_fixture_is_reviewed(tmp_path):
+    fixture = tmp_path / "empty.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
+    fixture.write_text("[]")
+
+    result = background.background_run_once(
+        fixture,
+        db_path,
+        tmp_path / "reports",
+        config_path=tmp_path / "missing_config.json",
+    )
+
+    assert result.ledger.target_id == "NO_TARGETS"
+    assert result.ledger.outcome == "reviewed"
+    assert result.reviewed is not None
+    assert result.needs_follow_up is None
+    assert table_count(db_path, "run_ledger") == 1
+    assert table_count(db_path, "reviewed_log") == 1
+
+
+def test_summaries_return_latest_entries(monkeypatch, tmp_path):
+    fixture = tmp_path / "targets.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
+    write_fixture(fixture)
+    monkeypatch.setattr(background, "score_tracklet", lambda tracklet, run_id: make_scored())
+
+    background.background_run_once(fixture, db_path, tmp_path / "reports")
+
+    ledger = background.ledger_summary(db_path)
+    followup = background.needs_follow_up_summary(db_path)
+    reviewed = background.reviewed_log_summary(db_path)
+    tests = background.follow_up_test_summary(db_path)
+    recommendations = background.submission_recommendation_summary(db_path)
+    validation = background.validation_summary(db_path)
+
+    assert ledger["total_runs"] == 1
+    assert ledger["by_outcome"] == {"needs_follow_up": 1}
+    assert ledger["latest"]["target_id"] == "T001"
+    assert followup["total_needs_follow_up"] == 1
+    assert reviewed["total_reviewed"] == 0
+    assert tests["target_id"] == "T001"
+    assert recommendations["recommendations"][-1]["recommended_action"] == "do_not_submit_yet"
+    assert validation["one_outcome_per_run"] is True
+
+
+def test_select_target_uses_highest_composite():
+    scored_low = make_scored("LOW", neo_prob=0.1, followup_value=0.1)
+    scored_high = make_scored("HIGH", neo_prob=0.8, followup_value=0.9)
+    low = background.BackgroundTarget(
+        target_id="LOW",
+        scored_neo=scored_low,
+        priority=background._priority_factors(scored_low, review_count=1),
+    )
+    high = background.BackgroundTarget(
+        target_id="HIGH",
+        scored_neo=scored_high,
+        priority=background._priority_factors(scored_high, review_count=0),
+    )
+
+    assert background.select_target((low, high)) == high
+
+
+def test_target_priority_summary(monkeypatch, tmp_path):
+    fixture = tmp_path / "targets.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
+    write_fixture(fixture, ("LOW", "HIGH"))
+
+    def fake_score(tracklet, run_id):
+        if tracklet.object_id == "HIGH":
+            return make_scored("HIGH", neo_prob=0.8, followup_value=0.9)
+        return make_scored("LOW", neo_prob=0.1, followup_value=0.1)
+
+    monkeypatch.setattr(background, "score_tracklet", fake_score)
+    summary = background.target_priority_summary(fixture, db_path)
+
+    assert summary["selected_target_id"] == "HIGH"
+    assert [target["target_id"] for target in summary["targets"]] == ["HIGH", "LOW"]
+
+
+def test_reviewed_path_for_low_priority(monkeypatch, tmp_path):
+    fixture = tmp_path / "targets.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
+    write_fixture(fixture)
+
+    def fake_score(tracklet, run_id):
+        return make_scored(
+            tracklet.object_id,
+            neo_prob=0.05,
+            artifact_prob=0.7,
+            known_object_score=0.8,
+            followup_value=0.0,
+            discovery_priority=0.0,
+        )
+
+    monkeypatch.setattr(background, "score_tracklet", fake_score)
+    monkeypatch.setattr(background, "_FOLLOW_UP_THRESHOLD", 0.95)
+    monkeypatch.setattr(background, "_trigger_reason_codes", lambda target, follow_up_threshold: ())
+
+    result = background.background_run_once(
+        fixture,
+        db_path,
+        tmp_path / "reports",
+        config_path=tmp_path / "missing_config.json",
+    )
+
+    assert result.ledger.outcome == "reviewed"
+    assert result.reviewed is not None
+    assert result.needs_follow_up is None
+    assert result.reviewed.priority is not None
+    assert result.reviewed.negative_evidence
+
+
+def test_failure_path_writes_reviewed_audit_record(tmp_path):
+    fixture = tmp_path / "missing_targets.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
+
+    result = background.background_run_once(
+        fixture,
+        db_path,
+        tmp_path / "reports",
+        config_path=tmp_path / "missing_config.json",
+    )
+
+    assert result.ledger.target_id == "RUN_FAILURE"
+    assert result.ledger.outcome == "reviewed"
+    assert result.ledger.failure_reason is not None
+    assert result.reviewed is not None
+    assert table_count(db_path, "run_ledger") == 1
+    assert table_count(db_path, "reviewed_log") == 1
+
+
+def test_lock_conflict_is_logged_as_failure(tmp_path):
+    fixture = tmp_path / "targets.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
+    write_fixture(fixture)
+    background.init_log_db(db_path)
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            "INSERT INTO run_lock (lock_id, run_id, acquired_at_utc) VALUES (1, 'busy', 'now')"
+        )
+
+    result = background.background_run_once(
+        fixture,
+        db_path,
+        tmp_path / "reports",
+        config_path=tmp_path / "missing_config.json",
+    )
+
+    assert result.ledger.target_id == "RUN_FAILURE"
+    assert "already in progress" in (result.ledger.failure_reason or "")
+
+
+def test_record_human_signoff_and_validation(monkeypatch, tmp_path):
+    fixture = tmp_path / "targets.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
+    write_fixture(fixture)
+    monkeypatch.setattr(background, "score_tracklet", lambda tracklet, run_id: make_scored())
+    result = background.background_run_once(
+        fixture,
+        db_path,
+        tmp_path / "reports",
+        config_path=tmp_path / "missing_config.json",
+    )
+
+    entry = background.record_human_signoff(
+        run_id=result.ledger.run_id,
+        target_id=result.ledger.target_id,
+        reviewer="Dr. Reviewer",
+        decision="approved_for_internal_review",
+        scope="Internal follow-up only",
+        notes="Looks ready for local review.",
+        db_path=db_path,
+    )
+    summary = background.human_signoff_summary(db_path)
+    validation = background.validation_summary(db_path)
+
+    assert entry.reviewer == "Dr. Reviewer"
+    assert summary["total_signoffs"] == 1
+    assert summary["latest"]["decision"] == "approved_for_internal_review"
+    assert validation["total_signoffs"] == 1
+    assert validation["lock_active"] is False
+    assert validation["sqlite_integrity"] == "ok"
+    assert validation["all_follow_up_runs_signed"] is True
+
+
+def test_multiple_signoffs_and_readiness(monkeypatch, tmp_path):
+    fixture = tmp_path / "targets.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
+    write_fixture(fixture)
+    monkeypatch.setattr(background, "score_tracklet", lambda tracklet, run_id: make_scored())
+    result = background.background_run_once(
+        fixture,
+        db_path,
+        tmp_path / "reports",
+        config_path=tmp_path / "missing_config.json",
+    )
+
+    background.record_human_signoff(
+        result.ledger.run_id,
+        result.ledger.target_id,
+        "Reviewer A",
+        "needs_more_work",
+        "Internal review",
+        db_path=db_path,
+    )
+    not_ready = background.signoff_readiness_summary(db_path)
+    background.record_human_signoff(
+        result.ledger.run_id,
+        result.ledger.target_id,
+        "Reviewer B",
+        "approved_for_internal_review",
+        "Internal review",
+        db_path=db_path,
+    )
+    ready = background.signoff_readiness_summary(db_path)
+
+    assert not_ready["runs"][0]["is_ready"] is False
+    assert not_ready["runs"][0]["report_readiness_state"] == "ready_for_internal_review"
+    assert ready["runs"][0]["is_ready"] is True
+    assert ready["runs"][0]["report_readiness_state"] == "signed"
+    assert ready["runs"][0]["signoff_count"] == 2
+    assert ready["runs"][0]["approval_count"] == 1
+
+
+def test_run_detail_and_target_history(monkeypatch, tmp_path):
+    fixture = tmp_path / "targets.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
+    write_fixture(fixture)
+    monkeypatch.setattr(background, "score_tracklet", lambda tracklet, run_id: make_scored())
+    result = background.background_run_once(
+        fixture,
+        db_path,
+        tmp_path / "reports",
+        config_path=tmp_path / "missing_config.json",
+    )
+
+    detail = background.run_detail(result.ledger.run_id, db_path)
+    history = background.target_history(result.ledger.target_id, db_path)
+
+    assert detail["ledger"]["run_id"] == result.ledger.run_id
+    assert detail["needs_follow_up"]["target_id"] == result.ledger.target_id
+    assert history["runs"][0]["target_id"] == result.ledger.target_id
+
+
+def test_init_log_db_migrates_existing_ledger(tmp_path):
+    db_path = tmp_path / "old.sqlite"
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            """
+            CREATE TABLE run_ledger (
+                run_id TEXT PRIMARY KEY,
+                started_at_utc TEXT NOT NULL,
+                completed_at_utc TEXT NOT NULL,
+                code_version TEXT NOT NULL,
+                schema_version TEXT NOT NULL,
+                input_path TEXT NOT NULL,
+                target_id TEXT NOT NULL,
+                outcome TEXT NOT NULL,
+                selected_score REAL NOT NULL,
+                reason_codes_json TEXT NOT NULL,
+                live_network_enabled INTEGER NOT NULL,
+                entry_json TEXT NOT NULL
+            )
+            """
+        )
+
+    background.init_log_db(db_path)
+
+    with sqlite3.connect(db_path) as conn:
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(run_ledger)")}
+        tables = {
+            row[0]
+            for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
+        }
+    assert {"run_mode", "config_path", "failure_reason"} <= columns
+    assert {"schema_metadata", "run_lock", "human_signoff_log"} <= tables
+
+
+def test_report_text_rejects_forbidden_language():
+    scored = make_scored()
+    explanation = CandidateExplanation(
+        summary="bad",
+        supporting_evidence=("confirmed discovery wording",),
+        contra_evidence=(),
+        model_version="test",
+    )
+    scored = scored.model_copy(
+        update={
+            "hazard": HazardAssessment(
+                hazard_flag=scored.hazard.hazard_flag,
+                moid_au=scored.hazard.moid_au,
+                estimated_diameter_m=scored.hazard.estimated_diameter_m,
+                absolute_magnitude_h=scored.hazard.absolute_magnitude_h,
+                neo_class=scored.hazard.neo_class,
+                alert_pathway=scored.hazard.alert_pathway,
+                explanation=explanation,
+                orbital_elements=scored.hazard.orbital_elements,
+            )
+        }
+    )
+    target = background.BackgroundTarget(
+        target_id="T001",
+        scored_neo=scored,
+        priority=background._priority_factors(scored, review_count=0),
+    )
+
+    try:
+        background._report_text(target, ())
+    except ValueError as exc:
+        assert "forbidden phrase" in str(exc)
+    else:  # pragma: no cover
+        raise AssertionError("forbidden report language was accepted")

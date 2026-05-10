@@ -1,4 +1,5 @@
 __pycache__/
+.venv/
 *.py[cod]
 *.pyo
 .neo_cache/
@@ -11,3 +12,12 @@ dist/
 build/
 .coverage
 htmlcov/
+Logs/*.sqlite
+Logs/*.sqlite-*
+Logs/*.db
+Logs/*.db-*
+Logs/*.log
+Logs/reports/*.md
+!Logs/.gitkeep
+!Logs/reports/
+!Logs/reports/.gitkeep

@@ -247,6 +247,49 @@ Both calibrators expose `.predict(scores: np.ndarray) -> np.ndarray` returning c
 
 ---
 
+## background.py
+
+```python
+def background_run_once(
+    input_path: Path = DEFAULT_INPUT_PATH,
+    db_path: Path = DEFAULT_DB_PATH,
+    report_dir: Path = DEFAULT_REPORT_DIR,
+) -> BackgroundRunResult
+```
+
+Execute exactly one offline background-search cycle, write one row to the
+top-level SQLite run ledger, write exactly one reviewed or needs-follow-up
+outcome row, and return the structured result.
+
+```python
+def ledger_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
+def reviewed_log_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
+def needs_follow_up_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
+def target_priority_summary(...) -> dict[str, Any]
+def follow_up_test_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
+def submission_recommendation_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
+def validation_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
+def record_human_signoff(...) -> HumanSignoffEntry
+def human_signoff_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
+def run_detail(run_id: str, db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
+def target_history(target_id: str, db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
+def signoff_readiness_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
+```
+
+Summarize the SQLite background logs, target priorities, follow-up tests,
+recommendations, human signoffs, and log invariants for manual review.
+
+Default background log path:
+
+```text
+Logs/background.sqlite
+```
+
+The background automation is fixture-only and manual-first by default. It never
+submits or contacts external destinations.
+
+---
+
 ## Alert Pathway Decision Tree
 
 ```

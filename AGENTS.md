@@ -1,6 +1,6 @@
-# CLAUDE.md — NEO Detection & Ranking Project
+# AGENTS.md — NEO Detection & Ranking Project
 
-This file is read automatically by Claude Code at session start.
+This file is read automatically by Codex at session start.
 It contains the facts a coding agent needs to work productively without re-reading every document.
 
 ---
