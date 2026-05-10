@@ -61,6 +61,7 @@ def main() -> None:
         "validation-summary",
         "human-signoff-summary",
         "signoff-readiness",
+        "unsigned-follow-up",
     ):
         cmd = sub.add_parser(name)
         cmd.add_argument("--db", type=Path, default=DEFAULT_DB_PATH)
@@ -108,6 +109,13 @@ def main() -> None:
         _print_json(human_signoff_summary(args.db))
     elif args.command == "signoff-readiness":
         _print_json(signoff_readiness_summary(args.db))
+    elif args.command == "unsigned-follow-up":
+        readiness = signoff_readiness_summary(args.db)
+        _print_json({
+            "db_path": readiness["db_path"],
+            "unsigned_follow_up_runs": readiness["unsigned_follow_up_runs"],
+            "runs": [run for run in readiness["runs"] if not run["is_ready"]],
+        })
     elif args.command == "run-detail":
         _print_json(run_detail(args.run_id, args.db))
     elif args.command == "target-history":

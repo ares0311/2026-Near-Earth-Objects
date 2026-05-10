@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
+import subprocess
+import sys
 from pathlib import Path
 
 import background
@@ -31,6 +34,20 @@ def write_fixture(path: Path, object_ids: tuple[str, ...] = ("T001",)) -> None:
             "observations": [obs.model_dump() for obs in tracklet.observations],
         })
     path.write_text(json.dumps(rows))
+
+
+def write_manifest_fixture(path: Path, object_ids: tuple[str, ...] = ("T001",)) -> None:
+    rows = []
+    for object_id in object_ids:
+        tracklet = build_tracklet(n_obs=3, arc_days=2.0)
+        rows.append({
+            "object_id": object_id,
+            "arc_days": tracklet.arc_days,
+            "motion_rate_arcsec_per_hour": tracklet.motion_rate_arcsec_per_hour,
+            "motion_pa_degrees": tracklet.motion_pa_degrees,
+            "observations": [obs.model_dump() for obs in tracklet.observations],
+        })
+    path.write_text(json.dumps({"schema_version": "background-targets-v1", "targets": rows}))
 
 
 def make_scored(
@@ -150,6 +167,15 @@ def test_background_run_once_empty_fixture_is_reviewed(tmp_path):
     assert table_count(db_path, "reviewed_log") == 1
 
 
+def test_load_tracklets_supports_versioned_manifest(tmp_path):
+    fixture = tmp_path / "targets.json"
+    write_manifest_fixture(fixture, ("M001", "M002"))
+
+    tracklets = background.load_tracklets(fixture)
+
+    assert [tracklet.object_id for tracklet in tracklets] == ["M001", "M002"]
+
+
 def test_summaries_return_latest_entries(monkeypatch, tmp_path):
     fixture = tmp_path / "targets.json"
     db_path = tmp_path / "Logs" / "background.sqlite"
@@ -207,6 +233,8 @@ def test_target_priority_summary(monkeypatch, tmp_path):
 
     assert summary["selected_target_id"] == "HIGH"
     assert [target["target_id"] for target in summary["targets"]] == ["HIGH", "LOW"]
+    low_summary = summary["targets"][1]
+    assert low_summary["skipped_reason_codes"] == ("LOWER_PRIORITY_THAN_SELECTED",)
 
 
 def test_reviewed_path_for_low_priority(monkeypatch, tmp_path):
@@ -371,7 +399,93 @@ def test_run_detail_and_target_history(monkeypatch, tmp_path):
 
     assert detail["ledger"]["run_id"] == result.ledger.run_id
     assert detail["needs_follow_up"]["target_id"] == result.ledger.target_id
+    assert detail["signoff_readiness"]["report_readiness_state"] == "ready_for_internal_review"
     assert history["runs"][0]["target_id"] == result.ledger.target_id
+
+
+def test_background_cli_subcommands(tmp_path):
+    repo = Path(__file__).resolve().parents[1]
+    fixture = tmp_path / "empty.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
+    report_dir = tmp_path / "reports"
+    fixture.write_text("[]")
+    env = {**os.environ, "PYTHONPATH": str(repo / "src")}
+
+    run = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "run-once",
+            "--input",
+            str(fixture),
+            "--db",
+            str(db_path),
+            "--report-dir",
+            str(report_dir),
+            "--config",
+            str(tmp_path / "missing_config.json"),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    run_id = json.loads(run.stdout)["ledger"]["run_id"]
+
+    detail = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "run-detail",
+            "--run-id",
+            run_id,
+            "--db",
+            str(db_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    unsigned = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "unsigned-follow-up",
+            "--db",
+            str(db_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+
+    assert json.loads(detail.stdout)["run_id"] == run_id
+    assert json.loads(unsigned.stdout)["unsigned_follow_up_runs"] == []
+
+
+def test_deprecated_background_wrappers_are_removed():
+    repo = Path(__file__).resolve().parents[1]
+
+    deprecated = [
+        "background_run_once.py",
+        "background_ledger_summary.py",
+        "background_reviewed_summary.py",
+        "background_needs_follow_up_summary.py",
+        "background_target_priority_summary.py",
+        "background_follow_up_test_summary.py",
+        "background_submission_recommendation_summary.py",
+        "background_validation_summary.py",
+        "background_record_signoff.py",
+        "background_human_signoff_summary.py",
+    ]
+
+    assert not any((repo / "Skills" / name).exists() for name in deprecated)
+    assert (repo / "Skills" / "background.py").exists()
 
 
 def test_init_log_db_migrates_existing_ledger(tmp_path):

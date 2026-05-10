@@ -468,9 +468,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.9.0)
+## Current State (v0.10.0)
 
-All 10 pipeline modules are complete. 328 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. link.py prediction bug fixed (62% link rate, up from 2%). Injection-recovery baseline updated.
+All 10 pipeline modules are complete. 346 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified manual CLI with top-level SQLite logs and auditable signoff readiness.
 
 ### Skills
 
@@ -489,17 +489,7 @@ All 10 pipeline modules are complete. 328 tests passing (100% coverage). CI gree
 | `Skills/train_tier2_cnn.py` | Fine-tune CNN on labeled ZTF cutout CSV; saves `models/tier2_cnn.pt` |
 | `Skills/train_tier3_transformer.py` | Train Transformer on MPC tracklet CSV; saves `models/tier3_transformer.pt` |
 | `Skills/tune_linker.py` | Parametric sweep of `position_tolerance_arcsec` × `chi2_threshold` vs link/score rate |
-| `Skills/background_run_once.py` | Run one bounded offline background search cycle; writes top-level SQLite logs |
-| `Skills/background_ledger_summary.py` | Summarize the SQLite durable run ledger |
-| `Skills/background_reviewed_summary.py` | Summarize the SQLite reviewed log |
-| `Skills/background_needs_follow_up_summary.py` | Summarize the SQLite needs-follow-up log |
-| `Skills/background_target_priority_summary.py` | Summarize target priority factors for the next background run |
-| `Skills/background_follow_up_test_summary.py` | Summarize latest required follow-up tests |
-| `Skills/background_submission_recommendation_summary.py` | Summarize latest conservative recommendations |
-| `Skills/background_validation_summary.py` | Validate SQLite log invariants |
-| `Skills/background_record_signoff.py` | Record a manual human signoff decision |
-| `Skills/background_human_signoff_summary.py` | Summarize manual human signoff records |
-| `Skills/background.py` | Unified background automation CLI with subcommands |
+| `Skills/background.py` | Unified background automation CLI with run, summary, detail, history, and signoff subcommands |
 
 ### Docs
 
@@ -519,9 +509,10 @@ All 10 pipeline modules are complete. 328 tests passing (100% coverage). CI gree
 | `data/README.md` | Data directory documentation and format reference |
 | `data/injection_recovery_baseline.json` | Injection-recovery results (n=50, seed=42): 100% detection, 62% link, 62% score |
 | `background/config.json` | Manual-first background automation configuration |
+| `background/config.schema.json` | JSON Schema for manual-first background config |
 | `background/targets.json` | Stable background automation fixture manifest |
 
-### Coverage by Module (v0.9.0)
+### Coverage by Module (v0.10.0)
 
 | Module | Coverage |
 |---|---|
@@ -551,6 +542,14 @@ All 10 pipeline modules are complete. 328 tests passing (100% coverage). CI gree
 - Integrate live ZTF alert stream (Milestone 4)
 - Train and evaluate Tier 2 CNN on real cutouts (Milestone 5)
 - Investigate remaining 38% of unlinked synthetic tracklets (likely high-motion or chi² outliers)
+
+### Key Changes in v0.10.0
+
+- Removed deprecated background wrapper scripts; `Skills/background.py` is the single supported CLI.
+- Added versioned background target manifest support and `background/config.schema.json`.
+- Added run detail, target history, signoff readiness, and unsigned follow-up audit views.
+- Added CLI and manifest regression tests; 346 total; 100% coverage.
+- Version bumped to 0.10.0.
 
 ### Key Changes in v0.9.0
 

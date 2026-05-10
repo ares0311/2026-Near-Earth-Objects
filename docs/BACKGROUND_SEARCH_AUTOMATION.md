@@ -29,6 +29,7 @@ The default config lives at:
 
 ```text
 background/config.json
+background/config.schema.json
 ```
 
 It pins the run mode to `manual`, disables live network access, and requires
@@ -70,11 +71,14 @@ PYTHONPATH=src python Skills/background.py submission-recommendation-summary
 PYTHONPATH=src python Skills/background.py validation-summary
 PYTHONPATH=src python Skills/background.py human-signoff-summary
 PYTHONPATH=src python Skills/background.py signoff-readiness
+PYTHONPATH=src python Skills/background.py unsigned-follow-up
 PYTHONPATH=src python Skills/background.py run-detail --run-id <run-id>
 PYTHONPATH=src python Skills/background.py target-history --target-id <target-id>
 ```
 
 Each command prints structured JSON for scheduler notifications or manual review.
+The deprecated one-file wrapper scripts have been removed; use
+`Skills/background.py` with a subcommand for all background operations.
 
 ## Human Signoff
 

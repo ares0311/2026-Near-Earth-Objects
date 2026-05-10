@@ -62,7 +62,7 @@ DEFAULT_INPUT_PATH = _ROOT / "background" / "targets.json"
 DEFAULT_DB_PATH = _ROOT / "Logs" / "background.sqlite"
 DEFAULT_REPORT_DIR = _ROOT / "Logs" / "reports"
 _SCHEMA_VERSION = "background-v1"
-_CODE_VERSION = "0.1.0"
+_CODE_VERSION = "0.10.0"
 _FOLLOW_UP_THRESHOLD = 0.45
 _LOCK_ID = 1
 
@@ -339,12 +339,13 @@ def _run_lock(db_path: Path, run_id: str) -> Any:
 
 
 def load_tracklets(path: Path = DEFAULT_INPUT_PATH) -> tuple[Tracklet, ...]:
-    """Load fixture tracklets from the existing sample JSON format."""
+    """Load fixture tracklets from a list or versioned manifest JSON file."""
     with path.open() as handle:
         data = json.load(handle)
+    entries = data.get("targets", data) if isinstance(data, dict) else data
 
     tracklets: list[Tracklet] = []
-    for idx, entry in enumerate(data):
+    for idx, entry in enumerate(entries):
         observations = tuple(Observation(**obs) for obs in entry["observations"])
         tracklets.append(
             Tracklet(
@@ -971,6 +972,27 @@ def _run_signoff_readiness(
     }
 
 
+def _with_report_readiness(
+    readiness: dict[str, Any],
+    report_path: str | None,
+) -> dict[str, Any]:
+    report_exists = bool(report_path and Path(report_path).exists())
+    if readiness["is_ready"]:
+        report_readiness_state = "signed"
+    elif report_exists:
+        report_readiness_state = "ready_for_internal_review"
+    elif report_path:
+        report_readiness_state = "drafted"
+    else:
+        report_readiness_state = "blocked"
+    return {
+        "report_path": report_path,
+        "report_exists": report_exists,
+        "report_readiness_state": report_readiness_state,
+        **readiness,
+    }
+
+
 def run_detail(
     run_id: str,
     db_path: Path = DEFAULT_DB_PATH,
@@ -990,17 +1012,24 @@ def run_detail(
             "SELECT entry_json FROM needs_follow_up_log WHERE run_id = ?",
             (run_id,),
         ).fetchone()
+        signoff_readiness = _run_signoff_readiness(
+            conn,
+            run_id,
+            required_approval_count,
+        )
+        follow_up_data = json.loads(follow_up["entry_json"]) if follow_up else None
+        if follow_up_data:
+            signoff_readiness = _with_report_readiness(
+                signoff_readiness,
+                follow_up_data.get("report_path"),
+            )
         return {
             "db_path": str(db_path),
             "run_id": run_id,
             "ledger": json.loads(ledger["entry_json"]) if ledger else None,
             "reviewed": json.loads(reviewed["entry_json"]) if reviewed else None,
-            "needs_follow_up": json.loads(follow_up["entry_json"]) if follow_up else None,
-            "signoff_readiness": _run_signoff_readiness(
-                conn,
-                run_id,
-                required_approval_count,
-            ),
+            "needs_follow_up": follow_up_data,
+            "signoff_readiness": signoff_readiness,
         }
 
 
@@ -1053,22 +1082,9 @@ def signoff_readiness_summary(
                 row["run_id"],
                 required_approval_count,
             )
-            report_path = row["report_path"]
-            report_exists = bool(report_path and Path(report_path).exists())
-            if readiness["is_ready"]:
-                report_readiness_state = "signed"
-            elif report_exists:
-                report_readiness_state = "ready_for_internal_review"
-            elif report_path:
-                report_readiness_state = "drafted"
-            else:
-                report_readiness_state = "blocked"
             runs.append({
                 "target_id": row["target_id"],
-                "report_path": report_path,
-                "report_exists": report_exists,
-                "report_readiness_state": report_readiness_state,
-                **readiness,
+                **_with_report_readiness(readiness, row["report_path"]),
             })
         return {
             "db_path": str(db_path),
@@ -1086,15 +1102,17 @@ def target_priority_summary(
 ) -> dict[str, Any]:
     targets = build_targets(input_path=input_path, db_path=db_path)
     selected = select_target(targets)
+    selected_id = selected.target_id if selected else None
     return {
         "input_path": str(input_path),
         "db_path": str(db_path),
-        "selected_target_id": selected.target_id if selected else None,
+        "selected_target_id": selected_id,
         "targets": [
             {
                 "target_id": target.target_id,
                 "priority": target.priority.model_dump(),
-                "skipped_reason_codes": target.skipped_reason_codes,
+                "skipped_reason_codes": target.skipped_reason_codes
+                or (() if target.target_id == selected_id else ("LOWER_PRIORITY_THAN_SELECTED",)),
             }
             for target in sorted(
                 targets,

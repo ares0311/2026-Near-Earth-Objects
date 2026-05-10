@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "background-config-v1",
+  "title": "Background Automation Config",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "input_path",
+    "db_path",
+    "report_dir",
+    "follow_up_threshold",
+    "run_mode",
+    "live_network_enabled",
+    "require_human_signoff",
+    "required_approval_count"
+  ],
+  "properties": {
+    "input_path": {
+      "type": "string"
+    },
+    "db_path": {
+      "type": "string"
+    },
+    "report_dir": {
+      "type": "string"
+    },
+    "follow_up_threshold": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "run_mode": {
+      "const": "manual"
+    },
+    "live_network_enabled": {
+      "const": false
+    },
+    "require_human_signoff": {
+      "type": "boolean"
+    },
+    "required_approval_count": {
+      "type": "integer",
+      "minimum": 1
+    }
+  }
+}

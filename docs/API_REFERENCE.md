@@ -251,9 +251,10 @@ Both calibrators expose `.predict(scores: np.ndarray) -> np.ndarray` returning c
 
 ```python
 def background_run_once(
-    input_path: Path = DEFAULT_INPUT_PATH,
-    db_path: Path = DEFAULT_DB_PATH,
-    report_dir: Path = DEFAULT_REPORT_DIR,
+    input_path: Path | None = None,
+    db_path: Path | None = None,
+    report_dir: Path | None = None,
+    config_path: Path = DEFAULT_CONFIG_PATH,
 ) -> BackgroundRunResult
 ```
 
@@ -277,7 +278,9 @@ def signoff_readiness_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
 ```
 
 Summarize the SQLite background logs, target priorities, follow-up tests,
-recommendations, human signoffs, and log invariants for manual review.
+recommendations, human signoffs, report readiness, and log invariants for
+manual review. The supported command-line entrypoint is `Skills/background.py`
+with subcommands; deprecated one-file wrappers have been removed.
 
 Default background log path:
 
