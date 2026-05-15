@@ -1,0 +1,32 @@
+{
+  "seed": 42,
+  "n_per_bin": 50,
+  "bins": [
+    {
+      "bin": "1-10 arcsec/hr",
+      "n_total": 50,
+      "n_detected": 50,
+      "n_linked": 50,
+      "detection_rate": 1.0,
+      "link_rate": 1.0
+    },
+    {
+      "bin": "10-30 arcsec/hr",
+      "n_total": 50,
+      "n_detected": 50,
+      "n_linked": 50,
+      "detection_rate": 1.0,
+      "link_rate": 1.0
+    },
+    {
+      "bin": "30-60 arcsec/hr",
+      "n_total": 50,
+      "n_detected": 50,
+      "n_linked": 50,
+      "detection_rate": 1.0,
+      "link_rate": 1.0
+    }
+  ],
+  "high_motion_pass": true,
+  "high_motion_threshold": 0.6
+}

@@ -7,6 +7,7 @@ from link import (
     _make_tracklet,
     _motion,
     _obs_by_night,
+    _predict_from_arc,
     _sep_arcsec,
     link,
 )
@@ -266,6 +267,31 @@ class TestLinkPipeline:
                       position_tolerance_arcsec=10.0)
         assert len(result.tracklets) == 0
 
+    def test_improved_link_rate_after_chi2_fix(self):
+        """Regression: fixed error proxy raises link rate from 62% to ≥90% on noisy arcs."""
+        import numpy as np
+        rng = np.random.default_rng(0)
+        n_linked = 0
+        for i in range(20):
+            motion = rng.uniform(0.5, 5.0)
+            dra_hr = motion / 3600.0
+            cands = []
+            for night in range(3):
+                jd = 2460000.5 + night
+                ra = 180.0 + night * dra_hr * 24
+                o1 = make_obs(obs_id=f"r{i}_n{night}a", jd=jd,
+                              ra_deg=ra + rng.normal(0, 0.5 / 3600.0), dec_deg=5.0)
+                o2 = make_obs(obs_id=f"r{i}_n{night}b", jd=jd + 1 / 24,
+                              ra_deg=ra + dra_hr + rng.normal(0, 0.5 / 3600.0), dec_deg=5.0)
+                cands.append(make_candidate((o1, o2), rate=motion))
+            from detect import detect
+            from schemas import RawCandidate
+            dr = detect(tuple(o for c in cands for o in c.observations), mpc_cross_match=False)
+            lr = link(tuple(dr.candidates), min_nights=2, min_observations=3)
+            if lr.tracklets:
+                n_linked += 1
+        assert n_linked >= 18, f"Expected ≥18/20 linked after chi² fix, got {n_linked}"
+
     def test_mid_jd_observations_link_correctly(self):
         # Regression test for predict_position bug: observations at JD .5 (noon)
         # were not linked because prediction used integer night key (midnight).
@@ -294,3 +320,46 @@ class TestLinkPipeline:
         result = link(tuple(candidates), min_nights=2, min_observations=3,
                       position_tolerance_arcsec=10.0)
         assert len(result.tracklets) >= 1, "mid-JD observations must link after prediction fix"
+
+
+class TestPredictFromArc:
+    def test_two_obs_linear_interpolation(self):
+        # Two obs with 1 arcsec/hr motion; predict at midpoint → exact interpolation
+        dra_hr = 1.0 / 3600.0
+        obs1 = make_obs(obs_id="p1", jd=2460000.0, ra_deg=180.0, dec_deg=5.0)
+        obs2 = make_obs(obs_id="p2", jd=2460001.0, ra_deg=180.0 + dra_hr * 24, dec_deg=5.0)
+        pred_ra, pred_dec = _predict_from_arc([obs1, obs2], target_jd=2460002.0)
+        expected_ra = 180.0 + dra_hr * 48
+        assert pred_ra == pytest.approx(expected_ra, rel=1e-4)
+        assert pred_dec == pytest.approx(5.0, abs=1e-6)
+
+    def test_three_obs_quadratic_fit(self):
+        # Three collinear obs → quadratic fit degenerates to linear → exact prediction
+        dra_hr = 2.0 / 3600.0
+        obs1 = make_obs(obs_id="q1", jd=2460000.0, ra_deg=180.0, dec_deg=0.0)
+        obs2 = make_obs(obs_id="q2", jd=2460001.0, ra_deg=180.0 + dra_hr * 24, dec_deg=0.0)
+        obs3 = make_obs(obs_id="q3", jd=2460002.0, ra_deg=180.0 + dra_hr * 48, dec_deg=0.0)
+        pred_ra, pred_dec = _predict_from_arc([obs1, obs2, obs3], target_jd=2460003.0)
+        expected_ra = 180.0 + dra_hr * 72
+        assert pred_ra == pytest.approx(expected_ra, rel=1e-4)
+
+    def test_predicts_backward_in_time(self):
+        dra_hr = 1.0 / 3600.0
+        obs1 = make_obs(obs_id="b1", jd=2460001.0, ra_deg=180.0 + dra_hr * 24, dec_deg=0.0)
+        obs2 = make_obs(obs_id="b2", jd=2460002.0, ra_deg=180.0 + dra_hr * 48, dec_deg=0.0)
+        pred_ra, _ = _predict_from_arc([obs1, obs2], target_jd=2460000.0)
+        assert pred_ra == pytest.approx(180.0, rel=1e-4)
+
+    def test_ra_wraps_360(self):
+        # RA near 360°: predict forward; result should be in [0, 360)
+        obs1 = make_obs(obs_id="w1", jd=2460000.0, ra_deg=359.0, dec_deg=0.0)
+        obs2 = make_obs(obs_id="w2", jd=2460001.0, ra_deg=359.5, dec_deg=0.0)
+        pred_ra, _ = _predict_from_arc([obs1, obs2], target_jd=2460002.0)
+        assert 0.0 <= pred_ra < 360.0
+
+    def test_dec_clamped_to_poles(self):
+        # Dec approaching 90° should not exceed 90
+        obs1 = make_obs(obs_id="d1", jd=2460000.0, ra_deg=0.0, dec_deg=89.0)
+        obs2 = make_obs(obs_id="d2", jd=2460001.0, ra_deg=0.0, dec_deg=89.5)
+        _, pred_dec = _predict_from_arc([obs1, obs2], target_jd=2460010.0)
+        assert pred_dec <= 90.0

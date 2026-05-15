@@ -11,6 +11,7 @@ from alert import (
     _submit_to_mpc,
     format_mpc_observation,
     format_mpc_report,
+    monitor_neocp,
     process_alert,
     summarise,
 )
@@ -309,3 +310,94 @@ class TestPDCOAlertPackage:
         )
         assert "pdco_package" in result
         assert any("PDCO" in a for a in result["actions"])
+
+
+class TestMonitorNeocp:
+    def test_returns_timeout_when_no_confirmation(self):
+        # Mock _monitor_neocp to always return checked-but-not-confirmed
+        import alert as alert_mod
+
+        calls = {"n": 0}
+
+        def mock_sleep(seconds):
+            calls["n"] += 1
+
+        with patch.object(
+            alert_mod, "_monitor_neocp",
+            return_value={"status": "checked", "confirmed": False},
+        ):
+            result = monitor_neocp(
+                "TEST001",
+                max_wait_hr=2.0,
+                poll_interval_hr=1.0,
+                _sleep_fn=mock_sleep,
+            )
+        assert result["status"] == "timeout"
+        assert result["confirmed"] is False
+        assert calls["n"] == 2
+
+    def test_returns_error_on_first_network_failure(self):
+        # If the first _monitor_neocp returns an error, return immediately without sleeping
+        import alert as alert_mod
+
+        def mock_sleep(seconds):
+            raise AssertionError("should not sleep after error")
+
+        with patch.object(
+            alert_mod, "_monitor_neocp",
+            return_value={"status": "error", "error": "unreachable"},
+        ):
+            result = monitor_neocp(
+                "ERR001",
+                max_wait_hr=1.0,
+                poll_interval_hr=0.5,
+                _sleep_fn=mock_sleep,
+            )
+        assert result["status"] == "error"
+        assert "elapsed_hr" in result
+
+    def test_elapsed_hr_populated(self):
+        import alert as alert_mod
+
+        with patch.object(
+            alert_mod, "_monitor_neocp",
+            return_value={"status": "error", "error": "blocked"},
+        ):
+            result = monitor_neocp(
+                "X001",
+                max_wait_hr=1.0,
+                poll_interval_hr=1.0,
+                _sleep_fn=lambda _: None,
+            )
+        assert "elapsed_hr" in result
+        assert result["elapsed_hr"] >= 0.0
+
+    def test_returns_confirmed_immediately(self):
+        # _monitor_neocp returns confirmed=True → returns on first poll without sleeping
+        import alert as alert_mod
+
+        slept = []
+
+        with patch.object(
+            alert_mod, "_monitor_neocp",
+            return_value={"status": "checked", "confirmed": True, "raw": "..."},
+        ):
+            result = monitor_neocp(
+                "CONF001",
+                max_wait_hr=24.0,
+                poll_interval_hr=1.0,
+                _sleep_fn=lambda s: slept.append(s),
+            )
+        assert result["confirmed"] is True
+        assert result["status"] == "checked"
+        assert len(slept) == 0  # returned before sleeping
+
+
+class TestMonitorNeocpDirect:
+    """Tests that exercise the _monitor_neocp function body directly."""
+
+    def test_exception_path_returns_error_dict(self):
+        with patch("requests.get", side_effect=ConnectionError("unreachable")):
+            result = _monitor_neocp("TEST001")
+        assert result["status"] == "error"
+        assert "unreachable" in result["error"]

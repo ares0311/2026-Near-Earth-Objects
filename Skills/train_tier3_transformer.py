@@ -2,46 +2,54 @@
 """Train the Tier 3 Transformer on MPC tracklet observation sequences.
 
 Usage:
-    PYTHONPATH=src python Skills/train_tier3_transformer.py \
-        --labels data/tier3_labels.csv \
-        --epochs 30 \
+    PYTHONPATH=src python Skills/train_tier3_transformer.py \\
+        --labels data/sequences/train.csv \\
+        --epochs 30 \\
         --out models/tier3_transformer.pt
 
-Expected CSV columns: object_id, label (0-4), obs_json
-  obs_json: JSON list of {ra_deg, dec_deg, mag, jd, filter_band} per observation
+Expected CSV format produced by ``Skills/build_sequence_dataset.py``:
+  Flat token columns ``tok_0_0`` … ``tok_{T-1}_4`` where feature indices are
+  0=RA_norm, 1=Dec_norm, 2=mag_norm, 3=time_norm, 4=filter_id_norm.
+  Final column: ``label`` (int 0–4).
 """
 
 from __future__ import annotations
 
 import argparse
 import csv
-import json
 import pathlib
+import re
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 LABEL_NAMES = [
     "neo_candidate", "known_object", "main_belt_asteroid",
     "stellar_artifact", "other_solar_system",
 ]
-FILTER_MAP = {"g": 0, "r": 1, "i": 2, "o": 3, "c": 4, "V": 5}
+_N_FEATURES = 5
 
 
-def _obs_to_seq(obs_list: list[dict]):  # noqa: ANN201
+def _row_to_tensor(row: dict):  # noqa: ANN201
     import numpy as np
     import torch
 
-    obs_sorted = sorted(obs_list, key=lambda o: o["jd"])
-    t0 = obs_sorted[0]["jd"]
-    rows = [
-        [
-            o["ra_deg"] / 360.0,
-            (o["dec_deg"] + 90.0) / 180.0,
-            o["mag"] / 30.0,
-            (o["jd"] - t0) / 30.0,
-            FILTER_MAP.get(o.get("filter_band", "r"), 1) / 5.0,
-        ]
-        for o in obs_sorted
-    ]
-    return torch.from_numpy(np.array(rows, dtype=np.float32)).unsqueeze(0)  # (1, T, 5)
+    # Discover max observation index from column names
+    tok_keys = [k for k in row if re.match(r"^tok_\d+_\d+$", k)]
+    if not tok_keys:
+        return None
+    max_t = max(int(k.split("_")[1]) for k in tok_keys) + 1
+    seq = np.zeros((max_t, _N_FEATURES), dtype=np.float32)
+    for key in tok_keys:
+        _, t_str, j_str = key.split("_")
+        seq[int(t_str), int(j_str)] = float(row[key])
+    # Drop all-zero rows (padding) at end
+    mask = seq.any(axis=1)
+    seq = seq[mask]
+    if seq.shape[0] < 2:
+        return None
+    return torch.from_numpy(seq).unsqueeze(0)  # (1, T, 5)
 
 
 def train(labels_csv: str, epochs: int, out_path: str, lr: float) -> None:
@@ -67,11 +75,11 @@ def train(labels_csv: str, epochs: int, out_path: str, lr: float) -> None:
     model.train()
     for epoch in range(epochs):
         total_loss = 0.0
+        n_trained = 0
         for row in rows:
-            obs_list = json.loads(row["obs_json"])
-            if len(obs_list) < 2:
+            x = _row_to_tensor(row)
+            if x is None:
                 continue
-            x = _obs_to_seq(obs_list)
             label = torch.tensor([int(row["label"])], dtype=torch.long)
 
             optimizer.zero_grad()
@@ -80,8 +88,9 @@ def train(labels_csv: str, epochs: int, out_path: str, lr: float) -> None:
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
+            n_trained += 1
 
-        print(f"  Epoch {epoch + 1}/{epochs}  loss={total_loss / max(len(rows), 1):.4f}")
+        print(f"  Epoch {epoch + 1}/{epochs}  loss={total_loss / max(n_trained, 1):.4f}")
 
     pathlib.Path(out_path).parent.mkdir(parents=True, exist_ok=True)
     torch.save(model.state_dict(), out_path)
@@ -89,8 +98,9 @@ def train(labels_csv: str, epochs: int, out_path: str, lr: float) -> None:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--labels", required=True)
+    parser = argparse.ArgumentParser(description="Train Tier 3 Transformer on sequence CSV")
+    parser.add_argument("--labels", required=True,
+                        help="CSV with tok_i_j columns and label (from build_sequence_dataset.py)")
     parser.add_argument("--epochs", type=int, default=30)
     parser.add_argument("--out", default="models/tier3_transformer.pt")
     parser.add_argument("--lr", type=float, default=1e-4)

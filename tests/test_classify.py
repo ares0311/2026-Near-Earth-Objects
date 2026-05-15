@@ -651,3 +651,144 @@ class TestClassifyErrorPaths:
         t = make_tracklet(n_obs=4)
         result = cls_mod._tier3_predict(t, model=model)
         assert result is None
+
+
+def _make_tier1_csv(csv_path, n_rows: int = 10, n_classes: int = 3):
+    import csv
+    feature_cols = [
+        "real_bogus_score", "motion_consistency_score", "arc_coverage_score",
+        "nights_observed_score", "brightness_score", "color_score",
+        "lightcurve_variability_score", "streak_score", "psf_quality_score",
+        "known_object_score",
+    ]
+    with open(csv_path, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=feature_cols + ["label"])
+        writer.writeheader()
+        for i in range(n_rows):
+            row = {col: str(0.5 + (i % 2) * 0.3) for col in feature_cols}
+            row["label"] = str(i % n_classes)
+            writer.writerow(row)
+
+
+class TestRetrainTier1:
+    def test_retrain_from_csv(self, tmp_path, monkeypatch):
+        import classify as cls_mod
+        monkeypatch.setattr(cls_mod, "_MODEL_DIR", tmp_path)
+        from classify import retrain_tier1
+
+        csv_path = tmp_path / "labels.csv"
+        _make_tier1_csv(csv_path, n_rows=20, n_classes=2)
+
+        report = retrain_tier1(csv_path, tmp_path / "model.json")
+        assert report["n_samples"] == 20
+        assert report["n_classes"] >= 2
+
+    def test_retrain_returns_error_without_xgboost(self, tmp_path, monkeypatch):
+        import sys
+        import classify as cls_mod
+        monkeypatch.setattr(cls_mod, "_MODEL_DIR", tmp_path)
+        from classify import retrain_tier1
+
+        csv_path = tmp_path / "labels.csv"
+        _make_tier1_csv(csv_path, n_rows=2, n_classes=1)
+
+        monkeypatch.setitem(sys.modules, "xgboost", None)
+        report = retrain_tier1(csv_path, tmp_path / "model.json")
+        assert "error" in report
+
+    def test_retrain_report_keys(self, tmp_path, monkeypatch):
+        import classify as cls_mod
+        monkeypatch.setattr(cls_mod, "_MODEL_DIR", tmp_path)
+        from classify import retrain_tier1
+
+        csv_path = tmp_path / "labels.csv"
+        _make_tier1_csv(csv_path, n_rows=15, n_classes=3)
+
+        report = retrain_tier1(csv_path, tmp_path / "model_keys.json")
+        assert {"n_samples", "n_classes"} <= report.keys()
+
+
+class TestRetrainStacker:
+    def _make_training_data(self, n: int = 20):
+        import numpy as np
+        rng = np.random.default_rng(0)
+        labels_list = [
+            "neo_candidate", "known_object", "main_belt_asteroid",
+            "stellar_artifact", "other_solar_system",
+        ]
+        tier1_outputs = []
+        labels = []
+        for i in range(n):
+            raw = rng.dirichlet(np.ones(5))
+            tier1_outputs.append(dict(zip(labels_list, raw.tolist())))
+            labels.append({"label": i % 5})
+        return tier1_outputs, labels
+
+    def test_retrain_stacker_returns_report(self, tmp_path):
+        from classify import retrain_stacker
+        t1, lbls = self._make_training_data()
+        report = retrain_stacker(t1, lbls, tmp_path / "coef.json")
+        assert "n_samples" in report
+        assert report["n_samples"] == 20
+
+    def test_coef_file_written(self, tmp_path):
+        from classify import retrain_stacker
+        t1, lbls = self._make_training_data()
+        report = retrain_stacker(t1, lbls, tmp_path / "coef.json")
+        if report["coef_path"] is not None:
+            import json
+            data = json.loads((tmp_path / "coef.json").read_text())
+            assert "coef" in data
+            assert "labels" in data
+
+    def test_retrain_stacker_insufficient_classes(self, tmp_path):
+        from classify import retrain_stacker
+        labels_list = [
+            "neo_candidate", "known_object", "main_belt_asteroid",
+            "stellar_artifact", "other_solar_system",
+        ]
+        # All same class → _build_ensemble returns None (< 2 classes)
+        t1 = [dict(zip(labels_list, [0.9, 0.02, 0.02, 0.03, 0.03])) for _ in range(5)]
+        lbls = [{"label": 0}] * 5
+        report = retrain_stacker(t1, lbls, tmp_path / "coef.json")
+        assert report["n_samples"] == 5
+
+    def test_retrain_stacker_auc_present(self, tmp_path):
+        from classify import retrain_stacker
+        t1, lbls = self._make_training_data(30)
+        report = retrain_stacker(t1, lbls, tmp_path / "coef.json")
+        # auc may be None if sklearn unavailable or single class; otherwise float
+        if report["auc"] is not None:
+            assert 0.0 <= report["auc"] <= 1.0
+
+    def test_retrain_stacker_two_classes(self, tmp_path):
+        import numpy as np
+        from classify import retrain_stacker
+        rng = np.random.default_rng(7)
+        labels_list = [
+            "neo_candidate", "known_object", "main_belt_asteroid",
+            "stellar_artifact", "other_solar_system",
+        ]
+        # Only 2 distinct classes → exercises the binary AUC path
+        t1 = [dict(zip(labels_list, rng.dirichlet(np.ones(5)).tolist())) for _ in range(20)]
+        lbls = [{"label": i % 2} for i in range(20)]
+        report = retrain_stacker(t1, lbls, tmp_path / "coef2.json")
+        assert report["n_classes"] == 2
+        if report["auc"] is not None:
+            assert 0.0 <= report["auc"] <= 1.0
+
+    def test_retrain_stacker_exception_in_metrics(self, tmp_path, monkeypatch):
+        import numpy as np
+        import sys
+        from classify import retrain_stacker
+        rng = np.random.default_rng(0)
+        labels_list = [
+            "neo_candidate", "known_object", "main_belt_asteroid",
+            "stellar_artifact", "other_solar_system",
+        ]
+        t1 = [dict(zip(labels_list, rng.dirichlet(np.ones(5)).tolist())) for _ in range(20)]
+        lbls = [{"label": i % 5} for i in range(20)]
+        # Block sklearn.metrics to force the except Exception path
+        monkeypatch.setitem(sys.modules, "sklearn.metrics", None)
+        report = retrain_stacker(t1, lbls, tmp_path / "coef_exc.json")
+        assert "n_samples" in report

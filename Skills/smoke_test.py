@@ -16,6 +16,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 import numpy as np
 
+from alert import monitor_neocp
+from classify import retrain_tier1, retrain_stacker
 from detect import detect
 from link import link
 from orbit import classify_neo, compute_moid
@@ -137,6 +139,77 @@ def smoke_score() -> None:
     print(f"  score       ✓  (pathway={result.hazard.alert_pathway})")
 
 
+def smoke_monitor_neocp() -> None:
+    # Verify monitor_neocp is importable and returns expected structure
+    calls = []
+
+    def fake_sleep(s: float) -> None:
+        calls.append(s)
+
+    from unittest.mock import patch
+    import alert as alert_mod
+
+    with patch.object(
+        alert_mod, "_monitor_neocp",
+        return_value={"status": "checked", "confirmed": False},
+    ):
+        result = monitor_neocp(
+            "SMOKE001",
+            max_wait_hr=2.0,
+            poll_interval_hr=1.0,
+            _sleep_fn=fake_sleep,
+        )
+    assert result["status"] == "timeout"
+    assert len(calls) == 2
+    print("  monitor_neocp ✓")
+
+
+def smoke_retrain() -> None:
+    import csv
+    import tempfile
+
+    # retrain_tier1 smoke: build minimal CSV and train
+    with tempfile.TemporaryDirectory() as td:
+        from pathlib import Path
+        feature_cols = [
+            "real_bogus_score", "motion_consistency_score", "arc_coverage_score",
+            "nights_observed_score", "brightness_score", "color_score",
+            "lightcurve_variability_score", "streak_score", "psf_quality_score",
+            "known_object_score",
+        ]
+        csv_path = Path(td) / "labels.csv"
+        with csv_path.open("w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=feature_cols + ["label"])
+            writer.writeheader()
+            for i in range(10):
+                row = {c: str(0.5) for c in feature_cols}
+                row["label"] = str(i % 3)
+                writer.writerow(row)
+        report = retrain_tier1(csv_path, Path(td) / "model.json")
+        assert "n_samples" in report
+        assert report["n_samples"] == 10
+    print("  retrain_tier1 ✓")
+
+    # retrain_stacker smoke
+    labels_list = [
+        "neo_candidate", "known_object", "main_belt_asteroid",
+        "stellar_artifact", "other_solar_system",
+    ]
+    import numpy as np
+    rng = np.random.default_rng(0)
+    with tempfile.TemporaryDirectory() as td:
+        from pathlib import Path
+        t1_outputs = [
+            dict(zip(labels_list, rng.dirichlet(np.ones(5)).tolist()))
+            for _ in range(15)
+        ]
+        lbls = [{"label": i % 5} for i in range(15)]
+        report = retrain_stacker(t1_outputs, lbls, Path(td) / "coef.json")
+        assert "n_samples" in report
+        assert report["n_samples"] == 15
+    print("  retrain_stacker ✓")
+
+
 def main() -> None:
     print("NEO pipeline smoke test")
     print("-" * 40)
@@ -145,6 +218,8 @@ def main() -> None:
     smoke_link()
     smoke_orbit()
     smoke_score()
+    smoke_monitor_neocp()
+    smoke_retrain()
     print("-" * 40)
     print("All checks passed.")
 

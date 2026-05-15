@@ -2,11 +2,13 @@
 """Check a list of candidates against the MPC known object catalog.
 
 Reads candidate observations from a JSON file (same format as data/sample_tracklets.json)
-and queries the MPC to identify which are already known objects.
+and queries the MPC to identify which are already known objects.  Can also check NEOCP
+for confirmation status of candidate object IDs.
 
 Usage:
     PYTHONPATH=src python Skills/check_mpc_known.py --input data/sample_tracklets.json
     PYTHONPATH=src python Skills/check_mpc_known.py --ra 180.0 --dec 10.0 --radius 0.5
+    PYTHONPATH=src python Skills/check_mpc_known.py --neocp ID001 ID002 ID003
 """
 
 from __future__ import annotations
@@ -18,6 +20,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
+from alert import _monitor_neocp
 from schemas import Observation
 
 
@@ -76,14 +79,44 @@ def load_tracklets_from_json(path: Path) -> list[list[Observation]]:
     return tracklets
 
 
+def check_neocp(object_ids: list[str]) -> list[dict]:
+    """Check a list of object IDs against NEOCP for confirmation status.
+
+    Returns a list of dicts with keys ``object_id``, ``status``, ``confirmed``,
+    and optionally ``error``.  Requires network access to MPC.
+    """
+    results = []
+    for oid in object_ids:
+        result = _monitor_neocp(oid)
+        results.append({"object_id": oid, **result})
+    return results
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Check NEO candidates against MPC catalog")
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--input", type=Path, help="JSON tracklets file")
     group.add_argument("--ra", type=float, help="RA (deg) for single position check")
+    group.add_argument("--neocp", nargs="+", metavar="OBJECT_ID",
+                       help="Check these object IDs against NEOCP (requires network)")
     parser.add_argument("--dec", type=float, help="Dec (deg) for single position check")
     parser.add_argument("--radius", type=float, default=1.0, help="Search radius (deg)")
     args = parser.parse_args()
+
+    if args.neocp:
+        print(f"Checking {len(args.neocp)} object ID(s) against NEOCP (requires network)")
+        print("-" * 60)
+        results = check_neocp(args.neocp)
+        for r in results:
+            status = r.get("status", "unknown")
+            confirmed = r.get("confirmed", False)
+            error = r.get("error", "")
+            if error:
+                print(f"  {r['object_id']:20s}  error: {error}")
+            else:
+                print(f"  {r['object_id']:20s}  status={status}  confirmed={confirmed}")
+        print("-" * 60)
+        return
 
     if args.input:
         tracklets = load_tracklets_from_json(args.input)

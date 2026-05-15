@@ -2,14 +2,16 @@
 """Fine-tune the Tier 2 CNN on labeled ZTF cutout data.
 
 Usage:
-    PYTHONPATH=src python Skills/train_tier2_cnn.py \
-        --labels data/tier2_labels.csv \
-        --cutouts data/cutouts/ \
-        --epochs 20 \
+    PYTHONPATH=src python Skills/train_tier2_cnn.py \\
+        --labels data/cutouts/index.csv \\
+        --epochs 20 \\
         --out models/tier2_cnn.pt
 
-Expected CSV columns: obs_id, label (0-4 int matching NEOPosterior order),
-                      cutout_science_path, cutout_reference_path, cutout_difference_path
+Expected CSV columns: ``cutout_path`` (path to .npz file produced by
+``Skills/build_cutout_dataset.py``), ``label`` (int 0–4 matching NEOPosterior order).
+
+The .npz file must contain arrays ``science``, ``reference``, ``difference``
+each of shape (63, 63) float32, normalised to [0, 1].
 """
 
 from __future__ import annotations
@@ -17,6 +19,10 @@ from __future__ import annotations
 import argparse
 import csv
 import pathlib
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 LABEL_NAMES = [
     "neo_candidate", "known_object", "main_belt_asteroid",
@@ -24,13 +30,15 @@ LABEL_NAMES = [
 ]
 
 
-def _load_cutout(path: str):  # noqa: ANN201
+def _load_cutout_npz(npz_path: str):  # noqa: ANN201
     import numpy as np
     import torch
 
-    arr = np.fromfile(path, dtype=np.float32).reshape(63, 63)
-    arr = (arr - arr.min()) / max(arr.max() - arr.min(), 1e-6)
-    return torch.from_numpy(arr).unsqueeze(0)  # (1, 63, 63)
+    data = np.load(npz_path)
+    sci = torch.from_numpy(data["science"].astype(np.float32)).unsqueeze(0)   # (1,63,63)
+    ref = torch.from_numpy(data["reference"].astype(np.float32)).unsqueeze(0)
+    diff = torch.from_numpy(data["difference"].astype(np.float32)).unsqueeze(0)
+    return sci, ref, diff
 
 
 def train(labels_csv: str, epochs: int, out_path: str, lr: float) -> None:
@@ -57,9 +65,8 @@ def train(labels_csv: str, epochs: int, out_path: str, lr: float) -> None:
     for epoch in range(epochs):
         total_loss = 0.0
         for row in rows:
-            sci = _load_cutout(row["cutout_science_path"]).unsqueeze(0)
-            ref = _load_cutout(row["cutout_reference_path"]).unsqueeze(0)
-            diff = _load_cutout(row["cutout_difference_path"]).unsqueeze(0)
+            sci, ref, diff = _load_cutout_npz(row["cutout_path"])
+            sci, ref, diff = sci.unsqueeze(0), ref.unsqueeze(0), diff.unsqueeze(0)
             label = torch.tensor([int(row["label"])], dtype=torch.long)
 
             optimizer.zero_grad()
@@ -77,8 +84,9 @@ def train(labels_csv: str, epochs: int, out_path: str, lr: float) -> None:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--labels", required=True)
+    parser = argparse.ArgumentParser(description="Train Tier 2 CNN on cutout dataset")
+    parser.add_argument("--labels", required=True,
+                        help="CSV with cutout_path and label columns")
     parser.add_argument("--epochs", type=int, default=20)
     parser.add_argument("--out", default="models/tier2_cnn.pt")
     parser.add_argument("--lr", type=float, default=1e-4)
