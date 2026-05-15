@@ -28,6 +28,10 @@ _MOTION_MIN_ARCSEC_PER_HR = 0.01
 _MOTION_MAX_ARCSEC_PER_HR = 60.0
 _POSITION_TOLERANCE_ARCSEC = 10.0  # sky-plane prediction window
 _CHI2_DOF_THRESHOLD = 5.0  # max reduced chi² for orbit consistency
+# Satellite/debris trail filter: reject seed pairs with motion that is
+# >95% along a single axis (nearly pure E-W or N-S) at rate > threshold
+_SATELLITE_RATE_MIN_ARCSEC_PER_HR = 30.0
+_SATELLITE_AXIS_FRACTION = 0.98  # |dra|/rate or |ddec|/rate must be < this
 
 
 # ---------------------------------------------------------------------------
@@ -40,6 +44,17 @@ def _sep_arcsec(ra1: float, dec1: float, ra2: float, dec2: float) -> float:
     cos_sep = math.sin(d1) * math.sin(d2) + math.cos(d1) * math.cos(d2) * math.cos(r1 - r2)
     cos_sep = max(-1.0, min(1.0, cos_sep))
     return math.degrees(math.acos(cos_sep)) * 3600.0
+
+
+def _is_satellite_trail(dra: float, ddec: float, rate: float) -> bool:
+    """Return True if motion looks like a satellite or debris trail.
+
+    Fast (>30 arcsec/hr) purely E-W or N-S movers are almost certainly
+    low-Earth-orbit objects, not solar system bodies.
+    """
+    if rate < _SATELLITE_RATE_MIN_ARCSEC_PER_HR:
+        return False
+    return abs(dra) / rate > _SATELLITE_AXIS_FRACTION or abs(ddec) / rate > _SATELLITE_AXIS_FRACTION
 
 
 def _motion(obs_a: Observation, obs_b: Observation) -> tuple[float, float]:
@@ -222,6 +237,8 @@ def _link_candidates(
                     dra, ddec = _motion(obs_a, obs_b)
                     rate = math.hypot(dra, ddec)
                     if not (_MOTION_MIN_ARCSEC_PER_HR <= rate <= _MOTION_MAX_ARCSEC_PER_HR):
+                        continue
+                    if _is_satellite_trail(dra, ddec, rate):
                         continue
 
                     # Seed pair found — propagate to remaining nights

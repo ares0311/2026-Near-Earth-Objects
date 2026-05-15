@@ -83,10 +83,11 @@ def fetch(
     jd_start: float,
     jd_end: float,
     surveys: tuple[str, ...] = ("ZTF",),
+    force_refresh: bool = False,
 ) -> FetchResult
 ```
 
-Query survey alert streams for observations in the specified sky region and time range.
+Query survey alert streams for observations in the specified sky region and time range. Set `force_refresh=True` to bypass the on-disk cache and re-download. ATLAS authentication falls back to the `ATLAS_TOKEN` environment variable when no token is passed.
 
 **Returns** `FetchResult(alerts: tuple[Observation, ...], provenance: FetchProvenance)`
 
@@ -139,6 +140,7 @@ Link single-night detections into multi-night tracklets using linear motion prop
 - Requires ≥`min_nights` distinct nights and ≥`min_observations` total detections.
 - Motion rate gate: 0.01–`max_rate_arcsec_per_hr` arcsec/hr between seed nights.
 - Seed pairs more than 30 days apart are skipped.
+- Candidate pairs exhibiting purely E-W or N-S linear motion at rate ≥ 30 arcsec/hr are rejected as probable satellite trails (`_is_satellite_trail` filter).
 
 ---
 
@@ -156,6 +158,39 @@ def extract_features(tracklet: Tracklet) -> CandidateFeatures
 
 Extract tabular feature vector from a tracklet (no ML inference).
 
+```python
+def classify_batch(
+    tracklets: list[Tracklet],
+    xgb_model=None,
+    cnn_model=None,
+    transformer_model=None,
+) -> list[tuple[CandidateFeatures, NEOPosterior]]
+```
+
+Classify a list of tracklets in one call, loading models once. Returns one `(features, posterior)` pair per tracklet in the same order.
+
+```python
+def get_tier1_feature_importances(model_path: str | Path) -> dict[str, float] | None
+```
+
+Load a saved XGBoost model and return normalised gain-based feature importances. Returns `None` if the model cannot be loaded.
+
+```python
+def retrain_tier1(csv_path: str | Path, model_path: str | Path) -> dict
+```
+
+Retrain the XGBoost Tier 1 classifier from a labelled CSV. Saves the model to `model_path` and returns a JSON-serialisable training report.
+
+```python
+def retrain_stacker(
+    tier1_outputs: list[float],
+    labels: list[int],
+    model_path: str | Path,
+) -> dict
+```
+
+Retrain the logistic-regression stacking meta-learner from Tier 1 probabilities and binary labels. Saves coefficients to `model_path` as JSON and returns a report.
+
 ---
 
 ## orbit.py
@@ -171,6 +206,21 @@ def compute_moid(elements: OrbitalElements) -> float | None
 ```
 
 Compute Minimum Orbit Intersection Distance relative to Earth's orbit. Returns `None` when orbit quality is too low.
+
+```python
+def arc_quality_report(tracklet: Tracklet) -> dict
+```
+
+Return a quality summary for the tracklet arc. Fields:
+
+| Key | Type | Notes |
+|---|---|---|
+| `arc_days` | `float` | Total arc length |
+| `n_observations` | `int` | Total observation count |
+| `n_nights` | `int` | Number of distinct nights |
+| `quality_code` | `int` | 1 = < 1 day; 2 = multi-night; 3 = ≥ 7 days; 4 = ≥ 30 days |
+| `arc_warning` | `str \| None` | Human-readable caution for short arcs |
+| `recommended_action` | `str` | Suggested follow-up step |
 
 ---
 
@@ -193,6 +243,17 @@ Compute hazard assessment, discovery priority, and alert pathway for a classifie
 - `nominal`: does not meet close-approach criteria
 - `unknown`: MOID unavailable or orbit quality < 2
 
+`ScoringMetadata.close_approach_au` is populated with the MOID value when orbit quality ≥ 2; otherwise `None`.
+
+```python
+def score_batch(
+    items: list[tuple[Tracklet, CandidateFeatures, NEOPosterior, OrbitalElements | None]],
+    pipeline_run_id: str = "",
+) -> list[ScoredNEO]
+```
+
+Score a list of classified tracklets in one call. Returns one `ScoredNEO` per item in the same order. Shares the same pipeline-run ID across all results.
+
 ---
 
 ## alert.py
@@ -214,6 +275,33 @@ def format_mpc_observation(obs: Observation, designation: str, is_discovery: boo
 ```
 
 Format a single observation as one 80-character MPC line.
+
+```python
+def format_mpc_json(neo: ScoredNEO, obs_code: str = "500") -> dict
+```
+
+Return a MPC JSON submission dict. Fields: `type`, `provId`, `submissions` (list of observation dicts with the discovery observation marked `"remarks": "discovery"`), `moid_au`, `neo_class`, `hazard_flag`.
+
+```python
+def batch_process_alerts(
+    neos: list[ScoredNEO],
+    dry_run: bool = True,
+    mpc_obs_code: str = "500",
+) -> list[dict]
+```
+
+Process a list of `ScoredNEO` objects through the alert protocol. Returns one result dict per item. Per-item exceptions are caught and recorded as `{"error": ...}` entries.
+
+```python
+def monitor_neocp(
+    object_id: str,
+    max_wait_hr: float = 48.0,
+    poll_interval_hr: float = 1.0,
+    _sleep_fn=None,
+) -> dict
+```
+
+Blocking NEOCP poll loop. Checks the MPC NEOCP page for `object_id` at `poll_interval_hr` intervals up to `max_wait_hr`. Returns `{"confirmed": bool, "elapsed_hr": float, "confirmations": int}`. Use `_sleep_fn` to inject a no-op in tests.
 
 ```python
 def summarise(neo: ScoredNEO) -> str

@@ -5,6 +5,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## v0.12.0
+
+- `link.py`: added `_is_satellite_trail` filter — rejects candidate pairs with purely E-W or N-S motion at rate ≥ 30 arcsec/hr as probable satellite/debris trails.
+- `classify.py`: added `classify_batch(tracklets, ...)` — classifies a list of tracklets in one call, loading models once; added to `__all__`.
+- `classify.py`: added `get_tier1_feature_importances(model_path)` — loads XGBoost model and returns normalised gain-based feature importances; returns `None` on load failure; added to `__all__`.
+- `orbit.py`: added `arc_quality_report(tracklet)` — returns arc quality dict with `arc_days`, `n_observations`, `n_nights`, `quality_code` (1–4), `arc_warning`, `recommended_action`; added to `__all__`.
+- `score.py`: added `score_batch(items, pipeline_run_id)` — scores a list of classified tracklets in one call; added to `__all__`.
+- `score.py`: `ScoringMetadata.close_approach_au` now populated with MOID value when orbit quality ≥ 2 (else `None`).
+- `schemas.py`: added `close_approach_au: float | None = None` field to `ScoringMetadata`.
+- `alert.py`: added `format_mpc_json(neo, obs_code)` — returns MPC JSON submission dict; added to `__all__`.
+- `alert.py`: added `batch_process_alerts(neos, dry_run, mpc_obs_code)` — processes list of ScoredNEOs through alert protocol with per-item exception handling; added to `__all__`.
+- `Skills/validate_mpc_report.py`: validate MPC 80-column observation reports for line length, date/RA/Dec format, and observatory code; CLI with `--json` flag.
+- `Skills/diagnose_pipeline.py`: run each pipeline stage with synthetic data and report pass/fail with elapsed time; CLI with `--json` flag.
+- `Skills/compare_baselines.py`: compare two injection-recovery JSON baselines; exits 1 on regression; CLI with `--json` flag.
+- `docs/API_REFERENCE.md`: updated with all v0.12.0 public APIs (`classify_batch`, `get_tier1_feature_importances`, `retrain_tier1`, `retrain_stacker`, `format_mpc_json`, `batch_process_alerts`, `monitor_neocp`, `score_batch`, `arc_quality_report`, `close_approach_au`, `force_refresh`, satellite trail filter note).
+- 34 new tests; 411 total; 100% coverage maintained.
+- Version bumped to 0.12.0.
+
 ## v0.11.0
 
 - `link.py`: added `_predict_from_arc` (quadratic polyfit for ≥3 obs, linear fallback for 2); replaces constant-velocity extrapolation when arc has grown.

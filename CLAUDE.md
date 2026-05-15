@@ -468,9 +468,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.11.0)
+## Current State (v0.12.0)
 
-All 10 pipeline modules are complete. 377 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified manual CLI with top-level SQLite logs and auditable signoff readiness.
+All 10 pipeline modules are complete. 411 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified manual CLI with top-level SQLite logs and auditable signoff readiness.
 
 ### Skills
 
@@ -493,6 +493,9 @@ All 10 pipeline modules are complete. 377 tests passing (100% coverage). CI gree
 | `Skills/stress_test_high_motion.py` | Stress-test linker across 3 motion bins (1–10, 10–30, 30–60 arcsec/hr); saves results to `data/` |
 | `Skills/build_cutout_dataset.py` | Convert ZTF alert JSON (base64 cutouts) to `.npz` + CSV index for Tier 2 CNN training |
 | `Skills/build_sequence_dataset.py` | Convert tracklet JSON to flat token CSV for Tier 3 Transformer training |
+| `Skills/validate_mpc_report.py` | Validate MPC 80-column observation report files; CLI with `--json` flag |
+| `Skills/diagnose_pipeline.py` | Run each pipeline stage with synthetic data; report pass/fail per stage |
+| `Skills/compare_baselines.py` | Compare two injection-recovery JSON baselines; exits 1 on regression |
 
 ### Docs
 
@@ -517,7 +520,7 @@ All 10 pipeline modules are complete. 377 tests passing (100% coverage). CI gree
 | `background/config.schema.json` | JSON Schema for manual-first background config |
 | `background/targets.json` | Stable background automation fixture manifest |
 
-### Coverage by Module (v0.11.0)
+### Coverage by Module (v0.12.0)
 
 | Module | Coverage |
 |---|---|
@@ -546,6 +549,21 @@ All 10 pipeline modules are complete. 377 tests passing (100% coverage). CI gree
 - Collect labeled training data via `Skills/generate_training_labels.py`
 - Integrate live ZTF alert stream (Milestone 4)
 - Train and evaluate Tier 2 CNN on real cutouts (Milestone 5)
+
+### Key Changes in v0.12.0
+
+- `link.py`: added `_is_satellite_trail` — rejects purely E-W or N-S fast-moving pairs (≥30 arcsec/hr) as satellite/debris trails.
+- `classify.py`: added `classify_batch` and `get_tier1_feature_importances` public APIs.
+- `orbit.py`: added `arc_quality_report` — returns quality dict with codes 1–4.
+- `score.py`: added `score_batch`; `ScoringMetadata.close_approach_au` now populated from MOID when orbit quality ≥ 2.
+- `schemas.py`: added `close_approach_au: float | None = None` to `ScoringMetadata`.
+- `alert.py`: added `format_mpc_json` and `batch_process_alerts` public APIs.
+- `Skills/validate_mpc_report.py`: new — validate MPC 80-column report format.
+- `Skills/diagnose_pipeline.py`: new — per-stage diagnostic runner with synthetic data.
+- `Skills/compare_baselines.py`: new — compare injection-recovery baselines; regression detection.
+- `docs/API_REFERENCE.md`: updated with all v0.12.0 public APIs.
+- 34 new tests; 411 total; 100% coverage maintained.
+- Version bumped to 0.12.0.
 
 ### Key Changes in v0.11.0
 

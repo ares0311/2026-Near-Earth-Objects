@@ -5,6 +5,8 @@ from __future__ import annotations
 __all__ = [
     "extract_features",
     "classify",
+    "classify_batch",
+    "get_tier1_feature_importances",
     "ensemble_predict",
     "_build_ensemble",
     "retrain_tier1",
@@ -743,3 +745,57 @@ def classify(
     )
 
     return updated_features, posterior
+
+
+def classify_batch(
+    tracklets: list[Tracklet],
+    xgb_model: Any = None,
+    cnn_model: Any = None,
+    transformer_model: Any = None,
+) -> list[tuple[CandidateFeatures, NEOPosterior]]:
+    """Run the three-tier classification pipeline on a list of tracklets.
+
+    Loads each model at most once, then applies it to every tracklet.
+    Returns a list of (CandidateFeatures, NEOPosterior) in the same order
+    as the input list.
+    """
+    loaded_xgb = xgb_model if xgb_model is not None else _load_xgb_model()
+    loaded_cnn = cnn_model if cnn_model is not None else _load_cnn_model()
+    loaded_t3 = transformer_model if transformer_model is not None else _load_transformer_model()
+    return [
+        classify(t, xgb_model=loaded_xgb, cnn_model=loaded_cnn, transformer_model=loaded_t3)
+        for t in tracklets
+    ]
+
+
+def get_tier1_feature_importances(model_path: Path | str | None = None) -> dict[str, float] | None:
+    """Return feature importances from the saved Tier 1 XGBoost model.
+
+    Returns a dict mapping feature name → importance (gain-based), or None
+    if the model file does not exist or cannot be loaded.
+    """
+    path = Path(model_path) if model_path else _MODEL_DIR / "tier1_xgb.json"
+    if not path.exists():
+        return None
+    try:
+        import xgboost as xgb  # type: ignore[import]
+
+        clf = xgb.XGBClassifier()
+        clf.load_model(str(path))
+        scores = clf.get_booster().get_fscore()
+        feature_names = [
+            "real_bogus_score", "motion_consistency_score", "arc_coverage_score",
+            "nights_observed_score", "brightness_score", "color_score",
+            "lightcurve_variability_score", "streak_score", "psf_quality_score",
+            "known_object_score",
+        ]
+        # Map f0, f1, … back to feature names; fill missing with 0.0
+        named: dict[str, float] = {name: 0.0 for name in feature_names}
+        for fkey, imp in scores.items():
+            idx = int(fkey.lstrip("f"))
+            if idx < len(feature_names):
+                named[feature_names[idx]] = float(imp)
+        total = sum(named.values()) or 1.0
+        return {k: v / total for k, v in named.items()}
+    except Exception:
+        return None

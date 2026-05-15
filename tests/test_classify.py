@@ -6,6 +6,7 @@ import sys
 import numpy as np
 import pytest
 
+import classify as cls_mod
 from classify import (
     _arc_coverage,
     _brightness_score,
@@ -22,10 +23,14 @@ from classify import (
     _tier1_predict,
     _tracklet_to_sequence,
     classify,
+    classify_batch,
     ensemble_predict,
     extract_features,
+    get_tier1_feature_importances,
+    retrain_tier1,
+    retrain_stacker,
 )
-from schemas import CandidateFeatures, Observation, Tracklet
+from schemas import CandidateFeatures, NEOPosterior, Observation, Tracklet
 
 
 def make_obs(**kwargs) -> Observation:
@@ -792,3 +797,68 @@ class TestRetrainStacker:
         monkeypatch.setitem(sys.modules, "sklearn.metrics", None)
         report = retrain_stacker(t1, lbls, tmp_path / "coef_exc.json")
         assert "n_samples" in report
+
+
+class TestClassifyBatch:
+    def test_returns_list_same_length(self):
+        from .conftest import build_tracklet
+        tracklets = [build_tracklet(n_obs=3) for _ in range(4)]
+        results = classify_batch(tracklets)
+        assert len(results) == 4
+
+    def test_each_result_is_tuple_of_features_and_posterior(self):
+        from .conftest import build_tracklet
+        tracklets = [build_tracklet(n_obs=3)]
+        features, posterior = classify_batch(tracklets)[0]
+        assert isinstance(features, CandidateFeatures)
+        assert isinstance(posterior, NEOPosterior)
+
+    def test_empty_list_returns_empty(self):
+        assert classify_batch([]) == []
+
+    def test_models_loaded_once(self):
+        from .conftest import build_tracklet
+        # Should not raise even with multiple tracklets
+        tracklets = [build_tracklet(n_obs=3) for _ in range(3)]
+        results = classify_batch(tracklets)
+        assert all(isinstance(r, tuple) for r in results)
+
+
+class TestGetTier1FeatureImportances:
+    def test_returns_none_when_no_model(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(cls_mod, "_MODEL_DIR", tmp_path)
+        result = get_tier1_feature_importances(tmp_path / "nonexistent.json")
+        assert result is None
+
+    def test_returns_dict_after_training(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(cls_mod, "_MODEL_DIR", tmp_path)
+        csv_file = tmp_path / "train.csv"
+        _make_tier1_csv(csv_file)
+        model_path = tmp_path / "tier1_xgb.json"
+        retrain_tier1(csv_file, model_path=model_path)
+        result = get_tier1_feature_importances(model_path)
+        assert result is not None
+        assert isinstance(result, dict)
+        assert "real_bogus_score" in result
+
+    def test_importances_sum_to_one(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(cls_mod, "_MODEL_DIR", tmp_path)
+        csv_file = tmp_path / "train.csv"
+        _make_tier1_csv(csv_file)
+        model_path = tmp_path / "tier1_xgb.json"
+        retrain_tier1(csv_file, model_path=model_path)
+        result = get_tier1_feature_importances(model_path)
+        assert result is not None
+        assert abs(sum(result.values()) - 1.0) < 1e-6
+
+    def test_returns_none_on_bad_path(self):
+        result = get_tier1_feature_importances("/totally/nonexistent/model.json")
+        assert result is None
+
+    def test_returns_none_on_xgboost_load_exception(self, tmp_path, monkeypatch):
+        import xgboost as xgb
+        # Write a valid-looking but empty JSON file to trigger an xgb load error
+        bad_path = tmp_path / "bad_model.json"
+        bad_path.write_text("{}")
+        result = get_tier1_feature_importances(bad_path)
+        assert result is None
