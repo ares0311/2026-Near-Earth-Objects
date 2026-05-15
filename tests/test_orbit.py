@@ -9,12 +9,15 @@ from orbit import (
     _differential_correction,
     _equatorial_to_ecliptic,
     _gauss_iod,
+    _kepler_equation,
     _state_to_elements,
     _sun_position_ecliptic,
     arc_quality_report,
     classify_neo,
     compute_moid,
     fit_orbit,
+    predict_ephemeris,
+    propagate_orbit,
 )
 from schemas import Observation, OrbitalElements, Tracklet
 
@@ -411,3 +414,79 @@ class TestArcQualityReport:
         report = arc_quality_report(t)
         assert report["arc_days"] == 0.0
         assert report["quality_code"] == 1
+
+
+class TestPropagateOrbit:
+    def test_advances_mean_anomaly(self):
+        el = make_elements(mean_anomaly_deg=0.0)
+        propagated = propagate_orbit(el, dt_days=365.25)
+        # After one full period, M should return close to 0
+        # (T for a=1.5 AU ~ 1.837 yr; after 1 yr M should be ~360/1.837 ~ 196°)
+        assert 0.0 < propagated.mean_anomaly_deg < 360.0
+
+    def test_epoch_advances(self):
+        el = make_elements(epoch_jd=2460000.0)
+        propagated = propagate_orbit(el, dt_days=10.0)
+        assert propagated.epoch_jd == pytest.approx(2460010.0)
+
+    def test_zero_dt_unchanged(self):
+        el = make_elements(mean_anomaly_deg=90.0)
+        propagated = propagate_orbit(el, dt_days=0.0)
+        assert propagated.mean_anomaly_deg == pytest.approx(90.0)
+
+    def test_other_elements_preserved(self):
+        el = make_elements()
+        propagated = propagate_orbit(el, dt_days=30.0)
+        assert propagated.semi_major_axis_au == pytest.approx(el.semi_major_axis_au)
+        assert propagated.eccentricity == pytest.approx(el.eccentricity)
+        assert propagated.inclination_deg == pytest.approx(el.inclination_deg)
+
+    def test_full_period_returns_to_start(self):
+        import math
+        a = 1.5
+        T_days = 365.25 * math.sqrt(a**3)
+        el = make_elements(semi_major_axis_au=a, mean_anomaly_deg=45.0)
+        propagated = propagate_orbit(el, dt_days=T_days)
+        assert propagated.mean_anomaly_deg == pytest.approx(45.0, abs=1e-6)
+
+
+class TestKeplerEquation:
+    def test_circular_orbit(self):
+        import math
+        E = _kepler_equation(math.pi / 2, e=0.0)
+        assert E == pytest.approx(math.pi / 2, abs=1e-8)
+
+    def test_known_eccentric_solution(self):
+        import math
+        # For e=0.5, M=π: E=π (by symmetry)
+        E = _kepler_equation(math.pi, e=0.5)
+        assert E == pytest.approx(math.pi, abs=1e-8)
+
+
+class TestPredictEphemeris:
+    def test_returns_required_keys(self):
+        el = make_elements()
+        result = predict_ephemeris(el, jd=2460000.5)
+        assert set(result.keys()) == {"ra_deg", "dec_deg", "helio_dist_au", "jd"}
+
+    def test_ra_in_valid_range(self):
+        el = make_elements()
+        result = predict_ephemeris(el, jd=2460000.5)
+        assert 0.0 <= result["ra_deg"] < 360.0
+
+    def test_dec_in_valid_range(self):
+        el = make_elements()
+        result = predict_ephemeris(el, jd=2460100.0)
+        assert -90.0 <= result["dec_deg"] <= 90.0
+
+    def test_helio_dist_within_orbit(self):
+        el = make_elements(perihelion_au=1.05, aphelion_au=1.95)
+        result = predict_ephemeris(el, jd=2460000.5)
+        # Helio distance should be between perihelion and aphelion (approx)
+        assert 0.5 <= result["helio_dist_au"] <= 2.5
+
+    def test_jd_matches_input(self):
+        el = make_elements()
+        target_jd = 2461000.0
+        result = predict_ephemeris(el, jd=target_jd)
+        assert result["jd"] == target_jd

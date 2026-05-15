@@ -18,6 +18,9 @@ from schemas import (
     NEOPosterior,
     Observation,
     OrbitalElements,
+    PipelineResult,
+    PreprocessProvenance,
+    PreprocessResult,
     RawCandidate,
     Tracklet,
 )
@@ -174,3 +177,66 @@ class TestOrbitalElements:
             aphelion_au=1.95,
         )
         assert el.quality_code == 1
+
+
+def _make_pipeline_result(**kwargs):
+    obs = (Observation(
+        obs_id="pr1", ra_deg=180.0, dec_deg=0.0, jd=2460000.5,
+        mag=19.5, mag_err=0.05, filter_band="r", mission="ZTF",
+    ),)
+    fetch = FetchResult(
+        alerts=obs,
+        provenance=FetchProvenance(surveys=("ZTF",), start_jd=2460000.0, end_jd=2460001.0),
+    )
+    preprocess = PreprocessResult(
+        sources=obs,
+        provenance=PreprocessProvenance(n_sources_in=1, n_sources_out=1),
+    )
+    detect = DetectResult(
+        candidates=(),
+        known_matches=(),
+        provenance=DetectProvenance(real_bogus_threshold=0.65, n_candidates=0, n_known_matches=0),
+    )
+    link = LinkResult(
+        tracklets=(),
+        provenance=LinkProvenance(n_tracklets=0, min_nights=3, min_observations=6),
+    )
+    defaults = dict(
+        run_id="test_run_001",
+        started_at_jd=2460000.0,
+        finished_at_jd=2460000.1,
+        fetch=fetch,
+        preprocess=preprocess,
+        detect=detect,
+        link=link,
+        scored_neos=(),
+    )
+    defaults.update(kwargs)
+    return PipelineResult(**defaults)
+
+
+class TestPipelineResult:
+    def test_constructs_successfully(self):
+        pr = _make_pipeline_result()
+        assert pr.run_id == "test_run_001"
+
+    def test_is_frozen(self):
+        pr = _make_pipeline_result()
+        with pytest.raises(Exception):
+            pr.run_id = "modified"  # type: ignore[misc]
+
+    def test_default_n_pha_candidates_zero(self):
+        pr = _make_pipeline_result()
+        assert pr.n_pha_candidates == 0
+
+    def test_custom_n_pha_candidates(self):
+        pr = _make_pipeline_result(n_pha_candidates=3)
+        assert pr.n_pha_candidates == 3
+
+    def test_scored_neos_empty_tuple_default(self):
+        pr = _make_pipeline_result()
+        assert pr.scored_neos == ()
+
+    def test_pipeline_version_default_empty(self):
+        pr = _make_pipeline_result()
+        assert pr.pipeline_version == ""

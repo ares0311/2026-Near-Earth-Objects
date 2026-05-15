@@ -5,6 +5,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## v0.13.0
+
+- `fetch.py`: added `fetch_batch(targets, radius_deg, start_jd, end_jd, ...)` — fetch multiple sky positions in one call; added to `__all__`.
+- `preprocess.py`: added `preprocess_batch(fetch_results, apply_astrometry)` — batch preprocessing from a list of `FetchResult` objects; added to `__all__`.
+- `detect.py`: added `detect_batch(preprocess_results, ...)` — batch detection from a list of `PreprocessResult` objects; added to `__all__`.
+- `link.py`: added `merge_tracklets(a, b)` — merge two tracklets into a longer arc, deduplicating by `obs_id`; added to `__all__`.
+- `orbit.py`: added `propagate_orbit(elements, dt_days)` — two-body Keplerian propagation of orbital elements; added to `__all__`.
+- `orbit.py`: added `predict_ephemeris(elements, jd)` — approximate geocentric RA/Dec prediction at a target JD; added to `__all__`.
+- `orbit.py`: added `_kepler_equation` helper (internal; covered by tests).
+- `score.py`: added `rank_candidates(neos)` — sort `ScoredNEO` list by descending discovery priority with PHA tier; added to `__all__`.
+- `alert.py`: added `generate_alert_package(neo, obs_code)` — bundle MPC report, MPC JSON, summary, and metadata into a single dict; added to `__all__`.
+- `schemas.py`: added `PipelineResult` — immutable top-level container for a complete pipeline run; added to `__all__`.
+- `Skills/simulate_survey.py`: generate synthetic ZTF-like survey observations for a sky field.
+- `Skills/export_ranked_table.py`: export a ranked `ScoredNEO` table to CSV or HTML.
+- `Skills/check_orbit_quality.py`: check orbit quality and fit preliminary orbit for tracklets from a JSON file.
+- `tests/conftest.py`: extended with `build_raw_candidate`, `build_scored_neo`, `raw_candidate` fixture, `scored_neo` fixture.
+- `docs/PIPELINE_SPEC.md`: updated with all v0.13.0 batch APIs, new orbit utilities, `PipelineResult`, and updated running examples.
+- 54 new tests; 465 total; 100% coverage maintained.
+- Version bumped to 0.13.0.
+
 ## v0.12.0
 
 - `link.py`: added `_is_satellite_trail` filter — rejects candidate pairs with purely E-W or N-S motion at rate ≥ 30 arcsec/hr as probable satellite/debris trails.

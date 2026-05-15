@@ -14,8 +14,9 @@ from preprocess import (
     _psf_elongation,
     _psf_quality,
     preprocess,
+    preprocess_batch,
 )
-from schemas import Observation
+from schemas import FetchProvenance, FetchResult, Observation
 
 
 def make_obs(**kwargs) -> Observation:
@@ -260,3 +261,35 @@ class TestPreprocessQualityCuts:
         )
         result = preprocess((obs,), apply_astrometry=False)
         assert result.provenance.n_sources_out == 0
+
+
+def _make_fetch_result(obs: tuple) -> FetchResult:
+    return FetchResult(
+        alerts=obs,
+        provenance=FetchProvenance(surveys=("ZTF",), start_jd=2460000.0, end_jd=2460001.0),
+    )
+
+
+class TestPreprocessBatch:
+    def test_returns_one_result_per_input(self):
+        obs = (make_obs(obs_id="b1"),)
+        fr = _make_fetch_result(obs)
+        results = preprocess_batch([fr, fr], apply_astrometry=False)
+        assert len(results) == 2
+
+    def test_empty_list_returns_empty(self):
+        assert preprocess_batch([]) == []
+
+    def test_each_result_is_preprocess_result(self):
+        from schemas import PreprocessResult
+        obs = (make_obs(obs_id="b2"),)
+        fr = _make_fetch_result(obs)
+        results = preprocess_batch([fr], apply_astrometry=False)
+        assert isinstance(results[0], PreprocessResult)
+
+    def test_source_counts_match_individual(self):
+        obs = (make_obs(obs_id="b3"), make_obs(obs_id="b4"))
+        fr = _make_fetch_result(obs)
+        batch = preprocess_batch([fr], apply_astrometry=False)
+        individual = preprocess(obs, apply_astrometry=False)
+        assert batch[0].provenance.n_sources_out == individual.provenance.n_sources_out

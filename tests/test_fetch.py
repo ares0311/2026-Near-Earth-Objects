@@ -14,6 +14,7 @@ from fetch import (
     _save_cache,
     _ztf_filter_id,
     fetch,
+    fetch_batch,
     fetch_horizons,
     fetch_mpc_known,
     fetch_ztf,
@@ -705,6 +706,54 @@ class TestAtlasTokenEnvVar:
                 fetch_mod.fetch_atlas(10.0, 5.0, 0.5, 2460000.0, 2460005.0,
                                       atlas_token="explicit_token")
         assert mock_post.call_args[1]["headers"].get("Authorization") == "Token explicit_token"
+
+
+class TestFetchBatch:
+    """Tests for fetch_batch."""
+
+    def _mock_fetch(self, monkeypatch, tmp_path):
+        """Patch _CACHE_DIR and requests.get to avoid real network calls."""
+        import fetch as fetch_mod
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status = MagicMock()
+        mock_resp.json.return_value = {"data": []}
+        return mock_resp
+
+    def test_returns_one_result_per_target(self, tmp_path, monkeypatch):
+        mock_resp = self._mock_fetch(monkeypatch, tmp_path)
+        with patch("requests.get", return_value=mock_resp):
+            targets = [(180.0, 0.0), (90.0, 45.0), (270.0, -30.0)]
+            results = fetch_batch(targets, radius_deg=0.5, start_jd=2460000.0, end_jd=2460001.0)
+        assert len(results) == 3
+
+    def test_empty_targets_returns_empty(self, tmp_path, monkeypatch):
+        self._mock_fetch(monkeypatch, tmp_path)
+        results = fetch_batch([], radius_deg=0.5, start_jd=2460000.0, end_jd=2460001.0)
+        assert results == []
+
+    def test_provenance_reflects_each_target(self, tmp_path, monkeypatch):
+        mock_resp = self._mock_fetch(monkeypatch, tmp_path)
+        with patch("requests.get", return_value=mock_resp):
+            targets = [(10.0, 5.0), (20.0, -5.0)]
+            results = fetch_batch(targets, radius_deg=0.5, start_jd=2460000.0, end_jd=2460001.0)
+        assert results[0].provenance.search_ra_deg == pytest.approx(10.0)
+        assert results[1].provenance.search_ra_deg == pytest.approx(20.0)
+
+    def test_force_refresh_propagated(self, tmp_path, monkeypatch):
+        mock_resp = self._mock_fetch(monkeypatch, tmp_path)
+        calls = []
+        original_fetch = fetch_mod.fetch
+
+        def capturing_fetch(*args, **kwargs):
+            calls.append(kwargs.get("force_refresh"))
+            return original_fetch(*args, **kwargs)
+
+        monkeypatch.setattr(fetch_mod, "fetch", capturing_fetch)
+        with patch("requests.get", return_value=mock_resp):
+            fetch_batch([(180.0, 0.0)], radius_deg=0.5, start_jd=2460000.0,
+                        end_jd=2460001.0, force_refresh=True)
+        assert calls == [True]
 
 
 @pytest.mark.integration_live

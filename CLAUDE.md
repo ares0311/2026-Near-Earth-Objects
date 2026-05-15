@@ -468,9 +468,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.12.0)
+## Current State (v0.13.0)
 
-All 10 pipeline modules are complete. 411 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified manual CLI with top-level SQLite logs and auditable signoff readiness.
+All 10 pipeline modules are complete. 465 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified manual CLI with top-level SQLite logs and auditable signoff readiness.
 
 ### Skills
 
@@ -496,6 +496,9 @@ All 10 pipeline modules are complete. 411 tests passing (100% coverage). CI gree
 | `Skills/validate_mpc_report.py` | Validate MPC 80-column observation report files; CLI with `--json` flag |
 | `Skills/diagnose_pipeline.py` | Run each pipeline stage with synthetic data; report pass/fail per stage |
 | `Skills/compare_baselines.py` | Compare two injection-recovery JSON baselines; exits 1 on regression |
+| `Skills/simulate_survey.py` | Generate synthetic ZTF-like survey observations for a sky field |
+| `Skills/export_ranked_table.py` | Export a ranked ScoredNEO table to CSV or HTML |
+| `Skills/check_orbit_quality.py` | Check orbit quality and fit preliminary orbit for tracklets from JSON |
 
 ### Docs
 
@@ -520,7 +523,7 @@ All 10 pipeline modules are complete. 411 tests passing (100% coverage). CI gree
 | `background/config.schema.json` | JSON Schema for manual-first background config |
 | `background/targets.json` | Stable background automation fixture manifest |
 
-### Coverage by Module (v0.12.0)
+### Coverage by Module (v0.13.0)
 
 | Module | Coverage |
 |---|---|
@@ -549,6 +552,24 @@ All 10 pipeline modules are complete. 411 tests passing (100% coverage). CI gree
 - Collect labeled training data via `Skills/generate_training_labels.py`
 - Integrate live ZTF alert stream (Milestone 4)
 - Train and evaluate Tier 2 CNN on real cutouts (Milestone 5)
+
+### Key Changes in v0.13.0
+
+- `fetch.py`: added `fetch_batch` — fetch multiple sky positions in one call.
+- `preprocess.py`: added `preprocess_batch` — batch preprocessing from `FetchResult` list.
+- `detect.py`: added `detect_batch` — batch detection from `PreprocessResult` list.
+- `link.py`: added `merge_tracklets` — merge two tracklets into a longer deduplicated arc.
+- `orbit.py`: added `propagate_orbit` (Keplerian propagation), `predict_ephemeris` (geocentric RA/Dec at target JD).
+- `score.py`: added `rank_candidates` — sort `ScoredNEO` list by priority with PHA tier.
+- `alert.py`: added `generate_alert_package` — bundle all alert artifacts into one dict.
+- `schemas.py`: added `PipelineResult` — immutable top-level pipeline run container.
+- `Skills/simulate_survey.py`: synthetic ZTF-like survey generator.
+- `Skills/export_ranked_table.py`: CSV/HTML ranked table export.
+- `Skills/check_orbit_quality.py`: orbit quality CLI for tracklet JSON.
+- `tests/conftest.py`: extended with `build_raw_candidate`, `build_scored_neo`, and `scored_neo`/`raw_candidate` fixtures.
+- `docs/PIPELINE_SPEC.md`: updated with all v0.13.0 APIs and `PipelineResult` container.
+- 54 new tests; 465 total; 100% coverage maintained.
+- Version bumped to 0.13.0.
 
 ### Key Changes in v0.12.0
 

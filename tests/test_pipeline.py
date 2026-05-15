@@ -102,3 +102,119 @@ class TestTuneLinkerSkill:
         link_rate, score_rate = _run_one(n=3, seed=0, tol=10.0, chi2=5.0)
         assert 0.0 <= link_rate <= 1.0
         assert 0.0 <= score_rate <= 1.0
+
+
+class TestSimulateSurveySkill:
+    """Smoke tests for simulate_survey.py."""
+
+    def test_returns_correct_observation_count(self):
+        import sys
+        from pathlib import Path
+
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from simulate_survey import simulate_survey
+
+        obs = simulate_survey(nights=3, n_objects=4, seed=7)
+        # 4 objects × 3 nights × 2 obs/night = 24
+        assert len(obs) == 24
+
+    def test_all_obs_ids_unique(self):
+        import sys
+        from pathlib import Path
+
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from simulate_survey import simulate_survey
+
+        obs = simulate_survey(nights=2, n_objects=3, seed=99)
+        ids = [o.obs_id for o in obs]
+        assert len(ids) == len(set(ids))
+
+    def test_main_writes_json(self, tmp_path):
+        import sys
+        from pathlib import Path
+
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from simulate_survey import main
+
+        out = tmp_path / "sim.json"
+        main(["--nights", "2", "--objects", "2", "--out", str(out)])
+        assert out.exists()
+        import json
+        data = json.loads(out.read_text())
+        assert len(data) == 2 * 2 * 2
+
+
+class TestExportRankedTableSkill:
+    """Smoke tests for export_ranked_table.py."""
+
+    def test_csv_output(self, tmp_path):
+        import sys, json
+        from pathlib import Path
+
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from export_ranked_table import export_csv, export_html
+
+        rows = [{"object_id": "X001", "discovery_priority": 0.9, "hazard_flag": "nominal"}]
+        csv = export_csv(rows)
+        assert "X001" in csv
+        assert "object_id" in csv.split("\n")[0]
+
+    def test_html_output_contains_table(self, tmp_path):
+        import sys
+        from pathlib import Path
+
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from export_ranked_table import export_html
+
+        rows = [{"object_id": "X002", "hazard_flag": "pha_candidate"}]
+        html = export_html(rows)
+        assert "<table" in html
+        assert "X002" in html
+
+    def test_empty_csv(self):
+        import sys
+        from pathlib import Path
+
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from export_ranked_table import export_csv
+
+        assert export_csv([]) == ""
+
+    def test_empty_html(self):
+        import sys
+        from pathlib import Path
+
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from export_ranked_table import export_html
+
+        assert "<table>" in export_html([])
+
+
+class TestCheckOrbitQualitySkill:
+    """Smoke tests for check_orbit_quality.py."""
+
+    def test_assess_tracklet_returns_keys(self, tmp_path):
+        import sys
+        from pathlib import Path
+
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from check_orbit_quality import assess_tracklet
+        from .conftest import build_tracklet
+
+        t = build_tracklet(n_obs=4, arc_days=10.0)
+        result = assess_tracklet(t)
+        assert "object_id" in result
+        assert "quality_code" in result
+        assert "recommended_action" in result
+
+    def test_short_arc_no_orbit(self):
+        import sys
+        from pathlib import Path
+
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from check_orbit_quality import assess_tracklet
+        from .conftest import build_tracklet
+
+        t = build_tracklet(n_obs=2, arc_days=0.1)
+        result = assess_tracklet(t)
+        assert result["quality_code"] == 1
