@@ -17,7 +17,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from alert import process_alert, summarise
+from alert import monitor_neocp, process_alert, summarise
 from classify import classify
 from detect import detect
 from fetch import fetch
@@ -35,6 +35,10 @@ def run_pipeline(
     end_jd: float,
     surveys: tuple[str, ...] = ("ZTF",),
     dry_run: bool = True,
+    atlas_token: str | None = None,
+    force_refresh: bool = False,
+    neocp_timeout_hours: float = 0.0,
+    neocp_poll_interval_hours: float = 1.0,
 ) -> list[dict]:
     print(f"[fetch] Querying {surveys} at RA={ra_deg}, Dec={dec_deg}, r={radius_deg}°")
     fetch_result = fetch(
@@ -44,6 +48,8 @@ def run_pipeline(
         start_jd=start_jd,
         end_jd=end_jd,
         surveys=surveys,  # type: ignore[arg-type]
+        atlas_token=atlas_token,
+        force_refresh=force_refresh,
     )
     print(f"[fetch] Retrieved {len(fetch_result.alerts)} alerts")
 
@@ -77,6 +83,18 @@ def run_pipeline(
         print(f"[alert] Processing alert for {tracklet.object_id}")
         alert_result = process_alert(scored, dry_run=dry_run)
 
+        if neocp_timeout_hours > 0:
+            print(f"[neocp] Monitoring NEOCP for {tracklet.object_id} "
+                  f"(timeout={neocp_timeout_hours}h)")
+            neocp_result = monitor_neocp(
+                tracklet.object_id,
+                max_wait_hr=neocp_timeout_hours,
+                poll_interval_hr=neocp_poll_interval_hours,
+            )
+            alert_result["neocp_monitor"] = neocp_result
+            print(f"[neocp] status={neocp_result['status']}, "
+                  f"confirmed={neocp_result.get('confirmed', False)}")
+
         print(summarise(scored))
         results.append({
             "object_id": tracklet.object_id,
@@ -101,6 +119,14 @@ def main() -> None:
     parser.add_argument("--end-jd", type=float, required=True)
     parser.add_argument("--surveys", nargs="+", default=["ZTF"])
     parser.add_argument("--dry-run", action="store_true", default=True)
+    parser.add_argument("--atlas-token", type=str, default=None,
+                        help="ATLAS authentication token (or set ATLAS_TOKEN env var)")
+    parser.add_argument("--force-refresh", action="store_true", default=False,
+                        help="Bypass on-disk cache and re-fetch all survey data")
+    parser.add_argument("--neocp-timeout-hours", type=float, default=0.0,
+                        help="Hours to poll NEOCP for independent confirmation (0 = skip)")
+    parser.add_argument("--neocp-poll-interval", type=float, default=1.0,
+                        help="NEOCP poll interval in hours (default 1)")
     parser.add_argument("--output", type=str, default=None)
     args = parser.parse_args()
 
@@ -112,6 +138,10 @@ def main() -> None:
         end_jd=args.end_jd,
         surveys=tuple(args.surveys),
         dry_run=args.dry_run,
+        atlas_token=args.atlas_token,
+        force_refresh=args.force_refresh,
+        neocp_timeout_hours=args.neocp_timeout_hours,
+        neocp_poll_interval_hours=args.neocp_poll_interval,
     )
 
     if args.output:

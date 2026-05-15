@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__all__ = ["link"]
+__all__ = ["link", "_predict_from_arc"]
 
 import math
 import uuid
@@ -53,18 +53,32 @@ def _motion(obs_a: Observation, obs_b: Observation) -> tuple[float, float]:
     return dra, ddec
 
 
-def _predict_position(
-    ref: Observation,
-    dra_arcsec_hr: float,
-    ddec_arcsec_hr: float,
+
+def _predict_from_arc(
+    arc_obs: list[Observation],
     target_jd: float,
 ) -> tuple[float, float]:
-    """Predict RA, Dec at target_jd by linear extrapolation from ref."""
-    dt_hr = (target_jd - ref.jd) * 24.0
-    cos_dec = math.cos(math.radians(ref.dec_deg))
-    new_ra = ref.ra_deg + (dra_arcsec_hr * dt_hr) / (3600.0 * cos_dec)
-    new_dec = ref.dec_deg + (ddec_arcsec_hr * dt_hr) / 3600.0
-    return new_ra % 360.0, max(-90.0, min(90.0, new_dec))
+    """Predict RA, Dec at target_jd using observations already in the arc.
+
+    Uses a quadratic polynomial fit when ≥3 observations are available,
+    falling back to linear (degree-1) for exactly 2.  This improves
+    accuracy over the constant-rate seed-pair extrapolation for arcs
+    that already span multiple nights.
+    """
+    obs_sorted = sorted(arc_obs, key=lambda o: o.jd)
+    t0 = obs_sorted[0].jd
+    ts = np.array([(o.jd - t0) * 24.0 for o in obs_sorted])  # hours since first obs
+    ras = np.array([o.ra_deg for o in obs_sorted])
+    decs = np.array([o.dec_deg for o in obs_sorted])
+
+    degree = min(2, len(obs_sorted) - 1)  # quadratic when ≥3 obs, linear for 2
+    ra_coeffs = np.polyfit(ts, ras, degree)
+    dec_coeffs = np.polyfit(ts, decs, degree)
+
+    dt = (target_jd - t0) * 24.0
+    pred_ra = float(np.polyval(ra_coeffs, dt)) % 360.0
+    pred_dec = float(max(-90.0, min(90.0, np.polyval(dec_coeffs, dt))))
+    return pred_ra, pred_dec
 
 
 # ---------------------------------------------------------------------------
@@ -90,7 +104,8 @@ def _fit_linear_motion(
     ts = np.array([(o.jd - t0) * 24.0 for o in obs_sorted])  # hours
     ras = np.array([o.ra_deg * 3600.0 * cos_dec for o in obs_sorted])  # arcsec
     decs = np.array([o.dec_deg * 3600.0 for o in obs_sorted])
-    errs = np.array([max(o.mag_err * 0.1, 0.1) for o in obs_sorted])  # proxy astrometric err
+    # 0.5 arcsec floor ≈ typical ground-based survey astrometric uncertainty
+    errs = np.array([max(o.mag_err, 0.5) for o in obs_sorted])
 
     # Weighted least squares: [1, t] @ [a, b] = y
     A = np.column_stack([np.ones_like(ts), ts])
@@ -218,7 +233,8 @@ def _link_candidates(
                         for obs_c in nights[night_c]:
                             if obs_c.obs_id in used_obs_ids:
                                 continue
-                            pred_ra, pred_dec = _predict_position(obs_a, dra, ddec, obs_c.jd)
+                            # Use arc-based predictor once we have ≥2 obs for better accuracy
+                            pred_ra, pred_dec = _predict_from_arc(arc_obs, obs_c.jd)
                             sep = _sep_arcsec(obs_c.ra_deg, obs_c.dec_deg, pred_ra, pred_dec)
                             if sep <= tolerance_arcsec:
                                 arc_obs.append(obs_c)

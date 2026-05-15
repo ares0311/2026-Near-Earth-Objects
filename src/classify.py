@@ -2,9 +2,17 @@
 
 from __future__ import annotations
 
-__all__ = ["extract_features", "classify", "ensemble_predict", "_build_ensemble"]
+__all__ = [
+    "extract_features",
+    "classify",
+    "ensemble_predict",
+    "_build_ensemble",
+    "retrain_tier1",
+    "retrain_stacker",
+]
 
 import base64
+import json
 import math
 from pathlib import Path
 from typing import Any
@@ -544,6 +552,152 @@ def _stack_predictions(
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+
+
+def retrain_tier1(
+    csv_path: Path | str,
+    model_path: Path | str | None = None,
+) -> dict[str, Any]:
+    """Retrain the Tier 1 XGBoost classifier from a labelled CSV file.
+
+    The CSV must contain columns matching the 10 feature names in
+    ``_features_to_array`` plus a ``label`` column (integer 0–4 mapping
+    to the five hypotheses).
+
+    Returns a training report dict with keys ``n_samples``, ``n_classes``,
+    ``auc``, ``model_path``.  The trained model is saved as JSON to
+    ``model_path`` (defaults to ``models/tier1_xgb.json``).
+    """
+    import csv
+
+    import numpy as np
+
+    feature_cols = [
+        "real_bogus_score", "motion_consistency_score", "arc_coverage_score",
+        "nights_observed_score", "brightness_score", "color_score",
+        "lightcurve_variability_score", "streak_score", "psf_quality_score",
+        "known_object_score",
+    ]
+
+    rows: list[list[float]] = []
+    labels_list: list[int] = []
+    with open(csv_path, newline="") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            vals = [float(row.get(c) or 0.0) for c in feature_cols]
+            rows.append(vals)
+            labels_list.append(int(row["label"]))
+
+    X = np.array(rows, dtype=np.float32)
+    y = np.array(labels_list, dtype=np.int32)
+    n_samples = len(y)
+    n_classes = len(set(y))
+
+    try:
+        import xgboost as xgb  # type: ignore[import]
+        from sklearn.metrics import roc_auc_score  # type: ignore[import]
+        from sklearn.preprocessing import label_binarize  # type: ignore[import]
+
+        clf = xgb.XGBClassifier(
+            n_estimators=100,
+            max_depth=4,
+            use_label_encoder=False,
+            eval_metric="mlogloss",
+        )
+        clf.fit(X, y)
+
+        proba = clf.predict_proba(X)
+        classes = sorted(set(y))
+        auc: float | None
+        if n_classes == 2:
+            auc = float(roc_auc_score(y, proba[:, 1]))
+        elif n_classes > 2:
+            y_bin = label_binarize(y, classes=classes)
+            auc = float(roc_auc_score(y_bin, proba, multi_class="ovr", average="macro"))
+        else:
+            auc = None  # pragma: no cover — n_classes < 2 only for single-class datasets
+
+        out_path = Path(model_path) if model_path else _MODEL_DIR / "tier1_xgb.json"
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        clf.save_model(str(out_path))
+
+        return {
+            "n_samples": n_samples,
+            "n_classes": n_classes,
+            "auc": auc,
+            "model_path": str(out_path),
+        }
+    except ImportError as exc:
+        return {
+            "n_samples": n_samples,
+            "n_classes": n_classes,
+            "auc": None,
+            "model_path": None,
+            "error": f"xgboost/sklearn not available: {exc}",
+        }
+
+
+def retrain_stacker(
+    tier1_outputs: list[dict[str, float]],
+    labels: list[dict[str, float]],
+    model_path: Path | str | None = None,
+) -> dict[str, Any]:
+    """Retrain the stacking meta-learner from tier-1 probability outputs.
+
+    ``tier1_outputs`` is a list of probability dicts (one per training example).
+    ``labels`` is a list of dicts each with key ``"label"`` (int 0–4).
+
+    Serialises the fitted coefficients to a JSON sidecar at ``model_path``
+    (defaults to ``models/stacker_coef.json``).
+
+    Returns a training report with keys ``n_samples``, ``n_classes``,
+    ``auc``, ``model_path``, ``coef_path``.
+    """
+    model = _build_ensemble(tier1_outputs, labels)
+    n_samples = len(labels)
+    n_classes = len({int(d["label"]) for d in labels})
+
+    out_path = Path(model_path) if model_path else _MODEL_DIR / "stacker_coef.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    auc: float | None = None
+    coef_path: str | None = None
+
+    if model is not None:
+        try:
+            import numpy as np
+            from sklearn.metrics import roc_auc_score  # type: ignore[import]
+            from sklearn.preprocessing import label_binarize  # type: ignore[import]
+
+            X = np.array([[d[lbl] for lbl in _LABELS] for d in tier1_outputs], dtype=np.float32)
+            y = np.array([int(d["label"]) for d in labels], dtype=np.int32)
+            proba = model.predict_proba(X)
+            classes = sorted(set(y))
+            if n_classes == 2:
+                auc = float(roc_auc_score(y, proba[:, 1]))
+            elif n_classes > 2:
+                y_bin = label_binarize(y, classes=classes)
+                auc = float(roc_auc_score(y_bin, proba, multi_class="ovr", average="macro"))
+
+            coef_data = {
+                "classes": model.classes_.tolist(),
+                "coef": model.coef_.tolist(),
+                "intercept": model.intercept_.tolist(),
+                "labels": _LABELS,
+            }
+            with out_path.open("w") as f:
+                json.dump(coef_data, f, indent=2)
+            coef_path = str(out_path)
+        except Exception:
+            pass
+
+    return {
+        "n_samples": n_samples,
+        "n_classes": n_classes,
+        "auc": auc,
+        "model_path": coef_path,
+        "coef_path": coef_path,
+    }
 
 
 def classify(

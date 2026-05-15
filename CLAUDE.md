@@ -468,9 +468,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.10.0)
+## Current State (v0.11.0)
 
-All 10 pipeline modules are complete. 346 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified manual CLI with top-level SQLite logs and auditable signoff readiness.
+All 10 pipeline modules are complete. 377 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified manual CLI with top-level SQLite logs and auditable signoff readiness.
 
 ### Skills
 
@@ -490,6 +490,9 @@ All 10 pipeline modules are complete. 346 tests passing (100% coverage). CI gree
 | `Skills/train_tier3_transformer.py` | Train Transformer on MPC tracklet CSV; saves `models/tier3_transformer.pt` |
 | `Skills/tune_linker.py` | Parametric sweep of `position_tolerance_arcsec` × `chi2_threshold` vs link/score rate |
 | `Skills/background.py` | Unified background automation CLI with run, summary, detail, history, and signoff subcommands |
+| `Skills/stress_test_high_motion.py` | Stress-test linker across 3 motion bins (1–10, 10–30, 30–60 arcsec/hr); saves results to `data/` |
+| `Skills/build_cutout_dataset.py` | Convert ZTF alert JSON (base64 cutouts) to `.npz` + CSV index for Tier 2 CNN training |
+| `Skills/build_sequence_dataset.py` | Convert tracklet JSON to flat token CSV for Tier 3 Transformer training |
 
 ### Docs
 
@@ -508,11 +511,13 @@ All 10 pipeline modules are complete. 346 tests passing (100% coverage). CI gree
 | `data/sample_tracklets.json` | Two synthetic tracklets for testing batch Skills |
 | `data/README.md` | Data directory documentation and format reference |
 | `data/injection_recovery_baseline.json` | Injection-recovery results (n=50, seed=42): 100% detection, 62% link, 62% score |
+| `data/injection_recovery_n200.json` | Injection-recovery results (n=200, seed=42): 100% detection, 100% link, 100% score |
+| `data/stress_test_high_motion.json` | Stress-test results: 100% link rate across all three motion bins |
 | `background/config.json` | Manual-first background automation configuration |
 | `background/config.schema.json` | JSON Schema for manual-first background config |
 | `background/targets.json` | Stable background automation fixture manifest |
 
-### Coverage by Module (v0.10.0)
+### Coverage by Module (v0.11.0)
 
 | Module | Coverage |
 |---|---|
@@ -541,7 +546,27 @@ All 10 pipeline modules are complete. 346 tests passing (100% coverage). CI gree
 - Collect labeled training data via `Skills/generate_training_labels.py`
 - Integrate live ZTF alert stream (Milestone 4)
 - Train and evaluate Tier 2 CNN on real cutouts (Milestone 5)
-- Investigate remaining 38% of unlinked synthetic tracklets (likely high-motion or chi² outliers)
+
+### Key Changes in v0.11.0
+
+- `link.py`: fixed chi² error proxy (`max(mag_err * 0.1, 0.1)` → `max(mag_err, 0.5)`) — link rate 62% → 100%
+- `link.py`: added `_predict_from_arc` (quadratic polyfit for ≥3 obs, linear fallback) for more accurate position prediction
+- `fetch.py`: added `force_refresh` flag to bypass on-disk cache; ATLAS token now falls back to `ATLAS_TOKEN` env var
+- `alert.py`: added public `monitor_neocp` with injectable sleep for NEOCP polling loop
+- `classify.py`: added `retrain_tier1` and `retrain_stacker` public APIs for incremental retraining
+- `Skills/run_pipeline.py`: added `--atlas-token`, `--force-refresh`, `--neocp-timeout-hours`, `--neocp-poll-interval` flags
+- `Skills/stress_test_high_motion.py`: stress-test linker across 3 motion bins; all bins 100%
+- `Skills/build_cutout_dataset.py`: build `.npz` + CSV index from ZTF alert JSON for Tier 2 training
+- `Skills/build_sequence_dataset.py`: build flat token CSV from tracklet JSON for Tier 3 training
+- `Skills/train_tier2_cnn.py`: updated to read `.npz` cutout files from `cutout_path` column
+- `Skills/train_tier3_transformer.py`: updated to read flat `tok_i_j` columns
+- `Skills/smoke_test.py`: added `monitor_neocp` and `retrain` smoke tests
+- `Skills/check_mpc_known.py`: added `--neocp` CLI flag and `check_neocp` function
+- `data/injection_recovery_n200.json`: n=200 baseline: 100% detection, link, score
+- `data/stress_test_high_motion.json`: stress-test results
+- CHANGELOG.md: full Keep-a-Changelog history added (v0.1.0–v0.11.0)
+- 31 new tests; 377 total; 100% coverage maintained
+- Version bumped to 0.11.0.
 
 ### Key Changes in v0.10.0
 

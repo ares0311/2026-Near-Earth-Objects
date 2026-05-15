@@ -603,3 +603,119 @@ class TestFetchHorizonsNetwork:
         assert len(result) == 1
         assert result[0].jd == pytest.approx(2460005.0)
         assert result[0].filter_band == "V"
+
+
+class TestForceRefresh:
+    """Tests for force_refresh=True parameter in fetch, fetch_ztf, fetch_atlas."""
+
+    def test_force_refresh_bypasses_ztf_cache(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        # Seed cache with one observation
+        obs = _make_obs(obs_id="stale_ztf")
+        cache_key = hashlib.md5(b"ztf_180.0_10.0_1.0_2460000.0_2460010.0").hexdigest()
+        fetch_mod._save_cache(cache_key, [obs.model_dump()])
+
+        # force_refresh=True → ignore cache, call IRSA API (mock returns 0 rows)
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"metadata": [], "data": []}
+        mock_response.raise_for_status = MagicMock()
+        with patch("requests.get", return_value=mock_response):
+            result = fetch_mod.fetch_ztf(180.0, 10.0, 1.0, 2460000.0, 2460010.0,
+                                          force_refresh=True)
+        assert len(result) == 0
+
+    def test_load_cache_force_refresh_returns_none(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        fetch_mod._save_cache("k", [{"x": 1}])
+        assert fetch_mod._load_cache("k", force_refresh=False) is not None
+        assert fetch_mod._load_cache("k", force_refresh=True) is None
+
+    def test_force_refresh_atlas(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        monkeypatch.setattr(fetch_mod.time, "sleep", lambda _: None)
+
+        obs = _make_obs(obs_id="stale_atlas", mission="ATLAS", filter_band="o")
+        cache_key = hashlib.md5(b"atlas_90.0_0.0_0.5_2460000.0_2460010.0").hexdigest()
+        fetch_mod._save_cache(cache_key, [obs.model_dump()])
+
+        queue_resp = MagicMock()
+        queue_resp.json.return_value = {"url": "http://fake/1/"}
+        queue_resp.raise_for_status = MagicMock()
+        poll_resp = MagicMock()
+        poll_resp.json.return_value = {"finishtimestamp": "2024-01-01", "result_url": ""}
+        poll_resp.raise_for_status = MagicMock()
+
+        with patch("requests.post", return_value=queue_resp):
+            with patch("requests.get", return_value=poll_resp):
+                result = fetch_mod.fetch_atlas(90.0, 0.0, 0.5, 2460000.0, 2460010.0,
+                                               force_refresh=True)
+        assert result == []  # stale cache bypassed; no result_url → empty
+
+    def test_force_refresh_top_level_fetch(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        obs = _make_obs(obs_id="stale_top")
+        cache_key = hashlib.md5(b"ztf_180.0_10.0_1.0_2460000.0_2460010.0").hexdigest()
+        fetch_mod._save_cache(cache_key, [obs.model_dump()])
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"metadata": [], "data": []}
+        mock_response.raise_for_status = MagicMock()
+        with patch("requests.get", return_value=mock_response):
+            result = fetch_mod.fetch(180.0, 10.0, 1.0, 2460000.0, 2460010.0,
+                                     surveys=("ZTF",), force_refresh=True)
+        assert len(result.alerts) == 0
+
+
+class TestAtlasTokenEnvVar:
+    """Tests for ATLAS_TOKEN environment variable fallback."""
+
+    def test_env_var_used_when_no_explicit_token(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        monkeypatch.setattr(fetch_mod.time, "sleep", lambda _: None)
+        monkeypatch.setenv("ATLAS_TOKEN", "env_token_123")
+
+        queue_resp = MagicMock()
+        queue_resp.json.return_value = {"url": "http://fake/1/"}
+        queue_resp.raise_for_status = MagicMock()
+        poll_resp = MagicMock()
+        poll_resp.json.return_value = {"finishtimestamp": "2024-01-01", "result_url": ""}
+        poll_resp.raise_for_status = MagicMock()
+
+        with patch("requests.post", return_value=queue_resp) as mock_post:
+            with patch("requests.get", return_value=poll_resp):
+                fetch_mod.fetch_atlas(10.0, 5.0, 0.5, 2460000.0, 2460005.0)
+        assert mock_post.call_args[1]["headers"].get("Authorization") == "Token env_token_123"
+
+    def test_explicit_token_overrides_env_var(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        monkeypatch.setattr(fetch_mod.time, "sleep", lambda _: None)
+        monkeypatch.setenv("ATLAS_TOKEN", "env_token")
+
+        queue_resp = MagicMock()
+        queue_resp.json.return_value = {"url": "http://fake/1/"}
+        queue_resp.raise_for_status = MagicMock()
+        poll_resp = MagicMock()
+        poll_resp.json.return_value = {"finishtimestamp": "2024-01-01", "result_url": ""}
+        poll_resp.raise_for_status = MagicMock()
+
+        with patch("requests.post", return_value=queue_resp) as mock_post:
+            with patch("requests.get", return_value=poll_resp):
+                fetch_mod.fetch_atlas(10.0, 5.0, 0.5, 2460000.0, 2460005.0,
+                                      atlas_token="explicit_token")
+        assert mock_post.call_args[1]["headers"].get("Authorization") == "Token explicit_token"
+
+
+@pytest.mark.integration_live
+class TestFetchZtfLive:
+    """Live integration tests — require network access; excluded from CI."""
+
+    def test_fetch_ztf_live_small_region(self):
+        result = fetch_ztf(180.0, 0.0, 0.1, 2460000.0, 2460001.0)
+        assert isinstance(result, list)
+
+    def test_fetch_atlas_live_small_region(self):
+        from fetch import fetch_atlas
+        result = fetch_atlas(180.0, 0.0, 0.1, 2460000.0, 2460001.0)
+        assert isinstance(result, list)

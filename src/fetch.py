@@ -5,6 +5,7 @@ from __future__ import annotations
 __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fetch"]
 
 import json
+import os
 import time
 from pathlib import Path
 
@@ -23,7 +24,9 @@ def _cache_path(key: str) -> Path:
     return _CACHE_DIR / f"{key}.json"
 
 
-def _load_cache(key: str) -> list[dict] | None:
+def _load_cache(key: str, force_refresh: bool = False) -> list[dict] | None:
+    if force_refresh:
+        return None
     p = _cache_path(key)
     if p.exists():
         with p.open() as f:
@@ -47,6 +50,7 @@ def fetch_ztf(
     radius_deg: float,
     start_jd: float,
     end_jd: float,
+    force_refresh: bool = False,
 ) -> list[Observation]:
     """Query ZTF alert stream via IRSA.  Requires ``ztfquery`` or requests."""
     import hashlib
@@ -54,7 +58,7 @@ def fetch_ztf(
     cache_key = hashlib.md5(
         f"ztf_{ra_deg}_{dec_deg}_{radius_deg}_{start_jd}_{end_jd}".encode()
     ).hexdigest()
-    cached = _load_cache(cache_key)
+    cached = _load_cache(cache_key, force_refresh=force_refresh)
     if cached is not None:
         return [Observation(**row) for row in cached]
 
@@ -161,23 +165,30 @@ def fetch_atlas(
     start_jd: float,
     end_jd: float,
     atlas_token: str | None = None,
+    force_refresh: bool = False,
 ) -> list[Observation]:
-    """Query ATLAS Forced Photometry Server for a sky position."""
+    """Query ATLAS Forced Photometry Server for a sky position.
+
+    ``atlas_token`` may also be supplied via the ``ATLAS_TOKEN`` environment variable.
+    An explicit argument takes precedence over the environment variable.
+    """
     import hashlib
 
     import requests
 
+    resolved_token = atlas_token or os.environ.get("ATLAS_TOKEN")
+
     cache_key = hashlib.md5(
         f"atlas_{ra_deg}_{dec_deg}_{radius_deg}_{start_jd}_{end_jd}".encode()
     ).hexdigest()
-    cached = _load_cache(cache_key)
+    cached = _load_cache(cache_key, force_refresh=force_refresh)
     if cached is not None:
         return [Observation(**row) for row in cached]
 
     base = "https://fallingstar-data.com/forcedphot"
     headers: dict[str, str] = {}
-    if atlas_token:
-        headers["Authorization"] = f"Token {atlas_token}"
+    if resolved_token:
+        headers["Authorization"] = f"Token {resolved_token}"
 
     payload = {
         "ra": ra_deg,
@@ -358,6 +369,7 @@ def fetch(
     end_jd: float,
     surveys: tuple[Mission, ...] = ("ZTF",),
     atlas_token: str | None = None,
+    force_refresh: bool = False,
 ) -> FetchResult:
     """Fetch alerts from the requested surveys for a sky position and time range."""
     from astropy.time import Time
@@ -367,10 +379,14 @@ def fetch(
 
     for survey in surveys:
         if survey == "ZTF":
-            all_alerts.extend(fetch_ztf(ra_deg, dec_deg, radius_deg, start_jd, end_jd))
+            all_alerts.extend(
+                fetch_ztf(ra_deg, dec_deg, radius_deg, start_jd, end_jd,
+                          force_refresh=force_refresh)
+            )
         elif survey == "ATLAS":
             all_alerts.extend(
-                fetch_atlas(ra_deg, dec_deg, radius_deg, start_jd, end_jd, atlas_token)
+                fetch_atlas(ra_deg, dec_deg, radius_deg, start_jd, end_jd,
+                            atlas_token=atlas_token, force_refresh=force_refresh)
             )
         elif survey == "MPC":
             all_alerts.extend(fetch_mpc_known(ra_deg, dec_deg, radius_deg))

@@ -556,3 +556,152 @@ def test_report_text_rejects_forbidden_language():
         assert "forbidden phrase" in str(exc)
     else:  # pragma: no cover
         raise AssertionError("forbidden report language was accepted")
+
+
+def test_resolve_project_path_relative(tmp_path, monkeypatch):
+    monkeypatch.setattr(background, "_ROOT", tmp_path)
+    result = background._resolve_project_path("subdir/file.json")
+    assert result == tmp_path / "subdir" / "file.json"
+
+
+def test_score_tracklet_direct():
+    from .conftest import build_tracklet
+    tracklet = build_tracklet(n_obs=4, arc_days=3.0)
+    scored = background.score_tracklet(tracklet, "run-direct")
+    assert scored.tracklet.object_id == tracklet.object_id
+
+
+def test_blocking_penalty_all_none_features():
+    from schemas import OrbitalElements
+    scored = make_scored()
+    # Build a scored with None blocking fields
+    features_none = CandidateFeatures(
+        real_bogus_score=None,
+        known_object_score=None,
+    )
+    # score_tracklet returns a ScoredNEO; use model_copy to patch features + hazard orbital_elements
+    scored_none = scored.model_copy(
+        update={
+            "features": features_none,
+            "hazard": HazardAssessment(
+                hazard_flag=scored.hazard.hazard_flag,
+                moid_au=scored.hazard.moid_au,
+                estimated_diameter_m=scored.hazard.estimated_diameter_m,
+                absolute_magnitude_h=scored.hazard.absolute_magnitude_h,
+                neo_class=scored.hazard.neo_class,
+                alert_pathway=scored.hazard.alert_pathway,
+                explanation=scored.hazard.explanation,
+                orbital_elements=None,
+            ),
+        }
+    )
+    penalty = background._blocking_penalty(scored_none)
+    assert penalty == min(1.0, 0.25 + 0.25 + 0.10)
+
+
+def test_review_reasons_alert_pathway_and_hazard_flag(monkeypatch, tmp_path):
+    from schemas import OrbitalElements
+
+    scored = make_scored(neo_prob=0.7, followup_value=0.7, discovery_priority=0.4)
+    scored_mpc = scored.model_copy(
+        update={
+            "hazard": HazardAssessment(
+                hazard_flag="pha_candidate",
+                moid_au=0.03,
+                estimated_diameter_m=200.0,
+                absolute_magnitude_h=20.0,
+                neo_class=scored.hazard.neo_class,
+                alert_pathway="mpc_submission",
+                explanation=scored.hazard.explanation,
+                orbital_elements=scored.hazard.orbital_elements,
+            ),
+            "metadata": ScoringMetadata(
+                scorer_version="test",
+                scored_at_jd=2460000.5,
+                pipeline_run_id="run",
+                discovery_priority=0.4,
+                followup_value=0.7,
+                scientific_interest=0.3,
+            ),
+        }
+    )
+    # Give it low calibration_confidence and blocking penalty
+    features_none = CandidateFeatures(
+        real_bogus_score=None,
+        known_object_score=None,
+    )
+    scored_full = scored_mpc.model_copy(
+        update={
+            "features": features_none,
+            "hazard": HazardAssessment(
+                hazard_flag="pha_candidate",
+                moid_au=0.03,
+                estimated_diameter_m=200.0,
+                absolute_magnitude_h=20.0,
+                neo_class=scored.hazard.neo_class,
+                alert_pathway="mpc_submission",
+                explanation=scored.hazard.explanation,
+                orbital_elements=None,
+            ),
+        }
+    )
+    priority = background._priority_factors(scored_full, review_count=0)
+    # Manually adjust calibration_confidence to < 0.4
+    priority_low_cal = type(priority)(
+        composite_score=priority.composite_score,
+        scientific_interest=priority.scientific_interest,
+        never_reviewed_boost=priority.never_reviewed_boost,
+        prior_review_penalty=priority.prior_review_penalty,
+        data_completeness=priority.data_completeness,
+        false_positive_risk=priority.false_positive_risk,
+        followup_feasibility=priority.followup_feasibility,
+        calibration_confidence=0.2,
+        blocking_issue_penalty=0.5,
+    )
+    target = background.BackgroundTarget(
+        target_id="T_REASONS",
+        scored_neo=scored_full,
+        priority=priority_low_cal,
+    )
+    reasons = background._trigger_reason_codes(target)
+    assert "ALERT_PATHWAY_REVIEW" in reasons
+    assert "HAZARD_FLAG_REVIEW" in reasons
+    assert "BLOCKING_ISSUE_REVIEW" in reasons
+    assert "CALIBRATION_UNCERTAINTY_REVIEW" in reasons
+
+
+def test_with_report_readiness_drafted_and_blocked():
+    readiness = {"is_ready": False, "signoff_count": 0, "approval_count": 0}
+    # "drafted": report_path given but file does not exist
+    result = background._with_report_readiness(readiness, "/nonexistent/report.md")
+    assert result["report_readiness_state"] == "drafted"
+    # "blocked": no report_path
+    result2 = background._with_report_readiness(readiness, None)
+    assert result2["report_readiness_state"] == "blocked"
+
+
+def test_background_run_once_raises_on_live_network(tmp_path):
+    import json as _json
+
+    fixture = tmp_path / "targets.json"
+    fixture.write_text("[]")
+    db_path = tmp_path / "bg.sqlite"
+    config_path = tmp_path / "config.json"
+    config_path.write_text(_json.dumps({
+        "live_network_enabled": True,
+        "input_path": str(fixture),
+        "db_path": str(db_path),
+        "report_dir": str(tmp_path / "reports"),
+        "follow_up_threshold": 0.5,
+    }))
+
+    result = background.background_run_once(
+        fixture,
+        db_path,
+        tmp_path / "reports",
+        config_path=config_path,
+    )
+    # RuntimeError is caught internally and logged as a run failure
+    assert result.ledger.target_id == "RUN_FAILURE"
+    assert result.ledger.failure_reason is not None
+    assert "not enabled" in result.ledger.failure_reason

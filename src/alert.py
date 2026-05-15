@@ -2,10 +2,17 @@
 
 from __future__ import annotations
 
-__all__ = ["format_mpc_observation", "format_mpc_report", "process_alert", "summarise"]
+__all__ = [
+    "format_mpc_observation",
+    "format_mpc_report",
+    "process_alert",
+    "summarise",
+    "monitor_neocp",
+]
 
 import json
 import logging
+import time as _time_mod
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -218,6 +225,42 @@ def _monitor_neocp(object_id: str) -> dict:
         return {"status": "checked", "confirmed": False, "raw": resp.text[:500]}
     except Exception as exc:
         return {"status": "error", "error": str(exc)}
+
+
+def monitor_neocp(
+    object_id: str,
+    max_wait_hr: float = 24.0,
+    poll_interval_hr: float = 1.0,
+    _sleep_fn: object = None,
+) -> dict:
+    """Poll NEOCP for independent confirmation of a candidate.
+
+    Blocks until confirmed, ``max_wait_hr`` expires, or a network error occurs.
+    ``_sleep_fn`` is injectable for testing (defaults to ``time.sleep``).
+
+    Returns a dict with keys ``status``, ``confirmed``, ``elapsed_hr``,
+    and optionally ``raw`` or ``error``.
+    """
+    sleep_fn = _sleep_fn if _sleep_fn is not None else _time_mod.sleep
+    interval_s = poll_interval_hr * 3600.0
+    max_s = max_wait_hr * 3600.0
+    elapsed = 0.0
+
+    while elapsed < max_s:
+        result = _monitor_neocp(object_id)
+        if result.get("status") == "error":
+            return {**result, "elapsed_hr": elapsed / 3600.0}
+        if result.get("confirmed"):
+            return {**result, "elapsed_hr": elapsed / 3600.0}
+        sleep_fn(interval_s)
+        elapsed += interval_s
+
+    return {
+        "status": "timeout",
+        "confirmed": False,
+        "elapsed_hr": elapsed / 3600.0,
+        "object_id": object_id,
+    }
 
 
 def _generate_pdco_alert_package(neo: ScoredNEO) -> dict:
