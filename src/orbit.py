@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__all__ = ["classify_neo", "compute_moid", "fit_orbit"]
+__all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report"]
 
 import math
 from typing import NamedTuple
@@ -397,3 +397,50 @@ def fit_orbit(tracklet: Tracklet) -> OrbitalElements | None:
     # Improve with one differential correction step
     elements = _differential_correction(elements, obs_tuples)
     return elements
+
+
+def arc_quality_report(tracklet: Tracklet) -> dict:
+    """Return a quality assessment dict for a tracklet's observational arc.
+
+    Keys:
+      arc_days          — float, total arc length in days
+      n_observations    — int, total number of observations
+      n_nights          — int, number of distinct nights (integer JD)
+      quality_code      — int 1–4 (same scale as OrbitalElements.quality_code)
+      arc_warning       — str | None, human-readable warning when arc is short
+      recommended_action — str, suggested next step
+    """
+    obs = sorted(tracklet.observations, key=lambda o: o.jd)
+    arc_days = float(obs[-1].jd - obs[0].jd) if len(obs) >= 2 else 0.0
+    n_obs = len(obs)
+    n_nights = len({int(o.jd) for o in obs})
+
+    if arc_days < 1.0:
+        quality_code = 1
+        arc_warning = f"Short arc ({arc_days:.2f} d < 1 day): MOID unreliable."
+        recommended_action = "Obtain observations on additional nights before orbit fitting."
+    elif n_nights < 3:
+        quality_code = 2
+        arc_warning = f"Only {n_nights} distinct nights: orbit poorly constrained."
+        recommended_action = "Request follow-up observations to extend to ≥3 nights."
+    elif arc_days < 7.0:
+        quality_code = 2
+        arc_warning = None
+        recommended_action = "Multi-night arc; continue monitoring to improve orbit."
+    elif arc_days < 30.0:
+        quality_code = 3
+        arc_warning = None
+        recommended_action = "Multi-week arc; orbit suitable for MPC submission."
+    else:
+        quality_code = 4
+        arc_warning = None
+        recommended_action = "Opposition arc; orbit well-constrained."
+
+    return {
+        "arc_days": arc_days,
+        "n_observations": n_obs,
+        "n_nights": n_nights,
+        "quality_code": quality_code,
+        "arc_warning": arc_warning,
+        "recommended_action": recommended_action,
+    }

@@ -5,6 +5,8 @@ from __future__ import annotations
 __all__ = [
     "format_mpc_observation",
     "format_mpc_report",
+    "format_mpc_json",
+    "batch_process_alerts",
     "process_alert",
     "summarise",
     "monitor_neocp",
@@ -119,6 +121,40 @@ def format_mpc_observation(
     )
     # Truncate/pad to exactly 80 columns
     return line[:80].ljust(80)
+
+
+def format_mpc_json(neo: ScoredNEO, obs_code: str = _MPC_OBS_CODE) -> dict:
+    """Generate an MPC JSON submission record (modern alternative to 80-col format).
+
+    Returns a dict conforming to the MPC JSON observation format spec
+    (https://minorplanetcenter.net/mpc-new-obs-format).
+    """
+    designation = neo.tracklet.object_id[:12]
+    observations = []
+    for i, obs in enumerate(sorted(neo.tracklet.observations, key=lambda o: o.jd)):
+        from astropy.time import Time  # type: ignore[import]
+
+        t = Time(obs.jd, format="jd")
+        observations.append({
+            "obsTime": t.isot,
+            "ra": round(obs.ra_deg, 6),
+            "dec": round(obs.dec_deg, 6),
+            "rmsRA": None,
+            "rmsDec": None,
+            "mag": round(obs.mag, 2) if obs.mag < 99 else None,
+            "rmsMag": round(obs.mag_err, 3) if obs.mag_err > 0 else None,
+            "band": obs.filter_band,
+            "stn": obs_code,
+            "remarks": "discovery" if i == 0 else None,
+        })
+    return {
+        "type": "observation",
+        "provId": designation,
+        "submissions": observations,
+        "moid_au": neo.hazard.moid_au,
+        "neo_class": neo.hazard.neo_class,
+        "hazard_flag": neo.hazard.hazard_flag,
+    }
 
 
 def format_mpc_report(neo: ScoredNEO, obs_code: str = _MPC_OBS_CODE) -> str:
@@ -405,3 +441,23 @@ def summarise(neo: ScoredNEO) -> str:
         "Defer all hazard assessment to MPC/CNEOS.",
     ]
     return "\n".join(lines)
+
+
+def batch_process_alerts(
+    neos: list[ScoredNEO],
+    dry_run: bool = True,
+    mpc_obs_code: str = _MPC_OBS_CODE,
+) -> list[dict]:
+    """Process a list of ScoredNEOs through the alert decision tree.
+
+    Calls ``process_alert`` for each NEO and returns a list of result dicts
+    in the same order.  Errors in individual NEOs are caught and reported as
+    ``{"object_id": ..., "error": ...}`` rather than raising.
+    """
+    results: list[dict] = []
+    for neo in neos:
+        try:
+            results.append(process_alert(neo, dry_run=dry_run, mpc_obs_code=mpc_obs_code))
+        except Exception as exc:  # pragma: no cover — defensive wrapper
+            results.append({"object_id": neo.tracklet.object_id, "error": str(exc)})
+    return results

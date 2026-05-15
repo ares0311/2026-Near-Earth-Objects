@@ -16,6 +16,7 @@ from score import (
     _diameter_from_h,
     _discovery_priority,
     score,
+    score_batch,
 )
 
 
@@ -292,3 +293,67 @@ class TestBuildExplanation:
         p = make_posterior(stellar_artifact=0.0, main_belt_asteroid=0.0)
         ex = _build_explanation(f, p, "nominal", None)
         assert any("known" in e.lower() for e in ex.contra_evidence)
+
+
+class TestScoreBatch:
+    def test_returns_list_same_length(self):
+        from .conftest import build_tracklet, build_orbital_elements
+        from classify import classify, extract_features
+
+        items = []
+        for _ in range(3):
+            t = build_tracklet(n_obs=4)
+            f, p = classify(t)
+            items.append((t, f, p, build_orbital_elements()))
+        results = score_batch(items)
+        assert len(results) == 3
+
+    def test_empty_input_returns_empty(self):
+        assert score_batch([]) == []
+
+    def test_shared_pipeline_run_id(self):
+        from .conftest import build_tracklet, build_orbital_elements
+        from classify import classify
+
+        items = []
+        for _ in range(2):
+            t = build_tracklet(n_obs=4)
+            f, p = classify(t)
+            items.append((t, f, p, None))
+        results = score_batch(items, pipeline_run_id="batch-run-001")
+        assert all(r.metadata.pipeline_run_id == "batch-run-001" for r in results)
+
+
+class TestCloseApproachAu:
+    def test_close_approach_au_set_when_orbit_quality_2(self):
+        from .conftest import build_tracklet, build_orbital_elements
+        from classify import classify
+
+        t = build_tracklet(n_obs=4)
+        f, p = classify(t)
+        orbital = build_orbital_elements(quality_code=2)
+        s = score(t, f, p, orbital)
+        # close_approach_au should equal moid_au when quality_code >= 2
+        if s.hazard.moid_au is not None:
+            assert s.metadata.close_approach_au == s.hazard.moid_au
+        else:
+            assert s.metadata.close_approach_au is None
+
+    def test_close_approach_au_none_when_no_orbit(self):
+        from .conftest import build_tracklet
+        from classify import classify
+
+        t = build_tracklet(n_obs=4)
+        f, p = classify(t)
+        s = score(t, f, p, None)
+        assert s.metadata.close_approach_au is None
+
+    def test_close_approach_au_none_when_orbit_quality_1(self):
+        from .conftest import build_tracklet, build_orbital_elements
+        from classify import classify
+
+        t = build_tracklet(n_obs=4)
+        f, p = classify(t)
+        orbital = build_orbital_elements(quality_code=1)
+        s = score(t, f, p, orbital)
+        assert s.metadata.close_approach_au is None

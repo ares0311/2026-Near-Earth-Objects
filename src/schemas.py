@@ -216,6 +216,7 @@ class ScoringMetadata(BaseModel):
     discovery_priority: float = Field(ge=0.0, le=1.0, default=0.0)
     followup_value: float = Field(ge=0.0, le=1.0, default=0.0)
     scientific_interest: float = Field(ge=0.0, le=1.0, default=0.0)
+    close_approach_au: float | None = None
 
 
 # ---------------------------------------------------------------------------

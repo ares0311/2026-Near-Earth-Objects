@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__all__ = ["score"]
+__all__ = ["score", "score_batch"]
 
 import math
 import uuid
@@ -310,6 +310,13 @@ def score(
     fv = _followup_value(updated_features, orbital)
     si = _scientific_interest(orbital)
 
+    # Populate close_approach_au: use MOID when orbit quality is sufficient.
+    # MOID is the minimum distance between the two orbits; it equals the closest
+    # possible approach but not a specific predicted flyby distance.
+    close_approach_au: float | None = None
+    if moid_au is not None and orbit_quality >= 2:
+        close_approach_au = moid_au
+
     metadata = ScoringMetadata(
         scorer_version=_SCORER_VERSION,
         scored_at_jd=scored_at_jd,
@@ -317,6 +324,7 @@ def score(
         discovery_priority=dp,
         followup_value=fv,
         scientific_interest=si,
+        close_approach_au=close_approach_au,
     )
 
     return ScoredNEO(
@@ -326,3 +334,15 @@ def score(
         hazard=hazard,
         metadata=metadata,
     )
+
+
+def score_batch(
+    items: list[tuple[Tracklet, CandidateFeatures, NEOPosterior, OrbitalElements | None]],
+    pipeline_run_id: str | None = None,
+) -> list[ScoredNEO]:
+    """Score a list of (tracklet, features, posterior, orbital) tuples.
+
+    Each item is passed to :func:`score` with a shared ``pipeline_run_id``.
+    Returns results in the same order as the input list.
+    """
+    return [score(t, f, p, o, pipeline_run_id=pipeline_run_id) for t, f, p, o in items]

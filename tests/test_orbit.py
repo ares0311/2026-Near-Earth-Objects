@@ -11,6 +11,7 @@ from orbit import (
     _gauss_iod,
     _state_to_elements,
     _sun_position_ecliptic,
+    arc_quality_report,
     classify_neo,
     compute_moid,
     fit_orbit,
@@ -335,3 +336,78 @@ class TestFitOrbitReachesDifferentialCorrection:
         # Bound elliptical orbit with e_vec[2] < 0 → line 216 reached
         assert el is not None
         assert el.argument_perihelion_deg >= 0.0
+
+
+class TestArcQualityReport:
+    def test_short_arc_quality_code_1(self):
+        from .conftest import build_tracklet
+        t = build_tracklet(n_obs=3, arc_days=0.5)
+        report = arc_quality_report(t)
+        assert report["quality_code"] == 1
+        assert report["arc_warning"] is not None
+        assert "1 day" in report["arc_warning"]
+
+    def test_multi_night_quality_code_2_few_nights(self):
+        from schemas import Tracklet, Observation
+        obs = tuple(
+            Observation(
+                obs_id=f"q{i}",
+                ra_deg=180.0,
+                dec_deg=10.0,
+                jd=2460000.5 + i * 1.5,
+                mag=19.5,
+                mag_err=0.05,
+                filter_band="r",
+                mission="ZTF",
+            )
+            for i in range(2)
+        )
+        t = Tracklet(
+            object_id="QC",
+            observations=obs,
+            arc_days=1.5,
+            motion_rate_arcsec_per_hour=1.0,
+            motion_pa_degrees=90.0,
+        )
+        report = arc_quality_report(t)
+        assert report["quality_code"] == 2
+        assert "nights" in report["arc_warning"]
+
+    def test_multi_week_quality_code_3(self):
+        from .conftest import build_tracklet
+        t = build_tracklet(n_obs=6, arc_days=10.0)
+        report = arc_quality_report(t)
+        assert report["quality_code"] in (2, 3)
+        assert report["arc_warning"] is None
+
+    def test_opposition_arc_quality_code_4(self):
+        from .conftest import build_tracklet
+        t = build_tracklet(n_obs=6, arc_days=45.0)
+        report = arc_quality_report(t)
+        assert report["quality_code"] == 4
+        assert report["arc_warning"] is None
+
+    def test_report_keys_present(self):
+        from .conftest import build_tracklet
+        t = build_tracklet(n_obs=4, arc_days=3.0)
+        report = arc_quality_report(t)
+        for key in ("arc_days", "n_observations", "n_nights", "quality_code",
+                    "arc_warning", "recommended_action"):
+            assert key in report
+
+    def test_single_obs_arc_days_zero(self):
+        from schemas import Tracklet, Observation
+        obs = (Observation(
+            obs_id="solo",
+            ra_deg=180.0,
+            dec_deg=10.0,
+            jd=2460000.5,
+            mag=19.5,
+            mag_err=0.05,
+            filter_band="r",
+            mission="ZTF",
+        ),)
+        t = Tracklet("SOLO", obs, 0.0, 0.0, 0.0)
+        report = arc_quality_report(t)
+        assert report["arc_days"] == 0.0
+        assert report["quality_code"] == 1

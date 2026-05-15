@@ -9,6 +9,8 @@ from alert import (
     _jd_to_mpc_date,
     _monitor_neocp,
     _submit_to_mpc,
+    batch_process_alerts,
+    format_mpc_json,
     format_mpc_observation,
     format_mpc_report,
     monitor_neocp,
@@ -401,3 +403,58 @@ class TestMonitorNeocpDirect:
             result = _monitor_neocp("TEST001")
         assert result["status"] == "error"
         assert "unreachable" in result["error"]
+
+
+class TestFormatMpcJson:
+    def test_returns_dict_with_required_keys(self):
+        neo = make_scored_neo()
+        result = format_mpc_json(neo)
+        assert isinstance(result, dict)
+        assert "type" in result
+        assert "provId" in result
+        assert "submissions" in result
+        assert result["type"] == "observation"
+
+    def test_submissions_count_matches_observations(self):
+        neo = make_scored_neo()
+        result = format_mpc_json(neo)
+        assert len(result["submissions"]) == len(neo.tracklet.observations)
+
+    def test_submission_has_obs_time_and_coords(self):
+        neo = make_scored_neo()
+        sub = format_mpc_json(neo)["submissions"][0]
+        assert "obsTime" in sub
+        assert "ra" in sub
+        assert "dec" in sub
+        assert isinstance(sub["ra"], float)
+
+    def test_first_observation_marked_discovery(self):
+        neo = make_scored_neo()
+        subs = format_mpc_json(neo)["submissions"]
+        assert subs[0]["remarks"] == "discovery"
+        assert subs[1]["remarks"] is None
+
+    def test_hazard_fields_propagated(self):
+        neo = make_scored_neo(moid_au=0.03)
+        result = format_mpc_json(neo)
+        assert result["moid_au"] == 0.03
+        assert result["neo_class"] == "apollo"
+
+
+class TestBatchProcessAlerts:
+    def test_returns_list_same_length(self, tmp_path, monkeypatch):
+        import alert as alert_mod
+        monkeypatch.setattr(alert_mod, "_LOG_DIR", tmp_path)
+        neos = [make_scored_neo(alert_pathway="internal_candidate") for _ in range(3)]
+        results = batch_process_alerts(neos, dry_run=True)
+        assert len(results) == 3
+
+    def test_each_result_has_pathway(self, tmp_path, monkeypatch):
+        import alert as alert_mod
+        monkeypatch.setattr(alert_mod, "_LOG_DIR", tmp_path)
+        neos = [make_scored_neo(alert_pathway="internal_candidate")]
+        results = batch_process_alerts(neos, dry_run=True)
+        assert "pathway" in results[0]
+
+    def test_empty_input_returns_empty_list(self):
+        assert batch_process_alerts([], dry_run=True) == []

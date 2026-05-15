@@ -4,6 +4,7 @@ import pytest
 
 from link import (
     _fit_linear_motion,
+    _is_satellite_trail,
     _make_tracklet,
     _motion,
     _obs_by_night,
@@ -363,3 +364,47 @@ class TestPredictFromArc:
         obs2 = make_obs(obs_id="d2", jd=2460001.0, ra_deg=0.0, dec_deg=89.5)
         _, pred_dec = _predict_from_arc([obs1, obs2], target_jd=2460010.0)
         assert pred_dec <= 90.0
+
+
+class TestIsSatelliteTrail:
+    def test_slow_motion_not_satellite(self):
+        # Rate well below threshold (30 arcsec/hr)
+        assert _is_satellite_trail(1.0, 0.5, 5.0) is False
+
+    def test_fast_mixed_motion_not_satellite(self):
+        # Fast but diagonal — not a satellite trail
+        assert _is_satellite_trail(25.0, 25.0, 35.0) is False
+
+    def test_fast_pure_ew_is_satellite(self):
+        # Nearly pure E-W at high rate
+        assert _is_satellite_trail(35.0, 0.01, 35.0) is True
+
+    def test_fast_pure_ns_is_satellite(self):
+        # Nearly pure N-S at high rate
+        assert _is_satellite_trail(0.01, 35.0, 35.0) is True
+
+    def test_satellite_filter_excludes_trail_from_linking(self):
+        """Observations with purely E-W fast motion should not form tracklets."""
+        # Build three nights; each night has one obs moving purely east at 40"/hr
+        # (dRA = 40, dDec ≈ 0 → should be filtered out)
+        def _ew_obs(night: int) -> Observation:
+            # 40 arcsec/hr E-W: RA advances by 40/(3600*cos(dec)) deg/hr
+            cos_dec = 0.9848  # cos(10°)
+            ra_advance = 40.0 / 3600.0 / cos_dec * 24.0 * night
+            return Observation(
+                obs_id=f"ew_{night}",
+                ra_deg=180.0 + ra_advance,
+                dec_deg=10.0,
+                jd=2460000.5 + night,
+                mag=18.0,
+                mag_err=0.1,
+                filter_band="r",
+                mission="ZTF",
+            )
+
+        cands = tuple(
+            make_candidate((_ew_obs(n),), rate=40.0)
+            for n in range(3)
+        )
+        result = link(cands, min_nights=2, min_observations=3)
+        assert len(result.tracklets) == 0
