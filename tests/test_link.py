@@ -11,8 +11,9 @@ from link import (
     _predict_from_arc,
     _sep_arcsec,
     link,
+    merge_tracklets,
 )
-from schemas import Observation, RawCandidate
+from schemas import Observation, RawCandidate, Tracklet
 
 
 def make_obs(**kwargs) -> Observation:
@@ -408,3 +409,55 @@ class TestIsSatelliteTrail:
         )
         result = link(cands, min_nights=2, min_observations=3)
         assert len(result.tracklets) == 0
+
+
+def _make_tracklet_direct(obs_list: list) -> Tracklet:
+    return Tracklet(
+        object_id="MERGE_TEST",
+        observations=tuple(obs_list),
+        arc_days=float(obs_list[-1].jd - obs_list[0].jd) if len(obs_list) >= 2 else 0.0,
+        motion_rate_arcsec_per_hour=1.0,
+        motion_pa_degrees=90.0,
+    )
+
+
+class TestMergeTracklets:
+    def test_combines_observations(self):
+        obs_a = [make_obs(obs_id=f"a{i}", jd=2460000.0 + i) for i in range(3)]
+        obs_b = [make_obs(obs_id=f"b{i}", jd=2460003.0 + i) for i in range(3)]
+        ta = _make_tracklet_direct(obs_a)
+        tb = _make_tracklet_direct(obs_b)
+        merged = merge_tracklets(ta, tb)
+        assert len(merged.observations) == 6
+
+    def test_deduplicates_by_obs_id(self):
+        obs = [make_obs(obs_id=f"d{i}", jd=2460000.0 + i) for i in range(3)]
+        ta = _make_tracklet_direct(obs)
+        tb = _make_tracklet_direct(obs)  # identical
+        merged = merge_tracklets(ta, tb)
+        assert len(merged.observations) == 3
+
+    def test_merged_arc_spans_both(self):
+        obs_a = [make_obs(obs_id=f"m{i}", jd=2460000.0 + i) for i in range(2)]
+        obs_b = [make_obs(obs_id=f"n{i}", jd=2460005.0 + i) for i in range(2)]
+        ta = _make_tracklet_direct(obs_a)
+        tb = _make_tracklet_direct(obs_b)
+        merged = merge_tracklets(ta, tb)
+        assert merged.arc_days >= 6.0
+
+    def test_returns_new_object_id(self):
+        obs_a = [make_obs(obs_id="p0", jd=2460000.0), make_obs(obs_id="p1", jd=2460001.0)]
+        obs_b = [make_obs(obs_id="q0", jd=2460002.0), make_obs(obs_id="q1", jd=2460003.0)]
+        ta = _make_tracklet_direct(obs_a)
+        tb = _make_tracklet_direct(obs_b)
+        merged = merge_tracklets(ta, tb)
+        assert merged.object_id not in (ta.object_id, tb.object_id)
+
+    def test_observations_sorted_by_jd(self):
+        obs_a = [make_obs(obs_id="s0", jd=2460010.0), make_obs(obs_id="s1", jd=2460000.0)]
+        obs_b = [make_obs(obs_id="t0", jd=2460005.0)]
+        ta = _make_tracklet_direct(obs_a)
+        tb = _make_tracklet_direct(obs_b)
+        merged = merge_tracklets(ta, tb)
+        jds = [o.jd for o in merged.observations]
+        assert jds == sorted(jds)

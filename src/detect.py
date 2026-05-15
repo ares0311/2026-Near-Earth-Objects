@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__all__ = ["detect"]
+__all__ = ["detect", "detect_batch"]
 
 import math
 import uuid
@@ -15,6 +15,7 @@ from schemas import (
     DetectResult,
     KnownMatch,
     Observation,
+    PreprocessResult,
     RawCandidate,
 )
 
@@ -278,3 +279,19 @@ def detect(
         known_matches=tuple(known_matches),
         provenance=provenance,
     )
+
+
+def detect_batch(
+    preprocess_results: list[PreprocessResult],
+    real_bogus_threshold: float = _REAL_BOGUS_THRESHOLD,
+    mpc_cross_match: bool = True,
+) -> list[DetectResult]:
+    """Run detection on a list of :class:`PreprocessResult` objects.
+
+    Returns one :class:`DetectResult` per input result in the same order.
+    """
+    return [
+        detect(pr.sources, real_bogus_threshold=real_bogus_threshold,
+               mpc_cross_match=mpc_cross_match)
+        for pr in preprocess_results
+    ]

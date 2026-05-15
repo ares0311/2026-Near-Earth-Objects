@@ -14,8 +14,9 @@ from detect import (
     _motion_rate_and_pa,
     _passes_real_bogus,
     detect,
+    detect_batch,
 )
-from schemas import Observation
+from schemas import Observation, PreprocessProvenance, PreprocessResult
 
 
 def make_obs(**kwargs) -> Observation:
@@ -293,3 +294,36 @@ class TestLoadMpcEphemerides:
         from detect import _load_mpc_ephemerides
         result = _load_mpc_ephemerides(180.0, 10.0, 0.5, 2460000.5)
         assert result == []
+
+
+def _make_preprocess_result(obs: tuple) -> PreprocessResult:
+    return PreprocessResult(
+        sources=obs,
+        provenance=PreprocessProvenance(n_sources_in=len(obs), n_sources_out=len(obs)),
+    )
+
+
+class TestDetectBatch:
+    def test_returns_one_result_per_input(self):
+        obs = (make_obs(obs_id="db1", real_bogus=0.9),)
+        pr = _make_preprocess_result(obs)
+        results = detect_batch([pr, pr], mpc_cross_match=False)
+        assert len(results) == 2
+
+    def test_empty_list_returns_empty(self):
+        assert detect_batch([]) == []
+
+    def test_each_result_is_detect_result(self):
+        from schemas import DetectResult
+        obs = (make_obs(obs_id="db2", real_bogus=0.9),)
+        pr = _make_preprocess_result(obs)
+        results = detect_batch([pr], mpc_cross_match=False)
+        assert isinstance(results[0], DetectResult)
+
+    def test_candidate_counts_match_individual(self):
+        obs = (make_obs(obs_id="db3", real_bogus=0.9),)
+        pr = _make_preprocess_result(obs)
+        batch = detect_batch([pr], mpc_cross_match=False)
+        individual = detect(obs, mpc_cross_match=False)
+        assert (batch[0].provenance.n_candidates ==
+                individual.provenance.n_candidates)

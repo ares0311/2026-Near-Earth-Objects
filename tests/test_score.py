@@ -15,6 +15,7 @@ from score import (
     _determine_alert_pathway,
     _diameter_from_h,
     _discovery_priority,
+    rank_candidates,
     score,
     score_batch,
 )
@@ -357,3 +358,51 @@ class TestCloseApproachAu:
         orbital = build_orbital_elements(quality_code=1)
         s = score(t, f, p, orbital)
         assert s.metadata.close_approach_au is None
+
+
+def _make_scored_neo_for_rank(
+    priority: float, hazard_flag: str = "nominal"
+):
+    from .conftest import build_scored_neo
+    return build_scored_neo(
+        discovery_priority=priority,
+        hazard_flag=hazard_flag,
+        alert_pathway="internal_candidate",
+        moid_au=0.1,
+        orbit_quality=2,
+    )
+
+
+class TestRankCandidates:
+    def test_sorted_by_descending_priority(self):
+        neos = [
+            _make_scored_neo_for_rank(0.3),
+            _make_scored_neo_for_rank(0.9),
+            _make_scored_neo_for_rank(0.6),
+        ]
+        ranked = rank_candidates(neos)
+        priorities = [n.metadata.discovery_priority for n in ranked]
+        assert priorities == sorted(priorities, reverse=True)
+
+    def test_pha_before_nominal(self):
+        nominal = _make_scored_neo_for_rank(0.99, hazard_flag="nominal")
+        pha = _make_scored_neo_for_rank(0.1, hazard_flag="pha_candidate")
+        ranked = rank_candidates([nominal, pha])
+        assert ranked[0].hazard.hazard_flag == "pha_candidate"
+
+    def test_empty_list_returns_empty(self):
+        assert rank_candidates([]) == []
+
+    def test_single_item_unchanged(self):
+        neo = _make_scored_neo_for_rank(0.5)
+        ranked = rank_candidates([neo])
+        assert ranked == [neo]
+
+    def test_does_not_mutate_input(self):
+        neos = [
+            _make_scored_neo_for_rank(0.2),
+            _make_scored_neo_for_rank(0.8),
+        ]
+        original_order = [id(n) for n in neos]
+        rank_candidates(neos)
+        assert [id(n) for n in neos] == original_order

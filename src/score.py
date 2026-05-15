@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__all__ = ["score", "score_batch"]
+__all__ = ["score", "score_batch", "rank_candidates"]
 
 import math
 import uuid
@@ -334,6 +334,20 @@ def score(
         hazard=hazard,
         metadata=metadata,
     )
+
+
+def rank_candidates(neos: list[ScoredNEO]) -> list[ScoredNEO]:
+    """Return a copy of ``neos`` sorted by descending discovery priority.
+
+    PHA candidates are always placed above non-PHA candidates of equal
+    numerical priority.  Within the same hazard tier, objects are sorted by
+    ``metadata.discovery_priority`` (descending).
+    """
+    def _sort_key(neo: ScoredNEO) -> tuple[int, float]:
+        pha_tier = 0 if neo.hazard.hazard_flag == "pha_candidate" else 1
+        return (pha_tier, -neo.metadata.discovery_priority)
+
+    return sorted(neos, key=_sort_key)
 
 
 def score_batch(

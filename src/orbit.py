@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-__all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report"]
+__all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
+           "propagate_orbit", "predict_ephemeris"]
 
 import math
 from typing import NamedTuple
@@ -443,4 +444,111 @@ def arc_quality_report(tracklet: Tracklet) -> dict:
         "quality_code": quality_code,
         "arc_warning": arc_warning,
         "recommended_action": recommended_action,
+    }
+
+
+def propagate_orbit(elements: OrbitalElements, dt_days: float) -> OrbitalElements:
+    """Propagate Keplerian orbital elements forward by ``dt_days``.
+
+    Uses two-body (Keplerian) propagation: advances the mean anomaly by
+    ``n * dt_days`` where ``n = 2π / T`` is the mean motion.  All other
+    elements are unchanged (no perturbations).
+
+    Returns a new :class:`OrbitalElements` with the updated ``mean_anomaly_deg``
+    and ``epoch_jd``.
+    """
+    a = elements.semi_major_axis_au
+    # Mean motion in deg/day (n = 360 / T, T in days)
+    T_days = 365.25 * math.sqrt(a**3)  # Kepler's third law (AU, yr)
+    n_deg_per_day = 360.0 / T_days if T_days > 0 else 0.0
+    new_M = (elements.mean_anomaly_deg + n_deg_per_day * dt_days) % 360.0
+    return OrbitalElements(
+        semi_major_axis_au=elements.semi_major_axis_au,
+        eccentricity=elements.eccentricity,
+        inclination_deg=elements.inclination_deg,
+        longitude_ascending_node_deg=elements.longitude_ascending_node_deg,
+        argument_perihelion_deg=elements.argument_perihelion_deg,
+        mean_anomaly_deg=new_M,
+        epoch_jd=elements.epoch_jd + dt_days,
+        perihelion_au=elements.perihelion_au,
+        aphelion_au=elements.aphelion_au,
+        quality_code=elements.quality_code,
+        fit_residual_arcsec=elements.fit_residual_arcsec,
+    )
+
+
+def _kepler_equation(M_rad: float, e: float, tol: float = 1e-10) -> float:
+    """Solve Kepler's equation M = E - e*sin(E) for eccentric anomaly E."""
+    E = M_rad  # initial guess
+    for _ in range(50):
+        dE = (M_rad - E + e * math.sin(E)) / (1.0 - e * math.cos(E))
+        E += dE
+        if abs(dE) < tol:
+            break
+    return E
+
+
+def predict_ephemeris(elements: OrbitalElements, jd: float) -> dict:
+    """Predict heliocentric ecliptic position at a given Julian Date.
+
+    Propagates the orbit to ``jd`` and converts to geocentric equatorial
+    coordinates (approximate — no light-travel-time correction, geocentric
+    parallax, or planetary perturbations).
+
+    Returns a dict with keys:
+      ``ra_deg``, ``dec_deg``  — approximate geocentric equatorial coordinates
+      ``helio_dist_au``        — heliocentric distance in AU
+      ``jd``                   — the requested epoch
+    """
+    dt = jd - elements.epoch_jd
+    propagated = propagate_orbit(elements, dt)
+    a = propagated.semi_major_axis_au
+    e = propagated.eccentricity
+    M_rad = math.radians(propagated.mean_anomaly_deg)
+
+    E = _kepler_equation(M_rad, e)
+    nu = 2.0 * math.atan2(
+        math.sqrt(1 + e) * math.sin(E / 2),
+        math.sqrt(1 - e) * math.cos(E / 2),
+    )
+    r = a * (1 - e * math.cos(E))
+
+    om = math.radians(propagated.argument_perihelion_deg)
+    Om = math.radians(propagated.longitude_ascending_node_deg)
+    inc = math.radians(propagated.inclination_deg)
+
+    # Heliocentric ecliptic position
+    x_orb = r * math.cos(nu)
+    y_orb = r * math.sin(nu)
+
+    x_ecl = (math.cos(Om) * math.cos(om + nu) -
+              math.sin(Om) * math.sin(om + nu) * math.cos(inc))
+    y_ecl = (math.sin(Om) * math.cos(om + nu) +
+              math.cos(Om) * math.sin(om + nu) * math.cos(inc))
+    z_ecl = math.sin(inc) * math.sin(om + nu)
+
+    x_helio = r * x_ecl
+    y_helio = r * y_ecl
+    z_helio = r * z_ecl
+
+    # Approximate geocentric position (subtract Earth's heliocentric position)
+    earth = _sun_position_ecliptic(jd)  # Earth–Sun vector; negate for helio
+    x_geo = x_helio - (-earth[0])
+    y_geo = y_helio - (-earth[1])
+    z_geo = z_helio - (-earth[2])
+
+    # Ecliptic → equatorial (J2000 obliquity)
+    eps = math.radians(23.439291111)
+    x_eq = x_geo
+    y_eq = y_geo * math.cos(eps) - z_geo * math.sin(eps)
+    z_eq = y_geo * math.sin(eps) + z_geo * math.cos(eps)
+
+    ra_rad = math.atan2(y_eq, x_eq) % (2 * math.pi)
+    dec_rad = math.asin(max(-1.0, min(1.0, z_eq / math.sqrt(x_eq**2 + y_eq**2 + z_eq**2))))
+
+    return {
+        "ra_deg": math.degrees(ra_rad),
+        "dec_deg": math.degrees(dec_rad),
+        "helio_dist_au": r,
+        "jd": jd,
     }

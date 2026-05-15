@@ -7,6 +7,7 @@ __all__ = [
     "format_mpc_report",
     "format_mpc_json",
     "batch_process_alerts",
+    "generate_alert_package",
     "process_alert",
     "summarise",
     "monitor_neocp",
@@ -441,6 +442,29 @@ def summarise(neo: ScoredNEO) -> str:
         "Defer all hazard assessment to MPC/CNEOS.",
     ]
     return "\n".join(lines)
+
+
+def generate_alert_package(neo: ScoredNEO, obs_code: str = _MPC_OBS_CODE) -> dict:
+    """Bundle all alert artifacts for a ScoredNEO into a single dict.
+
+    Returns:
+      ``object_id``       — tracklet identifier
+      ``mpc_report``      — MPC 80-column formatted string
+      ``mpc_json``        — MPC JSON submission dict
+      ``summary``         — human-readable text summary
+      ``hazard_flag``     — hazard classification
+      ``alert_pathway``   — recommended reporting action
+      ``n_observations``  — number of observations in tracklet
+    """
+    return {
+        "object_id": neo.tracklet.object_id,
+        "mpc_report": format_mpc_report(neo, obs_code=obs_code),
+        "mpc_json": format_mpc_json(neo, obs_code=obs_code),
+        "summary": summarise(neo),
+        "hazard_flag": neo.hazard.hazard_flag,
+        "alert_pathway": neo.hazard.alert_pathway,
+        "n_observations": len(neo.tracklet.observations),
+    }
 
 
 def batch_process_alerts(

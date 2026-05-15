@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__all__ = ["preprocess"]
+__all__ = ["preprocess", "preprocess_batch"]
 
 import base64
 import math
@@ -10,6 +10,7 @@ import math
 import numpy as np
 
 from schemas import (
+    FetchResult,
     Observation,
     PreprocessProvenance,
     PreprocessResult,
@@ -212,3 +213,14 @@ def preprocess(
         astrometric_reference="Gaia DR3" if apply_astrometry else "none",
     )
     return PreprocessResult(sources=tuple(valid), provenance=provenance)
+
+
+def preprocess_batch(
+    fetch_results: list[FetchResult],
+    apply_astrometry: bool = True,
+) -> list[PreprocessResult]:
+    """Preprocess a list of :class:`FetchResult` objects in one call.
+
+    Returns one :class:`PreprocessResult` per input result in the same order.
+    """
+    return [preprocess(fr.alerts, apply_astrometry=apply_astrometry) for fr in fetch_results]

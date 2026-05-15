@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__all__ = ["link", "_predict_from_arc"]
+__all__ = ["link", "merge_tracklets", "_predict_from_arc"]
 
 import math
 import uuid
@@ -281,6 +281,22 @@ def _link_candidates(
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+
+
+def merge_tracklets(a: Tracklet, b: Tracklet) -> Tracklet:
+    """Merge two tracklets covering overlapping or adjacent arcs.
+
+    Combines all observations (deduplicated by ``obs_id``), then recomputes
+    arc length, motion rate, and position angle from the merged set.
+    Returns a new :class:`Tracklet` with a fresh ``object_id``.
+    """
+    seen: set[str] = set()
+    merged_obs: list[Observation] = []
+    for obs in (*a.observations, *b.observations):
+        if obs.obs_id not in seen:
+            seen.add(obs.obs_id)
+            merged_obs.append(obs)
+    return _make_tracklet(merged_obs)
 
 
 def link(

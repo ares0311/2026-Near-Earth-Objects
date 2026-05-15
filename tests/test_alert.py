@@ -13,6 +13,7 @@ from alert import (
     format_mpc_json,
     format_mpc_observation,
     format_mpc_report,
+    generate_alert_package,
     monitor_neocp,
     process_alert,
     summarise,
@@ -458,3 +459,44 @@ class TestBatchProcessAlerts:
 
     def test_empty_input_returns_empty_list(self):
         assert batch_process_alerts([], dry_run=True) == []
+
+
+class TestGenerateAlertPackage:
+    def test_returns_all_required_keys(self, tmp_path, monkeypatch):
+        import alert as alert_mod
+        monkeypatch.setattr(alert_mod, "_LOG_DIR", tmp_path)
+        neo = make_scored_neo()
+        pkg = generate_alert_package(neo)
+        expected = {
+            "object_id", "mpc_report", "mpc_json", "summary",
+            "hazard_flag", "alert_pathway", "n_observations",
+        }
+        assert expected.issubset(pkg.keys())
+
+    def test_object_id_matches_tracklet(self, tmp_path, monkeypatch):
+        import alert as alert_mod
+        monkeypatch.setattr(alert_mod, "_LOG_DIR", tmp_path)
+        neo = make_scored_neo()
+        pkg = generate_alert_package(neo)
+        assert pkg["object_id"] == neo.tracklet.object_id
+
+    def test_n_observations_correct(self, tmp_path, monkeypatch):
+        import alert as alert_mod
+        monkeypatch.setattr(alert_mod, "_LOG_DIR", tmp_path)
+        neo = make_scored_neo()
+        pkg = generate_alert_package(neo)
+        assert pkg["n_observations"] == len(neo.tracklet.observations)
+
+    def test_mpc_report_is_string(self, tmp_path, monkeypatch):
+        import alert as alert_mod
+        monkeypatch.setattr(alert_mod, "_LOG_DIR", tmp_path)
+        neo = make_scored_neo()
+        pkg = generate_alert_package(neo)
+        assert isinstance(pkg["mpc_report"], str)
+
+    def test_mpc_json_is_dict(self, tmp_path, monkeypatch):
+        import alert as alert_mod
+        monkeypatch.setattr(alert_mod, "_LOG_DIR", tmp_path)
+        neo = make_scored_neo()
+        pkg = generate_alert_package(neo)
+        assert isinstance(pkg["mpc_json"], dict)

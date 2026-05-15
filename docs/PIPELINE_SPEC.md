@@ -33,6 +33,9 @@ Each stage produces a typed, immutable result object. No shared mutable state.
 | `radius_deg` | — | Cone search radius |
 | `surveys` | `("ZTF",)` | Which surveys to query |
 | `atlas_token` | `None` | ATLAS authentication token |
+| `force_refresh` | `False` | Bypass on-disk cache and re-download |
+
+**Batch API**: `fetch_batch(targets, radius_deg, start_jd, end_jd, ...)` accepts a list of `(ra_deg, dec_deg)` tuples and returns one `FetchResult` per target.
 
 ---
 
@@ -53,6 +56,8 @@ Each stage produces a typed, immutable result object. No shared mutable state.
 - ATLAS: uses forced-photometry magnitudes directly (no cutouts)
 - `apply_astrometry=False` skips the Gaia query (offline mode)
 
+**Batch API**: `preprocess_batch(fetch_results, apply_astrometry)` accepts a list of `FetchResult` objects and returns one `PreprocessResult` per input.
+
 ---
 
 ## Stage 3: detect.py
@@ -67,6 +72,8 @@ Each stage produces a typed, immutable result object. No shared mutable state.
 5. Cross-match against MPC known object ephemerides
 
 **Output**: `DetectResult(candidates: list[RawCandidate], known_matches: list[KnownMatch])`
+
+**Batch API**: `detect_batch(preprocess_results, real_bogus_threshold, mpc_cross_match)` accepts a list of `PreprocessResult` objects and returns one `DetectResult` per input.
 
 **Key parameters**:
 | Parameter | Default | Description |
@@ -90,9 +97,13 @@ Each stage produces a typed, immutable result object. No shared mutable state.
 
 **Output**: `LinkResult(tracklets: list[Tracklet])`
 
+**Additional APIs**:
+- `merge_tracklets(a, b)` — combine two tracklets into a longer arc; deduplicates by `obs_id`, recomputes motion rate and PA.
+
 **Notes**:
 - Pure numpy/scipy implementation (THOR-inspired; Moeyens et al. 2021)
 - No external orbit-determination dependency at this stage
+- Satellite/debris trail filter: candidate pairs with purely E-W or N-S motion at rate ≥ 30 arcsec/hr are rejected.
 
 ---
 
@@ -145,6 +156,11 @@ Stacking meta-learner over Tier 1 + Tier 2 + Tier 3 outputs, calibrated via `cal
 
 **Output**: `OrbitalElements | None`
 
+**Additional APIs** (v0.13.0):
+- `arc_quality_report(tracklet)` — returns quality dict with `arc_days`, `n_observations`, `n_nights`, `quality_code` (1–4), `arc_warning`, and `recommended_action`.
+- `propagate_orbit(elements, dt_days)` — two-body Keplerian propagation; advances `mean_anomaly_deg` and `epoch_jd`.
+- `predict_ephemeris(elements, jd)` — approximate geocentric RA/Dec at a target JD; returns `{ra_deg, dec_deg, helio_dist_au, jd}`.
+
 **Dynamical classification boundaries**:
 | Class | Condition |
 |---|---|
@@ -179,6 +195,11 @@ Stacking meta-learner over Tier 1 + Tier 2 + Tier 3 outputs, calibrated via `cal
 
 **Output**: `ScoredNEO`
 
+**Additional APIs** (v0.13.0):
+- `score_batch(items, pipeline_run_id)` — score a list of `(tracklet, features, posterior, orbital)` tuples; returns `list[ScoredNEO]`.
+- `rank_candidates(neos)` — sort a list of `ScoredNEO` objects by descending discovery priority; PHA candidates always rank above non-PHA.
+- `ScoringMetadata.close_approach_au` — populated with MOID value when orbit quality ≥ 2.
+
 ---
 
 ## Stage 8: alert.py
@@ -191,7 +212,13 @@ Stacking meta-learner over Tier 1 + Tier 2 + Tier 3 outputs, calibrated via `cal
 3. For `nasa_pdco_notify`: generate structured alert package
 4. Log all alert actions with timestamps and provenance
 
-**Output**: `AlertResult`
+**Output**: alert result dict
+
+**Additional APIs** (v0.13.0):
+- `generate_alert_package(neo, obs_code)` — bundle MPC report, MPC JSON, summary, hazard flag, alert pathway, and observation count into a single dict.
+- `batch_process_alerts(neos, dry_run, mpc_obs_code)` — process a list of `ScoredNEO` objects; per-item exceptions recorded as `{"error": ...}` entries.
+- `monitor_neocp(object_id, max_wait_hr, poll_interval_hr)` — blocking NEOCP poll loop with injectable sleep for testing.
+- `format_mpc_json(neo, obs_code)` — MPC JSON submission dict.
 
 **Alert pathway gate** (ordered priority):
 1. `internal_candidate` — below all external thresholds
@@ -216,18 +243,52 @@ Observation (raw)
 
 ---
 
+## Top-level container: PipelineResult
+
+`PipelineResult` (v0.13.0) is an immutable Pydantic model that bundles the outputs of all pipeline stages into a single object.
+
+| Field | Type | Description |
+|---|---|---|
+| `run_id` | `str` | Unique identifier for this pipeline run |
+| `started_at_jd` | `float` | JD when the run began |
+| `finished_at_jd` | `float` | JD when the run completed |
+| `fetch` | `FetchResult` | Raw fetch output |
+| `preprocess` | `PreprocessResult` | Preprocessed sources |
+| `detect` | `DetectResult` | Candidate detections |
+| `link` | `LinkResult` | Linked tracklets |
+| `scored_neos` | `tuple[ScoredNEO, ...]` | Ranked scored candidates |
+| `pipeline_version` | `str` | Version tag (default `""`) |
+| `n_pha_candidates` | `int` | Count of PHA-flagged candidates |
+
+---
+
 ## Running the Pipeline
 
 ```bash
 # Full end-to-end (offline synthetic data)
 PYTHONPATH=src python Skills/run_pipeline.py
 
+# Generate synthetic survey observations
+PYTHONPATH=src python Skills/simulate_survey.py --objects 10 --nights 3
+
 # Batch score from JSON file
 PYTHONPATH=src python Skills/batch_score.py --input data/sample_tracklets.json
+
+# Export ranked table (CSV or HTML)
+PYTHONPATH=src python Skills/export_ranked_table.py scored.json --format html --out ranked.html
+
+# Check orbit quality for tracklets
+PYTHONPATH=src python Skills/check_orbit_quality.py data/sample_tracklets.json
 
 # Injection-recovery benchmark
 PYTHONPATH=src python Skills/injection_recovery.py --n-inject 50
 
 # Cross-match against MPC
 PYTHONPATH=src python Skills/check_mpc_known.py --input data/sample_tracklets.json
+
+# Validate MPC 80-column report
+PYTHONPATH=src python Skills/validate_mpc_report.py report.txt
+
+# Compare injection-recovery baselines
+PYTHONPATH=src python Skills/compare_baselines.py data/injection_recovery_baseline.json data/injection_recovery_n200.json
 ```

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fetch"]
+__all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fetch", "fetch_batch"]
 
 import json
 import os
@@ -402,3 +402,32 @@ def fetch(
         cached=False,
     )
     return FetchResult(alerts=tuple(all_alerts), provenance=provenance)
+
+
+def fetch_batch(
+    targets: list[tuple[float, float]],
+    radius_deg: float,
+    start_jd: float,
+    end_jd: float,
+    surveys: tuple[Mission, ...] = ("ZTF",),
+    atlas_token: str | None = None,
+    force_refresh: bool = False,
+) -> list[FetchResult]:
+    """Fetch alerts for multiple (RA, Dec) targets in one call.
+
+    Each element of ``targets`` is a ``(ra_deg, dec_deg)`` pair.  Returns one
+    :class:`FetchResult` per target in the same order.
+    """
+    return [
+        fetch(
+            ra_deg=ra,
+            dec_deg=dec,
+            radius_deg=radius_deg,
+            start_jd=start_jd,
+            end_jd=end_jd,
+            surveys=surveys,
+            atlas_token=atlas_token,
+            force_refresh=force_refresh,
+        )
+        for ra, dec in targets
+    ]

@@ -9,6 +9,7 @@ __all__ = [
     "RawCandidate", "KnownMatch",
     "FetchProvenance", "PreprocessProvenance", "DetectProvenance", "LinkProvenance",
     "FetchResult", "PreprocessResult", "DetectResult", "LinkResult",
+    "PipelineResult",
     "BackgroundOutcome", "BackgroundRunMode", "FollowUpTestStatus", "HumanReviewStatus",
     "RecommendationAction", "SignoffDecision",
     "PriorityFactors", "BackgroundTarget", "FollowUpTestResult",
@@ -468,3 +469,25 @@ class BackgroundRunResult(BaseModel):
     ledger: BackgroundRunLedgerEntry
     reviewed: ReviewedLogEntry | None = None
     needs_follow_up: NeedsFollowUpLogEntry | None = None
+
+
+# ---------------------------------------------------------------------------
+# Top-level pipeline result container
+# ---------------------------------------------------------------------------
+
+
+class PipelineResult(BaseModel):
+    """Immutable container for a complete end-to-end pipeline run."""
+
+    model_config = ConfigDict(frozen=True)
+
+    run_id: str
+    started_at_jd: float
+    finished_at_jd: float
+    fetch: FetchResult
+    preprocess: PreprocessResult
+    detect: DetectResult
+    link: LinkResult
+    scored_neos: tuple[ScoredNEO, ...]
+    pipeline_version: str = ""
+    n_pha_candidates: int = 0
