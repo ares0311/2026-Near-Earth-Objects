@@ -795,7 +795,8 @@ def get_tier1_feature_importances(model_path: Path | str | None = None) -> dict[
         for fkey, imp in scores.items():
             idx = int(fkey.lstrip("f"))
             if idx < len(feature_names):
-                named[feature_names[idx]] = float(imp)
+                val = imp[0] if isinstance(imp, list) else imp
+                named[feature_names[idx]] = float(val)
         total = sum(named.values()) or 1.0
         return {k: v / total for k, v in named.items()}
     except Exception:

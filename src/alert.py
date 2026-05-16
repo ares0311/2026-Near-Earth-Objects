@@ -17,6 +17,7 @@ __all__ = [
 import json
 import logging
 import time as _time_mod
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -269,7 +270,7 @@ def monitor_neocp(
     object_id: str,
     max_wait_hr: float = 24.0,
     poll_interval_hr: float = 1.0,
-    _sleep_fn: object = None,
+    _sleep_fn: Callable[[float], None] | None = None,
 ) -> dict:
     """Poll NEOCP for independent confirmation of a candidate.
 

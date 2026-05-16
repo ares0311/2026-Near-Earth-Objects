@@ -92,7 +92,7 @@ def _predict_from_arc(
 
     dt = (target_jd - t0) * 24.0
     pred_ra = float(np.polyval(ra_coeffs, dt)) % 360.0
-    pred_dec = float(max(-90.0, min(90.0, np.polyval(dec_coeffs, dt))))
+    pred_dec = float(np.clip(float(np.polyval(dec_coeffs, dt)), -90.0, 90.0))
     return pred_ra, pred_dec
 
 
