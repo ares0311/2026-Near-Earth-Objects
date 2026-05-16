@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-__all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty", "_predict_from_arc"]
+__all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
+           "filter_high_motion", "_predict_from_arc"]
 
 import math
 import uuid
@@ -369,3 +370,24 @@ def estimate_motion_uncertainty(tracklet: Tracklet) -> dict:
         "reduced_chi2": round(reduced_chi2, 4),
         "n_obs": n,
     }
+
+
+def filter_high_motion(
+    tracklets: list[Tracklet],
+    min_rate_arcsec_hr: float = 10.0,
+) -> list[Tracklet]:
+    """Return tracklets whose motion rate exceeds *min_rate_arcsec_hr*.
+
+    Useful for isolating fast-moving NEO candidates that are most likely to
+    be lost without rapid follow-up (e.g., close-approaching Apollos).
+
+    Args:
+        tracklets:          Input list of :class:`Tracklet` objects.
+        min_rate_arcsec_hr: Minimum motion rate threshold (arcsec/hr).
+                            Defaults to 10.0 arcsec/hr.
+
+    Returns:
+        List of tracklets with ``motion_rate_arcsec_per_hour ≥ min_rate_arcsec_hr``,
+        in input order.
+    """
+    return [t for t in tracklets if t.motion_rate_arcsec_per_hour >= min_rate_arcsec_hr]

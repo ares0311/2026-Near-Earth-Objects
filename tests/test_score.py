@@ -460,3 +460,47 @@ class TestDiscoveryReport:
         neo = self._make_neo()
         result = discovery_report(neo)
         assert result["arc_days"] == pytest.approx(neo.tracklet.arc_days, abs=1e-3)
+
+
+class TestFollowupPriorityTable:
+    def _make_neo(self, obj_id: str = "T001", priority: float = 0.8) -> object:
+        from .conftest import build_scored_neo
+        return build_scored_neo(object_id=obj_id, discovery_priority=priority)
+
+    def test_returns_list(self):
+        from score import followup_priority_table
+        neos = [self._make_neo()]
+        result = followup_priority_table(neos)
+        assert isinstance(result, list)
+
+    def test_empty_input_returns_empty(self):
+        from score import followup_priority_table
+        assert followup_priority_table([]) == []
+
+    def test_row_has_required_keys(self):
+        from score import followup_priority_table
+        neos = [self._make_neo()]
+        row = followup_priority_table(neos)[0]
+        for key in ("rank", "object_id", "hazard_flag", "alert_pathway",
+                    "discovery_priority", "moid_au", "neo_class",
+                    "n_observations", "arc_days", "motion_rate_arcsec_hr"):
+            assert key in row, f"missing key: {key}"
+
+    def test_rank_starts_at_one(self):
+        from score import followup_priority_table
+        neos = [self._make_neo("A", 0.9), self._make_neo("B", 0.5)]
+        rows = followup_priority_table(neos)
+        assert rows[0]["rank"] == 1
+
+    def test_sorted_by_priority_descending(self):
+        from score import followup_priority_table
+        neos = [self._make_neo("low", 0.2), self._make_neo("high", 0.9)]
+        rows = followup_priority_table(neos)
+        priorities = [r["discovery_priority"] for r in rows]
+        assert priorities == sorted(priorities, reverse=True)
+
+    def test_object_id_matches(self):
+        from score import followup_priority_table
+        neo = self._make_neo("TESTOBJ")
+        rows = followup_priority_table([neo])
+        assert rows[0]["object_id"] == "TESTOBJ"

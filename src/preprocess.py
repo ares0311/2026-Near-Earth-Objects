@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__all__ = ["preprocess", "preprocess_batch", "quality_summary"]
+__all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_sources"]
 
 import base64
 import math
@@ -264,3 +264,18 @@ def quality_summary(result: PreprocessResult) -> dict:
         "median_bg_rms": round(statistics.median(bg_vals), 4) if bg_vals else None,
         "median_elongation": round(statistics.median(elong_vals), 4) if elong_vals else None,
     }
+
+
+def flag_saturated_sources(result: PreprocessResult, saturation_mag: float = 12.0) -> list[str]:
+    """Return obs_ids of sources brighter than saturation_mag (likely saturated).
+
+    Sources at or above the detector saturation limit produce unreliable
+    astrometry and photometry.  Use this list to mask them before linking.
+    """
+    if not isinstance(result, PreprocessResult):
+        raise TypeError("result must be a PreprocessResult")
+    flagged: list[str] = []
+    for obs in result.sources:
+        if obs.mag < saturation_mag:
+            flagged.append(obs.obs_id)
+    return flagged

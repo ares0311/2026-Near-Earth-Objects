@@ -905,3 +905,42 @@ class TestExplainClassification:
         result = explain_classification(t)
         # Without a real model file, importances should be None
         assert result["tier1_importances"] is None or isinstance(result["tier1_importances"], dict)
+
+
+class TestBatchExplain:
+    def _make_tracklets(self, n: int = 3):
+        from .conftest import build_tracklet
+        return [build_tracklet(object_id=f"T{i:03d}") for i in range(n)]
+
+    def test_returns_list_same_length(self):
+        from classify import batch_explain
+        tracklets = self._make_tracklets(3)
+        result = batch_explain(tracklets)
+        assert len(result) == 3
+
+    def test_empty_input_returns_empty(self):
+        from classify import batch_explain
+        assert batch_explain([]) == []
+
+    def test_each_item_has_required_keys(self):
+        from classify import batch_explain
+        tracklets = self._make_tracklets(2)
+        for item in batch_explain(tracklets):
+            assert "dominant_hypothesis" in item
+            assert "confidence" in item
+            assert "posterior" in item
+
+    def test_single_tracklet(self):
+        from classify import batch_explain
+
+        from .conftest import build_tracklet
+        t = build_tracklet()
+        result = batch_explain([t])
+        assert len(result) == 1
+        assert isinstance(result[0], dict)
+
+    def test_confidence_is_float(self):
+        from classify import batch_explain
+        tracklets = self._make_tracklets(1)
+        result = batch_explain(tracklets)
+        assert isinstance(result[0]["confidence"], float)

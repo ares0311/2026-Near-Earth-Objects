@@ -220,3 +220,161 @@ class TestCheckOrbitQualitySkill:
         t = build_tracklet(n_obs=2, arc_days=0.1)
         result = assess_tracklet(t)
         assert result["quality_code"] == 1
+
+
+class TestFilterCandidatesSkill:
+    """Smoke tests for Skills/filter_candidates.py."""
+
+    def _neos_json(self, tmp_path, n: int = 3) -> str:
+        import json
+        neos = [
+            {
+                "tracklet": {"object_id": f"OBJ{i}", "observations": [], "arc_days": 2.0,
+                             "motion_rate_arcsec_per_hour": 1.0, "motion_pa_degrees": 90.0},
+                "hazard": {"hazard_flag": "pha_candidate" if i == 0 else "nominal",
+                           "alert_pathway": "mpc_submission" if i == 0 else "internal_candidate",
+                           "neo_class": "apollo"},
+                "metadata": {"discovery_priority": 0.9 - i * 0.3},
+            }
+            for i in range(n)
+        ]
+        p = tmp_path / "neos.json"
+        p.write_text(json.dumps(neos))
+        return str(p)
+
+    def test_filter_by_hazard_flag(self, tmp_path):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from filter_candidates import filter_candidates
+
+        neos = [
+            {"hazard": {"hazard_flag": "pha_candidate", "alert_pathway": "mpc_submission"},
+             "metadata": {"discovery_priority": 0.9}},
+            {"hazard": {"hazard_flag": "nominal", "alert_pathway": "internal_candidate"},
+             "metadata": {"discovery_priority": 0.2}},
+        ]
+        result = filter_candidates(neos, hazard_flag="pha_candidate")
+        assert len(result) == 1
+        assert result[0]["hazard"]["hazard_flag"] == "pha_candidate"
+
+    def test_filter_empty_returns_empty(self, tmp_path):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from filter_candidates import filter_candidates
+
+        assert filter_candidates([], hazard_flag="pha_candidate") == []
+
+    def test_min_priority_filter(self, tmp_path):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from filter_candidates import filter_candidates
+
+        neos = [
+            {"hazard": {}, "metadata": {"discovery_priority": 0.8}},
+            {"hazard": {}, "metadata": {"discovery_priority": 0.2}},
+        ]
+        result = filter_candidates(neos, min_priority=0.5)
+        assert len(result) == 1
+
+
+class TestSummariseRunSkill:
+    """Smoke tests for Skills/summarise_run.py."""
+
+    def _make_neos(self, n: int = 3) -> list:
+        return [
+            {
+                "tracklet": {"object_id": f"OBJ{i}", "observations": []},
+                "hazard": {"hazard_flag": "nominal", "alert_pathway": "internal_candidate",
+                           "neo_class": "unknown"},
+                "metadata": {"discovery_priority": float(i) / n},
+            }
+            for i in range(n)
+        ]
+
+    def test_returns_dict(self):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from summarise_run import summarise_run
+
+        result = summarise_run(self._make_neos(3))
+        assert isinstance(result, dict)
+
+    def test_n_candidates_correct(self):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from summarise_run import summarise_run
+
+        result = summarise_run(self._make_neos(4))
+        assert result["n_candidates"] == 4
+
+    def test_empty_returns_zero_candidates(self):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from summarise_run import summarise_run
+
+        result = summarise_run([])
+        assert result["n_candidates"] == 0
+
+    def test_required_keys_present(self):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from summarise_run import summarise_run
+
+        result = summarise_run(self._make_neos(2))
+        for key in ("n_candidates", "hazard_flag_counts", "alert_pathway_counts",
+                    "neo_class_counts", "mean_priority", "max_priority", "top_candidates"):
+            assert key in result
+
+
+class TestPlotSkyCoverageSkill:
+    """Smoke tests for Skills/plot_sky_coverage.py."""
+
+    def _make_neos(self) -> list:
+        return [
+            {
+                "hazard": {"hazard_flag": "nominal"},
+                "tracklet": {
+                    "observations": [
+                        {"ra_deg": 180.0, "dec_deg": 10.0},
+                        {"ra_deg": 180.5, "dec_deg": 10.5},
+                    ]
+                },
+            }
+        ]
+
+    def test_save_png(self, tmp_path):
+        import sys
+        from pathlib import Path
+
+        import pytest
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from plot_sky_coverage import plot_sky_coverage
+
+        out = str(tmp_path / "sky.png")
+        try:
+            plot_sky_coverage(self._make_neos(), out=out)
+        except ImportError:
+            pytest.skip("matplotlib not installed")
+        assert Path(out).exists()
+
+    def test_empty_neos_does_not_raise(self, tmp_path):
+        import sys
+        from pathlib import Path
+
+        import pytest
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from plot_sky_coverage import plot_sky_coverage
+
+        out = str(tmp_path / "empty_sky.png")
+        try:
+            plot_sky_coverage([], out=out)
+        except ImportError:
+            pytest.skip("matplotlib not installed")
+        assert Path(out).exists()

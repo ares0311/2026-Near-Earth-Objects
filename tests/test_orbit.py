@@ -559,3 +559,43 @@ class TestCloseApproachTable:
         rows = close_approach_table(el, 2460000.0, 2460010.0, n_steps=5)
         for row in rows:
             assert -90.0 <= row["dec_deg"] <= 90.0
+
+
+class TestComputeOrbitalPeriod:
+    def _make_elements(self, a: float = 1.5) -> "OrbitalElements":
+        from .conftest import build_orbital_elements
+        return build_orbital_elements(semi_major_axis_au=a)
+
+    def test_returns_positive_period_for_valid_a(self):
+        from orbit import compute_orbital_period
+        el = self._make_elements(a=1.5)
+        period = compute_orbital_period(el)
+        assert period > 0.0
+
+    def test_kepler_third_law_earth(self):
+        from orbit import compute_orbital_period
+        el = self._make_elements(a=1.0)
+        period = compute_orbital_period(el)
+        assert abs(period - 365.25) < 1.0
+
+    def test_longer_period_for_larger_a(self):
+        from orbit import compute_orbital_period
+        el_inner = self._make_elements(a=0.8)
+        el_outer = self._make_elements(a=2.0)
+        assert compute_orbital_period(el_inner) < compute_orbital_period(el_outer)
+
+    def test_zero_for_non_positive_a(self):
+        from orbit import compute_orbital_period
+        el = self._make_elements(a=0.0)
+        assert compute_orbital_period(el) == 0.0
+
+    def test_negative_a_returns_zero(self):
+        from orbit import compute_orbital_period
+        el = self._make_elements(a=-1.0)
+        assert compute_orbital_period(el) == 0.0
+
+    def test_result_in_days(self):
+        from orbit import compute_orbital_period
+        el = self._make_elements(a=1.524)  # Mars
+        period = compute_orbital_period(el)
+        assert 680 < period < 690  # Mars ~687 days

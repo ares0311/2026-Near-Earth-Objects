@@ -7,6 +7,7 @@ __all__ = [
     "classify",
     "classify_batch",
     "explain_classification",
+    "batch_explain",
     "get_tier1_feature_importances",
     "ensemble_predict",
     "_build_ensemble",
@@ -831,3 +832,13 @@ def explain_classification(tracklet: Tracklet) -> dict:
         "dominant_hypothesis": dominant,
         "confidence": post_dict[dominant],
     }
+
+
+def batch_explain(tracklets: list[Tracklet]) -> list[dict]:
+    """Run :func:`explain_classification` on a list of tracklets.
+
+    Returns one explanation dict per tracklet in input order.
+    Each dict has keys ``features``, ``posterior``, ``tier1_importances``,
+    ``dominant_hypothesis``, and ``confidence``.
+    """
+    return [explain_classification(t) for t in tracklets]

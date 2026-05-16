@@ -9,7 +9,7 @@ __all__ = [
     "RawCandidate", "KnownMatch",
     "FetchProvenance", "PreprocessProvenance", "DetectProvenance", "LinkProvenance",
     "FetchResult", "PreprocessResult", "DetectResult", "LinkResult",
-    "ObservationWindow", "PipelineResult",
+    "ObservationWindow", "PipelineResult", "CandidateSummary",
     "BackgroundOutcome", "BackgroundRunMode", "FollowUpTestStatus", "HumanReviewStatus",
     "RecommendationAction", "SignoffDecision",
     "PriorityFactors", "BackgroundTarget", "FollowUpTestResult",
@@ -514,3 +514,21 @@ class PipelineResult(BaseModel):
     scored_neos: tuple[ScoredNEO, ...]
     pipeline_version: str = ""
     n_pha_candidates: int = 0
+
+
+class CandidateSummary(BaseModel):
+    """Lightweight summary of a ScoredNEO for display or export."""
+
+    model_config = ConfigDict(frozen=True)
+
+    object_id: str
+    neo_class: NEOClass
+    hazard_flag: HazardFlag
+    alert_pathway: AlertPathway
+    moid_au: float | None = None
+    estimated_diameter_m: float | None = None
+    absolute_magnitude_h: float | None = None
+    arc_days: float
+    n_observations: int
+    neo_candidate_probability: Score
+    discovery_priority: float = 0.0
