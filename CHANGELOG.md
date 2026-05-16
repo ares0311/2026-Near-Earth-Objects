@@ -5,6 +5,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## v0.14.0
+
+- `orbit.py`: added `close_approach_table(elements, jd_start, jd_end, n_steps)` — tabulate geocentric distance, RA/Dec, and heliocentric distance over a time window at uniform steps; added to `__all__`.
+- `link.py`: added `estimate_motion_uncertainty(tracklet)` — propagate formal astrometric uncertainties through the linear motion fit to produce rate and PA error estimates; added to `__all__`.
+- `score.py`: added `discovery_report(neo)` — comprehensive nested summary dict for human review and export; added to `__all__`.
+- `classify.py`: added `explain_classification(tracklet)` — structured classification breakdown with Tier 1 feature importances, dominant hypothesis, and confidence; added to `__all__`.  Fixed Pydantic v2.11 deprecation in `model_fields` access.
+- `alert.py`: added `draft_mpc_submission(neo, obs_code)` — complete MPC submission bundle with cover letter and guardrail text; added to `__all__`.
+- `schemas.py`: added `ObservationWindow` — frozen typed model for sky/time search queries; added to `__all__`.
+- `fetch.py`: added `estimate_limiting_magnitude(fetch_result)` — 5-sigma depth proxy from the 90th–99th percentile of detected magnitudes; added to `__all__`.
+- `preprocess.py`: added `quality_summary(result)` — per-field quality statistics (PSF quality, background RMS, elongation, pass fraction); added to `__all__`.
+- `detect.py`: added `streak_candidates(detect_result)` — filter a `DetectResult` for streak/trail detections only; added to `__all__`.
+- `background.py`: added `audit_report(db_path)` — consolidated cross-log audit report covering runs, reviews, signoff coverage, and integrity; added to `__all__`.
+- `Skills/generate_obs_schedule.py`: generate a prioritized follow-up observation schedule with urgency tiers and recommended exposure times.
+- `Skills/photometric_calibration.py`: per-field photometric zero-point fit and magnitude correction via Gaia DR3 reference stars.
+- `Skills/export_mpc_bulk.py`: bulk export MPC 80-column observation reports for a list of `ScoredNEO` objects to a directory with manifest.
+- `docs/SCORING_MODEL.md`: updated with ranking, discovery report, motion uncertainty, close-approach table, and photometric calibration sections.
+- 63 new tests; 528 total; 100% coverage maintained.
+- Version bumped to 0.14.0.
+
 ## v0.13.0
 
 - `fetch.py`: added `fetch_batch(targets, radius_deg, start_jd, end_jd, ...)` — fetch multiple sky positions in one call; added to `__all__`.

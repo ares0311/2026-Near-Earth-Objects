@@ -25,6 +25,7 @@ __all__ = [
     "follow_up_test_summary",
     "submission_recommendation_summary",
     "validation_summary",
+    "audit_report",
 ]
 
 import json
@@ -1191,4 +1192,46 @@ def validation_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]:
         "manual_first": True,
         "external_submission_enabled": False,
         "log_backend": "sqlite",
+    }
+
+
+def audit_report(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]:
+    """Generate a consolidated cross-log audit report.
+
+    Pulls from all background log tables and returns a summary covering:
+      ``total_runs``          — number of ledger entries
+      ``reviewed_count``      — entries in the reviewed log
+      ``needs_follow_up_count`` — entries in the needs-follow-up log
+      ``signoff_coverage``    — fraction of reviewed entries with human signoff
+      ``unsigned_count``      — reviewed entries lacking a signoff
+      ``pha_candidates``      — count of PHA-flagged candidates ever processed
+      ``submission_ready``    — count of candidates recommended for submission
+      ``has_unreviewed_runs`` — True when runs exist with no reviewed/follow-up outcome
+      ``integrity_ok``        — True when log invariants are satisfied
+    """
+    ledger = ledger_summary(db_path)
+    reviewed = reviewed_log_summary(db_path)
+    follow_up = needs_follow_up_summary(db_path)
+    readiness = signoff_readiness_summary(db_path)
+    validation = validation_summary(db_path)
+
+    total_runs: int = ledger.get("total_runs", 0)
+    reviewed_count: int = reviewed.get("total_reviewed", 0)
+    follow_up_count: int = follow_up.get("total_needs_follow_up", 0)
+    outcome_count = reviewed_count + follow_up_count
+
+    signed_off: int = readiness.get("signed_off", 0)
+    unsigned: int = readiness.get("unsigned", 0)
+    signoff_coverage = (signed_off / reviewed_count) if reviewed_count > 0 else 0.0
+
+    return {
+        "total_runs": total_runs,
+        "reviewed_count": reviewed_count,
+        "needs_follow_up_count": follow_up_count,
+        "signoff_coverage": round(signoff_coverage, 4),
+        "unsigned_count": unsigned,
+        "pha_candidates": reviewed.get("pha_count", 0),
+        "submission_ready": reviewed.get("submission_ready_count", 0),
+        "has_unreviewed_runs": outcome_count < total_runs,
+        "integrity_ok": validation.get("integrity_ok", True),
     }

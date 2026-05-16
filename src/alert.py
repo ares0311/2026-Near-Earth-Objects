@@ -8,6 +8,7 @@ __all__ = [
     "format_mpc_json",
     "batch_process_alerts",
     "generate_alert_package",
+    "draft_mpc_submission",
     "process_alert",
     "summarise",
     "monitor_neocp",
@@ -16,6 +17,7 @@ __all__ = [
 import json
 import logging
 import time as _time_mod
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -268,7 +270,7 @@ def monitor_neocp(
     object_id: str,
     max_wait_hr: float = 24.0,
     poll_interval_hr: float = 1.0,
-    _sleep_fn: object = None,
+    _sleep_fn: Callable[[float], None] | None = None,
 ) -> dict:
     """Poll NEOCP for independent confirmation of a candidate.
 
@@ -485,3 +487,47 @@ def batch_process_alerts(
         except Exception as exc:  # pragma: no cover — defensive wrapper
             results.append({"object_id": neo.tracklet.object_id, "error": str(exc)})
     return results
+
+
+def draft_mpc_submission(neo: ScoredNEO, obs_code: str = _MPC_OBS_CODE) -> dict:
+    """Generate a complete MPC submission bundle for human review.
+
+    Combines the 80-column observation report, MPC JSON, a cover-letter
+    draft, and a summary into a single dict.  This bundle is for human
+    review only — it must never be transmitted automatically.
+
+    Returns:
+      ``object_id``    — tracklet identifier
+      ``cover_letter`` — plain-text cover letter draft (for human editing)
+      ``mpc_report``   — MPC 80-column observation report string
+      ``mpc_json``     — MPC JSON submission dict
+      ``summary``      — human-readable candidate summary
+      ``ready_to_submit`` — bool: True when alert_pathway is mpc_submission
+    """
+    from datetime import datetime
+
+    obs_count = len(neo.tracklet.observations)
+    date_str = datetime.now(UTC).strftime("%Y %B %d")
+    cover = (
+        f"To: mpc@cfa.harvard.edu\n"
+        f"Subject: New NEO Candidate — {neo.tracklet.object_id}\n\n"
+        f"Dear MPC,\n\n"
+        f"We report {obs_count} astrometric observations of a new moving-object "
+        f"candidate ({neo.tracklet.object_id}) obtained on "
+        f"{date_str}.  The object shows motion consistent with a "
+        f"Near-Earth Object (class: {neo.hazard.neo_class}).\n\n"
+        f"Hazard flag     : {neo.hazard.hazard_flag}\n"
+        f"Alert pathway   : {neo.hazard.alert_pathway}\n"
+        f"MOID (AU)       : {neo.hazard.moid_au}\n\n"
+        f"Observations are appended in MPC 80-column format.\n\n"
+        f"NOTICE: Impact probability is NOT asserted here.\n"
+        f"Please consult MPC/CNEOS for authoritative hazard assessment.\n"
+    )
+    return {
+        "object_id": neo.tracklet.object_id,
+        "cover_letter": cover,
+        "mpc_report": format_mpc_report(neo, obs_code=obs_code),
+        "mpc_json": format_mpc_json(neo, obs_code=obs_code),
+        "summary": summarise(neo),
+        "ready_to_submit": neo.hazard.alert_pathway == "mpc_submission",
+    }

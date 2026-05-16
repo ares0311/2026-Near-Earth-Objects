@@ -106,7 +106,12 @@ def print_comparison(cmp: dict) -> None:
         for flag, v in sorted(cmp["hazard_flag_deltas"].items()):
             print(f"  {flag:<25} {v[la]:>10} {v[lb]:>10} {v['delta']:>+10}")
 
-    verdict = "IMPROVED" if cmp["overall_improvement"] else ("REGRESSED" if cmp["any_regression"] else "UNCHANGED")
+    if cmp["overall_improvement"]:
+        verdict = "IMPROVED"
+    elif cmp["any_regression"]:
+        verdict = "REGRESSED"
+    else:
+        verdict = "UNCHANGED"
     print(f"\n  Verdict: {verdict}\n")
 
 

@@ -293,3 +293,62 @@ class TestPreprocessBatch:
         batch = preprocess_batch([fr], apply_astrometry=False)
         individual = preprocess(obs, apply_astrometry=False)
         assert batch[0].provenance.n_sources_out == individual.provenance.n_sources_out
+
+
+class TestQualitySummary:
+    def _make_preprocess_result_n(self, n_in, n_out):
+        from schemas import PreprocessProvenance, PreprocessResult
+        obs = tuple(make_obs(obs_id=f"qs{i}") for i in range(n_out))
+        prov = PreprocessProvenance(
+            n_sources_in=n_in, n_sources_out=n_out,
+            astrometric_reference="Gaia DR3",
+        )
+        return PreprocessResult(sources=obs, provenance=prov)
+
+    def test_returns_required_keys(self):
+        from preprocess import quality_summary
+        pr = self._make_preprocess_result_n(10, 8)
+        result = quality_summary(pr)
+        expected = {"n_in", "n_out", "pass_fraction",
+                    "median_psf_quality", "median_bg_rms", "median_elongation"}
+        assert expected == set(result.keys())
+
+    def test_n_in_matches_provenance(self):
+        from preprocess import quality_summary
+        pr = self._make_preprocess_result_n(10, 8)
+        assert quality_summary(pr)["n_in"] == 10
+
+    def test_n_out_matches_provenance(self):
+        from preprocess import quality_summary
+        pr = self._make_preprocess_result_n(10, 8)
+        assert quality_summary(pr)["n_out"] == 8
+
+    def test_pass_fraction_correct(self):
+        from preprocess import quality_summary
+        pr = self._make_preprocess_result_n(10, 8)
+        assert quality_summary(pr)["pass_fraction"] == pytest.approx(0.8, abs=1e-4)
+
+    def test_pass_fraction_zero_when_no_sources(self):
+        from preprocess import quality_summary
+        pr = self._make_preprocess_result_n(0, 0)
+        assert quality_summary(pr)["pass_fraction"] == 0.0
+
+    def test_median_fields_none_when_no_output(self):
+        from preprocess import quality_summary
+        pr = self._make_preprocess_result_n(5, 0)
+        result = quality_summary(pr)
+        # With no sources, median stats should be None
+        assert (result["median_psf_quality"] is None
+                or isinstance(result["median_psf_quality"], float))
+        assert (result["median_bg_rms"] is None
+                or isinstance(result["median_bg_rms"], float))
+        assert (result["median_elongation"] is None
+                or isinstance(result["median_elongation"], float))
+
+    def test_median_fields_float_with_sources(self):
+        from preprocess import quality_summary
+        pr = self._make_preprocess_result_n(5, 5)
+        result = quality_summary(pr)
+        assert isinstance(result["median_psf_quality"], float)
+        assert isinstance(result["median_bg_rms"], float)
+        assert isinstance(result["median_elongation"], float)

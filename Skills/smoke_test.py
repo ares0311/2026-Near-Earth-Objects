@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 import numpy as np
 
 from alert import monitor_neocp
-from classify import retrain_tier1, retrain_stacker
+from classify import retrain_stacker, retrain_tier1
 from detect import detect
 from link import link
 from orbit import classify_neo, compute_moid
@@ -147,6 +147,7 @@ def smoke_monitor_neocp() -> None:
         calls.append(s)
 
     from unittest.mock import patch
+
     import alert as alert_mod
 
     with patch.object(

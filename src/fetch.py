@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-__all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fetch", "fetch_batch"]
+__all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fetch",
+           "fetch_batch", "estimate_limiting_magnitude"]
 
 import json
 import os
@@ -431,3 +432,28 @@ def fetch_batch(
         )
         for ra, dec in targets
     ]
+
+
+def estimate_limiting_magnitude(fetch_result: FetchResult) -> float | None:
+    """Estimate the 5-sigma limiting magnitude from detected source magnitudes.
+
+    Uses the faint-end tail of the magnitude distribution (90th–99th percentile)
+    as a proxy for the survey depth.  Returns ``None`` when fewer than 5
+    observations with valid magnitudes are available.
+    """
+    import statistics
+
+    mags = [
+        obs.mag
+        for obs in fetch_result.alerts
+        if obs.mag is not None and 10.0 < obs.mag < 35.0
+    ]
+    if len(mags) < 5:
+        return None
+
+    mags_sorted = sorted(mags)
+    # Use the 90th–99th percentile band as faint-end estimate
+    lo = int(0.90 * len(mags_sorted))
+    hi = max(lo + 1, int(0.99 * len(mags_sorted)))
+    tail = mags_sorted[lo:hi]
+    return round(statistics.mean(tail), 2) if tail else None

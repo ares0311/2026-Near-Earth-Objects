@@ -315,7 +315,7 @@ class TestPDCOAlertPackage:
         assert any("PDCO" in a for a in result["actions"])
 
 
-class TestMonitorNeocp:
+class TestMonitorNeocpPublic:
     def test_returns_timeout_when_no_confirmation(self):
         # Mock _monitor_neocp to always return checked-but-not-confirmed
         import alert as alert_mod
@@ -500,3 +500,61 @@ class TestGenerateAlertPackage:
         neo = make_scored_neo()
         pkg = generate_alert_package(neo)
         assert isinstance(pkg["mpc_json"], dict)
+
+
+class TestDraftMpcSubmission:
+    def test_returns_required_keys(self, tmp_path, monkeypatch):
+        import alert as alert_mod
+        monkeypatch.setattr(alert_mod, "_LOG_DIR", tmp_path)
+        from alert import draft_mpc_submission
+        neo = make_scored_neo()
+        result = draft_mpc_submission(neo)
+        expected = {"object_id", "cover_letter", "mpc_report",
+                    "mpc_json", "summary", "ready_to_submit"}
+        assert expected == set(result.keys())
+
+    def test_object_id_matches(self, tmp_path, monkeypatch):
+        import alert as alert_mod
+        monkeypatch.setattr(alert_mod, "_LOG_DIR", tmp_path)
+        from alert import draft_mpc_submission
+        neo = make_scored_neo()
+        result = draft_mpc_submission(neo)
+        assert result["object_id"] == neo.tracklet.object_id
+
+    def test_ready_to_submit_true_for_mpc_submission(self, tmp_path, monkeypatch):
+        import alert as alert_mod
+        monkeypatch.setattr(alert_mod, "_LOG_DIR", tmp_path)
+        from alert import draft_mpc_submission
+        neo = make_scored_neo(alert_pathway="mpc_submission")
+        assert draft_mpc_submission(neo)["ready_to_submit"] is True
+
+    def test_ready_to_submit_false_for_internal(self, tmp_path, monkeypatch):
+        import alert as alert_mod
+        monkeypatch.setattr(alert_mod, "_LOG_DIR", tmp_path)
+        from alert import draft_mpc_submission
+        neo = make_scored_neo(alert_pathway="internal_candidate")
+        assert draft_mpc_submission(neo)["ready_to_submit"] is False
+
+    def test_cover_letter_contains_guardrail(self, tmp_path, monkeypatch):
+        import alert as alert_mod
+        monkeypatch.setattr(alert_mod, "_LOG_DIR", tmp_path)
+        from alert import draft_mpc_submission
+        neo = make_scored_neo()
+        result = draft_mpc_submission(neo)
+        assert "Impact probability is NOT asserted" in result["cover_letter"]
+
+    def test_mpc_report_is_string(self, tmp_path, monkeypatch):
+        import alert as alert_mod
+        monkeypatch.setattr(alert_mod, "_LOG_DIR", tmp_path)
+        from alert import draft_mpc_submission
+        neo = make_scored_neo()
+        result = draft_mpc_submission(neo)
+        assert isinstance(result["mpc_report"], str)
+
+    def test_mpc_json_is_dict(self, tmp_path, monkeypatch):
+        import alert as alert_mod
+        monkeypatch.setattr(alert_mod, "_LOG_DIR", tmp_path)
+        from alert import draft_mpc_submission
+        neo = make_scored_neo()
+        result = draft_mpc_submission(neo)
+        assert isinstance(result["mpc_json"], dict)

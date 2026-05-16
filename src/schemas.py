@@ -9,7 +9,7 @@ __all__ = [
     "RawCandidate", "KnownMatch",
     "FetchProvenance", "PreprocessProvenance", "DetectProvenance", "LinkProvenance",
     "FetchResult", "PreprocessResult", "DetectResult", "LinkResult",
-    "PipelineResult",
+    "ObservationWindow", "PipelineResult",
     "BackgroundOutcome", "BackgroundRunMode", "FollowUpTestStatus", "HumanReviewStatus",
     "RecommendationAction", "SignoffDecision",
     "PriorityFactors", "BackgroundTarget", "FollowUpTestResult",
@@ -469,6 +469,29 @@ class BackgroundRunResult(BaseModel):
     ledger: BackgroundRunLedgerEntry
     reviewed: ReviewedLogEntry | None = None
     needs_follow_up: NeedsFollowUpLogEntry | None = None
+
+
+# ---------------------------------------------------------------------------
+# Sky/time search query container
+# ---------------------------------------------------------------------------
+
+
+class ObservationWindow(BaseModel):
+    """Typed, immutable container for a sky/time search query.
+
+    Used as a self-documenting parameter object for :func:`fetch.fetch` and
+    :func:`fetch.fetch_batch`.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    ra_deg: float
+    dec_deg: float
+    radius_deg: float
+    start_jd: float
+    end_jd: float
+    surveys: tuple[Mission, ...] = ("ZTF",)
+    description: str = ""
 
 
 # ---------------------------------------------------------------------------

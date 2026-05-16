@@ -148,11 +148,11 @@ class TestExportRankedTableSkill:
     """Smoke tests for export_ranked_table.py."""
 
     def test_csv_output(self, tmp_path):
-        import sys, json
+        import sys
         from pathlib import Path
 
         sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
-        from export_ranked_table import export_csv, export_html
+        from export_ranked_table import export_csv
 
         rows = [{"object_id": "X001", "discovery_priority": 0.9, "hazard_flag": "nominal"}]
         csv = export_csv(rows)
@@ -199,6 +199,7 @@ class TestCheckOrbitQualitySkill:
 
         sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
         from check_orbit_quality import assess_tracklet
+
         from .conftest import build_tracklet
 
         t = build_tracklet(n_obs=4, arc_days=10.0)
@@ -213,6 +214,7 @@ class TestCheckOrbitQualitySkill:
 
         sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
         from check_orbit_quality import assess_tracklet
+
         from .conftest import build_tracklet
 
         t = build_tracklet(n_obs=2, arc_days=0.1)

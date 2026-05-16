@@ -86,7 +86,7 @@ def run_diagnostics() -> list[dict]:
     # ---- detect ----
     def _diag_detect() -> Any:
         from detect import detect
-        from schemas import Observation, PreprocessResult, PreprocessProvenance
+        from schemas import PreprocessProvenance, PreprocessResult
 
         obs = tuple(_make_obs(f"det_{i}", 2460000.5 + i * 0.04) for i in range(3))
         prep = PreprocessResult(
@@ -149,7 +149,7 @@ def run_diagnostics() -> list[dict]:
 
     # ---- orbit ----
     def _diag_orbit() -> Any:
-        from orbit import fit_orbit, arc_quality_report
+        from orbit import arc_quality_report, fit_orbit
 
         t = _make_tracklet(n_obs=5, arc_days=5.0)
         report = arc_quality_report(t)
@@ -160,7 +160,7 @@ def run_diagnostics() -> list[dict]:
 
     # ---- score ----
     def _diag_score() -> Any:
-        from classify import classify, extract_features
+        from classify import classify
         from orbit import fit_orbit
         from score import score
 
@@ -189,10 +189,10 @@ def run_diagnostics() -> list[dict]:
 
     # ---- alert (format_mpc_report) ----
     def _diag_alert() -> Any:
+        from alert import format_mpc_json, format_mpc_report
         from classify import classify
         from orbit import fit_orbit
         from score import score
-        from alert import format_mpc_report, format_mpc_json
 
         t = _make_tracklet()
         f, p = classify(t)
@@ -205,10 +205,11 @@ def run_diagnostics() -> list[dict]:
     # ---- validate_mpc_report (self-test via export) ----
     def _diag_validate() -> Any:
         import tempfile
+
+        from alert import format_mpc_report
         from classify import classify
         from orbit import fit_orbit
         from score import score
-        from alert import format_mpc_report
         from Skills.validate_mpc_report import validate_report  # type: ignore[import]
 
         t = _make_tracklet()
