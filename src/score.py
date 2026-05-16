@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__all__ = ["score", "score_batch", "rank_candidates"]
+__all__ = ["score", "score_batch", "rank_candidates", "discovery_report"]
 
 import math
 import uuid
@@ -360,3 +360,56 @@ def score_batch(
     Returns results in the same order as the input list.
     """
     return [score(t, f, p, o, pipeline_run_id=pipeline_run_id) for t, f, p, o in items]
+
+
+def discovery_report(neo: ScoredNEO) -> dict:
+    """Return a comprehensive discovery summary dict for human review or export.
+
+    Combines tracklet geometry, classification posterior, hazard assessment,
+    all feature scores, and scoring metadata into a single flat or nested
+    structure suitable for JSON serialisation or display.
+    """
+    f = neo.features
+    p = neo.posterior
+    h = neo.hazard
+    m = neo.metadata
+    t = neo.tracklet
+    return {
+        "object_id": t.object_id,
+        "n_observations": len(t.observations),
+        "arc_days": round(t.arc_days, 4),
+        "motion_rate_arcsec_hr": round(t.motion_rate_arcsec_per_hour, 4),
+        "motion_pa_deg": round(t.motion_pa_degrees, 2),
+        "posterior": {
+            "neo_candidate": round(p.neo_candidate, 4),
+            "known_object": round(p.known_object, 4),
+            "main_belt_asteroid": round(p.main_belt_asteroid, 4),
+            "stellar_artifact": round(p.stellar_artifact, 4),
+            "other_solar_system": round(p.other_solar_system, 4),
+        },
+        "features": {
+            "real_bogus_score": f.real_bogus_score,
+            "motion_consistency_score": f.motion_consistency_score,
+            "arc_coverage_score": f.arc_coverage_score,
+            "nights_observed_score": f.nights_observed_score,
+            "orbit_quality_score": f.orbit_quality_score,
+            "moid_score": f.moid_score,
+            "known_object_score": f.known_object_score,
+        },
+        "hazard": {
+            "hazard_flag": h.hazard_flag,
+            "alert_pathway": h.alert_pathway,
+            "moid_au": h.moid_au,
+            "estimated_diameter_m": h.estimated_diameter_m,
+            "absolute_magnitude_h": h.absolute_magnitude_h,
+            "neo_class": h.neo_class,
+        },
+        "scoring": {
+            "discovery_priority": round(m.discovery_priority, 4),
+            "followup_value": round(m.followup_value, 4),
+            "scientific_interest": round(m.scientific_interest, 4),
+            "close_approach_au": m.close_approach_au,
+            "scorer_version": m.scorer_version,
+            "pipeline_run_id": m.pipeline_run_id,
+        },
+    }

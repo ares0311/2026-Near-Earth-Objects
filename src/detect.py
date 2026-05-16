@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__all__ = ["detect", "detect_batch"]
+__all__ = ["detect", "detect_batch", "streak_candidates"]
 
 import math
 import uuid
@@ -295,3 +295,20 @@ def detect_batch(
                mpc_cross_match=mpc_cross_match)
         for pr in preprocess_results
     ]
+
+
+def streak_candidates(detect_result: DetectResult) -> tuple[RawCandidate, ...]:
+    """Filter a :class:`DetectResult` to return only streak/trail detections.
+
+    A streak candidate is one whose constituent observations include at least
+    one detection flagged as a streak (``is_streak=True``).  Useful for
+    isolating fast-moving NEOs that trail across the focal plane in a single
+    exposure.
+
+    Returns a tuple of :class:`RawCandidate` objects from ``detect_result``
+    where at least one observation is a streak.
+    """
+    return tuple(
+        cand for cand in detect_result.candidates
+        if cand.is_streak
+    )

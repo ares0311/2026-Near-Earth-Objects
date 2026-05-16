@@ -768,3 +768,58 @@ class TestFetchZtfLive:
         from fetch import fetch_atlas
         result = fetch_atlas(180.0, 0.0, 0.1, 2460000.0, 2460001.0)
         assert isinstance(result, list)
+
+
+class TestEstimateLimitingMagnitude:
+    def _make_fetch_result(self, mags):
+        from schemas import FetchProvenance, FetchResult, Observation
+        obs = tuple(
+            Observation(
+                obs_id=f"lm{i}",
+                ra_deg=180.0,
+                dec_deg=10.0,
+                jd=2460000.5 + i * 0.1,
+                mag=m,
+                mag_err=0.05,
+                filter_band="r",
+                mission="ZTF",
+            )
+            for i, m in enumerate(mags)
+        )
+        prov = FetchProvenance(surveys=("ZTF",), start_jd=2460000.0, end_jd=2460001.0)
+        return FetchResult(alerts=obs, provenance=prov)
+
+    def test_returns_none_for_fewer_than_5_obs(self):
+        from fetch import estimate_limiting_magnitude
+        fr = self._make_fetch_result([18.0, 19.0, 20.0, 21.0])
+        assert estimate_limiting_magnitude(fr) is None
+
+    def test_returns_float_for_sufficient_obs(self):
+        from fetch import estimate_limiting_magnitude
+        mags = list(range(15, 25))  # 10 observations
+        fr = self._make_fetch_result(mags)
+        result = estimate_limiting_magnitude(fr)
+        assert result is not None
+        assert isinstance(result, float)
+
+    def test_result_in_faint_end_range(self):
+        from fetch import estimate_limiting_magnitude
+        mags = list(range(15, 25))
+        fr = self._make_fetch_result(mags)
+        result = estimate_limiting_magnitude(fr)
+        # Should be near the faint end (90th-99th percentile of 15-24 = ~23)
+        assert result >= 20.0
+
+    def test_filters_out_extreme_magnitudes(self):
+        from fetch import estimate_limiting_magnitude
+        # Include some out-of-range magnitudes that should be ignored
+        mags = [5.0, 10.0] + list(range(18, 28)) + [99.0]
+        fr = self._make_fetch_result(mags)
+        result = estimate_limiting_magnitude(fr)
+        assert result is not None
+        assert 10.0 < result < 35.0
+
+    def test_empty_alerts_returns_none(self):
+        from fetch import estimate_limiting_magnitude
+        fr = self._make_fetch_result([])
+        assert estimate_limiting_magnitude(fr) is None

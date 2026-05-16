@@ -142,6 +142,73 @@ Ranges [0, 1]; higher = more urgent follow-up needed.
 
 ---
 
+## Ranking
+
+`score.rank_candidates(neos)` sorts `ScoredNEO` objects in two tiers:
+
+1. PHA candidates (`hazard_flag == "pha_candidate"`) always rank above all others.
+2. Within each tier, candidates are sorted by descending `discovery_priority`.
+
+---
+
+## Discovery Report
+
+`score.discovery_report(neo)` returns a nested summary dict for human review:
+
+```python
+{
+    "object_id": str,
+    "n_observations": int,
+    "arc_days": float,
+    "motion_rate_arcsec_hr": float,
+    "motion_pa_deg": float,
+    "posterior": {neo_candidate, known_object, main_belt_asteroid, stellar_artifact, other_solar_system},
+    "features": {real_bogus_score, orbit_quality_score, moid_score, ...},
+    "hazard": {hazard_flag, moid_au, estimated_diameter_m, neo_class, alert_pathway},
+    "scoring": {discovery_priority, followup_value, scientific_interest, model_version},
+}
+```
+
+---
+
+## Motion Uncertainty
+
+`link.estimate_motion_uncertainty(tracklet)` propagates formal astrometric uncertainty
+through the linear motion fit to produce:
+
+```python
+{
+    "rate_arcsec_hr": float,
+    "rate_err_arcsec_hr": float,
+    "pa_deg": float,
+    "pa_err_deg": float,
+    "reduced_chi2": float,
+    "n_obs": int,
+}
+```
+
+Uncertainty propagation: σ_rate ≈ √2 · σ_pos / (T/2), where T is the total arc
+timespan and σ_pos = 0.5 arcsec assumed per observation. PA error is σ_rate / rate
+converted to degrees, clamped at 180°.
+
+---
+
+## Close-Approach Table
+
+`orbit.close_approach_table(elements, jd_start, jd_end, n_steps)` samples the
+candidate's geocentric distance at uniform time steps, returning:
+
+```python
+[{"jd": float, "ra_deg": float, "dec_deg": float,
+  "helio_dist_au": float, "geo_dist_au": float}, ...]
+```
+
+Uses Keplerian propagation (no perturbations). For short arcs the MOID from this
+table should be treated as indicative only; refer to MPC/CNEOS for authoritative
+close-approach data.
+
+---
+
 ## Calibration
 
 Final probabilities are calibrated via `calibration.py`:
@@ -149,6 +216,20 @@ Final probabilities are calibrated via `calibration.py`:
 - **Isotonic regression (PAVA)**: non-parametric; preferred for larger validation sets
 
 Both calibrators are evaluated via Brier score and Expected Calibration Error (ECE) using `Skills/evaluate_calibration.py`.
+
+---
+
+## Photometric Calibration
+
+`Skills/photometric_calibration.py` performs per-field photometric zero-point fitting:
+
+1. Queries Gaia DR3 reference stars within 0.5° of the field centre.
+2. Cross-matches reference stars to observation positions within 3 arcsec.
+3. Fits a weighted mean zero-point: ZP = Σ w·(mag_ref − mag_inst) / Σ w.
+4. Applies ZP to each observation to produce calibrated magnitudes.
+
+Output includes the zero-point, formal error, number of reference stars used,
+and per-observation corrected magnitudes.
 
 ---
 

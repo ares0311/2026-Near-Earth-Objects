@@ -705,3 +705,61 @@ def test_background_run_once_raises_on_live_network(tmp_path):
     assert result.ledger.target_id == "RUN_FAILURE"
     assert result.ledger.failure_reason is not None
     assert "not enabled" in result.ledger.failure_reason
+
+
+def test_audit_report_returns_required_keys(tmp_path):
+    db = tmp_path / "neo.db"
+    from background import audit_report, init_log_db
+    init_log_db(db)
+    result = audit_report(db)
+    expected = {
+        "total_runs", "reviewed_count", "needs_follow_up_count",
+        "signoff_coverage", "unsigned_count", "pha_candidates",
+        "submission_ready", "has_unreviewed_runs", "integrity_ok",
+    }
+    assert expected == set(result.keys())
+
+
+def test_audit_report_empty_db_all_zeros(tmp_path):
+    db = tmp_path / "neo.db"
+    from background import audit_report, init_log_db
+    init_log_db(db)
+    result = audit_report(db)
+    assert result["total_runs"] == 0
+    assert result["reviewed_count"] == 0
+    assert result["needs_follow_up_count"] == 0
+    assert result["pha_candidates"] == 0
+    assert result["submission_ready"] == 0
+    assert result["has_unreviewed_runs"] is False
+    assert result["integrity_ok"] is True
+
+
+def test_audit_report_signoff_coverage_zero_no_reviewed(tmp_path):
+    db = tmp_path / "neo.db"
+    from background import audit_report, init_log_db
+    init_log_db(db)
+    result = audit_report(db)
+    assert result["signoff_coverage"] == 0.0
+
+
+def test_audit_report_has_unreviewed_when_runs_present(tmp_path):
+    import json as _json
+    import sqlite3
+    db = tmp_path / "neo.db"
+    from background import audit_report, init_log_db
+    init_log_db(db)
+    # Directly insert a minimal ledger row to simulate a completed run
+    with sqlite3.connect(db) as conn:
+        conn.execute(
+            """INSERT INTO run_ledger (
+                run_id, started_at_utc, completed_at_utc, code_version, schema_version,
+                input_path, target_id, outcome, selected_score, reason_codes_json,
+                run_mode, config_path, failure_reason, live_network_enabled, entry_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            ("r001", "2026-01-01T00:00:00Z", "2026-01-01T00:01:00Z",
+             "0.14.0", "1", "targets.json", "AU001", "completed",
+             0.3, "[]", "manual", "config.json", None, 0, "{}"),
+        )
+    result = audit_report(db)
+    assert result["total_runs"] >= 1
+    assert result["has_unreviewed_runs"] is True

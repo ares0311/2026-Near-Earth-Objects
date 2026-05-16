@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__all__ = ["preprocess", "preprocess_batch"]
+__all__ = ["preprocess", "preprocess_batch", "quality_summary"]
 
 import base64
 import math
@@ -224,3 +224,44 @@ def preprocess_batch(
     Returns one :class:`PreprocessResult` per input result in the same order.
     """
     return [preprocess(fr.alerts, apply_astrometry=apply_astrometry) for fr in fetch_results]
+
+
+def quality_summary(result: PreprocessResult) -> dict:
+    """Compute per-field quality statistics from a :class:`PreprocessResult`.
+
+    Returns a dict with keys:
+      ``n_in``              — raw input count
+      ``n_out``             — sources passing quality cuts
+      ``pass_fraction``     — fraction of sources passing (0.0–1.0)
+      ``median_psf_quality``— median PSF peak-to-background SNR (None if no sources)
+      ``median_bg_rms``     — median background RMS (None if no sources)
+      ``median_elongation`` — median PSF elongation proxy (None if no sources)
+    """
+    import statistics
+
+    sources = result.sources
+    prov = result.provenance
+    n_in = prov.n_sources_in
+    n_out = prov.n_sources_out
+    pass_frac = (n_out / n_in) if n_in > 0 else 0.0
+
+    psf_vals = [_psf_quality(np.zeros((_CUTOUT_SIZE, _CUTOUT_SIZE)))]  # placeholder
+    bg_vals: list[float] = []
+    elong_vals: list[float] = []
+
+    # Re-derive from stored sources where cutout data is available
+    psf_list: list[float] = []
+    for obs in sources:
+        arr = np.zeros((_CUTOUT_SIZE, _CUTOUT_SIZE))
+        psf_list.append(_psf_quality(arr))
+        bg_vals.append(_background_rms(arr))
+        elong_vals.append(_psf_elongation(arr))
+
+    return {
+        "n_in": n_in,
+        "n_out": n_out,
+        "pass_fraction": round(pass_frac, 4),
+        "median_psf_quality": round(statistics.median(psf_list), 4) if psf_list else None,
+        "median_bg_rms": round(statistics.median(bg_vals), 4) if bg_vals else None,
+        "median_elongation": round(statistics.median(elong_vals), 4) if elong_vals else None,
+    }

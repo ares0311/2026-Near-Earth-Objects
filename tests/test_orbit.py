@@ -490,3 +490,72 @@ class TestPredictEphemeris:
         target_jd = 2461000.0
         result = predict_ephemeris(el, jd=target_jd)
         assert result["jd"] == target_jd
+
+
+class TestCloseApproachTable:
+    def test_returns_n_steps_rows(self):
+        from orbit import close_approach_table
+        el = make_elements()
+        rows = close_approach_table(el, 2460000.0, 2460010.0, n_steps=5)
+        assert len(rows) == 5
+
+    def test_enforces_minimum_two_steps(self):
+        from orbit import close_approach_table
+        el = make_elements()
+        rows = close_approach_table(el, 2460000.0, 2460010.0, n_steps=1)
+        assert len(rows) == 2
+
+    def test_returns_required_keys(self):
+        from orbit import close_approach_table
+        el = make_elements()
+        rows = close_approach_table(el, 2460000.0, 2460010.0, n_steps=3)
+        expected = {"jd", "ra_deg", "dec_deg", "helio_dist_au", "geo_dist_au"}
+        for row in rows:
+            assert expected.issubset(row.keys())
+
+    def test_jd_range_sorted_ascending(self):
+        from orbit import close_approach_table
+        el = make_elements()
+        rows = close_approach_table(el, 2460000.0, 2460030.0, n_steps=10)
+        jds = [r["jd"] for r in rows]
+        assert jds == sorted(jds)
+
+    def test_first_jd_equals_start(self):
+        from orbit import close_approach_table
+        el = make_elements()
+        rows = close_approach_table(el, 2460000.0, 2460010.0, n_steps=5)
+        assert rows[0]["jd"] == pytest.approx(2460000.0, abs=1e-6)
+
+    def test_last_jd_equals_end(self):
+        from orbit import close_approach_table
+        el = make_elements()
+        rows = close_approach_table(el, 2460000.0, 2460010.0, n_steps=5)
+        assert rows[-1]["jd"] == pytest.approx(2460010.0, abs=1e-6)
+
+    def test_helio_dist_positive(self):
+        from orbit import close_approach_table
+        el = make_elements()
+        rows = close_approach_table(el, 2460000.0, 2460010.0, n_steps=5)
+        for row in rows:
+            assert row["helio_dist_au"] > 0.0
+
+    def test_geo_dist_positive(self):
+        from orbit import close_approach_table
+        el = make_elements()
+        rows = close_approach_table(el, 2460000.0, 2460010.0, n_steps=5)
+        for row in rows:
+            assert row["geo_dist_au"] > 0.0
+
+    def test_ra_in_valid_range(self):
+        from orbit import close_approach_table
+        el = make_elements()
+        rows = close_approach_table(el, 2460000.0, 2460010.0, n_steps=5)
+        for row in rows:
+            assert 0.0 <= row["ra_deg"] < 360.0
+
+    def test_dec_in_valid_range(self):
+        from orbit import close_approach_table
+        el = make_elements()
+        rows = close_approach_table(el, 2460000.0, 2460010.0, n_steps=5)
+        for row in rows:
+            assert -90.0 <= row["dec_deg"] <= 90.0

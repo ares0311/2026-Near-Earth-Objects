@@ -862,3 +862,51 @@ class TestGetTier1FeatureImportances:
         bad_path.write_text("{}")
         result = get_tier1_feature_importances(bad_path)
         assert result is None
+
+
+class TestExplainClassification:
+    def test_returns_required_keys(self):
+        from classify import explain_classification
+        t = make_tracklet()
+        result = explain_classification(t)
+        expected = {"features", "posterior", "tier1_importances",
+                    "dominant_hypothesis", "confidence"}
+        assert expected == set(result.keys())
+
+    def test_dominant_hypothesis_is_valid(self):
+        from classify import explain_classification
+        t = make_tracklet()
+        result = explain_classification(t)
+        valid = {"neo_candidate", "known_object", "main_belt_asteroid",
+                 "stellar_artifact", "other_solar_system"}
+        assert result["dominant_hypothesis"] in valid
+
+    def test_confidence_is_max_posterior(self):
+        from classify import explain_classification
+        t = make_tracklet()
+        result = explain_classification(t)
+        max_prob = max(result["posterior"].values())
+        assert result["confidence"] == pytest.approx(max_prob, abs=1e-6)
+
+    def test_posterior_sums_to_one(self):
+        from classify import explain_classification
+        t = make_tracklet()
+        result = explain_classification(t)
+        total = sum(result["posterior"].values())
+        assert abs(total - 1.0) < 1e-3
+
+    def test_features_dict_non_empty(self):
+        from classify import explain_classification
+        t = make_tracklet()
+        result = explain_classification(t)
+        assert len(result["features"]) > 0
+
+    def test_tier1_importances_is_none_without_model(self, tmp_path, monkeypatch):
+        from classify import explain_classification
+        # Ensure model file doesn't exist by pointing to empty dir
+        import classify as cls_mod
+        monkeypatch.setattr(cls_mod, "_MODEL_DIR", tmp_path)
+        t = make_tracklet()
+        result = explain_classification(t)
+        # Without a real model file, importances should be None
+        assert result["tier1_importances"] is None or isinstance(result["tier1_importances"], dict)

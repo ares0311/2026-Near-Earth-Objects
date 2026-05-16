@@ -468,9 +468,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.13.0)
+## Current State (v0.14.0)
 
-All 10 pipeline modules are complete. 465 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified manual CLI with top-level SQLite logs and auditable signoff readiness.
+All 10 pipeline modules are complete. 528 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified manual CLI with top-level SQLite logs and auditable signoff readiness.
 
 ### Skills
 
@@ -499,6 +499,9 @@ All 10 pipeline modules are complete. 465 tests passing (100% coverage). CI gree
 | `Skills/simulate_survey.py` | Generate synthetic ZTF-like survey observations for a sky field |
 | `Skills/export_ranked_table.py` | Export a ranked ScoredNEO table to CSV or HTML |
 | `Skills/check_orbit_quality.py` | Check orbit quality and fit preliminary orbit for tracklets from JSON |
+| `Skills/generate_obs_schedule.py` | Generate prioritized follow-up observation schedule with urgency tiers |
+| `Skills/photometric_calibration.py` | Per-field photometric zero-point fit and magnitude correction |
+| `Skills/export_mpc_bulk.py` | Bulk export MPC 80-column reports for a list of ScoredNEOs to a directory |
 
 ### Docs
 
@@ -552,6 +555,25 @@ All 10 pipeline modules are complete. 465 tests passing (100% coverage). CI gree
 - Collect labeled training data via `Skills/generate_training_labels.py`
 - Integrate live ZTF alert stream (Milestone 4)
 - Train and evaluate Tier 2 CNN on real cutouts (Milestone 5)
+
+### Key Changes in v0.14.0
+
+- `orbit.py`: added `close_approach_table` — tabulate geocentric distance over a time window.
+- `link.py`: added `estimate_motion_uncertainty` — rate and PA error from linear fit residuals.
+- `score.py`: added `discovery_report` — comprehensive nested summary dict for human review.
+- `classify.py`: added `explain_classification` — structured classification breakdown with Tier 1 importances. Fixed Pydantic v2.11 `model_fields` deprecation.
+- `alert.py`: added `draft_mpc_submission` — complete MPC submission bundle with guardrail cover letter.
+- `schemas.py`: added `ObservationWindow` — frozen typed model for sky/time search queries.
+- `fetch.py`: added `estimate_limiting_magnitude` — survey depth proxy from faint-end magnitude tail.
+- `preprocess.py`: added `quality_summary` — per-field PSF quality, background RMS, and elongation statistics.
+- `detect.py`: added `streak_candidates` — filter `DetectResult` for streak/trail detections only.
+- `background.py`: added `audit_report` — consolidated cross-log audit report.
+- `Skills/generate_obs_schedule.py`: prioritized follow-up observation schedule with urgency tiers.
+- `Skills/photometric_calibration.py`: per-field photometric zero-point fit via Gaia DR3.
+- `Skills/export_mpc_bulk.py`: bulk MPC 80-column report export with manifest.
+- `docs/SCORING_MODEL.md`: updated with ranking, discovery report, motion uncertainty, close-approach table, and photometric calibration.
+- 63 new tests; 528 total; 100% coverage maintained.
+- Version bumped to 0.14.0.
 
 ### Key Changes in v0.13.0
 

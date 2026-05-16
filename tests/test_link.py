@@ -461,3 +461,84 @@ class TestMergeTracklets:
         merged = merge_tracklets(ta, tb)
         jds = [o.jd for o in merged.observations]
         assert jds == sorted(jds)
+
+
+class TestEstimateMotionUncertainty:
+    def _build_tracklet(self, obs_list):
+        from link import _make_tracklet
+        return _make_tracklet(obs_list)
+
+    def test_returns_required_keys(self):
+        from link import estimate_motion_uncertainty
+        obs = [
+            make_obs(obs_id="u1", jd=2460000.0, ra_deg=180.0, dec_deg=10.0),
+            make_obs(obs_id="u2", jd=2460001.0, ra_deg=180.001, dec_deg=10.001),
+            make_obs(obs_id="u3", jd=2460002.0, ra_deg=180.002, dec_deg=10.002),
+        ]
+        tracklet = self._build_tracklet(obs)
+        result = estimate_motion_uncertainty(tracklet)
+        expected = {"rate_arcsec_hr", "rate_err_arcsec_hr", "pa_deg",
+                    "pa_err_deg", "reduced_chi2", "n_obs"}
+        assert expected == set(result.keys())
+
+    def test_n_obs_matches_tracklet(self):
+        from link import estimate_motion_uncertainty
+        obs = [
+            make_obs(obs_id=f"v{i}", jd=2460000.0 + i,
+                     ra_deg=180.0 + i * 0.001, dec_deg=10.0 + i * 0.001)
+            for i in range(4)
+        ]
+        tracklet = self._build_tracklet(obs)
+        result = estimate_motion_uncertainty(tracklet)
+        assert result["n_obs"] == 4
+
+    def test_rate_non_negative(self):
+        from link import estimate_motion_uncertainty
+        obs = [
+            make_obs(obs_id=f"w{i}", jd=2460000.0 + i,
+                     ra_deg=180.0 + i * 0.001, dec_deg=10.0)
+            for i in range(3)
+        ]
+        tracklet = self._build_tracklet(obs)
+        result = estimate_motion_uncertainty(tracklet)
+        assert result["rate_arcsec_hr"] >= 0.0
+
+    def test_pa_in_valid_range(self):
+        from link import estimate_motion_uncertainty
+        obs = [
+            make_obs(obs_id=f"x{i}", jd=2460000.0 + i,
+                     ra_deg=180.0 + i * 0.001, dec_deg=10.0 + i * 0.001)
+            for i in range(3)
+        ]
+        tracklet = self._build_tracklet(obs)
+        result = estimate_motion_uncertainty(tracklet)
+        assert 0.0 <= result["pa_deg"] < 360.0
+
+    def test_pa_err_clamped_at_180(self):
+        from link import estimate_motion_uncertainty
+        # Zero-motion tracklet → rate ≈ 0, pa_err should clamp to 180
+        obs = [
+            make_obs(obs_id=f"y{i}", jd=2460000.0 + i,
+                     ra_deg=180.0, dec_deg=10.0)  # identical positions
+            for i in range(3)
+        ]
+        tracklet = self._build_tracklet(obs)
+        result = estimate_motion_uncertainty(tracklet)
+        assert result["pa_err_deg"] <= 180.0
+
+    def test_zero_arc_rate_err_is_inf(self):
+        from link import estimate_motion_uncertainty
+        from schemas import Tracklet
+        # Construct a Tracklet with arc_days=0 directly to exercise the else branch
+        obs1 = make_obs(obs_id="z1", jd=2460000.0, ra_deg=180.0, dec_deg=10.0)
+        obs2 = make_obs(obs_id="z2", jd=2460001.0, ra_deg=180.001, dec_deg=10.001)
+        obs3 = make_obs(obs_id="z3", jd=2460002.0, ra_deg=180.002, dec_deg=10.002)
+        tracklet = Tracklet(
+            object_id="zero_arc",
+            observations=(obs1, obs2, obs3),
+            arc_days=0.0,
+            motion_rate_arcsec_per_hour=1.0,
+            motion_pa_degrees=45.0,
+        )
+        result = estimate_motion_uncertainty(tracklet)
+        assert result["rate_err_arcsec_hr"] == float("inf")

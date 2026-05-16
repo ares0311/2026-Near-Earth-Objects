@@ -1,5 +1,6 @@
 """Tests for score.py."""
 
+import pytest
 
 from schemas import (
     CandidateFeatures,
@@ -406,3 +407,51 @@ class TestRankCandidates:
         original_order = [id(n) for n in neos]
         rank_candidates(neos)
         assert [id(n) for n in neos] == original_order
+
+
+class TestDiscoveryReport:
+    def _make_neo(self):
+        from score import score
+        return score(make_tracklet(3), make_features(), make_posterior(), make_orbital())
+
+    def test_returns_required_top_level_keys(self):
+        from score import discovery_report
+        neo = self._make_neo()
+        result = discovery_report(neo)
+        required = {"object_id", "n_observations", "arc_days",
+                    "motion_rate_arcsec_hr", "motion_pa_deg",
+                    "posterior", "features", "hazard", "scoring"}
+        assert required.issubset(result.keys())
+
+    def test_object_id_matches(self):
+        from score import discovery_report
+        neo = self._make_neo()
+        assert discovery_report(neo)["object_id"] == neo.tracklet.object_id
+
+    def test_n_observations_correct(self):
+        from score import discovery_report
+        neo = self._make_neo()
+        assert discovery_report(neo)["n_observations"] == len(neo.tracklet.observations)
+
+    def test_posterior_sums_to_one(self):
+        from score import discovery_report
+        neo = self._make_neo()
+        post = discovery_report(neo)["posterior"]
+        total = sum(post.values())
+        assert abs(total - 1.0) < 1e-3
+
+    def test_hazard_flag_present(self):
+        from score import discovery_report
+        neo = self._make_neo()
+        assert "hazard_flag" in discovery_report(neo)["hazard"]
+
+    def test_scoring_has_discovery_priority(self):
+        from score import discovery_report
+        neo = self._make_neo()
+        assert "discovery_priority" in discovery_report(neo)["scoring"]
+
+    def test_arc_days_matches_tracklet(self):
+        from score import discovery_report
+        neo = self._make_neo()
+        result = discovery_report(neo)
+        assert result["arc_days"] == pytest.approx(neo.tracklet.arc_days, abs=1e-3)

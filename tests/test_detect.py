@@ -327,3 +327,69 @@ class TestDetectBatch:
         individual = detect(obs, mpc_cross_match=False)
         assert (batch[0].provenance.n_candidates ==
                 individual.provenance.n_candidates)
+
+
+class TestStreakCandidates:
+    def _make_detect_result(self, has_streak):
+        import uuid
+        from schemas import DetectProvenance, DetectResult, RawCandidate
+        obs = (make_obs(obs_id="sc1"), make_obs(obs_id="sc2"))
+        cand = RawCandidate(
+            candidate_id=str(uuid.uuid4()),
+            observations=obs,
+            apparent_motion_arcsec_per_hr=5.0,
+            motion_pa_deg=90.0,
+            is_streak=has_streak,
+        )
+        prov = DetectProvenance(
+            real_bogus_threshold=0.65, n_candidates=1, n_known_matches=0,
+        )
+        return DetectResult(candidates=(cand,), known_matches=(), provenance=prov)
+
+    def test_returns_streaks_only(self):
+        from detect import streak_candidates
+        result = self._make_detect_result(has_streak=True)
+        streaks = streak_candidates(result)
+        assert len(streaks) == 1
+        assert all(c.is_streak for c in streaks)
+
+    def test_returns_empty_when_no_streaks(self):
+        from detect import streak_candidates
+        result = self._make_detect_result(has_streak=False)
+        streaks = streak_candidates(result)
+        assert len(streaks) == 0
+
+    def test_returns_tuple(self):
+        from detect import streak_candidates
+        result = self._make_detect_result(has_streak=True)
+        assert isinstance(streak_candidates(result), tuple)
+
+    def test_empty_candidates_returns_empty(self):
+        from detect import streak_candidates
+        from schemas import DetectProvenance, DetectResult
+        prov = DetectProvenance(
+            real_bogus_threshold=0.65, n_candidates=0, n_known_matches=0,
+        )
+        empty = DetectResult(candidates=(), known_matches=(), provenance=prov)
+        assert streak_candidates(empty) == ()
+
+    def test_mixed_returns_only_streak_candidates(self):
+        import uuid
+        from detect import streak_candidates
+        from schemas import DetectProvenance, DetectResult, RawCandidate
+        obs = (make_obs(obs_id="m1"), make_obs(obs_id="m2"))
+        streak_cand = RawCandidate(
+            candidate_id=str(uuid.uuid4()), observations=obs,
+            apparent_motion_arcsec_per_hr=5.0, motion_pa_deg=90.0, is_streak=True,
+        )
+        non_streak = RawCandidate(
+            candidate_id=str(uuid.uuid4()), observations=obs,
+            apparent_motion_arcsec_per_hr=5.0, motion_pa_deg=90.0, is_streak=False,
+        )
+        prov = DetectProvenance(real_bogus_threshold=0.65, n_candidates=2, n_known_matches=0)
+        result = DetectResult(
+            candidates=(streak_cand, non_streak), known_matches=(), provenance=prov,
+        )
+        streaks = streak_candidates(result)
+        assert len(streaks) == 1
+        assert streaks[0].is_streak is True

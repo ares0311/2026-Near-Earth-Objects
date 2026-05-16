@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__all__ = ["link", "merge_tracklets", "_predict_from_arc"]
+__all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty", "_predict_from_arc"]
 
 import math
 import uuid
@@ -323,3 +323,49 @@ def link(
         min_observations=min_observations,
     )
     return LinkResult(tracklets=tuple(tracklets), provenance=provenance)
+
+
+def estimate_motion_uncertainty(tracklet: Tracklet) -> dict:
+    """Estimate uncertainty on motion rate and position angle from fit residuals.
+
+    Fits a linear motion model to the tracklet observations and propagates
+    the formal uncertainties on the rate components into rate and PA errors.
+
+    Returns a dict with keys:
+      ``rate_arcsec_hr``    — best-fit motion rate (arcsec/hr)
+      ``rate_err_arcsec_hr``— 1-σ uncertainty on rate
+      ``pa_deg``            — best-fit position angle (deg, N through E)
+      ``pa_err_deg``        — 1-σ uncertainty on PA
+      ``reduced_chi2``      — goodness-of-fit (1.0 = perfect linear motion)
+      ``n_obs``             — number of observations used
+    """
+    obs = list(tracklet.observations)
+    _, _, dra, ddec, reduced_chi2 = _fit_linear_motion(obs)
+    rate = math.hypot(dra, ddec)
+    pa = math.degrees(math.atan2(dra, ddec)) % 360.0
+
+    # Formal rate uncertainty: propagate from per-observation astrometric noise
+    errs = [max(o.mag_err, 0.5) for o in obs]
+    median_err = float(np.median(errs)) if errs else 0.5
+    n = len(obs)
+    # σ_rate ≈ sqrt(2) * σ_pos / (T/2) where T is arc length in hours
+    arc_hr = tracklet.arc_days * 24.0
+    if arc_hr > 0:
+        rate_err = math.sqrt(2.0) * median_err / (arc_hr / 2.0)
+    else:
+        rate_err = float("inf")
+
+    # σ_PA from error propagation: σ_PA = σ_rate / rate (radians) when rate >> σ
+    if rate > 1e-6:
+        pa_err = math.degrees(rate_err / rate)
+    else:
+        pa_err = 180.0
+
+    return {
+        "rate_arcsec_hr": round(rate, 4),
+        "rate_err_arcsec_hr": round(rate_err, 4),
+        "pa_deg": round(pa, 3),
+        "pa_err_deg": round(min(pa_err, 180.0), 3),
+        "reduced_chi2": round(reduced_chi2, 4),
+        "n_obs": n,
+    }

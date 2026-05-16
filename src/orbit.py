@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
-           "propagate_orbit", "predict_ephemeris"]
+           "propagate_orbit", "predict_ephemeris", "close_approach_table"]
 
 import math
 from typing import NamedTuple
@@ -552,3 +552,80 @@ def predict_ephemeris(elements: OrbitalElements, jd: float) -> dict:
         "helio_dist_au": r,
         "jd": jd,
     }
+
+
+def close_approach_table(
+    elements: OrbitalElements,
+    jd_start: float,
+    jd_end: float,
+    n_steps: int = 100,
+) -> list[dict]:
+    """Tabulate geocentric distance over a time window.
+
+    Propagates the orbit at ``n_steps`` evenly-spaced epochs between
+    ``jd_start`` and ``jd_end`` and computes the approximate geocentric
+    distance at each step.
+
+    Returns a list of dicts (one per step), sorted by ascending JD:
+      ``jd``           — Julian date
+      ``ra_deg``       — approximate geocentric RA
+      ``dec_deg``      — approximate geocentric Dec
+      ``helio_dist_au`` — heliocentric distance
+      ``geo_dist_au``  — approximate geocentric distance
+    """
+    if n_steps < 2:
+        n_steps = 2
+    step = (jd_end - jd_start) / max(n_steps - 1, 1)
+    rows: list[dict] = []
+    for i in range(n_steps):
+        jd = jd_start + i * step
+        ephem = predict_ephemeris(elements, jd)
+        # Approximate geocentric distance: vector difference magnitude
+        # predict_ephemeris returns geocentric coords; compute |r_geo| from
+        # helio and earth-sun distance components already inside predict_ephemeris.
+        # We re-derive geo dist from the ecliptic vectors here.
+        dt = jd - elements.epoch_jd
+        prop = propagate_orbit(elements, dt)
+        a = prop.semi_major_axis_au
+        e = prop.eccentricity
+        M_rad = math.radians(prop.mean_anomaly_deg)
+        E = _kepler_equation(M_rad, e)
+        r_helio = a * (1.0 - e * math.cos(E))
+
+        # Earth-sun distance (approximately from sun position)
+        earth_vec = _sun_position_ecliptic(jd)
+        r_earth = float(np.linalg.norm(earth_vec))
+
+        # Use law of cosines with RA/Dec to estimate geo distance
+        # Approximate: |r_geo| ~ sqrt(r_helio^2 + r_earth^2 - 2*r_helio*r_earth*cos(theta))
+        # where theta is the Sun-object-Earth angle (elongation proxy).
+        # Simpler: use Cartesian difference
+        eps = math.radians(23.439291111)
+        om = math.radians(prop.argument_perihelion_deg)
+        Om = math.radians(prop.longitude_ascending_node_deg)
+        inc = math.radians(prop.inclination_deg)
+        nu = 2.0 * math.atan2(
+            math.sqrt(1 + e) * math.sin(E / 2),
+            math.sqrt(1 - e) * math.cos(E / 2),
+        )
+        x_ecl = r_helio * (math.cos(Om) * math.cos(om + nu) -
+                           math.sin(Om) * math.sin(om + nu) * math.cos(inc))
+        y_ecl = r_helio * (math.sin(Om) * math.cos(om + nu) +
+                           math.cos(Om) * math.sin(om + nu) * math.cos(inc))
+        z_ecl = r_helio * math.sin(inc) * math.sin(om + nu)
+
+        # Earth heliocentric (= -sun vector)
+        ex, ey, ez = -earth_vec[0], -earth_vec[1], -earth_vec[2]
+        gx = x_ecl - ex
+        gy = y_ecl - ey
+        gz = z_ecl - ez
+        geo_dist = math.sqrt(gx * gx + gy * gy + gz * gz)
+
+        rows.append({
+            "jd": round(jd, 4),
+            "ra_deg": round(ephem["ra_deg"], 4),
+            "dec_deg": round(ephem["dec_deg"], 4),
+            "helio_dist_au": round(r_helio, 6),
+            "geo_dist_au": round(geo_dist, 6),
+        })
+    return rows

@@ -6,6 +6,7 @@ __all__ = [
     "extract_features",
     "classify",
     "classify_batch",
+    "explain_classification",
     "get_tier1_feature_importances",
     "ensemble_predict",
     "_build_ensemble",
@@ -799,3 +800,33 @@ def get_tier1_feature_importances(model_path: Path | str | None = None) -> dict[
         return {k: v / total for k, v in named.items()}
     except Exception:
         return None
+
+
+def explain_classification(tracklet: Tracklet) -> dict:
+    """Return a structured breakdown of the classification for a tracklet.
+
+    Runs the full three-tier classifier and returns:
+      ``features``            — dict of feature name → score
+      ``posterior``           — dict of hypothesis → probability
+      ``tier1_importances``   — normalised XGBoost gain importances (or ``None``)
+      ``dominant_hypothesis`` — name of the highest-probability hypothesis
+      ``confidence``          — probability of the dominant hypothesis
+    """
+    features, posterior = classify(tracklet)
+    feat_dict = {k: getattr(features, k) for k in type(features).model_fields}
+    post_dict = {
+        "neo_candidate": round(posterior.neo_candidate, 4),
+        "known_object": round(posterior.known_object, 4),
+        "main_belt_asteroid": round(posterior.main_belt_asteroid, 4),
+        "stellar_artifact": round(posterior.stellar_artifact, 4),
+        "other_solar_system": round(posterior.other_solar_system, 4),
+    }
+    dominant = max(post_dict, key=lambda k: post_dict[k])
+    importances = get_tier1_feature_importances(Path("models/tier1_xgb.json"))
+    return {
+        "features": feat_dict,
+        "posterior": post_dict,
+        "tier1_importances": importances,
+        "dominant_hypothesis": dominant,
+        "confidence": post_dict[dominant],
+    }

@@ -240,3 +240,56 @@ class TestPipelineResult:
     def test_pipeline_version_default_empty(self):
         pr = _make_pipeline_result()
         assert pr.pipeline_version == ""
+
+
+class TestObservationWindow:
+    def test_constructs_successfully(self):
+        from schemas import ObservationWindow
+        w = ObservationWindow(
+            ra_deg=180.0, dec_deg=10.0, radius_deg=0.5,
+            start_jd=2460000.0, end_jd=2460001.0,
+        )
+        assert w.ra_deg == 180.0
+
+    def test_is_frozen(self):
+        from schemas import ObservationWindow
+        w = ObservationWindow(
+            ra_deg=180.0, dec_deg=10.0, radius_deg=0.5,
+            start_jd=2460000.0, end_jd=2460001.0,
+        )
+        with pytest.raises(Exception):
+            w.ra_deg = 0.0  # type: ignore[misc]
+
+    def test_default_surveys_is_ztf(self):
+        from schemas import ObservationWindow
+        w = ObservationWindow(
+            ra_deg=180.0, dec_deg=10.0, radius_deg=0.5,
+            start_jd=2460000.0, end_jd=2460001.0,
+        )
+        assert "ZTF" in w.surveys
+
+    def test_custom_surveys(self):
+        from schemas import ObservationWindow
+        w = ObservationWindow(
+            ra_deg=180.0, dec_deg=10.0, radius_deg=0.5,
+            start_jd=2460000.0, end_jd=2460001.0,
+            surveys=("ATLAS", "PanSTARRS"),
+        )
+        assert "ATLAS" in w.surveys
+
+    def test_description_default_empty(self):
+        from schemas import ObservationWindow
+        w = ObservationWindow(
+            ra_deg=180.0, dec_deg=10.0, radius_deg=0.5,
+            start_jd=2460000.0, end_jd=2460001.0,
+        )
+        assert w.description == ""
+
+    def test_custom_description(self):
+        from schemas import ObservationWindow
+        w = ObservationWindow(
+            ra_deg=180.0, dec_deg=10.0, radius_deg=0.5,
+            start_jd=2460000.0, end_jd=2460001.0,
+            description="Test field",
+        )
+        assert w.description == "Test field"
