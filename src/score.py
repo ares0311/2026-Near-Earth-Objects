@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-__all__ = ["score", "score_batch", "rank_candidates", "discovery_report"]
+__all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
+           "followup_priority_table"]
 
 import math
 import uuid
@@ -413,3 +414,36 @@ def discovery_report(neo: ScoredNEO) -> dict:
             "pipeline_run_id": m.pipeline_run_id,
         },
     }
+
+
+def followup_priority_table(neos: list[ScoredNEO]) -> list[dict]:
+    """Return a flat table of follow-up priorities for all candidates.
+
+    Combines key fields from :func:`discovery_report` into a flat dict per
+    candidate, sorted by descending ``discovery_priority`` with PHA candidates
+    first (mirrors :func:`rank_candidates`).
+
+    Suitable for CSV export, dashboard display, or MPC queue generation.
+
+    Returns a list of dicts with keys:
+      ``rank``, ``object_id``, ``hazard_flag``, ``alert_pathway``,
+      ``discovery_priority``, ``moid_au``, ``neo_class``,
+      ``n_observations``, ``arc_days``, ``motion_rate_arcsec_hr``.
+    """
+    ranked = rank_candidates(neos)
+    rows = []
+    for i, neo in enumerate(ranked):
+        report = discovery_report(neo)
+        rows.append({
+            "rank": i + 1,
+            "object_id": report["object_id"],
+            "hazard_flag": report["hazard"]["hazard_flag"],
+            "alert_pathway": report["hazard"]["alert_pathway"],
+            "discovery_priority": report["scoring"]["discovery_priority"],
+            "moid_au": report["hazard"]["moid_au"],
+            "neo_class": report["hazard"]["neo_class"],
+            "n_observations": report["n_observations"],
+            "arc_days": report["arc_days"],
+            "motion_rate_arcsec_hr": report["motion_rate_arcsec_hr"],
+        })
+    return rows

@@ -399,3 +399,231 @@ AND NOT known_object
 
 PDCO notification (`nasa_pdco_notify`) requires independent MPC confirmation
 and CNEOS Scout/Sentry impact probability ≥ 0.01%. Never triggered autonomously.
+
+---
+
+## v0.14.0 New Public APIs
+
+### orbit.py
+
+```python
+def close_approach_table(
+    elements: OrbitalElements,
+    start_jd: float,
+    end_jd: float,
+    n_steps: int = 10,
+) -> list[dict]
+```
+
+Compute a close-approach table for the given orbital elements over the
+specified JD range.  Each row contains `jd`, `helio_dist_au`, `geo_dist_au`,
+`ra_deg`, and `dec_deg`.  Minimum two steps enforced.
+
+### link.py
+
+```python
+def estimate_motion_uncertainty(tracklet: Tracklet) -> dict
+```
+
+Return a dict with keys `rate_err_arcsec_hr` (rate uncertainty) and
+`pa_err_deg` (position-angle uncertainty) derived from the arc length and
+motion-rate uncertainty stored in the tracklet.
+
+### score.py
+
+```python
+def discovery_report(neo: ScoredNEO) -> dict
+```
+
+Generate a discovery-report dict for a `ScoredNEO`.  Contains object_id,
+hazard_flag, alert_pathway, moid_au, neo_class, arc_days, n_observations,
+neo_candidate_probability, discovery_priority, and estimated_diameter_m.
+
+### classify.py
+
+```python
+def explain_classification(tracklet: Tracklet) -> dict
+```
+
+Return a dict with keys `dominant_hypothesis`, `confidence`, `posterior` (all
+five probabilities), `features` (raw feature values), and
+`tier1_feature_importances` (importances if a Tier-1 model is loaded, else
+None).
+
+### alert.py
+
+```python
+def draft_mpc_submission(neo: ScoredNEO, obs_code: str = "Xnn") -> dict
+```
+
+Assemble a draft MPC submission package (cover letter, 80-column report, JSON
+format, ready-to-submit flag) without triggering any network actions.
+
+### schemas.py
+
+```python
+class ObservationWindow(BaseModel):
+    survey: Mission
+    ra_deg: float
+    dec_deg: float
+    radius_deg: float
+    start_jd: float
+    end_jd: float
+    limiting_magnitude: float | None = None
+    notes: str = ""
+```
+
+Represents a planned or completed sky-survey window.
+
+### fetch.py
+
+```python
+def estimate_limiting_magnitude(
+    survey: Mission,
+    exposure_time_s: float = 30.0,
+    airmass: float = 1.0,
+) -> float
+```
+
+Estimate the 5-sigma limiting magnitude for a given survey and observing
+conditions using empirical zero-points.
+
+### preprocess.py
+
+```python
+def quality_summary(result: PreprocessResult) -> dict
+```
+
+Summarise the quality of a `PreprocessResult`: fraction of sources passing
+quality cuts, median PSF quality, median elongation.
+
+### detect.py
+
+```python
+def streak_candidates(result: DetectResult) -> list[RawCandidate]
+```
+
+Return only the subset of raw candidates flagged as streaks/trails.
+
+### Skills/photometric_calibration.py
+
+Fit a zero-point offset from reference stars and apply to a tracklet.
+
+```python
+def fit_zero_point(obs_mags, ref_mags, weights=None) -> ZeroPointFit
+def calibrate_observation(obs: dict, zero_point: ZeroPointFit) -> dict
+def calibrate_tracklet(tracklet: dict, band: str, match_radius_arcsec=2.0) -> dict
+```
+
+### Skills/export_mpc_bulk.py
+
+Batch-export MPC 80-column reports for all qualifying scored NEOs.
+
+```python
+def export_bulk(
+    neos: list[ScoredNEO],
+    out_dir: Path,
+    obs_code: str = "Xnn",
+    min_priority: float = 0.0,
+    allowed_pathways: list[str] | None = None,
+) -> dict
+```
+
+---
+
+## v0.15.0 New Public APIs
+
+### orbit.py
+
+```python
+def compute_orbital_period(elements: OrbitalElements) -> float
+```
+
+Return the orbital period in days using Kepler's third law: T = 365.25 × √(a³).
+Returns 0.0 for non-positive semi-major axis.
+
+### link.py
+
+```python
+def filter_high_motion(
+    tracklets: list[Tracklet],
+    min_rate_arcsec_hr: float = 10.0,
+) -> list[Tracklet]
+```
+
+Return tracklets whose motion rate exceeds `min_rate_arcsec_hr`.  Useful for
+isolating fast-moving NEO candidates from the bulk of slower main-belt objects.
+
+### score.py
+
+```python
+def followup_priority_table(neos: list[ScoredNEO]) -> list[dict]
+```
+
+Return a flat list of dicts (one per NEO) sorted by discovery priority,
+containing: rank, object_id, hazard_flag, alert_pathway, discovery_priority,
+moid_au, neo_class, n_observations, arc_days, motion_rate_arcsec_hr.
+
+### classify.py
+
+```python
+def batch_explain(tracklets: list[Tracklet]) -> list[dict]
+```
+
+Run `explain_classification` on a list of tracklets and return the results
+as a list of dicts.
+
+### alert.py
+
+```python
+def alert_summary_table(neos: list[ScoredNEO]) -> list[dict]
+```
+
+Return a flat per-NEO alert summary (no submissions triggered).  Each row
+contains: object_id, hazard_flag, alert_pathway, moid_au, neo_class, arc_days,
+n_observations, ready_to_submit.
+
+### fetch.py
+
+```python
+def summarise_fetch_result(result: FetchResult) -> dict
+```
+
+Return a summary of a `FetchResult`: n_alerts, n_known_objects, survey,
+ra_deg, dec_deg, radius_deg, date_start, date_end, limiting_magnitude.
+
+### preprocess.py
+
+```python
+def flag_saturated_sources(result: PreprocessResult, saturation_mag: float = 12.0) -> list[str]
+```
+
+Return a list of `obs_id` strings for sources brighter than `saturation_mag`
+that are likely saturated and should be masked before linking.
+
+### schemas.py
+
+```python
+class CandidateSummary(BaseModel):
+    object_id: str
+    neo_class: NEOClass
+    hazard_flag: HazardFlag
+    alert_pathway: AlertPathway
+    moid_au: float | None = None
+    estimated_diameter_m: float | None = None
+    absolute_magnitude_h: float | None = None
+    arc_days: float
+    n_observations: int
+    neo_candidate_probability: Score
+    discovery_priority: float = 0.0
+```
+
+Lightweight summary of a `ScoredNEO` for display or export.
+
+### Skills
+
+| Script | Purpose |
+|---|---|
+| `Skills/filter_candidates.py` | Filter scored NEO JSON by hazard flag, pathway, or minimum priority |
+| `Skills/summarise_run.py` | Print/JSON summary of a pipeline run from scored NEO JSON |
+| `Skills/plot_sky_coverage.py` | RA/Dec scatter plot of tracklet positions colour-coded by hazard flag |

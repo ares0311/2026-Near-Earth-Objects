@@ -5,6 +5,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## v0.15.0
+
+- `orbit.py`: added `compute_orbital_period(elements)` — Kepler's third law; T = 365.25 × √(a³) days; returns 0.0 for non-positive a.
+- `link.py`: added `filter_high_motion(tracklets, min_rate_arcsec_hr)` — return tracklets exceeding a motion-rate threshold; default 10 arcsec/hr.
+- `score.py`: added `followup_priority_table(neos)` — flat ranked list of dicts with rank, object_id, hazard_flag, pathway, priority, MOID, neo_class, n_obs, arc_days, motion_rate.
+- `classify.py`: added `batch_explain(tracklets)` — run `explain_classification` on a list of tracklets; return list of dicts.
+- `alert.py`: added `alert_summary_table(neos)` — flat per-NEO alert summary (no submissions triggered); keys include ready_to_submit.
+- `fetch.py`: added `summarise_fetch_result(result)` — summary dict with n_alerts, surveys, search_ra/dec/radius, start/end JD, limiting_magnitude.
+- `preprocess.py`: added `flag_saturated_sources(result, saturation_mag)` — return obs_ids of sources brighter than saturation_mag.
+- `schemas.py`: added `CandidateSummary` — lightweight frozen Pydantic model for display/export.
+- `Skills/filter_candidates.py`: new — filter scored NEO JSON by hazard flag, alert pathway, or minimum priority.
+- `Skills/summarise_run.py`: new — print or JSON-export a pipeline run summary from scored NEO JSON.
+- `Skills/plot_sky_coverage.py`: new — RA/Dec scatter plot of tracklet positions colour-coded by hazard flag (requires matplotlib).
+- `docs/API_REFERENCE.md`: updated with all v0.14.0 and v0.15.0 public APIs.
+- 583 tests total (55 new); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.15.0.
+
 ## v0.14.0
 
 - `orbit.py`: added `close_approach_table(elements, jd_start, jd_end, n_steps)` — tabulate geocentric distance, RA/Dec, and heliocentric distance over a time window at uniform steps; added to `__all__`.

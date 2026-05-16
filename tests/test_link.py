@@ -541,3 +541,51 @@ class TestEstimateMotionUncertainty:
         )
         result = estimate_motion_uncertainty(tracklet)
         assert result["rate_err_arcsec_hr"] == float("inf")
+
+
+class TestFilterHighMotion:
+    def _make_tracklet(self, rate: float, object_id: str = "T001") -> "Tracklet":
+        from .conftest import build_tracklet
+        t = build_tracklet(n_obs=3, arc_days=2.0)
+        from schemas import Tracklet
+        return Tracklet(
+            object_id=object_id,
+            observations=t.observations,
+            arc_days=t.arc_days,
+            motion_rate_arcsec_per_hour=rate,
+            motion_pa_degrees=t.motion_pa_degrees,
+        )
+
+    def test_returns_only_fast_movers(self):
+        from link import filter_high_motion
+        slow = self._make_tracklet(5.0, "slow")
+        fast = self._make_tracklet(15.0, "fast")
+        result = filter_high_motion([slow, fast])
+        ids = [t.object_id for t in result]
+        assert "fast" in ids
+        assert "slow" not in ids
+
+    def test_empty_input_returns_empty(self):
+        from link import filter_high_motion
+        assert filter_high_motion([]) == []
+
+    def test_default_threshold_is_ten(self):
+        from link import filter_high_motion
+        t9 = self._make_tracklet(9.9, "below")
+        t10 = self._make_tracklet(10.0, "at")
+        result = filter_high_motion([t9, t10])
+        assert len(result) == 1
+        assert result[0].object_id == "at"
+
+    def test_custom_threshold(self):
+        from link import filter_high_motion
+        t5 = self._make_tracklet(5.0, "five")
+        t20 = self._make_tracklet(20.0, "twenty")
+        result = filter_high_motion([t5, t20], min_rate_arcsec_hr=6.0)
+        assert result[0].object_id == "twenty"
+
+    def test_all_pass_when_threshold_zero(self):
+        from link import filter_high_motion
+        tracklets = [self._make_tracklet(float(r), f"t{r}") for r in [1, 5, 20]]
+        result = filter_high_motion(tracklets, min_rate_arcsec_hr=0.0)
+        assert len(result) == 3

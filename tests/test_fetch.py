@@ -823,3 +823,63 @@ class TestEstimateLimitingMagnitude:
         from fetch import estimate_limiting_magnitude
         fr = self._make_fetch_result([])
         assert estimate_limiting_magnitude(fr) is None
+
+
+class TestSummariseFetchResult:
+    def _make_fetch_result(self, n_alerts: int = 3):
+        from schemas import FetchProvenance, FetchResult
+
+        from .conftest import build_observation
+        alerts = tuple(
+            build_observation(obs_id=f"a{i}", jd=2460000.5 + i)
+            for i in range(n_alerts)
+        )
+        prov = FetchProvenance(
+            surveys=("ZTF",),
+            start_jd=2460000.0,
+            end_jd=2460001.0,
+            search_ra_deg=180.0,
+            search_dec_deg=10.0,
+            search_radius_deg=0.5,
+        )
+        return FetchResult(alerts=alerts, provenance=prov)
+
+    def test_returns_dict(self):
+        from fetch import summarise_fetch_result
+        fr = self._make_fetch_result()
+        result = summarise_fetch_result(fr)
+        assert isinstance(result, dict)
+
+    def test_required_keys_present(self):
+        from fetch import summarise_fetch_result
+        fr = self._make_fetch_result()
+        result = summarise_fetch_result(fr)
+        for key in ("n_alerts", "surveys", "search_ra_deg", "search_dec_deg",
+                    "search_radius_deg", "start_jd", "end_jd", "limiting_magnitude"):
+            assert key in result, f"missing key: {key}"
+
+    def test_n_alerts_correct(self):
+        from fetch import summarise_fetch_result
+        fr = self._make_fetch_result(n_alerts=5)
+        result = summarise_fetch_result(fr)
+        assert result["n_alerts"] == 5
+
+    def test_surveys_is_list(self):
+        from fetch import summarise_fetch_result
+        fr = self._make_fetch_result()
+        result = summarise_fetch_result(fr)
+        assert isinstance(result["surveys"], list)
+        assert "ZTF" in result["surveys"]
+
+    def test_start_jd_matches_provenance(self):
+        from fetch import summarise_fetch_result
+        fr = self._make_fetch_result()
+        result = summarise_fetch_result(fr)
+        assert result["start_jd"] == 2460000.0
+
+    def test_invalid_input_raises(self):
+        import pytest
+
+        from fetch import summarise_fetch_result
+        with pytest.raises(TypeError):
+            summarise_fetch_result({"not": "a FetchResult"})  # type: ignore[arg-type]

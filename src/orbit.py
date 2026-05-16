@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
-           "propagate_orbit", "predict_ephemeris", "close_approach_table"]
+           "propagate_orbit", "predict_ephemeris", "close_approach_table",
+           "compute_orbital_period"]
 
 import math
 from typing import NamedTuple
@@ -619,3 +620,15 @@ def close_approach_table(
             "geo_dist_au": round(geo_dist, 6),
         })
     return rows
+
+
+def compute_orbital_period(elements: OrbitalElements) -> float:
+    """Return the orbital period in days using Kepler's third law.
+
+    T = 365.25 * sqrt(a^3) days, where a is the semi-major axis in AU.
+    Returns 0.0 for unphysical (non-positive) semi-major axis values.
+    """
+    a = elements.semi_major_axis_au
+    if a <= 0.0:
+        return 0.0
+    return 365.25 * math.sqrt(a ** 3)

@@ -352,3 +352,57 @@ class TestQualitySummary:
         assert isinstance(result["median_psf_quality"], float)
         assert isinstance(result["median_bg_rms"], float)
         assert isinstance(result["median_elongation"], float)
+
+
+class TestFlagSaturatedSources:
+    def _make_preprocess_result(self, mags: list[float]) -> object:
+        from schemas import PreprocessProvenance, PreprocessResult
+
+        from .conftest import build_observation
+        obs = tuple(
+            build_observation(obs_id=f"s{i}", mag=m, jd=2460000.5 + i)
+            for i, m in enumerate(mags)
+        )
+        prov = PreprocessProvenance(
+            n_sources_in=len(mags),
+            n_sources_out=len(mags),
+            astrometric_reference="none",
+        )
+        return PreprocessResult(sources=obs, provenance=prov)
+
+    def test_returns_list(self):
+        from preprocess import flag_saturated_sources
+        pr = self._make_preprocess_result([15.0, 19.0])
+        result = flag_saturated_sources(pr)
+        assert isinstance(result, list)
+
+    def test_faint_sources_not_flagged(self):
+        from preprocess import flag_saturated_sources
+        pr = self._make_preprocess_result([19.0, 20.0])
+        result = flag_saturated_sources(pr)
+        assert result == []
+
+    def test_bright_sources_flagged(self):
+        from preprocess import flag_saturated_sources
+        pr = self._make_preprocess_result([8.0, 19.0])
+        result = flag_saturated_sources(pr)
+        assert len(result) == 1
+
+    def test_custom_saturation_magnitude(self):
+        from preprocess import flag_saturated_sources
+        pr = self._make_preprocess_result([13.0, 19.0])
+        result = flag_saturated_sources(pr, saturation_mag=15.0)
+        assert len(result) == 1
+
+    def test_returns_obs_ids(self):
+        from preprocess import flag_saturated_sources
+        pr = self._make_preprocess_result([8.0, 19.0])
+        result = flag_saturated_sources(pr)
+        assert isinstance(result[0], str)
+
+    def test_invalid_input_raises(self):
+        import pytest
+
+        from preprocess import flag_saturated_sources
+        with pytest.raises(TypeError):
+            flag_saturated_sources("not a PreprocessResult")  # type: ignore[arg-type]

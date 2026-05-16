@@ -468,9 +468,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.14.0)
+## Current State (v0.15.0)
 
-All 10 pipeline modules are complete. 528 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified manual CLI with top-level SQLite logs and auditable signoff readiness.
+All 10 pipeline modules are complete. 583 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified manual CLI with top-level SQLite logs and auditable signoff readiness.
 
 ### Skills
 
@@ -502,6 +502,9 @@ All 10 pipeline modules are complete. 528 tests passing (100% coverage). CI gree
 | `Skills/generate_obs_schedule.py` | Generate prioritized follow-up observation schedule with urgency tiers |
 | `Skills/photometric_calibration.py` | Per-field photometric zero-point fit and magnitude correction |
 | `Skills/export_mpc_bulk.py` | Bulk export MPC 80-column reports for a list of ScoredNEOs to a directory |
+| `Skills/filter_candidates.py` | Filter scored NEO JSON by hazard flag, alert pathway, or minimum priority |
+| `Skills/summarise_run.py` | Print or JSON-export a pipeline run summary from scored NEO JSON |
+| `Skills/plot_sky_coverage.py` | RA/Dec scatter plot of tracklet positions colour-coded by hazard flag |
 
 ### Docs
 
@@ -555,6 +558,23 @@ All 10 pipeline modules are complete. 528 tests passing (100% coverage). CI gree
 - Collect labeled training data via `Skills/generate_training_labels.py`
 - Integrate live ZTF alert stream (Milestone 4)
 - Train and evaluate Tier 2 CNN on real cutouts (Milestone 5)
+
+### Key Changes in v0.15.0
+
+- `orbit.py`: added `compute_orbital_period` — Kepler's third law; T = 365.25 × √(a³) days.
+- `link.py`: added `filter_high_motion(tracklets, min_rate_arcsec_hr)` — filter by motion rate threshold (default 10 arcsec/hr).
+- `score.py`: added `followup_priority_table(neos)` — flat ranked table dict list sorted by discovery priority.
+- `classify.py`: added `batch_explain(tracklets)` — batch version of `explain_classification`.
+- `alert.py`: added `alert_summary_table(neos)` — flat per-NEO alert summary with ready_to_submit flag.
+- `fetch.py`: added `summarise_fetch_result(result)` — summary dict of a FetchResult.
+- `preprocess.py`: added `flag_saturated_sources(result, saturation_mag)` — return obs_ids of likely saturated sources.
+- `schemas.py`: added `CandidateSummary` — lightweight frozen Pydantic model for NEO display/export.
+- `Skills/filter_candidates.py`: new — filter scored NEO JSON by hazard flag, pathway, or priority.
+- `Skills/summarise_run.py`: new — human-readable or JSON pipeline run summary.
+- `Skills/plot_sky_coverage.py`: new — RA/Dec scatter plot colour-coded by hazard flag (matplotlib).
+- `docs/API_REFERENCE.md`: updated with all v0.14.0 and v0.15.0 APIs.
+- 55 new tests; 583 total; 100% coverage maintained.
+- Version bumped to 0.15.0.
 
 ### Key Changes in v0.14.0
 

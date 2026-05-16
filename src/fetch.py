@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fetch",
-           "fetch_batch", "estimate_limiting_magnitude"]
+           "fetch_batch", "estimate_limiting_magnitude", "summarise_fetch_result"]
 
 import json
 import os
@@ -457,3 +457,24 @@ def estimate_limiting_magnitude(fetch_result: FetchResult) -> float | None:
     hi = max(lo + 1, int(0.99 * len(mags_sorted)))
     tail = mags_sorted[lo:hi]
     return round(statistics.mean(tail), 2) if tail else None
+
+
+def summarise_fetch_result(result: FetchResult) -> dict:
+    """Return a summary dict describing a FetchResult.
+
+    Keys: n_alerts, surveys, search_ra_deg, search_dec_deg, search_radius_deg,
+    start_jd, end_jd, limiting_magnitude.
+    """
+    if not isinstance(result, FetchResult):
+        raise TypeError("result must be a FetchResult")
+    prov = result.provenance
+    return {
+        "n_alerts": len(result.alerts),
+        "surveys": list(prov.surveys),
+        "search_ra_deg": prov.search_ra_deg,
+        "search_dec_deg": prov.search_dec_deg,
+        "search_radius_deg": prov.search_radius_deg,
+        "start_jd": prov.start_jd,
+        "end_jd": prov.end_jd,
+        "limiting_magnitude": prov.limiting_magnitude,
+    }

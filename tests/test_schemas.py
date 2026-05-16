@@ -293,3 +293,47 @@ class TestObservationWindow:
             description="Test field",
         )
         assert w.description == "Test field"
+
+
+class TestCandidateSummary:
+    def _make_summary(self, **kwargs) -> object:
+        from schemas import CandidateSummary
+        defaults = dict(
+            object_id="T001",
+            neo_class="apollo",
+            hazard_flag="pha_candidate",
+            alert_pathway="mpc_submission",
+            arc_days=3.0,
+            n_observations=5,
+            neo_candidate_probability=0.8,
+        )
+        defaults.update(kwargs)
+        return CandidateSummary(**defaults)
+
+    def test_instantiation(self):
+        s = self._make_summary()
+        assert s.object_id == "T001"
+
+    def test_frozen(self):
+        import pytest
+        s = self._make_summary()
+        with pytest.raises(Exception):
+            s.object_id = "X"  # type: ignore[misc]
+
+    def test_optional_fields_default_none(self):
+        s = self._make_summary()
+        assert s.moid_au is None
+        assert s.estimated_diameter_m is None
+        assert s.absolute_magnitude_h is None
+
+    def test_discovery_priority_default_zero(self):
+        s = self._make_summary()
+        assert s.discovery_priority == 0.0
+
+    def test_custom_moid(self):
+        s = self._make_summary(moid_au=0.03)
+        assert s.moid_au == pytest.approx(0.03)
+
+    def test_neo_class_field(self):
+        s = self._make_summary(neo_class="aten")
+        assert s.neo_class == "aten"

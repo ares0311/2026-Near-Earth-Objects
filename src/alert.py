@@ -12,6 +12,7 @@ __all__ = [
     "process_alert",
     "summarise",
     "monitor_neocp",
+    "alert_summary_table",
 ]
 
 import json
@@ -531,3 +532,24 @@ def draft_mpc_submission(neo: ScoredNEO, obs_code: str = _MPC_OBS_CODE) -> dict:
         "summary": summarise(neo),
         "ready_to_submit": neo.hazard.alert_pathway == "mpc_submission",
     }
+
+
+def alert_summary_table(neos: list) -> list[dict]:
+    """Return a flat per-NEO alert summary without triggering any submission.
+
+    Each row contains: object_id, hazard_flag, alert_pathway, moid_au,
+    neo_class, arc_days, n_observations, ready_to_submit.
+    """
+    rows: list[dict] = []
+    for neo in neos:
+        rows.append({
+            "object_id": neo.tracklet.object_id,
+            "hazard_flag": neo.hazard.hazard_flag,
+            "alert_pathway": neo.hazard.alert_pathway,
+            "moid_au": neo.hazard.moid_au,
+            "neo_class": neo.hazard.neo_class,
+            "arc_days": neo.tracklet.arc_days,
+            "n_observations": len(neo.tracklet.observations),
+            "ready_to_submit": neo.hazard.alert_pathway == "mpc_submission",
+        })
+    return rows

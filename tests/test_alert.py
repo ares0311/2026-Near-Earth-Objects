@@ -558,3 +558,57 @@ class TestDraftMpcSubmission:
         neo = make_scored_neo()
         result = draft_mpc_submission(neo)
         assert isinstance(result["mpc_json"], dict)
+
+
+class TestAlertSummaryTable:
+    def _make_neos(self, n: int = 3):
+        from .conftest import build_scored_neo
+        return [build_scored_neo(object_id=f"OBJ{i:03d}") for i in range(n)]
+
+    def test_returns_list(self):
+        from alert import alert_summary_table
+        neos = self._make_neos(2)
+        result = alert_summary_table(neos)
+        assert isinstance(result, list)
+
+    def test_empty_input_returns_empty(self):
+        from alert import alert_summary_table
+        assert alert_summary_table([]) == []
+
+    def test_row_has_required_keys(self):
+        from alert import alert_summary_table
+        neos = self._make_neos(1)
+        row = alert_summary_table(neos)[0]
+        for key in ("object_id", "hazard_flag", "alert_pathway", "moid_au",
+                    "neo_class", "arc_days", "n_observations", "ready_to_submit"):
+            assert key in row, f"missing key: {key}"
+
+    def test_object_id_matches(self):
+        from alert import alert_summary_table
+
+        from .conftest import build_scored_neo
+        neo = build_scored_neo(object_id="MYOBJ")
+        rows = alert_summary_table([neo])
+        assert rows[0]["object_id"] == "MYOBJ"
+
+    def test_ready_to_submit_true_for_mpc_submission(self):
+        from alert import alert_summary_table
+
+        from .conftest import build_scored_neo
+        neo = build_scored_neo(alert_pathway="mpc_submission")
+        rows = alert_summary_table([neo])
+        assert rows[0]["ready_to_submit"] is True
+
+    def test_ready_to_submit_false_for_internal(self):
+        from alert import alert_summary_table
+
+        from .conftest import build_scored_neo
+        neo = build_scored_neo(alert_pathway="internal_candidate")
+        rows = alert_summary_table([neo])
+        assert rows[0]["ready_to_submit"] is False
+
+    def test_n_observations_correct(self):
+        from alert import alert_summary_table
+        neos = self._make_neos(1)
+        rows = alert_summary_table(neos)
+        assert rows[0]["n_observations"] == len(neos[0].tracklet.observations)
