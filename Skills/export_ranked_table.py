@@ -18,16 +18,10 @@ from pathlib import Path
 # Resolve src/ on PYTHONPATH when run directly.
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from score import rank_candidates  # noqa: E402
 from schemas import (  # noqa: E402
-    CandidateFeatures,
-    HazardAssessment,
-    NEOPosterior,
     ScoredNEO,
-    ScoringMetadata,
-    Tracklet,
-    Observation,
 )
+from score import rank_candidates  # noqa: E402
 
 
 def _load_scored_neos(path: Path) -> list[ScoredNEO]:

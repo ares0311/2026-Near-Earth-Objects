@@ -245,7 +245,6 @@ def quality_summary(result: PreprocessResult) -> dict:
     n_out = prov.n_sources_out
     pass_frac = (n_out / n_in) if n_in > 0 else 0.0
 
-    psf_vals = [_psf_quality(np.zeros((_CUTOUT_SIZE, _CUTOUT_SIZE)))]  # placeholder
     bg_vals: list[float] = []
     elong_vals: list[float] = []
 

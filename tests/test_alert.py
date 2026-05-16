@@ -315,7 +315,7 @@ class TestPDCOAlertPackage:
         assert any("PDCO" in a for a in result["actions"])
 
 
-class TestMonitorNeocp:
+class TestMonitorNeocpPublic:
     def test_returns_timeout_when_no_confirmation(self):
         # Mock _monitor_neocp to always return checked-but-not-confirmed
         import alert as alert_mod

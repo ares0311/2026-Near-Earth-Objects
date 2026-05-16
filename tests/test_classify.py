@@ -27,8 +27,8 @@ from classify import (
     ensemble_predict,
     extract_features,
     get_tier1_feature_importances,
-    retrain_tier1,
     retrain_stacker,
+    retrain_tier1,
 )
 from schemas import CandidateFeatures, NEOPosterior, Observation, Tracklet
 
@@ -690,6 +690,7 @@ class TestRetrainTier1:
 
     def test_retrain_returns_error_without_xgboost(self, tmp_path, monkeypatch):
         import sys
+
         import classify as cls_mod
         monkeypatch.setattr(cls_mod, "_MODEL_DIR", tmp_path)
         from classify import retrain_tier1
@@ -730,14 +731,12 @@ class TestRetrainStacker:
         return tier1_outputs, labels
 
     def test_retrain_stacker_returns_report(self, tmp_path):
-        from classify import retrain_stacker
         t1, lbls = self._make_training_data()
         report = retrain_stacker(t1, lbls, tmp_path / "coef.json")
         assert "n_samples" in report
         assert report["n_samples"] == 20
 
     def test_coef_file_written(self, tmp_path):
-        from classify import retrain_stacker
         t1, lbls = self._make_training_data()
         report = retrain_stacker(t1, lbls, tmp_path / "coef.json")
         if report["coef_path"] is not None:
@@ -747,7 +746,6 @@ class TestRetrainStacker:
             assert "labels" in data
 
     def test_retrain_stacker_insufficient_classes(self, tmp_path):
-        from classify import retrain_stacker
         labels_list = [
             "neo_candidate", "known_object", "main_belt_asteroid",
             "stellar_artifact", "other_solar_system",
@@ -759,7 +757,6 @@ class TestRetrainStacker:
         assert report["n_samples"] == 5
 
     def test_retrain_stacker_auc_present(self, tmp_path):
-        from classify import retrain_stacker
         t1, lbls = self._make_training_data(30)
         report = retrain_stacker(t1, lbls, tmp_path / "coef.json")
         # auc may be None if sklearn unavailable or single class; otherwise float
@@ -768,7 +765,6 @@ class TestRetrainStacker:
 
     def test_retrain_stacker_two_classes(self, tmp_path):
         import numpy as np
-        from classify import retrain_stacker
         rng = np.random.default_rng(7)
         labels_list = [
             "neo_candidate", "known_object", "main_belt_asteroid",
@@ -783,9 +779,9 @@ class TestRetrainStacker:
             assert 0.0 <= report["auc"] <= 1.0
 
     def test_retrain_stacker_exception_in_metrics(self, tmp_path, monkeypatch):
-        import numpy as np
         import sys
-        from classify import retrain_stacker
+
+        import numpy as np
         rng = np.random.default_rng(0)
         labels_list = [
             "neo_candidate", "known_object", "main_belt_asteroid",
@@ -856,7 +852,6 @@ class TestGetTier1FeatureImportances:
         assert result is None
 
     def test_returns_none_on_xgboost_load_exception(self, tmp_path, monkeypatch):
-        import xgboost as xgb
         # Write a valid-looking but empty JSON file to trigger an xgb load error
         bad_path = tmp_path / "bad_model.json"
         bad_path.write_text("{}")
@@ -902,9 +897,9 @@ class TestExplainClassification:
         assert len(result["features"]) > 0
 
     def test_tier1_importances_is_none_without_model(self, tmp_path, monkeypatch):
-        from classify import explain_classification
         # Ensure model file doesn't exist by pointing to empty dir
         import classify as cls_mod
+        from classify import explain_classification
         monkeypatch.setattr(cls_mod, "_MODEL_DIR", tmp_path)
         t = make_tracklet()
         result = explain_classification(t)

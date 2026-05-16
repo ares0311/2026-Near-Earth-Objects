@@ -351,7 +351,7 @@ class TestArcQualityReport:
         assert "1 day" in report["arc_warning"]
 
     def test_multi_night_quality_code_2_few_nights(self):
-        from schemas import Tracklet, Observation
+        from schemas import Observation, Tracklet
         obs = tuple(
             Observation(
                 obs_id=f"q{i}",
@@ -399,7 +399,7 @@ class TestArcQualityReport:
             assert key in report
 
     def test_single_obs_arc_days_zero(self):
-        from schemas import Tracklet, Observation
+        from schemas import Observation, Tracklet
         obs = (Observation(
             obs_id="solo",
             ra_deg=180.0,

@@ -50,7 +50,6 @@ def build_schedule(
         if len(schedule) >= max_objects:
             break
         urgency_label, exp_sec = _urgency(neo)
-        first_obs = neo.tracklet.observations[0]
         last_obs = neo.tracklet.observations[-1]
         schedule.append({
             "rank": len(schedule) + 1,

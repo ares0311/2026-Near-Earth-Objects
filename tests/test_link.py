@@ -287,7 +287,6 @@ class TestLinkPipeline:
                               ra_deg=ra + dra_hr + rng.normal(0, 0.5 / 3600.0), dec_deg=5.0)
                 cands.append(make_candidate((o1, o2), rate=motion))
             from detect import detect
-            from schemas import RawCandidate
             dr = detect(tuple(o for c in cands for o in c.observations), mpc_cross_match=False)
             lr = link(tuple(dr.candidates), min_nights=2, min_observations=3)
             if lr.tracklets:

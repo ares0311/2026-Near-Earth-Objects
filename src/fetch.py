@@ -434,7 +434,7 @@ def fetch_batch(
     ]
 
 
-def estimate_limiting_magnitude(fetch_result: "FetchResult") -> float | None:
+def estimate_limiting_magnitude(fetch_result: FetchResult) -> float | None:
     """Estimate the 5-sigma limiting magnitude from detected source magnitudes.
 
     Uses the faint-end tail of the magnitude distribution (90th–99th percentile)

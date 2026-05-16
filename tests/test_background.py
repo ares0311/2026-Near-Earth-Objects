@@ -572,7 +572,6 @@ def test_score_tracklet_direct():
 
 
 def test_blocking_penalty_all_none_features():
-    from schemas import OrbitalElements
     scored = make_scored()
     # Build a scored with None blocking fields
     features_none = CandidateFeatures(
@@ -600,7 +599,6 @@ def test_blocking_penalty_all_none_features():
 
 
 def test_review_reasons_alert_pathway_and_hazard_flag(monkeypatch, tmp_path):
-    from schemas import OrbitalElements
 
     scored = make_scored(neo_prob=0.7, followup_value=0.7, discovery_priority=0.4)
     scored_mpc = scored.model_copy(
@@ -743,7 +741,6 @@ def test_audit_report_signoff_coverage_zero_no_reviewed(tmp_path):
 
 
 def test_audit_report_has_unreviewed_when_runs_present(tmp_path):
-    import json as _json
     import sqlite3
     db = tmp_path / "neo.db"
     from background import audit_report, init_log_db

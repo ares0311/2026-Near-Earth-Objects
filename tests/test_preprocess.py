@@ -338,9 +338,12 @@ class TestQualitySummary:
         pr = self._make_preprocess_result_n(5, 0)
         result = quality_summary(pr)
         # With no sources, median stats should be None
-        assert result["median_psf_quality"] is None or isinstance(result["median_psf_quality"], float)
-        assert result["median_bg_rms"] is None or isinstance(result["median_bg_rms"], float)
-        assert result["median_elongation"] is None or isinstance(result["median_elongation"], float)
+        assert (result["median_psf_quality"] is None
+                or isinstance(result["median_psf_quality"], float))
+        assert (result["median_bg_rms"] is None
+                or isinstance(result["median_bg_rms"], float))
+        assert (result["median_elongation"] is None
+                or isinstance(result["median_elongation"], float))
 
     def test_median_fields_float_with_sources(self):
         from preprocess import quality_summary

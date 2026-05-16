@@ -517,10 +517,7 @@ def predict_ephemeris(elements: OrbitalElements, jd: float) -> dict:
     Om = math.radians(propagated.longitude_ascending_node_deg)
     inc = math.radians(propagated.inclination_deg)
 
-    # Heliocentric ecliptic position
-    x_orb = r * math.cos(nu)
-    y_orb = r * math.sin(nu)
-
+    # Heliocentric ecliptic position (orbital plane → ecliptic)
     x_ecl = (math.cos(Om) * math.cos(om + nu) -
               math.sin(Om) * math.sin(om + nu) * math.cos(inc))
     y_ecl = (math.sin(Om) * math.cos(om + nu) +
@@ -592,15 +589,8 @@ def close_approach_table(
         E = _kepler_equation(M_rad, e)
         r_helio = a * (1.0 - e * math.cos(E))
 
-        # Earth-sun distance (approximately from sun position)
+        # Geocentric distance via Cartesian vector difference
         earth_vec = _sun_position_ecliptic(jd)
-        r_earth = float(np.linalg.norm(earth_vec))
-
-        # Use law of cosines with RA/Dec to estimate geo distance
-        # Approximate: |r_geo| ~ sqrt(r_helio^2 + r_earth^2 - 2*r_helio*r_earth*cos(theta))
-        # where theta is the Sun-object-Earth angle (elongation proxy).
-        # Simpler: use Cartesian difference
-        eps = math.radians(23.439291111)
         om = math.radians(prop.argument_perihelion_deg)
         Om = math.radians(prop.longitude_ascending_node_deg)
         inc = math.radians(prop.inclination_deg)

@@ -299,8 +299,9 @@ class TestBuildExplanation:
 
 class TestScoreBatch:
     def test_returns_list_same_length(self):
-        from .conftest import build_tracklet, build_orbital_elements
-        from classify import classify, extract_features
+        from classify import classify
+
+        from .conftest import build_orbital_elements, build_tracklet
 
         items = []
         for _ in range(3):
@@ -314,8 +315,9 @@ class TestScoreBatch:
         assert score_batch([]) == []
 
     def test_shared_pipeline_run_id(self):
-        from .conftest import build_tracklet, build_orbital_elements
         from classify import classify
+
+        from .conftest import build_tracklet
 
         items = []
         for _ in range(2):
@@ -328,8 +330,9 @@ class TestScoreBatch:
 
 class TestCloseApproachAu:
     def test_close_approach_au_set_when_orbit_quality_2(self):
-        from .conftest import build_tracklet, build_orbital_elements
         from classify import classify
+
+        from .conftest import build_orbital_elements, build_tracklet
 
         t = build_tracklet(n_obs=4)
         f, p = classify(t)
@@ -342,8 +345,9 @@ class TestCloseApproachAu:
             assert s.metadata.close_approach_au is None
 
     def test_close_approach_au_none_when_no_orbit(self):
-        from .conftest import build_tracklet
         from classify import classify
+
+        from .conftest import build_tracklet
 
         t = build_tracklet(n_obs=4)
         f, p = classify(t)
@@ -351,8 +355,9 @@ class TestCloseApproachAu:
         assert s.metadata.close_approach_au is None
 
     def test_close_approach_au_none_when_orbit_quality_1(self):
-        from .conftest import build_tracklet, build_orbital_elements
         from classify import classify
+
+        from .conftest import build_orbital_elements, build_tracklet
 
         t = build_tracklet(n_obs=4)
         f, p = classify(t)

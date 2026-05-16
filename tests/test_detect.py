@@ -332,6 +332,7 @@ class TestDetectBatch:
 class TestStreakCandidates:
     def _make_detect_result(self, has_streak):
         import uuid
+
         from schemas import DetectProvenance, DetectResult, RawCandidate
         obs = (make_obs(obs_id="sc1"), make_obs(obs_id="sc2"))
         cand = RawCandidate(
@@ -375,6 +376,7 @@ class TestStreakCandidates:
 
     def test_mixed_returns_only_streak_candidates(self):
         import uuid
+
         from detect import streak_candidates
         from schemas import DetectProvenance, DetectResult, RawCandidate
         obs = (make_obs(obs_id="m1"), make_obs(obs_id="m2"))
