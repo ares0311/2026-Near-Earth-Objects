@@ -10,6 +10,7 @@ __all__ = [
     "FetchProvenance", "PreprocessProvenance", "DetectProvenance", "LinkProvenance",
     "FetchResult", "PreprocessResult", "DetectResult", "LinkResult",
     "ObservationWindow", "PipelineResult", "CandidateSummary", "NEOStatistics", "TrackletSummary",
+    "CloseApproachEvent",
     "BackgroundOutcome", "BackgroundRunMode", "FollowUpTestStatus", "HumanReviewStatus",
     "RecommendationAction", "SignoffDecision",
     "PriorityFactors", "BackgroundTarget", "FollowUpTestResult",
@@ -565,3 +566,19 @@ class TrackletSummary(BaseModel):
     motion_pa_degrees: float
     neo_class: NEOClass = "unknown"
     discovery_priority: float = 0.0
+
+
+class CloseApproachEvent(BaseModel):
+    """Record of a single close approach between an NEO and Earth.
+
+    Produced by ``orbit.close_approach_table`` and used in alert workflows.
+    All distances in AU; velocities in km/s.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    object_id: str
+    jd: float
+    geocentric_dist_au: float
+    relative_velocity_km_s: float | None = None
+    warning_time_days: float | None = None

@@ -1067,3 +1067,45 @@ class TestFilterAlertsByMotion:
         )
         result = filter_alerts_by_motion(obs_list)
         assert len(result) == 4
+
+
+class TestBuildObservationWindow:
+    def test_basic_construction(self):
+        from fetch import build_observation_window
+        w = build_observation_window(180.0, 0.0, start_jd=2460000.5, end_jd=2460030.5)
+        assert w.ra_deg == pytest.approx(180.0)
+        assert w.dec_deg == pytest.approx(0.0)
+
+    def test_default_survey_is_ztf(self):
+        from fetch import build_observation_window
+        w = build_observation_window(90.0, 10.0, start_jd=2460000.5, end_jd=2460010.5)
+        assert "ZTF" in w.surveys
+
+    def test_invalid_start_end_jd_raises(self):
+        import pytest as pt
+
+        from fetch import build_observation_window
+        with pt.raises(ValueError, match="start_jd"):
+            build_observation_window(0.0, 0.0, start_jd=2460010.0, end_jd=2460000.0)
+
+    def test_zero_radius_raises(self):
+        import pytest as pt
+
+        from fetch import build_observation_window
+        with pt.raises(ValueError, match="radius_deg"):
+            build_observation_window(0.0, 0.0, radius_deg=0.0,
+                                     start_jd=2460000.5, end_jd=2460010.5)
+
+    def test_invalid_survey_raises(self):
+        import pytest as pt
+
+        from fetch import build_observation_window
+        with pt.raises(ValueError, match="Unknown survey"):
+            build_observation_window(0.0, 0.0, surveys=["FAKE"],
+                                     start_jd=2460000.5, end_jd=2460010.5)
+
+    def test_custom_surveys_stored(self):
+        from fetch import build_observation_window
+        w = build_observation_window(0.0, 0.0, surveys=["ZTF", "ATLAS"],
+                                     start_jd=2460000.5, end_jd=2460010.5)
+        assert "ATLAS" in w.surveys

@@ -717,3 +717,65 @@ class TestSplitTracklet:
         t = self._make_tracklet()
         with pytest.raises(ValueError):
             split_tracklet(t, split_jd=2460005.0)  # only 1 obs after
+
+
+class TestComputeArcStatistics:
+    def _make_tracklet(self, n_obs: int = 4, arc_days: float = 3.0) -> object:
+        from schemas import Observation, Tracklet
+        jd0 = 2460000.5
+        step = arc_days / max(n_obs - 1, 1)
+        obs = tuple(
+            Observation(
+                obs_id=f"o{i}", ra_deg=180.0 + i * 0.01,
+                dec_deg=i * 0.005, jd=jd0 + i * step,
+                mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF",
+            )
+            for i in range(n_obs)
+        )
+        return Tracklet(
+            object_id="test", observations=obs, arc_days=arc_days,
+            motion_rate_arcsec_per_hour=3.0, motion_pa_degrees=45.0,
+        )
+
+    def test_returns_dict_with_expected_keys(self):
+        from link import compute_arc_statistics
+        t = self._make_tracklet()
+        result = compute_arc_statistics(t)
+        for key in ("n_observations", "n_nights", "arc_days",
+                    "mean_motion_arcsec_hr", "motion_pa_std_deg"):
+            assert key in result
+
+    def test_n_observations_correct(self):
+        from link import compute_arc_statistics
+        t = self._make_tracklet(n_obs=5)
+        assert compute_arc_statistics(t)["n_observations"] == 5
+
+    def test_arc_days_positive(self):
+        from link import compute_arc_statistics
+        t = self._make_tracklet(n_obs=4, arc_days=3.0)
+        assert compute_arc_statistics(t)["arc_days"] == pytest.approx(3.0, abs=0.01)
+
+    def test_mean_motion_non_negative(self):
+        from link import compute_arc_statistics
+        t = self._make_tracklet()
+        assert compute_arc_statistics(t)["mean_motion_arcsec_hr"] >= 0.0
+
+    def test_single_obs_zero_arc(self):
+        from link import compute_arc_statistics
+        from schemas import Observation, Tracklet
+        obs = (Observation(
+            obs_id="x", ra_deg=180.0, dec_deg=0.0, jd=2460000.5,
+            mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF",
+        ),)
+        t = Tracklet(
+            object_id="single", observations=obs, arc_days=0.0,
+            motion_rate_arcsec_per_hour=0.0, motion_pa_degrees=0.0,
+        )
+        result = compute_arc_statistics(t)
+        assert result["arc_days"] == pytest.approx(0.0)
+        assert result["n_observations"] == 1
+
+    def test_n_nights_at_least_one(self):
+        from link import compute_arc_statistics
+        t = self._make_tracklet(n_obs=3, arc_days=0.5)
+        assert compute_arc_statistics(t)["n_nights"] >= 1

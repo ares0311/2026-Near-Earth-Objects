@@ -725,3 +725,45 @@ class TestReadyForSubmission:
         result = ready_for_submission(neo)
         assert isinstance(result, tuple)
         assert len(result) == 2
+
+
+class TestFormatDiscoveryCircular:
+    def _make_neo(self):
+        from .conftest import build_scored_neo
+        return build_scored_neo()
+
+    def test_returns_string(self):
+        from alert import format_discovery_circular
+        neo = self._make_neo()
+        result = format_discovery_circular(neo)
+        assert isinstance(result, str)
+
+    def test_contains_object_id(self):
+        from alert import format_discovery_circular
+        neo = self._make_neo()
+        result = format_discovery_circular(neo)
+        assert neo.tracklet.object_id in result
+
+    def test_contains_draft_header(self):
+        from alert import format_discovery_circular
+        neo = self._make_neo()
+        result = format_discovery_circular(neo)
+        assert "DRAFT" in result
+
+    def test_contains_no_impact_warning(self):
+        from alert import format_discovery_circular
+        neo = self._make_neo()
+        result = format_discovery_circular(neo)
+        assert "impact" not in result.lower() or "Do not" in result
+
+    def test_contains_neo_class(self):
+        from alert import format_discovery_circular
+        neo = self._make_neo()
+        result = format_discovery_circular(neo)
+        assert "NEO CLASS" in result
+
+    def test_contains_observer_placeholder(self):
+        from alert import format_discovery_circular
+        neo = self._make_neo()
+        result = format_discovery_circular(neo)
+        assert "FILL IN" in result

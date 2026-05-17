@@ -265,3 +265,51 @@ class TestPlattSingularHessian:
         cal = PlattCalibrator(tol=1e10).fit(scores, labels)
         out = cal.predict(scores)
         assert out.shape == scores.shape
+
+
+class TestBootstrapConfidenceInterval:
+    def _make_data(self, n: int = 50) -> tuple[list[float], list[float]]:
+        import random
+        rng = random.Random(0)
+        probs = [rng.random() for _ in range(n)]
+        labels = [float(rng.random() < p) for p, _ in zip(probs, range(n))]
+        return probs, labels
+
+    def test_returns_tuple_of_three(self):
+        from calibration import bootstrap_confidence_interval
+        p, lbs = self._make_data()
+        result = bootstrap_confidence_interval(p, lbs, n_bootstrap=100)
+        assert len(result) == 3
+
+    def test_lower_le_mean_le_upper(self):
+        from calibration import bootstrap_confidence_interval
+        p, lbs = self._make_data()
+        lo, hi, mean = bootstrap_confidence_interval(p, lbs, n_bootstrap=100)
+        assert lo <= mean <= hi
+
+    def test_brier_metric(self):
+        from calibration import bootstrap_confidence_interval
+        p, lbs = self._make_data()
+        lo, hi, mean = bootstrap_confidence_interval(p, lbs, metric="brier", n_bootstrap=100)
+        assert 0.0 <= lo <= hi <= 1.0
+
+    def test_ece_metric(self):
+        from calibration import bootstrap_confidence_interval
+        p, lbs = self._make_data()
+        lo, hi, mean = bootstrap_confidence_interval(p, lbs, metric="ece", n_bootstrap=100)
+        assert 0.0 <= lo <= hi
+
+    def test_empty_input_raises(self):
+        import pytest as pt
+
+        from calibration import bootstrap_confidence_interval
+        with pt.raises(ValueError):
+            bootstrap_confidence_interval([], [], n_bootstrap=10)
+
+    def test_unknown_metric_raises(self):
+        import pytest as pt
+
+        from calibration import bootstrap_confidence_interval
+        p, lbs = self._make_data()
+        with pt.raises(ValueError, match="Unknown metric"):
+            bootstrap_confidence_interval(p, lbs, metric="rmse")

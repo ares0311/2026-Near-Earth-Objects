@@ -4,7 +4,7 @@ from __future__ import annotations
 
 __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "filter_high_motion", "deduplicate_tracklets", "_predict_from_arc",
-           "split_tracklet"]
+           "split_tracklet", "compute_arc_statistics"]
 
 import math
 import uuid
@@ -456,3 +456,44 @@ def split_tracklet(tracklet: Tracklet, split_jd: float) -> tuple[Tracklet, Track
         )
 
     return _build(before, "A"), _build(after, "B")
+
+
+def compute_arc_statistics(tracklet) -> dict:
+    """Compute a summary statistics dict for a tracklet.
+
+    Returns a dict with keys:
+      ``n_observations``        — total observation count
+      ``n_nights``              — number of distinct integer JD nights
+      ``arc_days``              — time span from first to last observation
+      ``mean_motion_arcsec_hr`` — mean apparent motion rate in arcsec/hr
+      ``motion_pa_std_deg``     — standard deviation of pairwise position angles (deg)
+    """
+    obs = sorted(tracklet.observations, key=lambda o: o.jd)
+    n_obs = len(obs)
+    nights = len({int(o.jd) for o in obs})
+    arc = obs[-1].jd - obs[0].jd if n_obs >= 2 else 0.0
+
+    rates: list[float] = []
+    pas: list[float] = []
+    for i in range(len(obs) - 1):
+        o1, o2 = obs[i], obs[i + 1]
+        dt_hr = (o2.jd - o1.jd) * 24.0
+        if dt_hr < 1e-6:
+            continue
+        cos_dec = math.cos(math.radians((o1.dec_deg + o2.dec_deg) / 2.0))
+        d_ra = (o2.ra_deg - o1.ra_deg) * 3600.0 * cos_dec
+        d_dec = (o2.dec_deg - o1.dec_deg) * 3600.0
+        sep = math.hypot(d_ra, d_dec)
+        rates.append(sep / dt_hr)
+        pas.append(math.degrees(math.atan2(d_ra, d_dec)) % 360.0)
+
+    mean_rate = float(np.mean(rates)) if rates else 0.0
+    pa_std = float(np.std(pas)) if len(pas) >= 2 else 0.0
+
+    return {
+        "n_observations": n_obs,
+        "n_nights": nights,
+        "arc_days": round(arc, 4),
+        "mean_motion_arcsec_hr": round(mean_rate, 4),
+        "motion_pa_std_deg": round(pa_std, 4),
+    }

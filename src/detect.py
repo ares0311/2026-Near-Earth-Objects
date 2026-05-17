@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus",
-           "compute_streak_metric"]
+           "compute_streak_metric", "cluster_detections"]
 
 import math
 import uuid
@@ -398,3 +398,43 @@ def compute_streak_metric(obs: Observation) -> float:
         return float(min(1.0, max(0.0, metric)))
     except Exception:
         return 0.0
+
+
+def cluster_detections(
+    observations: tuple | list,
+    radius_arcsec: float = 5.0,
+) -> list[tuple]:
+    """Group observations into spatial clusters within *radius_arcsec* of each other.
+
+    Uses a greedy single-linkage approach: each observation joins the first
+    existing cluster whose seed lies within *radius_arcsec*, or starts a new one.
+    Returns a list of tuples, each tuple containing the Observation objects in
+    that cluster.  Input order within each cluster is preserved.
+    """
+    obs_list = list(observations)
+    if not obs_list:
+        return []
+
+    radius_deg = radius_arcsec / 3600.0
+    seeds: list = []   # (ra, dec) of each cluster seed
+    groups: list[list] = []
+
+    for obs in obs_list:
+        placed = False
+        for idx, (seed_ra, seed_dec) in enumerate(seeds):
+            d1, d2 = math.radians(seed_dec), math.radians(obs.dec_deg)
+            r1, r2 = math.radians(seed_ra), math.radians(obs.ra_deg)
+            cos_sep = (
+                math.sin(d1) * math.sin(d2)
+                + math.cos(d1) * math.cos(d2) * math.cos(r1 - r2)
+            )
+            sep_deg = math.degrees(math.acos(max(-1.0, min(1.0, cos_sep))))
+            if sep_deg <= radius_deg:
+                groups[idx].append(obs)
+                placed = True
+                break
+        if not placed:
+            seeds.append((obs.ra_deg, obs.dec_deg))
+            groups.append([obs])
+
+    return [tuple(g) for g in groups]

@@ -541,3 +541,54 @@ class TestComputeStreakMetric:
         from detect import compute_streak_metric
         obs = self._make_obs(base64.b64encode(b"notanarray").decode())
         assert compute_streak_metric(obs) == 0.0
+
+
+class TestClusterDetections:
+    def _make_obs(self, obs_id: str, ra: float, dec: float) -> object:
+        from schemas import Observation
+        return Observation(
+            obs_id=obs_id, ra_deg=ra, dec_deg=dec, jd=2460000.5,
+            mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF",
+        )
+
+    def test_empty_input(self):
+        from detect import cluster_detections
+        assert cluster_detections([]) == []
+
+    def test_single_obs_one_cluster(self):
+        from detect import cluster_detections
+        obs = self._make_obs("a", 180.0, 0.0)
+        result = cluster_detections([obs])
+        assert len(result) == 1
+        assert result[0] == (obs,)
+
+    def test_nearby_obs_same_cluster(self):
+        from detect import cluster_detections
+        obs1 = self._make_obs("a", 180.0, 0.0)
+        obs2 = self._make_obs("b", 180.0001, 0.0)
+        result = cluster_detections([obs1, obs2], radius_arcsec=5.0)
+        assert len(result) == 1
+        assert len(result[0]) == 2
+
+    def test_distant_obs_separate_clusters(self):
+        from detect import cluster_detections
+        obs1 = self._make_obs("a", 180.0, 0.0)
+        obs2 = self._make_obs("b", 181.0, 0.0)
+        result = cluster_detections([obs1, obs2], radius_arcsec=5.0)
+        assert len(result) == 2
+
+    def test_returns_tuples(self):
+        from detect import cluster_detections
+        obs = self._make_obs("c", 90.0, 10.0)
+        result = cluster_detections([obs])
+        assert isinstance(result[0], tuple)
+
+    def test_cluster_count_correct(self):
+        from detect import cluster_detections
+        obs_list = [
+            self._make_obs("a", 180.0, 0.0),
+            self._make_obs("b", 180.0001, 0.0),
+            self._make_obs("c", 270.0, 0.0),
+        ]
+        result = cluster_detections(obs_list, radius_arcsec=5.0)
+        assert len(result) == 2

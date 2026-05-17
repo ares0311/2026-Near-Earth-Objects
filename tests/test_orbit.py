@@ -792,3 +792,74 @@ class TestResonanceCheck:
         result = resonance_check(el, tolerance=0.02)
         if result is not None:
             assert result["fractional_offset"] <= 0.02
+
+
+class TestEphemerisUncertainty:
+    def _make_elements(self, a: float = 1.5, quality_code: int = 2) -> object:
+        from schemas import OrbitalElements
+        e = 0.2
+        return OrbitalElements(
+            semi_major_axis_au=a,
+            eccentricity=e,
+            inclination_deg=10.0,
+            longitude_ascending_node_deg=0.0,
+            argument_perihelion_deg=0.0,
+            mean_anomaly_deg=0.0,
+            epoch_jd=2460000.5,
+            perihelion_au=a * (1 - e),
+            aphelion_au=a * (1 + e),
+            quality_code=quality_code,
+        )
+
+    def test_returns_dict_with_expected_keys(self):
+        from orbit import ephemeris_uncertainty
+        el = self._make_elements()
+        result = ephemeris_uncertainty(el, 2460010.5)
+        assert "ra_unc_arcsec" in result
+        assert "dec_unc_arcsec" in result
+        assert "jd" in result
+
+    def test_equal_ra_dec_uncertainty(self):
+        from orbit import ephemeris_uncertainty
+        el = self._make_elements()
+        result = ephemeris_uncertainty(el, 2460010.5)
+        assert result["ra_unc_arcsec"] == result["dec_unc_arcsec"]
+
+    def test_target_jd_stored(self):
+        from orbit import ephemeris_uncertainty
+        el = self._make_elements()
+        result = ephemeris_uncertainty(el, 2460050.0)
+        assert result["jd"] == pytest.approx(2460050.0)
+
+    def test_low_quality_code_larger_uncertainty(self):
+        from orbit import ephemeris_uncertainty
+        el_poor = self._make_elements(quality_code=1)
+        el_good = self._make_elements(quality_code=4)
+        r_poor = ephemeris_uncertainty(el_poor, 2460000.5)
+        r_good = ephemeris_uncertainty(el_good, 2460000.5)
+        assert r_poor["ra_unc_arcsec"] > r_good["ra_unc_arcsec"]
+
+    def test_longer_propagation_larger_uncertainty(self):
+        from orbit import ephemeris_uncertainty
+        el = self._make_elements()
+        r_near = ephemeris_uncertainty(el, 2460001.5)
+        r_far = ephemeris_uncertainty(el, 2460500.0)
+        assert r_far["ra_unc_arcsec"] >= r_near["ra_unc_arcsec"]
+
+    def test_zero_a_returns_large_uncertainty(self):
+        from orbit import ephemeris_uncertainty
+        from schemas import OrbitalElements
+        el = OrbitalElements(
+            semi_major_axis_au=0.0,
+            eccentricity=0.0,
+            inclination_deg=0.0,
+            longitude_ascending_node_deg=0.0,
+            argument_perihelion_deg=0.0,
+            mean_anomaly_deg=0.0,
+            epoch_jd=2460000.5,
+            perihelion_au=0.0,
+            aphelion_au=0.0,
+            quality_code=1,
+        )
+        result = ephemeris_uncertainty(el, 2460010.5)
+        assert result["ra_unc_arcsec"] > 1e5

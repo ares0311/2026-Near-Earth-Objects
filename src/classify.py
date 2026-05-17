@@ -15,6 +15,7 @@ __all__ = [
     "retrain_stacker",
     "posterior_entropy",
     "dominant_hypothesis",
+    "classify_morphology",
 ]
 
 import base64
@@ -888,3 +889,54 @@ def dominant_hypothesis(posterior: NEOPosterior) -> tuple[str, float]:
     if prob == 0.0:
         return ("unknown", 0.0)
     return (best, float(prob))
+
+
+def classify_morphology(obs) -> str:
+    """Classify source morphology as 'point_source', 'extended', or 'streak'.
+
+    Uses image second-moment elongation from the difference-image cutout.
+    Elongation ≥ 5 → 'streak'; elongation ≥ 1.5 → 'extended'; otherwise
+    'point_source'.  Falls back to 'point_source' if no cutout is available.
+    """
+    if obs.cutout_difference is None:
+        return "point_source"
+    try:
+        import base64
+        import math as _math
+
+        import numpy as np
+
+        raw = base64.b64decode(obs.cutout_difference)
+        arr = np.frombuffer(raw, dtype=np.float32)
+        size = int(_math.isqrt(len(arr)))
+        if size * size != len(arr) or size < 3:
+            return "point_source"
+        arr = arr.reshape(size, size).astype(np.float64)
+        arr = np.clip(arr, 0.0, None)
+        total = float(arr.sum())
+        if total <= 0:
+            return "point_source"
+        y, x = np.indices(arr.shape)
+        cx = float((x * arr).sum()) / total
+        cy = float((y * arr).sum()) / total
+        dx, dy = x - cx, y - cy
+        mxx = float((dx**2 * arr).sum()) / total
+        myy = float((dy**2 * arr).sum()) / total
+        mxy = float((dx * dy * arr).sum()) / total
+        trace = mxx + myy
+        if trace <= 0:
+            return "point_source"
+        det = mxx * myy - mxy**2
+        disc = max(0.0, (trace / 2) ** 2 - det)
+        lam1 = trace / 2 + _math.sqrt(disc)
+        lam2 = trace / 2 - _math.sqrt(disc)
+        if lam2 <= 1e-12 * lam1:
+            return "streak"
+        elongation = lam1 / lam2
+        if elongation >= 5.0:
+            return "streak"
+        if elongation >= 1.5:
+            return "extended"
+        return "point_source"
+    except Exception:
+        return "point_source"

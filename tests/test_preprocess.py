@@ -518,3 +518,75 @@ class TestEstimateSourceDensity:
         obs = self._make_obs("f")
         result = estimate_source_density((obs,), field_radius_deg=0.0)
         assert result == 0.0
+
+
+class TestComputeSourceSnr:
+    def _make_obs(self, cutout_b64: str | None = None) -> object:
+        from schemas import Observation
+        return Observation(
+            obs_id="snr1", ra_deg=180.0, dec_deg=0.0, jd=2460000.5,
+            mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF",
+            cutout_difference=cutout_b64,
+        )
+
+    def test_no_cutout_returns_none(self):
+        from preprocess import compute_source_snr
+        obs = self._make_obs(None)
+        assert compute_source_snr(obs) is None
+
+    def test_strong_source_positive_snr(self):
+        import base64
+
+        import numpy as np
+
+        from preprocess import compute_source_snr
+        arr = np.ones((63, 63), dtype=np.float32) * 0.01
+        arr[31, 31] = 10.0
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        obs = self._make_obs(b64)
+        snr = compute_source_snr(obs)
+        assert snr is not None
+        assert snr > 1.0
+
+    def test_returns_float_or_none(self):
+        import base64
+
+        import numpy as np
+
+        from preprocess import compute_source_snr
+        arr = np.zeros((63, 63), dtype=np.float32)
+        arr[31, 31] = 5.0
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        obs = self._make_obs(b64)
+        result = compute_source_snr(obs)
+        assert result is None or isinstance(result, float)
+
+    def test_zero_array_returns_none(self):
+        import base64
+
+        import numpy as np
+
+        from preprocess import compute_source_snr
+        arr = np.zeros((63, 63), dtype=np.float32)
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        obs = self._make_obs(b64)
+        assert compute_source_snr(obs) is None
+
+    def test_brighter_peak_higher_snr(self):
+        import base64
+
+        import numpy as np
+
+        from preprocess import compute_source_snr
+
+        rng = np.random.default_rng(42)
+
+        def make_b64(peak: float) -> str:
+            arr = rng.normal(0.0, 1.0, (63, 63)).astype(np.float32)
+            arr[31, 31] = peak
+            return base64.b64encode(arr.tobytes()).decode()
+
+        snr_dim = compute_source_snr(self._make_obs(make_b64(5.0)))
+        snr_bright = compute_source_snr(self._make_obs(make_b64(50.0)))
+        if snr_dim is not None and snr_bright is not None:
+            assert snr_bright > snr_dim
