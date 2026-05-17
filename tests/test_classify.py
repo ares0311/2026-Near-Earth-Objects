@@ -996,3 +996,55 @@ class TestPosteriorEntropy:
             main_belt_asteroid=0.025, stellar_artifact=0.025, other_solar_system=0.025,
         )
         assert posterior_entropy(p_skewed) < posterior_entropy(p_uniform)
+
+
+class TestDominantHypothesis:
+    def _make_posterior(self, **kwargs) -> "NEOPosterior":
+        from schemas import NEOPosterior
+        defaults = dict(
+            neo_candidate=0.2, known_object=0.2, main_belt_asteroid=0.2,
+            stellar_artifact=0.2, other_solar_system=0.2,
+        )
+        defaults.update(kwargs)
+        return NEOPosterior(**defaults)
+
+    def test_returns_tuple(self):
+        from classify import dominant_hypothesis
+        p = self._make_posterior()
+        result = dominant_hypothesis(p)
+        assert isinstance(result, tuple)
+        assert len(result) == 2
+
+    def test_correct_dominant_class(self):
+        from classify import dominant_hypothesis
+        p = self._make_posterior(neo_candidate=0.8, known_object=0.05,
+                                 main_belt_asteroid=0.05, stellar_artifact=0.05,
+                                 other_solar_system=0.05)
+        name, prob = dominant_hypothesis(p)
+        assert name == "neo_candidate"
+        assert prob == pytest.approx(0.8)
+
+    def test_artifact_dominant(self):
+        from classify import dominant_hypothesis
+        p = self._make_posterior(neo_candidate=0.1, known_object=0.1,
+                                 main_belt_asteroid=0.1, stellar_artifact=0.6,
+                                 other_solar_system=0.1)
+        name, _ = dominant_hypothesis(p)
+        assert name == "stellar_artifact"
+
+    def test_zero_posterior_returns_unknown(self):
+        from classify import dominant_hypothesis
+        p = self._make_posterior(neo_candidate=0.0, known_object=0.0,
+                                 main_belt_asteroid=0.0, stellar_artifact=0.0,
+                                 other_solar_system=0.0)
+        name, prob = dominant_hypothesis(p)
+        assert name == "unknown"
+        assert prob == 0.0
+
+    def test_probability_is_float(self):
+        from classify import dominant_hypothesis
+        p = self._make_posterior(neo_candidate=0.7, known_object=0.1,
+                                 main_belt_asteroid=0.1, stellar_artifact=0.05,
+                                 other_solar_system=0.05)
+        _, prob = dominant_hypothesis(p)
+        assert isinstance(prob, float)

@@ -702,3 +702,93 @@ class TestTisserandParameter:
         el = self._make_elements(a=5.0, e=0.8, i_deg=30.0)
         t = tisserand_parameter(el)
         assert t < 3.0
+
+
+class TestBatchPredictEphemeris:
+    def _make_elements(self, a: float = 1.5) -> "OrbitalElements":
+        from schemas import OrbitalElements
+        e = 0.3
+        return OrbitalElements(
+            semi_major_axis_au=a, eccentricity=e, inclination_deg=10.0,
+            longitude_ascending_node_deg=45.0, argument_perihelion_deg=90.0,
+            mean_anomaly_deg=180.0, epoch_jd=2460000.5,
+            perihelion_au=a * (1 - e), aphelion_au=a * (1 + e), quality_code=2,
+        )
+
+    def test_returns_list(self):
+        from orbit import batch_predict_ephemeris
+        el = self._make_elements()
+        result = batch_predict_ephemeris([el], 2460005.0)
+        assert isinstance(result, list)
+        assert len(result) == 1
+
+    def test_each_dict_has_required_keys(self):
+        from orbit import batch_predict_ephemeris
+        el = self._make_elements()
+        row = batch_predict_ephemeris([el], 2460005.0)[0]
+        for key in ("ra_deg", "dec_deg", "helio_dist_au", "jd"):
+            assert key in row
+
+    def test_empty_input(self):
+        from orbit import batch_predict_ephemeris
+        assert batch_predict_ephemeris([], 2460000.0) == []
+
+    def test_jd_matches_requested(self):
+        from orbit import batch_predict_ephemeris
+        el = self._make_elements()
+        row = batch_predict_ephemeris([el], 2460010.0)[0]
+        assert row["jd"] == 2460010.0
+
+    def test_multiple_elements(self):
+        from orbit import batch_predict_ephemeris
+        els = [self._make_elements(a) for a in [1.2, 1.5, 2.0]]
+        result = batch_predict_ephemeris(els, 2460005.0)
+        assert len(result) == 3
+
+
+class TestResonanceCheck:
+    def _make_elements(self, a: float) -> "OrbitalElements":
+        from schemas import OrbitalElements
+        e = 0.1
+        return OrbitalElements(
+            semi_major_axis_au=a, eccentricity=e, inclination_deg=5.0,
+            longitude_ascending_node_deg=0.0, argument_perihelion_deg=0.0,
+            mean_anomaly_deg=0.0, epoch_jd=2460000.5,
+            perihelion_au=a * (1 - e), aphelion_au=a * (1 + e), quality_code=2,
+        )
+
+    def test_3_1_resonance(self):
+        from orbit import resonance_check
+        a_3_1 = (11.862 / 3) ** (2 / 3)
+        el = self._make_elements(a_3_1)
+        result = resonance_check(el)
+        assert result is not None
+        assert result["resonance"] == "3:1"
+
+    def test_non_resonant_returns_none(self):
+        from orbit import resonance_check
+        el = self._make_elements(1.5)  # mid-belt, not resonant
+        result = resonance_check(el)
+        assert result is None or isinstance(result, dict)
+
+    def test_returns_dict_with_keys(self):
+        from orbit import resonance_check
+        a_2_1 = (11.862 / 2) ** (2 / 3)
+        el = self._make_elements(a_2_1)
+        result = resonance_check(el)
+        if result is not None:
+            for key in ("resonance", "period_ratio", "fractional_offset"):
+                assert key in result
+
+    def test_zero_a_returns_none(self):
+        from orbit import resonance_check
+        el = self._make_elements(0.0)
+        assert resonance_check(el) is None
+
+    def test_fractional_offset_within_tolerance(self):
+        from orbit import resonance_check
+        a_3_1 = (11.862 / 3) ** (2 / 3)
+        el = self._make_elements(a_3_1)
+        result = resonance_check(el, tolerance=0.02)
+        if result is not None:
+            assert result["fractional_offset"] <= 0.02

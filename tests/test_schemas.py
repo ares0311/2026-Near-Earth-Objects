@@ -379,3 +379,50 @@ class TestNEOStatistics:
     def test_max_priority_stored(self):
         s = self._make_stats(max_discovery_priority=0.99)
         assert s.max_discovery_priority == pytest.approx(0.99)
+
+
+class TestTrackletSummary:
+    def _make_summary(self, **kwargs) -> object:
+        from schemas import TrackletSummary
+
+        defaults = dict(
+            object_id="2026 AA1",
+            arc_days=2.5,
+            n_observations=6,
+            motion_rate_arcsec_per_hour=3.2,
+            motion_pa_degrees=45.0,
+        )
+        defaults.update(kwargs)
+        return TrackletSummary(**defaults)
+
+    def test_basic_construction(self):
+        s = self._make_summary()
+        assert s.object_id == "2026 AA1"
+        assert s.arc_days == pytest.approx(2.5)
+        assert s.n_observations == 6
+
+    def test_default_neo_class(self):
+        s = self._make_summary()
+        assert s.neo_class == "unknown"
+
+    def test_custom_neo_class(self):
+        s = self._make_summary(neo_class="apollo")
+        assert s.neo_class == "apollo"
+
+    def test_default_discovery_priority(self):
+        s = self._make_summary()
+        assert s.discovery_priority == pytest.approx(0.0)
+
+    def test_custom_discovery_priority(self):
+        s = self._make_summary(discovery_priority=0.87)
+        assert s.discovery_priority == pytest.approx(0.87)
+
+    def test_immutable(self):
+        import pytest as pt
+        s = self._make_summary()
+        with pt.raises(Exception):
+            s.object_id = "changed"  # type: ignore[misc]
+
+    def test_motion_pa_stored(self):
+        s = self._make_summary(motion_pa_degrees=123.4)
+        assert s.motion_pa_degrees == pytest.approx(123.4)

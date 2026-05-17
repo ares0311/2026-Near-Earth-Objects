@@ -5,6 +5,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## v0.17.0
+
+- `orbit.py`: added `batch_predict_ephemeris(elements_list, target_jd)` — predict sky positions for a list of OrbitalElements at one JD; wraps `predict_ephemeris` with per-element error isolation; added to `__all__`.
+- `orbit.py`: added `resonance_check(elements, tolerance)` — detect mean-motion resonance with Jupiter; checks T_J/T_asteroid ratio against common p:q pairs; returns resonance label and fractional offset or None; added to `__all__`.  Fixed ratio convention to use mean-motion ratio (T_Jupiter/T_asteroid).
+- `detect.py`: added `compute_streak_metric(obs)` — quantify streak severity from difference-image second moments; returns float in [0, 1] (0=round, 1=maximally elongated); handles degenerate zero-eigenvalue case; added to `__all__`.
+- `link.py`: added `split_tracklet(tracklet, split_jd)` — split a tracklet at split_jd into two sub-tracklets; raises ValueError if either sub-tracklet would have fewer than 2 observations; added to `__all__`.
+- `classify.py`: added `dominant_hypothesis(posterior)` — return (hypothesis_name, probability) for the highest-probability class in a NEOPosterior; returns ("unknown", 0.0) for all-zero posteriors; added to `__all__`.
+- `score.py`: added `close_approach_candidates(neos, max_moid_au)` — filter ScoredNEO list to objects with MOID ≤ max_moid_au; objects with moid_au=None excluded; default threshold 0.05 AU; added to `__all__`.
+- `alert.py`: added `ready_for_submission(neo)` — boolean gate checking all alert-protocol preconditions (MOID ≤ 0.05 AU, orbit quality ≥ 2, real_bogus ≥ 0.90, not known_object); returns (bool, unmet_conditions list); fixed `orbit_quality_code` → `quality_code` field name; added to `__all__`.
+- `fetch.py`: added `filter_alerts_by_motion(alerts, min_rate_arcsec_hr, max_rate_arcsec_hr)` — filter observation tuple by apparent motion rate proxy via ssdistnr; observations without ssdistnr pass through; added to `__all__`.
+- `preprocess.py`: added `estimate_source_density(observations, field_radius_deg)` — source count per square degree using great-circle separation from field centroid; returns 0.0 for empty input or zero field area; added to `__all__`.
+- `schemas.py`: added `TrackletSummary` — lightweight frozen Pydantic model for tracklet display/export (object_id, arc_days, n_observations, motion_rate, motion_pa, neo_class, discovery_priority); added to `__all__`.
+- `Skills/check_tisserand.py`: new — batch-compute Tisserand parameter for tracklets/ScoredNEO dicts; flags T_J < threshold as comet-like; CLI with `--threshold` and `--json` flags.
+- `Skills/export_followup_requests.py`: new — generate NEOCP follow-up request files for candidates above priority threshold; uses `format_neocp_report`; CLI with `--min-priority`, `--out-dir`, `--obs-code`, `--summary` flags.
+- `docs/ORBIT_FITTING.md`: new — technical reference for orbit fitting subsystem covering Gauss's method, differential correction, orbit quality codes, MOID computation, NEO classification, and Tisserand parameter.
+- 146 new tests (729 total, previously 583); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.17.0.
+
 ## v0.16.0
 
 - `orbit.py`: added `classify_neo_class(elements)` — derive NEO dynamical class (amor/apollo/aten/ieo/unknown) from orbital elements; added to `__all__`.

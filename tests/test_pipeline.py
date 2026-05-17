@@ -530,3 +530,227 @@ class TestTagNeoClassSkill:
         result = tag_neo_class([scored])
         assert "tracklet" in result[0]
         assert "neo_class" in result[0]["tracklet"]
+
+
+class TestCheckTissSerandSkill:
+    def _make_tracklet_dict(self) -> dict:
+        obs = [
+            {
+                "obs_id": f"t{i}",
+                "ra_deg": 180.0 + i * 0.1,
+                "dec_deg": i * 0.05,
+                "jd": 2460000.5 + i,
+                "mag": 19.0,
+                "mag_err": 0.05,
+                "filter_band": "r",
+                "mission": "ZTF",
+            }
+            for i in range(3)
+        ]
+        return {
+            "object_id": "2026TS1",
+            "observations": obs,
+        }
+
+    def test_returns_list(self):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from check_tisserand import check_tisserand
+
+        result = check_tisserand([self._make_tracklet_dict()])
+        assert isinstance(result, list)
+
+    def test_empty_input(self):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from check_tisserand import check_tisserand
+
+        assert check_tisserand([]) == []
+
+    def test_result_has_expected_keys(self):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from check_tisserand import check_tisserand
+
+        result = check_tisserand([self._make_tracklet_dict()])
+        assert len(result) == 1
+        row = result[0]
+        assert "object_id" in row
+        assert "tisserand_parameter" in row
+        assert "comet_like" in row
+
+    def test_comet_like_flag_below_threshold(self):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from check_tisserand import check_tisserand
+
+        record = self._make_tracklet_dict()
+        results = check_tisserand([record], threshold=100.0)
+        tj = results[0]["tisserand_parameter"]
+        if tj is not None:
+            assert results[0]["comet_like"] is True
+
+    def test_comet_like_false_above_threshold(self):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from check_tisserand import check_tisserand
+
+        record = self._make_tracklet_dict()
+        results = check_tisserand([record], threshold=0.0)
+        tj = results[0]["tisserand_parameter"]
+        if tj is not None:
+            assert results[0]["comet_like"] is False
+
+    def test_scored_neo_dict_accepted(self):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from check_tisserand import check_tisserand
+
+        scored = {"tracklet": self._make_tracklet_dict()}
+        result = check_tisserand([scored])
+        assert len(result) == 1
+        assert result[0]["object_id"] == "2026TS1"
+
+
+class TestExportFollowupRequestsSkill:
+    def _make_scored_neo(self, priority: float = 0.8, obs_code: str = "Xnn"):
+        from schemas import (
+            CandidateExplanation,
+            CandidateFeatures,
+            HazardAssessment,
+            NEOPosterior,
+            Observation,
+            ScoredNEO,
+            ScoringMetadata,
+            Tracklet,
+        )
+
+        obs = tuple(
+            Observation(
+                obs_id=f"o{i}",
+                ra_deg=180.0 + i * 0.1,
+                dec_deg=i * 0.05,
+                jd=2460000.5 + i,
+                mag=19.0,
+                mag_err=0.05,
+                filter_band="r",
+                mission="ZTF",
+            )
+            for i in range(3)
+        )
+        tracklet = Tracklet(
+            object_id="2026EFR1",
+            observations=obs,
+            arc_days=2.0,
+            motion_rate_arcsec_per_hour=3.0,
+            motion_pa_degrees=45.0,
+        )
+        explanation = CandidateExplanation(
+            summary="test",
+            supporting_evidence=(),
+            contra_evidence=(),
+            model_version="0.17.0",
+        )
+        hazard = HazardAssessment(
+            hazard_flag="nominal",
+            moid_au=0.1,
+            estimated_diameter_m=100.0,
+            absolute_magnitude_h=22.0,
+            neo_class="apollo",
+            alert_pathway="neocp_followup",
+            explanation=explanation,
+        )
+        features = CandidateFeatures()
+        posterior = NEOPosterior(
+            neo_candidate=0.8,
+            known_object=0.05,
+            main_belt_asteroid=0.1,
+            stellar_artifact=0.03,
+            other_solar_system=0.02,
+        )
+        metadata = ScoringMetadata(
+            scorer_version="0.17.0",
+            scored_at_jd=2460000.0,
+            pipeline_run_id="run-001",
+            discovery_priority=priority,
+            followup_value=0.5,
+            scientific_interest=0.3,
+        )
+        return ScoredNEO(
+            tracklet=tracklet,
+            features=features,
+            posterior=posterior,
+            hazard=hazard,
+            metadata=metadata,
+        )
+
+    def test_returns_list(self):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from export_followup_requests import export_followup_requests
+
+        neo = self._make_scored_neo()
+        result = export_followup_requests([neo])
+        assert isinstance(result, list)
+
+    def test_empty_input(self):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from export_followup_requests import export_followup_requests
+
+        assert export_followup_requests([]) == []
+
+    def test_result_has_expected_keys(self):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from export_followup_requests import export_followup_requests
+
+        neo = self._make_scored_neo()
+        result = export_followup_requests([neo])
+        assert len(result) == 1
+        row = result[0]
+        assert "object_id" in row
+        assert "priority" in row
+        assert "report" in row
+
+    def test_min_priority_filter(self):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from export_followup_requests import export_followup_requests
+
+        high = self._make_scored_neo(priority=0.9)
+        low = self._make_scored_neo(priority=0.1)
+        result = export_followup_requests([high, low], min_priority=0.5)
+        assert len(result) == 1
+        assert result[0]["priority"] == pytest.approx(0.9)
+
+    def test_sorted_by_priority_descending(self):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from export_followup_requests import export_followup_requests
+
+        neos = [self._make_scored_neo(priority=p) for p in (0.3, 0.9, 0.6)]
+        result = export_followup_requests(neos)
+        priorities = [r["priority"] for r in result]
+        assert priorities == sorted(priorities, reverse=True)
+
+    def test_obs_code_passed_through(self):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from export_followup_requests import export_followup_requests
+
+        neo = self._make_scored_neo()
+        result = export_followup_requests([neo], obs_code="F51")
+        assert "F51" in result[0]["report"]

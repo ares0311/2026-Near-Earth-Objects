@@ -589,3 +589,46 @@ class TestComputeStatistics:
         neos = [self._make_neo(obj_id=f"T{i}") for i in range(2)]
         result = compute_statistics(neos)
         assert isinstance(result.neo_class_distribution, dict)
+
+
+class TestCloseApproachCandidates:
+    def _make_neo(self, moid_au: float | None = 0.03, obj_id: str = "T001") -> object:
+        from .conftest import build_scored_neo
+        return build_scored_neo(moid_au=moid_au, object_id=obj_id)
+
+    def test_filters_by_moid(self):
+        from score import close_approach_candidates
+        near = self._make_neo(0.03, "NEAR")
+        far = self._make_neo(0.15, "FAR")
+        result = close_approach_candidates([near, far], max_moid_au=0.05)
+        ids = [n.tracklet.object_id for n in result]
+        assert "NEAR" in ids
+        assert "FAR" not in ids
+
+    def test_none_moid_excluded(self):
+        from score import close_approach_candidates
+        neo = self._make_neo(None, "NOMOID")
+        result = close_approach_candidates([neo])
+        assert len(result) == 0
+
+    def test_empty_input(self):
+        from score import close_approach_candidates
+        assert close_approach_candidates([]) == []
+
+    def test_custom_threshold(self):
+        from score import close_approach_candidates
+        neo = self._make_neo(0.08, "FAR")
+        result = close_approach_candidates([neo], max_moid_au=0.10)
+        assert len(result) == 1
+
+    def test_exact_threshold_included(self):
+        from score import close_approach_candidates
+        neo = self._make_neo(0.05, "EXACT")
+        result = close_approach_candidates([neo], max_moid_au=0.05)
+        assert len(result) == 1
+
+    def test_all_included_when_threshold_high(self):
+        from score import close_approach_candidates
+        neos = [self._make_neo(m, f"T{i}") for i, m in enumerate([0.01, 0.05, 0.10])]
+        result = close_approach_candidates(neos, max_moid_au=1.0)
+        assert len(result) == 3

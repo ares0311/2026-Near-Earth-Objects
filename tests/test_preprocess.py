@@ -457,3 +457,64 @@ class TestComputeColorIndex:
         r21 = compute_color_index(obs2, obs1)
         assert r12 is not None and r21 is not None
         assert r12 == pytest.approx(-r21)
+
+
+class TestEstimateSourceDensity:
+    def _make_obs(self, obs_id: str, ra: float = 180.0, dec: float = 0.0) -> object:
+        from schemas import Observation
+
+        return Observation(
+            obs_id=obs_id,
+            ra_deg=ra,
+            dec_deg=dec,
+            jd=2460000.5,
+            mag=19.0,
+            mag_err=0.05,
+            filter_band="r",
+            mission="ZTF",
+        )
+
+    def test_empty_returns_zero(self):
+        from preprocess import estimate_source_density
+
+        assert estimate_source_density(()) == 0.0
+
+    def test_single_obs_nonzero_density(self):
+        from preprocess import estimate_source_density
+
+        obs = self._make_obs("a")
+        result = estimate_source_density((obs,))
+        assert result > 0.0
+
+    def test_returns_float(self):
+        from preprocess import estimate_source_density
+
+        obs = self._make_obs("b")
+        assert isinstance(estimate_source_density((obs,)), float)
+
+    def test_more_obs_higher_density(self):
+        from preprocess import estimate_source_density
+
+        obs_close = tuple(
+            self._make_obs(f"c{i}", ra=180.0 + i * 0.01, dec=0.0) for i in range(5)
+        )
+        obs_far = tuple(
+            self._make_obs(f"d{i}", ra=180.0 + i * 0.3, dec=0.0) for i in range(5)
+        )
+        dense = estimate_source_density(obs_close, field_radius_deg=0.5)
+        sparse = estimate_source_density(obs_far, field_radius_deg=0.5)
+        assert dense >= sparse
+
+    def test_accepts_list_input(self):
+        from preprocess import estimate_source_density
+
+        obs_list = [self._make_obs(f"e{i}") for i in range(3)]
+        result = estimate_source_density(obs_list)
+        assert isinstance(result, float)
+
+    def test_zero_radius_returns_zero(self):
+        from preprocess import estimate_source_density
+
+        obs = self._make_obs("f")
+        result = estimate_source_density((obs,), field_radius_deg=0.0)
+        assert result == 0.0

@@ -14,6 +14,7 @@ __all__ = [
     "monitor_neocp",
     "alert_summary_table",
     "format_neocp_report",
+    "ready_for_submission",
 ]
 
 import json
@@ -593,3 +594,38 @@ def format_neocp_report(neo: ScoredNEO, obs_code: str = _MPC_OBS_CODE) -> str:
         obs_block,
     ]
     return "\n".join(lines)
+
+
+def ready_for_submission(neo: ScoredNEO) -> tuple[bool, list[str]]:
+    """Check all alert-protocol preconditions for MPC submission in one call.
+
+    Returns ``(ready, unmet_conditions)`` where *ready* is True only when all
+    conditions are satisfied and *unmet_conditions* is an empty list.  When
+    *ready* is False, *unmet_conditions* lists the specific failed gates.
+
+    Gates (all must pass):
+    - ``moid_au`` ≤ 0.05 AU (MOID below PHA threshold)
+    - Orbit quality code ≥ 2 (multi-night arc minimum)
+    - ``real_bogus_score`` ≥ 0.90
+    - ``alert_pathway`` ≠ ``"known_object"`` (not matched to MPC catalog)
+    """
+    unmet: list[str] = []
+
+    moid = neo.hazard.moid_au
+    if moid is None or moid > 0.05:
+        unmet.append(f"MOID not ≤ 0.05 AU (got {moid})")
+
+    quality = 0
+    if neo.hazard.orbital_elements is not None:
+        quality = neo.hazard.orbital_elements.quality_code
+    if quality < 2:
+        unmet.append(f"Orbit quality code < 2 (got {quality})")
+
+    rb = neo.features.real_bogus_score
+    if rb is None or rb < 0.90:
+        unmet.append(f"real_bogus_score < 0.90 (got {rb})")
+
+    if neo.hazard.alert_pathway == "known_object":
+        unmet.append("Alert pathway is 'known_object' — already in MPC catalog")
+
+    return (len(unmet) == 0, unmet)

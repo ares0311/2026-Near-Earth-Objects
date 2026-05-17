@@ -953,3 +953,117 @@ class TestMergeSurveyAlerts:
         r2 = self._make_fetch_result("ATLAS", 3, "bbb")
         result = merge_survey_alerts([r1, r2])
         assert len(result.alerts) == 6
+
+
+class TestFilterAlertsByMotion:
+    def _make_obs(self, obs_id: str, ssdistnr: float | None = None) -> object:
+        from schemas import Observation
+
+        kwargs = dict(
+            obs_id=obs_id,
+            ra_deg=180.0,
+            dec_deg=0.0,
+            jd=2460000.5,
+            mag=19.0,
+            mag_err=0.05,
+            filter_band="r",
+            mission="ZTF",
+        )
+        obs = Observation(**kwargs)
+        if ssdistnr is not None:
+            object.__setattr__(obs, "ssdistnr", ssdistnr)
+        return obs
+
+    def test_no_ssdistnr_passes_through(self):
+        from fetch import filter_alerts_by_motion
+        from schemas import Observation
+
+        obs = Observation(
+            obs_id="a",
+            ra_deg=180.0,
+            dec_deg=0.0,
+            jd=2460000.5,
+            mag=19.0,
+            mag_err=0.05,
+            filter_band="r",
+            mission="ZTF",
+        )
+        result = filter_alerts_by_motion((obs,))
+        assert len(result) == 1
+
+    def test_empty_input(self):
+        from fetch import filter_alerts_by_motion
+
+        result = filter_alerts_by_motion(())
+        assert result == ()
+
+    def test_returns_tuple(self):
+        from fetch import filter_alerts_by_motion
+        from schemas import Observation
+
+        obs = Observation(
+            obs_id="b",
+            ra_deg=10.0,
+            dec_deg=5.0,
+            jd=2460001.0,
+            mag=20.0,
+            mag_err=0.1,
+            filter_band="g",
+            mission="ZTF",
+        )
+        result = filter_alerts_by_motion((obs,))
+        assert isinstance(result, tuple)
+
+    def test_default_range_includes_no_ssdistnr(self):
+        from fetch import filter_alerts_by_motion
+        from schemas import Observation
+
+        obs = Observation(
+            obs_id="c",
+            ra_deg=90.0,
+            dec_deg=10.0,
+            jd=2460002.0,
+            mag=18.0,
+            mag_err=0.03,
+            filter_band="r",
+            mission="ATLAS",
+        )
+        result = filter_alerts_by_motion((obs,))
+        assert obs in result
+
+    def test_min_rate_zero_by_default(self):
+        from fetch import filter_alerts_by_motion
+        from schemas import Observation
+
+        obs = Observation(
+            obs_id="d",
+            ra_deg=270.0,
+            dec_deg=-5.0,
+            jd=2460003.0,
+            mag=21.0,
+            mag_err=0.2,
+            filter_band="i",
+            mission="ZTF",
+        )
+        result = filter_alerts_by_motion((obs,), min_rate_arcsec_hr=0.0)
+        assert isinstance(result, tuple)
+
+    def test_multiple_obs_all_returned_without_ssdistnr(self):
+        from fetch import filter_alerts_by_motion
+        from schemas import Observation
+
+        obs_list = tuple(
+            Observation(
+                obs_id=f"e{i}",
+                ra_deg=float(i),
+                dec_deg=0.0,
+                jd=2460000.5 + i,
+                mag=19.0,
+                mag_err=0.05,
+                filter_band="r",
+                mission="ZTF",
+            )
+            for i in range(4)
+        )
+        result = filter_alerts_by_motion(obs_list)
+        assert len(result) == 4

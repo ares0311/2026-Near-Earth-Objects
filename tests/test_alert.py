@@ -672,3 +672,56 @@ class TestFormatNeocopReport:
         neo2 = neo.model_copy(update={"tracklet": fast_tracklet})
         result = format_neocp_report(neo2)
         assert "30 s" in result
+
+
+class TestReadyForSubmission:
+    def _make_neo(self, moid_au: float = 0.03, rb: float = 0.95,
+                  orbit_quality: int = 2, hazard_flag: str = "pha_candidate",
+                  alert_pathway: str = "mpc_submission") -> object:
+        from .conftest import build_scored_neo
+        return build_scored_neo(
+            moid_au=moid_au, rb=rb, orbit_quality=orbit_quality,
+            hazard_flag=hazard_flag, alert_pathway=alert_pathway,
+        )
+
+    def test_all_gates_pass(self):
+        from alert import ready_for_submission
+        neo = self._make_neo()
+        ready, unmet = ready_for_submission(neo)
+        assert ready is True
+        assert unmet == []
+
+    def test_high_moid_fails(self):
+        from alert import ready_for_submission
+        neo = self._make_neo(moid_au=0.1)
+        ready, unmet = ready_for_submission(neo)
+        assert ready is False
+        assert any("MOID" in u for u in unmet)
+
+    def test_low_orbit_quality_fails(self):
+        from alert import ready_for_submission
+        neo = self._make_neo(orbit_quality=1)
+        ready, unmet = ready_for_submission(neo)
+        assert ready is False
+        assert any("quality" in u.lower() for u in unmet)
+
+    def test_low_rb_fails(self):
+        from alert import ready_for_submission
+        neo = self._make_neo(rb=0.5)
+        ready, unmet = ready_for_submission(neo)
+        assert ready is False
+        assert any("real_bogus" in u for u in unmet)
+
+    def test_known_object_fails(self):
+        from alert import ready_for_submission
+        neo = self._make_neo(alert_pathway="known_object")
+        ready, unmet = ready_for_submission(neo)
+        assert ready is False
+        assert any("known_object" in u for u in unmet)
+
+    def test_returns_tuple(self):
+        from alert import ready_for_submission
+        neo = self._make_neo()
+        result = ready_for_submission(neo)
+        assert isinstance(result, tuple)
+        assert len(result) == 2

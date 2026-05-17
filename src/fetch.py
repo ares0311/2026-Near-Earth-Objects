@@ -4,7 +4,7 @@ from __future__ import annotations
 
 __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fetch",
            "fetch_batch", "estimate_limiting_magnitude", "summarise_fetch_result",
-           "merge_survey_alerts"]
+           "merge_survey_alerts", "filter_alerts_by_motion"]
 
 import json
 import os
@@ -514,3 +514,37 @@ def merge_survey_alerts(results: list[FetchResult]) -> FetchResult:
         end_jd=end_jd,
     )
     return FetchResult(alerts=tuple(merged_alerts), provenance=merged_prov)
+
+
+def filter_alerts_by_motion(
+    alerts: tuple,
+    min_rate_arcsec_hr: float = 0.0,
+    max_rate_arcsec_hr: float = 60.0,
+) -> tuple:
+    """Filter a tuple of Observation objects by apparent motion rate.
+
+    Uses ``ssdistnr`` (solar-system distance) as a proxy: objects with
+    ``ssdistnr`` < 5 arcsec are likely known solar system objects whose
+    motion is already constrained by ZTF.  For observations without
+    ``ssdistnr``, the filter passes them through conservatively.
+
+    In practice, motion rate filtering is most useful as a pre-detect step
+    to remove stationary calibration stars (rate ≈ 0) and LEO satellite
+    streaks (rate > 60 arcsec/hr) from the alert stream.
+
+    Returns a tuple of Observation objects within the specified rate range.
+    """
+
+    result = []
+    for obs in alerts:
+        ssd = getattr(obs, "ssdistnr", None)
+        if ssd is None:
+            # No motion information — keep conservatively
+            result.append(obs)
+            continue
+        # ZTF ssdistnr is in arcseconds; use as proxy for motion displacement
+        # over one 30-second exposure (rate in arcsec/hr = ssd * 120)
+        rate_proxy = float(ssd) * 120.0
+        if min_rate_arcsec_hr <= rate_proxy <= max_rate_arcsec_hr:
+            result.append(obs)
+    return tuple(result)
