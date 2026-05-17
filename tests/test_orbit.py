@@ -599,3 +599,106 @@ class TestComputeOrbitalPeriod:
         el = self._make_elements(a=1.524)  # Mars
         period = compute_orbital_period(el)
         assert 680 < period < 690  # Mars ~687 days
+
+
+class TestClassifyNeoClass:
+    def _make_elements(self, **kwargs) -> "OrbitalElements":
+        from schemas import OrbitalElements
+        defaults = dict(
+            semi_major_axis_au=1.5,
+            eccentricity=0.3,
+            inclination_deg=10.0,
+            longitude_ascending_node_deg=45.0,
+            argument_perihelion_deg=90.0,
+            mean_anomaly_deg=180.0,
+            epoch_jd=2460000.5,
+            perihelion_au=1.05,
+            aphelion_au=1.95,
+            quality_code=2,
+        )
+        defaults.update(kwargs)
+        return OrbitalElements(**defaults)
+
+    def test_amor(self):
+        from orbit import classify_neo_class
+        el = self._make_elements(perihelion_au=1.2, aphelion_au=1.8, semi_major_axis_au=1.5)
+        assert classify_neo_class(el) == "amor"
+
+    def test_apollo(self):
+        from orbit import classify_neo_class
+        el = self._make_elements(semi_major_axis_au=1.5, perihelion_au=0.95, aphelion_au=2.05)
+        assert classify_neo_class(el) == "apollo"
+
+    def test_aten(self):
+        from orbit import classify_neo_class
+        el = self._make_elements(semi_major_axis_au=0.9, perihelion_au=0.8, aphelion_au=1.0)
+        assert classify_neo_class(el) == "aten"
+
+    def test_ieo(self):
+        from orbit import classify_neo_class
+        el = self._make_elements(semi_major_axis_au=0.6, perihelion_au=0.5, aphelion_au=0.7)
+        assert classify_neo_class(el) == "ieo"
+
+    def test_unknown_mba(self):
+        from orbit import classify_neo_class
+        el = self._make_elements(semi_major_axis_au=2.5, perihelion_au=2.0, aphelion_au=3.0)
+        assert classify_neo_class(el) == "unknown"
+
+    def test_amor_lower_boundary(self):
+        from orbit import classify_neo_class
+        el = self._make_elements(semi_major_axis_au=1.1, perihelion_au=1.017, aphelion_au=1.183)
+        assert classify_neo_class(el) == "amor"
+
+    def test_ieo_boundary(self):
+        from orbit import classify_neo_class
+        el = self._make_elements(semi_major_axis_au=0.55, perihelion_au=0.45, aphelion_au=0.65)
+        assert classify_neo_class(el) == "ieo"
+
+
+class TestTisserandParameter:
+    def _make_elements(
+        self, a: float = 2.5, e: float = 0.1, i_deg: float = 5.0
+    ) -> "OrbitalElements":
+        from schemas import OrbitalElements
+        q = a * (1 - e)
+        Q = a * (1 + e)
+        return OrbitalElements(
+            semi_major_axis_au=a,
+            eccentricity=e,
+            inclination_deg=i_deg,
+            longitude_ascending_node_deg=0.0,
+            argument_perihelion_deg=0.0,
+            mean_anomaly_deg=0.0,
+            epoch_jd=2460000.5,
+            perihelion_au=q,
+            aphelion_au=Q,
+            quality_code=2,
+        )
+
+    def test_typical_mba_value(self):
+        from orbit import tisserand_parameter
+        el = self._make_elements(a=2.5, e=0.1, i_deg=5.0)
+        t = tisserand_parameter(el)
+        assert t > 3.0
+
+    def test_zero_for_non_positive_a(self):
+        from orbit import tisserand_parameter
+        el = self._make_elements(a=0.0)
+        assert tisserand_parameter(el) == 0.0
+
+    def test_returns_float(self):
+        from orbit import tisserand_parameter
+        el = self._make_elements()
+        assert isinstance(tisserand_parameter(el), float)
+
+    def test_high_inclination_reduces_t(self):
+        from orbit import tisserand_parameter
+        el_low = self._make_elements(i_deg=5.0)
+        el_high = self._make_elements(i_deg=80.0)
+        assert tisserand_parameter(el_high) < tisserand_parameter(el_low)
+
+    def test_comet_like_value(self):
+        from orbit import tisserand_parameter
+        el = self._make_elements(a=5.0, e=0.8, i_deg=30.0)
+        t = tisserand_parameter(el)
+        assert t < 3.0

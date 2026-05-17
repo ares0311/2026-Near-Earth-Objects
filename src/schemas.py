@@ -9,7 +9,7 @@ __all__ = [
     "RawCandidate", "KnownMatch",
     "FetchProvenance", "PreprocessProvenance", "DetectProvenance", "LinkProvenance",
     "FetchResult", "PreprocessResult", "DetectResult", "LinkResult",
-    "ObservationWindow", "PipelineResult", "CandidateSummary",
+    "ObservationWindow", "PipelineResult", "CandidateSummary", "NEOStatistics",
     "BackgroundOutcome", "BackgroundRunMode", "FollowUpTestStatus", "HumanReviewStatus",
     "RecommendationAction", "SignoffDecision",
     "PriorityFactors", "BackgroundTarget", "FollowUpTestResult",
@@ -532,3 +532,18 @@ class CandidateSummary(BaseModel):
     n_observations: int
     neo_candidate_probability: Score
     discovery_priority: float = 0.0
+
+
+class NEOStatistics(BaseModel):
+    """Aggregate statistics for a pipeline run."""
+
+    model_config = ConfigDict(frozen=True)
+
+    n_total: int
+    n_pha_candidates: int
+    n_mpc_submission: int
+    n_internal_candidate: int
+    n_known_object: int
+    mean_discovery_priority: float
+    max_discovery_priority: float
+    neo_class_distribution: dict[str, int] = Field(default_factory=dict)

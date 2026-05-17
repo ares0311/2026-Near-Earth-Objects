@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
-           "filter_high_motion", "_predict_from_arc"]
+           "filter_high_motion", "deduplicate_tracklets", "_predict_from_arc"]
 
 import math
 import uuid
@@ -391,3 +391,28 @@ def filter_high_motion(
         in input order.
     """
     return [t for t in tracklets if t.motion_rate_arcsec_per_hour >= min_rate_arcsec_hr]
+
+
+def deduplicate_tracklets(tracklets: list[Tracklet]) -> list[Tracklet]:
+    """Remove tracklets that substantially overlap a longer-arc tracklet.
+
+    Two tracklets overlap when they share ≥ 50 % of obs_ids relative to the
+    shorter one.  The longer-arc tracklet is kept; ties are broken by the order
+    in the input list (earlier wins).
+    """
+    sorted_t = sorted(tracklets, key=lambda t: (-t.arc_days, -len(t.observations)))
+    kept: list[Tracklet] = []
+    kept_ids: list[set[str]] = []
+    for tracklet in sorted_t:
+        ids = {obs.obs_id for obs in tracklet.observations}
+        n = len(ids)
+        duplicate = False
+        for existing_ids in kept_ids:
+            overlap = len(ids & existing_ids)
+            if n > 0 and overlap / n >= 0.5:
+                duplicate = True
+                break
+        if not duplicate:
+            kept.append(tracklet)
+            kept_ids.append(ids)
+    return kept

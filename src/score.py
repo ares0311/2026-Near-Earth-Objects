@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
-           "followup_priority_table"]
+           "followup_priority_table", "pha_candidates", "compute_statistics"]
 
 import math
 import uuid
@@ -17,6 +17,7 @@ from schemas import (
     HazardFlag,
     NEOClass,
     NEOPosterior,
+    NEOStatistics,
     OrbitalElements,
     ScoredNEO,
     ScoringMetadata,
@@ -447,3 +448,32 @@ def followup_priority_table(neos: list[ScoredNEO]) -> list[dict]:
             "motion_rate_arcsec_hr": report["motion_rate_arcsec_hr"],
         })
     return rows
+
+
+def pha_candidates(neos: list) -> list:
+    """Return only ScoredNEO objects with hazard_flag == 'pha_candidate'."""
+    return [neo for neo in neos if neo.hazard.hazard_flag == "pha_candidate"]
+
+
+def compute_statistics(neos: list) -> NEOStatistics:
+    """Compute aggregate statistics from a list of ScoredNEO objects.
+
+    Returns a :class:`~schemas.NEOStatistics` instance.
+    """
+    from collections import Counter
+
+    priorities = [neo.metadata.discovery_priority for neo in neos]
+    hazard_flags = [neo.hazard.hazard_flag for neo in neos]
+    pathways = [neo.hazard.alert_pathway for neo in neos]
+    neo_classes = [neo.hazard.neo_class for neo in neos]
+
+    return NEOStatistics(
+        n_total=len(neos),
+        n_pha_candidates=hazard_flags.count("pha_candidate"),
+        n_mpc_submission=pathways.count("mpc_submission"),
+        n_internal_candidate=pathways.count("internal_candidate"),
+        n_known_object=pathways.count("known_object"),
+        mean_discovery_priority=sum(priorities) / len(priorities) if priorities else 0.0,
+        max_discovery_priority=max(priorities) if priorities else 0.0,
+        neo_class_distribution=dict(Counter(neo_classes)),
+    )

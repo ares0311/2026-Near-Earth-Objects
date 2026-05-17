@@ -612,3 +612,63 @@ class TestAlertSummaryTable:
         neos = self._make_neos(1)
         rows = alert_summary_table(neos)
         assert rows[0]["n_observations"] == len(neos[0].tracklet.observations)
+
+
+class TestFormatNeocopReport:
+    def _make_neo(self) -> object:
+        from .conftest import build_scored_neo
+        return build_scored_neo()
+
+    def test_returns_string(self):
+        from alert import format_neocp_report
+        neo = self._make_neo()
+        result = format_neocp_report(neo)
+        assert isinstance(result, str)
+
+    def test_contains_object_id(self):
+        from alert import format_neocp_report
+        neo = self._make_neo()
+        result = format_neocp_report(neo)
+        assert neo.tracklet.object_id in result
+
+    def test_contains_guardrail(self):
+        from alert import format_neocp_report
+        neo = self._make_neo()
+        result = format_neocp_report(neo)
+        assert "No impact probability" in result
+
+    def test_contains_mpc_header(self):
+        from alert import format_neocp_report
+        neo = self._make_neo()
+        result = format_neocp_report(neo)
+        assert "NEOCP Follow-Up Request" in result
+
+    def test_contains_motion_rate(self):
+        from alert import format_neocp_report
+        neo = self._make_neo()
+        result = format_neocp_report(neo)
+        assert "Motion rate" in result
+
+    def test_custom_obs_code(self):
+        from alert import format_neocp_report
+        neo = self._make_neo()
+        result = format_neocp_report(neo, obs_code="F51")
+        assert isinstance(result, str)
+
+    def test_fast_mover_short_exposure(self):
+        from alert import format_neocp_report
+        from schemas import Tracklet
+
+        from .conftest import build_scored_neo, build_tracklet
+        t = build_tracklet(n_obs=3)
+        fast_tracklet = Tracklet(
+            object_id=t.object_id,
+            observations=t.observations,
+            arc_days=t.arc_days,
+            motion_rate_arcsec_per_hour=15.0,
+            motion_pa_degrees=t.motion_pa_degrees,
+        )
+        neo = build_scored_neo()
+        neo2 = neo.model_copy(update={"tracklet": fast_tracklet})
+        result = format_neocp_report(neo2)
+        assert "30 s" in result

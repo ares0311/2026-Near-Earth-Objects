@@ -944,3 +944,55 @@ class TestBatchExplain:
         tracklets = self._make_tracklets(1)
         result = batch_explain(tracklets)
         assert isinstance(result[0]["confidence"], float)
+
+
+class TestPosteriorEntropy:
+    def _make_posterior(self, **kwargs) -> "NEOPosterior":
+        from schemas import NEOPosterior
+        defaults = dict(
+            neo_candidate=0.2,
+            known_object=0.2,
+            main_belt_asteroid=0.2,
+            stellar_artifact=0.2,
+            other_solar_system=0.2,
+        )
+        defaults.update(kwargs)
+        return NEOPosterior(**defaults)
+
+    def test_uniform_is_max_entropy(self):
+        import math
+
+        from classify import posterior_entropy
+        p = self._make_posterior()
+        h = posterior_entropy(p)
+        assert h == pytest.approx(math.log2(5), rel=1e-5)
+
+    def test_certain_is_zero_entropy(self):
+        from classify import posterior_entropy
+        p = self._make_posterior(
+            neo_candidate=1.0,
+            known_object=0.0,
+            main_belt_asteroid=0.0,
+            stellar_artifact=0.0,
+            other_solar_system=0.0,
+        )
+        assert posterior_entropy(p) == pytest.approx(0.0, abs=1e-10)
+
+    def test_returns_float(self):
+        from classify import posterior_entropy
+        p = self._make_posterior()
+        assert isinstance(posterior_entropy(p), float)
+
+    def test_entropy_non_negative(self):
+        from classify import posterior_entropy
+        p = self._make_posterior()
+        assert posterior_entropy(p) >= 0.0
+
+    def test_skewed_posterior_low_entropy(self):
+        from classify import posterior_entropy
+        p_uniform = self._make_posterior()
+        p_skewed = self._make_posterior(
+            neo_candidate=0.9, known_object=0.025,
+            main_belt_asteroid=0.025, stellar_artifact=0.025, other_solar_system=0.025,
+        )
+        assert posterior_entropy(p_skewed) < posterior_entropy(p_uniform)

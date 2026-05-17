@@ -589,3 +589,64 @@ class TestFilterHighMotion:
         tracklets = [self._make_tracklet(float(r), f"t{r}") for r in [1, 5, 20]]
         result = filter_high_motion(tracklets, min_rate_arcsec_hr=0.0)
         assert len(result) == 3
+
+
+class TestDeduplicateTracklets:
+    def _make_obs(self, obs_id: str, jd: float = 2460000.5) -> "Observation":
+        from schemas import Observation
+        return Observation(
+            obs_id=obs_id, ra_deg=180.0, dec_deg=0.0, jd=jd,
+            mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF",
+        )
+
+    def _make_tracklet(
+        self, obs_ids: list, arc_days: float = 1.0, obj_id: str = "T001"
+    ) -> "Tracklet":
+        from schemas import Tracklet
+        obs = tuple(self._make_obs(oid, jd=2460000.5 + i) for i, oid in enumerate(obs_ids))
+        return Tracklet(
+            object_id=obj_id,
+            observations=obs,
+            arc_days=arc_days,
+            motion_rate_arcsec_per_hour=1.0,
+            motion_pa_degrees=90.0,
+        )
+
+    def test_no_duplicates_unchanged(self):
+        from link import deduplicate_tracklets
+        t1 = self._make_tracklet(["a", "b", "c"], arc_days=2.0, obj_id="T1")
+        t2 = self._make_tracklet(["d", "e", "f"], arc_days=1.0, obj_id="T2")
+        result = deduplicate_tracklets([t1, t2])
+        assert len(result) == 2
+
+    def test_duplicate_removed(self):
+        from link import deduplicate_tracklets
+        t_long = self._make_tracklet(["a", "b", "c", "d"], arc_days=3.0, obj_id="T1")
+        t_short = self._make_tracklet(["a", "b", "c"], arc_days=2.0, obj_id="T2")
+        result = deduplicate_tracklets([t_long, t_short])
+        assert len(result) == 1
+
+    def test_longer_arc_wins(self):
+        from link import deduplicate_tracklets
+        t_long = self._make_tracklet(["a", "b", "c", "d"], arc_days=3.0, obj_id="LONG")
+        t_short = self._make_tracklet(["a", "b", "e"], arc_days=1.0, obj_id="SHORT")
+        result = deduplicate_tracklets([t_long, t_short])
+        assert result[0].object_id == "LONG"
+
+    def test_empty_input(self):
+        from link import deduplicate_tracklets
+        assert deduplicate_tracklets([]) == []
+
+    def test_single_tracklet_unchanged(self):
+        from link import deduplicate_tracklets
+        t = self._make_tracklet(["a", "b"], arc_days=1.0)
+        result = deduplicate_tracklets([t])
+        assert len(result) == 1
+        assert result[0].object_id == t.object_id
+
+    def test_overlap_below_50_percent_both_kept(self):
+        from link import deduplicate_tracklets
+        t1 = self._make_tracklet(["a", "b", "c", "d"], arc_days=2.0, obj_id="T1")
+        t2 = self._make_tracklet(["a", "e", "f", "g"], arc_days=1.0, obj_id="T2")
+        result = deduplicate_tracklets([t1, t2])
+        assert len(result) == 2

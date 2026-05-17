@@ -504,3 +504,88 @@ class TestFollowupPriorityTable:
         neo = self._make_neo("TESTOBJ")
         rows = followup_priority_table([neo])
         assert rows[0]["object_id"] == "TESTOBJ"
+
+
+class TestPhaCandidates:
+    def _make_neo(self, hazard_flag: str = "pha_candidate", obj_id: str = "T001") -> object:
+        from .conftest import build_scored_neo
+        return build_scored_neo(hazard_flag=hazard_flag, object_id=obj_id)
+
+    def test_returns_only_pha(self):
+        from score import pha_candidates
+        pha = self._make_neo("pha_candidate", "PHA")
+        nom = self._make_neo("nominal", "NOM")
+        result = pha_candidates([pha, nom])
+        assert len(result) == 1
+        assert result[0].tracklet.object_id == "PHA"
+
+    def test_empty_list(self):
+        from score import pha_candidates
+        assert pha_candidates([]) == []
+
+    def test_no_pha_returns_empty(self):
+        from score import pha_candidates
+        nom = self._make_neo("nominal")
+        assert pha_candidates([nom]) == []
+
+    def test_all_pha_returned(self):
+        from score import pha_candidates
+        neos = [self._make_neo("pha_candidate", f"P{i}") for i in range(3)]
+        assert len(pha_candidates(neos)) == 3
+
+    def test_close_approach_not_included(self):
+        from score import pha_candidates
+        ca = self._make_neo("close_approach", "CA")
+        assert pha_candidates([ca]) == []
+
+
+class TestComputeStatistics:
+    def _make_neo(self, hazard_flag: str = "pha_candidate", pathway: str = "mpc_submission",
+                  neo_class: str = "apollo", priority: float = 0.8, obj_id: str = "T001") -> object:
+        from .conftest import build_scored_neo
+        return build_scored_neo(
+            hazard_flag=hazard_flag, alert_pathway=pathway,
+            discovery_priority=priority, object_id=obj_id,
+        )
+
+    def test_returns_neo_statistics(self):
+        from schemas import NEOStatistics
+        from score import compute_statistics
+        neos = [self._make_neo()]
+        result = compute_statistics(neos)
+        assert isinstance(result, NEOStatistics)
+
+    def test_n_total(self):
+        from score import compute_statistics
+        neos = [self._make_neo(obj_id=f"T{i}") for i in range(4)]
+        assert compute_statistics(neos).n_total == 4
+
+    def test_n_pha_candidates(self):
+        from score import compute_statistics
+        neos = [self._make_neo("pha_candidate", obj_id="A"), self._make_neo("nominal", obj_id="B")]
+        result = compute_statistics(neos)
+        assert result.n_pha_candidates == 1
+
+    def test_empty_list(self):
+        from score import compute_statistics
+        result = compute_statistics([])
+        assert result.n_total == 0
+        assert result.mean_discovery_priority == 0.0
+
+    def test_mean_priority(self):
+        from score import compute_statistics
+        neos = [self._make_neo(priority=0.4, obj_id="A"), self._make_neo(priority=0.8, obj_id="B")]
+        result = compute_statistics(neos)
+        assert result.mean_discovery_priority == pytest.approx(0.6)
+
+    def test_max_priority(self):
+        from score import compute_statistics
+        neos = [self._make_neo(priority=0.4, obj_id="A"), self._make_neo(priority=0.9, obj_id="B")]
+        result = compute_statistics(neos)
+        assert result.max_discovery_priority == pytest.approx(0.9)
+
+    def test_neo_class_distribution_keys(self):
+        from score import compute_statistics
+        neos = [self._make_neo(obj_id=f"T{i}") for i in range(2)]
+        result = compute_statistics(neos)
+        assert isinstance(result.neo_class_distribution, dict)

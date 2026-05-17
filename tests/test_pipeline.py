@@ -378,3 +378,155 @@ class TestPlotSkyCoverageSkill:
         except ImportError:
             pytest.skip("matplotlib not installed")
         assert Path(out).exists()
+
+
+class TestExportCandidateReportSkill:
+    def _make_neo_dict(self, obj_id: str = "T001") -> dict:
+        return {
+            "tracklet": {
+                "object_id": obj_id,
+                "observations": [],
+                "arc_days": 2.0,
+                "motion_rate_arcsec_per_hour": 1.2,
+                "motion_pa_degrees": 90.0,
+            },
+            "hazard": {
+                "neo_class": "apollo",
+                "hazard_flag": "pha_candidate",
+                "alert_pathway": "mpc_submission",
+                "moid_au": 0.03,
+                "estimated_diameter_m": 200.0,
+                "absolute_magnitude_h": 21.5,
+                "explanation": {"summary": "test"},
+            },
+            "features": {"real_bogus_score": 0.9, "motion_consistency_score": 0.8},
+            "posterior": {
+                "neo_candidate": 0.75,
+                "known_object": 0.05,
+                "main_belt_asteroid": 0.1,
+                "stellar_artifact": 0.05,
+                "other_solar_system": 0.05,
+            },
+            "metadata": {
+                "discovery_priority": 0.8,
+                "followup_value": 0.6,
+                "scientific_interest": 0.5,
+                "model_version": "0.16.0",
+            },
+        }
+
+    def test_returns_list(self):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from export_candidate_report import export_candidate_report
+        neos = [self._make_neo_dict()]
+        result = export_candidate_report(neos)
+        assert isinstance(result, list)
+        assert len(result) == 1
+
+    def test_report_contains_object_id(self):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from export_candidate_report import export_candidate_report
+        neos = [self._make_neo_dict("MYOBJ")]
+        result = export_candidate_report(neos)
+        assert "MYOBJ" in result[0]["report"]
+
+    def test_report_contains_guardrail(self):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from export_candidate_report import export_candidate_report
+        neos = [self._make_neo_dict()]
+        result = export_candidate_report(neos)
+        assert "No impact probability" in result[0]["report"]
+
+    def test_split_writes_file(self, tmp_path):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from export_candidate_report import export_candidate_report
+        neos = [self._make_neo_dict("SPLIT_OBJ")]
+        export_candidate_report(neos, split=True, out_dir=tmp_path)
+        assert (tmp_path / "SPLIT_OBJ.txt").exists()
+
+    def test_empty_list_returns_empty(self):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from export_candidate_report import export_candidate_report
+        assert export_candidate_report([]) == []
+
+
+class TestTagNeoClassSkill:
+    def _make_tracklet_dict(self, n_obs: int = 3, obj_id: str = "T001") -> dict:
+        obs = []
+        for i in range(n_obs):
+            obs.append({
+                "obs_id": f"o{i}",
+                "ra_deg": 180.0 + i * 0.001,
+                "dec_deg": 0.0,
+                "jd": 2460000.5 + i,
+                "mag": 19.5,
+                "mag_err": 0.05,
+                "filter_band": "r",
+                "mission": "ZTF",
+            })
+        return {
+            "object_id": obj_id,
+            "observations": obs,
+            "arc_days": float(n_obs - 1),
+            "motion_rate_arcsec_per_hour": 1.0,
+            "motion_pa_degrees": 90.0,
+        }
+
+    def test_returns_list(self):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from tag_neo_class import tag_neo_class
+        records = [self._make_tracklet_dict()]
+        result = tag_neo_class(records)
+        assert isinstance(result, list)
+        assert len(result) == 1
+
+    def test_neo_class_key_present(self):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from tag_neo_class import tag_neo_class
+        records = [self._make_tracklet_dict()]
+        result = tag_neo_class(records)
+        assert "neo_class" in result[0]
+
+    def test_neo_class_is_valid_string(self):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from tag_neo_class import tag_neo_class
+        records = [self._make_tracklet_dict()]
+        result = tag_neo_class(records)
+        valid = {"amor", "apollo", "aten", "ieo", "unknown"}
+        assert result[0]["neo_class"] in valid
+
+    def test_empty_input(self):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from tag_neo_class import tag_neo_class
+        assert tag_neo_class([]) == []
+
+    def test_scored_neo_dict_tagged(self):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from tag_neo_class import tag_neo_class
+        scored = {
+            "tracklet": self._make_tracklet_dict(),
+            "hazard": {"neo_class": "unknown"},
+        }
+        result = tag_neo_class([scored])
+        assert "tracklet" in result[0]
+        assert "neo_class" in result[0]["tracklet"]

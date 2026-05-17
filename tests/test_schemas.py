@@ -337,3 +337,45 @@ class TestCandidateSummary:
     def test_neo_class_field(self):
         s = self._make_summary(neo_class="aten")
         assert s.neo_class == "aten"
+
+
+class TestNEOStatistics:
+    def _make_stats(self, **kwargs) -> object:
+        from schemas import NEOStatistics
+        defaults = dict(
+            n_total=10,
+            n_pha_candidates=2,
+            n_mpc_submission=3,
+            n_internal_candidate=5,
+            n_known_object=1,
+            mean_discovery_priority=0.6,
+            max_discovery_priority=0.95,
+        )
+        defaults.update(kwargs)
+        return NEOStatistics(**defaults)
+
+    def test_instantiation(self):
+        s = self._make_stats()
+        assert s.n_total == 10
+
+    def test_frozen(self):
+        import pytest
+        s = self._make_stats()
+        with pytest.raises(Exception):
+            s.n_total = 99  # type: ignore[misc]
+
+    def test_default_neo_class_distribution_empty(self):
+        s = self._make_stats()
+        assert s.neo_class_distribution == {}
+
+    def test_custom_distribution(self):
+        s = self._make_stats(neo_class_distribution={"apollo": 5, "amor": 3})
+        assert s.neo_class_distribution["apollo"] == 5
+
+    def test_mean_priority_stored(self):
+        s = self._make_stats(mean_discovery_priority=0.42)
+        assert s.mean_discovery_priority == pytest.approx(0.42)
+
+    def test_max_priority_stored(self):
+        s = self._make_stats(max_discovery_priority=0.99)
+        assert s.max_discovery_priority == pytest.approx(0.99)

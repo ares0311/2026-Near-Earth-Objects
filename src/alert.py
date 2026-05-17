@@ -13,6 +13,7 @@ __all__ = [
     "summarise",
     "monitor_neocp",
     "alert_summary_table",
+    "format_neocp_report",
 ]
 
 import json
@@ -553,3 +554,42 @@ def alert_summary_table(neos: list) -> list[dict]:
             "ready_to_submit": neo.hazard.alert_pathway == "mpc_submission",
         })
     return rows
+
+
+def format_neocp_report(neo: ScoredNEO, obs_code: str = _MPC_OBS_CODE) -> str:
+    """Return a plain-text NEOCP follow-up request for this candidate.
+
+    Does not submit anything.  The returned string is suitable for copying
+    into an email to the MPC or posting to the NEOCP community list.
+    """
+    t = neo.tracklet
+    h = neo.hazard
+    rate = t.motion_rate_arcsec_per_hour
+    pa = t.motion_pa_degrees
+    n_obs = len(t.observations)
+    # Recommended exposure based on brightness / motion
+    if rate > 10.0:
+        exp_s = 30
+    elif rate > 2.0:
+        exp_s = 60
+    else:
+        exp_s = 120
+    obs_block = format_mpc_report(neo, obs_code=obs_code)
+    lines = [
+        "NEOCP Follow-Up Request",
+        "=======================",
+        f"Object ID       : {t.object_id}",
+        f"NEO class       : {h.neo_class}",
+        f"Hazard flag     : {h.hazard_flag}",
+        f"MOID (AU)       : {h.moid_au}",
+        f"Motion rate     : {rate:.2f} arcsec/hr  PA={pa:.1f} deg",
+        f"Arc length      : {t.arc_days:.2f} days  ({n_obs} observations)",
+        f"Recommended exp : {exp_s} s (track at motion rate above)",
+        "",
+        "NOTICE: No impact probability is asserted here.",
+        "Please consult MPC/CNEOS for authoritative hazard assessment.",
+        "",
+        "Astrometry (MPC 80-column format):",
+        obs_block,
+    ]
+    return "\n".join(lines)
