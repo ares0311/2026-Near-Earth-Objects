@@ -468,9 +468,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.17.0)
+## Current State (v0.18.0)
 
-All 10 pipeline modules are complete. 729 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified manual CLI with top-level SQLite logs and auditable signoff readiness.
+All 10 pipeline modules are complete. 799 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified manual CLI with top-level SQLite logs and auditable signoff readiness.
 
 ### Skills
 
@@ -509,6 +509,8 @@ All 10 pipeline modules are complete. 729 tests passing (100% coverage). CI gree
 | `Skills/tag_neo_class.py` | Batch-tag NEO class for tracklets or ScoredNEO dicts using `classify_neo_class` from orbit.py |
 | `Skills/check_tisserand.py` | Batch-compute Tisserand parameter for tracklets/ScoredNEO dicts; flags T_J < threshold as comet-like |
 | `Skills/export_followup_requests.py` | Generate NEOCP follow-up request files for candidates above priority threshold; supports `--obs-code` and `--out-dir` |
+| `Skills/ephemeris_check.py` | Predict sky positions for tracklets at a given JD; observer-ready RA/Dec/dist table; `--jd` and `--json` flags |
+| `Skills/flag_comet_candidates.py` | Combined Tisserand + eccentricity comet-candidate flag; `--threshold`, `--min-ecc`, `--json` flags |
 
 ### Docs
 
@@ -521,6 +523,7 @@ All 10 pipeline modules are complete. 729 tests passing (100% coverage). CI gree
 | `docs/API_REFERENCE.md` | Public function signatures and schema field reference for all modules |
 | `docs/BACKGROUND_SEARCH_AUTOMATION.md` | Implemented one-run background automation, SQLite logs, and scheduler notes |
 | `docs/ORBIT_FITTING.md` | Technical reference for orbit fitting: Gauss's method, differential correction, MOID, Tisserand parameter |
+| `docs/ALERT_PROTOCOL.md` | Technical reference for alert-pathway decision tree, gate conditions, MPC submission, NEOCP monitoring, NASA PDCO notification |
 
 ### Data
 
@@ -564,6 +567,24 @@ All 10 pipeline modules are complete. 729 tests passing (100% coverage). CI gree
 - Collect labeled training data via `Skills/generate_training_labels.py`
 - Integrate live ZTF alert stream (Milestone 4)
 - Train and evaluate Tier 2 CNN on real cutouts (Milestone 5)
+
+### Key Changes in v0.18.0
+
+- `orbit.py`: added `ephemeris_uncertainty(elements, target_jd)` — sky-plane uncertainty propagated from quality code; scales with propagation time.
+- `detect.py`: added `cluster_detections(observations, radius_arcsec)` — greedy spatial clustering; returns list of Observation tuples.
+- `link.py`: added `compute_arc_statistics(tracklet)` — summary dict: n_observations, n_nights, arc_days, mean_motion_arcsec_hr, motion_pa_std_deg.
+- `classify.py`: added `classify_morphology(obs)` — source morphology from image moments: 'point_source', 'extended', or 'streak'.
+- `score.py`: added `absolute_magnitude_from_diameter(diameter_m, albedo)` — H from diameter and albedo; returns inf for zero/negative inputs. Fixed formula.
+- `alert.py`: added `format_discovery_circular(neo)` — IAU CBET-style discovery circular; does not transmit.
+- `fetch.py`: added `build_observation_window(ra_deg, dec_deg, ...)` — validated ObservationWindow factory with ValueError for bad inputs.
+- `preprocess.py`: added `compute_source_snr(obs)` — peak-to-background SNR from difference-image cutout.
+- `schemas.py`: added `CloseApproachEvent` — frozen model for a close approach event.
+- `calibration.py`: added `bootstrap_confidence_interval(probs, labels, n_bootstrap, metric)` — bootstrap 95% CI for Brier or ECE.
+- `Skills/ephemeris_check.py`: new — ephemeris prediction table at user-specified JD.
+- `Skills/flag_comet_candidates.py`: new — combined T_J + eccentricity comet-candidate flag.
+- `docs/ALERT_PROTOCOL.md`: new — alert pathway technical reference.
+- 70 new tests (799 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.18.0.
 
 ### Key Changes in v0.17.0
 

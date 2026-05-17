@@ -4,7 +4,7 @@ from __future__ import annotations
 
 __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fetch",
            "fetch_batch", "estimate_limiting_magnitude", "summarise_fetch_result",
-           "merge_survey_alerts", "filter_alerts_by_motion"]
+           "merge_survey_alerts", "filter_alerts_by_motion", "build_observation_window"]
 
 import json
 import os
@@ -548,3 +548,48 @@ def filter_alerts_by_motion(
         if min_rate_arcsec_hr <= rate_proxy <= max_rate_arcsec_hr:
             result.append(obs)
     return tuple(result)
+
+
+def build_observation_window(
+    ra_deg: float,
+    dec_deg: float,
+    radius_deg: float = 1.0,
+    start_jd: float = 2460000.5,
+    end_jd: float | None = None,
+    surveys: tuple | list | None = None,
+) -> object:
+    """Construct an ObservationWindow schema object from component parameters.
+
+    Validates that ``start_jd < end_jd``, that ``radius_deg > 0``, and that
+    all survey names are valid ``Mission`` literals.  Raises ``ValueError`` on
+    invalid inputs.  Returns an :class:`schemas.ObservationWindow`.
+    """
+    from schemas import ObservationWindow
+
+    if end_jd is None:
+        end_jd = start_jd + 30.0
+
+    if start_jd >= end_jd:
+        raise ValueError(
+            f"start_jd ({start_jd}) must be less than end_jd ({end_jd})"
+        )
+    if radius_deg <= 0.0:
+        raise ValueError(f"radius_deg must be positive (got {radius_deg})")
+
+    valid_missions: set[str] = {"ZTF", "ATLAS", "PanSTARRS", "CSS", "MPC"}
+    if surveys is None:
+        survey_tuple: tuple[Mission, ...] = ("ZTF",)
+    else:
+        bad = [s for s in surveys if s not in valid_missions]
+        if bad:
+            raise ValueError(f"Unknown survey(s): {bad}; valid: {sorted(valid_missions)}")
+        survey_tuple = tuple(surveys)  # type: ignore[assignment]
+
+    return ObservationWindow(
+        ra_deg=ra_deg,
+        dec_deg=dec_deg,
+        radius_deg=radius_deg,
+        start_jd=start_jd,
+        end_jd=end_jd,
+        surveys=survey_tuple,
+    )

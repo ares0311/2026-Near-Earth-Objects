@@ -4,7 +4,7 @@ from __future__ import annotations
 
 __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "followup_priority_table", "pha_candidates", "compute_statistics",
-           "close_approach_candidates"]
+           "close_approach_candidates", "absolute_magnitude_from_diameter"]
 
 import math
 import uuid
@@ -493,3 +493,19 @@ def close_approach_candidates(neos: list, max_moid_au: float = 0.05) -> list:
         neo for neo in neos
         if neo.hazard.moid_au is not None and neo.hazard.moid_au <= max_moid_au
     ]
+
+
+def absolute_magnitude_from_diameter(diameter_m: float, albedo: float = 0.14) -> float:
+    """Compute absolute magnitude H from diameter and geometric albedo.
+
+    Inverse of the standard diameter–albedo relation:
+        D = 1329 km / sqrt(p_v) * 10^(-H/5)
+    Rearranged:
+        H = -5 * log10(D / (1329000 * sqrt(p_v)))
+
+    where D is in metres.  Returns ``float('inf')`` for non-positive inputs.
+    """
+    if diameter_m <= 0.0 or albedo <= 0.0:
+        return float("inf")
+    import math as _math
+    return -5.0 * _math.log10(diameter_m * _math.sqrt(albedo) / 1_329_000.0)

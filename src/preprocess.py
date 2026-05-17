@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_sources",
-           "compute_color_index", "estimate_source_density"]
+           "compute_color_index", "estimate_source_density", "compute_source_snr"]
 
 import base64
 import math
@@ -338,3 +338,28 @@ def estimate_source_density(
     if area_sq_deg <= 0:
         return 0.0
     return count / area_sq_deg
+
+
+def compute_source_snr(obs) -> float | None:
+    """Estimate signal-to-noise ratio of a source from its difference-image cutout.
+
+    Computes SNR as peak pixel value divided by background RMS (using
+    sigma-clipped standard deviation over the image).  Returns ``None`` if
+    no cutout is available or the image cannot be decoded.
+    """
+    if obs.cutout_difference is None:
+        return None
+    try:
+        raw = base64.b64decode(obs.cutout_difference)
+        arr = np.frombuffer(raw, dtype=np.float32)
+        size = int(math.isqrt(len(arr)))
+        if size * size != len(arr) or size < 3:
+            return None
+        arr = arr.reshape(size, size).astype(np.float64)
+        rms = _background_rms(arr)
+        if rms <= 0:
+            return None
+        peak = float(arr.max())
+        return float(peak / rms)
+    except Exception:
+        return None

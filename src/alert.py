@@ -15,6 +15,7 @@ __all__ = [
     "alert_summary_table",
     "format_neocp_report",
     "ready_for_submission",
+    "format_discovery_circular",
 ]
 
 import json
@@ -629,3 +630,76 @@ def ready_for_submission(neo: ScoredNEO) -> tuple[bool, list[str]]:
         unmet.append("Alert pathway is 'known_object' — already in MPC catalog")
 
     return (len(unmet) == 0, unmet)
+
+
+def format_discovery_circular(neo) -> str:
+    """Generate an IAU CBET-style discovery circular for a ScoredNEO.
+
+    Produces a plain-text stub suitable for human review before submission.
+    Does **not** transmit to any external service.
+
+    Fields included: object ID, discovery epoch, RA/Dec, magnitude, orbital
+    elements, NEO class, estimated diameter, MOID, and observer template lines.
+    """
+    from datetime import datetime
+
+    obj_id = neo.tracklet.object_id
+    obs = sorted(neo.tracklet.observations, key=lambda o: o.jd)
+    first_obs = obs[0] if obs else None
+
+    lines = [
+        "CENTRAL BUREAU FOR ASTRONOMICAL TELEGRAMS / IAU CBET",
+        "CIRCULAR — DRAFT (NOT FOR DISTRIBUTION)",
+        "",
+        f"OBJECT:   {obj_id}",
+    ]
+
+    if first_obs is not None:
+        # Convert JD to approximate calendar date
+        unix_sec = (first_obs.jd - 2440587.5) * 86400.0
+        dt = datetime.fromtimestamp(unix_sec, tz=UTC)
+        date_str = dt.strftime("%Y %b %d.%f UTC")[:-4]
+        lines += [
+            f"DISCOVERY DATE:  {date_str}",
+            f"DISCOVERY RA:    {first_obs.ra_deg:.5f} deg",
+            f"DISCOVERY DEC:   {first_obs.dec_deg:+.5f} deg",
+            f"DISCOVERY MAG:   {first_obs.mag:.1f} ({first_obs.filter_band})",
+            f"SURVEY:          {first_obs.mission}",
+        ]
+
+    lines += ["", "ORBITAL ELEMENTS (preliminary):"]
+    el = neo.hazard.orbital_elements
+    if el is not None:
+        lines += [
+            f"  a  = {el.semi_major_axis_au:.4f} AU",
+            f"  e  = {el.eccentricity:.5f}",
+            f"  i  = {el.inclination_deg:.3f} deg",
+            f"  quality code = {el.quality_code}",
+        ]
+    else:
+        lines.append("  [orbital elements not available]")
+
+    lines += [
+        "",
+        f"NEO CLASS:       {neo.hazard.neo_class}",
+    ]
+    if neo.hazard.moid_au is not None:
+        lines.append(f"MOID:            {neo.hazard.moid_au:.4f} AU")
+    if neo.hazard.estimated_diameter_m is not None:
+        lines.append(f"EST. DIAMETER:   {neo.hazard.estimated_diameter_m:.0f} m")
+    if neo.hazard.absolute_magnitude_h is not None:
+        lines.append(f"ABS. MAGNITUDE:  H = {neo.hazard.absolute_magnitude_h:.1f}")
+
+    lines += [
+        "",
+        "NOTES:",
+        "  Astrometry pipeline: NEO Detection Pipeline v0.18",
+        "  Independent confirmation required before public announcement.",
+        "  Do not quote impact probability without CNEOS/MPC assessment.",
+        "",
+        "OBSERVER/REPORTER:  [FILL IN]",
+        "OBSERVATORY CODE:   [FILL IN]",
+        "MPC REPORT:         [ATTACH]",
+    ]
+
+    return "\n".join(lines)

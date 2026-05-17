@@ -5,6 +5,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## v0.18.0
+
+- `orbit.py`: added `ephemeris_uncertainty(elements, target_jd)` — sky-plane positional uncertainty (RA, Dec, arcsec) propagated from orbit quality code; scales with propagation time; added to `__all__`.
+- `detect.py`: added `cluster_detections(observations, radius_arcsec)` — greedy single-linkage spatial clustering; returns list of Observation tuples; added to `__all__`.
+- `link.py`: added `compute_arc_statistics(tracklet)` — summary dict with n_observations, n_nights, arc_days, mean_motion_arcsec_hr, motion_pa_std_deg; added to `__all__`.
+- `classify.py`: added `classify_morphology(obs)` — classify source as 'point_source', 'extended', or 'streak' from image second moments; falls back to 'point_source' without cutout; added to `__all__`.
+- `score.py`: added `absolute_magnitude_from_diameter(diameter_m, albedo)` — inverse diameter–albedo relation; returns inf for zero/negative inputs; added to `__all__`. Fixed formula: H = -5·log10(D·√p / 1329000).
+- `alert.py`: added `format_discovery_circular(neo)` — IAU CBET-style plain-text discovery circular; includes orbital elements, diameter, MOID, observer template; does not transmit; added to `__all__`.
+- `fetch.py`: added `build_observation_window(ra_deg, dec_deg, radius_deg, start_jd, end_jd, surveys)` — validated ObservationWindow factory; raises ValueError for invalid JD range, zero radius, or unknown surveys; added to `__all__`.
+- `preprocess.py`: added `compute_source_snr(obs)` — peak-to-background SNR from difference-image cutout; returns None if no cutout; added to `__all__`.
+- `schemas.py`: added `CloseApproachEvent` — frozen Pydantic model (object_id, jd, geocentric_dist_au, relative_velocity_km_s, warning_time_days); added to `__all__`.
+- `calibration.py`: added `bootstrap_confidence_interval(probs, labels, n_bootstrap, metric)` — bootstrap 95% CI for Brier or ECE; returns (lower, upper, mean); seed-reproducible; added to `__all__`.
+- `Skills/ephemeris_check.py`: new — predict sky positions for tracklets at a user-specified JD; CLI with `--jd` and `--json` flags.
+- `Skills/flag_comet_candidates.py`: new — combined Tisserand + eccentricity comet-candidate flag; CLI with `--threshold`, `--min-ecc`, `--json` flags.
+- `docs/ALERT_PROTOCOL.md`: new — detailed technical reference for the alert-pathway decision tree, gate conditions, MPC submission, NEOCP monitoring, and NASA PDCO notification.
+- 70 new tests (799 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.18.0.
+
 ## v0.17.0
 
 - `orbit.py`: added `batch_predict_ephemeris(elements_list, target_jd)` — predict sky positions for a list of OrbitalElements at one JD; wraps `predict_ephemeris` with per-element error isolation; added to `__all__`.

@@ -1048,3 +1048,60 @@ class TestDominantHypothesis:
                                  other_solar_system=0.05)
         _, prob = dominant_hypothesis(p)
         assert isinstance(prob, float)
+
+
+class TestClassifyMorphology:
+    def _make_obs(self, cutout_b64: str | None = None) -> object:
+        from schemas import Observation
+        return Observation(
+            obs_id="m1", ra_deg=180.0, dec_deg=0.0, jd=2460000.5,
+            mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF",
+            cutout_difference=cutout_b64,
+        )
+
+    def test_no_cutout_returns_point_source(self):
+        from classify import classify_morphology
+        obs = self._make_obs(None)
+        assert classify_morphology(obs) == "point_source"
+
+    def test_round_source_is_point_source(self):
+        import base64
+
+        import numpy as np
+
+        from classify import classify_morphology
+        arr = np.zeros((63, 63), dtype=np.float32)
+        y, x = np.mgrid[0:63, 0:63]
+        arr = np.exp(-((x - 31)**2 + (y - 31)**2) / 4.0).astype(np.float32)
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        obs = self._make_obs(b64)
+        assert classify_morphology(obs) == "point_source"
+
+    def test_horizontal_streak_is_streak(self):
+        import base64
+
+        import numpy as np
+
+        from classify import classify_morphology
+        arr = np.zeros((63, 63), dtype=np.float32)
+        arr[31, 5:58] = 1.0
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        obs = self._make_obs(b64)
+        assert classify_morphology(obs) == "streak"
+
+    def test_returns_valid_literal(self):
+        from classify import classify_morphology
+        obs = self._make_obs(None)
+        result = classify_morphology(obs)
+        assert result in ("point_source", "extended", "streak")
+
+    def test_empty_cutout_returns_point_source(self):
+        import base64
+
+        import numpy as np
+
+        from classify import classify_morphology
+        arr = np.zeros((63, 63), dtype=np.float32)
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        obs = self._make_obs(b64)
+        assert classify_morphology(obs) == "point_source"

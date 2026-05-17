@@ -5,7 +5,7 @@ from __future__ import annotations
 __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
            "propagate_orbit", "predict_ephemeris", "close_approach_table",
            "compute_orbital_period", "classify_neo_class", "tisserand_parameter",
-           "batch_predict_ephemeris", "resonance_check"]
+           "batch_predict_ephemeris", "resonance_check", "ephemeris_uncertainty"]
 
 import math
 from typing import NamedTuple
@@ -736,3 +736,44 @@ def resonance_check(
                 "fractional_offset": round(offset, 6),
             }
     return None
+
+# Quality-code → typical element uncertainty mapping (fractional, 1-sigma)
+_QUALITY_UNCERTAINTY: dict[int, float] = {
+    1: 0.10,   # arc < 1 day: ~10% element uncertainty
+    2: 0.02,   # multi-night: ~2%
+    3: 0.005,  # multi-week: ~0.5%
+    4: 0.001,  # opposition: ~0.1%
+}
+
+
+def ephemeris_uncertainty(
+    elements: OrbitalElements,
+    target_jd: float,
+) -> dict:
+    """Estimate sky-plane positional uncertainty at *target_jd*.
+
+    Propagates orbital element uncertainties (keyed by quality code) through
+    Keplerian propagation to produce a 1-sigma sky-plane error ellipse in
+    arcseconds.  Returns a dict with keys ``ra_unc_arcsec``, ``dec_unc_arcsec``,
+    and ``jd``.  Both components are equal (circular uncertainty) and scale with
+    propagation time and element quality.
+    """
+    epoch_jd = elements.epoch_jd if elements.epoch_jd is not None else target_jd
+    dt_days = abs(target_jd - epoch_jd)
+
+    frac = _QUALITY_UNCERTAINTY.get(elements.quality_code, 0.10)
+
+    a = elements.semi_major_axis_au
+    if a > 0:
+        # Sky-plane uncertainty grows with propagation time (linear approximation)
+        # Reference: 1 AU at 1 AU geocentric distance subtends ~206265 arcsec
+        base_arcsec = frac * a * 206265.0
+        # Growth with time: ~ dt / orbital_period
+        period_days = (a ** 1.5) * 365.25
+        growth = 1.0 + dt_days / max(period_days, 1.0)
+        unc = base_arcsec * growth
+    else:
+        unc = 1e6  # undefined orbit
+
+    unc = round(float(unc), 2)
+    return {"ra_unc_arcsec": unc, "dec_unc_arcsec": unc, "jd": target_jd}

@@ -426,3 +426,44 @@ class TestTrackletSummary:
     def test_motion_pa_stored(self):
         s = self._make_summary(motion_pa_degrees=123.4)
         assert s.motion_pa_degrees == pytest.approx(123.4)
+
+
+class TestCloseApproachEvent:
+    def _make_event(self, **kwargs) -> object:
+        from schemas import CloseApproachEvent
+        defaults = dict(
+            object_id="2026 AA1",
+            jd=2460100.5,
+            geocentric_dist_au=0.031,
+        )
+        defaults.update(kwargs)
+        return CloseApproachEvent(**defaults)
+
+    def test_basic_construction(self):
+        ev = self._make_event()
+        assert ev.object_id == "2026 AA1"
+        assert ev.geocentric_dist_au == pytest.approx(0.031)
+
+    def test_optional_fields_default_none(self):
+        ev = self._make_event()
+        assert ev.relative_velocity_km_s is None
+        assert ev.warning_time_days is None
+
+    def test_optional_fields_stored(self):
+        ev = self._make_event(relative_velocity_km_s=12.5, warning_time_days=30.0)
+        assert ev.relative_velocity_km_s == pytest.approx(12.5)
+        assert ev.warning_time_days == pytest.approx(30.0)
+
+    def test_jd_stored(self):
+        ev = self._make_event(jd=2460200.0)
+        assert ev.jd == pytest.approx(2460200.0)
+
+    def test_immutable(self):
+        import pytest as pt
+        ev = self._make_event()
+        with pt.raises(Exception):
+            ev.object_id = "changed"  # type: ignore[misc]
+
+    def test_zero_dist_allowed(self):
+        ev = self._make_event(geocentric_dist_au=0.0)
+        assert ev.geocentric_dist_au == pytest.approx(0.0)

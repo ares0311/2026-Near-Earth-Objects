@@ -5,6 +5,7 @@ from __future__ import annotations
 __all__ = [
     "IsotonicCalibrator", "PlattCalibrator",
     "brier_score", "reliability_diagram_data", "expected_calibration_error", "calibrate",
+    "bootstrap_confidence_interval",
 ]
 
 import math
@@ -293,3 +294,52 @@ def calibrate(
         cal.load(model_name)
 
     return cal.predict(raw_scores)
+
+
+def bootstrap_confidence_interval(
+    probs: list[float],
+    labels: list[float],
+    n_bootstrap: int = 1000,
+    metric: str = "brier",
+    seed: int = 42,
+) -> tuple[float, float, float]:
+    """Compute a bootstrap confidence interval for a calibration metric.
+
+    Draws *n_bootstrap* samples with replacement from (probs, labels) and
+    evaluates *metric* on each sample.  Returns ``(lower, upper, mean)``
+    where *lower* and *upper* are the 2.5th and 97.5th percentiles of the
+    bootstrap distribution (95% CI).
+
+    Supported metrics: ``"brier"`` (Brier score) and ``"ece"``
+    (expected calibration error).
+
+    Raises ``ValueError`` for empty inputs or unknown metric.
+    """
+    import random
+
+    if not probs or not labels:
+        raise ValueError("probs and labels must be non-empty")
+    if len(probs) != len(labels):
+        raise ValueError("probs and labels must have the same length")
+    if metric not in ("brier", "ece"):
+        raise ValueError(f"Unknown metric {metric!r}; choose 'brier' or 'ece'")
+
+    rng = random.Random(seed)
+    n = len(probs)
+    samples: list[float] = []
+
+    for _ in range(n_bootstrap):
+        indices = [rng.randint(0, n - 1) for _ in range(n)]
+        p_boot = [probs[i] for i in indices]
+        l_boot = [labels[i] for i in indices]
+        if metric == "brier":
+            val = brier_score(np.array(p_boot), np.array(l_boot))
+        else:
+            val = expected_calibration_error(np.array(p_boot), np.array(l_boot))
+        samples.append(val)
+
+    samples.sort()
+    lo = samples[int(0.025 * n_bootstrap)]
+    hi = samples[int(0.975 * n_bootstrap)]
+    mean = sum(samples) / len(samples)
+    return (round(lo, 6), round(hi, 6), round(mean, 6))

@@ -632,3 +632,34 @@ class TestCloseApproachCandidates:
         neos = [self._make_neo(m, f"T{i}") for i, m in enumerate([0.01, 0.05, 0.10])]
         result = close_approach_candidates(neos, max_moid_au=1.0)
         assert len(result) == 3
+
+
+class TestAbsoluteMagnitudeFromDiameter:
+    def test_140m_standard_albedo(self):
+        from score import absolute_magnitude_from_diameter
+        h = absolute_magnitude_from_diameter(140.0, albedo=0.14)
+        assert h == pytest.approx(22.0, abs=0.1)
+
+    def test_larger_diameter_brighter(self):
+        from score import absolute_magnitude_from_diameter
+        h1 = absolute_magnitude_from_diameter(100.0)
+        h2 = absolute_magnitude_from_diameter(1000.0)
+        assert h2 < h1
+
+    def test_higher_albedo_brighter(self):
+        from score import absolute_magnitude_from_diameter
+        h_dark = absolute_magnitude_from_diameter(140.0, albedo=0.05)
+        h_bright = absolute_magnitude_from_diameter(140.0, albedo=0.40)
+        assert h_bright < h_dark
+
+    def test_zero_diameter_returns_inf(self):
+        from score import absolute_magnitude_from_diameter
+        assert absolute_magnitude_from_diameter(0.0) == float("inf")
+
+    def test_zero_albedo_returns_inf(self):
+        from score import absolute_magnitude_from_diameter
+        assert absolute_magnitude_from_diameter(140.0, albedo=0.0) == float("inf")
+
+    def test_returns_float(self):
+        from score import absolute_magnitude_from_diameter
+        assert isinstance(absolute_magnitude_from_diameter(200.0), float)

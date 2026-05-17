@@ -754,3 +754,139 @@ class TestExportFollowupRequestsSkill:
         neo = self._make_scored_neo()
         result = export_followup_requests([neo], obs_code="F51")
         assert "F51" in result[0]["report"]
+
+
+class TestEphemerisCheckSkill:
+    def _make_tracklet_dict(self) -> dict:
+        return {
+            "object_id": "2026EC1",
+            "observations": [
+                {
+                    "obs_id": f"e{i}", "ra_deg": 180.0 + i * 0.1,
+                    "dec_deg": i * 0.05, "jd": 2460000.5 + i,
+                    "mag": 19.0, "mag_err": 0.05,
+                    "filter_band": "r", "mission": "ZTF",
+                }
+                for i in range(3)
+            ],
+        }
+
+    def test_returns_list(self):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from ephemeris_check import ephemeris_check
+        result = ephemeris_check([self._make_tracklet_dict()], target_jd=2460010.5)
+        assert isinstance(result, list)
+
+    def test_empty_input(self):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from ephemeris_check import ephemeris_check
+        assert ephemeris_check([], target_jd=2460010.5) == []
+
+    def test_result_has_expected_keys(self):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from ephemeris_check import ephemeris_check
+        result = ephemeris_check([self._make_tracklet_dict()], target_jd=2460010.5)
+        row = result[0]
+        for key in ("object_id", "target_jd", "ra_deg", "dec_deg", "helio_dist_au"):
+            assert key in row
+
+    def test_target_jd_stored(self):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from ephemeris_check import ephemeris_check
+        result = ephemeris_check([self._make_tracklet_dict()], target_jd=2460099.0)
+        assert result[0]["target_jd"] == pytest.approx(2460099.0)
+
+    def test_object_id_preserved(self):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from ephemeris_check import ephemeris_check
+        result = ephemeris_check([self._make_tracklet_dict()], target_jd=2460010.5)
+        assert result[0]["object_id"] == "2026EC1"
+
+    def test_scored_neo_dict_accepted(self):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from ephemeris_check import ephemeris_check
+        scored = {"tracklet": self._make_tracklet_dict()}
+        result = ephemeris_check([scored], target_jd=2460010.5)
+        assert len(result) == 1
+
+
+class TestFlagCometCandidatesSkill:
+    def _make_tracklet_dict(self) -> dict:
+        return {
+            "object_id": "2026FC1",
+            "observations": [
+                {
+                    "obs_id": f"f{i}", "ra_deg": 180.0 + i * 0.1,
+                    "dec_deg": i * 0.05, "jd": 2460000.5 + i,
+                    "mag": 19.0, "mag_err": 0.05,
+                    "filter_band": "r", "mission": "ZTF",
+                }
+                for i in range(3)
+            ],
+        }
+
+    def test_returns_list(self):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from flag_comet_candidates import flag_comet_candidates
+        result = flag_comet_candidates([self._make_tracklet_dict()])
+        assert isinstance(result, list)
+
+    def test_empty_input(self):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from flag_comet_candidates import flag_comet_candidates
+        assert flag_comet_candidates([]) == []
+
+    def test_result_has_expected_keys(self):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from flag_comet_candidates import flag_comet_candidates
+        result = flag_comet_candidates([self._make_tracklet_dict()])
+        row = result[0]
+        for key in ("object_id", "tisserand_parameter", "eccentricity",
+                    "comet_candidate", "reason"):
+            assert key in row
+
+    def test_comet_flag_true_when_threshold_very_high(self):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from flag_comet_candidates import flag_comet_candidates
+        result = flag_comet_candidates([self._make_tracklet_dict()],
+                                       threshold=100.0, min_ecc=0.0)
+        tj = result[0]["tisserand_parameter"]
+        if tj is not None:
+            assert result[0]["comet_candidate"] is True
+
+    def test_comet_flag_false_when_threshold_zero(self):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from flag_comet_candidates import flag_comet_candidates
+        result = flag_comet_candidates([self._make_tracklet_dict()], threshold=0.0)
+        assert result[0]["comet_candidate"] is False
+
+    def test_reason_always_present(self):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+        from flag_comet_candidates import flag_comet_candidates
+        result = flag_comet_candidates([self._make_tracklet_dict()])
+        assert isinstance(result[0]["reason"], str)
+        assert len(result[0]["reason"]) > 0
