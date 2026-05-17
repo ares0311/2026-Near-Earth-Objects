@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus",
-           "compute_streak_metric", "cluster_detections"]
+           "compute_streak_metric", "cluster_detections", "compute_trail_length"]
 
 import math
 import uuid
@@ -438,3 +438,41 @@ def cluster_detections(
             groups.append([obs])
 
     return [tuple(g) for g in groups]
+
+
+def compute_trail_length(obs: object) -> float | None:
+    """Estimate trail length in arcsec from difference-image second moments.
+
+    Returns the larger eigenvalue of the 2×2 moment ellipse converted to arcsec,
+    or ``None`` if the cutout is unavailable or the moment matrix is degenerate.
+    Pixel scale assumed 1.01 arcsec/pixel (ZTF).
+    """
+    _PIXEL_SCALE = 1.01  # arcsec / pixel (ZTF)
+    cutout_b64 = getattr(obs, "cutout_difference", None)
+    if not cutout_b64:
+        return None
+    try:
+        import base64
+
+        raw = base64.b64decode(cutout_b64)
+        arr = np.frombuffer(raw, dtype=np.float32).copy()
+        size = int(math.isqrt(len(arr)))
+        if size * size != len(arr) or size < 3:
+            return None
+        arr = arr.reshape(size, size).astype(np.float64)
+        arr -= arr.mean()
+        total = arr.sum()
+        if total <= 0:
+            return None
+        cy, cx = np.indices(arr.shape)
+        y0 = (cy * arr).sum() / total
+        x0 = (cx * arr).sum() / total
+        mxx = ((cx - x0) ** 2 * arr).sum() / total
+        myy = ((cy - y0) ** 2 * arr).sum() / total
+        mxy = ((cx - x0) * (cy - y0) * arr).sum() / total
+        trace = mxx + myy
+        disc = math.sqrt(max(0.0, ((mxx - myy) / 2) ** 2 + mxy ** 2))
+        lam1 = trace / 2 + disc
+        return round(float(math.sqrt(max(0.0, lam1))) * _PIXEL_SCALE, 3)
+    except Exception:
+        return None

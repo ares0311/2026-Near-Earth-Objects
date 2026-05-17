@@ -767,3 +767,81 @@ class TestFormatDiscoveryCircular:
         neo = self._make_neo()
         result = format_discovery_circular(neo)
         assert "FILL IN" in result
+
+
+class TestFormatAlertSummary:
+    def _make_neo(self, obj_id="NEO_001", priority=0.7, moid=0.04):
+        from .conftest import build_scored_neo
+        neo = build_scored_neo()
+        # Return as-is since build_scored_neo is self-contained
+        return neo
+
+    def test_returns_string(self):
+        from alert import format_alert_summary
+
+        from .conftest import build_scored_neo
+        neo = build_scored_neo()
+        result = format_alert_summary([neo])
+        assert isinstance(result, str)
+
+    def test_empty_list_returns_no_candidates_message(self):
+        from alert import format_alert_summary
+        result = format_alert_summary([])
+        assert "No NEO" in result
+
+    def test_contains_header(self):
+        from alert import format_alert_summary
+
+        from .conftest import build_scored_neo
+        neo = build_scored_neo()
+        result = format_alert_summary([neo])
+        assert "Object ID" in result
+
+    def test_max_rows_respected(self):
+        from alert import format_alert_summary
+
+        from .conftest import build_scored_neo
+        neos = [build_scored_neo() for _ in range(5)]
+        result = format_alert_summary(neos, max_rows=2)
+        # Count separator line + header + up to 2 data rows
+        lines = [ln for ln in result.splitlines() if ln.strip() and not ln.startswith("-")]
+        assert len(lines) <= 3  # header + 2 data rows max
+
+    def test_contains_rank_column(self):
+        from alert import format_alert_summary
+
+        from .conftest import build_scored_neo
+        result = format_alert_summary([build_scored_neo()])
+        assert "1" in result
+
+
+class TestFormatDiscoveryCircularNoElements:
+    def _make_neo_no_elements(self):
+        from .conftest import build_scored_neo
+        neo = build_scored_neo()
+        # Build a ScoredNEO with no orbital elements on the hazard assessment
+        from schemas import HazardAssessment, ScoredNEO
+        new_hazard = HazardAssessment(
+            hazard_flag=neo.hazard.hazard_flag,
+            moid_au=None,
+            estimated_diameter_m=None,
+            absolute_magnitude_h=None,
+            neo_class=neo.hazard.neo_class,
+            alert_pathway=neo.hazard.alert_pathway,
+            explanation=neo.hazard.explanation,
+        )
+        return ScoredNEO(
+            tracklet=neo.tracklet,
+            features=neo.features,
+            posterior=neo.posterior,
+            hazard=new_hazard,
+            metadata=neo.metadata,
+        )
+
+    def test_no_orbital_elements_branch(self):
+        from alert import format_discovery_circular
+        neo = self._make_neo_no_elements()
+        # Temporarily clear orbital_elements on the object if present
+        result = format_discovery_circular(neo)
+        assert isinstance(result, str)
+        assert "DRAFT" in result

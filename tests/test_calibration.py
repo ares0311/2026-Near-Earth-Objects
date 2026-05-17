@@ -313,3 +313,61 @@ class TestBootstrapConfidenceInterval:
         p, lbs = self._make_data()
         with pt.raises(ValueError, match="Unknown metric"):
             bootstrap_confidence_interval(p, lbs, metric="rmse")
+
+
+class TestCrossValidateCalibration:
+    def _make_data(self, n=100, seed=42):
+        import numpy as np
+        rng = np.random.default_rng(seed)
+        probs = rng.uniform(0.0, 1.0, n)
+        labels = (rng.uniform(0.0, 1.0, n) < probs).astype(float)
+        return probs, labels
+
+    def test_returns_tuple_of_floats(self):
+        from calibration import cross_validate_calibration
+        p, lbs = self._make_data()
+        result = cross_validate_calibration(p, lbs)
+        assert isinstance(result, tuple)
+        assert len(result) == 2
+        assert all(isinstance(v, float) for v in result)
+
+    def test_mean_in_reasonable_range(self):
+        from calibration import cross_validate_calibration
+        p, lbs = self._make_data()
+        mean, _ = cross_validate_calibration(p, lbs, metric="brier")
+        assert 0.0 <= mean <= 1.0
+
+    def test_std_nonnegative(self):
+        from calibration import cross_validate_calibration
+        p, lbs = self._make_data()
+        _, std = cross_validate_calibration(p, lbs)
+        assert std >= 0.0
+
+    def test_too_few_samples_returns_zeros(self):
+        import numpy as np
+
+        from calibration import cross_validate_calibration
+        p = np.array([0.5, 0.6, 0.7])
+        lbs = np.array([1.0, 0.0, 1.0])
+        mean, std = cross_validate_calibration(p, lbs, n_folds=5)
+        assert mean == pytest.approx(0.0)
+        assert std == pytest.approx(0.0)
+
+    def test_ece_metric(self):
+        from calibration import cross_validate_calibration
+        p, lbs = self._make_data()
+        mean, std = cross_validate_calibration(p, lbs, metric="ece")
+        assert 0.0 <= mean <= 1.0
+        assert std >= 0.0
+
+
+class TestBootstrapCILengthMismatch:
+    def test_mismatched_lengths_raises(self):
+        import numpy as np
+        import pytest as pt
+
+        from calibration import bootstrap_confidence_interval
+        p = np.array([0.5, 0.6, 0.7])
+        lbs = np.array([1.0, 0.0])
+        with pt.raises(ValueError, match="same length"):
+            bootstrap_confidence_interval(p, lbs, n_bootstrap=10)

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "filter_high_motion", "deduplicate_tracklets", "_predict_from_arc",
-           "split_tracklet", "compute_arc_statistics"]
+           "split_tracklet", "compute_arc_statistics", "assess_link_confidence"]
 
 import math
 import uuid
@@ -497,3 +497,31 @@ def compute_arc_statistics(tracklet) -> dict:
         "mean_motion_arcsec_hr": round(mean_rate, 4),
         "motion_pa_std_deg": round(pa_std, 4),
     }
+
+
+def assess_link_confidence(tracklet: object) -> float:
+    """Confidence score [0, 1] for a linked tracklet based on residual quality.
+
+    Fits a linear model to RA(t) and Dec(t) separately and computes the RMS
+    residual in arcsec.  Confidence = max(0, 1 - rms / 10.0), so an RMS of 0
+    arcsec → 1.0 and an RMS ≥ 10 arcsec → 0.0.
+    Returns 0.0 when the tracklet has fewer than 2 observations.
+    """
+    obs = list(getattr(tracklet, "observations", []))
+    if len(obs) < 2:
+        return 0.0
+
+    jds = np.array([o.jd for o in obs], dtype=np.float64)
+    ras = np.array([o.ra_deg for o in obs], dtype=np.float64)
+    decs = np.array([o.dec_deg for o in obs], dtype=np.float64)
+
+    # Convert RA/Dec residuals to arcsec
+    t = jds - jds[0]
+    ones = np.ones_like(t)
+    A = np.column_stack([ones, t])
+    ra_fit = np.linalg.lstsq(A, ras, rcond=None)[0]
+    dec_fit = np.linalg.lstsq(A, decs, rcond=None)[0]
+    ra_res = (ras - A @ ra_fit) * 3600.0
+    dec_res = (decs - A @ dec_fit) * 3600.0
+    rms = float(np.sqrt(np.mean(ra_res ** 2 + dec_res ** 2)))
+    return round(max(0.0, 1.0 - rms / 10.0), 4)

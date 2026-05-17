@@ -663,3 +663,44 @@ class TestAbsoluteMagnitudeFromDiameter:
     def test_returns_float(self):
         from score import absolute_magnitude_from_diameter
         assert isinstance(absolute_magnitude_from_diameter(200.0), float)
+
+
+class TestComputeImpactEnergy:
+    def test_positive_result(self):
+        from score import compute_impact_energy
+        result = compute_impact_energy(140.0, 20.0)
+        assert result > 0.0
+
+    def test_zero_diameter_returns_zero(self):
+        from score import compute_impact_energy
+        assert compute_impact_energy(0.0, 20.0) == pytest.approx(0.0)
+
+    def test_zero_velocity_returns_zero(self):
+        from score import compute_impact_energy
+        assert compute_impact_energy(140.0, 0.0) == pytest.approx(0.0)
+
+    def test_zero_density_returns_zero(self):
+        from score import compute_impact_energy
+        assert compute_impact_energy(140.0, 20.0, density_kg_m3=0.0) == pytest.approx(0.0)
+
+    def test_larger_diameter_more_energy(self):
+        from score import compute_impact_energy
+        e1 = compute_impact_energy(100.0, 20.0)
+        e2 = compute_impact_energy(200.0, 20.0)
+        assert e2 > e1
+
+    def test_higher_velocity_more_energy(self):
+        from score import compute_impact_energy
+        e1 = compute_impact_energy(140.0, 10.0)
+        e2 = compute_impact_energy(140.0, 20.0)
+        assert e2 > e1
+
+    def test_returns_float(self):
+        from score import compute_impact_energy
+        assert isinstance(compute_impact_energy(140.0, 20.0), float)
+
+    def test_known_order_of_magnitude(self):
+        # 140 m asteroid at 20 km/s ≈ few hundred megatons
+        from score import compute_impact_energy
+        result = compute_impact_energy(140.0, 20.0)
+        assert 10.0 < result < 10000.0

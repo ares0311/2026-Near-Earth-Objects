@@ -16,6 +16,7 @@ __all__ = [
     "format_neocp_report",
     "ready_for_submission",
     "format_discovery_circular",
+    "format_alert_summary",
 ]
 
 import json
@@ -703,3 +704,32 @@ def format_discovery_circular(neo) -> str:
     ]
 
     return "\n".join(lines)
+
+
+def format_alert_summary(neos: list, max_rows: int = 20) -> str:
+    """Plain-text ranked summary table of scored NEO candidates.
+
+    Columns: rank, object_id, hazard_flag, alert_pathway, moid_au, priority.
+    Limited to ``max_rows`` rows; sorted by ``discovery_priority`` descending.
+    """
+    from score import rank_candidates
+
+    ranked = rank_candidates(list(neos))[:max_rows]
+    if not ranked:
+        return "No NEO candidates to display."
+
+    header = (
+        f"{'#':>4}  {'Object ID':<20}  {'Hazard':>16}"
+        f"  {'Pathway':>22}  {'MOID (AU)':>10}  {'Priority':>8}"
+    )
+    sep = "-" * len(header)
+    rows = [header, sep]
+    for i, neo in enumerate(ranked, start=1):
+        haz = neo.hazard
+        meta = neo.metadata
+        moid_str = f"{haz.moid_au:.4f}" if haz.moid_au is not None else "  N/A  "
+        rows.append(
+            f"{i:>4}  {neo.tracklet.object_id:<20}  {haz.hazard_flag:>16}"
+            f"  {haz.alert_pathway:>22}  {moid_str:>10}  {meta.discovery_priority:>8.4f}"
+        )
+    return "\n".join(rows)

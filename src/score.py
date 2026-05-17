@@ -4,7 +4,8 @@ from __future__ import annotations
 
 __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "followup_priority_table", "pha_candidates", "compute_statistics",
-           "close_approach_candidates", "absolute_magnitude_from_diameter"]
+           "close_approach_candidates", "absolute_magnitude_from_diameter",
+           "compute_impact_energy"]
 
 import math
 import uuid
@@ -509,3 +510,25 @@ def absolute_magnitude_from_diameter(diameter_m: float, albedo: float = 0.14) ->
         return float("inf")
     import math as _math
     return -5.0 * _math.log10(diameter_m * _math.sqrt(albedo) / 1_329_000.0)
+
+
+def compute_impact_energy(
+    diameter_m: float,
+    velocity_km_s: float,
+    density_kg_m3: float = 2500.0,
+) -> float:
+    """Kinetic impact energy in megatons TNT equivalent.
+
+    E_k = 0.5 * m * v²  with mass from a sphere of given density.
+    1 megaton TNT = 4.184e15 J.
+    Returns 0.0 for non-positive diameter, velocity, or density.
+    """
+    if diameter_m <= 0.0 or velocity_km_s <= 0.0 or density_kg_m3 <= 0.0:
+        return 0.0
+    radius_m = diameter_m / 2.0
+    volume_m3 = (4.0 / 3.0) * math.pi * radius_m ** 3
+    mass_kg = density_kg_m3 * volume_m3
+    velocity_m_s = velocity_km_s * 1_000.0
+    joules = 0.5 * mass_kg * velocity_m_s ** 2
+    megatons = joules / 4.184e15
+    return round(megatons, 6)

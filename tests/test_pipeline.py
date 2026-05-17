@@ -890,3 +890,92 @@ class TestFlagCometCandidatesSkill:
         result = flag_comet_candidates([self._make_tracklet_dict()])
         assert isinstance(result[0]["reason"], str)
         assert len(result[0]["reason"]) > 0
+
+
+class TestComputeOrbitalEnergySkill:
+    def _skill_path(self):
+        from pathlib import Path
+        return str(Path(__file__).resolve().parent.parent / "Skills")
+
+    def test_imports_cleanly(self):
+        import sys
+        sys.path.insert(0, self._skill_path())
+        import importlib
+        spec = importlib.util.spec_from_file_location(
+            "compute_orbital_energy",
+            f"{self._skill_path()}/compute_orbital_energy.py",
+        )
+        mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+        assert hasattr(mod, "main")
+
+    def test_main_runs_on_sample(self, tmp_path):
+        import json
+        import sys
+        sys.path.insert(0, self._skill_path())
+        import importlib
+        spec = importlib.util.spec_from_file_location(
+            "compute_orbital_energy",
+            f"{self._skill_path()}/compute_orbital_energy.py",
+        )
+        mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+
+        # Write a minimal input file with an orbital_elements block
+        data = [{"object_id": "T_energy", "orbital_elements": {
+            "semi_major_axis_au": 1.5, "eccentricity": 0.3, "inclination_deg": 10.0,
+            "longitude_ascending_node_deg": 45.0, "argument_perihelion_deg": 90.0,
+            "mean_anomaly_deg": 180.0, "epoch_jd": 2460000.5,
+            "perihelion_au": 1.05, "aphelion_au": 1.95, "quality_code": 2,
+        }}]
+        f = tmp_path / "input.json"
+        f.write_text(json.dumps(data))
+        import sys as _sys
+        old_argv = _sys.argv
+        _sys.argv = ["compute_orbital_energy.py", str(f)]
+        try:
+            mod.main()
+        finally:
+            _sys.argv = old_argv
+
+
+class TestAssessSurveyCoverageSkill:
+    def _skill_path(self):
+        from pathlib import Path
+        return str(Path(__file__).resolve().parent.parent / "Skills")
+
+    def test_imports_cleanly(self):
+        import importlib
+        spec = importlib.util.spec_from_file_location(
+            "assess_survey_coverage",
+            f"{self._skill_path()}/assess_survey_coverage.py",
+        )
+        mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+        assert hasattr(mod, "main")
+
+    def test_main_runs_on_sample(self, tmp_path):
+        import importlib
+        import json
+        spec = importlib.util.spec_from_file_location(
+            "assess_survey_coverage",
+            f"{self._skill_path()}/assess_survey_coverage.py",
+        )
+        mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+
+        data = [
+            {"field_id": "F001", "ra_deg": 45.0, "dec_deg": 10.0, "radius_deg": 1.5,
+             "limiting_mag": 21.5, "n_sources": 80, "jd": 2460000.5},
+            {"field_id": "F002", "ra_deg": 90.0, "dec_deg": -5.0, "radius_deg": 1.5,
+             "limiting_mag": 21.8, "n_sources": 65, "jd": 2460001.5},
+        ]
+        f = tmp_path / "fields.json"
+        f.write_text(json.dumps(data))
+        import sys as _sys
+        old_argv = _sys.argv
+        _sys.argv = ["assess_survey_coverage.py", str(f)]
+        try:
+            mod.main()
+        finally:
+            _sys.argv = old_argv

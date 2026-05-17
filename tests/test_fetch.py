@@ -1109,3 +1109,69 @@ class TestBuildObservationWindow:
         w = build_observation_window(0.0, 0.0, surveys=["ZTF", "ATLAS"],
                                      start_jd=2460000.5, end_jd=2460010.5)
         assert "ATLAS" in w.surveys
+
+
+class TestCountKnownObjectsInField:
+    def test_returns_int(self):
+        from unittest.mock import patch
+
+        from fetch import count_known_objects_in_field
+        with patch("fetch.fetch_mpc_known", return_value=[]):
+            result = count_known_objects_in_field(10.0, 20.0, 1.0)
+        assert isinstance(result, int)
+
+    def test_returns_count_equal_to_alerts(self):
+        from unittest.mock import patch
+
+        from fetch import count_known_objects_in_field
+        from schemas import Observation
+        obs = Observation(
+            obs_id="k1", ra_deg=10.0, dec_deg=20.0, jd=2460000.5,
+            mag=18.0, mag_err=0.05, filter_band="r", mission="MPC", real_bogus=1.0,
+        )
+        with patch("fetch.fetch_mpc_known", return_value=[obs]):
+            result = count_known_objects_in_field(10.0, 20.0, 1.0)
+        assert result == 1
+
+    def test_returns_zero_on_error(self):
+        from unittest.mock import patch
+
+        from fetch import count_known_objects_in_field
+        with patch("fetch.fetch_mpc_known", side_effect=RuntimeError("network")):
+            result = count_known_objects_in_field(0.0, 0.0, 1.0)
+        assert result == 0
+
+
+class TestFilterAlertsByMotionRateProxy:
+    def _make_obs(self, ssd=None):
+        import types
+        obs = types.SimpleNamespace(
+            obs_id="fam_001", ra_deg=180.0, dec_deg=0.0, jd=2460000.5,
+            mag=19.5, mag_err=0.05, filter_band="r", mission="ZTF", real_bogus=0.9,
+        )
+        if ssd is not None:
+            obs.ssdistnr = ssd
+        return obs
+
+    def test_obs_with_ssd_in_range_included(self):
+        from fetch import filter_alerts_by_motion
+        # ssd=0.1 → rate_proxy = 0.1 * 120 = 12 arcsec/hr
+        obs = self._make_obs(ssd=0.1)
+        result = filter_alerts_by_motion((obs,), min_rate_arcsec_hr=5.0, max_rate_arcsec_hr=20.0)
+        assert len(result) == 1
+
+    def test_obs_with_ssd_out_of_range_excluded(self):
+        from fetch import filter_alerts_by_motion
+        # ssd=1.0 → rate_proxy = 120 → above max
+        obs = self._make_obs(ssd=1.0)
+        result = filter_alerts_by_motion((obs,), min_rate_arcsec_hr=5.0, max_rate_arcsec_hr=20.0)
+        assert len(result) == 0
+
+
+class TestBuildObservationWindowDefaultEndJd:
+    def test_default_end_jd_is_30_days_after_start(self):
+        import pytest as pt
+
+        from fetch import build_observation_window
+        w = build_observation_window(10.0, 20.0, start_jd=2460000.5)
+        assert w.end_jd == pt.approx(2460030.5)

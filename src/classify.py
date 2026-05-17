@@ -16,6 +16,7 @@ __all__ = [
     "posterior_entropy",
     "dominant_hypothesis",
     "classify_morphology",
+    "batch_morphology",
 ]
 
 import base64
@@ -940,3 +941,25 @@ def classify_morphology(obs) -> str:
         return "point_source"
     except Exception:
         return "point_source"
+
+
+def batch_morphology(tracklet: object) -> dict:
+    """Classify the morphology of every observation in a tracklet.
+
+    Returns a dict with:
+    - ``modal_class``: most common morphology string across all observations
+    - ``class_counts``: mapping from morphology label to count
+    - ``streak_fraction``: fraction of observations classified as "streak"
+    """
+    obs_list = list(getattr(tracklet, "observations", []))
+    if not obs_list:
+        return {"modal_class": "point_source", "class_counts": {}, "streak_fraction": 0.0}
+
+    labels = [classify_morphology(o) for o in obs_list]
+    counts: dict[str, int] = {}
+    for lbl in labels:
+        counts[lbl] = counts.get(lbl, 0) + 1
+
+    modal = max(counts, key=lambda k: counts[k])
+    streak_frac = round(counts.get("streak", 0) / len(labels), 4)
+    return {"modal_class": modal, "class_counts": counts, "streak_fraction": streak_frac}

@@ -5,7 +5,8 @@ from __future__ import annotations
 __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
            "propagate_orbit", "predict_ephemeris", "close_approach_table",
            "compute_orbital_period", "classify_neo_class", "tisserand_parameter",
-           "batch_predict_ephemeris", "resonance_check", "ephemeris_uncertainty"]
+           "batch_predict_ephemeris", "resonance_check", "ephemeris_uncertainty",
+           "orbital_energy"]
 
 import math
 from typing import NamedTuple
@@ -777,3 +778,17 @@ def ephemeris_uncertainty(
 
     unc = round(float(unc), 2)
     return {"ra_unc_arcsec": unc, "dec_unc_arcsec": unc, "jd": target_jd}
+
+
+def orbital_energy(elements: OrbitalElements) -> float:
+    """Specific orbital energy in AU²/yr² (two-body, heliocentric).
+
+    E = -GM / (2a) using GM = 4π² AU³/yr².
+    Negative → bound orbit; zero → parabolic; positive → hyperbolic.
+    Returns ``float('inf')`` when ``semi_major_axis_au`` ≤ 0.
+    """
+    a = elements.semi_major_axis_au
+    if a <= 0.0:
+        return float("inf")
+    GM = 4.0 * math.pi ** 2  # AU³/yr²
+    return -GM / (2.0 * a)

@@ -6,6 +6,7 @@ __all__ = [
     "IsotonicCalibrator", "PlattCalibrator",
     "brier_score", "reliability_diagram_data", "expected_calibration_error", "calibrate",
     "bootstrap_confidence_interval",
+    "cross_validate_calibration",
 ]
 
 import math
@@ -317,7 +318,7 @@ def bootstrap_confidence_interval(
     """
     import random
 
-    if not probs or not labels:
+    if len(probs) == 0 or len(labels) == 0:
         raise ValueError("probs and labels must be non-empty")
     if len(probs) != len(labels):
         raise ValueError("probs and labels must have the same length")
@@ -343,3 +344,47 @@ def bootstrap_confidence_interval(
     hi = samples[int(0.975 * n_bootstrap)]
     mean = sum(samples) / len(samples)
     return (round(lo, 6), round(hi, 6), round(mean, 6))
+
+
+def cross_validate_calibration(
+    probs: np.ndarray,
+    labels: np.ndarray,
+    n_folds: int = 5,
+    metric: str = "brier",
+) -> tuple[float, float]:
+    """K-fold cross-validation of calibration quality.
+
+    Splits ``probs`` and ``labels`` into ``n_folds`` folds, computes the
+    requested ``metric`` on each fold, and returns ``(mean, std)`` rounded to
+    6 decimal places.  Accepts either ``"brier"`` or ``"ece"`` as metric.
+    Returns ``(0.0, 0.0)`` when fewer than ``n_folds`` samples are provided.
+
+    Args:
+        probs: array of predicted probabilities, shape (N,)
+        labels: array of binary labels, shape (N,)
+        n_folds: number of cross-validation folds (default 5)
+        metric: ``"brier"`` or ``"ece"``
+
+    Returns:
+        (mean_score, std_score)
+    """
+    probs = np.asarray(probs, dtype=float)
+    labels = np.asarray(labels, dtype=float)
+    n = len(probs)
+    if n < n_folds:
+        return (0.0, 0.0)
+
+    fold_size = n // n_folds
+    scores: list[float] = []
+    for k in range(n_folds):
+        start = k * fold_size
+        end = start + fold_size if k < n_folds - 1 else n
+        p_fold = probs[start:end]
+        l_fold = labels[start:end]
+        if metric == "brier":
+            scores.append(brier_score(p_fold, l_fold))
+        else:
+            scores.append(expected_calibration_error(p_fold, l_fold))
+
+    arr = np.array(scores)
+    return (round(float(arr.mean()), 6), round(float(arr.std()), 6))
