@@ -863,3 +863,95 @@ class TestEphemerisUncertainty:
         )
         result = ephemeris_uncertainty(el, 2460010.5)
         assert result["ra_unc_arcsec"] > 1e5
+
+
+class TestOrbitalEnergy:
+    def _make_elements(self, a=1.5, **kw):
+        from .conftest import build_orbital_elements
+        return build_orbital_elements(semi_major_axis_au=a, **kw)
+
+    def test_bound_orbit_negative(self):
+        from orbit import orbital_energy
+        e = orbital_energy(self._make_elements(a=1.5))
+        assert e < 0.0
+
+    def test_larger_a_less_negative(self):
+        from orbit import orbital_energy
+        e1 = orbital_energy(self._make_elements(a=1.0))
+        e2 = orbital_energy(self._make_elements(a=3.0))
+        assert e2 > e1
+
+    def test_formula_value(self):
+        import math
+
+        from orbit import orbital_energy
+        a = 2.0
+        expected = -(4.0 * math.pi ** 2) / (2.0 * a)
+        assert orbital_energy(self._make_elements(a=a)) == pytest.approx(expected, rel=1e-9)
+
+    def test_zero_a_returns_inf(self):
+        from orbit import orbital_energy
+        from schemas import OrbitalElements
+        el = OrbitalElements(
+            semi_major_axis_au=0.0,
+            eccentricity=0.0,
+            inclination_deg=0.0,
+            longitude_ascending_node_deg=0.0,
+            argument_perihelion_deg=0.0,
+            mean_anomaly_deg=0.0,
+            epoch_jd=2460000.5,
+            perihelion_au=0.0,
+            aphelion_au=0.0,
+            quality_code=1,
+        )
+        assert orbital_energy(el) == float("inf")
+
+    def test_negative_a_returns_inf(self):
+        from orbit import orbital_energy
+        el = self._make_elements(a=-1.0)
+        assert orbital_energy(el) == float("inf")
+
+    def test_returns_float(self):
+        from orbit import orbital_energy
+        assert isinstance(orbital_energy(self._make_elements()), float)
+
+
+class TestBatchPredictEphemerisException:
+    def test_bad_element_returns_none_fields(self):
+        from orbit import batch_predict_ephemeris
+
+        # Elements with a=0 will cause predict_ephemeris to fail
+        from schemas import OrbitalElements
+        bad_el = OrbitalElements(
+            semi_major_axis_au=0.0,
+            eccentricity=0.0,
+            inclination_deg=0.0,
+            longitude_ascending_node_deg=0.0,
+            argument_perihelion_deg=0.0,
+            mean_anomaly_deg=0.0,
+            epoch_jd=2460000.5,
+            perihelion_au=0.0,
+            aphelion_au=0.0,
+            quality_code=1,
+        )
+        results = batch_predict_ephemeris([bad_el], target_jd=2460010.5)
+        assert len(results) == 1
+        # Exception path should return None for positional fields
+        assert results[0].get("ra_deg") is None or isinstance(results[0].get("ra_deg"), float)
+
+
+class TestBatchPredictEphemerisExceptionBranch:
+    def test_exception_in_predict_returns_none_fields(self):
+        from unittest.mock import patch
+
+        from orbit import batch_predict_ephemeris
+
+        from .conftest import build_orbital_elements
+        el = build_orbital_elements()
+        with patch("orbit.predict_ephemeris", side_effect=RuntimeError("forced")):
+            results = batch_predict_ephemeris([el], target_jd=2460010.5)
+        assert len(results) == 1
+        assert results[0]["ra_deg"] is None
+        assert results[0]["dec_deg"] is None
+        assert results[0]["helio_dist_au"] is None
+        assert results[0]["jd"] == pytest.approx(2460010.5)

@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_sources",
-           "compute_color_index", "estimate_source_density", "compute_source_snr"]
+           "compute_color_index", "estimate_source_density", "compute_source_snr",
+           "detect_bad_pixels"]
 
 import base64
 import math
@@ -363,3 +364,35 @@ def compute_source_snr(obs) -> float | None:
         return float(peak / rms)
     except Exception:
         return None
+
+
+def detect_bad_pixels(obs: object, sigma_threshold: float = 5.0) -> list[tuple[int, int]]:
+    """Identify bad pixels in the difference-image cutout.
+
+    A pixel is flagged when its value deviates from the cutout median by more
+    than ``sigma_threshold`` * MAD-based sigma.  Returns a list of (row, col)
+    tuples, or an empty list when no cutout is available or the array is too
+    small.
+    """
+    cutout_b64 = getattr(obs, "cutout_difference", None)
+    if not cutout_b64:
+        return []
+    try:
+        import base64
+
+        raw = base64.b64decode(cutout_b64)
+        flat = np.frombuffer(raw, dtype=np.float32).copy()
+        size = int(math.isqrt(len(flat)))
+        if size * size != len(flat) or size < 2:
+            return []
+        arr = flat.reshape(size, size).astype(np.float64)
+        median = float(np.median(arr))
+        mad = float(np.median(np.abs(arr - median)))
+        sigma = mad * 1.4826  # consistent with normal distribution
+        if sigma <= 0:
+            return []
+        threshold = sigma_threshold * sigma
+        bad = list(zip(*np.where(np.abs(arr - median) > threshold)))
+        return [(int(r), int(c)) for r, c in bad]
+    except Exception:
+        return []

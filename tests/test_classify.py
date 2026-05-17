@@ -1105,3 +1105,183 @@ class TestClassifyMorphology:
         b64 = base64.b64encode(arr.tobytes()).decode()
         obs = self._make_obs(b64)
         assert classify_morphology(obs) == "point_source"
+
+
+class TestBatchMorphology:
+    def _make_obs(self, cutout_b64=None):
+        import base64
+
+        import numpy as np
+
+        from schemas import Observation
+        if cutout_b64 is None:
+            arr = np.zeros((63, 63), dtype=np.float32)
+            cutout_b64 = base64.b64encode(arr.tobytes()).decode()
+        return Observation(
+            obs_id="bm_001",
+            ra_deg=180.0, dec_deg=10.0, jd=2460000.5,
+            mag=19.5, mag_err=0.05, filter_band="r", mission="ZTF", real_bogus=0.9,
+            cutout_difference=cutout_b64,
+        )
+
+    def _make_tracklet(self, n_obs=3):
+        from .conftest import build_tracklet
+        t = build_tracklet(n_obs=n_obs)
+        # give each observation a blank cutout
+        import base64
+
+        import numpy as np
+
+        from schemas import Observation, Tracklet
+        arr = np.zeros((63, 63), dtype=np.float32)
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        obs = tuple(
+            Observation(
+                obs_id=o.obs_id, ra_deg=o.ra_deg, dec_deg=o.dec_deg, jd=o.jd,
+                mag=o.mag, mag_err=o.mag_err, filter_band=o.filter_band,
+                mission=o.mission, real_bogus=o.real_bogus, cutout_difference=b64,
+            )
+            for o in t.observations
+        )
+        return Tracklet(
+            object_id=t.object_id, observations=obs, arc_days=t.arc_days,
+            motion_rate_arcsec_per_hour=t.motion_rate_arcsec_per_hour,
+            motion_pa_degrees=t.motion_pa_degrees,
+        )
+
+    def test_returns_dict_with_keys(self):
+        from classify import batch_morphology
+        t = self._make_tracklet()
+        result = batch_morphology(t)
+        assert "modal_class" in result
+        assert "class_counts" in result
+        assert "streak_fraction" in result
+
+    def test_modal_class_valid(self):
+        from classify import batch_morphology
+        t = self._make_tracklet()
+        result = batch_morphology(t)
+        assert result["modal_class"] in ("point_source", "extended", "streak")
+
+    def test_streak_fraction_range(self):
+        from classify import batch_morphology
+        t = self._make_tracklet()
+        frac = batch_morphology(t)["streak_fraction"]
+        assert 0.0 <= frac <= 1.0
+
+    def test_empty_tracklet_defaults(self):
+        from classify import batch_morphology
+        from schemas import Tracklet
+        t = Tracklet(
+            object_id="empty", observations=(),
+            arc_days=0.0, motion_rate_arcsec_per_hour=0.0, motion_pa_degrees=0.0,
+        )
+        result = batch_morphology(t)
+        assert result["modal_class"] == "point_source"
+        assert result["streak_fraction"] == pytest.approx(0.0)
+
+    def test_class_counts_sum_equals_n_obs(self):
+        from classify import batch_morphology
+        t = self._make_tracklet(n_obs=4)
+        result = batch_morphology(t)
+        total = sum(result["class_counts"].values())
+        assert total == len(t.observations)
+
+
+class TestClassifyMorphologyEdgeCases:
+    def _make_obs_with_arr(self, arr):
+        import base64
+
+        import numpy as np
+
+        from schemas import Observation
+        b64 = base64.b64encode(arr.astype(np.float32).tobytes()).decode()
+        return Observation(
+            obs_id="ce_001",
+            ra_deg=180.0, dec_deg=10.0, jd=2460000.5,
+            mag=19.5, mag_err=0.05, filter_band="r", mission="ZTF", real_bogus=0.9,
+            cutout_difference=b64,
+        )
+
+    def test_non_square_returns_point_source(self):
+        import numpy as np
+
+        from classify import classify_morphology
+        # 3*4=12 elements → not a perfect square
+        arr = np.ones(12, dtype=np.float32)
+        obs = self._make_obs_with_arr(arr)
+        assert classify_morphology(obs) == "point_source"
+
+    def test_zero_trace_returns_point_source(self):
+        import numpy as np
+
+        from classify import classify_morphology
+        # all-zeros → total == 0 → "point_source" (via total <= 0 branch)
+        arr = np.zeros((7, 7), dtype=np.float32)
+        assert classify_morphology(self._make_obs_with_arr(arr)) == "point_source"
+
+    def test_elongated_streak_high_ratio(self):
+        import numpy as np
+
+        from classify import classify_morphology
+        # Horizontal streak: all flux in one row
+        arr = np.zeros((9, 9), dtype=np.float32)
+        arr[4, :] = 1.0
+        result = classify_morphology(self._make_obs_with_arr(arr))
+        assert result == "streak"
+
+    def test_extended_source(self):
+        import numpy as np
+
+        from classify import classify_morphology
+        # Slightly elongated blob: 3:1 ratio
+        arr = np.zeros((15, 15), dtype=np.float32)
+        arr[7, 4:12] = 1.0
+        arr[7, 4:12] += 0.5
+        arr[6:9, 6:10] = 0.3
+        result = classify_morphology(self._make_obs_with_arr(arr))
+        # Accept streak or extended (both are non-round)
+        assert result in ("streak", "extended")
+
+    def test_invalid_b64_returns_point_source(self):
+        from classify import classify_morphology
+        from schemas import Observation
+        obs = Observation(
+            obs_id="bad", ra_deg=0.0, dec_deg=0.0, jd=2460000.5,
+            mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF", real_bogus=0.9,
+            cutout_difference="!!!not_valid_base64!!!",
+        )
+        assert classify_morphology(obs) == "point_source"
+
+
+class TestClassifyMorphologyCoverage:
+    def _encode(self, arr):
+        import base64
+
+        import numpy as np
+        return base64.b64encode(arr.astype(np.float32).tobytes()).decode()
+
+    def _obs(self, b64):
+        from schemas import Observation
+        return Observation(
+            obs_id="cmc_001", ra_deg=0.0, dec_deg=0.0, jd=2460000.5,
+            mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF", real_bogus=0.9,
+            cutout_difference=b64,
+        )
+
+    def test_single_pixel_trace_zero_returns_point_source(self):
+        import numpy as np
+
+        from classify import classify_morphology
+        arr = np.zeros((9, 9), dtype=np.float32)
+        arr[4, 4] = 1.0  # single pixel → trace=0 → "point_source"
+        assert classify_morphology(self._obs(self._encode(arr))) == "point_source"
+
+    def test_2x3_box_returns_extended(self):
+        import numpy as np
+
+        from classify import classify_morphology
+        arr = np.zeros((9, 9), dtype=np.float32)
+        arr[4:6, 3:6] = 1.0  # 2x3 box → elongation ~2.67 → "extended"
+        result = classify_morphology(self._obs(self._encode(arr)))
+        assert result == "extended"

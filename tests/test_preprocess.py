@@ -590,3 +590,121 @@ class TestComputeSourceSnr:
         snr_bright = compute_source_snr(self._make_obs(make_b64(50.0)))
         if snr_dim is not None and snr_bright is not None:
             assert snr_bright > snr_dim
+
+
+class TestDetectBadPixels:
+    def _make_obs(self, cutout_b64=None):
+        import base64
+
+        import numpy as np
+
+        from schemas import Observation
+        if cutout_b64 is None:
+            arr = np.zeros((9, 9), dtype=np.float32)
+            cutout_b64 = base64.b64encode(arr.tobytes()).decode()
+        return Observation(
+            obs_id="bp_001",
+            ra_deg=180.0, dec_deg=10.0, jd=2460000.5,
+            mag=19.5, mag_err=0.05, filter_band="r", mission="ZTF", real_bogus=0.9,
+            cutout_difference=cutout_b64,
+        )
+
+    def test_no_cutout_returns_empty(self):
+        from preprocess import detect_bad_pixels
+        from schemas import Observation
+        obs = Observation(
+            obs_id="x", ra_deg=0.0, dec_deg=0.0, jd=2460000.5,
+            mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF", real_bogus=0.9,
+        )
+        assert detect_bad_pixels(obs) == []
+
+    def test_uniform_array_no_bad_pixels(self):
+        import base64
+
+        import numpy as np
+
+        from preprocess import detect_bad_pixels
+        arr = np.ones((9, 9), dtype=np.float32) * 5.0
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        result = detect_bad_pixels(self._make_obs(b64))
+        assert result == []
+
+    def test_hot_pixel_detected(self):
+        import base64
+
+        import numpy as np
+
+        from preprocess import detect_bad_pixels
+        rng = np.random.default_rng(0)
+        arr = rng.normal(0.0, 1.0, (9, 9)).astype(np.float32)
+        arr[4, 4] = 1000.0  # extreme outlier
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        result = detect_bad_pixels(self._make_obs(b64), sigma_threshold=3.0)
+        assert (4, 4) in result
+
+    def test_returns_list_of_tuples(self):
+        from preprocess import detect_bad_pixels
+        result = detect_bad_pixels(self._make_obs())
+        assert isinstance(result, list)
+        for item in result:
+            assert isinstance(item, tuple)
+            assert len(item) == 2
+
+
+class TestComputeSourceSnrEdgeCases:
+    def _make_obs(self, cutout_b64=None):
+        from schemas import Observation
+        return Observation(
+            obs_id="snr_001", ra_deg=180.0, dec_deg=10.0, jd=2460000.5,
+            mag=19.5, mag_err=0.05, filter_band="r", mission="ZTF", real_bogus=0.9,
+            cutout_difference=cutout_b64,
+        )
+
+    def test_non_square_returns_none(self):
+        import base64
+
+        import numpy as np
+
+        from preprocess import compute_source_snr
+        arr = np.ones(12, dtype=np.float32)  # 12 elements, not a perfect square
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        assert compute_source_snr(self._make_obs(b64)) is None
+
+    def test_invalid_b64_returns_none(self):
+        from preprocess import compute_source_snr
+        assert compute_source_snr(self._make_obs("!!!invalid!!!")) is None
+
+
+class TestDetectBadPixelsEdgeCases:
+    def _make_obs(self, cutout_b64=None):
+        from schemas import Observation
+        return Observation(
+            obs_id="bp2_001", ra_deg=180.0, dec_deg=10.0, jd=2460000.5,
+            mag=19.5, mag_err=0.05, filter_band="r", mission="ZTF", real_bogus=0.9,
+            cutout_difference=cutout_b64,
+        )
+
+    def test_non_square_returns_empty(self):
+        import base64
+
+        import numpy as np
+
+        from preprocess import detect_bad_pixels
+        arr = np.ones(12, dtype=np.float32)  # not a perfect square
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        assert detect_bad_pixels(self._make_obs(b64)) == []
+
+    def test_constant_array_zero_sigma_returns_empty(self):
+        import base64
+
+        import numpy as np
+
+        from preprocess import detect_bad_pixels
+        arr = np.ones((3, 3), dtype=np.float32) * 5.0
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        # MAD of constant array is 0 → sigma = 0 → return []
+        assert detect_bad_pixels(self._make_obs(b64)) == []
+
+    def test_invalid_b64_returns_empty(self):
+        from preprocess import detect_bad_pixels
+        assert detect_bad_pixels(self._make_obs("!!!invalid!!!")) == []

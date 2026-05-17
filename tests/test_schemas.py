@@ -467,3 +467,42 @@ class TestCloseApproachEvent:
     def test_zero_dist_allowed(self):
         ev = self._make_event(geocentric_dist_au=0.0)
         assert ev.geocentric_dist_au == pytest.approx(0.0)
+
+
+class TestSurveyField:
+    def _make_field(self, **kwargs):
+        from schemas import SurveyField
+        defaults = dict(
+            field_id="F001",
+            ra_deg=180.0,
+            dec_deg=0.0,
+            radius_deg=1.5,
+            limiting_mag=21.5,
+            n_sources=120,
+            jd=2460000.5,
+        )
+        defaults.update(kwargs)
+        return SurveyField(**defaults)
+
+    def test_construction(self):
+        f = self._make_field()
+        assert f.field_id == "F001"
+        assert f.ra_deg == pytest.approx(180.0)
+
+    def test_immutable(self):
+        import pytest as pt
+        f = self._make_field()
+        with pt.raises(Exception):
+            f.field_id = "changed"  # type: ignore[misc]
+
+    def test_n_sources_stored(self):
+        f = self._make_field(n_sources=42)
+        assert f.n_sources == 42
+
+    def test_limiting_mag_stored(self):
+        f = self._make_field(limiting_mag=22.0)
+        assert f.limiting_mag == pytest.approx(22.0)
+
+    def test_jd_stored(self):
+        f = self._make_field(jd=2461000.5)
+        assert f.jd == pytest.approx(2461000.5)

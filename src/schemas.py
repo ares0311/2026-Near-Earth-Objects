@@ -10,7 +10,7 @@ __all__ = [
     "FetchProvenance", "PreprocessProvenance", "DetectProvenance", "LinkProvenance",
     "FetchResult", "PreprocessResult", "DetectResult", "LinkResult",
     "ObservationWindow", "PipelineResult", "CandidateSummary", "NEOStatistics", "TrackletSummary",
-    "CloseApproachEvent",
+    "CloseApproachEvent", "SurveyField",
     "BackgroundOutcome", "BackgroundRunMode", "FollowUpTestStatus", "HumanReviewStatus",
     "RecommendationAction", "SignoffDecision",
     "PriorityFactors", "BackgroundTarget", "FollowUpTestResult",
@@ -582,3 +582,21 @@ class CloseApproachEvent(BaseModel):
     geocentric_dist_au: float
     relative_velocity_km_s: float | None = None
     warning_time_days: float | None = None
+
+
+class SurveyField(BaseModel):
+    """Metadata for a single survey field pointing.
+
+    Captures the sky position, search radius, limiting magnitude, source count,
+    and observation epoch for one field visited by a survey.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    field_id: str
+    ra_deg: float
+    dec_deg: float
+    radius_deg: float
+    limiting_mag: float
+    n_sources: int
+    jd: float

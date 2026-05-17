@@ -5,6 +5,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## v0.19.0
+
+- `orbit.py`: added `orbital_energy(elements)` — specific orbital energy in AU²/yr² using two-body formula E = −4π²/(2a); negative = bound, 0 = parabolic, positive = hyperbolic; returns inf for a ≤ 0; added to `__all__`.
+- `detect.py`: added `compute_trail_length(obs)` — trail length in arcsec from difference-image second moments (largest eigenvalue of 2×2 moment ellipse); ZTF pixel scale 1.01 arcsec/px; added to `__all__`.
+- `link.py`: added `assess_link_confidence(tracklet)` — confidence score [0, 1] from linear-fit RMS residual; confidence = max(0, 1 − rms / 10 arcsec); returns 0 for <2 observations; added to `__all__`.
+- `classify.py`: added `batch_morphology(tracklet)` — aggregate morphology across all observations; returns modal_class, class_counts, streak_fraction; added to `__all__`.
+- `score.py`: added `compute_impact_energy(diameter_m, velocity_km_s, density_kg_m3)` — kinetic impact energy in megatons TNT; assumes spherical body; returns 0 for non-positive inputs; added to `__all__`.
+- `alert.py`: added `format_alert_summary(neos, max_rows)` — plain-text ranked NEO summary table; columns: rank, object_id, hazard_flag, alert_pathway, moid_au, priority; added to `__all__`.
+- `fetch.py`: added `count_known_objects_in_field(ra_deg, dec_deg, radius_deg)` — count MPC known objects in a circular field; returns 0 on network failure; added to `__all__`.
+- `preprocess.py`: added `detect_bad_pixels(obs, sigma_threshold)` — identify outlier pixels via MAD-based sigma clipping; returns list of (row, col) tuples; added to `__all__`.
+- `schemas.py`: added `SurveyField` — frozen Pydantic model (field_id, ra_deg, dec_deg, radius_deg, limiting_mag, n_sources, jd); added to `__all__`.
+- `calibration.py`: added `cross_validate_calibration(probs, labels, n_folds, metric)` — K-fold cross-validation of calibration quality; returns (mean, std); added to `__all__`. Fixed `bootstrap_confidence_interval` to use `len()` check for numpy array empty-guard.
+- `Skills/compute_orbital_energy.py`: new — batch orbital energy computation with bound/parabolic/hyperbolic label; CLI with `--json` flag.
+- `Skills/assess_survey_coverage.py`: new — survey field coverage report (area, limiting mag, source count, fields per night); CLI with `--json` flag.
+- `docs/CLASSIFICATION_GUIDE.md`: new — technical reference for three-tier ML classification, morphology classification, ensemble stacking, calibration, and conservative classification policy.
+- 81 new tests (880 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.19.0.
+
 ## v0.18.0
 
 - `orbit.py`: added `ephemeris_uncertainty(elements, target_jd)` — sky-plane positional uncertainty (RA, Dec, arcsec) propagated from orbit quality code; scales with propagation time; added to `__all__`.

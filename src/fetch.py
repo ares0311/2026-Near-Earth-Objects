@@ -4,7 +4,8 @@ from __future__ import annotations
 
 __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fetch",
            "fetch_batch", "estimate_limiting_magnitude", "summarise_fetch_result",
-           "merge_survey_alerts", "filter_alerts_by_motion", "build_observation_window"]
+           "merge_survey_alerts", "filter_alerts_by_motion", "build_observation_window",
+           "count_known_objects_in_field"]
 
 import json
 import os
@@ -593,3 +594,20 @@ def build_observation_window(
         end_jd=end_jd,
         surveys=survey_tuple,
     )
+
+
+def count_known_objects_in_field(
+    ra_deg: float,
+    dec_deg: float,
+    radius_deg: float = 1.0,
+) -> int:
+    """Count MPC known objects within a circular field.
+
+    Queries ``fetch_mpc_known`` and returns the number of observations returned.
+    Returns 0 on any error (network or parse failure).
+    """
+    try:
+        observations = fetch_mpc_known(ra_deg, dec_deg, radius_deg)
+        return len(observations)
+    except Exception:
+        return 0

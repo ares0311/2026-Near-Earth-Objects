@@ -779,3 +779,118 @@ class TestComputeArcStatistics:
         from link import compute_arc_statistics
         t = self._make_tracklet(n_obs=3, arc_days=0.5)
         assert compute_arc_statistics(t)["n_nights"] >= 1
+
+
+class TestAssessLinkConfidence:
+    def _make_tracklet(self, n_obs=4, noise_arcsec=0.01):
+        import numpy as np
+
+        from .conftest import build_tracklet
+        t = build_tracklet(n_obs=n_obs)
+        # perturb ra slightly to simulate linear motion
+        rng = np.random.default_rng(42)
+        obs_list = list(t.observations)
+        new_obs = []
+        for i, o in enumerate(obs_list):
+            from schemas import Observation
+            new_obs.append(Observation(
+                obs_id=o.obs_id,
+                ra_deg=o.ra_deg + rng.normal(0, noise_arcsec / 3600.0),
+                dec_deg=o.dec_deg + rng.normal(0, noise_arcsec / 3600.0),
+                jd=o.jd,
+                mag=o.mag,
+                mag_err=o.mag_err,
+                filter_band=o.filter_band,
+                mission=o.mission,
+                real_bogus=o.real_bogus,
+            ))
+        from schemas import Tracklet
+        return Tracklet(
+            object_id=t.object_id,
+            observations=tuple(new_obs),
+            arc_days=t.arc_days,
+            motion_rate_arcsec_per_hour=t.motion_rate_arcsec_per_hour,
+            motion_pa_degrees=t.motion_pa_degrees,
+        )
+
+    def test_returns_float_in_unit_interval(self):
+        from link import assess_link_confidence
+        t = self._make_tracklet()
+        result = assess_link_confidence(t)
+        assert isinstance(result, float)
+        assert 0.0 <= result <= 1.0
+
+    def test_high_confidence_for_low_noise(self):
+        from link import assess_link_confidence
+        t = self._make_tracklet(noise_arcsec=0.001)
+        assert assess_link_confidence(t) > 0.9
+
+    def test_low_confidence_for_high_noise(self):
+        from link import assess_link_confidence
+        t = self._make_tracklet(noise_arcsec=20.0)
+        assert assess_link_confidence(t) < 0.5
+
+    def test_single_obs_returns_zero(self):
+        from link import assess_link_confidence
+        from schemas import Observation, Tracklet
+        obs = (Observation(
+            obs_id="x", ra_deg=0.0, dec_deg=0.0, jd=2460000.5,
+            mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF", real_bogus=0.9,
+        ),)
+        t = Tracklet(
+            object_id="T_single", observations=obs,
+            arc_days=0.0, motion_rate_arcsec_per_hour=0.0, motion_pa_degrees=0.0,
+        )
+        assert assess_link_confidence(t) == pytest.approx(0.0)
+
+
+class TestAssessLinkConfidenceZeroDtSkip:
+    def test_identical_jd_observations_handled(self):
+        from link import assess_link_confidence
+        from schemas import Observation, Tracklet
+        # Two obs with identical JD — dt=0 should be skipped but still returns float
+        obs = (
+            Observation(
+                obs_id="z1", ra_deg=0.0, dec_deg=0.0, jd=2460000.5,
+                mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF", real_bogus=0.9,
+            ),
+            Observation(
+                obs_id="z2", ra_deg=0.001, dec_deg=0.001, jd=2460001.5,
+                mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF", real_bogus=0.9,
+            ),
+        )
+        t = Tracklet(
+            object_id="T_dt", observations=obs, arc_days=1.0,
+            motion_rate_arcsec_per_hour=1.0, motion_pa_degrees=0.0,
+        )
+        result = assess_link_confidence(t)
+        assert isinstance(result, float)
+        assert 0.0 <= result <= 1.0
+
+
+class TestComputeArcStatisticsDuplicateJd:
+    def test_duplicate_jd_skipped(self):
+        from link import compute_arc_statistics
+        from schemas import Observation, Tracklet
+        # Two obs with identical JD → dt_hr = 0 → continue
+        obs = (
+            Observation(
+                obs_id="dj1", ra_deg=0.0, dec_deg=0.0, jd=2460000.5,
+                mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF", real_bogus=0.9,
+            ),
+            Observation(
+                obs_id="dj2", ra_deg=0.001, dec_deg=0.001, jd=2460000.5,  # same JD
+                mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF", real_bogus=0.9,
+            ),
+            Observation(
+                obs_id="dj3", ra_deg=0.002, dec_deg=0.002, jd=2460001.5,
+                mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF", real_bogus=0.9,
+            ),
+        )
+        t = Tracklet(
+            object_id="T_dj", observations=obs, arc_days=1.0,
+            motion_rate_arcsec_per_hour=1.0, motion_pa_degrees=0.0,
+        )
+        result = compute_arc_statistics(t)
+        assert result["n_observations"] == 3
+        assert isinstance(result["mean_motion_arcsec_hr"], float)
