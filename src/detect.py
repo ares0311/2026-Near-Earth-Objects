@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__all__ = ["detect", "detect_batch", "streak_candidates"]
+__all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus"]
 
 import math
 import uuid
@@ -311,4 +311,29 @@ def streak_candidates(detect_result: DetectResult) -> tuple[RawCandidate, ...]:
     return tuple(
         cand for cand in detect_result.candidates
         if cand.is_streak
+    )
+
+
+def filter_by_real_bogus(result: DetectResult, threshold: float = 0.65) -> DetectResult:
+    """Return a new DetectResult keeping only candidates above a real/bogus threshold.
+
+    Candidates without a real_bogus score on any observation are kept by default
+    (conservative: do not discard uncertain sources).
+    """
+    kept = []
+    for cand in result.candidates:
+        rbs = [obs.real_bogus for obs in cand.observations if obs.real_bogus is not None]
+        if not rbs or max(rbs) >= threshold:
+            kept.append(cand)
+    from schemas import DetectProvenance
+    prov = DetectProvenance(
+        real_bogus_threshold=threshold,
+        n_candidates=len(kept),
+        n_known_matches=result.provenance.n_known_matches,
+        detected_at_jd=result.provenance.detected_at_jd,
+    )
+    return DetectResult(
+        candidates=tuple(kept),
+        known_matches=result.known_matches,
+        provenance=prov,
     )

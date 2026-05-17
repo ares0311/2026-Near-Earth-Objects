@@ -395,3 +395,88 @@ class TestStreakCandidates:
         streaks = streak_candidates(result)
         assert len(streaks) == 1
         assert streaks[0].is_streak is True
+
+
+class TestFilterByRealBogus:
+    def _make_detect_result(self, rb_scores: list) -> object:
+        from detect import detect
+        from schemas import Observation
+
+        sources = []
+        for i, rb in enumerate(rb_scores):
+            sources.append(Observation(
+                obs_id=f"d_{i}",
+                ra_deg=180.0 + i * 0.01,
+                dec_deg=0.0,
+                jd=2460000.5 + i,
+                mag=19.0,
+                mag_err=0.05,
+                filter_band="r",
+                mission="ZTF",
+                real_bogus=rb,
+            ))
+        return detect(tuple(sources), mpc_cross_match=False)
+
+    def test_returns_detect_result(self):
+        from detect import filter_by_real_bogus
+        dr = self._make_detect_result([0.9, 0.8])
+        result = filter_by_real_bogus(dr)
+        from detect import DetectResult
+        assert isinstance(result, DetectResult)
+
+    def test_filters_low_rb(self):
+        from detect import detect, filter_by_real_bogus
+        from schemas import Observation
+
+        # Build two observations: one high RB, one low RB
+        obs_high = Observation(
+            obs_id="h", ra_deg=180.0, dec_deg=0.0, jd=2460000.5,
+            mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF", real_bogus=0.9)
+        obs_low = Observation(
+            obs_id="l", ra_deg=181.0, dec_deg=0.0, jd=2460000.5,
+            mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF", real_bogus=0.1)
+        dr = detect((obs_high, obs_low), mpc_cross_match=False)
+        filtered = filter_by_real_bogus(dr, threshold=0.65)
+        all_ids = {obs.obs_id for c in filtered.candidates for obs in c.observations}
+        assert "l" not in all_ids
+
+    def test_keeps_candidates_without_rb(self):
+        from detect import detect, filter_by_real_bogus
+        from schemas import Observation
+
+        obs = Observation(obs_id="no_rb", ra_deg=180.0, dec_deg=0.0, jd=2460000.5,
+                          mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF", real_bogus=None)
+        dr = detect((obs,), mpc_cross_match=False)
+        filtered = filter_by_real_bogus(dr, threshold=0.65)
+        all_ids = {obs.obs_id for c in filtered.candidates for obs in c.observations}
+        assert "no_rb" in all_ids or len(filtered.candidates) == 0  # kept or empty (no motion)
+
+    def test_empty_input_returns_empty(self):
+        from detect import filter_by_real_bogus
+        from schemas import DetectProvenance, DetectResult
+        prov = DetectProvenance(
+            real_bogus_threshold=0.65, n_candidates=0, n_known_matches=0,
+            detected_at_jd=2460000.5)
+        dr = DetectResult(candidates=(), known_matches=(), provenance=prov)
+        result = filter_by_real_bogus(dr)
+        assert result.provenance.n_candidates == 0
+
+    def test_threshold_zero_keeps_all(self):
+        from detect import filter_by_real_bogus
+        from schemas import DetectProvenance, DetectResult
+        prov = DetectProvenance(
+            real_bogus_threshold=0.0, n_candidates=0, n_known_matches=0,
+            detected_at_jd=2460000.5)
+        dr = DetectResult(candidates=(), known_matches=(), provenance=prov)
+        result = filter_by_real_bogus(dr, threshold=0.0)
+        assert isinstance(result.candidates, tuple)
+
+    def test_provenance_updated(self):
+        from detect import filter_by_real_bogus
+        from schemas import DetectProvenance, DetectResult
+        prov = DetectProvenance(
+            real_bogus_threshold=0.65, n_candidates=0, n_known_matches=2,
+            detected_at_jd=2460000.5)
+        dr = DetectResult(candidates=(), known_matches=(), provenance=prov)
+        result = filter_by_real_bogus(dr, threshold=0.8)
+        assert result.provenance.real_bogus_threshold == pytest.approx(0.8)

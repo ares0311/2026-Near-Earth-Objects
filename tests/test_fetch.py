@@ -883,3 +883,73 @@ class TestSummariseFetchResult:
         from fetch import summarise_fetch_result
         with pytest.raises(TypeError):
             summarise_fetch_result({"not": "a FetchResult"})  # type: ignore[arg-type]
+
+
+class TestMergeSurveyAlerts:
+    def _make_fetch_result(self, survey: str = "ZTF", n_alerts: int = 2, id_prefix: str = "a"):
+        from schemas import FetchProvenance, FetchResult
+
+        from .conftest import build_observation
+        alerts = tuple(
+            build_observation(obs_id=f"{id_prefix}{i}", jd=2460000.5 + i)
+            for i in range(n_alerts)
+        )
+        prov = FetchProvenance(
+            surveys=(survey,),
+            start_jd=2460000.0,
+            end_jd=2460001.0,
+        )
+        return FetchResult(alerts=alerts, provenance=prov)
+
+    def test_returns_fetch_result(self):
+        from fetch import merge_survey_alerts
+        from schemas import FetchResult
+        r1 = self._make_fetch_result("ZTF", 2, "a")
+        result = merge_survey_alerts([r1])
+        assert isinstance(result, FetchResult)
+
+    def test_empty_list_returns_empty(self):
+        from fetch import merge_survey_alerts
+        result = merge_survey_alerts([])
+        assert len(result.alerts) == 0
+
+    def test_deduplicates_obs_ids(self):
+        from fetch import merge_survey_alerts
+        r1 = self._make_fetch_result("ZTF", 3, "a")
+        r2 = self._make_fetch_result("ZTF", 3, "a")  # same IDs
+        result = merge_survey_alerts([r1, r2])
+        assert len(result.alerts) == 3  # deduplicated
+
+    def test_merges_different_surveys(self):
+        from fetch import merge_survey_alerts
+        r1 = self._make_fetch_result("ZTF", 2, "z")
+        r2 = self._make_fetch_result("ATLAS", 2, "at")
+        result = merge_survey_alerts([r1, r2])
+        assert len(result.alerts) == 4
+
+    def test_unique_surveys_in_provenance(self):
+        from fetch import merge_survey_alerts
+        r1 = self._make_fetch_result("ZTF", 1, "z")
+        r2 = self._make_fetch_result("ZTF", 1, "zz")
+        result = merge_survey_alerts([r1, r2])
+        surveys = list(result.provenance.surveys)
+        assert surveys.count("ZTF") == 1
+
+    def test_jd_range_widened(self):
+        from fetch import merge_survey_alerts
+        from schemas import FetchProvenance, FetchResult
+
+        prov1 = FetchProvenance(surveys=("ZTF",), start_jd=2460000.0, end_jd=2460001.0)
+        prov2 = FetchProvenance(surveys=("ATLAS",), start_jd=2459999.0, end_jd=2460002.0)
+        r1 = FetchResult(alerts=(), provenance=prov1)
+        r2 = FetchResult(alerts=(), provenance=prov2)
+        result = merge_survey_alerts([r1, r2])
+        assert result.provenance.start_jd == pytest.approx(2459999.0)
+        assert result.provenance.end_jd == pytest.approx(2460002.0)
+
+    def test_non_overlapping_alerts_all_kept(self):
+        from fetch import merge_survey_alerts
+        r1 = self._make_fetch_result("ZTF", 3, "aaa")
+        r2 = self._make_fetch_result("ATLAS", 3, "bbb")
+        result = merge_survey_alerts([r1, r2])
+        assert len(result.alerts) == 6

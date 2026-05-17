@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-__all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_sources"]
+__all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_sources",
+           "compute_color_index"]
 
 import base64
 import math
@@ -279,3 +280,20 @@ def flag_saturated_sources(result: PreprocessResult, saturation_mag: float = 12.
         if obs.mag < saturation_mag:
             flagged.append(obs.obs_id)
     return flagged
+
+
+def compute_color_index(obs1: Observation, obs2: Observation) -> float | None:
+    """Compute the color index (magnitude difference) between two observations.
+
+    Returns obs1.mag - obs2.mag, or None if:
+    - the two observations share the same filter band, or
+    - the time separation between them exceeds 1 hour.
+
+    A typical g-r color index for S-type NEOs is ~0.5.
+    """
+    if obs1.filter_band == obs2.filter_band:
+        return None
+    dt_hr = abs(obs2.jd - obs1.jd) * 24.0
+    if dt_hr > 1.0:
+        return None
+    return obs1.mag - obs2.mag

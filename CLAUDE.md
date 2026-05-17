@@ -468,9 +468,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.15.0)
+## Current State (v0.16.0)
 
-All 10 pipeline modules are complete. 583 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified manual CLI with top-level SQLite logs and auditable signoff readiness.
+All 10 pipeline modules are complete. 660 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified manual CLI with top-level SQLite logs and auditable signoff readiness.
 
 ### Skills
 
@@ -505,6 +505,8 @@ All 10 pipeline modules are complete. 583 tests passing (100% coverage). CI gree
 | `Skills/filter_candidates.py` | Filter scored NEO JSON by hazard flag, alert pathway, or minimum priority |
 | `Skills/summarise_run.py` | Print or JSON-export a pipeline run summary from scored NEO JSON |
 | `Skills/plot_sky_coverage.py` | RA/Dec scatter plot of tracklet positions colour-coded by hazard flag |
+| `Skills/export_candidate_report.py` | Per-candidate plain-text reports from scored NEO JSON; `--split` writes one file per candidate |
+| `Skills/tag_neo_class.py` | Batch-tag NEO class for tracklets or ScoredNEO dicts using `classify_neo_class` from orbit.py |
 
 ### Docs
 
@@ -512,6 +514,7 @@ All 10 pipeline modules are complete. 583 tests passing (100% coverage). CI gree
 |---|---|
 | `docs/PIPELINE_SPEC.md` | Full stage-by-stage pipeline specification |
 | `docs/SCORING_MODEL.md` | Bayesian scoring model: hypotheses, priors, feature weights |
+| `docs/TRAINING_GUIDE.md` | Step-by-step ML training guide: Tier 1–3 training, calibration, injection-recovery |
 | `docs/DATA_SOURCES.md` | External data sources: ZTF, ATLAS, MPC, JPL Horizons, Gaia DR3 |
 | `docs/API_REFERENCE.md` | Public function signatures and schema field reference for all modules |
 | `docs/BACKGROUND_SEARCH_AUTOMATION.md` | Implemented one-run background automation, SQLite logs, and scheduler notes |
@@ -558,6 +561,25 @@ All 10 pipeline modules are complete. 583 tests passing (100% coverage). CI gree
 - Collect labeled training data via `Skills/generate_training_labels.py`
 - Integrate live ZTF alert stream (Milestone 4)
 - Train and evaluate Tier 2 CNN on real cutouts (Milestone 5)
+
+### Key Changes in v0.16.0
+
+- `orbit.py`: added `classify_neo_class(elements)` — derive NEO dynamical class from orbital elements.
+- `orbit.py`: added `tisserand_parameter(elements)` — Tisserand parameter relative to Jupiter; T_J < 3 distinguishes comets.
+- `detect.py`: added `filter_by_real_bogus(result, threshold)` — filter DetectResult by max real/bogus score.
+- `link.py`: added `deduplicate_tracklets(tracklets)` — remove tracklets with ≥ 50% overlapping obs_ids; longer arc wins.
+- `score.py`: added `pha_candidates(neos)` — filter to PHA candidates only.
+- `score.py`: added `compute_statistics(neos)` — aggregate NEOStatistics (counts, priority, class distribution).
+- `classify.py`: added `posterior_entropy(posterior)` — Shannon entropy of NEOPosterior in bits.
+- `alert.py`: added `format_neocp_report(neo, obs_code)` — plain-text NEOCP follow-up request with guardrails.
+- `fetch.py`: added `merge_survey_alerts(results)` — merge and deduplicate multiple FetchResults.
+- `preprocess.py`: added `compute_color_index(obs1, obs2)` — magnitude difference for observations in different bands.
+- `schemas.py`: added `NEOStatistics` — frozen Pydantic model for aggregate pipeline statistics.
+- `Skills/export_candidate_report.py`: new — per-candidate plain-text reports; `--split` writes one file per candidate.
+- `Skills/tag_neo_class.py`: new — batch-tag NEO class using `classify_neo_class`.
+- `docs/TRAINING_GUIDE.md`: new — step-by-step ML training guide (Tier 1–3, calibration, injection-recovery).
+- 77 new tests; 660 total; 100% coverage maintained.
+- Version bumped to 0.16.0.
 
 ### Key Changes in v0.15.0
 

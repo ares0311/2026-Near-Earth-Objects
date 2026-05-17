@@ -13,6 +13,7 @@ __all__ = [
     "_build_ensemble",
     "retrain_tier1",
     "retrain_stacker",
+    "posterior_entropy",
 ]
 
 import base64
@@ -842,3 +843,24 @@ def batch_explain(tracklets: list[Tracklet]) -> list[dict]:
     ``dominant_hypothesis``, and ``confidence``.
     """
     return [explain_classification(t) for t in tracklets]
+
+
+def posterior_entropy(posterior: NEOPosterior) -> float:  # type: ignore[name-defined]
+    """Compute Shannon entropy of the classification posterior in bits.
+
+    H = -sum(p * log2(p)) over the five hypotheses.
+    Range: [0, log2(5)] ≈ [0, 2.322].  High entropy means high uncertainty.
+    Zero entropy means one hypothesis has probability 1.
+    """
+    probs = [
+        posterior.neo_candidate,
+        posterior.known_object,
+        posterior.main_belt_asteroid,
+        posterior.stellar_artifact,
+        posterior.other_solar_system,
+    ]
+    h = 0.0
+    for p in probs:
+        if p > 0.0:
+            h -= p * math.log2(p)
+    return h

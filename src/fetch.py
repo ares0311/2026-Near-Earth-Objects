@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fetch",
-           "fetch_batch", "estimate_limiting_magnitude", "summarise_fetch_result"]
+           "fetch_batch", "estimate_limiting_magnitude", "summarise_fetch_result",
+           "merge_survey_alerts"]
 
 import json
 import os
@@ -478,3 +479,38 @@ def summarise_fetch_result(result: FetchResult) -> dict:
         "end_jd": prov.end_jd,
         "limiting_magnitude": prov.limiting_magnitude,
     }
+
+
+def merge_survey_alerts(results: list[FetchResult]) -> FetchResult:
+    """Merge multiple FetchResult objects into a single FetchResult.
+
+    Deduplicates alerts by obs_id.  The provenance of the merged result
+    reflects the union of all surveys and the widest JD range.
+    """
+    if not results:
+        prov = FetchProvenance(surveys=(), start_jd=0.0, end_jd=0.0)
+        return FetchResult(alerts=(), provenance=prov)
+
+    seen: set[str] = set()
+    merged_alerts: list = []
+    all_surveys: list = []
+    start_jd = float("inf")
+    end_jd = float("-inf")
+
+    for result in results:
+        prov = result.provenance
+        all_surveys.extend(prov.surveys)
+        start_jd = min(start_jd, prov.start_jd)
+        end_jd = max(end_jd, prov.end_jd)
+        for alert in result.alerts:
+            if alert.obs_id not in seen:
+                seen.add(alert.obs_id)
+                merged_alerts.append(alert)
+
+    unique_surveys: tuple = tuple(dict.fromkeys(all_surveys))
+    merged_prov = FetchProvenance(
+        surveys=unique_surveys,
+        start_jd=start_jd,
+        end_jd=end_jd,
+    )
+    return FetchResult(alerts=tuple(merged_alerts), provenance=merged_prov)

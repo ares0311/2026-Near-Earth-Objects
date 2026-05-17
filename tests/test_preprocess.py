@@ -406,3 +406,54 @@ class TestFlagSaturatedSources:
         from preprocess import flag_saturated_sources
         with pytest.raises(TypeError):
             flag_saturated_sources("not a PreprocessResult")  # type: ignore[arg-type]
+
+
+class TestComputeColorIndex:
+    def _make_obs(self, obs_id: str = "o1", jd: float = 2460000.5,
+                  mag: float = 19.0, filter_band: str = "r") -> "Observation":
+        from schemas import Observation
+        return Observation(
+            obs_id=obs_id, ra_deg=180.0, dec_deg=0.0, jd=jd,
+            mag=mag, mag_err=0.05, filter_band=filter_band, mission="ZTF",
+        )
+
+    def test_returns_float_for_different_bands(self):
+        from preprocess import compute_color_index
+        obs1 = self._make_obs("o1", jd=2460000.5, mag=19.0, filter_band="g")
+        obs2 = self._make_obs("o2", jd=2460000.5, mag=19.5, filter_band="r")
+        result = compute_color_index(obs1, obs2)
+        assert result == pytest.approx(-0.5)
+
+    def test_same_band_returns_none(self):
+        from preprocess import compute_color_index
+        obs1 = self._make_obs("o1", filter_band="r", mag=19.0)
+        obs2 = self._make_obs("o2", filter_band="r", mag=19.5)
+        assert compute_color_index(obs1, obs2) is None
+
+    def test_large_time_gap_returns_none(self):
+        from preprocess import compute_color_index
+        obs1 = self._make_obs("o1", jd=2460000.0, filter_band="g")
+        obs2 = self._make_obs("o2", jd=2460002.0, filter_band="r")
+        assert compute_color_index(obs1, obs2) is None
+
+    def test_within_one_hour_returns_value(self):
+        from preprocess import compute_color_index
+        obs1 = self._make_obs("o1", jd=2460000.5, mag=19.0, filter_band="g")
+        obs2 = self._make_obs("o2", jd=2460000.5 + 0.04 / 24.0, mag=19.5, filter_band="r")
+        result = compute_color_index(obs1, obs2)
+        assert result is not None
+
+    def test_exactly_one_hour_returns_none(self):
+        from preprocess import compute_color_index
+        obs1 = self._make_obs("o1", jd=2460000.5, filter_band="g")
+        obs2 = self._make_obs("o2", jd=2460000.5 + 1.0 / 24.0 + 1e-6, filter_band="r")
+        assert compute_color_index(obs1, obs2) is None
+
+    def test_symmetric_sign(self):
+        from preprocess import compute_color_index
+        obs1 = self._make_obs("o1", jd=2460000.5, mag=19.0, filter_band="g")
+        obs2 = self._make_obs("o2", jd=2460000.5, mag=19.5, filter_band="r")
+        r12 = compute_color_index(obs1, obs2)
+        r21 = compute_color_index(obs2, obs1)
+        assert r12 is not None and r21 is not None
+        assert r12 == pytest.approx(-r21)

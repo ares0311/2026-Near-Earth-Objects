@@ -4,7 +4,7 @@ from __future__ import annotations
 
 __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
            "propagate_orbit", "predict_ephemeris", "close_approach_table",
-           "compute_orbital_period"]
+           "compute_orbital_period", "classify_neo_class", "tisserand_parameter"]
 
 import math
 from typing import NamedTuple
@@ -632,3 +632,45 @@ def compute_orbital_period(elements: OrbitalElements) -> float:
     if a <= 0.0:
         return 0.0
     return 365.25 * math.sqrt(a ** 3)
+
+
+def classify_neo_class(elements: OrbitalElements) -> NEOClass:
+    """Derive the NEO dynamical class from orbital elements.
+
+    Uses perihelion (q) and aphelion (Q) to classify:
+    - IEO/Atira: Q < 0.983 AU
+    - Aten:      a < 1.0 AU, Q >= 0.983 AU
+    - Apollo:    a >= 1.0 AU, q < 1.017 AU
+    - Amor:      1.017 <= q < 1.3 AU
+    - unknown:   q >= 1.3 AU (main belt or beyond)
+    """
+    a = elements.semi_major_axis_au
+    q = elements.perihelion_au
+    Q = elements.aphelion_au
+    if Q < 0.983:
+        return "ieo"
+    if a < 1.0 and Q >= 0.983:
+        return "aten"
+    if a >= 1.0 and q < 1.017:
+        return "apollo"
+    if 1.017 <= q < 1.3:
+        return "amor"
+    return "unknown"
+
+
+def tisserand_parameter(elements: OrbitalElements) -> float:
+    """Compute the Tisserand parameter with respect to Jupiter.
+
+    T_J = a_J/a + 2*cos(i)*sqrt((a/a_J)*(1-e^2))
+
+    where a_J = 5.2044 AU (Jupiter's semi-major axis).
+    T_J < 3 indicates comet-like dynamics; T_J > 3 indicates asteroid-like.
+    Returns 0.0 for non-positive semi-major axis.
+    """
+    a_J = 5.2044
+    a = elements.semi_major_axis_au
+    if a <= 0.0:
+        return 0.0
+    e = elements.eccentricity
+    i_rad = math.radians(elements.inclination_deg)
+    return a_J / a + 2.0 * math.cos(i_rad) * math.sqrt((a / a_J) * (1.0 - e ** 2))

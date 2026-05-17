@@ -5,6 +5,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## v0.16.0
+
+- `orbit.py`: added `classify_neo_class(elements)` — derive NEO dynamical class (amor/apollo/aten/ieo/unknown) from orbital elements; added to `__all__`.
+- `orbit.py`: added `tisserand_parameter(elements)` — compute Tisserand parameter relative to Jupiter (T_J); returns 0.0 for non-positive a; added to `__all__`.
+- `detect.py`: added `filter_by_real_bogus(result, threshold)` — return new DetectResult keeping only candidates with max real/bogus ≥ threshold; candidates without RB score kept conservatively; added to `__all__`.
+- `link.py`: added `deduplicate_tracklets(tracklets)` — remove tracklets sharing ≥ 50% obs_ids with a longer-arc tracklet; longer arc wins; added to `__all__`.
+- `score.py`: added `pha_candidates(neos)` — filter ScoredNEO list to PHA candidates only; added to `__all__`.
+- `score.py`: added `compute_statistics(neos)` — compute aggregate NEOStatistics (counts, mean/max priority, class distribution); added to `__all__`.
+- `classify.py`: added `posterior_entropy(posterior)` — Shannon entropy of NEOPosterior in bits; range [0, log2(5)] ≈ [0, 2.322]; added to `__all__`.
+- `alert.py`: added `format_neocp_report(neo, obs_code)` — generate plain-text NEOCP follow-up request with guardrail text; does not submit; added to `__all__`.
+- `fetch.py`: added `merge_survey_alerts(results)` — merge multiple FetchResults, deduplicate by obs_id, widen JD range, deduplicate surveys; added to `__all__`.
+- `preprocess.py`: added `compute_color_index(obs1, obs2)` — magnitude difference between two observations in different bands within 1 hour; added to `__all__`.
+- `schemas.py`: added `NEOStatistics` — frozen Pydantic model for aggregate pipeline run statistics; added to `__all__`.
+- `Skills/export_candidate_report.py`: new — per-candidate plain-text reports from scored NEO JSON; supports `--split` to write one file per candidate.
+- `Skills/tag_neo_class.py`: new — batch-tag NEO class for tracklets or ScoredNEO dicts using `classify_neo_class` from orbit.py.
+- `docs/TRAINING_GUIDE.md`: new — step-by-step ML training guide covering Tier 1–3 training, calibration, and injection-recovery validation.
+- 660 tests total (77 new); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.16.0.
+
 ## v0.15.0
 
 - `orbit.py`: added `compute_orbital_period(elements)` — Kepler's third law; T = 365.25 × √(a³) days; returns 0.0 for non-positive a.
