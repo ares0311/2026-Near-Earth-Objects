@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
-           "followup_priority_table", "pha_candidates", "compute_statistics"]
+           "followup_priority_table", "pha_candidates", "compute_statistics",
+           "close_approach_candidates"]
 
 import math
 import uuid
@@ -477,3 +478,18 @@ def compute_statistics(neos: list) -> NEOStatistics:
         max_discovery_priority=max(priorities) if priorities else 0.0,
         neo_class_distribution=dict(Counter(neo_classes)),
     )
+
+
+def close_approach_candidates(neos: list, max_moid_au: float = 0.05) -> list:
+    """Return ScoredNEO objects with a known MOID at or below *max_moid_au*.
+
+    Unlike :func:`pha_candidates` (which also requires H ≤ 22), this function
+    only filters on MOID, letting callers set any threshold — e.g. 0.1 AU for
+    enhanced monitoring or 0.002 AU for imminent-flyby follow-up.
+
+    Objects with ``moid_au=None`` (orbit not well-determined) are excluded.
+    """
+    return [
+        neo for neo in neos
+        if neo.hazard.moid_au is not None and neo.hazard.moid_au <= max_moid_au
+    ]

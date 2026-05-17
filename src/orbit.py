@@ -4,7 +4,8 @@ from __future__ import annotations
 
 __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
            "propagate_orbit", "predict_ephemeris", "close_approach_table",
-           "compute_orbital_period", "classify_neo_class", "tisserand_parameter"]
+           "compute_orbital_period", "classify_neo_class", "tisserand_parameter",
+           "batch_predict_ephemeris", "resonance_check"]
 
 import math
 from typing import NamedTuple
@@ -674,3 +675,64 @@ def tisserand_parameter(elements: OrbitalElements) -> float:
     e = elements.eccentricity
     i_rad = math.radians(elements.inclination_deg)
     return a_J / a + 2.0 * math.cos(i_rad) * math.sqrt((a / a_J) * (1.0 - e ** 2))
+
+
+def batch_predict_ephemeris(
+    elements_list: list[OrbitalElements],
+    target_jd: float,
+) -> list[dict]:
+    """Predict sky positions for a list of OrbitalElements at one Julian Date.
+
+    Calls :func:`predict_ephemeris` for each element set and returns a list of
+    dicts in the same order.  Each dict has keys:
+      ``ra_deg``, ``dec_deg``, ``helio_dist_au``, ``jd``.
+
+    Objects for which propagation fails are represented by a dict with
+    ``ra_deg=None``, ``dec_deg=None``, ``helio_dist_au=None``, ``jd=target_jd``.
+    """
+    results = []
+    for el in elements_list:
+        try:
+            results.append(predict_ephemeris(el, target_jd))
+        except Exception:
+            results.append({"ra_deg": None, "dec_deg": None,
+                            "helio_dist_au": None, "jd": target_jd})
+    return results
+
+
+_JUPITER_RESONANCES: list[tuple[int, int]] = [
+    (1, 1), (2, 1), (3, 1), (3, 2), (4, 1), (4, 3),
+    (5, 1), (5, 2), (5, 3), (5, 4),
+    (7, 2), (7, 3), (7, 4),
+]
+_JUPITER_PERIOD_YR = 11.862  # Jupiter's orbital period in years
+
+
+def resonance_check(
+    elements: OrbitalElements,
+    tolerance: float = 0.02,
+) -> dict | None:
+    """Check for mean-motion resonance with Jupiter.
+
+    Tests the object's orbital period (from Kepler's 3rd law) against a list
+    of common resonance ratios p:q (object:Jupiter).  Returns a dict with
+    keys ``resonance`` (string like ``"3:1"``), ``period_ratio``, and
+    ``fractional_offset`` if any resonance is within *tolerance* (default 2%).
+    Returns ``None`` if no resonance is found.
+    """
+    a = elements.semi_major_axis_au
+    if a <= 0.0:
+        return None
+    period_yr = a ** 1.5  # Kepler: T = a^(3/2) years (Earth=1 yr)
+    ratio = _JUPITER_PERIOD_YR / period_yr  # mean-motion ratio n_obj/n_J = T_J/T_obj
+
+    for p, q in _JUPITER_RESONANCES:
+        exact = p / q
+        offset = abs(ratio - exact) / exact
+        if offset <= tolerance:
+            return {
+                "resonance": f"{p}:{q}",
+                "period_ratio": round(ratio, 6),
+                "fractional_offset": round(offset, 6),
+            }
+    return None

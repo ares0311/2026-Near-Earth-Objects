@@ -9,7 +9,7 @@ __all__ = [
     "RawCandidate", "KnownMatch",
     "FetchProvenance", "PreprocessProvenance", "DetectProvenance", "LinkProvenance",
     "FetchResult", "PreprocessResult", "DetectResult", "LinkResult",
-    "ObservationWindow", "PipelineResult", "CandidateSummary", "NEOStatistics",
+    "ObservationWindow", "PipelineResult", "CandidateSummary", "NEOStatistics", "TrackletSummary",
     "BackgroundOutcome", "BackgroundRunMode", "FollowUpTestStatus", "HumanReviewStatus",
     "RecommendationAction", "SignoffDecision",
     "PriorityFactors", "BackgroundTarget", "FollowUpTestResult",
@@ -547,3 +547,21 @@ class NEOStatistics(BaseModel):
     mean_discovery_priority: float
     max_discovery_priority: float
     neo_class_distribution: dict[str, int] = Field(default_factory=dict)
+
+
+class TrackletSummary(BaseModel):
+    """Lightweight summary of a Tracklet for display or export.
+
+    Avoids carrying the full observation list while preserving the key
+    properties needed for candidate tables and follow-up scheduling.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    object_id: str
+    arc_days: float
+    n_observations: int
+    motion_rate_arcsec_per_hour: float
+    motion_pa_degrees: float
+    neo_class: NEOClass = "unknown"
+    discovery_priority: float = 0.0

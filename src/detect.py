@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-__all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus"]
+__all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus",
+           "compute_streak_metric"]
 
 import math
 import uuid
@@ -337,3 +338,63 @@ def filter_by_real_bogus(result: DetectResult, threshold: float = 0.65) -> Detec
         known_matches=result.known_matches,
         provenance=prov,
     )
+
+
+def compute_streak_metric(obs: Observation) -> float:
+    """Quantify streak severity for a single observation using PSF elongation.
+
+    Decodes the difference-image cutout, computes second-order image moments,
+    and returns the axis ratio (major/minor) normalized to [0, 1]:
+
+    - 0.0 → perfectly round (no streak)
+    - 1.0 → maximally elongated
+
+    Falls back to 0.0 when no cutout is available or the image cannot be
+    decoded.
+    """
+    if obs.cutout_difference is None:
+        return 0.0
+    try:
+        import base64
+        import math
+
+        import numpy as np
+
+        raw = base64.b64decode(obs.cutout_difference)
+        arr = np.frombuffer(raw, dtype=np.float32)
+        size = int(math.isqrt(len(arr)))
+        if size * size != len(arr) or size < 3:
+            return 0.0
+        arr = arr.reshape(size, size).astype(np.float64)
+        arr = np.clip(arr, 0.0, None)
+
+        total = float(arr.sum())
+        if total <= 0:
+            return 0.0
+
+        y, x = np.indices(arr.shape)
+        cx = float((x * arr).sum()) / total
+        cy = float((y * arr).sum()) / total
+        dx = x - cx
+        dy = y - cy
+        mxx = float((dx ** 2 * arr).sum()) / total
+        myy = float((dy ** 2 * arr).sum()) / total
+        mxy = float((dx * dy * arr).sum()) / total
+
+        trace = mxx + myy
+        if trace <= 0:
+            return 0.0
+        det = mxx * myy - mxy ** 2
+        disc = max(0.0, (trace / 2) ** 2 - det)
+        lam1 = trace / 2 + math.sqrt(disc)
+        lam2 = trace / 2 - math.sqrt(disc)
+        if lam2 <= 1e-12 * lam1:
+            # Degenerate: one eigenvalue vanishes → perfectly elongated streak
+            return 1.0
+        elongation = lam1 / lam2  # ≥ 1
+
+        # Map elongation [1, ∞) → [0, 1]: elongation 5 → ~0.8
+        metric = 1.0 - 1.0 / elongation
+        return float(min(1.0, max(0.0, metric)))
+    except Exception:
+        return 0.0

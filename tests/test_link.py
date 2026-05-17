@@ -650,3 +650,70 @@ class TestDeduplicateTracklets:
         t2 = self._make_tracklet(["a", "e", "f", "g"], arc_days=1.0, obj_id="T2")
         result = deduplicate_tracklets([t1, t2])
         assert len(result) == 2
+
+
+class TestSplitTracklet:
+    def _make_obs(self, obs_id: str, jd: float) -> "Observation":
+        from schemas import Observation
+        return Observation(
+            obs_id=obs_id, ra_deg=180.0 + (jd - 2460000.5) * 0.01,
+            dec_deg=0.0, jd=jd, mag=19.0, mag_err=0.05,
+            filter_band="r", mission="ZTF",
+        )
+
+    def _make_tracklet(self) -> "Tracklet":
+        from schemas import Tracklet
+        obs = tuple(
+            self._make_obs(f"o{i}", 2460000.5 + i)
+            for i in range(6)
+        )
+        return Tracklet(
+            object_id="T001", observations=obs, arc_days=5.0,
+            motion_rate_arcsec_per_hour=1.0, motion_pa_degrees=90.0,
+        )
+
+    def test_returns_two_tracklets(self):
+        from link import split_tracklet
+        t = self._make_tracklet()
+        a, b = split_tracklet(t, split_jd=2460003.0)
+        from schemas import Tracklet
+        assert isinstance(a, Tracklet)
+        assert isinstance(b, Tracklet)
+
+    def test_split_preserves_all_observations(self):
+        from link import split_tracklet
+        t = self._make_tracklet()
+        a, b = split_tracklet(t, split_jd=2460003.0)
+        total = len(a.observations) + len(b.observations)
+        assert total == len(t.observations)
+
+    def test_before_after_ids_in_correct_tracklet(self):
+        from link import split_tracklet
+        t = self._make_tracklet()
+        split_jd = 2460003.0
+        a, b = split_tracklet(t, split_jd=split_jd)
+        assert all(o.jd < split_jd for o in a.observations)
+        assert all(o.jd >= split_jd for o in b.observations)
+
+    def test_object_id_suffixes(self):
+        from link import split_tracklet
+        t = self._make_tracklet()
+        a, b = split_tracklet(t, split_jd=2460003.0)
+        assert a.object_id.endswith("_A")
+        assert b.object_id.endswith("_B")
+
+    def test_too_few_before_raises(self):
+        import pytest
+
+        from link import split_tracklet
+        t = self._make_tracklet()
+        with pytest.raises(ValueError):
+            split_tracklet(t, split_jd=2460001.0)  # only 1 obs before
+
+    def test_too_few_after_raises(self):
+        import pytest
+
+        from link import split_tracklet
+        t = self._make_tracklet()
+        with pytest.raises(ValueError):
+            split_tracklet(t, split_jd=2460005.0)  # only 1 obs after

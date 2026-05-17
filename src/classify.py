@@ -14,6 +14,7 @@ __all__ = [
     "retrain_tier1",
     "retrain_stacker",
     "posterior_entropy",
+    "dominant_hypothesis",
 ]
 
 import base64
@@ -864,3 +865,26 @@ def posterior_entropy(posterior: NEOPosterior) -> float:  # type: ignore[name-de
         if p > 0.0:
             h -= p * math.log2(p)
     return h
+
+
+def dominant_hypothesis(posterior: NEOPosterior) -> tuple[str, float]:
+    """Return the hypothesis name and probability for the highest-probability class.
+
+    Returns a tuple ``(name, probability)`` where *name* is one of
+    ``"neo_candidate"``, ``"known_object"``, ``"main_belt_asteroid"``,
+    ``"stellar_artifact"``, or ``"other_solar_system"``.
+
+    Returns ``("unknown", 0.0)`` when all probabilities are zero.
+    """
+    candidates = {
+        "neo_candidate": posterior.neo_candidate,
+        "known_object": posterior.known_object,
+        "main_belt_asteroid": posterior.main_belt_asteroid,
+        "stellar_artifact": posterior.stellar_artifact,
+        "other_solar_system": posterior.other_solar_system,
+    }
+    best = max(candidates, key=lambda k: candidates[k])
+    prob = candidates[best]
+    if prob == 0.0:
+        return ("unknown", 0.0)
+    return (best, float(prob))

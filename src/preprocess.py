@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_sources",
-           "compute_color_index"]
+           "compute_color_index", "estimate_source_density"]
 
 import base64
 import math
@@ -297,3 +297,44 @@ def compute_color_index(obs1: Observation, obs2: Observation) -> float | None:
     if dt_hr > 1.0:
         return None
     return obs1.mag - obs2.mag
+
+
+def estimate_source_density(
+    observations: tuple[Observation, ...] | list[Observation],
+    field_radius_deg: float = 0.5,
+) -> float:
+    """Estimate source count per square degree for a field.
+
+    Computes the median RA/Dec centroid of the observation set, then counts
+    how many observations fall within *field_radius_deg* of that centroid.
+    Returns sources per square degree.
+
+    Returns 0.0 for an empty observation set or zero field area.
+    """
+    obs = list(observations)
+    if not obs:
+        return 0.0
+
+    import math
+
+    import numpy as np
+
+    ras = np.array([o.ra_deg for o in obs])
+    decs = np.array([o.dec_deg for o in obs])
+    center_ra = float(np.median(ras))
+    center_dec = float(np.median(decs))
+
+    count = 0
+    for o in obs:
+        # Great-circle separation
+        d1, d2 = math.radians(center_dec), math.radians(o.dec_deg)
+        r1, r2 = math.radians(center_ra), math.radians(o.ra_deg)
+        cos_sep = math.sin(d1) * math.sin(d2) + math.cos(d1) * math.cos(d2) * math.cos(r1 - r2)
+        sep_deg = math.degrees(math.acos(max(-1.0, min(1.0, cos_sep))))
+        if sep_deg <= field_radius_deg:
+            count += 1
+
+    area_sq_deg = math.pi * field_radius_deg ** 2
+    if area_sq_deg <= 0:
+        return 0.0
+    return count / area_sq_deg

@@ -480,3 +480,64 @@ class TestFilterByRealBogus:
         dr = DetectResult(candidates=(), known_matches=(), provenance=prov)
         result = filter_by_real_bogus(dr, threshold=0.8)
         assert result.provenance.real_bogus_threshold == pytest.approx(0.8)
+
+
+class TestComputeStreakMetric:
+    def _make_obs(self, cutout: str | None = None) -> "Observation":
+        from schemas import Observation
+        return Observation(
+            obs_id="s1", ra_deg=180.0, dec_deg=0.0, jd=2460000.5,
+            mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF",
+            cutout_difference=cutout,
+        )
+
+    def test_no_cutout_returns_zero(self):
+        from detect import compute_streak_metric
+        obs = self._make_obs(None)
+        assert compute_streak_metric(obs) == 0.0
+
+    def test_returns_float_in_range(self):
+        import base64
+
+        import numpy as np
+
+        from detect import compute_streak_metric
+        arr = np.zeros((63, 63), dtype=np.float32)
+        arr[31, :] = 1.0  # horizontal streak
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        obs = self._make_obs(b64)
+        result = compute_streak_metric(obs)
+        assert isinstance(result, float)
+        assert 0.0 <= result <= 1.0
+
+    def test_round_source_low_metric(self):
+        import base64
+
+        import numpy as np
+
+        from detect import compute_streak_metric
+        arr = np.zeros((63, 63), dtype=np.float32)
+        y, x = np.mgrid[0:63, 0:63]
+        arr = np.exp(-0.5 * ((x - 31) ** 2 + (y - 31) ** 2) / 4.0).astype(np.float32)
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        obs = self._make_obs(b64)
+        assert compute_streak_metric(obs) < 0.5
+
+    def test_streaked_source_high_metric(self):
+        import base64
+
+        import numpy as np
+
+        from detect import compute_streak_metric
+        arr = np.zeros((63, 63), dtype=np.float32)
+        arr[31, 5:58] = 1.0  # long horizontal streak
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        obs = self._make_obs(b64)
+        assert compute_streak_metric(obs) > 0.5
+
+    def test_invalid_cutout_returns_zero(self):
+        import base64
+
+        from detect import compute_streak_metric
+        obs = self._make_obs(base64.b64encode(b"notanarray").decode())
+        assert compute_streak_metric(obs) == 0.0

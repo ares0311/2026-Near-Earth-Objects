@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
-           "filter_high_motion", "deduplicate_tracklets", "_predict_from_arc"]
+           "filter_high_motion", "deduplicate_tracklets", "_predict_from_arc",
+           "split_tracklet"]
 
 import math
 import uuid
@@ -416,3 +417,42 @@ def deduplicate_tracklets(tracklets: list[Tracklet]) -> list[Tracklet]:
             kept.append(tracklet)
             kept_ids.append(ids)
     return kept
+
+
+def split_tracklet(tracklet: Tracklet, split_jd: float) -> tuple[Tracklet, Tracklet]:
+    """Split a tracklet at *split_jd* into two sub-tracklets.
+
+    Observations with jd < split_jd go into the first tracklet; observations
+    with jd >= split_jd go into the second.  Each sub-tracklet recomputes its
+    own arc length, motion rate, and position angle from its constituent
+    observations.
+
+    Raises :exc:`ValueError` if either side would have fewer than 2 observations.
+    """
+    before = [obs for obs in tracklet.observations if obs.jd < split_jd]
+    after = [obs for obs in tracklet.observations if obs.jd >= split_jd]
+
+    if len(before) < 2:
+        raise ValueError(
+            f"split_jd={split_jd} leaves fewer than 2 observations in the "
+            f"first sub-tracklet ({len(before)} found)"
+        )
+    if len(after) < 2:
+        raise ValueError(
+            f"split_jd={split_jd} leaves fewer than 2 observations in the "
+            f"second sub-tracklet ({len(after)} found)"
+        )
+
+    def _build(obs_list: list[Observation], suffix: str) -> Tracklet:
+        sorted_obs = sorted(obs_list, key=lambda o: o.jd)
+        arc = sorted_obs[-1].jd - sorted_obs[0].jd
+        rate, pa = _motion(*sorted_obs[:2]) if len(sorted_obs) >= 2 else (0.0, 0.0)
+        return Tracklet(
+            object_id=f"{tracklet.object_id}_{suffix}",
+            observations=tuple(sorted_obs),
+            arc_days=arc,
+            motion_rate_arcsec_per_hour=rate,
+            motion_pa_degrees=pa,
+        )
+
+    return _build(before, "A"), _build(after, "B")
