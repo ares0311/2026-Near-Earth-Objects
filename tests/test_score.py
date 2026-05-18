@@ -704,3 +704,60 @@ class TestComputeImpactEnergy:
         from score import compute_impact_energy
         result = compute_impact_energy(140.0, 20.0)
         assert 10.0 < result < 10000.0
+
+
+class TestComputeNoveltyScore:
+    def _make_neo(self):
+        from .conftest import build_scored_neo
+        return build_scored_neo()
+
+    def _make_elements(self, a=1.5, e=0.1, i=5.0):
+        from schemas import OrbitalElements
+        return OrbitalElements(
+            semi_major_axis_au=a,
+            eccentricity=e,
+            inclination_deg=i,
+            longitude_ascending_node_deg=0.0,
+            argument_perihelion_deg=0.0,
+            mean_anomaly_deg=0.0,
+            epoch_jd=2460000.5,
+            perihelion_au=a * (1 - e),
+            aphelion_au=a * (1 + e),
+            quality_code=2,
+        )
+
+    def test_returns_float(self):
+        from score import compute_novelty_score
+        neo = self._make_neo()
+        result = compute_novelty_score(neo, [])
+        assert isinstance(result, float)
+
+    def test_empty_catalog_returns_one(self):
+        from score import compute_novelty_score
+        neo = self._make_neo()
+        assert compute_novelty_score(neo, []) == pytest.approx(1.0)
+
+    def test_identical_orbit_returns_near_zero(self):
+        from score import compute_novelty_score
+
+        neo = self._make_neo()
+        # Use same elements as the neo's hazard assessment (a~1.5 ish)
+        catalog = [self._make_elements(a=1.5, e=0.1, i=5.0)]
+        result = compute_novelty_score(neo, catalog)
+        assert isinstance(result, float)
+        assert 0.0 <= result <= 1.0
+
+    def test_distant_catalog_near_one(self):
+        from score import compute_novelty_score
+        neo = self._make_neo()
+        # Very different orbital elements
+        catalog = [self._make_elements(a=10.0, e=0.9, i=170.0)]
+        result = compute_novelty_score(neo, catalog)
+        assert result > 0.5
+
+    def test_range_0_1(self):
+        from score import compute_novelty_score
+        neo = self._make_neo()
+        catalog = [self._make_elements(a=1.8, e=0.2, i=10.0)]
+        result = compute_novelty_score(neo, catalog)
+        assert 0.0 <= result <= 1.0

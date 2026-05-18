@@ -845,3 +845,99 @@ class TestFormatDiscoveryCircularNoElements:
         result = format_discovery_circular(neo)
         assert isinstance(result, str)
         assert "DRAFT" in result
+
+
+class TestGenerateObservationRequest:
+    def _make_neo(self):
+        from .conftest import build_scored_neo
+        return build_scored_neo()
+
+    def test_returns_string(self):
+        from alert import generate_observation_request
+        neo = self._make_neo()
+        result = generate_observation_request(neo)
+        assert isinstance(result, str)
+
+    def test_contains_object_id(self):
+        from alert import generate_observation_request
+        neo = self._make_neo()
+        result = generate_observation_request(neo)
+        assert neo.tracklet.object_id in result
+
+    def test_contains_obs_code(self):
+        from alert import generate_observation_request
+        neo = self._make_neo()
+        result = generate_observation_request(neo, obs_code="695")
+        assert "695" in result
+
+    def test_default_obs_code_500(self):
+        from alert import generate_observation_request
+        neo = self._make_neo()
+        result = generate_observation_request(neo)
+        assert "500" in result
+
+    def test_contains_urgency(self):
+        from alert import generate_observation_request
+        neo = self._make_neo()
+        result = generate_observation_request(neo)
+        assert any(word in result for word in ("URGENT", "HIGH", "MEDIUM", "ROUTINE"))
+
+    def test_guardrail_present(self):
+        from alert import generate_observation_request
+        neo = self._make_neo()
+        result = generate_observation_request(neo)
+        assert "impact" in result.lower() or "probability" in result.lower() or "Do not" in result
+
+
+class TestGenerateObservationRequestBranches:
+    """Cover urgency branches HIGH, MEDIUM, ROUTINE in generate_observation_request."""
+
+    def _make_neo(self, priority: float = 0.5, hazard_flag: str = "nominal"):
+
+        from .conftest import build_scored_neo
+        neo = build_scored_neo()
+        # Use simple namespace to set custom priority/hazard_flag
+        import types
+        meta = types.SimpleNamespace(
+            discovery_priority=priority,
+            followup_value=0.5,
+            scientific_interest=0.3,
+            pipeline_version="0.20.0",
+            scoring_timestamp=2460000.5,
+            close_approach_au=None,
+        )
+        haz = types.SimpleNamespace(
+            hazard_flag=hazard_flag,
+            moid_au=0.1,
+            estimated_diameter_m=100.0,
+            absolute_magnitude_h=22.5,
+            neo_class="amor",
+            alert_pathway="internal_candidate",
+            explanation=neo.hazard.explanation,
+        )
+        obj = types.SimpleNamespace(
+            tracklet=neo.tracklet,
+            features=neo.features,
+            posterior=neo.posterior,
+            hazard=haz,
+            metadata=meta,
+        )
+        return obj
+
+    def test_high_urgency(self):
+        from alert import generate_observation_request
+        neo = self._make_neo(priority=0.75, hazard_flag="nominal")
+        result = generate_observation_request(neo)
+        assert "HIGH" in result
+
+    def test_medium_urgency(self):
+        from alert import generate_observation_request
+        neo = self._make_neo(priority=0.5, hazard_flag="nominal")
+        result = generate_observation_request(neo)
+        assert "MEDIUM" in result
+
+    def test_routine_urgency(self):
+        from alert import generate_observation_request
+        neo = self._make_neo(priority=0.2, hazard_flag="nominal")
+        result = generate_observation_request(neo)
+        assert "ROUTINE" in result

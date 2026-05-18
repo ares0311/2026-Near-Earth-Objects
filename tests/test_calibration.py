@@ -371,3 +371,55 @@ class TestBootstrapCILengthMismatch:
         lbs = np.array([1.0, 0.0])
         with pt.raises(ValueError, match="same length"):
             bootstrap_confidence_interval(p, lbs, n_bootstrap=10)
+
+
+class TestComputeLogLoss:
+    def _make_data(self, n=100, seed=42):
+        import numpy as np
+        rng = np.random.default_rng(seed)
+        probs = rng.uniform(0.1, 0.9, n)
+        labels = (rng.uniform(0.0, 1.0, n) < probs).astype(float)
+        return probs, labels
+
+    def test_returns_float(self):
+        from calibration import compute_log_loss
+        p, lbs = self._make_data()
+        result = compute_log_loss(p, lbs)
+        assert isinstance(result, float)
+
+    def test_nonnegative(self):
+        from calibration import compute_log_loss
+        p, lbs = self._make_data()
+        assert compute_log_loss(p, lbs) >= 0.0
+
+    def test_perfect_predictions_near_zero(self):
+        import numpy as np
+
+        from calibration import compute_log_loss
+        p = np.array([0.99, 0.01, 0.99, 0.01])
+        lbs = np.array([1.0, 0.0, 1.0, 0.0])
+        assert compute_log_loss(p, lbs) < 0.05
+
+    def test_random_classifier_near_ln2(self):
+        import math
+
+        import numpy as np
+
+        from calibration import compute_log_loss
+        p = np.full(1000, 0.5)
+        lbs = np.array([float(i % 2) for i in range(1000)])
+        result = compute_log_loss(p, lbs)
+        assert abs(result - math.log(2)) < 0.05
+
+    def test_empty_returns_zero(self):
+        from calibration import compute_log_loss
+        assert compute_log_loss([], []) == pytest.approx(0.0)
+
+    def test_clipping_prevents_inf(self):
+        import numpy as np
+
+        from calibration import compute_log_loss
+        p = np.array([0.0, 1.0])
+        lbs = np.array([1.0, 0.0])
+        result = compute_log_loss(p, lbs)
+        assert result < 1e6

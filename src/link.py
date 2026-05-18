@@ -4,7 +4,8 @@ from __future__ import annotations
 
 __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "filter_high_motion", "deduplicate_tracklets", "_predict_from_arc",
-           "split_tracklet", "compute_arc_statistics", "assess_link_confidence"]
+           "split_tracklet", "compute_arc_statistics", "assess_link_confidence",
+           "compute_tracklet_grade"]
 
 import math
 import uuid
@@ -525,3 +526,34 @@ def assess_link_confidence(tracklet: object) -> float:
     dec_res = (decs - A @ dec_fit) * 3600.0
     rms = float(np.sqrt(np.mean(ra_res ** 2 + dec_res ** 2)))
     return round(max(0.0, 1.0 - rms / 10.0), 4)
+
+
+def compute_tracklet_grade(tracklet: object) -> str:
+    """Quality grade for a linked tracklet: 'A', 'B', 'C', or 'D'.
+
+    Grade criteria (all must be satisfied to achieve a given grade):
+
+    =========  ========  =========  ================
+    Grade      arc_days  n_nights   rms_arcsec
+    =========  ========  =========  ================
+    A          ≥ 7       ≥ 3        ≤ 0.5
+    B          ≥ 2       ≥ 2        ≤ 2.0
+    C          ≥ 0.5     ≥ 2        ≤ 5.0
+    D          anything  else       else
+    =========  ========  =========  ================
+
+    Uses ``assess_link_confidence`` to derive the RMS residual (rms = (1 - conf) * 10).
+    """
+    stats = compute_arc_statistics(tracklet)
+    arc = stats["arc_days"]
+    nights = stats["n_nights"]
+    conf = assess_link_confidence(tracklet)
+    rms = (1.0 - conf) * 10.0  # inverse of confidence formula
+
+    if arc >= 7.0 and nights >= 3 and rms <= 0.5:
+        return "A"
+    if arc >= 2.0 and nights >= 2 and rms <= 2.0:
+        return "B"
+    if arc >= 0.5 and nights >= 2 and rms <= 5.0:
+        return "C"
+    return "D"

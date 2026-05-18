@@ -468,9 +468,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.19.0)
+## Current State (v0.20.0)
 
-All 10 pipeline modules are complete. 880 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified manual CLI with top-level SQLite logs and auditable signoff readiness.
+All 10 pipeline modules are complete. 949 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified manual CLI with top-level SQLite logs and auditable signoff readiness.
 
 ### Skills
 
@@ -513,6 +513,8 @@ All 10 pipeline modules are complete. 880 tests passing (100% coverage). CI gree
 | `Skills/flag_comet_candidates.py` | Combined Tisserand + eccentricity comet-candidate flag; `--threshold`, `--min-ecc`, `--json` flags |
 | `Skills/compute_orbital_energy.py` | Batch orbital energy computation; bound/parabolic/hyperbolic label; `--json` flag |
 | `Skills/assess_survey_coverage.py` | Survey field coverage report (area, limiting mag, source count, fields per night); `--json` flag |
+| `Skills/grade_tracklets.py` | Batch-grade tracklets from JSON (A/B/C/D) using arc, nights, and astrometric RMS; `--json` flag |
+| `Skills/query_mpc_observations.py` | Query MPC observation history for a designation; prints table or JSON |
 
 ### Docs
 
@@ -527,6 +529,7 @@ All 10 pipeline modules are complete. 880 tests passing (100% coverage). CI gree
 | `docs/ORBIT_FITTING.md` | Technical reference for orbit fitting: Gauss's method, differential correction, MOID, Tisserand parameter |
 | `docs/ALERT_PROTOCOL.md` | Technical reference for alert-pathway decision tree, gate conditions, MPC submission, NEOCP monitoring, NASA PDCO notification |
 | `docs/CLASSIFICATION_GUIDE.md` | Technical reference for three-tier ML classification, morphology, ensemble stacking, calibration, and conservative classification policy |
+| `docs/QUALITY_METRICS.md` | Reference for all pipeline quality metrics: detection, astrometric, photometric, orbital, calibration, and hazard scoring |
 
 ### Data
 
@@ -570,6 +573,24 @@ All 10 pipeline modules are complete. 880 tests passing (100% coverage). CI gree
 - Collect labeled training data via `Skills/generate_training_labels.py`
 - Integrate live ZTF alert stream (Milestone 4)
 - Train and evaluate Tier 2 CNN on real cutouts (Milestone 5)
+
+### Key Changes in v0.20.0
+
+- `orbit.py`: added `compute_phase_angle(elements, target_jd)` — Sun–target–observer phase angle via law of cosines; returns NaN on degenerate geometry.
+- `detect.py`: added `compute_psf_fwhm(obs)` — PSF FWHM in arcsec from 2D Gaussian moment fit; returns None if no cutout or degenerate.
+- `link.py`: added `compute_tracklet_grade(tracklet)` — A/B/C/D quality grade from arc length, nights observed, and astrometric RMS.
+- `classify.py`: added `summarize_classifications(neos)` — aggregate summary dict: total, dominant_hypothesis_counts, mean_entropy_bits, mean_real_bogus_score, pha_candidate_count.
+- `score.py`: added `compute_novelty_score(neo, catalog_elements)` — orbital distance from nearest known NEO in (a, e, i) space; 1.0 = fully novel.
+- `alert.py`: added `generate_observation_request(neo, obs_code)` — structured NEOCP follow-up request with urgency tier (URGENT/HIGH/MEDIUM/ROUTINE) and guardrail.
+- `fetch.py`: added `fetch_mpc_observations(designation)` — query MPC observation history for a designation; caches to disk; returns list[Observation].
+- `preprocess.py`: added `compute_astrometric_scatter(observations)` — RMS of linear RA/Dec fit residuals in arcsec; None for <2 obs or identical JDs.
+- `schemas.py`: added `PipelineConfig` — frozen Pydantic model capturing sky position, time window, survey selection, and detection thresholds for a pipeline run.
+- `calibration.py`: added `compute_log_loss(probs, labels, eps)` — binary cross-entropy with clipping; returns 0.0 for empty inputs.
+- `Skills/grade_tracklets.py`: new — batch-grade tracklets from JSON; `--json` flag.
+- `Skills/query_mpc_observations.py`: new — query MPC observation history for a designation; `--json` flag.
+- `docs/QUALITY_METRICS.md`: new — comprehensive quality metrics reference for all pipeline stages.
+- 69 new tests (949 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.20.0.
 
 ### Key Changes in v0.19.0
 

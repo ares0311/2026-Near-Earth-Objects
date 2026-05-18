@@ -1175,3 +1175,194 @@ class TestBuildObservationWindowDefaultEndJd:
         from fetch import build_observation_window
         w = build_observation_window(10.0, 20.0, start_jd=2460000.5)
         assert w.end_jd == pt.approx(2460030.5)
+
+
+class TestFetchMpcObservations:
+    def test_returns_list_on_import_error(self):
+        from unittest.mock import patch
+
+        from fetch import fetch_mpc_observations
+        # Patch the astroquery.mpc module itself to simulate ImportError
+        with patch.dict("sys.modules", {"astroquery.mpc": None}):
+            result = fetch_mpc_observations("2020_XL5_net_err_test_xyz")
+        assert isinstance(result, list)
+
+    def test_returns_list_for_known_object(self):
+        from unittest.mock import MagicMock, patch
+
+        from fetch import fetch_mpc_observations
+
+        mock_row = MagicMock()
+        mock_row.__getitem__ = MagicMock(side_effect=lambda k: {
+            "number": "433",
+            "RA": 180.0,
+            "Dec": 5.0,
+            "JD": 2460000.5,
+            "mag": 18.5,
+            "band": "V",
+        }.get(k, None))
+        mock_row.get = MagicMock(side_effect=lambda k, default=None: {
+            "mag": 18.5,
+            "band": "V",
+        }.get(k, default))
+
+        mock_table = MagicMock()
+        mock_table.__iter__ = MagicMock(return_value=iter([mock_row]))
+        mock_table.__len__ = MagicMock(return_value=1)
+
+        mock_mpc_cls = MagicMock()
+        mock_mpc_cls.get_observations.return_value = mock_table
+
+        mock_mpc_mod = MagicMock()
+        mock_mpc_mod.MPC = mock_mpc_cls
+
+        with patch.dict("sys.modules", {"astroquery.mpc": mock_mpc_mod}):
+            result = fetch_mpc_observations("433_known_obj_test")
+        assert isinstance(result, list)
+
+    def test_empty_result_on_exception(self):
+        from unittest.mock import MagicMock, patch
+
+        from fetch import fetch_mpc_observations
+
+        mock_mpc_cls = MagicMock()
+        mock_mpc_cls.get_observations.side_effect = Exception("network error")
+
+        mock_mpc_mod = MagicMock()
+        mock_mpc_mod.MPC = mock_mpc_cls
+
+        with patch.dict("sys.modules", {"astroquery.mpc": mock_mpc_mod}):
+            result = fetch_mpc_observations("unknown_xyz_test_999")
+        assert result == []
+
+    def test_returns_list_type(self):
+        # Call with a designation unlikely to be cached; result is always list
+        from unittest.mock import patch
+
+        from fetch import fetch_mpc_observations
+        with patch.dict("sys.modules", {"astroquery.mpc": None}):
+            result = fetch_mpc_observations("test_designation_abc123")
+        assert isinstance(result, list)
+
+
+class TestFetchMpcObservationsCacheHit:
+    """Cover cache hit path in fetch_mpc_observations (lines 631-632)."""
+
+    def test_returns_from_cache(self, tmp_path, monkeypatch):
+        import hashlib
+        from unittest.mock import patch
+
+        import fetch as fetch_mod
+
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        # Pre-populate cache with a valid Observation dict
+        desig = "cache_hit_test_1234"
+        cache_key = hashlib.md5(f"mpc_obs_{desig}".encode()).hexdigest()
+
+        obs_dict = {
+            "obs_id": f"{desig}_1",
+            "ra_deg": 10.0,
+            "dec_deg": 5.0,
+            "jd": 2460000.5,
+            "mag": 18.5,
+            "mag_err": 0.1,
+            "filter_band": "V",
+            "mission": "MPC",
+            "real_bogus": 1.0,
+        }
+        fetch_mod._save_cache(cache_key, [obs_dict])
+
+        # Patch astroquery.mpc to ensure it's NOT called (cache hit)
+        with patch.dict("sys.modules", {"astroquery.mpc": None}):
+            result = fetch_mod.fetch_mpc_observations(desig)
+        assert isinstance(result, list)
+        assert len(result) == 1
+
+    def test_successful_mpc_query_and_cache(self, tmp_path, monkeypatch):
+        """Cover the successful astroquery path (lines 638-656)."""
+        from unittest.mock import MagicMock, patch
+
+        import fetch as fetch_mod
+
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        desig = "433_eros_full_path_test"
+
+        mock_row = MagicMock()
+        mock_row.__getitem__ = MagicMock(side_effect=lambda k: {
+            "number": "433",
+            "RA": 180.0,
+            "Dec": 5.0,
+            "JD": 2460000.5,
+        }.get(k, None))
+        mock_row.get = MagicMock(side_effect=lambda k, default=None: {
+            "mag": 18.5,
+            "band": "V",
+        }.get(k, default))
+
+        mock_table = MagicMock()
+        mock_table.__iter__ = MagicMock(return_value=iter([mock_row]))
+
+        mock_mpc_cls = MagicMock()
+        mock_mpc_cls.get_observations.return_value = mock_table
+
+        mock_mpc_mod = MagicMock()
+        mock_mpc_mod.MPC = mock_mpc_cls
+
+        with patch.dict("sys.modules", {"astroquery.mpc": mock_mpc_mod}):
+            result = fetch_mod.fetch_mpc_observations(desig)
+        assert isinstance(result, list)
+
+
+class TestFetchMpcObservationsEdgeCases:
+    """Cover lines 631-632 and 653-654 in fetch_mpc_observations."""
+
+    def test_bad_cached_observation_skipped(self, tmp_path, monkeypatch):
+        """Lines 631-632: except Exception in cache hit path."""
+        import hashlib
+        from unittest.mock import patch
+
+        import fetch as fetch_mod
+
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        desig = "bad_cache_obs_test_9999"
+        cache_key = hashlib.md5(f"mpc_obs_{desig}".encode()).hexdigest()
+        # Save an invalid dict that will fail Observation(**d)
+        fetch_mod._save_cache(cache_key, [{"invalid_field": "garbage"}])
+
+        with patch.dict("sys.modules", {"astroquery.mpc": None}):
+            result = fetch_mod.fetch_mpc_observations(desig)
+        # Invalid entry is skipped; returns empty list
+        assert isinstance(result, list)
+        assert len(result) == 0
+
+    def test_bad_row_skipped_in_mpc_query(self, tmp_path, monkeypatch):
+        """Lines 653-654: except Exception inside for-row loop."""
+        from unittest.mock import MagicMock, patch
+
+        import fetch as fetch_mod
+
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        desig = "bad_row_mpc_test_8888"
+
+        # Row that raises on key access
+        bad_row = MagicMock()
+        bad_row.__getitem__ = MagicMock(side_effect=KeyError("RA"))
+        bad_row.get = MagicMock(return_value=None)
+
+        mock_table = MagicMock()
+        mock_table.__iter__ = MagicMock(return_value=iter([bad_row]))
+
+        mock_mpc_cls = MagicMock()
+        mock_mpc_cls.get_observations.return_value = mock_table
+
+        mock_mpc_mod = MagicMock()
+        mock_mpc_mod.MPC = mock_mpc_cls
+
+        with patch.dict("sys.modules", {"astroquery.mpc": mock_mpc_mod}):
+            result = fetch_mod.fetch_mpc_observations(desig)
+        assert isinstance(result, list)
+        assert len(result) == 0

@@ -506,3 +506,45 @@ class TestSurveyField:
     def test_jd_stored(self):
         f = self._make_field(jd=2461000.5)
         assert f.jd == pytest.approx(2461000.5)
+
+
+class TestPipelineConfig:
+    def _make_config(self, **kwargs):
+        from schemas import PipelineConfig
+        defaults = dict(ra_deg=180.0, dec_deg=0.0)
+        defaults.update(kwargs)
+        return PipelineConfig(**defaults)
+
+    def test_construction(self):
+        cfg = self._make_config()
+        assert cfg.ra_deg == pytest.approx(180.0)
+        assert cfg.dec_deg == pytest.approx(0.0)
+
+    def test_defaults(self):
+        cfg = self._make_config()
+        assert cfg.radius_deg == pytest.approx(1.0)
+        assert cfg.real_bogus_threshold == pytest.approx(0.65)
+        assert cfg.surveys == ("ZTF",)
+        assert cfg.end_jd is None
+
+    def test_immutable(self):
+        import pytest as pt
+        cfg = self._make_config()
+        with pt.raises(Exception):
+            cfg.ra_deg = 0.0  # type: ignore[misc]
+
+    def test_custom_values(self):
+        cfg = self._make_config(
+            radius_deg=2.0,
+            real_bogus_threshold=0.80,
+            surveys=("ZTF", "ATLAS"),
+            end_jd=2460100.5,
+        )
+        assert cfg.radius_deg == pytest.approx(2.0)
+        assert cfg.real_bogus_threshold == pytest.approx(0.80)
+        assert "ATLAS" in cfg.surveys
+        assert cfg.end_jd == pytest.approx(2460100.5)
+
+    def test_surveys_is_tuple(self):
+        cfg = self._make_config(surveys=("ZTF", "Pan-STARRS"))
+        assert isinstance(cfg.surveys, tuple)

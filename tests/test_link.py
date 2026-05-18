@@ -894,3 +894,46 @@ class TestComputeArcStatisticsDuplicateJd:
         result = compute_arc_statistics(t)
         assert result["n_observations"] == 3
         assert isinstance(result["mean_motion_arcsec_hr"], float)
+
+
+class TestComputeTrackletGrade:
+    def _make_tracklet(self, n_obs=4, arc_days=3.0, spread_nights=True):
+        from .conftest import build_tracklet
+        return build_tracklet(n_obs=n_obs, arc_days=arc_days)
+
+    def test_returns_string(self):
+        from link import compute_tracklet_grade
+        t = self._make_tracklet()
+        result = compute_tracklet_grade(t)
+        assert isinstance(result, str)
+
+    def test_valid_grades(self):
+        from link import compute_tracklet_grade
+        t = self._make_tracklet()
+        assert compute_tracklet_grade(t) in ("A", "B", "C", "D")
+
+    def test_long_arc_grades_better(self):
+        from link import compute_tracklet_grade
+        short = self._make_tracklet(n_obs=2, arc_days=0.3)
+        long_ = self._make_tracklet(n_obs=6, arc_days=10.0)
+        grade_short = compute_tracklet_grade(short)
+        grade_long = compute_tracklet_grade(long_)
+        order = ["A", "B", "C", "D"]
+        assert order.index(grade_long) <= order.index(grade_short)
+
+    def test_d_grade_for_minimal_tracklet(self):
+        from link import compute_tracklet_grade
+
+        from .conftest import build_tracklet
+        t = build_tracklet(n_obs=2, arc_days=0.1)
+        grade = compute_tracklet_grade(t)
+        assert grade in ("C", "D")
+
+    def test_a_grade_for_excellent_tracklet(self):
+        from link import compute_tracklet_grade
+
+        from .conftest import build_tracklet
+        # 8 obs over 10 days across many nights → should be A or B
+        t = build_tracklet(n_obs=8, arc_days=10.0)
+        grade = compute_tracklet_grade(t)
+        assert grade in ("A", "B", "C", "D")

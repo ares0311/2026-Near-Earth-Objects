@@ -979,3 +979,146 @@ class TestAssessSurveyCoverageSkill:
             mod.main()
         finally:
             _sys.argv = old_argv
+
+
+class TestGradeTrackletsSkill:
+    def _skill_path(self):
+        import pathlib
+        return str(pathlib.Path(__file__).resolve().parents[1] / "Skills")
+
+    def test_module_has_main(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "grade_tracklets",
+            f"{self._skill_path()}/grade_tracklets.py",
+        )
+        mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+        assert hasattr(mod, "main")
+
+    def test_grade_tracklets_on_sample(self, tmp_path):
+        import importlib.util
+        import json
+        spec = importlib.util.spec_from_file_location(
+            "grade_tracklets",
+            f"{self._skill_path()}/grade_tracklets.py",
+        )
+        mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+
+        data = [
+            {
+                "object_id": "2026 AA1",
+                "arc_days": 3.0,
+                "motion_rate_arcsec_per_hour": 5.0,
+                "motion_pa_degrees": 90.0,
+                "observations": [
+                    {"obs_id": "o1", "ra_deg": 10.0, "dec_deg": 5.0, "jd": 2460000.5,
+                     "magnitude": 20.0, "magnitude_error": 0.1, "band": "r", "survey": "ZTF"},
+                    {"obs_id": "o2", "ra_deg": 10.01, "dec_deg": 5.01, "jd": 2460001.5,
+                     "magnitude": 20.1, "magnitude_error": 0.1, "band": "r", "survey": "ZTF"},
+                ],
+            }
+        ]
+        f = tmp_path / "tracklets.json"
+        f.write_text(json.dumps(data))
+        import sys as _sys
+        old_argv = _sys.argv
+        _sys.argv = ["grade_tracklets.py", str(f)]
+        try:
+            result = mod.grade_tracklets(str(f))
+        finally:
+            _sys.argv = old_argv
+        assert result == 0
+
+    def test_grade_tracklets_json_flag(self, tmp_path):
+        import importlib.util
+        import json
+        spec = importlib.util.spec_from_file_location(
+            "grade_tracklets",
+            f"{self._skill_path()}/grade_tracklets.py",
+        )
+        mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+
+        data = [
+            {
+                "object_id": "2026 BB2",
+                "arc_days": 1.0,
+                "motion_rate_arcsec_per_hour": 3.0,
+                "motion_pa_degrees": 45.0,
+                "observations": [
+                    {"obs_id": "o1", "ra_deg": 20.0, "dec_deg": 3.0, "jd": 2460000.5,
+                     "magnitude": 20.0, "magnitude_error": 0.1, "band": "r", "survey": "ZTF"},
+                    {"obs_id": "o2", "ra_deg": 20.01, "dec_deg": 3.01, "jd": 2460001.5,
+                     "magnitude": 20.1, "magnitude_error": 0.1, "band": "r", "survey": "ZTF"},
+                ],
+            }
+        ]
+        f = tmp_path / "t.json"
+        f.write_text(json.dumps(data))
+        result = mod.grade_tracklets(str(f), as_json=True)
+        assert result == 0
+
+    def test_empty_file_returns_nonzero(self, tmp_path):
+        import importlib.util
+        import json
+        spec = importlib.util.spec_from_file_location(
+            "grade_tracklets",
+            f"{self._skill_path()}/grade_tracklets.py",
+        )
+        mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+
+        f = tmp_path / "empty.json"
+        f.write_text(json.dumps([]))
+        result = mod.grade_tracklets(str(f))
+        assert result == 1
+
+
+class TestQueryMpcObservationsSkill:
+    def _skill_path(self):
+        import pathlib
+        return str(pathlib.Path(__file__).resolve().parents[1] / "Skills")
+
+    def test_module_has_main(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "query_mpc_observations",
+            f"{self._skill_path()}/query_mpc_observations.py",
+        )
+        mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+        assert hasattr(mod, "main")
+
+    def test_query_returns_0_on_empty(self):
+        import importlib.util
+        from unittest.mock import patch
+        spec = importlib.util.spec_from_file_location(
+            "query_mpc_observations",
+            f"{self._skill_path()}/query_mpc_observations.py",
+        )
+        mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+
+        with patch("fetch.fetch_mpc_observations", return_value=[]):
+            result = mod.query_observations("unknown_xyz")
+        assert result == 0
+
+    def test_query_json_flag_empty(self, capsys):
+        import importlib.util
+        from unittest.mock import patch
+        spec = importlib.util.spec_from_file_location(
+            "query_mpc_observations",
+            f"{self._skill_path()}/query_mpc_observations.py",
+        )
+        mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+
+        with patch("fetch.fetch_mpc_observations", return_value=[]):
+            result = mod.query_observations("unknown_xyz", as_json=True)
+        assert result == 0
+        captured = capsys.readouterr()
+        import json
+        data = json.loads(captured.out)
+        assert data["n_obs"] == 0

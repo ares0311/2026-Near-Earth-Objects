@@ -1285,3 +1285,51 @@ class TestClassifyMorphologyCoverage:
         arr[4:6, 3:6] = 1.0  # 2x3 box → elongation ~2.67 → "extended"
         result = classify_morphology(self._obs(self._encode(arr)))
         assert result == "extended"
+
+
+class TestSummarizeClassifications:
+    def _make_neos(self, n=3):
+        from .conftest import build_scored_neo
+        return [build_scored_neo() for _ in range(n)]
+
+    def test_returns_dict(self):
+        from classify import summarize_classifications
+        neos = self._make_neos()
+        result = summarize_classifications(neos)
+        assert isinstance(result, dict)
+
+    def test_total_count(self):
+        from classify import summarize_classifications
+        neos = self._make_neos(5)
+        result = summarize_classifications(neos)
+        assert result["total"] == 5
+
+    def test_dominant_hypothesis_counts_is_dict(self):
+        from classify import summarize_classifications
+        neos = self._make_neos()
+        result = summarize_classifications(neos)
+        assert isinstance(result["dominant_hypothesis_counts"], dict)
+
+    def test_mean_entropy_is_float(self):
+        from classify import summarize_classifications
+        neos = self._make_neos()
+        result = summarize_classifications(neos)
+        assert isinstance(result["mean_entropy_bits"], float)
+
+    def test_mean_real_bogus_in_range(self):
+        from classify import summarize_classifications
+        neos = self._make_neos()
+        result = summarize_classifications(neos)
+        rb = result["mean_real_bogus_score"]
+        assert rb is None or 0.0 <= rb <= 1.0
+
+    def test_pha_count_nonneg(self):
+        from classify import summarize_classifications
+        neos = self._make_neos()
+        result = summarize_classifications(neos)
+        assert result["pha_candidate_count"] >= 0
+
+    def test_empty_list(self):
+        from classify import summarize_classifications
+        result = summarize_classifications([])
+        assert result["total"] == 0

@@ -5,7 +5,7 @@ from __future__ import annotations
 __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "followup_priority_table", "pha_candidates", "compute_statistics",
            "close_approach_candidates", "absolute_magnitude_from_diameter",
-           "compute_impact_energy"]
+           "compute_impact_energy", "compute_novelty_score"]
 
 import math
 import uuid
@@ -532,3 +532,34 @@ def compute_impact_energy(
     joules = 0.5 * mass_kg * velocity_m_s ** 2
     megatons = joules / 4.184e15
     return round(megatons, 6)
+
+
+def compute_novelty_score(neo: object, catalog_elements: list) -> float:
+    """Orbital novelty score in [0, 1] relative to a catalog of known objects.
+
+    Computes a distance metric between the NEO's orbital elements and every
+    element in ``catalog_elements`` using a weighted combination of Δa, Δe, Δi.
+    Returns 1.0 (maximum novelty) when the catalog is empty or orbital elements
+    are unavailable.  Returns 0.0 when an exact match is found.
+
+    Distance metric: d = sqrt((Δa/3)² + (Δe)² + (Δi/180)²)
+    Score = min(1, min_distance / reference_distance) where reference_distance = 1.
+    """
+    el = getattr(getattr(neo, "hazard", None), "orbital_elements", None)
+    if el is None or not catalog_elements:
+        return 1.0
+
+    a0 = el.semi_major_axis_au
+    e0 = el.eccentricity
+    i0 = el.inclination_deg
+
+    min_dist = float("inf")
+    for cat_el in catalog_elements:
+        da = (cat_el.semi_major_axis_au - a0) / 3.0
+        de = cat_el.eccentricity - e0
+        di = (cat_el.inclination_deg - i0) / 180.0
+        d = math.sqrt(da**2 + de**2 + di**2)
+        if d < min_dist:
+            min_dist = d
+
+    return round(min(1.0, float(min_dist)), 4)

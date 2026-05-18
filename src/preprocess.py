@@ -4,10 +4,11 @@ from __future__ import annotations
 
 __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_sources",
            "compute_color_index", "estimate_source_density", "compute_source_snr",
-           "detect_bad_pixels"]
+           "detect_bad_pixels", "compute_astrometric_scatter"]
 
 import base64
 import math
+from typing import Any
 
 import numpy as np
 
@@ -396,3 +397,31 @@ def detect_bad_pixels(obs: object, sigma_threshold: float = 5.0) -> list[tuple[i
         return [(int(r), int(c)) for r, c in bad]
     except Exception:
         return []
+
+
+def compute_astrometric_scatter(observations: Any) -> float | None:
+    """RMS astrometric residual from a linear RA/Dec fit in arcsec.
+
+    Fits a linear model to RA(t) and Dec(t), then computes the RMS of the
+    residuals converted to arcsec.  Returns None for fewer than 2 observations
+    or when all observations have identical JDs.
+    """
+    obs_list = list(observations)
+    if len(obs_list) < 2:
+        return None
+    try:
+        jds = np.array([o.jd for o in obs_list], dtype=np.float64)
+        ras = np.array([o.ra_deg for o in obs_list], dtype=np.float64)
+        decs = np.array([o.dec_deg for o in obs_list], dtype=np.float64)
+        t = jds - jds[0]
+        if t.max() < 1e-9:
+            return None
+        A = np.column_stack([np.ones_like(t), t])
+        ra_fit = np.linalg.lstsq(A, ras, rcond=None)[0]
+        dec_fit = np.linalg.lstsq(A, decs, rcond=None)[0]
+        ra_res = (ras - A @ ra_fit) * 3600.0
+        dec_res = (decs - A @ dec_fit) * 3600.0
+        rms = float(np.sqrt(np.mean(ra_res**2 + dec_res**2)))
+        return round(rms, 4)
+    except Exception:
+        return None

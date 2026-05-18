@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus",
-           "compute_streak_metric", "cluster_detections", "compute_trail_length"]
+           "compute_streak_metric", "cluster_detections", "compute_trail_length",
+           "compute_psf_fwhm"]
 
 import math
 import uuid
@@ -474,5 +475,44 @@ def compute_trail_length(obs: object) -> float | None:
         disc = math.sqrt(max(0.0, ((mxx - myy) / 2) ** 2 + mxy ** 2))
         lam1 = trace / 2 + disc
         return round(float(math.sqrt(max(0.0, lam1))) * _PIXEL_SCALE, 3)
+    except Exception:
+        return None
+
+
+def compute_psf_fwhm(obs: Observation) -> float | None:
+    """Estimate PSF FWHM in arcsec from the difference-image cutout.
+
+    Fits a 2D Gaussian to the cutout by computing the RMS radius of the
+    light distribution and converting to FWHM (FWHM = 2.355 * sigma).
+    Returns None when no cutout is available or the array cannot be decoded.
+    Pixel scale: 1.01 arcsec/pixel (ZTF).
+    """
+    _PIXEL_SCALE = 1.01  # arcsec/pixel
+    _FWHM_FACTOR = 2.3548  # 2 * sqrt(2 * ln(2))
+    cutout_b64 = getattr(obs, "cutout_difference", None)
+    if not cutout_b64:
+        return None
+    try:
+        import base64
+        raw = base64.b64decode(cutout_b64)
+        arr = np.frombuffer(raw, dtype=np.float32).copy()
+        size = int(math.isqrt(len(arr)))
+        if size * size != len(arr) or size < 3:
+            return None
+        arr = arr.reshape(size, size).astype(np.float64)
+        arr = np.clip(arr, 0.0, None)
+        total = float(arr.sum())
+        if total <= 0:
+            return None
+        y, x = np.indices(arr.shape)
+        cx = float((x * arr).sum()) / total
+        cy = float((y * arr).sum()) / total
+        dx = x - cx
+        dy = y - cy
+        mxx = float((dx**2 * arr).sum()) / total
+        myy = float((dy**2 * arr).sum()) / total
+        sigma_px = math.sqrt(max(0.0, (mxx + myy) / 2.0))
+        fwhm_arcsec = sigma_px * _FWHM_FACTOR * _PIXEL_SCALE
+        return round(fwhm_arcsec, 3)
     except Exception:
         return None
