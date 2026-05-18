@@ -584,3 +584,46 @@ class TestCompareCalibrators:
         labels = [0.0, 1.0]
         result = compare_calibrators([probs_good, probs_poor], labels, ["good", "poor"])
         assert result["good"]["brier_score"] < result["poor"]["brier_score"]
+
+
+class TestComputeRocAuc:
+    def test_returns_float(self):
+        from calibration import compute_roc_auc
+        result = compute_roc_auc([0.1, 0.9], [0.0, 1.0])
+        assert isinstance(result, float)
+
+    def test_perfect_classifier_auc_1(self):
+        from calibration import compute_roc_auc
+        result = compute_roc_auc([0.0, 1.0], [0.0, 1.0])
+        assert result == pytest.approx(1.0, abs=0.01)
+
+    def test_equal_probs_returns_valid_auc(self):
+        from calibration import compute_roc_auc
+        # Equal probabilities: AUC depends on tie-breaking order; just verify valid float
+        result = compute_roc_auc([0.5, 0.5], [0.0, 1.0])
+        assert 0.0 <= result <= 1.0
+
+    def test_empty_returns_05(self):
+        from calibration import compute_roc_auc
+        assert compute_roc_auc([], []) == pytest.approx(0.5)
+
+    def test_single_class_returns_05(self):
+        from calibration import compute_roc_auc
+        assert compute_roc_auc([0.3, 0.7], [0.0, 0.0]) == pytest.approx(0.5)
+
+    def test_range_0_1(self):
+        import numpy as np
+
+        from calibration import compute_roc_auc
+        rng = np.random.default_rng(42)
+        probs = rng.random(20).tolist()
+        labels = rng.integers(0, 2, 20).tolist()
+        result = compute_roc_auc(probs, labels)
+        assert 0.0 <= result <= 1.0
+
+    def test_better_model_higher_auc(self):
+        from calibration import compute_roc_auc
+        labels = [0, 0, 1, 1]
+        good = [0.1, 0.2, 0.8, 0.9]
+        poor = [0.4, 0.5, 0.5, 0.6]
+        assert compute_roc_auc(good, labels) > compute_roc_auc(poor, labels)

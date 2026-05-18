@@ -11,6 +11,7 @@ __all__ = [
     "reliability_diagram",
     "calibration_report",
     "compare_calibrators",
+    "compute_roc_auc",
 ]
 
 import math
@@ -532,3 +533,46 @@ def compare_calibrators(
         name = names[idx] if idx < len(names) else f"calibrator_{idx}"
         result[name] = calibration_report(probs, labels)
     return result
+
+
+def compute_roc_auc(probs: list | np.ndarray, labels: list | np.ndarray) -> float:
+    """Compute the area under the ROC curve (AUC) for a binary classifier.
+
+    Uses the trapezoidal rule on the (FPR, TPR) curve sorted by threshold.
+    Returns 0.5 for empty inputs or inputs with only one class label.
+
+    Args:
+        probs: Predicted probabilities for the positive class.
+        labels: Binary ground-truth labels (0 or 1).
+
+    Returns:
+        AUC in [0, 1]; 0.5 indicates a random classifier.
+    """
+    probs_arr = np.asarray(probs, dtype=float)
+    labels_arr = np.asarray(labels, dtype=float)
+    n = len(probs_arr)
+    if n == 0 or len(np.unique(labels_arr)) < 2:
+        return 0.5
+
+    # Sort by descending score
+    order = np.argsort(-probs_arr)
+    labels_sorted = labels_arr[order]
+
+    n_pos = float(labels_arr.sum())
+    n_neg = float(n - n_pos)
+
+    tprs = [0.0]
+    fprs = [0.0]
+    tp = fp = 0.0
+    for lbl in labels_sorted:
+        if lbl == 1:
+            tp += 1
+        else:
+            fp += 1
+        tprs.append(tp / n_pos)
+        fprs.append(fp / n_neg)
+
+    # Trapezoidal integration
+    trapz_fn = getattr(np, "trapezoid", None) or getattr(np, "trapz")
+    auc = float(trapz_fn(tprs, fprs))
+    return round(abs(auc), 6)

@@ -1502,3 +1502,176 @@ class TestTriageCandidatesSkill:
         captured = capsys.readouterr()
         rows = json.loads(captured.out)
         assert isinstance(rows, list)
+
+
+class TestComputeDiscoveryScoresSkill:
+    """Smoke tests for Skills/compute_discovery_scores.py."""
+
+    def _load_skill(self):
+        import importlib.util
+        import pathlib
+        spec = importlib.util.spec_from_file_location(
+            "compute_discovery_scores",
+            str(pathlib.Path(__file__).resolve().parents[1]
+                / "Skills" / "compute_discovery_scores.py"),
+        )
+        mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+        return mod
+
+    def test_module_has_main(self):
+        mod = self._load_skill()
+        assert hasattr(mod, "main")
+
+    def test_main_runs(self, tmp_path):
+        import json
+
+        from .conftest import build_scored_neo
+        mod = self._load_skill()
+        neo = build_scored_neo(alert_pathway="internal_candidate")
+        data = [json.loads(neo.model_dump_json())]
+        f = tmp_path / "neos.json"
+        f.write_text(json.dumps(data))
+        mod.main([str(f)])
+
+    def test_main_json_flag(self, tmp_path, capsys):
+        import json
+
+        from .conftest import build_scored_neo
+        mod = self._load_skill()
+        neo = build_scored_neo(alert_pathway="internal_candidate")
+        data = [json.loads(neo.model_dump_json())]
+        f = tmp_path / "neos.json"
+        f.write_text(json.dumps(data))
+        mod.main([str(f), "--json"])
+        captured = capsys.readouterr()
+        rows = json.loads(captured.out)
+        assert isinstance(rows, list)
+
+    def test_threshold_filters(self, tmp_path, capsys):
+        import json
+
+        from .conftest import build_scored_neo
+        mod = self._load_skill()
+        neo = build_scored_neo(alert_pathway="internal_candidate")
+        data = [json.loads(neo.model_dump_json())]
+        f = tmp_path / "neos.json"
+        f.write_text(json.dumps(data))
+        mod.main([str(f), "--threshold", "0.99", "--json"])
+        captured = capsys.readouterr()
+        rows = json.loads(captured.out)
+        for row in rows:
+            assert row["discovery_score"] >= 0.99
+
+    def test_sort_flag(self, tmp_path, capsys):
+        import json
+
+        from .conftest import build_scored_neo
+        mod = self._load_skill()
+        neo = build_scored_neo(alert_pathway="internal_candidate")
+        data = [json.loads(neo.model_dump_json()) for _ in range(2)]
+        f = tmp_path / "neos.json"
+        f.write_text(json.dumps(data))
+        mod.main([str(f), "--sort", "--json"])
+        captured = capsys.readouterr()
+        rows = json.loads(captured.out)
+        scores = [r["discovery_score"] for r in rows]
+        assert scores == sorted(scores, reverse=True)
+
+    def test_dict_input_wrapped(self, tmp_path, capsys):
+        import json
+
+        from .conftest import build_scored_neo
+        mod = self._load_skill()
+        neo = build_scored_neo()
+        f = tmp_path / "neo.json"
+        f.write_text(neo.model_dump_json())
+        mod.main([str(f), "--json"])
+        captured = capsys.readouterr()
+        rows = json.loads(captured.out)
+        assert isinstance(rows, list)
+
+
+class TestFormatSubmissionChecklistsSkill:
+    """Smoke tests for Skills/format_submission_checklists.py."""
+
+    def _load_skill(self):
+        import importlib.util
+        import pathlib
+        spec = importlib.util.spec_from_file_location(
+            "format_submission_checklists",
+            str(pathlib.Path(__file__).resolve().parents[1]
+                / "Skills" / "format_submission_checklists.py"),
+        )
+        mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+        return mod
+
+    def test_module_has_main(self):
+        mod = self._load_skill()
+        assert hasattr(mod, "main")
+
+    def test_main_runs(self, tmp_path):
+        import json
+
+        from .conftest import build_scored_neo
+        mod = self._load_skill()
+        neo = build_scored_neo()
+        data = [json.loads(neo.model_dump_json())]
+        f = tmp_path / "neos.json"
+        f.write_text(json.dumps(data))
+        mod.main([str(f)])
+
+    def test_main_json_flag(self, tmp_path, capsys):
+        import json
+
+        from .conftest import build_scored_neo
+        mod = self._load_skill()
+        neo = build_scored_neo()
+        data = [json.loads(neo.model_dump_json())]
+        f = tmp_path / "neos.json"
+        f.write_text(json.dumps(data))
+        mod.main([str(f), "--json"])
+        captured = capsys.readouterr()
+        rows = json.loads(captured.out)
+        assert isinstance(rows, list)
+        assert "checklist" in rows[0]
+
+    def test_min_priority_filter(self, tmp_path, capsys):
+        import json
+
+        from .conftest import build_scored_neo
+        mod = self._load_skill()
+        neo = build_scored_neo()
+        data = [json.loads(neo.model_dump_json())]
+        f = tmp_path / "neos.json"
+        f.write_text(json.dumps(data))
+        mod.main([str(f), "--min-priority", "0.99"])
+        captured = capsys.readouterr()
+        assert "No candidates" in captured.out or captured.out == ""
+
+    def test_checklist_contains_guardrail(self, tmp_path, capsys):
+        import json
+
+        from .conftest import build_scored_neo
+        mod = self._load_skill()
+        neo = build_scored_neo()
+        data = [json.loads(neo.model_dump_json())]
+        f = tmp_path / "neos.json"
+        f.write_text(json.dumps(data))
+        mod.main([str(f)])
+        captured = capsys.readouterr()
+        assert "GUARDRAIL" in captured.out
+
+    def test_dict_input_wrapped(self, tmp_path, capsys):
+        import json
+
+        from .conftest import build_scored_neo
+        mod = self._load_skill()
+        neo = build_scored_neo()
+        f = tmp_path / "neo.json"
+        f.write_text(neo.model_dump_json())
+        mod.main([str(f), "--json"])
+        captured = capsys.readouterr()
+        rows = json.loads(captured.out)
+        assert len(rows) == 1

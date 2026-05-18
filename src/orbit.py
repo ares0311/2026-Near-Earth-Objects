@@ -8,7 +8,7 @@ __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
            "batch_predict_ephemeris", "resonance_check", "ephemeris_uncertainty",
            "orbital_energy", "compute_phase_angle",
            "compute_heliocentric_distance", "compute_synodic_period",
-           "compute_apparent_magnitude"]
+           "compute_apparent_magnitude", "compute_absolute_magnitude"]
 
 import math
 from typing import NamedTuple
@@ -950,5 +950,43 @@ def compute_apparent_magnitude(
         phase_correction = -2.5 * math.log10((1.0 - G_slope) * phi1 + G_slope * phi2)
         dist_correction = 5.0 * math.log10(r * delta)
         return round(h_mag + phase_correction + dist_correction, 4)
+    except Exception:
+        return float("nan")
+
+
+def compute_absolute_magnitude(
+    observed_mag: float,
+    r_au: float,
+    delta_au: float,
+    phase_deg: float,
+    g: float = 0.15,
+) -> float:
+    """Derive absolute magnitude H from an observed apparent magnitude.
+
+    Inverts the IAU HG phase function:
+    H = V - 5*log10(r * delta) + 2.5*log10((1-G)*phi1 + G*phi2)
+
+    Args:
+        observed_mag: Observed apparent V-band magnitude.
+        r_au: Heliocentric distance in AU.
+        delta_au: Geocentric (observer) distance in AU.
+        phase_deg: Sun-target-observer phase angle in degrees.
+        g: Slope parameter G (default 0.15).
+
+    Returns:
+        Absolute magnitude H as float, or ``float("nan")`` for degenerate inputs.
+    """
+    try:
+        if r_au <= 0.0 or delta_au <= 0.0:
+            return float("nan")
+        alpha = math.radians(phase_deg)
+        tan_half = math.tan(alpha / 2.0)
+        if tan_half < 0.0:
+            return float("nan")
+        phi1 = math.exp(-3.33 * (tan_half ** 0.63))
+        phi2 = math.exp(-1.87 * (tan_half ** 1.22))
+        phase_correction = -2.5 * math.log10((1.0 - g) * phi1 + g * phi2)
+        dist_correction = 5.0 * math.log10(r_au * delta_au)
+        return round(observed_mag - phase_correction - dist_correction, 4)
     except Exception:
         return float("nan")

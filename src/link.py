@@ -6,7 +6,7 @@ __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "filter_high_motion", "deduplicate_tracklets", "_predict_from_arc",
            "split_tracklet", "compute_arc_statistics", "assess_link_confidence",
            "compute_tracklet_grade", "filter_by_arc_length", "summarize_arc_statistics",
-           "filter_by_nights_observed"]
+           "filter_by_nights_observed", "merge_overlapping_tracklets"]
 
 import math
 import uuid
@@ -625,3 +625,83 @@ def filter_by_nights_observed(tracklets: list, min_nights: int = 2) -> list:
         Filtered list of tracklets.
     """
     return [t for t in tracklets if _count_nights(t) >= min_nights]
+
+
+def merge_overlapping_tracklets(tracklets: list) -> list:
+    """Merge tracklets that share at least one common observation ID.
+
+    Uses a union-find approach: any pair sharing ≥1 ``obs_id`` is merged into
+    a single tracklet.  The merged tracklet takes the ``object_id`` of the
+    longer-arc member, deduplicates observations (by ``obs_id``), and
+    recomputes ``arc_days``, ``motion_rate_arcsec_per_hour``, and
+    ``motion_pa_degrees`` from the merged observation set.
+
+    Args:
+        tracklets: List of :class:`~schemas.Tracklet` objects.
+
+    Returns:
+        New list of tracklets with overlapping ones merged.
+    """
+    from schemas import Tracklet
+
+    if not tracklets:
+        return []
+
+    # Build obs_id → tracklet index map
+    obs_to_idx: dict = {}
+    for i, t in enumerate(tracklets):
+        for o in t.observations:
+            if o.obs_id not in obs_to_idx:
+                obs_to_idx[o.obs_id] = i
+
+    # Union-Find
+    parent = list(range(len(tracklets)))
+
+    def find(x: int) -> int:
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a: int, b: int) -> None:
+        parent[find(a)] = find(b)
+
+    for i, t in enumerate(tracklets):
+        for o in t.observations:
+            j = obs_to_idx.get(o.obs_id, i)
+            if j != i:
+                union(i, j)
+
+    # Group by root
+    groups: dict = {}
+    for i in range(len(tracklets)):
+        root = find(i)
+        groups.setdefault(root, []).append(i)
+
+    merged: list = []
+    for indices in groups.values():
+        if len(indices) == 1:
+            merged.append(tracklets[indices[0]])
+            continue
+        # Pick representative (longest arc)
+        rep = max(indices, key=lambda i: tracklets[i].arc_days)
+        # Merge observations (deduplicate by obs_id)
+        seen_ids: set = set()
+        all_obs = []
+        for i in sorted(indices, key=lambda i: -tracklets[i].arc_days):
+            for o in tracklets[i].observations:
+                if o.obs_id not in seen_ids:
+                    seen_ids.add(o.obs_id)
+                    all_obs.append(o)
+        all_obs.sort(key=lambda o: o.jd)
+        arc = all_obs[-1].jd - all_obs[0].jd if len(all_obs) >= 2 else 0.0
+        rate = tracklets[rep].motion_rate_arcsec_per_hour
+        pa = tracklets[rep].motion_pa_degrees
+        merged.append(Tracklet(
+            object_id=tracklets[rep].object_id,
+            observations=tuple(all_obs),
+            arc_days=arc,
+            motion_rate_arcsec_per_hour=rate,
+            motion_pa_degrees=pa,
+        ))
+    return merged

@@ -1771,3 +1771,54 @@ class TestEstimateSurveyDepth:
         # 99.0 excluded, so depth should be based only on [18.0, 19.0]
         assert depth is not None
         assert depth < 90.0
+
+
+class TestFilterBySurvey:
+    def _make_result(self, missions):
+        from schemas import FetchProvenance, FetchResult
+
+        from .conftest import build_observation
+        alerts = tuple(
+            build_observation(obs_id=f"o_{i}", mission=m)
+            for i, m in enumerate(missions)
+        )
+        prov = FetchProvenance(surveys=("ZTF", "ATLAS"), start_jd=2460000.5, end_jd=2460001.5)
+        return FetchResult(alerts=alerts, provenance=prov)
+
+    def test_empty_surveys_returns_empty_alerts(self):
+        from fetch import filter_by_survey
+        result = self._make_result(["ZTF", "ATLAS"])
+        filtered = filter_by_survey(result, [])
+        assert len(filtered.alerts) == 0
+
+    def test_filters_to_single_survey(self):
+        from fetch import filter_by_survey
+        result = self._make_result(["ZTF", "ATLAS", "ZTF"])
+        filtered = filter_by_survey(result, ["ZTF"])
+        assert len(filtered.alerts) == 2
+        assert all(o.mission == "ZTF" for o in filtered.alerts)
+
+    def test_keeps_multiple_surveys(self):
+        from fetch import filter_by_survey
+        result = self._make_result(["ZTF", "ATLAS", "CSS"])
+        filtered = filter_by_survey(result, ["ZTF", "ATLAS"])
+        assert len(filtered.alerts) == 2
+
+    def test_preserves_provenance(self):
+        from fetch import filter_by_survey
+        result = self._make_result(["ZTF"])
+        filtered = filter_by_survey(result, ["ZTF"])
+        assert filtered.provenance is result.provenance
+
+    def test_returns_fetch_result(self):
+        from fetch import filter_by_survey
+        from schemas import FetchResult
+        result = self._make_result(["ZTF"])
+        filtered = filter_by_survey(result, ["ZTF"])
+        assert isinstance(filtered, FetchResult)
+
+    def test_unknown_survey_returns_empty(self):
+        from fetch import filter_by_survey
+        result = self._make_result(["ZTF", "ATLAS"])
+        filtered = filter_by_survey(result, ["PanSTARRS"])
+        assert len(filtered.alerts) == 0

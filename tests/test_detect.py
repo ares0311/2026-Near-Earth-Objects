@@ -1025,3 +1025,56 @@ class TestCountDetectionsByFilter:
         obs = tuple(build_observation(filter_band="o") for _ in range(2))
         result = count_detections_by_filter(obs)
         assert result == {"o": 2}
+
+
+class TestComputeMotionVector:
+    def _make_obs(self, ra, dec, jd):
+        from .conftest import build_observation
+        return build_observation(ra_deg=ra, dec_deg=dec, jd=jd)
+
+    def test_returns_dict_with_expected_keys(self):
+        from detect import compute_motion_vector
+        obs1 = self._make_obs(180.0, 10.0, 2460000.5)
+        obs2 = self._make_obs(180.01, 10.005, 2460001.5)
+        result = compute_motion_vector(obs1, obs2)
+        for key in ["dra_arcsec_hr", "ddec_arcsec_hr", "rate_arcsec_hr", "pa_deg"]:
+            assert key in result
+
+    def test_zero_dt_returns_zeros(self):
+        from detect import compute_motion_vector
+        obs1 = self._make_obs(180.0, 10.0, 2460000.5)
+        obs2 = self._make_obs(180.01, 10.005, 2460000.5)
+        result = compute_motion_vector(obs1, obs2)
+        assert result["rate_arcsec_hr"] == 0.0
+        assert result["pa_deg"] == 0.0
+
+    def test_rate_positive(self):
+        from detect import compute_motion_vector
+        obs1 = self._make_obs(180.0, 10.0, 2460000.5)
+        obs2 = self._make_obs(180.01, 10.005, 2460001.5)
+        result = compute_motion_vector(obs1, obs2)
+        assert result["rate_arcsec_hr"] >= 0.0
+
+    def test_pa_in_range(self):
+        from detect import compute_motion_vector
+        obs1 = self._make_obs(180.0, 10.0, 2460000.5)
+        obs2 = self._make_obs(180.01, 10.005, 2460001.5)
+        result = compute_motion_vector(obs1, obs2)
+        assert 0.0 <= result["pa_deg"] < 360.0
+
+    def test_pure_dec_motion_pa_zero(self):
+        from detect import compute_motion_vector
+        obs1 = self._make_obs(180.0, 10.0, 2460000.5)
+        obs2 = self._make_obs(180.0, 10.1, 2460001.5)
+        result = compute_motion_vector(obs1, obs2)
+        # Pure northward motion → PA = 0 (N)
+        assert result["dra_arcsec_hr"] == pytest.approx(0.0, abs=1e-4)
+        assert result["ddec_arcsec_hr"] > 0.0
+
+    def test_values_are_floats(self):
+        from detect import compute_motion_vector
+        obs1 = self._make_obs(180.0, 10.0, 2460000.5)
+        obs2 = self._make_obs(180.01, 10.0, 2460001.5)
+        result = compute_motion_vector(obs1, obs2)
+        for v in result.values():
+            assert isinstance(v, float)

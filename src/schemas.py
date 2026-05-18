@@ -12,6 +12,7 @@ __all__ = [
     "ObservationWindow", "PipelineResult", "CandidateSummary", "NEOStatistics", "TrackletSummary",
     "CloseApproachEvent", "SurveyField", "PipelineConfig", "ObservationBatch", "DetectionSummary",
     "PhotometricSolution",
+    "ObservationStatistics",
     "BackgroundOutcome", "BackgroundRunMode", "FollowUpTestStatus", "HumanReviewStatus",
     "RecommendationAction", "SignoffDecision",
     "PriorityFactors", "BackgroundTarget", "FollowUpTestResult",
@@ -700,3 +701,28 @@ class PhotometricSolution(BaseModel):
     n_stars: int = Field(ge=0, default=0)
     filter_band: str = "r"
     epoch_jd: float | None = None
+
+
+class ObservationStatistics(BaseModel):
+    """Aggregate statistics computed over a set of observations.
+
+    Provides a compact summary of observation quality and coverage for use in
+    scoring, reporting, and scheduling tools.  Immutable after construction.
+
+    Attributes:
+        n_obs: Total number of observations.
+        mean_mag: Mean apparent magnitude; None if no valid magnitudes.
+        mag_range: Max − min apparent magnitude; None if <2 valid magnitudes.
+        mean_real_bogus: Mean real/bogus score; None if no scored observations.
+        n_filters: Number of distinct filter bands observed.
+        arc_days: Temporal arc from first to last observation in days.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    n_obs: int = Field(ge=0)
+    mean_mag: float | None = None
+    mag_range: float | None = None
+    mean_real_bogus: float | None = None
+    n_filters: int = Field(ge=0, default=0)
+    arc_days: float = 0.0

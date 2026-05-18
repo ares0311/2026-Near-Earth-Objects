@@ -939,3 +939,53 @@ class TestComputePhotometricScatter:
         obs = [self._make_obs(m) for m in [18.0, 19.0, 20.0]]
         result = compute_photometric_scatter(obs)
         assert result >= 0.0
+
+
+class TestEstimateZeroPoint:
+    def _make_obs(self, mag):
+        from .conftest import build_observation
+        return build_observation(mag=mag)
+
+    def test_empty_returns_none(self):
+        from preprocess import estimate_zero_point
+        assert estimate_zero_point([], []) is None
+
+    def test_single_pair_returns_none(self):
+        from preprocess import estimate_zero_point
+        assert estimate_zero_point([self._make_obs(19.0)], [18.5]) is None
+
+    def test_two_pairs_returns_median(self):
+        from preprocess import estimate_zero_point
+        obs = [self._make_obs(19.0), self._make_obs(20.0)]
+        catalog = [18.5, 19.5]
+        result = estimate_zero_point(obs, catalog)
+        assert result == pytest.approx(0.5, abs=1e-5)
+
+    def test_returns_float(self):
+        from preprocess import estimate_zero_point
+        obs = [self._make_obs(19.0), self._make_obs(20.0), self._make_obs(21.0)]
+        catalog = [18.7, 19.7, 20.7]
+        result = estimate_zero_point(obs, catalog)
+        assert isinstance(result, float)
+
+    def test_sentinel_mags_excluded(self):
+        from preprocess import estimate_zero_point
+        obs = [self._make_obs(99.0), self._make_obs(99.0)]
+        catalog = [18.5, 19.5]
+        result = estimate_zero_point(obs, catalog)
+        assert result is None
+
+    def test_mismatched_length_uses_min(self):
+        from preprocess import estimate_zero_point
+        obs = [self._make_obs(19.0), self._make_obs(20.0), self._make_obs(21.0)]
+        catalog = [18.5, 19.5]
+        # Only 2 pairs → median of [0.5, 0.5]
+        result = estimate_zero_point(obs, catalog)
+        assert result == pytest.approx(0.5, abs=1e-5)
+
+    def test_known_offset(self):
+        from preprocess import estimate_zero_point
+        obs = [self._make_obs(19.3), self._make_obs(20.3), self._make_obs(21.3)]
+        catalog = [19.0, 20.0, 21.0]
+        result = estimate_zero_point(obs, catalog)
+        assert result == pytest.approx(0.3, abs=1e-5)

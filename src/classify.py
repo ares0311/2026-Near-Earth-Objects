@@ -20,6 +20,7 @@ __all__ = [
     "summarize_classifications",
     "calibrate_posterior", "compute_classification_table",
     "get_posterior_vector",
+    "compute_neo_probability",
 ]
 
 import base64
@@ -1122,3 +1123,46 @@ def get_posterior_vector(posterior: NEOPosterior) -> np.ndarray:
         posterior.stellar_artifact,
         posterior.other_solar_system,
     ], dtype=float)
+
+
+def compute_neo_probability(features: CandidateFeatures) -> float:
+    """Compute a scalar NEO probability directly from a CandidateFeatures object.
+
+    Applies the Tier-1 log-score model from the scoring model spec without
+    running the full classify pipeline.  Useful for quick screening.
+
+    Args:
+        features: A :class:`~schemas.CandidateFeatures` object.
+
+    Returns:
+        Scalar probability in [0, 1] that the candidate is a genuine new NEO.
+    """
+    import math as _math
+
+    log_prior_neo = _math.log(0.05)
+    log_prior_other = _math.log(0.95)
+
+    weights = {
+        "real_bogus_score": 2.0,
+        "arc_coverage_score": 1.5,
+        "nights_observed_score": 1.5,
+        "motion_consistency_score": 1.2,
+        "orbit_quality_score": 1.0,
+        "known_object_score": -2.5,
+        "stellar_artifact_score": -2.0,
+        "main_belt_consistency_score": -1.5,
+    }
+
+    log_score = log_prior_neo
+    for attr, w in weights.items():
+        val = getattr(features, attr, None)
+        if val is not None:
+            log_score += w * float(val)
+
+    # Two-class softmax: neo vs other
+    log_other = log_prior_other
+    log_max = max(log_score, log_other)
+    exp_neo = _math.exp(log_score - log_max)
+    exp_other = _math.exp(log_other - log_max)
+    prob = exp_neo / (exp_neo + exp_other)
+    return round(float(prob), 6)

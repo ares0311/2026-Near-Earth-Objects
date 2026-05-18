@@ -1486,3 +1486,50 @@ class TestGetPosteriorVector:
         from classify import get_posterior_vector
         vec = get_posterior_vector(self._make_posterior())
         assert vec.dtype == np.float64
+
+
+class TestComputeNeoProbability:
+    def _make_features(self, **kwargs):
+        from schemas import CandidateFeatures
+        defaults = dict(real_bogus_score=0.9, arc_coverage_score=0.8,
+                        nights_observed_score=0.7, motion_consistency_score=0.8)
+        defaults.update(kwargs)
+        return CandidateFeatures(**defaults)
+
+    def test_returns_float(self):
+        from classify import compute_neo_probability
+        result = compute_neo_probability(self._make_features())
+        assert isinstance(result, float)
+
+    def test_range_0_1(self):
+        from classify import compute_neo_probability
+        result = compute_neo_probability(self._make_features())
+        assert 0.0 <= result <= 1.0
+
+    def test_high_scores_give_high_probability(self):
+        from classify import compute_neo_probability
+        feat = self._make_features(real_bogus_score=1.0, arc_coverage_score=1.0,
+                                   nights_observed_score=1.0, motion_consistency_score=1.0)
+        result = compute_neo_probability(feat)
+        assert result > 0.5
+
+    def test_low_scores_give_low_probability(self):
+        from classify import compute_neo_probability
+        feat = self._make_features(real_bogus_score=0.0, arc_coverage_score=0.0,
+                                   nights_observed_score=0.0, motion_consistency_score=0.0,
+                                   known_object_score=1.0)
+        result = compute_neo_probability(feat)
+        assert result < 0.5
+
+    def test_all_none_features(self):
+        from classify import compute_neo_probability
+        from schemas import CandidateFeatures
+        feat = CandidateFeatures()
+        result = compute_neo_probability(feat)
+        assert 0.0 <= result <= 1.0
+
+    def test_known_object_penalty(self):
+        from classify import compute_neo_probability
+        high_neo = self._make_features(known_object_score=0.0)
+        known_obj = self._make_features(known_object_score=1.0)
+        assert compute_neo_probability(high_neo) > compute_neo_probability(known_obj)

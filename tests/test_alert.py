@@ -1089,3 +1089,53 @@ class TestCountPendingAlerts:
         result = count_pending_alerts(neos)
         assert "mpc_submission" not in result
         assert "internal_candidate" in result
+
+
+class TestFormatSubmissionChecklist:
+    def test_returns_string(self):
+        from alert import format_submission_checklist
+
+        from .conftest import build_scored_neo
+        neo = build_scored_neo()
+        result = format_submission_checklist(neo)
+        assert isinstance(result, str)
+
+    def test_contains_object_id(self):
+        from alert import format_submission_checklist
+
+        from .conftest import build_scored_neo
+        neo = build_scored_neo()
+        result = format_submission_checklist(neo)
+        assert neo.tracklet.object_id in result
+
+    def test_contains_guardrail(self):
+        from alert import format_submission_checklist
+
+        from .conftest import build_scored_neo
+        neo = build_scored_neo()
+        result = format_submission_checklist(neo)
+        assert "GUARDRAIL" in result
+
+    def test_contains_gate_markers(self):
+        from alert import format_submission_checklist
+
+        from .conftest import build_scored_neo
+        neo = build_scored_neo()
+        result = format_submission_checklist(neo)
+        assert "✓" in result or "✗" in result
+
+    def test_mpc_submission_pathway_in_checklist(self):
+        from alert import format_submission_checklist
+
+        from .conftest import build_scored_neo
+        neo = build_scored_neo(alert_pathway="mpc_submission")
+        result = format_submission_checklist(neo)
+        assert "Step 1" in result
+
+    def test_multiline(self):
+        from alert import format_submission_checklist
+
+        from .conftest import build_scored_neo
+        neo = build_scored_neo()
+        result = format_submission_checklist(neo)
+        assert "\n" in result
