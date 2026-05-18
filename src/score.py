@@ -5,7 +5,7 @@ from __future__ import annotations
 __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "followup_priority_table", "pha_candidates", "compute_statistics",
            "close_approach_candidates", "absolute_magnitude_from_diameter",
-           "compute_impact_energy", "compute_novelty_score"]
+           "compute_impact_energy", "compute_novelty_score", "compute_threat_score"]
 
 import math
 import uuid
@@ -563,3 +563,62 @@ def compute_novelty_score(neo: object, catalog_elements: list) -> float:
             min_dist = d
 
     return round(min(1.0, float(min_dist)), 4)
+
+
+def compute_threat_score(neo: ScoredNEO) -> float:
+    """Composite threat score combining MOID, H magnitude, and orbit quality.
+
+    Combines three threat-relevant signals into a single [0, 1] score:
+
+    - **MOID proximity**: 1.0 if MOID ≤ 0.01 AU, linearly decaying to 0 at 0.05 AU;
+      0.5 if MOID is unknown.
+    - **Size proxy**: 1.0 if H ≤ 18 (>1 km), linearly decaying to 0 at H = 25.
+    - **Orbit quality**: quality_code / 4.0 (capped at 1).
+
+    The composite score is the geometric mean of the three components.
+    Returns 0.0 if all signals are absent.
+
+    Args:
+        neo: A ScoredNEO object.
+
+    Returns:
+        Threat score in [0, 1].
+    """
+    haz = neo.hazard
+
+    # MOID component
+    moid = haz.moid_au
+    if moid is None:
+        moid_score = 0.5
+    elif moid <= 0.01:
+        moid_score = 1.0
+    elif moid >= 0.05:
+        moid_score = 0.0
+    else:
+        moid_score = 1.0 - (moid - 0.01) / 0.04
+
+    # Size component from H magnitude
+    h = haz.absolute_magnitude_h
+    if h is None:
+        size_score = 0.5
+    elif h <= 18.0:
+        size_score = 1.0
+    elif h >= 25.0:
+        size_score = 0.0
+    else:
+        size_score = 1.0 - (h - 18.0) / 7.0
+
+    # Orbit quality component
+    quality = None
+    if haz.orbital_elements is not None:
+        quality = getattr(haz.orbital_elements, "quality_code", None)
+    if quality is None:
+        orbit_score = 0.5
+    else:
+        orbit_score = min(1.0, int(quality) / 4.0)
+
+    # Geometric mean of three components
+    product = moid_score * size_score * orbit_score
+    if product <= 0.0:
+        return 0.0
+    return round(product ** (1.0 / 3.0), 4)

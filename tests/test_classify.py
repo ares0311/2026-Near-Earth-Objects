@@ -1333,3 +1333,71 @@ class TestSummarizeClassifications:
         from classify import summarize_classifications
         result = summarize_classifications([])
         assert result["total"] == 0
+
+
+class TestCalibratePosterior:
+    def _make_posterior(self, **kwargs):
+        from schemas import NEOPosterior
+        defaults = dict(
+            neo_candidate=0.6,
+            known_object=0.1,
+            main_belt_asteroid=0.1,
+            stellar_artifact=0.1,
+            other_solar_system=0.1,
+        )
+        defaults.update(kwargs)
+        return NEOPosterior(**defaults)
+
+    def test_returns_neo_posterior(self):
+        from classify import calibrate_posterior
+        from schemas import NEOPosterior
+        p = self._make_posterior()
+        result = calibrate_posterior(p)
+        assert isinstance(result, NEOPosterior)
+
+    def test_probabilities_sum_to_one(self):
+        from classify import calibrate_posterior
+        p = self._make_posterior()
+        result = calibrate_posterior(p)
+        total = (result.neo_candidate + result.known_object + result.main_belt_asteroid
+                 + result.stellar_artifact + result.other_solar_system)
+        assert abs(total - 1.0) < 1e-5
+
+    def test_laplace_smoothing_reduces_extreme_probs(self):
+        from classify import calibrate_posterior
+        p = self._make_posterior(
+            neo_candidate=1.0,
+            known_object=0.0,
+            main_belt_asteroid=0.0,
+            stellar_artifact=0.0,
+            other_solar_system=0.0,
+        )
+        result = calibrate_posterior(p)
+        assert result.neo_candidate < 1.0
+        assert result.known_object > 0.0
+
+    def test_with_calibrator(self):
+        import numpy as np
+
+        from classify import calibrate_posterior
+
+        class FakeCal:
+            def predict_proba(self, x):
+                return np.array([[0.2, 0.2, 0.2, 0.2, 0.2]])
+
+        p = self._make_posterior()
+        result = calibrate_posterior(p, calibrator=FakeCal())
+        total = (result.neo_candidate + result.known_object + result.main_belt_asteroid
+                 + result.stellar_artifact + result.other_solar_system)
+        assert abs(total - 1.0) < 1e-5
+
+    def test_calibrator_exception_falls_back(self):
+        from classify import calibrate_posterior
+
+        class BadCal:
+            def predict_proba(self, x):
+                raise RuntimeError("fail")
+
+        p = self._make_posterior()
+        result = calibrate_posterior(p, calibrator=BadCal())
+        assert isinstance(result, type(p))

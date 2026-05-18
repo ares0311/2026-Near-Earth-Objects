@@ -6,7 +6,7 @@ __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
            "propagate_orbit", "predict_ephemeris", "close_approach_table",
            "compute_orbital_period", "classify_neo_class", "tisserand_parameter",
            "batch_predict_ephemeris", "resonance_check", "ephemeris_uncertainty",
-           "orbital_energy", "compute_phase_angle"]
+           "orbital_energy", "compute_phase_angle", "compute_heliocentric_distance"]
 
 import math
 from typing import NamedTuple
@@ -826,5 +826,34 @@ def compute_phase_angle(elements: OrbitalElements, target_jd: float) -> float:
         cos_phase = (a**2 + c**2 - b**2) / (2.0 * a * c)
         cos_phase = max(-1.0, min(1.0, cos_phase))
         return round(math.degrees(math.acos(cos_phase)), 4)
+    except Exception:
+        return float("nan")
+
+
+def compute_heliocentric_distance(elements: OrbitalElements, target_jd: float) -> float:
+    """Heliocentric distance of the object at a given Julian Date.
+
+    Propagates the orbit to ``target_jd`` via Keplerian two-body motion and
+    returns the heliocentric distance in AU.  Returns ``float('inf')`` for
+    degenerate elements (semi-major axis ≤ 0 or eccentricity ≥ 1 for elliptic
+    classification), and ``float('nan')`` if propagation fails for any other
+    reason.
+
+    Args:
+        elements: Orbital elements frozen at epoch_jd.
+        target_jd: Julian Date at which to evaluate the distance.
+
+    Returns:
+        Heliocentric distance in AU, or inf/nan on failure.
+    """
+    a = elements.semi_major_axis_au
+    if a <= 0.0:
+        return float("inf")
+    try:
+        ephem = predict_ephemeris(elements, target_jd)
+        r = ephem.get("helio_dist_au")
+        if r is None or r != r:  # None or NaN
+            return float("nan")
+        return round(float(r), 6)
     except Exception:
         return float("nan")

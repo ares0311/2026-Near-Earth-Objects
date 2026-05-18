@@ -4,7 +4,7 @@ from __future__ import annotations
 
 __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_sources",
            "compute_color_index", "estimate_source_density", "compute_source_snr",
-           "detect_bad_pixels", "compute_astrometric_scatter"]
+           "detect_bad_pixels", "compute_astrometric_scatter", "normalize_photometry"]
 
 import base64
 import math
@@ -425,3 +425,37 @@ def compute_astrometric_scatter(observations: Any) -> float | None:
         return round(rms, 4)
     except Exception:
         return None
+
+
+def normalize_photometry(
+    observations: list[Observation],
+    zero_point: float,
+    reference_zero_point: float = 25.0,
+) -> list[Observation]:
+    """Apply a photometric zero-point correction to a list of observations.
+
+    Adjusts each magnitude by the offset between ``zero_point`` and
+    ``reference_zero_point``:
+
+        mag_corrected = mag + (reference_zero_point - zero_point)
+
+    Returns a new list of frozen :class:`Observation` objects with the
+    corrected magnitude.  ``mag_err`` is preserved unchanged.  Observations
+    whose corrected magnitude falls outside [0, 35] are silently dropped.
+
+    Args:
+        observations: List of Observation objects.
+        zero_point: Measured field zero-point magnitude.
+        reference_zero_point: Target zero-point (default 25.0).
+
+    Returns:
+        New list of Observation objects with corrected magnitudes.
+    """
+    offset = reference_zero_point - zero_point
+    result = []
+    for obs in observations:
+        corrected = obs.mag + offset
+        if corrected < 0.0 or corrected > 35.0:
+            continue
+        result.append(obs.model_copy(update={"mag": round(corrected, 4)}))
+    return result

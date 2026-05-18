@@ -875,3 +875,62 @@ class TestComputePsfFwhmNonSquare:
             cutout_difference=b64,
         )
         assert compute_psf_fwhm(obs) is None
+
+
+class TestEstimateSkyBackground:
+    def _make_cutout_b64(self, values):
+        import base64
+
+        import numpy as np
+        arr = np.array(values, dtype=np.float32)
+        return base64.b64encode(arr.tobytes()).decode()
+
+    def _make_obs(self, cutout=None):
+        from .conftest import build_observation
+        return build_observation(cutout_difference=cutout)
+
+    def test_returns_float_for_valid_cutouts(self):
+        from detect import estimate_sky_background
+        obs = self._make_obs(self._make_cutout_b64([1.0, 2.0, 3.0, 4.0, 5.0, 6.0]))
+        result = estimate_sky_background([obs])
+        assert isinstance(result, float)
+
+    def test_returns_none_for_no_cutouts(self):
+        from detect import estimate_sky_background
+        obs = self._make_obs(None)
+        result = estimate_sky_background([obs])
+        assert result is None
+
+    def test_returns_none_for_empty_list(self):
+        from detect import estimate_sky_background
+        result = estimate_sky_background([])
+        assert result is None
+
+    def test_percentile_is_applied(self):
+        from detect import estimate_sky_background
+        vals = list(range(1, 101))  # 1..100
+        obs = self._make_obs(self._make_cutout_b64(vals))
+        result_25 = estimate_sky_background([obs], percentile=25.0)
+        result_75 = estimate_sky_background([obs], percentile=75.0)
+        assert result_25 is not None and result_75 is not None
+        assert result_25 < result_75
+
+    def test_skips_obs_with_invalid_cutout(self):
+        from detect import estimate_sky_background
+        bad_obs = self._make_obs("!!!not_base64!!!")
+        good_obs = self._make_obs(self._make_cutout_b64([1.0, 2.0, 3.0, 4.0]))
+        result = estimate_sky_background([bad_obs, good_obs])
+        assert isinstance(result, float)
+
+    def test_skips_cutout_too_small(self):
+        import base64
+
+        import numpy as np
+
+        from detect import estimate_sky_background
+
+        from .conftest import build_observation
+        tiny = base64.b64encode(np.array([1.0], dtype=np.float32).tobytes()).decode()
+        obs = build_observation(cutout_difference=tiny)
+        result = estimate_sky_background([obs])
+        assert result is None

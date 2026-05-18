@@ -18,6 +18,7 @@ __all__ = [
     "classify_morphology",
     "batch_morphology",
     "summarize_classifications",
+    "calibrate_posterior",
 ]
 
 import base64
@@ -1010,3 +1011,58 @@ def summarize_classifications(neos: list) -> dict:
         "mean_real_bogus_score": mean_rb,
         "pha_candidate_count": pha_count,
     }
+
+
+def calibrate_posterior(
+    posterior: NEOPosterior,
+    calibrator: object | None = None,
+) -> NEOPosterior:
+    """Re-calibrate a NEOPosterior using an optional probability calibrator.
+
+    If ``calibrator`` is None, applies a simple Laplace smoothing step to
+    bring very sharp posteriors slightly toward the uniform prior (avoids
+    overconfident 0/1 probabilities in downstream alert logic).
+
+    The returned posterior is always normalised to sum to 1.0.
+
+    Args:
+        posterior: The raw NEOPosterior to calibrate.
+        calibrator: Optional calibrator object with a ``predict_proba`` method.
+            When None, soft Laplace smoothing (alpha=0.05) is applied.
+
+    Returns:
+        A new NEOPosterior with calibrated, normalised probabilities.
+    """
+    import numpy as np
+
+    from schemas import NEOPosterior
+
+    raw = np.array([
+        posterior.neo_candidate,
+        posterior.known_object,
+        posterior.main_belt_asteroid,
+        posterior.stellar_artifact,
+        posterior.other_solar_system,
+    ], dtype=float)
+
+    if calibrator is not None and hasattr(calibrator, "predict_proba"):
+        try:
+            cal = np.asarray(calibrator.predict_proba(raw.reshape(1, -1))[0], dtype=float)
+            raw = cal
+        except Exception:
+            pass
+
+    # Laplace smoothing: alpha / (1 + n_classes * alpha)
+    alpha = 0.05
+    raw = raw + alpha
+    total = raw.sum()
+    if total > 0:
+        raw = raw / total
+
+    return NEOPosterior(
+        neo_candidate=round(float(raw[0]), 6),
+        known_object=round(float(raw[1]), 6),
+        main_belt_asteroid=round(float(raw[2]), 6),
+        stellar_artifact=round(float(raw[3]), 6),
+        other_solar_system=round(float(raw[4]), 6),
+    )

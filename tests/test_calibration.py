@@ -423,3 +423,67 @@ class TestComputeLogLoss:
         lbs = np.array([1.0, 0.0])
         result = compute_log_loss(p, lbs)
         assert result < 1e6
+
+
+class TestReliabilityDiagramNew:
+    def test_returns_dict(self):
+        import numpy as np
+
+        from calibration import reliability_diagram
+        rng = np.random.default_rng(0)
+        probs = rng.uniform(0, 1, 100)
+        labels = rng.binomial(1, probs).astype(float)
+        result = reliability_diagram(probs, labels)
+        assert isinstance(result, dict)
+
+    def test_has_required_keys(self):
+        import numpy as np
+
+        from calibration import reliability_diagram
+        result = reliability_diagram(np.array([0.3, 0.7]), np.array([0.0, 1.0]))
+        assert "bin_centers" in result
+        assert "fraction_positive" in result
+        assert "bin_counts" in result
+
+    def test_lists_same_length(self):
+        import numpy as np
+
+        from calibration import reliability_diagram
+        rng = np.random.default_rng(1)
+        probs = rng.uniform(0, 1, 200)
+        labels = rng.binomial(1, probs).astype(float)
+        result = reliability_diagram(probs, labels)
+        assert len(result["bin_centers"]) == len(result["fraction_positive"])
+        assert len(result["bin_centers"]) == len(result["bin_counts"])
+
+    def test_empty_bins_excluded(self):
+        import numpy as np
+
+        from calibration import reliability_diagram
+        # All probs in [0.0, 0.1); bins 2–10 are empty
+        probs = np.full(50, 0.05)
+        labels = np.zeros(50)
+        result = reliability_diagram(probs, labels, n_bins=10)
+        # Only one non-empty bin
+        assert len(result["bin_centers"]) == 1
+
+    def test_fraction_positive_in_range(self):
+        import numpy as np
+
+        from calibration import reliability_diagram
+        rng = np.random.default_rng(2)
+        probs = rng.uniform(0, 1, 100)
+        labels = rng.binomial(1, probs).astype(float)
+        result = reliability_diagram(probs, labels)
+        for f in result["fraction_positive"]:
+            assert 0.0 <= f <= 1.0
+
+    def test_bin_counts_positive(self):
+        import numpy as np
+
+        from calibration import reliability_diagram
+        probs = np.array([0.2, 0.4, 0.6, 0.8])
+        labels = np.array([0.0, 1.0, 0.0, 1.0])
+        result = reliability_diagram(probs, labels)
+        for c in result["bin_counts"]:
+            assert c > 0

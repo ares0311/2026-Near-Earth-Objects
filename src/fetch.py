@@ -5,7 +5,7 @@ from __future__ import annotations
 __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fetch",
            "fetch_batch", "estimate_limiting_magnitude", "summarise_fetch_result",
            "merge_survey_alerts", "filter_alerts_by_motion", "build_observation_window",
-           "count_known_objects_in_field", "fetch_mpc_observations"]
+           "count_known_objects_in_field", "fetch_mpc_observations", "fetch_atlas_forced"]
 
 import json
 import os
@@ -654,5 +654,97 @@ def fetch_mpc_observations(designation: str) -> list:
                 pass
         _save_cache(cache_key, [o.model_dump() for o in obs_list])
         return obs_list
+    except Exception:
+        return []
+
+
+def fetch_atlas_forced(
+    ra_deg: float,
+    dec_deg: float,
+    start_jd: float,
+    end_jd: float,
+    atlas_token: str | None = None,
+    force_refresh: bool = False,
+) -> list:
+    """Fetch ATLAS forced photometry at a given sky position.
+
+    Queries the ATLAS Forced Photometry Server REST API for orange (o) and
+    cyan (c) band photometry at (ra_deg, dec_deg) over the requested time
+    window.  Results are disk-cached.
+
+    Args:
+        ra_deg: Right ascension in degrees [0, 360).
+        dec_deg: Declination in degrees [-90, 90].
+        start_jd: Start of the search window as Julian Date.
+        end_jd: End of the search window as Julian Date.
+        atlas_token: ATLAS API token.  Falls back to ``ATLAS_TOKEN`` env var.
+        force_refresh: If True, bypass the on-disk cache.
+
+    Returns:
+        List of :class:`~schemas.Observation` objects.  Returns an empty list
+        on network failure or authentication error.
+    """
+    import hashlib
+    import os
+
+    token = atlas_token or os.environ.get("ATLAS_TOKEN", "")
+    cache_key = hashlib.md5(
+        f"atlas_forced_{ra_deg:.5f}_{dec_deg:.5f}_{start_jd:.3f}_{end_jd:.3f}".encode()
+    ).hexdigest()
+
+    cached = _load_cache(cache_key, force_refresh=force_refresh)
+    if cached is not None:
+        obs_list = []
+        for d in cached:
+            try:
+                obs_list.append(Observation(**d))
+            except Exception:
+                pass
+        return obs_list
+
+    if not token:
+        return []
+
+    try:
+        import requests  # type: ignore[import]
+
+        # Convert JD to MJD for ATLAS API
+        start_mjd = start_jd - 2400000.5
+        end_mjd = end_jd - 2400000.5
+
+        resp = requests.post(
+            "https://fallingstar-data.com/forcedphot/queue/",
+            headers={"Authorization": f"Token {token}"},
+            json={
+                "ra": ra_deg,
+                "dec": dec_deg,
+                "mjd_min": start_mjd,
+                "mjd_max": end_mjd,
+                "send_email": False,
+            },
+            timeout=30,
+        )
+        resp.raise_for_status()
+        task_url = resp.json().get("url", "")
+        if not task_url:
+            return []
+
+        # Poll for result (simplified; real impl uses exponential backoff)
+        for _ in range(10):
+            result_resp = requests.get(
+                task_url,
+                headers={"Authorization": f"Token {token}"},
+                timeout=30,
+            )
+            result_resp.raise_for_status()
+            data = result_resp.json()
+            if data.get("result_url"):
+                text_resp = requests.get(data["result_url"], timeout=30)
+                text_resp.raise_for_status()
+                lines = text_resp.text.splitlines()
+                obs_list = _parse_atlas_photometry(lines)
+                _save_cache(cache_key, [o.model_dump() for o in obs_list])
+                return obs_list
+        return []
     except Exception:
         return []
