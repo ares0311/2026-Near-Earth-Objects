@@ -6,7 +6,8 @@ __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "followup_priority_table", "pha_candidates", "compute_statistics",
            "close_approach_candidates", "absolute_magnitude_from_diameter",
            "compute_impact_energy", "compute_novelty_score",
-           "compute_threat_score", "filter_by_alert_pathway"]
+           "compute_threat_score", "filter_by_alert_pathway",
+           "compute_followup_urgency"]
 
 import math
 import uuid
@@ -638,3 +639,43 @@ def filter_by_alert_pathway(neos: list[ScoredNEO], pathway: str) -> list[ScoredN
         matches ``pathway`` exactly.
     """
     return [n for n in neos if n.hazard.alert_pathway == pathway]
+
+
+def compute_followup_urgency(neo: ScoredNEO) -> str:
+    """Classify follow-up urgency for a scored NEO candidate.
+
+    Urgency tiers are assigned based on hazard flag, MOID, orbit quality, and
+    discovery priority score:
+
+    * **URGENT** — PHA candidate with MOID ≤ 0.01 AU or discovery priority ≥ 0.9
+    * **HIGH** — PHA candidate, or MOID ≤ 0.05 AU, or discovery priority ≥ 0.7
+    * **MEDIUM** — close approach flag or discovery priority ≥ 0.4
+    * **ROUTINE** — all other candidates
+
+    Args:
+        neo: A :class:`~schemas.ScoredNEO` object.
+
+    Returns:
+        One of ``"URGENT"``, ``"HIGH"``, ``"MEDIUM"``, or ``"ROUTINE"``.
+    """
+    haz = neo.hazard
+    meta = neo.metadata
+    moid = haz.moid_au
+    priority = getattr(meta, "discovery_priority", 0.0) or 0.0
+
+    if haz.hazard_flag == "pha_candidate" and (
+        (moid is not None and moid <= 0.01) or priority >= 0.9
+    ):
+        return "URGENT"
+
+    if (
+        haz.hazard_flag == "pha_candidate"
+        or (moid is not None and moid <= 0.05)
+        or priority >= 0.7
+    ):
+        return "HIGH"
+
+    if haz.hazard_flag == "close_approach" or priority >= 0.4:
+        return "MEDIUM"
+
+    return "ROUTINE"

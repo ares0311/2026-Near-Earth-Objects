@@ -4,7 +4,8 @@ from __future__ import annotations
 
 __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus",
            "compute_streak_metric", "cluster_detections", "compute_trail_length",
-           "compute_psf_fwhm", "estimate_sky_background", "compute_detection_efficiency"]
+           "compute_psf_fwhm", "estimate_sky_background", "compute_detection_efficiency",
+           "count_detections_by_filter"]
 
 import math
 import uuid
@@ -580,3 +581,22 @@ def compute_detection_efficiency(
         if getattr(o, "mag", None) is not None and o.mag < limiting_mag and o.mag < 90.0
     )
     return round(n_detected / len(obs_list), 6)
+
+
+def count_detections_by_filter(observations: tuple | list) -> dict:
+    """Count detections grouped by filter band.
+
+    Args:
+        observations: Iterable of :class:`~schemas.Observation` objects.
+
+    Returns:
+        Dict mapping ``filter_band`` string to integer count.  Returns an empty
+        dict when the input is empty.
+    """
+    counts: dict = {}
+    for obs in observations:
+        band = getattr(obs, "filter_band", None)
+        if band is None:
+            band = "unknown"
+        counts[band] = counts.get(band, 0) + 1
+    return counts

@@ -903,3 +903,71 @@ class TestFilterByAlertPathway:
         from score import filter_by_alert_pathway
         result = filter_by_alert_pathway(self._make_neos(), "internal_candidate")
         assert isinstance(result, list)
+
+
+class TestComputeFollowupUrgency:
+    def _make_neo(self, hazard_flag="nominal", moid=0.1, pathway="internal_candidate",
+                  priority=0.0):
+        import types
+        hazard = types.SimpleNamespace(
+            hazard_flag=hazard_flag, moid_au=moid, alert_pathway=pathway,
+        )
+        metadata = types.SimpleNamespace(discovery_priority=priority)
+        return types.SimpleNamespace(hazard=hazard, metadata=metadata)
+
+    def test_pha_with_small_moid_is_urgent(self):
+        from score import compute_followup_urgency
+        neo = self._make_neo(hazard_flag="pha_candidate", moid=0.005)
+        assert compute_followup_urgency(neo) == "URGENT"
+
+    def test_pha_with_high_priority_is_urgent(self):
+        from score import compute_followup_urgency
+        neo = self._make_neo(hazard_flag="pha_candidate", moid=0.04, priority=0.95)
+        assert compute_followup_urgency(neo) == "URGENT"
+
+    def test_pha_with_medium_moid_is_high(self):
+        from score import compute_followup_urgency
+        neo = self._make_neo(hazard_flag="pha_candidate", moid=0.04, priority=0.5)
+        assert compute_followup_urgency(neo) == "HIGH"
+
+    def test_small_moid_non_pha_is_high(self):
+        from score import compute_followup_urgency
+        neo = self._make_neo(hazard_flag="nominal", moid=0.03)
+        assert compute_followup_urgency(neo) == "HIGH"
+
+    def test_high_priority_non_pha_is_high(self):
+        from score import compute_followup_urgency
+        neo = self._make_neo(hazard_flag="nominal", moid=0.5, priority=0.75)
+        assert compute_followup_urgency(neo) == "HIGH"
+
+    def test_close_approach_flag_is_medium(self):
+        from score import compute_followup_urgency
+        neo = self._make_neo(hazard_flag="close_approach", moid=0.15, priority=0.2)
+        assert compute_followup_urgency(neo) == "MEDIUM"
+
+    def test_medium_priority_is_medium(self):
+        from score import compute_followup_urgency
+        neo = self._make_neo(hazard_flag="nominal", moid=0.5, priority=0.5)
+        assert compute_followup_urgency(neo) == "MEDIUM"
+
+    def test_low_priority_nominal_is_routine(self):
+        from score import compute_followup_urgency
+        neo = self._make_neo(hazard_flag="nominal", moid=0.5, priority=0.1)
+        assert compute_followup_urgency(neo) == "ROUTINE"
+
+    def test_none_moid_non_pha_is_routine_or_medium(self):
+        from score import compute_followup_urgency
+        neo = self._make_neo(hazard_flag="nominal", moid=None, priority=0.1)
+        result = compute_followup_urgency(neo)
+        assert result in {"ROUTINE", "MEDIUM"}
+
+    def test_none_priority_treated_as_zero(self):
+        from score import compute_followup_urgency
+        neo = self._make_neo(hazard_flag="nominal", moid=0.5, priority=None)
+        result = compute_followup_urgency(neo)
+        assert result == "ROUTINE"
+
+    def test_returns_string(self):
+        from score import compute_followup_urgency
+        result = compute_followup_urgency(self._make_neo())
+        assert isinstance(result, str)

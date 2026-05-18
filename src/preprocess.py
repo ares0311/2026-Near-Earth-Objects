@@ -5,7 +5,8 @@ from __future__ import annotations
 __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_sources",
            "compute_color_index", "estimate_source_density", "compute_source_snr",
            "detect_bad_pixels", "compute_astrometric_scatter",
-           "normalize_photometry", "compute_image_quality_metrics"]
+           "normalize_photometry", "compute_image_quality_metrics",
+           "compute_photometric_scatter"]
 
 import base64
 import math
@@ -519,3 +520,29 @@ def compute_image_quality_metrics(observations: list) -> dict:
         "mean_snr": mean_snr,
         "background_rms": bg_rms,
     }
+
+
+def compute_photometric_scatter(observations: tuple | list) -> float | None:
+    """Compute the RMS scatter of apparent magnitudes across a set of observations.
+
+    Provides a measure of photometric variability or calibration residuals.
+    Observations with sentinel magnitudes ≥ 90 or ``None`` are excluded.
+
+    Args:
+        observations: Iterable of :class:`~schemas.Observation` objects.
+
+    Returns:
+        RMS scatter in magnitudes as ``float``, or ``None`` if fewer than 2
+        valid magnitudes are available.
+    """
+    import numpy as np
+
+    mags = [
+        obs.mag
+        for obs in observations
+        if getattr(obs, "mag", None) is not None and obs.mag < 90.0
+    ]
+    if len(mags) < 2:
+        return None
+    arr = np.array(mags, dtype=float)
+    return round(float(np.sqrt(np.mean((arr - arr.mean()) ** 2))), 6)

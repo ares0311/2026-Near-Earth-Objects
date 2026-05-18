@@ -1440,3 +1440,49 @@ class TestComputeClassificationTable:
     def test_empty_list(self):
         from classify import compute_classification_table
         assert compute_classification_table([]) == []
+
+
+class TestGetPosteriorVector:
+    def _make_posterior(self, neo=0.1, ko=0.3, mba=0.35, sa=0.2, other=0.05):
+        from schemas import NEOPosterior
+        return NEOPosterior(
+            neo_candidate=neo, known_object=ko, main_belt_asteroid=mba,
+            stellar_artifact=sa, other_solar_system=other,
+        )
+
+    def test_returns_array_length_5(self):
+        import numpy as np
+
+        from classify import get_posterior_vector
+        vec = get_posterior_vector(self._make_posterior())
+        assert isinstance(vec, np.ndarray)
+        assert vec.shape == (5,)
+
+    def test_correct_order(self):
+        import numpy as np
+
+        from classify import get_posterior_vector
+        p = self._make_posterior(neo=0.1, ko=0.3, mba=0.35, sa=0.2, other=0.05)
+        vec = get_posterior_vector(p)
+        np.testing.assert_array_almost_equal(vec, [0.1, 0.3, 0.35, 0.2, 0.05])
+
+    def test_all_zero_posterior(self):
+        import numpy as np
+
+        from classify import get_posterior_vector
+        p = self._make_posterior(neo=0.0, ko=0.0, mba=0.0, sa=0.0, other=0.0)
+        vec = get_posterior_vector(p)
+        np.testing.assert_array_equal(vec, [0.0, 0.0, 0.0, 0.0, 0.0])
+
+    def test_sums_to_one_for_valid_posterior(self):
+        from classify import get_posterior_vector
+        p = self._make_posterior()
+        vec = get_posterior_vector(p)
+        assert vec.sum() == pytest.approx(1.0, abs=1e-6)
+
+    def test_dtype_is_float(self):
+        import numpy as np
+
+        from classify import get_posterior_vector
+        vec = get_posterior_vector(self._make_posterior())
+        assert vec.dtype == np.float64

@@ -1023,3 +1023,57 @@ class TestSummarizeArcStatistics:
         tracklets = [self._make_tracklet(2.0, n_nights=2), self._make_tracklet(3.0, n_nights=3)]
         result = summarize_arc_statistics(tracklets)
         assert result["fraction_multi_night"] == pytest.approx(1.0)
+
+
+class TestFilterByNightsObserved:
+    def _make_tracklet(self, n_nights=2, arc_days=2.0):
+        from schemas import Tracklet
+
+        from .conftest import build_observation
+        obs = tuple(
+            build_observation(obs_id=f"n_{i}", jd=2460000.5 + i)
+            for i in range(n_nights)
+        )
+        return Tracklet(
+            object_id=f"T_nights_{n_nights}", observations=obs,
+            arc_days=arc_days, motion_rate_arcsec_per_hour=1.0, motion_pa_degrees=90.0,
+        )
+
+    def test_empty_input(self):
+        from link import filter_by_nights_observed
+        assert filter_by_nights_observed([]) == []
+
+    def test_keeps_multi_night(self):
+        from link import filter_by_nights_observed
+        tracklets = [self._make_tracklet(n_nights=2), self._make_tracklet(n_nights=3)]
+        result = filter_by_nights_observed(tracklets, min_nights=2)
+        assert len(result) == 2
+
+    def test_rejects_single_night(self):
+        from link import filter_by_nights_observed
+        tracklets = [self._make_tracklet(n_nights=1), self._make_tracklet(n_nights=2)]
+        result = filter_by_nights_observed(tracklets, min_nights=2)
+        assert len(result) == 1
+        assert result[0].object_id == "T_nights_2"
+
+    def test_min_nights_3_filters_correctly(self):
+        from link import filter_by_nights_observed
+        tracklets = [
+            self._make_tracklet(n_nights=2),
+            self._make_tracklet(n_nights=3),
+            self._make_tracklet(n_nights=4),
+        ]
+        result = filter_by_nights_observed(tracklets, min_nights=3)
+        assert len(result) == 2
+
+    def test_default_min_nights_is_2(self):
+        from link import filter_by_nights_observed
+        t1 = self._make_tracklet(n_nights=1)
+        t2 = self._make_tracklet(n_nights=2)
+        result = filter_by_nights_observed([t1, t2])
+        assert len(result) == 1
+
+    def test_returns_list(self):
+        from link import filter_by_nights_observed
+        result = filter_by_nights_observed([self._make_tracklet()], min_nights=1)
+        assert isinstance(result, list)

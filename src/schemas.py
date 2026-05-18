@@ -11,6 +11,7 @@ __all__ = [
     "FetchResult", "PreprocessResult", "DetectResult", "LinkResult",
     "ObservationWindow", "PipelineResult", "CandidateSummary", "NEOStatistics", "TrackletSummary",
     "CloseApproachEvent", "SurveyField", "PipelineConfig", "ObservationBatch", "DetectionSummary",
+    "PhotometricSolution",
     "BackgroundOutcome", "BackgroundRunMode", "FollowUpTestStatus", "HumanReviewStatus",
     "RecommendationAction", "SignoffDecision",
     "PriorityFactors", "BackgroundTarget", "FollowUpTestResult",
@@ -671,3 +672,31 @@ class DetectionSummary(BaseModel):
     n_known_matches: int = Field(ge=0)
     n_new: int = Field(ge=0)
     limiting_mag: float | None = None
+
+
+class PhotometricSolution(BaseModel):
+    """Photometric calibration solution for a survey field.
+
+    Captures the zero-point and colour-term coefficients derived from a
+    catalogue cross-match (e.g. Gaia DR3 or Pan-STARRS).  Immutable after
+    construction.
+
+    Attributes:
+        zero_point: Instrumental zero-point magnitude (mag).
+        color_coeff: First-order colour coefficient (mag/mag).
+        extinction_coeff: Atmospheric extinction coefficient (mag/airmass).
+        rms_scatter: RMS residual of the photometric fit in magnitudes.
+        n_stars: Number of reference stars used in the fit.
+        filter_band: Photometric band (e.g. ``"g"``, ``"r"``, ``"i"``).
+        epoch_jd: Julian Date of the calibration observation.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    zero_point: float
+    color_coeff: float = 0.0
+    extinction_coeff: float = 0.0
+    rms_scatter: float | None = None
+    n_stars: int = Field(ge=0, default=0)
+    filter_band: str = "r"
+    epoch_jd: float | None = None

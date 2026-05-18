@@ -468,9 +468,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.22.0)
+## Current State (v0.23.0)
 
-All 10 pipeline modules are complete. 1089 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified manual CLI with top-level SQLite logs and auditable signoff readiness.
+All 10 pipeline modules are complete. 1167 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified manual CLI with top-level SQLite logs and auditable signoff readiness.
 
 ### Skills
 
@@ -519,6 +519,8 @@ All 10 pipeline modules are complete. 1089 tests passing (100% coverage). CI gre
 | `Skills/fetch_atlas_data.py` | Fetch ATLAS forced photometry for a sky position; `--token`, `--force-refresh`, `--json` flags |
 | `Skills/plot_calibration.py` | Plot reliability diagram from scored NEO or prob/label JSON; saves PNG; prints Brier/ECE/log-loss |
 | `Skills/export_survey_summary.py` | Export per-candidate detection summary from pipeline run JSON to CSV or HTML |
+| `Skills/compute_apparent_magnitudes.py` | Batch apparent magnitude at JD from tracklet JSON; `--jd`, `--albedo`, `--json` flags |
+| `Skills/triage_candidates.py` | Urgency-sorted triage table from scored NEO JSON; `--urgency`, `--pathway`, `--json` flags |
 
 ### Docs
 
@@ -536,6 +538,7 @@ All 10 pipeline modules are complete. 1089 tests passing (100% coverage). CI gre
 | `docs/QUALITY_METRICS.md` | Reference for all pipeline quality metrics: detection, astrometric, photometric, orbital, calibration, and hazard scoring |
 | `docs/THREAT_ASSESSMENT.md` | Technical reference for threat score formula, components, interpretation guidelines, and CLI usage |
 | `docs/DETECTION_GUIDE.md` | Technical reference for detect.py: RB threshold, streak detection, clustering, known-object matching, detection efficiency, DetectionSummary |
+| `docs/LINKING_GUIDE.md` | Technical reference for link.py: tracklet formation, arc statistics, satellite trail rejection, deduplication, quality grades |
 
 ### Data
 
@@ -579,6 +582,24 @@ All 10 pipeline modules are complete. 1089 tests passing (100% coverage). CI gre
 - Collect labeled training data via `Skills/generate_training_labels.py`
 - Integrate live ZTF alert stream (Milestone 4)
 - Train and evaluate Tier 2 CNN on real cutouts (Milestone 5)
+
+### Key Changes in v0.23.0
+
+- `orbit.py`: added `compute_apparent_magnitude(elements, target_jd, albedo=0.14)` — approximate V-band apparent magnitude using IAU HG phase function; returns NaN for degenerate geometry.
+- `detect.py`: added `count_detections_by_filter(observations)` — dict mapping filter_band → count; None filter_band mapped to "unknown".
+- `link.py`: added `filter_by_nights_observed(tracklets, min_nights=2)` — keep only tracklets spanning ≥ min distinct integer-JD nights.
+- `classify.py`: added `get_posterior_vector(posterior)` — 5-element numpy array [neo_candidate, known_object, main_belt_asteroid, stellar_artifact, other_solar_system].
+- `score.py`: added `compute_followup_urgency(neo)` — URGENT/HIGH/MEDIUM/ROUTINE tier based on hazard_flag, MOID, and discovery_priority.
+- `alert.py`: added `count_pending_alerts(neos)` — dict of alert_pathway → count; only pathways with ≥1 candidate included.
+- `fetch.py`: added `estimate_survey_depth(fetch_result)` — 95th-percentile magnitude from valid alerts; None if no valid magnitudes.
+- `preprocess.py`: added `compute_photometric_scatter(observations)` — RMS scatter of magnitudes; None for <2 valid observations.
+- `schemas.py`: added `PhotometricSolution` — frozen model: zero_point, color_coeff, extinction_coeff, rms_scatter, n_stars, filter_band, epoch_jd.
+- `calibration.py`: added `compare_calibrators(probs_list, labels, names)` — dict of name → calibration_report for multiple calibrator comparisons.
+- `Skills/compute_apparent_magnitudes.py`: new — batch apparent magnitude at JD from tracklet JSON; `--jd`, `--albedo`, `--json` flags.
+- `Skills/triage_candidates.py`: new — urgency-sorted triage table; `--urgency`, `--pathway`, `--json` flags.
+- `docs/LINKING_GUIDE.md`: new — tracklet formation, arc statistics, satellite trail rejection, deduplication, quality grades.
+- 78 new tests (1167 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.23.0.
 
 ### Key Changes in v0.22.0
 

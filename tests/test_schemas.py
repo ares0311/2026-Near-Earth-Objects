@@ -644,3 +644,43 @@ class TestDetectionSummary:
         for survey in ("ZTF", "ATLAS", "PanSTARRS", "CSS", "MPC"):
             s = self._make_summary(survey=survey)
             assert s.survey == survey
+
+
+class TestPhotometricSolution:
+    def test_instantiation(self):
+        from schemas import PhotometricSolution
+        sol = PhotometricSolution(zero_point=25.0, filter_band="r", epoch_jd=2460000.5)
+        assert sol.zero_point == 25.0
+
+    def test_defaults(self):
+        from schemas import PhotometricSolution
+        sol = PhotometricSolution(zero_point=25.0)
+        assert sol.color_coeff == 0.0
+        assert sol.extinction_coeff == 0.0
+        assert sol.rms_scatter is None
+        assert sol.n_stars == 0
+        assert sol.filter_band == "r"
+        assert sol.epoch_jd is None
+
+    def test_frozen(self):
+        from schemas import PhotometricSolution
+        sol = PhotometricSolution(zero_point=25.0)
+        with pytest.raises(Exception):
+            sol.zero_point = 26.0  # type: ignore[misc]
+
+    def test_all_fields(self):
+        from schemas import PhotometricSolution
+        sol = PhotometricSolution(
+            zero_point=25.5, color_coeff=0.05, extinction_coeff=0.12,
+            rms_scatter=0.02, n_stars=150, filter_band="g", epoch_jd=2460000.5,
+        )
+        assert sol.rms_scatter == pytest.approx(0.02)
+        assert sol.n_stars == 150
+        assert sol.filter_band == "g"
+
+    def test_n_stars_nonnegative(self):
+        import pytest
+
+        from schemas import PhotometricSolution
+        with pytest.raises(Exception):
+            PhotometricSolution(zero_point=25.0, n_stars=-1)

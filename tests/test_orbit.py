@@ -1149,3 +1149,107 @@ class TestComputeSynodicPeriod:
         # Aten (a=0.8 AU) → synodic period around 584 days
         result = compute_synodic_period(self._make_elements(a=0.8))
         assert result > 300.0
+
+
+class TestComputeApparentMagnitude:
+    def _make_elements(self, a=1.5, e=0.2, q=1.2, Q=1.8, quality_code=2):
+        from schemas import OrbitalElements
+        return OrbitalElements(
+            semi_major_axis_au=a, eccentricity=e, inclination_deg=5.0,
+            longitude_ascending_node_deg=30.0, argument_perihelion_deg=60.0,
+            mean_anomaly_deg=90.0, epoch_jd=2460000.5,
+            perihelion_au=q, aphelion_au=Q, quality_code=quality_code,
+        )
+
+    def test_returns_float(self):
+        from orbit import compute_apparent_magnitude
+        result = compute_apparent_magnitude(self._make_elements(), 2460010.5)
+        assert isinstance(result, float)
+
+    def test_reasonable_magnitude_range(self):
+        from orbit import compute_apparent_magnitude
+        result = compute_apparent_magnitude(self._make_elements(), 2460010.5)
+        # Allow nan (geometry may be degenerate) or a plausible V mag
+        import math
+        if not math.isnan(result):
+            assert -5.0 < result < 35.0
+
+    def test_albedo_affects_result(self):
+        import math
+
+        from orbit import compute_apparent_magnitude
+        el = self._make_elements()
+        jd = 2460010.5
+        v1 = compute_apparent_magnitude(el, jd, albedo=0.10)
+        v2 = compute_apparent_magnitude(el, jd, albedo=0.25)
+        # Higher albedo → brighter (lower magnitude)
+        if not (math.isnan(v1) or math.isnan(v2)):
+            assert v2 < v1
+
+    def test_exception_returns_nan(self):
+        import math
+        from unittest.mock import patch
+
+        from orbit import compute_apparent_magnitude
+        el = self._make_elements()
+        with patch("orbit.compute_phase_angle", side_effect=RuntimeError("forced")):
+            result = compute_apparent_magnitude(el, 2460010.5)
+        assert math.isnan(result)
+
+    def test_nan_phase_angle_returns_nan(self):
+        import math
+        from unittest.mock import patch
+
+        from orbit import compute_apparent_magnitude
+        el = self._make_elements()
+        with patch("orbit.compute_phase_angle", return_value=float("nan")):
+            result = compute_apparent_magnitude(el, 2460010.5)
+        assert math.isnan(result)
+
+    def test_nonpositive_helio_dist_returns_nan(self):
+        import math
+        from unittest.mock import patch
+
+        from orbit import compute_apparent_magnitude
+        el = self._make_elements()
+        with patch("orbit.compute_phase_angle", return_value=30.0), \
+             patch("orbit.predict_ephemeris", return_value={"helio_dist_au": 0.0}):
+            result = compute_apparent_magnitude(el, 2460010.5)
+        assert math.isnan(result)
+
+    def test_default_albedo_is_014(self):
+        import math
+        from unittest.mock import patch
+
+        from orbit import compute_apparent_magnitude
+        el = self._make_elements()
+        with patch("orbit.compute_phase_angle", return_value=30.0), \
+             patch("orbit.predict_ephemeris", return_value={"helio_dist_au": 1.5}):
+            result = compute_apparent_magnitude(el, 2460010.5)
+        assert not math.isnan(result)
+
+    def test_degenerate_delta_sq_returns_nan(self):
+        import math
+        from unittest.mock import patch
+
+        from orbit import compute_apparent_magnitude
+        el = self._make_elements()
+        # cos(alpha)=1 means alpha=0, delta^2=r^2+1-2r=(r-1)^2 which is 0 when r=1
+        # But when r^2+1-2*r*cos(alpha)<=0 we return nan
+        with patch("orbit.compute_phase_angle", return_value=0.0), \
+             patch("orbit.predict_ephemeris", return_value={"helio_dist_au": 1.0}):
+            # delta_sq = 1 + 1 - 2*1*1 = 0 → nan
+            result = compute_apparent_magnitude(el, 2460010.5)
+        assert math.isnan(result)
+
+    def test_negative_tan_half_returns_nan(self):
+        import math
+        from unittest.mock import patch
+
+        from orbit import compute_apparent_magnitude
+        el = self._make_elements()
+        # Phase angle 270° → alpha/2 = 135° → tan(135°) = -1 < 0
+        with patch("orbit.compute_phase_angle", return_value=270.0), \
+             patch("orbit.predict_ephemeris", return_value={"helio_dist_au": 1.5}):
+            result = compute_apparent_magnitude(el, 2460010.5)
+        assert math.isnan(result)

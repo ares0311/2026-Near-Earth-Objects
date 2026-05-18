@@ -889,3 +889,53 @@ class TestComputeImageQualityMetricsBranches:
         obs = build_observation(cutout_difference="!!!invalid_base64!!!")
         result = compute_image_quality_metrics([obs])
         assert result["background_rms"] is None
+
+
+class TestComputePhotometricScatter:
+    def _make_obs(self, mag):
+        from .conftest import build_observation
+        return build_observation(mag=mag)
+
+    def test_empty_returns_none(self):
+        from preprocess import compute_photometric_scatter
+        assert compute_photometric_scatter([]) is None
+
+    def test_single_obs_returns_none(self):
+        from preprocess import compute_photometric_scatter
+        assert compute_photometric_scatter([self._make_obs(19.0)]) is None
+
+    def test_two_identical_mags_returns_zero(self):
+        from preprocess import compute_photometric_scatter
+        obs = [self._make_obs(19.0), self._make_obs(19.0)]
+        result = compute_photometric_scatter(obs)
+        assert result == pytest.approx(0.0, abs=1e-6)
+
+    def test_known_scatter(self):
+        import numpy as np
+
+        from preprocess import compute_photometric_scatter
+        mags = [19.0, 19.2, 18.8, 19.1, 18.9]
+        obs = [self._make_obs(m) for m in mags]
+        result = compute_photometric_scatter(obs)
+        arr = np.array(mags)
+        expected = round(float(np.sqrt(np.mean((arr - arr.mean()) ** 2))), 6)
+        assert result == pytest.approx(expected, abs=1e-5)
+
+    def test_excludes_sentinel_mags(self):
+        from preprocess import compute_photometric_scatter
+        obs = [self._make_obs(99.0), self._make_obs(19.0)]
+        # Only one valid mag → None
+        result = compute_photometric_scatter(obs)
+        assert result is None
+
+    def test_returns_float_for_valid_input(self):
+        from preprocess import compute_photometric_scatter
+        obs = [self._make_obs(19.0), self._make_obs(19.5)]
+        result = compute_photometric_scatter(obs)
+        assert isinstance(result, float)
+
+    def test_non_negative(self):
+        from preprocess import compute_photometric_scatter
+        obs = [self._make_obs(m) for m in [18.0, 19.0, 20.0]]
+        result = compute_photometric_scatter(obs)
+        assert result >= 0.0

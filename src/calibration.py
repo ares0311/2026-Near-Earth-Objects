@@ -10,6 +10,7 @@ __all__ = [
     "compute_log_loss",
     "reliability_diagram",
     "calibration_report",
+    "compare_calibrators",
 ]
 
 import math
@@ -502,3 +503,32 @@ def calibration_report(
         "ece": round(expected_calibration_error(probs_arr, labels_arr), 6),
         "log_loss": round(compute_log_loss(probs_arr, labels_arr), 6),
     }
+
+
+def compare_calibrators(
+    probs_list: list[list[float]],
+    labels: list[float],
+    names: list[str],
+) -> dict:
+    """Compare multiple calibrator outputs against the same label set.
+
+    For each set of predicted probabilities in ``probs_list``, computes a full
+    :func:`calibration_report` and assembles the results in a dict keyed by
+    the corresponding name from ``names``.
+
+    Args:
+        probs_list: List of probability arrays, one per calibrator.
+        labels: Shared ground-truth binary labels (0 or 1).
+        names: Human-readable names for each calibrator (same length as
+            ``probs_list``).
+
+    Returns:
+        Dict mapping each name to its :func:`calibration_report` dict.
+        Extra names beyond the length of ``probs_list`` are ignored; missing
+        names default to ``"calibrator_<index>"``.
+    """
+    result: dict = {}
+    for idx, probs in enumerate(probs_list):
+        name = names[idx] if idx < len(names) else f"calibrator_{idx}"
+        result[name] = calibration_report(probs, labels)
+    return result

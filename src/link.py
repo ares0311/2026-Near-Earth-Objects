@@ -5,7 +5,8 @@ from __future__ import annotations
 __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "filter_high_motion", "deduplicate_tracklets", "_predict_from_arc",
            "split_tracklet", "compute_arc_statistics", "assess_link_confidence",
-           "compute_tracklet_grade", "filter_by_arc_length", "summarize_arc_statistics"]
+           "compute_tracklet_grade", "filter_by_arc_length", "summarize_arc_statistics",
+           "filter_by_nights_observed"]
 
 import math
 import uuid
@@ -608,3 +609,19 @@ def summarize_arc_statistics(tracklets: list) -> dict:
 def _count_nights(tracklet) -> int:
     """Count distinct integer JD nights in a tracklet."""
     return len({int(o.jd) for o in getattr(tracklet, "observations", [])})
+
+
+def filter_by_nights_observed(tracklets: list, min_nights: int = 2) -> list:
+    """Keep only tracklets that span at least *min_nights* distinct calendar nights.
+
+    A "night" is defined as a distinct integer Julian Date (``int(obs.jd)``).
+    Tracklets with fewer than *min_nights* distinct nights are discarded.
+
+    Args:
+        tracklets: List of :class:`~schemas.Tracklet` objects.
+        min_nights: Minimum number of distinct nights required (default 2).
+
+    Returns:
+        Filtered list of tracklets.
+    """
+    return [t for t in tracklets if _count_nights(t) >= min_nights]
