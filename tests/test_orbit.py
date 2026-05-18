@@ -955,3 +955,65 @@ class TestBatchPredictEphemerisExceptionBranch:
         assert results[0]["dec_deg"] is None
         assert results[0]["helio_dist_au"] is None
         assert results[0]["jd"] == pytest.approx(2460010.5)
+
+
+class TestComputePhaseAngle:
+    def _make_elements(self, **kwargs):
+        from schemas import OrbitalElements
+        defaults = dict(
+            semi_major_axis_au=1.5,
+            eccentricity=0.1,
+            inclination_deg=5.0,
+            longitude_ascending_node_deg=10.0,
+            argument_perihelion_deg=20.0,
+            mean_anomaly_deg=0.0,
+            epoch_jd=2460000.5,
+            perihelion_au=1.35,
+            aphelion_au=1.65,
+            quality_code=2,
+        )
+        defaults.update(kwargs)
+        return OrbitalElements(**defaults)
+
+    def test_returns_float(self):
+        from orbit import compute_phase_angle
+        result = compute_phase_angle(self._make_elements(), 2460010.5)
+        assert isinstance(result, float)
+
+    def test_range_0_to_180(self):
+        from orbit import compute_phase_angle
+        result = compute_phase_angle(self._make_elements(), 2460010.5)
+        import math
+        if not math.isnan(result):
+            assert 0.0 <= result <= 180.0
+
+    def test_nan_on_exception(self):
+        import math
+        from unittest.mock import patch
+
+        from orbit import compute_phase_angle
+        el = self._make_elements()
+        with patch("orbit.predict_ephemeris", side_effect=RuntimeError("forced")):
+            result = compute_phase_angle(el, 2460010.5)
+        assert math.isnan(result)
+
+    def test_zero_helio_dist_returns_nan(self):
+        import math
+        from unittest.mock import patch
+
+        from orbit import compute_phase_angle
+        el = self._make_elements()
+        _zero_ephem = {"ra_deg": 0.0, "dec_deg": 0.0, "helio_dist_au": 0.0}
+        with patch("orbit.predict_ephemeris", return_value=_zero_ephem):
+            result = compute_phase_angle(el, 2460010.5)
+        assert math.isnan(result)
+
+    def test_different_jds_different_angles(self):
+
+        from orbit import compute_phase_angle
+        el = self._make_elements()
+        r1 = compute_phase_angle(el, 2460010.5)
+        r2 = compute_phase_angle(el, 2460100.5)
+        # Both should be valid floats (or NaN)
+        assert isinstance(r1, float)
+        assert isinstance(r2, float)

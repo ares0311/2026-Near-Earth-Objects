@@ -5,7 +5,7 @@ from __future__ import annotations
 __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fetch",
            "fetch_batch", "estimate_limiting_magnitude", "summarise_fetch_result",
            "merge_survey_alerts", "filter_alerts_by_motion", "build_observation_window",
-           "count_known_objects_in_field"]
+           "count_known_objects_in_field", "fetch_mpc_observations"]
 
 import json
 import os
@@ -611,3 +611,48 @@ def count_known_objects_in_field(
         return len(observations)
     except Exception:
         return 0
+
+
+def fetch_mpc_observations(designation: str) -> list:
+    """Fetch MPC observation history for a known-object designation.
+
+    Queries ``astroquery.mpc`` for all observations of the given designation
+    and returns a list of :class:`schemas.Observation` objects.
+    Returns an empty list on any error (network failure, unknown designation).
+    """
+    import hashlib
+    cache_key = hashlib.md5(f"mpc_obs_{designation}".encode()).hexdigest()
+    cached = _load_cache(cache_key)
+    if cached is not None:
+        obs_list = []
+        for d in cached:
+            try:
+                obs_list.append(Observation(**d))
+            except Exception:
+                pass
+        return obs_list
+
+    try:
+        from astroquery.mpc import MPC  # type: ignore[import]
+        table = MPC.get_observations(designation)
+        obs_list = []
+        for row in table:
+            try:
+                obs = Observation(
+                    obs_id=f"{designation}_{row['number']}",
+                    ra_deg=float(row["RA"]),
+                    dec_deg=float(row["Dec"]),
+                    jd=float(row["JD"]),
+                    mag=float(row.get("mag", 99.0) or 99.0),
+                    mag_err=0.1,
+                    filter_band=str(row.get("band", "?")),
+                    mission="MPC",
+                    real_bogus=1.0,
+                )
+                obs_list.append(obs)
+            except Exception:
+                pass
+        _save_cache(cache_key, [o.model_dump() for o in obs_list])
+        return obs_list
+    except Exception:
+        return []

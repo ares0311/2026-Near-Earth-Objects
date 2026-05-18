@@ -17,6 +17,7 @@ __all__ = [
     "ready_for_submission",
     "format_discovery_circular",
     "format_alert_summary",
+    "generate_observation_request",
 ]
 
 import json
@@ -25,6 +26,7 @@ import time as _time_mod
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from schemas import (
     AlertPathway,
@@ -733,3 +735,52 @@ def format_alert_summary(neos: list, max_rows: int = 20) -> str:
             f"  {haz.alert_pathway:>22}  {moid_str:>10}  {meta.discovery_priority:>8.4f}"
         )
     return "\n".join(rows)
+
+
+def generate_observation_request(neo: Any, obs_code: str = "500") -> str:
+    """Generate a structured follow-up observation request (NEOCP-style text).
+
+    Includes urgency tier, ephemeris coordinates, magnitude estimate, and
+    observer instructions.  Does not transmit; returns a plain-text string.
+    """
+    haz = neo.hazard
+    meta = neo.metadata
+    obj_id = neo.tracklet.object_id
+    first_obs = neo.tracklet.observations[0] if neo.tracklet.observations else None
+
+    if haz.hazard_flag == "pha_candidate":
+        urgency = "URGENT (PHA candidate)"
+    elif meta.discovery_priority >= 0.7:
+        urgency = "HIGH"
+    elif meta.discovery_priority >= 0.4:
+        urgency = "MEDIUM"
+    else:
+        urgency = "ROUTINE"
+
+    lines = [
+        "NEOCP FOLLOW-UP OBSERVATION REQUEST",
+        f"Object:     {obj_id}",
+        f"Urgency:    {urgency}",
+        f"Obs. code:  {obs_code}",
+    ]
+
+    if first_obs is not None:
+        lines += [
+            f"RA (J2000): {first_obs.ra_deg:.5f} deg",
+            f"Dec(J2000): {first_obs.dec_deg:+.5f} deg",
+            f"Magnitude:  {first_obs.mag:.1f} ({first_obs.filter_band})",
+        ]
+
+    if haz.moid_au is not None:
+        lines.append(f"MOID:       {haz.moid_au:.4f} AU")
+
+    lines += [
+        f"Hazard:     {haz.hazard_flag}",
+        f"Pathway:    {haz.alert_pathway}",
+        "",
+        "Observations requested: ≥3 over ≥2 nights within 72 hours.",
+        "Report to MPC using standard 80-column format.",
+        "Do not publicly announce impact probability.",
+        "GUARDRAIL: This request is for astrometric confirmation only.",
+    ]
+    return "\n".join(lines)

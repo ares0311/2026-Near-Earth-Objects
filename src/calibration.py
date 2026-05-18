@@ -7,6 +7,7 @@ __all__ = [
     "brier_score", "reliability_diagram_data", "expected_calibration_error", "calibrate",
     "bootstrap_confidence_interval",
     "cross_validate_calibration",
+    "compute_log_loss",
 ]
 
 import math
@@ -388,3 +389,27 @@ def cross_validate_calibration(
 
     arr = np.array(scores)
     return (round(float(arr.mean()), 6), round(float(arr.std()), 6))
+
+
+def compute_log_loss(probs: np.ndarray, labels: np.ndarray, eps: float = 1e-7) -> float:
+    """Binary cross-entropy log-loss for calibration evaluation.
+
+    Clips probabilities to [eps, 1 - eps] to avoid log(0).  Lower is better;
+    a perfectly calibrated classifier has log-loss equal to its Brier score
+    in the limit of many samples.
+
+    Args:
+        probs: array of predicted probabilities, shape (N,)
+        labels: array of binary labels (0 or 1), shape (N,)
+        eps: small constant to avoid log(0)
+
+    Returns:
+        Mean log-loss as a non-negative float.  Returns 0.0 for empty inputs.
+    """
+    probs = np.asarray(probs, dtype=float)
+    labels = np.asarray(labels, dtype=float)
+    if len(probs) == 0:
+        return 0.0
+    p = np.clip(probs, eps, 1.0 - eps)
+    loss = -(labels * np.log(p) + (1.0 - labels) * np.log(1.0 - p))
+    return round(float(loss.mean()), 6)

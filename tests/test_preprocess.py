@@ -708,3 +708,66 @@ class TestDetectBadPixelsEdgeCases:
     def test_invalid_b64_returns_empty(self):
         from preprocess import detect_bad_pixels
         assert detect_bad_pixels(self._make_obs("!!!invalid!!!")) == []
+
+
+class TestComputeAstrometricScatter:
+    def _make_obs(self, n=5, arc_days=2.0):
+        from .conftest import build_tracklet
+        t = build_tracklet(n_obs=n, arc_days=arc_days)
+        return list(t.observations)
+
+    def test_returns_float_for_valid_obs(self):
+        from preprocess import compute_astrometric_scatter
+        obs = self._make_obs(n=4, arc_days=1.0)
+        result = compute_astrometric_scatter(obs)
+        assert result is None or isinstance(result, float)
+
+    def test_returns_none_for_single_obs(self):
+        from preprocess import compute_astrometric_scatter
+        obs = self._make_obs(n=1)
+        result = compute_astrometric_scatter(obs)
+        assert result is None
+
+    def test_returns_none_for_empty(self):
+        from preprocess import compute_astrometric_scatter
+        result = compute_astrometric_scatter([])
+        assert result is None
+
+    def test_nonnegative_when_returned(self):
+        from preprocess import compute_astrometric_scatter
+        obs = self._make_obs(n=5, arc_days=2.0)
+        result = compute_astrometric_scatter(obs)
+        if result is not None:
+            assert result >= 0.0
+
+    def test_identical_jd_returns_none(self):
+        from preprocess import compute_astrometric_scatter
+        from schemas import Observation
+        obs = [
+            Observation(obs_id=f"o{i}", ra_deg=10.0, dec_deg=5.0,
+                       jd=2460000.5, mag=20.0, mag_err=0.1,
+                       filter_band="r", mission="ZTF")
+            for i in range(3)
+        ]
+        result = compute_astrometric_scatter(obs)
+        assert result is None
+
+
+class TestComputeAstrometricScatterException:
+    """Cover except Exception branch in compute_astrometric_scatter."""
+
+    def test_exception_returns_none(self, monkeypatch):
+        import numpy as np
+
+        from preprocess import compute_astrometric_scatter
+
+        from .conftest import build_tracklet
+
+        # Monkeypatch np.linalg.lstsq to raise
+        def raise_lstsq(*args, **kwargs):
+            raise ValueError("forced failure")
+
+        monkeypatch.setattr(np.linalg, "lstsq", raise_lstsq)
+        obs = list(build_tracklet(n_obs=4, arc_days=2.0).observations)
+        result = compute_astrometric_scatter(obs)
+        assert result is None

@@ -17,6 +17,7 @@ __all__ = [
     "dominant_hypothesis",
     "classify_morphology",
     "batch_morphology",
+    "summarize_classifications",
 ]
 
 import base64
@@ -963,3 +964,49 @@ def batch_morphology(tracklet: object) -> dict:
     modal = max(counts, key=lambda k: counts[k])
     streak_frac = round(counts.get("streak", 0) / len(labels), 4)
     return {"modal_class": modal, "class_counts": counts, "streak_fraction": streak_frac}
+
+
+def summarize_classifications(neos: list) -> dict:
+    """Aggregate classification summary across a list of ScoredNEO objects.
+
+    Returns a dict with:
+    - ``total``: number of NEOs
+    - ``dominant_hypothesis_counts``: mapping from hypothesis name → count
+    - ``mean_entropy_bits``: mean Shannon entropy of posteriors
+    - ``mean_real_bogus_score``: mean real_bogus_score (None scores excluded)
+    - ``pha_candidate_count``: number with hazard_flag == 'pha_candidate'
+    """
+    if not neos:
+        return {
+            "total": 0,
+            "dominant_hypothesis_counts": {},
+            "mean_entropy_bits": 0.0,
+            "mean_real_bogus_score": None,
+            "pha_candidate_count": 0,
+        }
+
+    hyp_counts: dict[str, int] = {}
+    entropies: list[float] = []
+    rb_scores: list[float] = []
+    pha_count = 0
+
+    for neo in neos:
+        name, _ = dominant_hypothesis(neo.posterior)
+        hyp_counts[name] = hyp_counts.get(name, 0) + 1
+        entropies.append(posterior_entropy(neo.posterior))
+        rb = neo.features.real_bogus_score
+        if rb is not None:
+            rb_scores.append(rb)
+        if getattr(neo.hazard, "hazard_flag", None) == "pha_candidate":
+            pha_count += 1
+
+    mean_ent = round(float(sum(entropies) / len(entropies)), 6)
+    mean_rb = round(float(sum(rb_scores) / len(rb_scores)), 6) if rb_scores else None
+
+    return {
+        "total": len(neos),
+        "dominant_hypothesis_counts": hyp_counts,
+        "mean_entropy_bits": mean_ent,
+        "mean_real_bogus_score": mean_rb,
+        "pha_candidate_count": pha_count,
+    }

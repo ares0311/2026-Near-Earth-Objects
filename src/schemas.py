@@ -10,7 +10,7 @@ __all__ = [
     "FetchProvenance", "PreprocessProvenance", "DetectProvenance", "LinkProvenance",
     "FetchResult", "PreprocessResult", "DetectResult", "LinkResult",
     "ObservationWindow", "PipelineResult", "CandidateSummary", "NEOStatistics", "TrackletSummary",
-    "CloseApproachEvent", "SurveyField",
+    "CloseApproachEvent", "SurveyField", "PipelineConfig",
     "BackgroundOutcome", "BackgroundRunMode", "FollowUpTestStatus", "HumanReviewStatus",
     "RecommendationAction", "SignoffDecision",
     "PriorityFactors", "BackgroundTarget", "FollowUpTestResult",
@@ -600,3 +600,21 @@ class SurveyField(BaseModel):
     limiting_mag: float
     n_sources: int
     jd: float
+
+
+class PipelineConfig(BaseModel):
+    """Configuration for a single pipeline run.
+
+    Captures the sky search parameters, time window, survey selection, and
+    key detection thresholds for a repeatable pipeline execution.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    ra_deg: float
+    dec_deg: float
+    radius_deg: float = 1.0
+    start_jd: float = 2460000.5
+    end_jd: float | None = None
+    real_bogus_threshold: float = 0.65
+    surveys: tuple[str, ...] = ("ZTF",)

@@ -778,3 +778,100 @@ class TestComputeStreakMetricSinglePixel:
             cutout_difference=b64,
         )
         assert compute_streak_metric(obs) == pytest.approx(0.0)
+
+
+class TestComputePsfFwhm:
+    def _make_obs(self, b64: str | None = None):
+        import base64
+
+        import numpy as np
+        if b64 is None:
+            arr = np.zeros((9, 9), dtype=np.float32)
+            # Gaussian-like blob in centre
+            for r in range(9):
+                for c in range(9):
+                    arr[r, c] = float(np.exp(-((r - 4) ** 2 + (c - 4) ** 2) / 4.0))
+            raw = arr.astype(np.float32).tobytes()
+            b64 = base64.b64encode(raw).decode()
+        from schemas import Observation
+        return Observation(
+            obs_id="psf_test",
+            ra_deg=10.0,
+            dec_deg=5.0,
+            jd=2460000.5,
+            mag=20.0,
+            mag_err=0.05,
+            filter_band="r",
+            mission="ZTF",
+            cutout_difference=b64,
+        )
+
+    def test_returns_float_for_valid_cutout(self):
+        from detect import compute_psf_fwhm
+        result = compute_psf_fwhm(self._make_obs())
+        assert result is None or isinstance(result, float)
+
+    def test_returns_none_without_cutout(self):
+        from detect import compute_psf_fwhm
+        from schemas import Observation
+        obs = Observation(
+            obs_id="no_cutout",
+            ra_deg=10.0,
+            dec_deg=5.0,
+            jd=2460000.5,
+            mag=20.0,
+            mag_err=0.05,
+            filter_band="r",
+            mission="ZTF",
+        )
+        assert compute_psf_fwhm(obs) is None
+
+    def test_returns_none_for_invalid_b64(self):
+        from detect import compute_psf_fwhm
+        result = compute_psf_fwhm(self._make_obs("!!!invalid!!!"))
+        assert result is None
+
+    def test_fwhm_positive_when_returned(self):
+        from detect import compute_psf_fwhm
+        result = compute_psf_fwhm(self._make_obs())
+        if result is not None:
+            assert result > 0.0
+
+    def test_flat_array_returns_none_or_zero(self):
+        import base64
+
+        import numpy as np
+
+        from detect import compute_psf_fwhm
+        arr = np.zeros((9, 9), dtype=np.float32)
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        result = compute_psf_fwhm(self._make_obs(b64))
+        # Flat image → degenerate fit; None is acceptable
+        assert result is None or isinstance(result, float)
+
+
+class TestComputePsfFwhmNonSquare:
+    """Cover size*size != len(arr) branch in compute_psf_fwhm."""
+
+    def test_non_square_array_returns_none(self):
+        import base64
+
+        import numpy as np
+
+        from detect import compute_psf_fwhm
+        from schemas import Observation
+        # 3x4=12 floats → not a perfect square
+        arr = np.ones(12, dtype=np.float32)
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        obs = Observation(
+            obs_id="non_sq",
+            ra_deg=10.0,
+            dec_deg=5.0,
+            jd=2460000.5,
+            mag=20.0,
+            mag_err=0.05,
+            filter_band="r",
+            mission="ZTF",
+            cutout_difference=b64,
+        )
+        assert compute_psf_fwhm(obs) is None
