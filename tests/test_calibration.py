@@ -487,3 +487,54 @@ class TestReliabilityDiagramNew:
         result = reliability_diagram(probs, labels)
         for c in result["bin_counts"]:
             assert c > 0
+
+
+class TestCalibrationReport:
+    def test_returns_dict(self):
+        import numpy as np
+
+        from calibration import calibration_report
+        result = calibration_report(np.array([0.3, 0.7]), np.array([0.0, 1.0]))
+        assert isinstance(result, dict)
+
+    def test_has_required_keys(self):
+        import numpy as np
+
+        from calibration import calibration_report
+        result = calibration_report(np.array([0.3, 0.7]), np.array([0.0, 1.0]))
+        for key in ["n_samples", "mean_prob", "fraction_positive",
+                    "brier_score", "ece", "log_loss"]:
+            assert key in result
+
+    def test_empty_returns_none_values(self):
+        from calibration import calibration_report
+        result = calibration_report([], [])
+        assert result["n_samples"] == 0
+        assert result["brier_score"] is None
+        assert result["ece"] is None
+        assert result["log_loss"] is None
+
+    def test_n_samples_correct(self):
+        import numpy as np
+
+        from calibration import calibration_report
+        result = calibration_report(np.zeros(50), np.zeros(50))
+        assert result["n_samples"] == 50
+
+    def test_perfect_calibration_low_brier(self):
+        import numpy as np
+
+        from calibration import calibration_report
+        # Near-perfect: 0 → label 0, 1 → label 1
+        probs = np.array([0.01, 0.99])
+        labels = np.array([0.0, 1.0])
+        result = calibration_report(probs, labels)
+        assert result["brier_score"] < 0.01
+
+    def test_metrics_are_floats(self):
+        import numpy as np
+
+        from calibration import calibration_report
+        result = calibration_report(np.array([0.5, 0.5]), np.array([0.0, 1.0]))
+        for key in ["brier_score", "ece", "log_loss", "mean_prob", "fraction_positive"]:
+            assert isinstance(result[key], float)

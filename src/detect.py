@@ -4,7 +4,7 @@ from __future__ import annotations
 
 __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus",
            "compute_streak_metric", "cluster_detections", "compute_trail_length",
-           "compute_psf_fwhm", "estimate_sky_background"]
+           "compute_psf_fwhm", "estimate_sky_background", "compute_detection_efficiency"]
 
 import math
 import uuid
@@ -552,3 +552,31 @@ def estimate_sky_background(observations: tuple | list, percentile: float = 25.0
     if not values:
         return None
     return round(float(np.percentile(values, percentile)), 6)
+
+
+def compute_detection_efficiency(
+    observations: tuple | list,
+    limiting_mag: float,
+) -> float:
+    """Estimate detection efficiency as the fraction of observations above the limiting magnitude.
+
+    A detection is considered "above threshold" (efficiently detected) when
+    ``obs.mag < limiting_mag``.  Observations with ``mag`` equal to ``None``
+    or above 90 (sentinel for non-detection) are counted as missed.
+
+    Args:
+        observations: Iterable of Observation objects.
+        limiting_mag: Survey limiting magnitude (5-sigma depth).
+
+    Returns:
+        Fraction of observations brighter than ``limiting_mag`` in [0.0, 1.0].
+        Returns 0.0 for an empty collection.
+    """
+    obs_list = list(observations)
+    if not obs_list:
+        return 0.0
+    n_detected = sum(
+        1 for o in obs_list
+        if getattr(o, "mag", None) is not None and o.mag < limiting_mag and o.mag < 90.0
+    )
+    return round(n_detected / len(obs_list), 6)

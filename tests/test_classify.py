@@ -1401,3 +1401,42 @@ class TestCalibratePosterior:
         p = self._make_posterior()
         result = calibrate_posterior(p, calibrator=BadCal())
         assert isinstance(result, type(p))
+
+
+class TestComputeClassificationTable:
+    def _make_neos(self, n=3):
+        from .conftest import build_scored_neo
+        return [build_scored_neo(object_id=f"T{i:03d}") for i in range(n)]
+
+    def test_returns_list(self):
+        from classify import compute_classification_table
+        result = compute_classification_table(self._make_neos())
+        assert isinstance(result, list)
+
+    def test_length_matches_input(self):
+        from classify import compute_classification_table
+        neos = self._make_neos(4)
+        assert len(compute_classification_table(neos)) == 4
+
+    def test_has_required_keys(self):
+        from classify import compute_classification_table
+        result = compute_classification_table(self._make_neos(1))
+        row = result[0]
+        assert "object_id" in row
+        assert "dominant_hypothesis" in row
+        assert "probability" in row
+        assert "entropy_bits" in row
+
+    def test_probability_in_range(self):
+        from classify import compute_classification_table
+        for row in compute_classification_table(self._make_neos(3)):
+            assert 0.0 <= row["probability"] <= 1.0
+
+    def test_entropy_non_negative(self):
+        from classify import compute_classification_table
+        for row in compute_classification_table(self._make_neos(3)):
+            assert row["entropy_bits"] >= 0.0
+
+    def test_empty_list(self):
+        from classify import compute_classification_table
+        assert compute_classification_table([]) == []

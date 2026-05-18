@@ -934,3 +934,42 @@ class TestEstimateSkyBackground:
         obs = build_observation(cutout_difference=tiny)
         result = estimate_sky_background([obs])
         assert result is None
+
+
+class TestComputeDetectionEfficiency:
+    def _make_obs(self, mag=19.0):
+        from .conftest import build_observation
+        return build_observation(mag=mag)
+
+    def test_empty_returns_zero(self):
+        from detect import compute_detection_efficiency
+        assert compute_detection_efficiency([], 20.0) == 0.0
+
+    def test_all_detected(self):
+        from detect import compute_detection_efficiency
+        obs = [self._make_obs(18.0), self._make_obs(19.0)]
+        assert compute_detection_efficiency(obs, 20.0) == pytest.approx(1.0)
+
+    def test_none_detected(self):
+        from detect import compute_detection_efficiency
+        obs = [self._make_obs(21.0), self._make_obs(22.0)]
+        assert compute_detection_efficiency(obs, 20.0) == pytest.approx(0.0)
+
+    def test_partial_detection(self):
+        from detect import compute_detection_efficiency
+        obs = [self._make_obs(18.0), self._make_obs(21.0)]
+        result = compute_detection_efficiency(obs, 20.0)
+        assert result == pytest.approx(0.5)
+
+    def test_range_0_1(self):
+        from detect import compute_detection_efficiency
+        obs = [self._make_obs(m) for m in [17.0, 19.0, 20.5, 21.0]]
+        result = compute_detection_efficiency(obs, 20.0)
+        assert 0.0 <= result <= 1.0
+
+    def test_sentinel_mag_counts_as_missed(self):
+        from detect import compute_detection_efficiency
+
+        from .conftest import build_observation
+        obs = [build_observation(mag=99.0)]
+        assert compute_detection_efficiency(obs, 100.0) == pytest.approx(0.0)

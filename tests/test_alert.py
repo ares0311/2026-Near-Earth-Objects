@@ -991,3 +991,60 @@ class TestGenerateMpcCoverLetter:
         neo = build_scored_neo()
         result = generate_mpc_cover_letter(neo)
         assert "=" * 20 in result
+
+
+class TestFormatImpactNotification:
+    def test_returns_dict(self):
+        from alert import format_impact_notification
+
+        from .conftest import build_scored_neo
+        neo = build_scored_neo()
+        result = format_impact_notification(neo)
+        assert isinstance(result, dict)
+
+    def test_has_required_keys(self):
+        from alert import format_impact_notification
+
+        from .conftest import build_scored_neo
+        result = format_impact_notification(build_scored_neo())
+        for key in ["object_id", "guardrails", "observations", "moid_au",
+                    "hazard_flag", "alert_pathway", "neo_class", "arc_days"]:
+            assert key in result
+
+    def test_object_id_correct(self):
+        from alert import format_impact_notification
+
+        from .conftest import build_scored_neo
+        result = format_impact_notification(build_scored_neo(object_id="2026-XY1"))
+        assert result["object_id"] == "2026-XY1"
+
+    def test_guardrails_is_list(self):
+        from alert import format_impact_notification
+
+        from .conftest import build_scored_neo
+        result = format_impact_notification(build_scored_neo())
+        assert isinstance(result["guardrails"], list)
+        assert len(result["guardrails"]) > 0
+
+    def test_guardrail_contains_no_impact_probability(self):
+        from alert import format_impact_notification
+
+        from .conftest import build_scored_neo
+        result = format_impact_notification(build_scored_neo())
+        all_text = " ".join(result["guardrails"])
+        assert "impact probability" in all_text.lower()
+
+    def test_observations_list_nonempty(self):
+        from alert import format_impact_notification
+
+        from .conftest import build_scored_neo
+        result = format_impact_notification(build_scored_neo())
+        assert isinstance(result["observations"], list)
+        assert len(result["observations"]) > 0
+
+    def test_generated_utc_is_string(self):
+        from alert import format_impact_notification
+
+        from .conftest import build_scored_neo
+        result = format_impact_notification(build_scored_neo())
+        assert isinstance(result["generated_utc"], str)

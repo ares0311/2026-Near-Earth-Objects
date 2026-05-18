@@ -5,7 +5,8 @@ from __future__ import annotations
 __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fetch",
            "fetch_batch", "estimate_limiting_magnitude", "summarise_fetch_result",
            "merge_survey_alerts", "filter_alerts_by_motion", "build_observation_window",
-           "count_known_objects_in_field", "fetch_mpc_observations", "fetch_atlas_forced"]
+           "count_known_objects_in_field", "fetch_mpc_observations",
+           "fetch_atlas_forced", "fetch_ztf_alerts"]
 
 import json
 import os
@@ -746,5 +747,93 @@ def fetch_atlas_forced(
                 _save_cache(cache_key, [o.model_dump() for o in obs_list])
                 return obs_list
         return []
+    except Exception:
+        return []
+
+
+def fetch_ztf_alerts(
+    ra_deg: float,
+    dec_deg: float,
+    radius_deg: float,
+    start_jd: float,
+    end_jd: float,
+    force_refresh: bool = False,
+) -> list:
+    """Fetch ZTF difference-image alerts from the IRSA TAP service.
+
+    Queries the IRSA ZTF alert archive for all alerts within ``radius_deg``
+    of (``ra_deg``, ``dec_deg``) in the time window [``start_jd``, ``end_jd``].
+    Results are disk-cached; subsequent calls with the same parameters return
+    immediately from cache unless ``force_refresh=True``.
+
+    Args:
+        ra_deg: Right ascension of the search centre in degrees.
+        dec_deg: Declination of the search centre in degrees.
+        radius_deg: Search radius in degrees.
+        start_jd: Start of the search window as Julian Date.
+        end_jd: End of the search window as Julian Date.
+        force_refresh: Bypass on-disk cache if True.
+
+    Returns:
+        List of :class:`~schemas.Observation` objects.  Returns an empty list
+        on network failure or missing dependency.
+    """
+    import hashlib
+
+    cache_key = hashlib.md5(
+        f"ztf_irsa_{ra_deg:.5f}_{dec_deg:.5f}_{radius_deg:.4f}"
+        f"_{start_jd:.3f}_{end_jd:.3f}".encode()
+    ).hexdigest()
+
+    cached = _load_cache(cache_key, force_refresh=force_refresh)
+    if cached is not None:
+        obs_list = []
+        for d in cached:
+            try:
+                obs_list.append(Observation(**d))
+            except Exception:
+                pass
+        return obs_list
+
+    try:
+        import astropy.units as u
+        from astropy.coordinates import SkyCoord
+        from astroquery.irsa import Irsa  # type: ignore[import]
+
+        coord = SkyCoord(ra=ra_deg, dec=dec_deg, unit="deg")
+        radius = radius_deg * u.deg
+
+        table = Irsa.query_region(
+            coord,
+            catalog="ztf_alerts",
+            spatial="Cone",
+            radius=radius,
+        )
+
+        ztf_obs: list[Observation] = []
+        for row in table:
+            try:
+                jd = float(row["jd"])
+                if not (start_jd <= jd <= end_jd):
+                    continue
+                ztf_obs.append(
+                    Observation(
+                        obs_id=str(row.get("candid", f"ztf_{jd}")),
+                        ra_deg=float(row["ra"]),
+                        dec_deg=float(row["dec"]),
+                        jd=jd,
+                        mag=float(row.get("magpsf", 99.0)),
+                        mag_err=float(row.get("sigmapsf", 0.1)),
+                        filter_band=str(row.get("fid", "r")),
+                        mission="ZTF",
+                        real_bogus=float(row.get("rb", 0.0)) if row.get("rb") is not None else None,
+                    )
+                )
+            except Exception:
+                continue
+
+        _save_cache(cache_key, [o.model_dump() for o in ztf_obs])
+        return ztf_obs
+
     except Exception:
         return []

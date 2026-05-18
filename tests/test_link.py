@@ -971,3 +971,55 @@ class TestFilterByArcLength:
         tracklets = [self._make_tracklet(0.1), self._make_tracklet(0.5)]
         result = filter_by_arc_length(tracklets, min_arc_days=1.0)
         assert result == []
+
+
+class TestSummarizeArcStatistics:
+    def _make_tracklet(self, arc_days, n_nights=2):
+        from schemas import Tracklet
+
+        from .conftest import build_observation
+        obs = tuple(
+            build_observation(obs_id=f"s_{i}", jd=2460000.5 + i * arc_days / max(n_nights - 1, 1))
+            for i in range(n_nights)
+        )
+        return Tracklet(object_id="T1", observations=obs, arc_days=arc_days,
+                        motion_rate_arcsec_per_hour=1.0, motion_pa_degrees=90.0)
+
+    def test_empty_list(self):
+        from link import summarize_arc_statistics
+        result = summarize_arc_statistics([])
+        assert result["n_tracklets"] == 0
+        assert result["mean_arc_days"] == 0.0
+        assert result["max_arc_days"] == 0.0
+        assert result["fraction_multi_night"] == 0.0
+
+    def test_counts_tracklets(self):
+        from link import summarize_arc_statistics
+        tracklets = [self._make_tracklet(1.0), self._make_tracklet(2.0)]
+        result = summarize_arc_statistics(tracklets)
+        assert result["n_tracklets"] == 2
+
+    def test_mean_arc(self):
+        from link import summarize_arc_statistics
+        tracklets = [self._make_tracklet(1.0), self._make_tracklet(3.0)]
+        result = summarize_arc_statistics(tracklets)
+        assert result["mean_arc_days"] == pytest.approx(2.0, abs=0.01)
+
+    def test_max_arc(self):
+        from link import summarize_arc_statistics
+        tracklets = [self._make_tracklet(1.0), self._make_tracklet(5.0)]
+        result = summarize_arc_statistics(tracklets)
+        assert result["max_arc_days"] == pytest.approx(5.0, abs=0.01)
+
+    def test_fraction_multi_night_single_night(self):
+        from link import summarize_arc_statistics
+        # n_nights=1 → all obs on same integer JD
+        tracklets = [self._make_tracklet(0.0, n_nights=1)]
+        result = summarize_arc_statistics(tracklets)
+        assert result["fraction_multi_night"] == pytest.approx(0.0)
+
+    def test_fraction_multi_night_all_multi(self):
+        from link import summarize_arc_statistics
+        tracklets = [self._make_tracklet(2.0, n_nights=2), self._make_tracklet(3.0, n_nights=3)]
+        result = summarize_arc_statistics(tracklets)
+        assert result["fraction_multi_night"] == pytest.approx(1.0)

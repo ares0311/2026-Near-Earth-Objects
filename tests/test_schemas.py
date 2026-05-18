@@ -605,3 +605,42 @@ class TestObservationBatch:
             mission="ATLAS", observations=(obs,),
         )
         assert batch.mission == "ATLAS"
+
+
+class TestDetectionSummary:
+    def _make_summary(self, **kwargs):
+        from schemas import DetectionSummary
+        defaults = dict(
+            field_id="ZTF_F001", epoch_jd=2460000.5, survey="ZTF",
+            n_candidates=10, n_known_matches=8, n_new=2, limiting_mag=20.5,
+        )
+        defaults.update(kwargs)
+        return DetectionSummary(**defaults)
+
+    def test_construction(self):
+        s = self._make_summary()
+        assert s.field_id == "ZTF_F001"
+        assert s.n_candidates == 10
+        assert s.n_new == 2
+        assert s.limiting_mag == pytest.approx(20.5)
+
+    def test_limiting_mag_optional(self):
+        from schemas import DetectionSummary
+        s = DetectionSummary(field_id="F", epoch_jd=2460000.5, survey="ZTF",
+                             n_candidates=5, n_known_matches=3, n_new=2)
+        assert s.limiting_mag is None
+
+    def test_frozen(self):
+        import pytest as pt
+        s = self._make_summary()
+        with pt.raises(Exception):
+            s.field_id = "other"  # type: ignore[misc]
+
+    def test_zero_candidates(self):
+        s = self._make_summary(n_candidates=0, n_known_matches=0, n_new=0)
+        assert s.n_candidates == 0
+
+    def test_different_surveys(self):
+        for survey in ("ZTF", "ATLAS", "PanSTARRS", "CSS", "MPC"):
+            s = self._make_summary(survey=survey)
+            assert s.survey == survey

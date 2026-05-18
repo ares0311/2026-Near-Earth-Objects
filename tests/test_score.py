@@ -863,3 +863,43 @@ class TestComputeThreatScoreH25:
         )
         neo = types.SimpleNamespace(hazard=hazard)
         assert compute_threat_score(neo) == pytest.approx(0.0)
+
+
+class TestFilterByAlertPathway:
+    def _make_neos(self):
+        from .conftest import build_scored_neo
+        return [
+            build_scored_neo(alert_pathway="mpc_submission"),
+            build_scored_neo(alert_pathway="internal_candidate"),
+            build_scored_neo(alert_pathway="mpc_submission"),
+            build_scored_neo(alert_pathway="known_object"),
+        ]
+
+    def test_filters_correctly(self):
+        from score import filter_by_alert_pathway
+        neos = self._make_neos()
+        result = filter_by_alert_pathway(neos, "mpc_submission")
+        assert len(result) == 2
+
+    def test_empty_result(self):
+        from score import filter_by_alert_pathway
+        neos = self._make_neos()
+        result = filter_by_alert_pathway(neos, "nasa_pdco_notify")
+        assert result == []
+
+    def test_all_match(self):
+        from score import filter_by_alert_pathway
+
+        from .conftest import build_scored_neo
+        neos = [build_scored_neo(alert_pathway="known_object") for _ in range(3)]
+        result = filter_by_alert_pathway(neos, "known_object")
+        assert len(result) == 3
+
+    def test_empty_input(self):
+        from score import filter_by_alert_pathway
+        assert filter_by_alert_pathway([], "mpc_submission") == []
+
+    def test_returns_list(self):
+        from score import filter_by_alert_pathway
+        result = filter_by_alert_pathway(self._make_neos(), "internal_candidate")
+        assert isinstance(result, list)

@@ -10,7 +10,7 @@ __all__ = [
     "FetchProvenance", "PreprocessProvenance", "DetectProvenance", "LinkProvenance",
     "FetchResult", "PreprocessResult", "DetectResult", "LinkResult",
     "ObservationWindow", "PipelineResult", "CandidateSummary", "NEOStatistics", "TrackletSummary",
-    "CloseApproachEvent", "SurveyField", "PipelineConfig", "ObservationBatch",
+    "CloseApproachEvent", "SurveyField", "PipelineConfig", "ObservationBatch", "DetectionSummary",
     "BackgroundOutcome", "BackgroundRunMode", "FollowUpTestStatus", "HumanReviewStatus",
     "RecommendationAction", "SignoffDecision",
     "PriorityFactors", "BackgroundTarget", "FollowUpTestResult",
@@ -642,4 +642,32 @@ class ObservationBatch(BaseModel):
     night_jd: int
     mission: Mission
     observations: tuple[Observation, ...]
+    limiting_mag: float | None = None
+
+
+class DetectionSummary(BaseModel):
+    """Summary statistics for a single detection run on a survey field.
+
+    Groups key outcomes from a detection pass: candidate count, known-object
+    matches, genuinely new detections, and field metadata.  Immutable after
+    construction.
+
+    Attributes:
+        field_id: Survey field identifier.
+        epoch_jd: Julian Date of the observation epoch.
+        survey: Survey that produced this detection run.
+        n_candidates: Total number of raw candidates extracted.
+        n_known_matches: Candidates matched to MPC known objects.
+        n_new: Candidates not matched to any known object (n_candidates - n_known_matches).
+        limiting_mag: Estimated 5-sigma limiting magnitude; None if unknown.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    field_id: str
+    epoch_jd: float
+    survey: Mission
+    n_candidates: int = Field(ge=0)
+    n_known_matches: int = Field(ge=0)
+    n_new: int = Field(ge=0)
     limiting_mag: float | None = None
