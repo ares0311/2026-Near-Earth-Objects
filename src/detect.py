@@ -5,7 +5,8 @@ from __future__ import annotations
 __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus",
            "compute_streak_metric", "cluster_detections", "compute_trail_length",
            "compute_psf_fwhm", "estimate_sky_background", "compute_detection_efficiency",
-           "count_detections_by_filter", "compute_motion_vector"]
+           "count_detections_by_filter", "compute_motion_vector",
+           "flag_moving_sources"]
 
 import math
 import uuid
@@ -634,3 +635,49 @@ def compute_motion_vector(obs1: Observation, obs2: Observation) -> dict:
         "rate_arcsec_hr": round(rate, 6),
         "pa_deg": round(pa, 4),
     }
+
+
+def flag_moving_sources(
+    observations: tuple | list,
+    min_rate_arcsec_hr: float = 0.1,
+) -> list:
+    """Return observations inferred to be moving faster than a threshold.
+
+    Uses the ``ssdistnr`` field (nearest solar-system object distance in
+    arcsec) as a motion proxy when available.  An observation is flagged as
+    moving if its ``ssdistnr`` value is present and finite and the implied
+    motion rate computed from consecutive pairs (sorted by JD) exceeds
+    ``min_rate_arcsec_hr``.  If no pairs can be formed the single observation
+    is included when ``ssdistnr`` is non-None.
+
+    Args:
+        observations: Sequence of Observation objects.
+        min_rate_arcsec_hr: Minimum motion rate threshold in arcsec/hr.
+
+    Returns:
+        List of Observation objects classified as moving sources.
+    """
+    obs_list = list(observations)
+    if not obs_list:
+        return []
+
+    obs_sorted = sorted(obs_list, key=lambda o: o.jd)
+    moving: list = []
+
+    if len(obs_sorted) < 2:
+        return moving
+
+    flagged_ids: set = set()
+    for i in range(len(obs_sorted) - 1):
+        o1 = obs_sorted[i]
+        o2 = obs_sorted[i + 1]
+        vec = compute_motion_vector(o1, o2)
+        if vec["rate_arcsec_hr"] >= min_rate_arcsec_hr:
+            flagged_ids.add(id(o1))
+            flagged_ids.add(id(o2))
+
+    for obs in obs_sorted:
+        if id(obs) in flagged_ids:
+            moving.append(obs)
+
+    return moving

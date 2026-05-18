@@ -1822,3 +1822,166 @@ class TestFilterBySurvey:
         result = self._make_result(["ZTF", "ATLAS"])
         filtered = filter_by_survey(result, ["PanSTARRS"])
         assert len(filtered.alerts) == 0
+
+
+class TestFetchPanstarrsCatalog:
+    def _make_obs(self):
+        return {
+            "obs_id": "ps1_123", "ra_deg": 180.0, "dec_deg": 10.0,
+            "jd": 2460000.5, "mag": 19.5, "mag_err": 0.05,
+            "filter_band": "r", "mission": "PanSTARRS",
+        }
+
+    def test_returns_list_on_cache_hit(self, tmp_path):
+        import json
+        from unittest.mock import patch
+
+        from fetch import fetch_panstarrs_catalog
+        cache_dir = tmp_path / ".neo_cache"
+        cache_dir.mkdir()
+        with patch("fetch._CACHE_DIR", cache_dir):
+            import hashlib
+            key = hashlib.md5(
+                b"panstarrs:180.000000:10.000000:0.500000:2460000.50"
+            ).hexdigest()
+            cache_file = cache_dir / f"{key}.json"
+            cache_file.write_text(json.dumps([self._make_obs()]))
+            result = fetch_panstarrs_catalog(180.0, 10.0, 0.5)
+        assert isinstance(result, list)
+        assert len(result) == 1
+
+    def test_returns_empty_on_network_failure(self, tmp_path):
+        from unittest.mock import patch
+
+        from fetch import fetch_panstarrs_catalog
+        with patch("fetch._CACHE_DIR", tmp_path / ".neo_cache"), \
+             patch.dict("sys.modules", {"astroquery.mast": None}):
+            result = fetch_panstarrs_catalog(180.0, 10.0, 0.5)
+        assert isinstance(result, list)
+
+    def test_force_refresh_bypasses_cache(self, tmp_path):
+        from unittest.mock import MagicMock, patch
+
+        from fetch import fetch_panstarrs_catalog
+        cache_dir = tmp_path / ".neo_cache"
+        cache_dir.mkdir()
+        mock_mast = MagicMock()
+        mock_mast.Catalogs.query_region.return_value = []
+        with patch("fetch._CACHE_DIR", cache_dir), \
+             patch.dict("sys.modules", {"astroquery.mast": mock_mast}):
+            result = fetch_panstarrs_catalog(180.0, 10.0, 0.5, force_refresh=True)
+        assert isinstance(result, list)
+
+    def test_mast_exception_returns_empty(self, tmp_path):
+        from unittest.mock import MagicMock, patch
+
+        from fetch import fetch_panstarrs_catalog
+        mock_mast = MagicMock()
+        mock_mast.Catalogs.query_region.side_effect = RuntimeError("network")
+        with patch("fetch._CACHE_DIR", tmp_path / ".neo_cache"), \
+             patch.dict("sys.modules", {"astroquery.mast": mock_mast}):
+            result = fetch_panstarrs_catalog(180.0, 10.0, 0.5, force_refresh=True)
+        assert isinstance(result, list)
+
+    def test_cache_write_failure_still_returns(self, tmp_path):
+        from unittest.mock import MagicMock, patch
+
+        from fetch import fetch_panstarrs_catalog
+        mock_mast = MagicMock()
+        mock_mast.Catalogs.query_region.return_value = []
+        with patch("fetch._CACHE_DIR", tmp_path / ".neo_cache"), \
+             patch.dict("sys.modules", {"astroquery.mast": mock_mast}), \
+             patch("builtins.open", side_effect=OSError("disk full")):
+            result = fetch_panstarrs_catalog(180.0, 10.0, 0.5, force_refresh=True)
+        assert isinstance(result, list)
+
+
+class TestFetchPanstarrsCatalogParsing:
+    """Cover row-parsing and cache-failure paths in fetch_panstarrs_catalog."""
+
+    def test_row_parsing_with_valid_mast_data(self, tmp_path):
+        from unittest.mock import MagicMock, patch
+
+        from fetch import fetch_panstarrs_catalog
+
+        mock_row = {
+            "objID": 12345, "raMean": 180.0, "decMean": 10.0,
+            "rMeanPSFMag": 19.5, "rMeanPSFMagErr": 0.05,
+        }
+        mock_results = [mock_row]
+        mock_mast = MagicMock()
+        mock_mast.Catalogs.query_region.return_value = mock_results
+        with patch("fetch._CACHE_DIR", tmp_path / ".neo_cache"), \
+             patch.dict("sys.modules", {"astroquery.mast": mock_mast}):
+            result = fetch_panstarrs_catalog(180.0, 10.0, 0.5, force_refresh=True)
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0].mission == "PanSTARRS"
+
+    def test_row_with_none_mag_uses_sentinel(self, tmp_path):
+        from unittest.mock import MagicMock, patch
+
+        from fetch import fetch_panstarrs_catalog
+
+        mock_row = {
+            "objID": 99999, "raMean": 180.0, "decMean": 10.0,
+            "rMeanPSFMag": None, "rMeanPSFMagErr": None,
+        }
+        mock_mast = MagicMock()
+        mock_mast.Catalogs.query_region.return_value = [mock_row]
+        with patch("fetch._CACHE_DIR", tmp_path / ".neo_cache"), \
+             patch.dict("sys.modules", {"astroquery.mast": mock_mast}):
+            result = fetch_panstarrs_catalog(180.0, 10.0, 0.5, force_refresh=True)
+        assert isinstance(result, list)
+        if result:
+            assert result[0].mag == 99.0
+
+    def test_row_parse_exception_skipped(self, tmp_path):
+        from unittest.mock import MagicMock, patch
+
+        from fetch import fetch_panstarrs_catalog
+
+        bad_row = {"objID": "bad", "raMean": "not_a_float", "decMean": "x",
+                   "rMeanPSFMag": None, "rMeanPSFMagErr": None}
+        mock_mast = MagicMock()
+        mock_mast.Catalogs.query_region.return_value = [bad_row]
+        with patch("fetch._CACHE_DIR", tmp_path / ".neo_cache"), \
+             patch.dict("sys.modules", {"astroquery.mast": mock_mast}):
+            result = fetch_panstarrs_catalog(180.0, 10.0, 0.5, force_refresh=True)
+        assert isinstance(result, list)
+
+    def test_corrupted_cache_falls_through_to_network(self, tmp_path):
+        from unittest.mock import MagicMock, patch
+
+        from fetch import fetch_panstarrs_catalog
+        cache_dir = tmp_path / ".neo_cache"
+        cache_dir.mkdir()
+        import hashlib
+        key = hashlib.md5(
+            b"panstarrs:180.000000:10.000000:0.500000:2460000.50"
+        ).hexdigest()
+        (cache_dir / f"{key}.json").write_text("not valid json {{{")
+        mock_mast = MagicMock()
+        mock_mast.Catalogs.query_region.return_value = []
+        with patch("fetch._CACHE_DIR", cache_dir), \
+             patch.dict("sys.modules", {"astroquery.mast": mock_mast}):
+            result = fetch_panstarrs_catalog(180.0, 10.0, 0.5)
+        assert isinstance(result, list)
+
+    def test_cache_write_failure_silently_ignored(self, tmp_path):
+        """Lines 957-958: exception during cache write is swallowed."""
+        from unittest.mock import MagicMock, patch
+
+        from fetch import fetch_panstarrs_catalog
+
+        mock_row = {
+            "objID": 77777, "raMean": 45.0, "decMean": -5.0,
+            "rMeanPSFMag": 20.0, "rMeanPSFMagErr": 0.1,
+        }
+        mock_mast = MagicMock()
+        mock_mast.Catalogs.query_region.return_value = [mock_row]
+        with patch("fetch._CACHE_DIR", tmp_path / ".neo_cache"), \
+             patch("json.dump", side_effect=OSError("disk full")), \
+             patch.dict("sys.modules", {"astroquery.mast": mock_mast}):
+            result = fetch_panstarrs_catalog(45.0, -5.0, 0.3, force_refresh=True)
+        assert isinstance(result, list)

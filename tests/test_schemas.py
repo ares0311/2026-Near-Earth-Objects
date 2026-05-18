@@ -720,3 +720,70 @@ class TestObservationStatistics:
         from schemas import ObservationStatistics
         with pytest.raises(Exception):
             ObservationStatistics(n_obs=-1)
+
+
+class TestAlertPackage:
+    def _make_obs(self):
+        from schemas import Observation
+        return Observation(
+            obs_id="o1", ra_deg=180.0, dec_deg=10.0, jd=2460000.5,
+            mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF",
+        )
+
+    def test_basic_construction(self):
+        from schemas import AlertPackage
+        pkg = AlertPackage(
+            neo_id="NEO-001",
+            alert_pathway="mpc_submission",
+            submission_timestamp_jd=2460001.0,
+        )
+        assert pkg.neo_id == "NEO-001"
+        assert pkg.alert_pathway == "mpc_submission"
+
+    def test_default_guardrail_contains_not(self):
+        from schemas import AlertPackage
+        pkg = AlertPackage(
+            neo_id="NEO-002",
+            alert_pathway="internal_candidate",
+            submission_timestamp_jd=2460001.0,
+        )
+        assert "NOT" in pkg.guardrail_statement.upper()
+
+    def test_with_observations(self):
+        from schemas import AlertPackage
+        obs = self._make_obs()
+        pkg = AlertPackage(
+            neo_id="NEO-003",
+            alert_pathway="mpc_submission",
+            moid_au=0.04,
+            observations=(obs,),
+            submission_timestamp_jd=2460001.0,
+        )
+        assert len(pkg.observations) == 1
+        assert pkg.moid_au == 0.04
+
+    def test_frozen(self):
+        import pytest
+
+        from schemas import AlertPackage
+        pkg = AlertPackage(
+            neo_id="NEO-004",
+            alert_pathway="mpc_submission",
+            submission_timestamp_jd=2460001.0,
+        )
+        with pytest.raises(Exception):
+            pkg.neo_id = "CHANGED"
+
+    def test_none_moid_allowed(self):
+        from schemas import AlertPackage
+        pkg = AlertPackage(
+            neo_id="NEO-005",
+            alert_pathway="internal_candidate",
+            moid_au=None,
+            submission_timestamp_jd=2460001.0,
+        )
+        assert pkg.moid_au is None
+
+    def test_in_all(self):
+        from schemas import __all__
+        assert "AlertPackage" in __all__

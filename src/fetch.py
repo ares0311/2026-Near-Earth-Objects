@@ -7,7 +7,7 @@ __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fet
            "merge_survey_alerts", "filter_alerts_by_motion", "build_observation_window",
            "count_known_objects_in_field", "fetch_mpc_observations",
            "fetch_atlas_forced", "fetch_ztf_alerts", "estimate_survey_depth",
-           "filter_by_survey"]
+           "filter_by_survey", "fetch_panstarrs_catalog"]
 
 import json
 import os
@@ -880,3 +880,81 @@ def filter_by_survey(fetch_result: FetchResult, surveys: list[str]) -> FetchResu
     allowed = set(surveys)
     filtered = tuple(obs for obs in fetch_result.alerts if obs.mission in allowed)
     return FetchResult(alerts=filtered, provenance=fetch_result.provenance)
+
+
+def fetch_panstarrs_catalog(
+    ra_deg: float,
+    dec_deg: float,
+    radius_deg: float,
+    epoch_jd: float = 2460000.5,
+    force_refresh: bool = False,
+) -> list:
+    """Fetch Pan-STARRS DR2 catalog sources in a cone search.
+
+    Queries the Pan-STARRS PS1 catalog via ``astroquery.mast`` for
+    point-source detections around the target position.  Results are
+    cached to ``.neo_cache/`` by query parameters.
+
+    Args:
+        ra_deg: Right ascension of search centre in degrees [0, 360).
+        dec_deg: Declination of search centre in degrees [-90, 90].
+        radius_deg: Search radius in degrees.
+        epoch_jd: Reference epoch as Julian Date (default 2460000.5).
+        force_refresh: If ``True``, bypass the on-disk cache.
+
+    Returns:
+        List of :class:`~schemas.Observation` objects from Pan-STARRS.
+        Returns an empty list on network failure or when no sources are found.
+    """
+    import hashlib
+
+    cache_key = hashlib.md5(
+        f"panstarrs:{ra_deg:.6f}:{dec_deg:.6f}:{radius_deg:.6f}:{epoch_jd:.2f}".encode()
+    ).hexdigest()
+    cache_path = _CACHE_DIR / f"{cache_key}.json"
+
+    if not force_refresh and cache_path.exists():
+        try:
+            with cache_path.open() as f:
+                raw = json.load(f)
+            return [Observation(**item) for item in raw]
+        except Exception:
+            pass
+
+    observations: list = []
+    try:
+        from astroquery.mast import Catalogs  # type: ignore[import]
+
+        results = Catalogs.query_region(  # type: ignore[no-untyped-call]
+            f"{ra_deg} {dec_deg}",
+            radius=radius_deg,
+            catalog="PanSTARRS",
+            data_release="dr2",
+            table="mean",
+        )
+        for row in results:
+            try:
+                obs = Observation(
+                    obs_id=f"ps1_{row['objID']}",
+                    jd=float(epoch_jd),
+                    ra_deg=float(row["raMean"]),
+                    dec_deg=float(row["decMean"]),
+                    mag=float(row["rMeanPSFMag"]) if row["rMeanPSFMag"] else 99.0,
+                    mag_err=float(row["rMeanPSFMagErr"]) if row["rMeanPSFMagErr"] else 0.0,
+                    filter_band="r",
+                    mission="PanSTARRS",
+                )
+                observations.append(obs)
+            except Exception:
+                continue
+    except Exception:
+        pass
+
+    try:
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        with cache_path.open("w") as f:
+            json.dump([o.model_dump() for o in observations], f)
+    except Exception:
+        pass
+
+    return observations

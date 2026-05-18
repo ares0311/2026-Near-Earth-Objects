@@ -6,7 +6,8 @@ __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_
            "compute_color_index", "estimate_source_density", "compute_source_snr",
            "detect_bad_pixels", "compute_astrometric_scatter",
            "normalize_photometry", "compute_image_quality_metrics",
-           "compute_photometric_scatter", "estimate_zero_point"]
+           "compute_photometric_scatter", "estimate_zero_point",
+           "compute_difference_image_snr"]
 
 import base64
 import math
@@ -578,3 +579,37 @@ def estimate_zero_point(
         return None
     import numpy as np
     return round(float(np.median(diffs)), 6)
+
+
+def compute_difference_image_snr(obs: object) -> float | None:
+    """Compute the peak-pixel SNR of a detection in its difference-image cutout.
+
+    Estimates signal-to-noise ratio as peak_pixel_value / background_rms,
+    where background_rms is computed from the outer annulus of the
+    63×63 cutout (pixels outside the central 15×15 box).
+
+    Args:
+        obs: An :class:`~schemas.Observation` object with an optional
+            ``cutout_difference`` base64-encoded float32 cutout.
+
+    Returns:
+        Peak-to-background SNR as a float, or ``None`` if no valid cutout
+        is available or if the background is degenerate (zero or near-zero).
+    """
+    cutout = getattr(obs, "cutout_difference", None)
+    if cutout is None:
+        return None
+    try:
+        raw = base64.b64decode(cutout)
+        arr = np.frombuffer(raw, dtype=np.float32).reshape(63, 63)
+        peak = float(arr.max())
+        outer_mask = np.ones((63, 63), dtype=bool)
+        outer_mask[24:39, 24:39] = False
+        background_pixels = arr[outer_mask]
+        rms = _background_rms(background_pixels.reshape(1, -1).flatten()
+                              if background_pixels.ndim != 1 else background_pixels)
+        if rms <= 0.0:
+            return None
+        return round(float(peak / rms), 4)
+    except Exception:
+        return None

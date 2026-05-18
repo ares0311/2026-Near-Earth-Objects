@@ -1675,3 +1675,181 @@ class TestFormatSubmissionChecklistsSkill:
         captured = capsys.readouterr()
         rows = json.loads(captured.out)
         assert len(rows) == 1
+
+
+class TestValidatePipelineRunSkill:
+    def _load_skill(self):
+        import importlib.util
+        from pathlib import Path
+        skill_path = (
+            Path(__file__).parent.parent / "Skills" / "validate_pipeline_run.py"
+        )
+        spec = importlib.util.spec_from_file_location("validate_pipeline_run", skill_path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def test_valid_run_exits_zero(self, tmp_path, capsys):
+        import pytest
+
+        from .conftest import build_scored_neo
+        mod = self._load_skill()
+        neo = build_scored_neo()
+        f = tmp_path / "run.json"
+        f.write_text("[" + neo.model_dump_json() + "]")
+        with pytest.raises(SystemExit) as exc:
+            mod.main([str(f)])
+        assert exc.value.code == 0
+
+    def test_json_flag_valid(self, tmp_path, capsys):
+        import json as _json
+
+        import pytest
+
+        from .conftest import build_scored_neo
+        mod = self._load_skill()
+        neo = build_scored_neo()
+        f = tmp_path / "run.json"
+        f.write_text("[" + neo.model_dump_json() + "]")
+        with pytest.raises(SystemExit):
+            mod.main([str(f), "--json"])
+        out = capsys.readouterr().out
+        rows = _json.loads(out)
+        assert isinstance(rows, list)
+        assert rows[0]["status"] in ("PASS", "FAIL")
+
+    def test_missing_key_exits_one(self, tmp_path):
+        import pytest
+        mod = self._load_skill()
+        f = tmp_path / "bad.json"
+        f.write_text('[{"tracklet": {"object_id": "x", "observations": [1, 2]}}]')
+        with pytest.raises(SystemExit) as exc:
+            mod.main([str(f)])
+        assert exc.value.code == 1
+
+    def test_empty_observations_flagged(self, tmp_path):
+        import pytest
+
+        from .conftest import build_scored_neo
+        mod = self._load_skill()
+        neo = build_scored_neo()
+        data = neo.model_dump()
+        data["tracklet"]["observations"] = []
+        f = tmp_path / "run.json"
+        import json as _json
+        f.write_text(_json.dumps([data]))
+        with pytest.raises(SystemExit) as exc:
+            mod.main([str(f)])
+        assert exc.value.code == 1
+
+    def test_dict_input_wrapped(self, tmp_path, capsys):
+        import json as _json
+
+        import pytest
+
+        from .conftest import build_scored_neo
+        mod = self._load_skill()
+        neo = build_scored_neo()
+        f = tmp_path / "single.json"
+        f.write_text(neo.model_dump_json())
+        with pytest.raises(SystemExit):
+            mod.main([str(f), "--json"])
+        out = capsys.readouterr().out
+        rows = _json.loads(out)
+        assert isinstance(rows, list)
+
+
+class TestExportAtlasLightcurveSkill:
+    def _load_skill(self):
+        import importlib.util
+        from pathlib import Path
+        skill_path = (
+            Path(__file__).parent.parent / "Skills" / "export_atlas_lightcurve.py"
+        )
+        spec = importlib.util.spec_from_file_location("export_atlas_lightcurve", skill_path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def _make_observations(self):
+        from schemas import Observation
+        return [
+            Observation(
+                obs_id=f"atl_{i}", ra_deg=180.0, dec_deg=10.0,
+                jd=2460000.5 + i, mag=18.5 + i * 0.1, mag_err=0.05,
+                filter_band="o" if i % 2 == 0 else "c", mission="ATLAS",
+            )
+            for i in range(4)
+        ]
+
+    def test_csv_to_stdout(self, capsys):
+        from unittest.mock import patch
+        mod = self._load_skill()
+        obs = self._make_observations()
+        with patch("fetch.fetch_atlas_forced", return_value=obs):
+            mod.main([
+                "--ra", "180.0", "--dec", "10.0",
+                "--start-jd", "2460000.5", "--end-jd", "2460004.5",
+                "--format", "csv",
+            ])
+        out = capsys.readouterr().out
+        assert "jd" in out.lower() or "obs_id" in out.lower()
+
+    def test_json_output(self, capsys):
+        import json as _json
+        from unittest.mock import patch
+        mod = self._load_skill()
+        obs = self._make_observations()
+        with patch("fetch.fetch_atlas_forced", return_value=obs):
+            mod.main([
+                "--ra", "180.0", "--dec", "10.0",
+                "--start-jd", "2460000.5", "--end-jd", "2460004.5",
+                "--format", "json",
+            ])
+        out = capsys.readouterr().out
+        rows = _json.loads(out)
+        assert isinstance(rows, list)
+        assert len(rows) > 0
+
+    def test_csv_to_file(self, tmp_path):
+        from unittest.mock import patch
+        mod = self._load_skill()
+        obs = self._make_observations()
+        out_file = tmp_path / "lc.csv"
+        with patch("fetch.fetch_atlas_forced", return_value=obs):
+            mod.main([
+                "--ra", "180.0", "--dec", "10.0",
+                "--start-jd", "2460000.5", "--end-jd", "2460004.5",
+                "--format", "csv", "--out", str(out_file),
+            ])
+        assert out_file.exists()
+
+    def test_no_observations_exits_one(self, tmp_path):
+        from unittest.mock import patch
+
+        import pytest
+        mod = self._load_skill()
+        with patch("fetch.fetch_atlas_forced", return_value=[]), \
+             pytest.raises(SystemExit) as exc:
+            mod.main([
+                "--ra", "180.0", "--dec", "10.0",
+                "--start-jd", "2460000.5", "--end-jd", "2460004.5",
+                "--format", "csv",
+            ])
+        assert exc.value.code == 1
+
+    def test_json_to_file(self, tmp_path):
+        from unittest.mock import patch
+        mod = self._load_skill()
+        obs = self._make_observations()
+        out_file = tmp_path / "lc.json"
+        with patch("fetch.fetch_atlas_forced", return_value=obs):
+            mod.main([
+                "--ra", "180.0", "--dec", "10.0",
+                "--start-jd", "2460000.5", "--end-jd", "2460004.5",
+                "--format", "json", "--out", str(out_file),
+            ])
+        import json as _json
+        assert out_file.exists()
+        content = _json.loads(out_file.read_text())
+        assert isinstance(content, list)

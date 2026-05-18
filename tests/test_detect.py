@@ -1078,3 +1078,66 @@ class TestComputeMotionVector:
         result = compute_motion_vector(obs1, obs2)
         for v in result.values():
             assert isinstance(v, float)
+
+
+class TestFlagMovingSources:
+    def _obs(self, jd, ra, dec, obs_id=None):
+        import uuid
+
+        from schemas import Observation
+        return Observation(
+            obs_id=obs_id or str(uuid.uuid4()),
+            ra_deg=ra, dec_deg=dec, jd=jd,
+            mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF",
+        )
+
+    def test_empty_returns_empty(self):
+        from detect import flag_moving_sources
+        assert flag_moving_sources([]) == []
+
+    def test_moving_pair_flagged(self):
+        from detect import flag_moving_sources
+        o1 = self._obs(2460000.5, 180.0, 10.0)
+        o2 = self._obs(2460000.5 + 1.0 / 24, 180.01, 10.0)
+        result = flag_moving_sources([o1, o2], min_rate_arcsec_hr=0.1)
+        assert len(result) == 2
+
+    def test_stationary_pair_not_flagged(self):
+        from detect import flag_moving_sources
+        o1 = self._obs(2460000.5, 180.0, 10.0, obs_id="a")
+        o2 = self._obs(2460001.5, 180.0, 10.0, obs_id="b")
+        result = flag_moving_sources([o1, o2], min_rate_arcsec_hr=1.0)
+        assert len(result) == 0
+
+    def test_single_obs_with_ssdistnr(self):
+        import uuid
+
+        from detect import flag_moving_sources
+        from schemas import Observation
+        obs = Observation(
+            obs_id=str(uuid.uuid4()), ra_deg=180.0, dec_deg=10.0,
+            jd=2460000.5, mag=19.0, mag_err=0.05,
+            filter_band="r", mission="ZTF",
+        )
+        result = flag_moving_sources([obs])
+        assert isinstance(result, list)
+
+    def test_single_obs_without_ssdistnr(self):
+        from detect import flag_moving_sources
+        obs = self._obs(2460000.5, 180.0, 10.0)
+        result = flag_moving_sources([obs])
+        assert isinstance(result, list)
+
+    def test_high_threshold_excludes_slow_movers(self):
+        from detect import flag_moving_sources
+        o1 = self._obs(2460000.5, 180.0, 10.0)
+        o2 = self._obs(2460000.5 + 1.0 / 24, 180.001, 10.0)
+        result = flag_moving_sources([o1, o2], min_rate_arcsec_hr=100.0)
+        assert len(result) == 0
+
+    def test_returns_list(self):
+        from detect import flag_moving_sources
+        o1 = self._obs(2460000.5, 180.0, 10.0)
+        o2 = self._obs(2460001.5, 181.0, 10.0)
+        result = flag_moving_sources((o1, o2))
+        assert isinstance(result, list)

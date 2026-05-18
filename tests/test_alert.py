@@ -1139,3 +1139,94 @@ class TestFormatSubmissionChecklist:
         neo = build_scored_neo()
         result = format_submission_checklist(neo)
         assert "\n" in result
+
+
+class TestValidateAlertPackage:
+    def _make_valid_package(self):
+        from schemas import Observation
+        obs = Observation(
+            obs_id="o1", ra_deg=180.0, dec_deg=10.0, jd=2460000.5,
+            mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF",
+        )
+        return {
+            "observations": [obs],
+            "orbit": {"semi_major_axis_au": 1.5},
+            "moid_au": 0.03,
+            "alert_pathway": "mpc_submission",
+            "guardrail_statement": "Do NOT publicly announce any impact probability.",
+        }
+
+    def test_valid_package_passes(self):
+        from alert import validate_alert_package
+        valid, issues = validate_alert_package(self._make_valid_package())
+        assert valid is True
+        assert issues == []
+
+    def test_missing_observations_fails(self):
+        from alert import validate_alert_package
+        pkg = self._make_valid_package()
+        del pkg["observations"]
+        valid, issues = validate_alert_package(pkg)
+        assert valid is False
+        assert any("observations" in i for i in issues)
+
+    def test_missing_orbit_fails(self):
+        from alert import validate_alert_package
+        pkg = self._make_valid_package()
+        del pkg["orbit"]
+        valid, issues = validate_alert_package(pkg)
+        assert valid is False
+        assert any("orbit" in i for i in issues)
+
+    def test_empty_observations_fails(self):
+        from alert import validate_alert_package
+        pkg = self._make_valid_package()
+        pkg["observations"] = []
+        valid, issues = validate_alert_package(pkg)
+        assert valid is False
+        assert any("empty" in i for i in issues)
+
+    def test_invalid_pathway_fails(self):
+        from alert import validate_alert_package
+        pkg = self._make_valid_package()
+        pkg["alert_pathway"] = "unknown_pathway"
+        valid, issues = validate_alert_package(pkg)
+        assert valid is False
+        assert any("alert_pathway" in i for i in issues)
+
+    def test_empty_guardrail_fails(self):
+        from alert import validate_alert_package
+        pkg = self._make_valid_package()
+        pkg["guardrail_statement"] = ""
+        valid, issues = validate_alert_package(pkg)
+        assert valid is False
+        assert any("guardrail" in i for i in issues)
+
+    def test_guardrail_without_not_fails(self):
+        from alert import validate_alert_package
+        pkg = self._make_valid_package()
+        pkg["guardrail_statement"] = "Please inform authorities."
+        valid, issues = validate_alert_package(pkg)
+        assert valid is False
+        assert any("NOT" in i for i in issues)
+
+    def test_multiple_missing_keys_reported(self):
+        from alert import validate_alert_package
+        valid, issues = validate_alert_package({})
+        assert valid is False
+        assert len(issues) >= 5
+
+    def test_none_moid_allowed(self):
+        from alert import validate_alert_package
+        pkg = self._make_valid_package()
+        pkg["moid_au"] = None
+        valid, issues = validate_alert_package(pkg)
+        assert valid is True
+
+    def test_none_observations_fails(self):
+        from alert import validate_alert_package
+        pkg = self._make_valid_package()
+        pkg["observations"] = None
+        valid, issues = validate_alert_package(pkg)
+        assert valid is False
+        assert any("None" in i for i in issues)

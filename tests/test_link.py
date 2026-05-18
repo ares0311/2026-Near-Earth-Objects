@@ -1135,3 +1135,89 @@ class TestMergeOverlappingTracklets:
         result = merge_overlapping_tracklets([t1, t2])
         obs_ids = [o.obs_id for o in result[0].observations]
         assert len(obs_ids) == len(set(obs_ids))
+
+
+class TestValidateTracklet:
+    def _obs(self, jd, obs_id=None):
+        import uuid
+
+        from schemas import Observation
+        return Observation(
+            obs_id=obs_id or str(uuid.uuid4()),
+            ra_deg=180.0, dec_deg=10.0, jd=jd,
+            mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF",
+        )
+
+    def _make_tracklet(self, obs_ids=None, arc_days=1.0, rate=5.0):
+        from schemas import Tracklet
+        obs_ids = obs_ids or ["a", "b"]
+        obs = tuple(self._obs(2460000.5 + i * 0.5, oid)
+                    for i, oid in enumerate(obs_ids))
+        return Tracklet(
+            object_id="T1", observations=obs,
+            arc_days=arc_days, motion_rate_arcsec_per_hour=rate,
+            motion_pa_degrees=45.0,
+        )
+
+    def test_valid_tracklet_passes(self):
+        from link import validate_tracklet
+        t = self._make_tracklet()
+        valid, reasons = validate_tracklet(t)
+        assert valid is True
+        assert reasons == []
+
+    def test_single_obs_fails(self):
+        from link import validate_tracklet
+        from schemas import Tracklet
+        obs = (self._obs(2460000.5, "a"),)
+        t = Tracklet(object_id="T1", observations=obs, arc_days=0.0,
+                     motion_rate_arcsec_per_hour=0.0, motion_pa_degrees=0.0)
+        valid, reasons = validate_tracklet(t)
+        assert valid is False
+        assert any("fewer than 2" in r for r in reasons)
+
+    def test_negative_arc_fails(self):
+        from link import validate_tracklet
+        t = self._make_tracklet(arc_days=-1.0)
+        valid, reasons = validate_tracklet(t)
+        assert valid is False
+        assert any("negative" in r for r in reasons)
+
+    def test_negative_rate_fails(self):
+        from link import validate_tracklet
+        t = self._make_tracklet(rate=-1.0)
+        valid, reasons = validate_tracklet(t)
+        assert valid is False
+        assert any("negative" in r for r in reasons)
+
+    def test_unsorted_jds_fails(self):
+        from link import validate_tracklet
+        from schemas import Tracklet
+        o1 = self._obs(2460002.5, "a")
+        o2 = self._obs(2460000.5, "b")
+        t = Tracklet(object_id="T1", observations=(o1, o2), arc_days=2.0,
+                     motion_rate_arcsec_per_hour=5.0, motion_pa_degrees=0.0)
+        valid, reasons = validate_tracklet(t)
+        assert valid is False
+        assert any("sorted" in r for r in reasons)
+
+    def test_duplicate_obs_ids_fails(self):
+        from link import validate_tracklet
+        from schemas import Tracklet
+        o1 = self._obs(2460000.5, "dup")
+        o2 = self._obs(2460001.5, "dup")
+        t = Tracklet(object_id="T1", observations=(o1, o2), arc_days=1.0,
+                     motion_rate_arcsec_per_hour=5.0, motion_pa_degrees=0.0)
+        valid, reasons = validate_tracklet(t)
+        assert valid is False
+        assert any("duplicate" in r for r in reasons)
+
+    def test_multiple_failures_reported(self):
+        from link import validate_tracklet
+        from schemas import Tracklet
+        obs = (self._obs(2460000.5, "a"),)
+        t = Tracklet(object_id="T1", observations=obs, arc_days=-1.0,
+                     motion_rate_arcsec_per_hour=-5.0, motion_pa_degrees=0.0)
+        valid, reasons = validate_tracklet(t)
+        assert valid is False
+        assert len(reasons) >= 2

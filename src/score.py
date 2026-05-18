@@ -7,7 +7,8 @@ __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "close_approach_candidates", "absolute_magnitude_from_diameter",
            "compute_impact_energy", "compute_novelty_score",
            "compute_threat_score", "filter_by_alert_pathway",
-           "compute_followup_urgency", "compute_discovery_score"]
+           "compute_followup_urgency", "compute_discovery_score",
+           "compute_observation_priority"]
 
 import math
 import uuid
@@ -703,4 +704,40 @@ def compute_discovery_score(neo: ScoredNEO) -> float:
     orbit_q = neo.features.orbit_quality_score or 0.0
     brightness = neo.features.brightness_score or 0.0
     score = 0.5 * priority + 0.3 * orbit_q + 0.2 * brightness
+    return round(min(1.0, max(0.0, float(score))), 4)
+
+
+def compute_observation_priority(neo: ScoredNEO) -> float:
+    """Compute an observational follow-up priority score.
+
+    Combines three factors:
+    - **Arc gap**: time since the last observation in the tracklet (longer gap
+      → more urgent); normalized so 30 days maps to 1.0.  Uses a reference
+      JD of 2460000.0 when no observations are present.
+    - **Discovery priority**: ``metadata.discovery_priority`` (weight 0.4).
+    - **Orbit quality**: ``features.orbit_quality_score`` (weight 0.3;
+      low quality → needs more data → higher urgency inverted to 1 − score).
+
+    The result is clamped to [0, 1].
+
+    Args:
+        neo: A :class:`~schemas.ScoredNEO` object.
+
+    Returns:
+        Observation follow-up priority score in [0, 1].
+    """
+    obs = neo.tracklet.observations
+    if obs:
+        last_jd = max(o.jd for o in obs)
+        ref_jd = 2460000.0
+        gap_days = max(0.0, ref_jd - last_jd)
+        gap_score = min(1.0, gap_days / 30.0)
+    else:
+        gap_score = 0.5
+
+    priority = getattr(neo.metadata, "discovery_priority", None) or 0.0
+    orbit_q = neo.features.orbit_quality_score or 0.0
+    orbit_urgency = 1.0 - orbit_q
+
+    score = 0.3 * gap_score + 0.4 * float(priority) + 0.3 * orbit_urgency
     return round(min(1.0, max(0.0, float(score))), 4)

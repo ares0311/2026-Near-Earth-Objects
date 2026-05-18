@@ -627,3 +627,54 @@ class TestComputeRocAuc:
         good = [0.1, 0.2, 0.8, 0.9]
         poor = [0.4, 0.5, 0.5, 0.6]
         assert compute_roc_auc(good, labels) > compute_roc_auc(poor, labels)
+
+
+class TestComputePrecisionRecallCurve:
+    def test_returns_dict_with_required_keys(self):
+        from calibration import compute_precision_recall_curve
+        result = compute_precision_recall_curve([0.9, 0.7, 0.3], [1, 1, 0])
+        assert "precisions" in result
+        assert "recalls" in result
+        assert "thresholds" in result
+        assert "average_precision" in result
+
+    def test_empty_returns_zero_ap(self):
+        from calibration import compute_precision_recall_curve
+        result = compute_precision_recall_curve([], [])
+        assert result["average_precision"] == 0.0
+
+    def test_single_class_returns_zero_ap(self):
+        from calibration import compute_precision_recall_curve
+        result = compute_precision_recall_curve([0.9, 0.8, 0.7], [1, 1, 1])
+        assert result["average_precision"] == 0.0
+
+    def test_perfect_classifier_high_ap(self):
+        from calibration import compute_precision_recall_curve
+        result = compute_precision_recall_curve([0.95, 0.9, 0.1, 0.05], [1, 1, 0, 0])
+        assert result["average_precision"] > 0.9
+
+    def test_ap_in_unit_interval(self):
+        import numpy as np
+
+        from calibration import compute_precision_recall_curve
+        rng = np.random.default_rng(42)
+        probs = rng.random(50)
+        labels = rng.integers(0, 2, 50)
+        result = compute_precision_recall_curve(probs, labels)
+        assert 0.0 <= result["average_precision"] <= 1.0
+
+    def test_arrays_same_length(self):
+        from calibration import compute_precision_recall_curve
+        result = compute_precision_recall_curve([0.9, 0.6, 0.3, 0.1], [1, 1, 0, 0])
+        assert len(result["precisions"]) == len(result["recalls"])
+
+    def test_no_positive_labels_returns_zero_ap(self):
+        from calibration import compute_precision_recall_curve
+        result = compute_precision_recall_curve([0.9, 0.5, 0.1], [0, 0, 0])
+        assert result["average_precision"] == 0.0
+
+    def test_thresholds_descending(self):
+        from calibration import compute_precision_recall_curve
+        result = compute_precision_recall_curve([0.9, 0.7, 0.4, 0.2], [1, 0, 1, 0])
+        thresholds = result["thresholds"]
+        assert list(thresholds) == sorted(thresholds, reverse=True)

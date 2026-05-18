@@ -6,7 +6,8 @@ __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "filter_high_motion", "deduplicate_tracklets", "_predict_from_arc",
            "split_tracklet", "compute_arc_statistics", "assess_link_confidence",
            "compute_tracklet_grade", "filter_by_arc_length", "summarize_arc_statistics",
-           "filter_by_nights_observed", "merge_overlapping_tracklets"]
+           "filter_by_nights_observed", "merge_overlapping_tracklets",
+           "validate_tracklet"]
 
 import math
 import uuid
@@ -705,3 +706,47 @@ def merge_overlapping_tracklets(tracklets: list) -> list:
             motion_pa_degrees=pa,
         ))
     return merged
+
+
+def validate_tracklet(tracklet: object) -> tuple[bool, list[str]]:
+    """Check a tracklet for internal consistency.
+
+    Validates that:
+    - There are at least 2 observations.
+    - ``arc_days`` is non-negative.
+    - ``motion_rate_arcsec_per_hour`` is non-negative.
+    - Observations are sorted in ascending JD order.
+    - All ``obs_id`` values are unique.
+
+    Args:
+        tracklet: A :class:`~schemas.Tracklet` object.
+
+    Returns:
+        Tuple of ``(is_valid, reasons)`` where ``is_valid`` is ``True`` when
+        all checks pass and ``reasons`` is a list of failure descriptions
+        (empty when valid).
+    """
+    reasons: list[str] = []
+
+    obs = getattr(tracklet, "observations", ())
+    if len(obs) < 2:
+        reasons.append(f"fewer than 2 observations ({len(obs)} found)")
+
+    arc = getattr(tracklet, "arc_days", None)
+    if arc is not None and arc < 0.0:
+        reasons.append(f"arc_days is negative ({arc})")
+
+    rate = getattr(tracklet, "motion_rate_arcsec_per_hour", None)
+    if rate is not None and rate < 0.0:
+        reasons.append(f"motion_rate_arcsec_per_hour is negative ({rate})")
+
+    if len(obs) >= 2:
+        jds = [o.jd for o in obs]
+        if jds != sorted(jds):
+            reasons.append("observations are not sorted by ascending JD")
+
+        obs_ids = [o.obs_id for o in obs]
+        if len(obs_ids) != len(set(obs_ids)):
+            reasons.append("duplicate obs_id values found")
+
+    return (len(reasons) == 0, reasons)

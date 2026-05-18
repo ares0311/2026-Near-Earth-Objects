@@ -1018,3 +1018,92 @@ class TestComputeDiscoveryScore:
         from score import compute_discovery_score
         result = compute_discovery_score(self._make_neo(priority=0.4, orbit_q=0.0, brightness=0.0))
         assert result == pytest.approx(0.5 * 0.4, abs=0.001)
+
+
+class TestComputeObservationPriority:
+    def _make_neo(self, priority=0.5, orbit_q=0.5, last_jd=2459000.0):
+        import types
+
+        from .conftest import build_scored_neo
+        neo = build_scored_neo()
+        obs_list = list(neo.tracklet.observations)
+        if obs_list:
+            obs_list[0] = obs_list[0].model_copy(update={"jd": last_jd})
+        import schemas
+        tracklet = schemas.Tracklet(
+            object_id=neo.tracklet.object_id,
+            observations=tuple(obs_list),
+            arc_days=neo.tracklet.arc_days,
+            motion_rate_arcsec_per_hour=neo.tracklet.motion_rate_arcsec_per_hour,
+            motion_pa_degrees=neo.tracklet.motion_pa_degrees,
+        )
+        return types.SimpleNamespace(
+            metadata=types.SimpleNamespace(discovery_priority=priority),
+            features=types.SimpleNamespace(orbit_quality_score=orbit_q),
+            hazard=neo.hazard,
+            tracklet=tracklet,
+            posterior=neo.posterior,
+        )
+
+    def test_returns_float(self):
+        from score import compute_observation_priority
+        result = compute_observation_priority(self._make_neo())
+        assert isinstance(result, float)
+
+    def test_result_in_unit_interval(self):
+        from score import compute_observation_priority
+        result = compute_observation_priority(self._make_neo())
+        assert 0.0 <= result <= 1.0
+
+    def test_high_priority_increases_score(self):
+        from score import compute_observation_priority
+        low = self._make_neo(priority=0.0)
+        high = self._make_neo(priority=1.0)
+        assert compute_observation_priority(high) > compute_observation_priority(low)
+
+    def test_low_orbit_quality_increases_score(self):
+        from score import compute_observation_priority
+        good = self._make_neo(orbit_q=1.0)
+        poor = self._make_neo(orbit_q=0.0)
+        assert compute_observation_priority(poor) >= compute_observation_priority(good)
+
+    def test_old_observation_increases_urgency(self):
+        from score import compute_observation_priority
+        recent = self._make_neo(last_jd=2459990.0)
+        old = self._make_neo(last_jd=2459000.0)
+        assert compute_observation_priority(old) >= compute_observation_priority(recent)
+
+    def test_all_zeros_returns_valid_score(self):
+        from score import compute_observation_priority
+        result = compute_observation_priority(self._make_neo(priority=0.0, orbit_q=0.0))
+        assert 0.0 <= result <= 1.0
+
+    def test_clamped_to_unit_interval(self):
+        from score import compute_observation_priority
+        result = compute_observation_priority(self._make_neo(priority=1.0, orbit_q=0.0))
+        assert result <= 1.0
+
+    def test_empty_observations_returns_valid(self):
+        import types
+
+        import schemas
+        from score import compute_observation_priority
+
+        from .conftest import build_scored_neo
+        neo = build_scored_neo()
+        tracklet = schemas.Tracklet(
+            object_id=neo.tracklet.object_id,
+            observations=(),
+            arc_days=0.0,
+            motion_rate_arcsec_per_hour=0.0,
+            motion_pa_degrees=0.0,
+        )
+        stub = types.SimpleNamespace(
+            metadata=types.SimpleNamespace(discovery_priority=0.5),
+            features=types.SimpleNamespace(orbit_quality_score=0.5),
+            hazard=neo.hazard,
+            tracklet=tracklet,
+            posterior=neo.posterior,
+        )
+        result = compute_observation_priority(stub)
+        assert 0.0 <= result <= 1.0
