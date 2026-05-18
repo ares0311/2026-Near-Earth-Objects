@@ -1324,3 +1324,83 @@ class TestComputeAbsoluteMagnitude:
             mock_math.radians.side_effect = RuntimeError("forced")
             result = compute_absolute_magnitude(19.0, 1.5, 0.5, 30.0)
         assert math.isnan(result)
+
+
+class TestComputePerihelionDate:
+    def _make_elements(self, **kwargs):
+        from schemas import OrbitalElements
+        defaults = dict(
+            semi_major_axis_au=1.5, eccentricity=0.2, inclination_deg=5.0,
+            longitude_ascending_node_deg=30.0, argument_perihelion_deg=60.0,
+            mean_anomaly_deg=90.0, epoch_jd=2460000.5,
+            perihelion_au=1.2, aphelion_au=1.8, quality_code=2,
+        )
+        defaults.update(kwargs)
+        return OrbitalElements(**defaults)
+
+    def test_returns_float_for_elliptic_orbit(self):
+        from orbit import compute_perihelion_date
+        el = self._make_elements(mean_anomaly_deg=90.0)
+        result = compute_perihelion_date(el)
+        assert isinstance(result, float)
+        assert result > el.epoch_jd
+
+    def test_perihelion_within_one_period(self):
+        from orbit import compute_orbital_period, compute_perihelion_date
+        el = self._make_elements(mean_anomaly_deg=45.0)
+        result = compute_perihelion_date(el)
+        period = compute_orbital_period(el)
+        assert result is not None
+        assert result <= el.epoch_jd + period + 1.0
+
+    def test_mean_anomaly_zero_perihelion_now(self):
+        from orbit import compute_perihelion_date
+        el = self._make_elements(mean_anomaly_deg=0.0)
+        result = compute_perihelion_date(el)
+        period_est = 365.25 * (1.5 ** 1.5)
+        assert result is not None
+        delta = abs(result - el.epoch_jd)
+        assert delta < 1.0 or abs(delta - period_est) < 1.0
+
+    def test_hyperbolic_orbit_returns_none(self):
+        from orbit import compute_perihelion_date
+        el = self._make_elements(eccentricity=1.5, aphelion_au=99.0)
+        result = compute_perihelion_date(el)
+        assert result is None
+
+    def test_negative_semi_major_axis_returns_none(self):
+        from orbit import compute_perihelion_date
+        el = self._make_elements(semi_major_axis_au=-1.0, eccentricity=0.5)
+        result = compute_perihelion_date(el)
+        assert result is None
+
+    def test_near_perihelion_small_m(self):
+        from orbit import compute_perihelion_date
+        el = self._make_elements(mean_anomaly_deg=10.0)
+        result = compute_perihelion_date(el)
+        assert result is not None
+        assert result > el.epoch_jd
+
+    def test_near_aphelion_m_180(self):
+        from orbit import compute_perihelion_date
+        el = self._make_elements(mean_anomaly_deg=180.0)
+        result = compute_perihelion_date(el)
+        assert result is not None
+
+    def test_exception_returns_none(self):
+        from unittest.mock import patch
+
+        from orbit import compute_perihelion_date
+        el = self._make_elements()
+        with patch("orbit.compute_orbital_period", side_effect=RuntimeError):
+            result = compute_perihelion_date(el)
+        assert result is None
+
+    def test_non_positive_period_returns_none(self):
+        from unittest.mock import patch
+
+        from orbit import compute_perihelion_date
+        el = self._make_elements()
+        with patch("orbit.compute_orbital_period", return_value=0.0):
+            result = compute_perihelion_date(el)
+        assert result is None

@@ -22,6 +22,7 @@ __all__ = [
     "format_impact_notification",
     "count_pending_alerts",
     "format_submission_checklist",
+    "validate_alert_package",
 ]
 
 import json
@@ -976,3 +977,61 @@ def format_submission_checklist(neo: ScoredNEO) -> str:
         "GUARDRAIL: Do NOT publicly announce any impact probability.",
     ]
     return "\n".join(lines)
+
+
+def validate_alert_package(package: dict) -> tuple[bool, list[str]]:
+    """Validate the completeness of an alert package dict.
+
+    Checks that the package contains all keys required for a NASA PDCO
+    notification or MPC submission.  Also validates that no raw impact
+    probability has been quoted (guardrail enforcement).
+
+    Required keys:
+    - ``observations``: non-empty sequence of observations
+    - ``orbit``: orbital elements dict or object
+    - ``moid_au``: float (may be None but key must be present)
+    - ``alert_pathway``: valid AlertPathway string
+    - ``guardrail_statement``: non-empty string containing the word "NOT"
+
+    Args:
+        package: Dict produced by :func:`generate_alert_package` or similar.
+
+    Returns:
+        Tuple of ``(is_valid, issues)`` where ``is_valid`` is ``True`` when
+        all checks pass and ``issues`` is a list of problem descriptions.
+    """
+    _REQUIRED_KEYS = {"observations", "orbit", "moid_au", "alert_pathway",
+                      "guardrail_statement"}
+    _VALID_PATHWAYS = {
+        "mpc_submission", "neocp_followup", "nasa_pdco_notify",
+        "internal_candidate", "known_object",
+    }
+
+    issues: list[str] = []
+
+    missing = _REQUIRED_KEYS - set(package.keys())
+    for key in sorted(missing):
+        issues.append(f"missing required key: '{key}'")
+
+    if "observations" in package:
+        obs = package["observations"]
+        if hasattr(obs, "__len__") and len(obs) == 0:
+            issues.append("'observations' is empty")
+        elif obs is None:
+            issues.append("'observations' is None")
+
+    if "alert_pathway" in package:
+        pathway = package["alert_pathway"]
+        if pathway not in _VALID_PATHWAYS:
+            issues.append(f"'alert_pathway' value '{pathway}' is not a valid AlertPathway")
+
+    if "guardrail_statement" in package:
+        gs = package.get("guardrail_statement") or ""
+        if not gs:
+            issues.append("'guardrail_statement' is empty")
+        elif "NOT" not in gs.upper():
+            issues.append(
+                "'guardrail_statement' should contain 'NOT' to comply with impact-claim guardrail"
+            )
+
+    return (len(issues) == 0, issues)

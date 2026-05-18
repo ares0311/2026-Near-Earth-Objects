@@ -8,7 +8,8 @@ __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
            "batch_predict_ephemeris", "resonance_check", "ephemeris_uncertainty",
            "orbital_energy", "compute_phase_angle",
            "compute_heliocentric_distance", "compute_synodic_period",
-           "compute_apparent_magnitude", "compute_absolute_magnitude"]
+           "compute_apparent_magnitude", "compute_absolute_magnitude",
+           "compute_perihelion_date"]
 
 import math
 from typing import NamedTuple
@@ -990,3 +991,34 @@ def compute_absolute_magnitude(
         return round(observed_mag - phase_correction - dist_correction, 4)
     except Exception:
         return float("nan")
+
+
+def compute_perihelion_date(elements: OrbitalElements) -> float | None:
+    """Compute the JD of next perihelion passage from orbital elements.
+
+    Uses the current mean anomaly, orbital period, and epoch to project
+    forward (or backward minimally) to the nearest future perihelion.
+
+    Args:
+        elements: OrbitalElements with semi-major axis, eccentricity, mean
+            anomaly at epoch, and epoch_jd.
+
+    Returns:
+        JD of next perihelion passage, or ``None`` for hyperbolic/parabolic
+        orbits (e >= 1) or non-positive semi-major axis.
+    """
+    try:
+        a = elements.semi_major_axis_au
+        e = elements.eccentricity
+        if a <= 0.0 or e >= 1.0:
+            return None
+        period_days = compute_orbital_period(elements)
+        if not math.isfinite(period_days) or period_days <= 0.0:
+            return None
+        M_deg = elements.mean_anomaly_deg % 360.0
+        M_rad = math.radians(M_deg)
+        fraction_to_perihelion = (2.0 * math.pi - M_rad) / (2.0 * math.pi)
+        days_to_perihelion = fraction_to_perihelion * period_days
+        return round(elements.epoch_jd + days_to_perihelion, 4)
+    except Exception:
+        return None

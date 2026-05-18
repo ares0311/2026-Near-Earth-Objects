@@ -21,6 +21,7 @@ __all__ = [
     "calibrate_posterior", "compute_classification_table",
     "get_posterior_vector",
     "compute_neo_probability",
+    "compute_artifact_probability",
 ]
 
 import base64
@@ -1165,4 +1166,53 @@ def compute_neo_probability(features: CandidateFeatures) -> float:
     exp_neo = _math.exp(log_score - log_max)
     exp_other = _math.exp(log_other - log_max)
     prob = exp_neo / (exp_neo + exp_other)
+    return round(float(prob), 6)
+
+
+def compute_artifact_probability(features: CandidateFeatures) -> float:
+    """Compute a scalar artifact (non-astronomical source) probability.
+
+    Applies a log-score model using features indicative of instrumental
+    artifacts — the complement framing to :func:`compute_neo_probability`.
+    A high score means the candidate is likely an artifact rather than a
+    real astronomical source.
+
+    Feature weights used:
+
+    - ``stellar_artifact_score``: +2.5 (strong artifact indicator)
+    - ``psf_quality_score``: -2.0 (good PSF → less likely artifact)
+    - ``real_bogus_score``: -2.0 (high rb → less likely artifact)
+    - ``streak_score``: +1.5 (streaks are often satellites/cosmic rays)
+    - ``motion_consistency_score``: -1.0 (consistent motion → less likely artifact)
+
+    Args:
+        features: A :class:`~schemas.CandidateFeatures` object.
+
+    Returns:
+        Scalar probability in [0, 1] that the candidate is an artifact.
+    """
+    import math as _math
+
+    log_prior_art = _math.log(0.25)
+    log_prior_other = _math.log(0.75)
+
+    weights = {
+        "stellar_artifact_score": 2.5,
+        "psf_quality_score": -2.0,
+        "real_bogus_score": -2.0,
+        "streak_score": 1.5,
+        "motion_consistency_score": -1.0,
+    }
+
+    log_score = log_prior_art
+    for attr, w in weights.items():
+        val = getattr(features, attr, None)
+        if val is not None:
+            log_score += w * float(val)
+
+    log_other = log_prior_other
+    log_max = max(log_score, log_other)
+    exp_art = _math.exp(log_score - log_max)
+    exp_other = _math.exp(log_other - log_max)
+    prob = exp_art / (exp_art + exp_other)
     return round(float(prob), 6)

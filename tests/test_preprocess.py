@@ -989,3 +989,75 @@ class TestEstimateZeroPoint:
         catalog = [19.0, 20.0, 21.0]
         result = estimate_zero_point(obs, catalog)
         assert result == pytest.approx(0.3, abs=1e-5)
+
+
+class TestComputeDifferenceImageSnr:
+    def _make_cutout_obs(self, peak=50.0):
+        import base64
+
+        import numpy as np
+
+        from schemas import Observation
+        rng = np.random.default_rng(0)
+        arr = rng.normal(0.0, 1.0, (63, 63)).astype(np.float32)
+        arr[31, 31] = peak
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        return Observation(
+            obs_id="o1", ra_deg=180.0, dec_deg=10.0, jd=2460000.5,
+            mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF",
+            cutout_difference=b64,
+        )
+
+    def test_returns_float_for_valid_cutout(self):
+        from preprocess import compute_difference_image_snr
+        obs = self._make_cutout_obs(peak=50.0)
+        result = compute_difference_image_snr(obs)
+        assert isinstance(result, float)
+        assert result > 0.0
+
+    def test_returns_none_without_cutout(self):
+        from preprocess import compute_difference_image_snr
+        from schemas import Observation
+        obs = Observation(
+            obs_id="o1", ra_deg=180.0, dec_deg=10.0, jd=2460000.5,
+            mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF",
+        )
+        result = compute_difference_image_snr(obs)
+        assert result is None
+
+    def test_zero_background_returns_none(self):
+        import base64
+
+        import numpy as np
+
+        from preprocess import compute_difference_image_snr
+        from schemas import Observation
+        arr = np.zeros((63, 63), dtype=np.float32)
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        obs = Observation(
+            obs_id="o2", ra_deg=180.0, dec_deg=10.0, jd=2460000.5,
+            mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF",
+            cutout_difference=b64,
+        )
+        result = compute_difference_image_snr(obs)
+        assert result is None
+
+    def test_invalid_cutout_returns_none(self):
+        from preprocess import compute_difference_image_snr
+        from schemas import Observation
+        obs = Observation(
+            obs_id="o3", ra_deg=180.0, dec_deg=10.0, jd=2460000.5,
+            mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF",
+            cutout_difference="not_valid_base64!!!",
+        )
+        result = compute_difference_image_snr(obs)
+        assert result is None
+
+    def test_brighter_peak_gives_higher_snr(self):
+        from preprocess import compute_difference_image_snr
+        low = self._make_cutout_obs(peak=10.0)
+        high = self._make_cutout_obs(peak=200.0)
+        snr_low = compute_difference_image_snr(low)
+        snr_high = compute_difference_image_snr(high)
+        assert snr_high is not None and snr_low is not None
+        assert snr_high > snr_low

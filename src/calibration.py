@@ -12,6 +12,7 @@ __all__ = [
     "calibration_report",
     "compare_calibrators",
     "compute_roc_auc",
+    "compute_precision_recall_curve",
 ]
 
 import math
@@ -576,3 +577,83 @@ def compute_roc_auc(probs: list | np.ndarray, labels: list | np.ndarray) -> floa
     trapz_fn = getattr(np, "trapezoid", None) or getattr(np, "trapz")
     auc = float(trapz_fn(tprs, fprs))
     return round(abs(auc), 6)
+
+
+def compute_precision_recall_curve(
+    probs: list | np.ndarray,
+    labels: list | np.ndarray,
+) -> dict:
+    """Compute precision-recall curve data for a binary classifier.
+
+    Sweeps classification thresholds from high to low and records precision
+    and recall at each step.  Also computes the Average Precision (AP) as
+    the area under the PR curve via the trapezoidal rule.
+
+    Args:
+        probs: Predicted probabilities for the positive class.
+        labels: Binary ground-truth labels (0 or 1).
+
+    Returns:
+        Dict with keys:
+
+        - ``"precisions"``: numpy array of precision values.
+        - ``"recalls"``: numpy array of recall values.
+        - ``"thresholds"``: numpy array of decision thresholds used.
+        - ``"average_precision"``: Area under the PR curve (AP score) in [0, 1].
+          Returns 0.0 for empty or single-class inputs.
+    """
+    probs_arr = np.asarray(probs, dtype=float)
+    labels_arr = np.asarray(labels, dtype=float)
+    n = len(probs_arr)
+
+    empty_result: dict = {
+        "precisions": np.array([]),
+        "recalls": np.array([]),
+        "thresholds": np.array([]),
+        "average_precision": 0.0,
+    }
+
+    if n == 0 or len(np.unique(labels_arr)) < 2:
+        return empty_result
+
+    n_pos = float(labels_arr.sum())
+
+    # Sort by descending probability
+    order = np.argsort(-probs_arr)
+    probs_sorted = probs_arr[order]
+    labels_sorted = labels_arr[order]
+
+    precisions = []
+    recalls = []
+    thresholds = []
+
+    tp = fp = 0.0
+    for i, (prob, lbl) in enumerate(zip(probs_sorted, labels_sorted)):
+        if lbl == 1:
+            tp += 1
+        else:
+            fp += 1
+        precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+        recall = tp / n_pos
+        precisions.append(precision)
+        recalls.append(recall)
+        thresholds.append(prob)
+
+    precisions_arr = np.array(precisions)
+    recalls_arr = np.array(recalls)
+    thresholds_arr = np.array(thresholds)
+
+    # AP via trapezoidal integration anchored at (recall=0, precision=1)
+    # Prepend anchor so area from recall=0 is included
+    recalls_full = np.concatenate([[0.0], recalls_arr])
+    precisions_full = np.concatenate([[1.0], precisions_arr])
+    order_r = np.argsort(recalls_full)
+    trapz_fn = getattr(np, "trapezoid", None) or getattr(np, "trapz")
+    ap = float(abs(trapz_fn(precisions_full[order_r], recalls_full[order_r])))
+
+    return {
+        "precisions": precisions_arr,
+        "recalls": recalls_arr,
+        "thresholds": thresholds_arr,
+        "average_precision": round(ap, 6),
+    }

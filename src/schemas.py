@@ -13,6 +13,7 @@ __all__ = [
     "CloseApproachEvent", "SurveyField", "PipelineConfig", "ObservationBatch", "DetectionSummary",
     "PhotometricSolution",
     "ObservationStatistics",
+    "AlertPackage",
     "BackgroundOutcome", "BackgroundRunMode", "FollowUpTestStatus", "HumanReviewStatus",
     "RecommendationAction", "SignoffDecision",
     "PriorityFactors", "BackgroundTarget", "FollowUpTestResult",
@@ -726,3 +727,34 @@ class ObservationStatistics(BaseModel):
     mean_real_bogus: float | None = None
     n_filters: int = Field(ge=0, default=0)
     arc_days: float = 0.0
+
+
+class AlertPackage(BaseModel):
+    """Immutable container for a complete external alert submission package.
+
+    Bundles all artefacts required for MPC submission or NASA PDCO notification
+    into a single, auditable object.  Always includes a mandatory guardrail
+    statement.
+
+    Attributes:
+        neo_id: Object identifier from the pipeline (tracklet ``object_id``).
+        alert_pathway: The determined alert pathway for this candidate.
+        moid_au: Minimum Orbit Intersection Distance in AU; None if unknown.
+        observations: Tuple of observations supporting this alert.
+        submission_timestamp_jd: Julian Date at which the package was created.
+        guardrail_statement: Mandatory non-impact-claim statement.  Must
+            contain "NOT" to confirm compliance with the no-impact-probability
+            guardrail.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    neo_id: str
+    alert_pathway: AlertPathway
+    moid_au: float | None = None
+    observations: tuple[Observation, ...] = Field(default_factory=tuple)
+    submission_timestamp_jd: float
+    guardrail_statement: str = (
+        "Do NOT publicly announce any impact probability. "
+        "Defer all public communication to NASA/CNEOS."
+    )

@@ -1533,3 +1533,55 @@ class TestComputeNeoProbability:
         high_neo = self._make_features(known_object_score=0.0)
         known_obj = self._make_features(known_object_score=1.0)
         assert compute_neo_probability(high_neo) > compute_neo_probability(known_obj)
+
+
+class TestComputeArtifactProbability:
+    def _make_features(self, **kwargs):
+        from schemas import CandidateFeatures
+        defaults = dict(real_bogus_score=0.5, psf_quality_score=0.5,
+                        stellar_artifact_score=0.5, streak_score=0.5,
+                        motion_consistency_score=0.5)
+        defaults.update(kwargs)
+        return CandidateFeatures(**defaults)
+
+    def test_returns_float(self):
+        from classify import compute_artifact_probability
+        result = compute_artifact_probability(self._make_features())
+        assert isinstance(result, float)
+
+    def test_result_in_unit_interval(self):
+        from classify import compute_artifact_probability
+        for rb in [0.0, 0.3, 0.7, 1.0]:
+            result = compute_artifact_probability(self._make_features(real_bogus_score=rb))
+            assert 0.0 <= result <= 1.0
+
+    def test_high_artifact_score_increases_probability(self):
+        from classify import compute_artifact_probability
+        low = self._make_features(stellar_artifact_score=0.0)
+        high = self._make_features(stellar_artifact_score=1.0)
+        assert compute_artifact_probability(high) > compute_artifact_probability(low)
+
+    def test_high_real_bogus_decreases_artifact_prob(self):
+        from classify import compute_artifact_probability
+        low_rb = self._make_features(real_bogus_score=0.0, stellar_artifact_score=0.5)
+        high_rb = self._make_features(real_bogus_score=1.0, stellar_artifact_score=0.5)
+        assert compute_artifact_probability(low_rb) > compute_artifact_probability(high_rb)
+
+    def test_none_features_handled(self):
+        from classify import compute_artifact_probability
+        from schemas import CandidateFeatures
+        feat = CandidateFeatures()
+        result = compute_artifact_probability(feat)
+        assert 0.0 <= result <= 1.0
+
+    def test_streak_increases_artifact_prob(self):
+        from classify import compute_artifact_probability
+        no_streak = self._make_features(streak_score=0.0)
+        streak = self._make_features(streak_score=1.0)
+        assert compute_artifact_probability(streak) > compute_artifact_probability(no_streak)
+
+    def test_consistent_motion_decreases_artifact_prob(self):
+        from classify import compute_artifact_probability
+        low = self._make_features(motion_consistency_score=0.0)
+        high = self._make_features(motion_consistency_score=1.0)
+        assert compute_artifact_probability(high) < compute_artifact_probability(low)
