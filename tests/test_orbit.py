@@ -1017,3 +1017,81 @@ class TestComputePhaseAngle:
         # Both should be valid floats (or NaN)
         assert isinstance(r1, float)
         assert isinstance(r2, float)
+
+
+class TestComputeHeliocentricDistance:
+    def _make_elements(self, **kwargs):
+        from schemas import OrbitalElements
+        defaults = dict(
+            semi_major_axis_au=1.5,
+            eccentricity=0.2,
+            inclination_deg=5.0,
+            longitude_ascending_node_deg=30.0,
+            argument_perihelion_deg=60.0,
+            mean_anomaly_deg=90.0,
+            epoch_jd=2460000.5,
+            perihelion_au=1.2,
+            aphelion_au=1.8,
+            quality_code=2,
+        )
+        defaults.update(kwargs)
+        return OrbitalElements(**defaults)
+
+    def test_returns_positive_float(self):
+        from orbit import compute_heliocentric_distance
+        r = compute_heliocentric_distance(self._make_elements(), 2460010.5)
+        assert isinstance(r, float)
+
+    def test_positive_or_nan(self):
+        import math
+
+        from orbit import compute_heliocentric_distance
+        r = compute_heliocentric_distance(self._make_elements(), 2460010.5)
+        assert math.isnan(r) or r > 0.0
+
+    def test_zero_semi_major_axis_returns_inf(self):
+        import math
+
+        from orbit import compute_heliocentric_distance
+        el = self._make_elements(semi_major_axis_au=0.0)
+        r = compute_heliocentric_distance(el, 2460010.5)
+        assert r == math.inf
+
+    def test_negative_semi_major_axis_returns_inf(self):
+        import math
+
+        from orbit import compute_heliocentric_distance
+        el = self._make_elements(semi_major_axis_au=-1.0)
+        r = compute_heliocentric_distance(el, 2460010.5)
+        assert r == math.inf
+
+    def test_exception_returns_nan(self):
+        import math
+        from unittest.mock import patch
+
+        from orbit import compute_heliocentric_distance
+        el = self._make_elements()
+        with patch("orbit.predict_ephemeris", side_effect=RuntimeError("forced")):
+            r = compute_heliocentric_distance(el, 2460010.5)
+        assert math.isnan(r)
+
+    def test_none_helio_dist_returns_nan(self):
+        import math
+        from unittest.mock import patch
+
+        from orbit import compute_heliocentric_distance
+        el = self._make_elements()
+        fake_ephem = {"ra_deg": 10.0, "dec_deg": 5.0, "helio_dist_au": None}
+        with patch("orbit.predict_ephemeris", return_value=fake_ephem):
+            r = compute_heliocentric_distance(el, 2460010.5)
+        assert math.isnan(r)
+
+    def test_rounded_to_6_decimals(self):
+        from unittest.mock import patch
+
+        from orbit import compute_heliocentric_distance
+        el = self._make_elements()
+        fake_ephem2 = {"ra_deg": 0.0, "dec_deg": 0.0, "helio_dist_au": 1.23456789}
+        with patch("orbit.predict_ephemeris", return_value=fake_ephem2):
+            r = compute_heliocentric_distance(el, 2460010.5)
+        assert r == pytest.approx(1.234568, abs=1e-6)

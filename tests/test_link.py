@@ -937,3 +937,37 @@ class TestComputeTrackletGrade:
         t = build_tracklet(n_obs=8, arc_days=10.0)
         grade = compute_tracklet_grade(t)
         assert grade in ("A", "B", "C", "D")
+
+
+class TestFilterByArcLength:
+    def _make_tracklet(self, arc_days):
+        from .conftest import build_tracklet
+        return build_tracklet(n_obs=3, arc_days=arc_days)
+
+    def test_filters_below_threshold(self):
+        from link import filter_by_arc_length
+        tracklets = [self._make_tracklet(0.5), self._make_tracklet(2.0), self._make_tracklet(1.0)]
+        result = filter_by_arc_length(tracklets, min_arc_days=1.0)
+        assert len(result) == 2
+
+    def test_default_threshold_1_day(self):
+        from link import filter_by_arc_length
+        tracklets = [self._make_tracklet(0.9), self._make_tracklet(1.0), self._make_tracklet(1.5)]
+        result = filter_by_arc_length(tracklets)
+        assert len(result) == 2
+
+    def test_empty_list(self):
+        from link import filter_by_arc_length
+        assert filter_by_arc_length([]) == []
+
+    def test_all_pass(self):
+        from link import filter_by_arc_length
+        tracklets = [self._make_tracklet(2.0), self._make_tracklet(3.0)]
+        result = filter_by_arc_length(tracklets, min_arc_days=1.0)
+        assert len(result) == 2
+
+    def test_none_pass(self):
+        from link import filter_by_arc_length
+        tracklets = [self._make_tracklet(0.1), self._make_tracklet(0.5)]
+        result = filter_by_arc_length(tracklets, min_arc_days=1.0)
+        assert result == []

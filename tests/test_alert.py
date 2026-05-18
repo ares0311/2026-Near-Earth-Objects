@@ -941,3 +941,53 @@ class TestGenerateObservationRequestBranches:
         neo = self._make_neo(priority=0.2, hazard_flag="nominal")
         result = generate_observation_request(neo)
         assert "ROUTINE" in result
+
+
+class TestGenerateMpcCoverLetter:
+    def test_returns_string(self):
+        from alert import generate_mpc_cover_letter
+
+        from .conftest import build_scored_neo
+        neo = build_scored_neo()
+        result = generate_mpc_cover_letter(neo)
+        assert isinstance(result, str)
+
+    def test_contains_object_id(self):
+        from alert import generate_mpc_cover_letter
+
+        from .conftest import build_scored_neo
+        neo = build_scored_neo(object_id="2026-AB1")
+        result = generate_mpc_cover_letter(neo)
+        assert "2026-AB1" in result
+
+    def test_contains_guardrail_text(self):
+        from alert import generate_mpc_cover_letter
+
+        from .conftest import build_scored_neo
+        neo = build_scored_neo()
+        result = generate_mpc_cover_letter(neo)
+        assert "Do NOT publicly announce any impact probability" in result
+
+    def test_contains_moid(self):
+        from alert import generate_mpc_cover_letter
+
+        from .conftest import build_scored_neo
+        neo = build_scored_neo(moid_au=0.023)
+        result = generate_mpc_cover_letter(neo)
+        assert "0.0230" in result
+
+    def test_moid_none_shows_unknown(self):
+        from alert import generate_mpc_cover_letter
+
+        from .conftest import build_scored_neo
+        neo = build_scored_neo(moid_au=None)
+        result = generate_mpc_cover_letter(neo)
+        assert "unknown" in result.lower()
+
+    def test_contains_separator(self):
+        from alert import generate_mpc_cover_letter
+
+        from .conftest import build_scored_neo
+        neo = build_scored_neo()
+        result = generate_mpc_cover_letter(neo)
+        assert "=" * 20 in result

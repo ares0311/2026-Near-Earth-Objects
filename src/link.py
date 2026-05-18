@@ -5,7 +5,7 @@ from __future__ import annotations
 __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "filter_high_motion", "deduplicate_tracklets", "_predict_from_arc",
            "split_tracklet", "compute_arc_statistics", "assess_link_confidence",
-           "compute_tracklet_grade"]
+           "compute_tracklet_grade", "filter_by_arc_length"]
 
 import math
 import uuid
@@ -557,3 +557,19 @@ def compute_tracklet_grade(tracklet: object) -> str:
     if arc >= 0.5 and nights >= 2 and rms <= 5.0:
         return "C"
     return "D"
+
+
+def filter_by_arc_length(tracklets: list, min_arc_days: float = 1.0) -> list:
+    """Filter tracklets by minimum arc length.
+
+    Returns a new list containing only tracklets whose ``arc_days`` attribute
+    is at least ``min_arc_days``.  The input list is not modified.
+
+    Args:
+        tracklets: List of Tracklet objects (or duck-typed equivalents).
+        min_arc_days: Minimum arc length in days (inclusive). Default 1.0.
+
+    Returns:
+        Filtered list of tracklets satisfying the arc-length criterion.
+    """
+    return [t for t in tracklets if getattr(t, "arc_days", 0.0) >= min_arc_days]

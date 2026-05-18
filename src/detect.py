@@ -4,7 +4,7 @@ from __future__ import annotations
 
 __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus",
            "compute_streak_metric", "cluster_detections", "compute_trail_length",
-           "compute_psf_fwhm"]
+           "compute_psf_fwhm", "estimate_sky_background"]
 
 import math
 import uuid
@@ -516,3 +516,39 @@ def compute_psf_fwhm(obs: Observation) -> float | None:
         return round(fwhm_arcsec, 3)
     except Exception:
         return None
+
+
+def estimate_sky_background(observations: tuple | list, percentile: float = 25.0) -> float | None:
+    """Estimate the sky background level from a collection of observations.
+
+    Computes the ``percentile``-th percentile of all pixel values across the
+    difference-image cutouts in ``observations``.  Useful as a field-level
+    sky estimate when no explicit background map is available.
+
+    Args:
+        observations: Iterable of Observation objects with optional cutout_difference.
+        percentile: Percentile of pixel distribution to use (default 25.0 → lower quartile).
+
+    Returns:
+        Estimated background level as a float, or None if no valid cutouts are found.
+    """
+    import base64
+
+    import numpy as np
+
+    values: list[float] = []
+    for obs in observations:
+        cutout_b64 = getattr(obs, "cutout_difference", None)
+        if not cutout_b64:
+            continue
+        try:
+            raw = base64.b64decode(cutout_b64)
+            arr = np.frombuffer(raw, dtype=np.float32).copy()
+            if arr.size < 4:
+                continue
+            values.extend(arr.tolist())
+        except Exception:
+            continue
+    if not values:
+        return None
+    return round(float(np.percentile(values, percentile)), 6)

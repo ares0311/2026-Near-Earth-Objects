@@ -761,3 +761,105 @@ class TestComputeNoveltyScore:
         catalog = [self._make_elements(a=1.8, e=0.2, i=10.0)]
         result = compute_novelty_score(neo, catalog)
         assert 0.0 <= result <= 1.0
+
+
+class TestComputeThreatScore:
+    def _make_neo(self, moid_au=0.03, h=21.5, quality=2):
+        import types
+        hazard = types.SimpleNamespace(
+            moid_au=moid_au,
+            absolute_magnitude_h=h,
+            orbital_elements=types.SimpleNamespace(quality_code=quality),
+        )
+        metadata = types.SimpleNamespace(quality_code=quality)
+        return types.SimpleNamespace(hazard=hazard, metadata=metadata)
+
+    def test_returns_float(self):
+        from score import compute_threat_score
+        neo = self._make_neo()
+        assert isinstance(compute_threat_score(neo), float)
+
+    def test_range_0_to_1(self):
+        from score import compute_threat_score
+        neo = self._make_neo()
+        score = compute_threat_score(neo)
+        assert 0.0 <= score <= 1.0
+
+    def test_high_threat_large_close_well_observed(self):
+        from score import compute_threat_score
+        neo = self._make_neo(moid_au=0.005, h=17.0, quality=4)
+        assert compute_threat_score(neo) > 0.8
+
+    def test_zero_for_far_moid(self):
+        from score import compute_threat_score
+        neo = self._make_neo(moid_au=0.1, h=22.0, quality=3)
+        # moid_score = 0.0 → product = 0
+        assert compute_threat_score(neo) == pytest.approx(0.0)
+
+    def test_none_moid_uses_neutral(self):
+        import types
+
+        from score import compute_threat_score
+        hazard = types.SimpleNamespace(
+            moid_au=None,
+            absolute_magnitude_h=21.0,
+            orbital_elements=types.SimpleNamespace(quality_code=2),
+        )
+        neo = types.SimpleNamespace(hazard=hazard)
+        score = compute_threat_score(neo)
+        assert 0.0 <= score <= 1.0
+
+    def test_none_h_uses_neutral(self):
+        import types
+
+        from score import compute_threat_score
+        hazard = types.SimpleNamespace(
+            moid_au=0.02,
+            absolute_magnitude_h=None,
+            orbital_elements=types.SimpleNamespace(quality_code=2),
+        )
+        neo = types.SimpleNamespace(hazard=hazard)
+        score = compute_threat_score(neo)
+        assert 0.0 <= score <= 1.0
+
+    def test_none_orbital_elements_uses_neutral(self):
+        import types
+
+        from score import compute_threat_score
+        hazard = types.SimpleNamespace(
+            moid_au=0.02,
+            absolute_magnitude_h=21.0,
+            orbital_elements=None,
+        )
+        neo = types.SimpleNamespace(hazard=hazard)
+        score = compute_threat_score(neo)
+        assert 0.0 <= score <= 1.0
+
+
+class TestComputeThreatScoreH25:
+    """Cover h >= 25 branch (size_score = 0.0) in compute_threat_score."""
+
+    def test_h_at_25_gives_zero_size(self):
+        import types
+
+        from score import compute_threat_score
+        hazard = types.SimpleNamespace(
+            moid_au=0.02,
+            absolute_magnitude_h=25.0,
+            orbital_elements=types.SimpleNamespace(quality_code=2),
+        )
+        neo = types.SimpleNamespace(hazard=hazard)
+        # size_score = 0.0 → product = 0 → threat_score = 0.0
+        assert compute_threat_score(neo) == pytest.approx(0.0)
+
+    def test_h_above_25_gives_zero(self):
+        import types
+
+        from score import compute_threat_score
+        hazard = types.SimpleNamespace(
+            moid_au=0.02,
+            absolute_magnitude_h=28.0,
+            orbital_elements=types.SimpleNamespace(quality_code=3),
+        )
+        neo = types.SimpleNamespace(hazard=hazard)
+        assert compute_threat_score(neo) == pytest.approx(0.0)

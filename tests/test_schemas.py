@@ -548,3 +548,60 @@ class TestPipelineConfig:
     def test_surveys_is_tuple(self):
         cfg = self._make_config(surveys=("ZTF", "Pan-STARRS"))
         assert isinstance(cfg.surveys, tuple)
+
+
+class TestObservationBatch:
+    def _make_obs(self, obs_id="b_001"):
+        from .conftest import build_observation
+        return build_observation(obs_id=obs_id, mission="ZTF")
+
+    def _make_batch(self, **kwargs):
+        from schemas import ObservationBatch
+        defaults = dict(
+            batch_id="batch_001",
+            field_id="ZTF_F001",
+            night_jd=2460000,
+            mission="ZTF",
+            observations=(self._make_obs("b_001"), self._make_obs("b_002")),
+            limiting_mag=20.5,
+        )
+        defaults.update(kwargs)
+        return ObservationBatch(**defaults)
+
+    def test_construction(self):
+        batch = self._make_batch()
+        assert batch.batch_id == "batch_001"
+        assert batch.field_id == "ZTF_F001"
+        assert batch.night_jd == 2460000
+        assert batch.mission == "ZTF"
+        assert len(batch.observations) == 2
+        assert batch.limiting_mag == pytest.approx(20.5)
+
+    def test_limiting_mag_optional(self):
+        from schemas import ObservationBatch
+        batch = ObservationBatch(
+            batch_id="b", field_id="f", night_jd=2460000, mission="ZTF",
+            observations=(self._make_obs(),),
+        )
+        assert batch.limiting_mag is None
+
+    def test_frozen(self):
+        import pytest as pt
+        batch = self._make_batch()
+        with pt.raises(Exception):
+            batch.batch_id = "other"  # type: ignore[misc]
+
+    def test_observations_is_tuple(self):
+        batch = self._make_batch()
+        assert isinstance(batch.observations, tuple)
+
+    def test_different_missions(self):
+        from schemas import ObservationBatch
+
+        from .conftest import build_observation
+        obs = build_observation(mission="ATLAS")
+        batch = ObservationBatch(
+            batch_id="b2", field_id="ATLAS_F001", night_jd=2460001,
+            mission="ATLAS", observations=(obs,),
+        )
+        assert batch.mission == "ATLAS"

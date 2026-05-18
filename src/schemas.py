@@ -10,7 +10,7 @@ __all__ = [
     "FetchProvenance", "PreprocessProvenance", "DetectProvenance", "LinkProvenance",
     "FetchResult", "PreprocessResult", "DetectResult", "LinkResult",
     "ObservationWindow", "PipelineResult", "CandidateSummary", "NEOStatistics", "TrackletSummary",
-    "CloseApproachEvent", "SurveyField", "PipelineConfig",
+    "CloseApproachEvent", "SurveyField", "PipelineConfig", "ObservationBatch",
     "BackgroundOutcome", "BackgroundRunMode", "FollowUpTestStatus", "HumanReviewStatus",
     "RecommendationAction", "SignoffDecision",
     "PriorityFactors", "BackgroundTarget", "FollowUpTestResult",
@@ -618,3 +618,28 @@ class PipelineConfig(BaseModel):
     end_jd: float | None = None
     real_bogus_threshold: float = 0.65
     surveys: tuple[str, ...] = ("ZTF",)
+
+
+class ObservationBatch(BaseModel):
+    """A named batch of observations from the same survey field and night.
+
+    Groups related :class:`Observation` objects for efficient processing and
+    provenance tracking.  Immutable after construction.
+
+    Attributes:
+        batch_id: Unique identifier for this batch (e.g. field+night hash).
+        field_id: Survey field identifier.
+        night_jd: Integer Julian Date of the observation night.
+        mission: Survey that produced this batch.
+        observations: Tuple of Observation objects in this batch.
+        limiting_mag: Estimated 5-sigma limiting magnitude for this batch.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    batch_id: str
+    field_id: str
+    night_jd: int
+    mission: Mission
+    observations: tuple[Observation, ...]
+    limiting_mag: float | None = None

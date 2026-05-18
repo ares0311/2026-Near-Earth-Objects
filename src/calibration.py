@@ -8,6 +8,7 @@ __all__ = [
     "bootstrap_confidence_interval",
     "cross_validate_calibration",
     "compute_log_loss",
+    "reliability_diagram",
 ]
 
 import math
@@ -413,3 +414,45 @@ def compute_log_loss(probs: np.ndarray, labels: np.ndarray, eps: float = 1e-7) -
     p = np.clip(probs, eps, 1.0 - eps)
     loss = -(labels * np.log(p) + (1.0 - labels) * np.log(1.0 - p))
     return round(float(loss.mean()), 6)
+
+
+def reliability_diagram(
+    probs: np.ndarray | list,
+    labels: np.ndarray | list,
+    n_bins: int = 10,
+) -> dict:
+    """Compute reliability diagram data for calibration visualisation.
+
+    Bins predicted probabilities into ``n_bins`` equal-width bins over [0, 1]
+    and returns the mean predicted probability and observed positive fraction
+    within each bin.  Empty bins are excluded from the output.
+
+    Args:
+        probs: Array of predicted probabilities in [0, 1], shape (N,).
+        labels: Array of binary labels (0 or 1), shape (N,).
+        n_bins: Number of equal-width bins (default 10).
+
+    Returns:
+        Dict with keys:
+          - ``"bin_centers"``: list of mean predicted probabilities per bin.
+          - ``"fraction_positive"``: list of observed positive fractions per bin.
+          - ``"bin_counts"``: list of sample counts per bin.
+    """
+    probs_arr = np.asarray(probs, dtype=float)
+    labels_arr = np.asarray(labels, dtype=float)
+    bin_edges = np.linspace(0.0, 1.0, n_bins + 1)
+    centers: list[float] = []
+    fractions: list[float] = []
+    counts: list[int] = []
+    for lo, hi in zip(bin_edges[:-1], bin_edges[1:]):
+        mask = (probs_arr >= lo) & (probs_arr < hi)
+        if mask.sum() == 0:
+            continue
+        centers.append(round(float(probs_arr[mask].mean()), 4))
+        fractions.append(round(float(labels_arr[mask].mean()), 4))
+        counts.append(int(mask.sum()))
+    return {
+        "bin_centers": centers,
+        "fraction_positive": fractions,
+        "bin_counts": counts,
+    }

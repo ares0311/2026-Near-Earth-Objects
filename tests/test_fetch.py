@@ -1366,3 +1366,186 @@ class TestFetchMpcObservationsEdgeCases:
             result = fetch_mod.fetch_mpc_observations(desig)
         assert isinstance(result, list)
         assert len(result) == 0
+
+
+class TestFetchAtlasForced:
+    def test_returns_empty_without_token(self, tmp_path, monkeypatch):
+        import fetch as fetch_mod
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        monkeypatch.delenv("ATLAS_TOKEN", raising=False)
+        result = fetch_mod.fetch_atlas_forced(180.0, 10.0, 2460000.0, 2460010.0, atlas_token=None)
+        assert result == []
+
+    def test_returns_list_type(self, tmp_path, monkeypatch):
+        import fetch as fetch_mod
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        monkeypatch.delenv("ATLAS_TOKEN", raising=False)
+        result = fetch_mod.fetch_atlas_forced(180.0, 10.0, 2460000.0, 2460010.0)
+        assert isinstance(result, list)
+
+    def test_returns_from_cache(self, tmp_path, monkeypatch):
+        import hashlib
+
+        import fetch as fetch_mod
+        from schemas import Observation
+
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        obs = Observation(
+            obs_id="atlas_001", ra_deg=180.0, dec_deg=10.0, jd=2460005.0,
+            mag=18.5, mag_err=0.05, filter_band="o", mission="ATLAS",
+        )
+        ra, dec = 180.0, 10.0
+        start_jd, end_jd = 2460000.0, 2460010.0
+        cache_key = hashlib.md5(
+            f"atlas_forced_{ra:.5f}_{dec:.5f}_{start_jd:.3f}_{end_jd:.3f}".encode()
+        ).hexdigest()
+        fetch_mod._save_cache(cache_key, [obs.model_dump()])
+
+        result = fetch_mod.fetch_atlas_forced(ra, dec, start_jd, end_jd)
+        assert len(result) == 1
+        assert result[0].obs_id == "atlas_001"
+
+    def test_network_error_returns_empty(self, tmp_path, monkeypatch):
+        from unittest.mock import MagicMock, patch
+
+        import fetch as fetch_mod
+
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        mock_requests = MagicMock()
+        mock_requests.post.side_effect = RuntimeError("network error")
+
+        with patch.dict("sys.modules", {"requests": mock_requests}):
+            result = fetch_mod.fetch_atlas_forced(
+                180.0, 10.0, 2460000.0, 2460010.0, atlas_token="fake_token"
+            )
+        assert result == []
+
+    def test_force_refresh_bypasses_cache(self, tmp_path, monkeypatch):
+        import hashlib
+
+        import fetch as fetch_mod
+        from schemas import Observation
+
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        monkeypatch.delenv("ATLAS_TOKEN", raising=False)
+
+        obs = Observation(
+            obs_id="atlas_stale", ra_deg=180.0, dec_deg=10.0, jd=2460005.0,
+            mag=18.5, mag_err=0.05, filter_band="o", mission="ATLAS",
+        )
+        ra, dec = 180.0, 10.0
+        start_jd, end_jd = 2460000.0, 2460010.0
+        cache_key = hashlib.md5(
+            f"atlas_forced_{ra:.5f}_{dec:.5f}_{start_jd:.3f}_{end_jd:.3f}".encode()
+        ).hexdigest()
+        fetch_mod._save_cache(cache_key, [obs.model_dump()])
+
+        # force_refresh=True + no token → should bypass cache and return []
+        result = fetch_mod.fetch_atlas_forced(ra, dec, start_jd, end_jd, force_refresh=True)
+        assert result == []
+
+    def test_bad_cached_entry_skipped(self, tmp_path, monkeypatch):
+        import hashlib
+
+        import fetch as fetch_mod
+
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        ra, dec = 10.0, 20.0
+        start_jd, end_jd = 2460000.0, 2460010.0
+        cache_key = hashlib.md5(
+            f"atlas_forced_{ra:.5f}_{dec:.5f}_{start_jd:.3f}_{end_jd:.3f}".encode()
+        ).hexdigest()
+        fetch_mod._save_cache(cache_key, [{"invalid": "garbage"}])
+
+        result = fetch_mod.fetch_atlas_forced(ra, dec, start_jd, end_jd)
+        assert result == []
+
+
+class TestFetchAtlasForcedPollingLoop:
+    """Cover lines 727-748 in fetch_atlas_forced: the API polling + result parsing."""
+
+    def test_successful_api_call_returns_observations(self, tmp_path, monkeypatch):
+        from unittest.mock import MagicMock, patch
+
+        import fetch as fetch_mod
+
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        # ATLAS text format: first # line is header; subsequent lines are data.
+        # Parser reads "MJD" column (uppercase) for the Julian date.
+        atlas_data = "#MJD RA Dec m dm F\n60000.5 180.001 10.001 18.5 0.05 o\n"
+
+        # Setup mocked requests
+        mock_post_resp = MagicMock()
+        mock_post_resp.raise_for_status = MagicMock()
+        mock_post_resp.json.return_value = {"url": "https://fake-atlas/task/1/"}
+
+        mock_task_resp = MagicMock()
+        mock_task_resp.raise_for_status = MagicMock()
+        mock_task_resp.json.return_value = {"result_url": "https://fake-atlas/result/1/"}
+
+        mock_result_resp = MagicMock()
+        mock_result_resp.raise_for_status = MagicMock()
+        mock_result_resp.text = atlas_data
+
+        mock_requests = MagicMock()
+        mock_requests.post.return_value = mock_post_resp
+        mock_requests.get.side_effect = [mock_task_resp, mock_result_resp]
+
+        with patch.dict("sys.modules", {"requests": mock_requests}):
+            result = fetch_mod.fetch_atlas_forced(
+                180.0, 10.0, 2459600.0, 2459610.0, atlas_token="valid_token"
+            )
+
+        assert isinstance(result, list)
+
+    def test_empty_task_url_returns_empty(self, tmp_path, monkeypatch):
+        from unittest.mock import MagicMock, patch
+
+        import fetch as fetch_mod
+
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        mock_post_resp = MagicMock()
+        mock_post_resp.raise_for_status = MagicMock()
+        mock_post_resp.json.return_value = {"url": ""}
+
+        mock_requests = MagicMock()
+        mock_requests.post.return_value = mock_post_resp
+
+        with patch.dict("sys.modules", {"requests": mock_requests}):
+            result = fetch_mod.fetch_atlas_forced(
+                180.0, 10.0, 2459600.0, 2459610.0, atlas_token="valid_token"
+            )
+
+        assert result == []
+
+    def test_polling_exhausted_returns_empty(self, tmp_path, monkeypatch):
+        """Poll loop runs 10 times but no result_url ever appears."""
+        from unittest.mock import MagicMock, patch
+
+        import fetch as fetch_mod
+
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        mock_post_resp = MagicMock()
+        mock_post_resp.raise_for_status = MagicMock()
+        mock_post_resp.json.return_value = {"url": "https://fake-atlas/task/2/"}
+
+        mock_poll_resp = MagicMock()
+        mock_poll_resp.raise_for_status = MagicMock()
+        mock_poll_resp.json.return_value = {}  # no result_url yet
+
+        mock_requests = MagicMock()
+        mock_requests.post.return_value = mock_post_resp
+        mock_requests.get.return_value = mock_poll_resp
+
+        with patch.dict("sys.modules", {"requests": mock_requests}):
+            result = fetch_mod.fetch_atlas_forced(
+                10.0, 5.0, 2459600.0, 2459610.0, atlas_token="valid_token"
+            )
+
+        assert result == []

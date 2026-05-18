@@ -771,3 +771,55 @@ class TestComputeAstrometricScatterException:
         obs = list(build_tracklet(n_obs=4, arc_days=2.0).observations)
         result = compute_astrometric_scatter(obs)
         assert result is None
+
+
+class TestNormalizePhotometry:
+    def _make_obs(self, mag=19.5, **kwargs):
+        from .conftest import build_observation
+        return build_observation(mag=mag, **kwargs)
+
+    def test_returns_list(self):
+        from preprocess import normalize_photometry
+        obs = [self._make_obs(19.5)]
+        result = normalize_photometry(obs, zero_point=24.0)
+        assert isinstance(result, list)
+
+    def test_applies_offset(self):
+        from preprocess import normalize_photometry
+        # zero_point=24.0, reference=25.0 → offset=+1.0
+        obs = [self._make_obs(19.5)]
+        result = normalize_photometry(obs, zero_point=24.0)
+        assert len(result) == 1
+        assert result[0].mag == pytest.approx(20.5, abs=0.001)
+
+    def test_drops_out_of_range(self):
+        from preprocess import normalize_photometry
+        # offset = 25 - 5 = 20 → corrected = 19.5 + 20 = 39.5 (>35, dropped)
+        obs = [self._make_obs(19.5)]
+        result = normalize_photometry(obs, zero_point=5.0)
+        assert result == []
+
+    def test_drops_negative_mag(self):
+        from preprocess import normalize_photometry
+        # offset = 25 - 50 = -25 → corrected = 5.0 - 25 = -20 (< 0, dropped)
+        obs = [self._make_obs(5.0)]
+        result = normalize_photometry(obs, zero_point=50.0)
+        assert result == []
+
+    def test_empty_list(self):
+        from preprocess import normalize_photometry
+        result = normalize_photometry([], zero_point=25.0)
+        assert result == []
+
+    def test_preserves_mag_err(self):
+        from preprocess import normalize_photometry
+        obs = [self._make_obs(19.5, mag_err=0.1)]
+        result = normalize_photometry(obs, zero_point=24.5)
+        assert result[0].mag_err == pytest.approx(0.1)
+
+    def test_custom_reference_zero_point(self):
+        from preprocess import normalize_photometry
+        # zero_point=23, reference=24 → offset=1
+        obs = [self._make_obs(18.0)]
+        result = normalize_photometry(obs, zero_point=23.0, reference_zero_point=24.0)
+        assert result[0].mag == pytest.approx(19.0, abs=0.001)

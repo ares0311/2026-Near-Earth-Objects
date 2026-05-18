@@ -1122,3 +1122,75 @@ class TestQueryMpcObservationsSkill:
         import json
         data = json.loads(captured.out)
         assert data["n_obs"] == 0
+
+
+class TestComputeThreatScoresSkill:
+    def _skill_path(self):
+        import pathlib
+        return str(pathlib.Path(__file__).resolve().parents[1] / "Skills")
+
+    def _load_skill(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "compute_threat_scores",
+            f"{self._skill_path()}/compute_threat_scores.py",
+        )
+        mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+        return mod
+
+    def test_module_has_main(self):
+        mod = self._load_skill()
+        assert hasattr(mod, "main")
+
+    def test_load_neos_returns_list(self, tmp_path):
+        import json
+        mod = self._load_skill()
+        data = [
+            {
+                "tracklet": {"object_id": "T001"},
+                "hazard": {"moid_au": 0.02, "absolute_magnitude_h": 21.0},
+                "metadata": {"quality_code": 2},
+                "features": {},
+            }
+        ]
+        f = tmp_path / "neos.json"
+        f.write_text(json.dumps(data))
+        neos = mod._load_neos(str(f))
+        assert isinstance(neos, list)
+        assert len(neos) == 1
+        assert neos[0].tracklet.object_id == "T001"
+
+    def test_load_neos_single_object(self, tmp_path):
+        import json
+        mod = self._load_skill()
+        data = {
+            "tracklet": {"object_id": "T002"},
+            "hazard": {"moid_au": None, "absolute_magnitude_h": None},
+            "metadata": {},
+            "features": {},
+        }
+        f = tmp_path / "single.json"
+        f.write_text(json.dumps(data))
+        neos = mod._load_neos(str(f))
+        assert len(neos) == 1
+
+
+class TestFetchAtlasDataSkill:
+    def _skill_path(self):
+        import pathlib
+        return str(pathlib.Path(__file__).resolve().parents[1] / "Skills")
+
+    def _load_skill(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "fetch_atlas_data",
+            f"{self._skill_path()}/fetch_atlas_data.py",
+        )
+        mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+        return mod
+
+    def test_module_has_main(self):
+        mod = self._load_skill()
+        assert hasattr(mod, "main")
