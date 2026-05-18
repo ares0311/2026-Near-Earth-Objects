@@ -538,3 +538,49 @@ class TestCalibrationReport:
         result = calibration_report(np.array([0.5, 0.5]), np.array([0.0, 1.0]))
         for key in ["brier_score", "ece", "log_loss", "mean_prob", "fraction_positive"]:
             assert isinstance(result[key], float)
+
+
+class TestCompareCalibrators:
+    def test_returns_dict(self):
+        from calibration import compare_calibrators
+        result = compare_calibrators([[0.3, 0.7], [0.4, 0.6]], [0.0, 1.0], ["A", "B"])
+        assert isinstance(result, dict)
+
+    def test_keys_match_names(self):
+        from calibration import compare_calibrators
+        result = compare_calibrators([[0.3, 0.7], [0.4, 0.6]], [0.0, 1.0], ["platt", "isotonic"])
+        assert "platt" in result
+        assert "isotonic" in result
+
+    def test_each_value_is_calibration_report(self):
+        from calibration import compare_calibrators
+        result = compare_calibrators([[0.3, 0.7]], [0.0, 1.0], ["model_a"])
+        report = result["model_a"]
+        for key in ["n_samples", "brier_score", "ece", "log_loss"]:
+            assert key in report
+
+    def test_empty_probs_list(self):
+        from calibration import compare_calibrators
+        result = compare_calibrators([], [0.0, 1.0], [])
+        assert result == {}
+
+    def test_extra_name_ignored(self):
+        from calibration import compare_calibrators
+        # Only one probs array, two names — extra name ignored
+        result = compare_calibrators([[0.5, 0.5]], [0.0, 1.0], ["a", "b"])
+        assert list(result.keys()) == ["a"]
+
+    def test_missing_name_defaults(self):
+        from calibration import compare_calibrators
+        # Two probs arrays, zero names → default names used
+        result = compare_calibrators([[0.3, 0.7], [0.4, 0.6]], [0.0, 1.0], [])
+        assert "calibrator_0" in result
+        assert "calibrator_1" in result
+
+    def test_metrics_differ_between_calibrators(self):
+        from calibration import compare_calibrators
+        probs_good = [0.1, 0.9]
+        probs_poor = [0.5, 0.5]
+        labels = [0.0, 1.0]
+        result = compare_calibrators([probs_good, probs_poor], labels, ["good", "poor"])
+        assert result["good"]["brier_score"] < result["poor"]["brier_score"]

@@ -1316,3 +1316,189 @@ class TestExportSurveySummarySkill:
         f.write_text(json.dumps([]))
         result = mod.export_summary(str(f), None, fmt="csv")
         assert result != 0
+
+
+class TestComputeApparentMagnitudesSkill:
+    """Smoke tests for Skills/compute_apparent_magnitudes.py."""
+
+    def _skill_path(self):
+        import pathlib
+        return str(pathlib.Path(__file__).resolve().parents[1] / "Skills")
+
+    def _load_skill(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "compute_apparent_magnitudes",
+            f"{self._skill_path()}/compute_apparent_magnitudes.py",
+        )
+        mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+        return mod
+
+    def test_module_has_main(self):
+        mod = self._load_skill()
+        assert hasattr(mod, "main")
+
+    def test_main_with_no_orbital_elements(self, tmp_path):
+        import json
+        mod = self._load_skill()
+        data = [{"tracklet": {"object_id": "NEO-001"}}]
+        f = tmp_path / "tracklets.json"
+        f.write_text(json.dumps(data))
+        mod.main([str(f), "--jd", "2460000.5"])
+
+    def test_main_json_flag(self, tmp_path, capsys):
+        import json
+        mod = self._load_skill()
+        data = [{"tracklet": {"object_id": "NEO-001"}}]
+        f = tmp_path / "tracklets.json"
+        f.write_text(json.dumps(data))
+        mod.main([str(f), "--jd", "2460000.5", "--json"])
+        captured = capsys.readouterr()
+        rows = json.loads(captured.out)
+        assert isinstance(rows, list)
+        assert rows[0]["object_id"] == "NEO-001"
+
+    def test_main_with_orbital_elements(self, tmp_path, capsys):
+        import json
+        mod = self._load_skill()
+        data = [{
+            "tracklet": {
+                "object_id": "NEO-002",
+                "orbital_elements": {
+                    "semi_major_axis_au": 1.5, "eccentricity": 0.2,
+                    "inclination_deg": 5.0, "longitude_ascending_node_deg": 30.0,
+                    "argument_perihelion_deg": 60.0, "mean_anomaly_deg": 90.0,
+                    "epoch_jd": 2460000.5, "perihelion_au": 1.2, "aphelion_au": 1.8,
+                },
+            }
+        }]
+        f = tmp_path / "tracklets.json"
+        f.write_text(json.dumps(data))
+        mod.main([str(f), "--jd", "2460010.5", "--json"])
+        captured = capsys.readouterr()
+        rows = json.loads(captured.out)
+        assert rows[0]["object_id"] == "NEO-002"
+
+    def test_main_dict_input_wrapped(self, tmp_path, capsys):
+        import json
+        mod = self._load_skill()
+        data = {"tracklet": {"object_id": "NEO-003"}}
+        f = tmp_path / "tracklets.json"
+        f.write_text(json.dumps(data))
+        mod.main([str(f), "--jd", "2460000.5", "--json"])
+        captured = capsys.readouterr()
+        rows = json.loads(captured.out)
+        assert len(rows) == 1
+
+
+class TestTriageCandidatesSkill:
+    """Smoke tests for Skills/triage_candidates.py."""
+
+    def _skill_path(self):
+        import pathlib
+        return str(pathlib.Path(__file__).resolve().parents[1] / "Skills")
+
+    def _load_skill(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "triage_candidates",
+            f"{self._skill_path()}/triage_candidates.py",
+        )
+        mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+        return mod
+
+    def _make_neo_data(self, pathway="internal_candidate", hazard_flag="nominal", moid=0.1):
+        import json
+
+        from .conftest import build_scored_neo
+        neo = build_scored_neo(alert_pathway=pathway)
+        return json.loads(neo.model_dump_json())
+
+    def test_module_has_main(self):
+        mod = self._load_skill()
+        assert hasattr(mod, "main")
+
+    def test_main_runs(self, tmp_path):
+        import json
+
+        from .conftest import build_scored_neo
+        mod = self._load_skill()
+        neo = build_scored_neo(alert_pathway="internal_candidate")
+        data = [json.loads(neo.model_dump_json())]
+        f = tmp_path / "neos.json"
+        f.write_text(json.dumps(data))
+        mod.main([str(f)])
+
+    def test_main_json_flag(self, tmp_path, capsys):
+        import json
+
+        from .conftest import build_scored_neo
+        mod = self._load_skill()
+        neo = build_scored_neo(alert_pathway="mpc_submission")
+        data = [json.loads(neo.model_dump_json())]
+        f = tmp_path / "neos.json"
+        f.write_text(json.dumps(data))
+        mod.main([str(f), "--json"])
+        captured = capsys.readouterr()
+        rows = json.loads(captured.out)
+        assert isinstance(rows, list)
+
+    def test_urgency_filter(self, tmp_path, capsys):
+        import json
+
+        from .conftest import build_scored_neo
+        mod = self._load_skill()
+        neo = build_scored_neo(alert_pathway="internal_candidate")
+        data = [json.loads(neo.model_dump_json())]
+        f = tmp_path / "neos.json"
+        f.write_text(json.dumps(data))
+        mod.main([str(f), "--urgency", "URGENT", "--json"])
+        captured = capsys.readouterr()
+        rows = json.loads(captured.out)
+        # All results should be URGENT tier (or empty)
+        for row in rows:
+            assert row["urgency"] == "URGENT"
+
+    def test_pathway_filter(self, tmp_path, capsys):
+        import json
+
+        from .conftest import build_scored_neo
+        mod = self._load_skill()
+        neo = build_scored_neo(alert_pathway="internal_candidate")
+        data = [json.loads(neo.model_dump_json())]
+        f = tmp_path / "neos.json"
+        f.write_text(json.dumps(data))
+        mod.main([str(f), "--pathway", "nasa_pdco_notify", "--json"])
+        captured = capsys.readouterr()
+        rows = json.loads(captured.out)
+        for row in rows:
+            assert row["alert_pathway"] == "nasa_pdco_notify"
+
+    def test_empty_result_no_match(self, tmp_path, capsys):
+        import json
+
+        from .conftest import build_scored_neo
+        mod = self._load_skill()
+        neo = build_scored_neo(alert_pathway="internal_candidate")
+        data = [json.loads(neo.model_dump_json())]
+        f = tmp_path / "neos.json"
+        f.write_text(json.dumps(data))
+        mod.main([str(f), "--pathway", "nasa_pdco_notify"])
+        captured = capsys.readouterr()
+        assert "No candidates" in captured.out or captured.out == ""
+
+    def test_dict_input_wrapped(self, tmp_path, capsys):
+        import json
+
+        from .conftest import build_scored_neo
+        mod = self._load_skill()
+        neo = build_scored_neo(alert_pathway="internal_candidate")
+        data = json.loads(neo.model_dump_json())
+        f = tmp_path / "neos.json"
+        f.write_text(json.dumps(data))
+        mod.main([str(f), "--json"])
+        captured = capsys.readouterr()
+        rows = json.loads(captured.out)
+        assert isinstance(rows, list)

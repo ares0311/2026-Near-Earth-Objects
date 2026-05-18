@@ -20,6 +20,7 @@ __all__ = [
     "generate_observation_request",
     "generate_mpc_cover_letter",
     "format_impact_notification",
+    "count_pending_alerts",
 ]
 
 import json
@@ -903,3 +904,23 @@ def format_impact_notification(neo: ScoredNEO) -> dict:
         ],
         "observations": obs_records,
     }
+
+
+def count_pending_alerts(neos: list) -> dict:
+    """Count scored NEOs grouped by their alert pathway.
+
+    Provides a quick tally of how many candidates fall into each alert category,
+    useful for operations dashboards and run summaries.
+
+    Args:
+        neos: List of :class:`~schemas.ScoredNEO` objects.
+
+    Returns:
+        Dict mapping each ``alert_pathway`` string to its count.  Only pathways
+        with at least one candidate are included.
+    """
+    counts: dict = {}
+    for neo in neos:
+        pathway = neo.hazard.alert_pathway
+        counts[pathway] = counts.get(pathway, 0) + 1
+    return counts

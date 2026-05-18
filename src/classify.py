@@ -19,6 +19,7 @@ __all__ = [
     "batch_morphology",
     "summarize_classifications",
     "calibrate_posterior", "compute_classification_table",
+    "get_posterior_vector",
 ]
 
 import base64
@@ -1096,3 +1097,28 @@ def compute_classification_table(neos: list) -> list[dict]:
             "entropy_bits": round(ent, 4),
         })
     return rows
+
+
+def get_posterior_vector(posterior: NEOPosterior) -> np.ndarray:
+    """Return the posterior probability distribution as a 5-element numpy array.
+
+    The element order is fixed:
+    [neo_candidate, known_object, main_belt_asteroid, stellar_artifact, other_solar_system]
+
+    This provides a convenient vector representation for downstream numerical
+    processing such as ensemble stacking or distance computations.
+
+    Args:
+        posterior: A :class:`~schemas.NEOPosterior` object.
+
+    Returns:
+        1-D numpy array of shape ``(5,)`` with probabilities in [0, 1].
+    """
+    import numpy as np  # already imported at module level but explicit for safety
+    return np.array([
+        posterior.neo_candidate,
+        posterior.known_object,
+        posterior.main_belt_asteroid,
+        posterior.stellar_artifact,
+        posterior.other_solar_system,
+    ], dtype=float)

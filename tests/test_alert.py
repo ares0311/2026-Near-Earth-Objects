@@ -1048,3 +1048,44 @@ class TestFormatImpactNotification:
         from .conftest import build_scored_neo
         result = format_impact_notification(build_scored_neo())
         assert isinstance(result["generated_utc"], str)
+
+
+class TestCountPendingAlerts:
+    def _make_neo(self, pathway):
+        from .conftest import build_scored_neo
+        return build_scored_neo(alert_pathway=pathway)
+
+    def test_empty_input_returns_empty_dict(self):
+        from alert import count_pending_alerts
+        assert count_pending_alerts([]) == {}
+
+    def test_single_pathway(self):
+        from alert import count_pending_alerts
+        neos = [self._make_neo("mpc_submission") for _ in range(3)]
+        result = count_pending_alerts(neos)
+        assert result == {"mpc_submission": 3}
+
+    def test_multiple_pathways(self):
+        from alert import count_pending_alerts
+        neos = [
+            self._make_neo("mpc_submission"),
+            self._make_neo("internal_candidate"),
+            self._make_neo("mpc_submission"),
+            self._make_neo("known_object"),
+        ]
+        result = count_pending_alerts(neos)
+        assert result["mpc_submission"] == 2
+        assert result["internal_candidate"] == 1
+        assert result["known_object"] == 1
+
+    def test_returns_dict(self):
+        from alert import count_pending_alerts
+        result = count_pending_alerts([self._make_neo("internal_candidate")])
+        assert isinstance(result, dict)
+
+    def test_only_present_pathways_in_result(self):
+        from alert import count_pending_alerts
+        neos = [self._make_neo("internal_candidate")]
+        result = count_pending_alerts(neos)
+        assert "mpc_submission" not in result
+        assert "internal_candidate" in result

@@ -6,7 +6,7 @@ __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fet
            "fetch_batch", "estimate_limiting_magnitude", "summarise_fetch_result",
            "merge_survey_alerts", "filter_alerts_by_motion", "build_observation_window",
            "count_known_objects_in_field", "fetch_mpc_observations",
-           "fetch_atlas_forced", "fetch_ztf_alerts"]
+           "fetch_atlas_forced", "fetch_ztf_alerts", "estimate_survey_depth"]
 
 import json
 import os
@@ -837,3 +837,29 @@ def fetch_ztf_alerts(
 
     except Exception:
         return []
+
+
+def estimate_survey_depth(fetch_result: FetchResult) -> float | None:
+    """Estimate the limiting magnitude of a survey observation window.
+
+    Returns the 95th-percentile apparent magnitude from all alert observations
+    in the :class:`~schemas.FetchResult`.  This provides a robust proxy for the
+    5-sigma survey depth, robust against a few very bright detections.
+
+    Args:
+        fetch_result: A :class:`~schemas.FetchResult` containing survey alerts.
+
+    Returns:
+        95th-percentile magnitude as ``float``, or ``None`` if there are no
+        valid magnitudes (empty alerts or all sentinel values ≥ 90).
+    """
+    import numpy as np
+
+    mags = [
+        obs.mag
+        for obs in fetch_result.alerts
+        if obs.mag is not None and obs.mag < 90.0
+    ]
+    if not mags:
+        return None
+    return round(float(np.percentile(mags, 95)), 4)

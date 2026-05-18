@@ -973,3 +973,55 @@ class TestComputeDetectionEfficiency:
         from .conftest import build_observation
         obs = [build_observation(mag=99.0)]
         assert compute_detection_efficiency(obs, 100.0) == pytest.approx(0.0)
+
+
+class TestCountDetectionsByFilter:
+    def test_empty_returns_empty_dict(self):
+        from detect import count_detections_by_filter
+        assert count_detections_by_filter([]) == {}
+
+    def test_single_band(self):
+        from detect import count_detections_by_filter
+
+        from .conftest import build_observation
+        obs = [build_observation(filter_band="r") for _ in range(3)]
+        result = count_detections_by_filter(obs)
+        assert result == {"r": 3}
+
+    def test_multiple_bands(self):
+        from detect import count_detections_by_filter
+
+        from .conftest import build_observation
+        obs = [
+            build_observation(filter_band="g"),
+            build_observation(filter_band="r"),
+            build_observation(filter_band="g"),
+            build_observation(filter_band="i"),
+        ]
+        result = count_detections_by_filter(obs)
+        assert result["g"] == 2
+        assert result["r"] == 1
+        assert result["i"] == 1
+
+    def test_none_filter_band_becomes_unknown(self):
+        import types
+
+        from detect import count_detections_by_filter
+        obs = [types.SimpleNamespace(filter_band=None)]
+        result = count_detections_by_filter(obs)
+        assert result == {"unknown": 1}
+
+    def test_returns_dict(self):
+        from detect import count_detections_by_filter
+
+        from .conftest import build_observation
+        result = count_detections_by_filter([build_observation(filter_band="r")])
+        assert isinstance(result, dict)
+
+    def test_tuple_input(self):
+        from detect import count_detections_by_filter
+
+        from .conftest import build_observation
+        obs = tuple(build_observation(filter_band="o") for _ in range(2))
+        result = count_detections_by_filter(obs)
+        assert result == {"o": 2}

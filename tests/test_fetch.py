@@ -1728,3 +1728,46 @@ class TestFetchZtfAlertsIrsaPath:
             result = fetch_mod.fetch_ztf_alerts(180.0, 10.0, 0.5, 2460000.0, 2460010.0)
 
         assert result == []
+
+
+class TestEstimateSurveyDepth:
+    def _make_result(self, mags):
+        from schemas import FetchProvenance, FetchResult
+
+        from .conftest import build_observation
+        alerts = tuple(build_observation(obs_id=f"s_{i}", mag=m) for i, m in enumerate(mags))
+        prov = FetchProvenance(surveys=("ZTF",), start_jd=2460000.5, end_jd=2460001.5)
+        return FetchResult(alerts=alerts, provenance=prov)
+
+    def test_empty_alerts_returns_none(self):
+        from fetch import estimate_survey_depth
+        result = self._make_result([])
+        assert estimate_survey_depth(result) is None
+
+    def test_all_sentinel_mags_returns_none(self):
+        from fetch import estimate_survey_depth
+        result = self._make_result([99.0, 99.0, 99.0])
+        assert estimate_survey_depth(result) is None
+
+    def test_returns_float(self):
+        from fetch import estimate_survey_depth
+        result = self._make_result([18.0, 19.0, 20.0, 21.0])
+        assert isinstance(estimate_survey_depth(result), float)
+
+    def test_95th_percentile(self):
+        import numpy as np
+
+        from fetch import estimate_survey_depth
+        mags = [18.0 + i * 0.1 for i in range(20)]
+        result = self._make_result(mags)
+        depth = estimate_survey_depth(result)
+        expected = round(float(np.percentile(mags, 95)), 4)
+        assert depth == pytest.approx(expected, abs=0.001)
+
+    def test_excludes_sentinel_mags(self):
+        from fetch import estimate_survey_depth
+        result = self._make_result([18.0, 19.0, 99.0])
+        depth = estimate_survey_depth(result)
+        # 99.0 excluded, so depth should be based only on [18.0, 19.0]
+        assert depth is not None
+        assert depth < 90.0
