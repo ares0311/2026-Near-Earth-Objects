@@ -18,7 +18,7 @@ __all__ = [
     "classify_morphology",
     "batch_morphology",
     "summarize_classifications",
-    "calibrate_posterior",
+    "calibrate_posterior", "compute_classification_table",
 ]
 
 import base64
@@ -1066,3 +1066,33 @@ def calibrate_posterior(
         stellar_artifact=round(float(raw[3]), 6),
         other_solar_system=round(float(raw[4]), 6),
     )
+
+
+def compute_classification_table(neos: list) -> list[dict]:
+    """Build a per-NEO classification summary table.
+
+    For each scored NEO, returns the object ID, dominant hypothesis name and
+    probability, and posterior entropy.  Useful for quick review of a batch
+    classification run.
+
+    Args:
+        neos: List of :class:`~schemas.ScoredNEO` objects.
+
+    Returns:
+        List of dicts, each with keys:
+          - ``"object_id"``: tracklet object identifier.
+          - ``"dominant_hypothesis"``: name of the highest-probability class.
+          - ``"probability"``: probability of the dominant class (rounded to 4 dp).
+          - ``"entropy_bits"``: Shannon entropy of the posterior (rounded to 4 dp).
+    """
+    rows = []
+    for neo in neos:
+        hyp, prob = dominant_hypothesis(neo.posterior)
+        ent = posterior_entropy(neo.posterior)
+        rows.append({
+            "object_id": neo.tracklet.object_id,
+            "dominant_hypothesis": hyp,
+            "probability": round(prob, 4),
+            "entropy_bits": round(ent, 4),
+        })
+    return rows

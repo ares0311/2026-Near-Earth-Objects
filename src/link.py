@@ -5,7 +5,7 @@ from __future__ import annotations
 __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "filter_high_motion", "deduplicate_tracklets", "_predict_from_arc",
            "split_tracklet", "compute_arc_statistics", "assess_link_confidence",
-           "compute_tracklet_grade", "filter_by_arc_length"]
+           "compute_tracklet_grade", "filter_by_arc_length", "summarize_arc_statistics"]
 
 import math
 import uuid
@@ -573,3 +573,38 @@ def filter_by_arc_length(tracklets: list, min_arc_days: float = 1.0) -> list:
         Filtered list of tracklets satisfying the arc-length criterion.
     """
     return [t for t in tracklets if getattr(t, "arc_days", 0.0) >= min_arc_days]
+
+
+def summarize_arc_statistics(tracklets: list) -> dict:
+    """Aggregate arc-length statistics across a list of tracklets.
+
+    Args:
+        tracklets: List of :class:`~schemas.Tracklet` objects.
+
+    Returns:
+        Dict with keys:
+          - ``"n_tracklets"``: total count.
+          - ``"mean_arc_days"``: mean arc length in days (0.0 if empty).
+          - ``"max_arc_days"``: maximum arc length in days (0.0 if empty).
+          - ``"fraction_multi_night"``: fraction of tracklets spanning >1 night.
+    """
+    if not tracklets:
+        return {
+            "n_tracklets": 0,
+            "mean_arc_days": 0.0,
+            "max_arc_days": 0.0,
+            "fraction_multi_night": 0.0,
+        }
+    arcs = [getattr(t, "arc_days", 0.0) for t in tracklets]
+    multi_night = sum(1 for t in tracklets if _count_nights(t) > 1)
+    return {
+        "n_tracklets": len(tracklets),
+        "mean_arc_days": round(float(np.mean(arcs)), 4),
+        "max_arc_days": round(float(np.max(arcs)), 4),
+        "fraction_multi_night": round(multi_night / len(tracklets), 4),
+    }
+
+
+def _count_nights(tracklet) -> int:
+    """Count distinct integer JD nights in a tracklet."""
+    return len({int(o.jd) for o in getattr(tracklet, "observations", [])})

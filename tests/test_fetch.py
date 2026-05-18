@@ -1549,3 +1549,182 @@ class TestFetchAtlasForcedPollingLoop:
             )
 
         assert result == []
+
+
+class TestFetchZtfAlerts:
+    def test_returns_empty_on_import_error(self, tmp_path, monkeypatch):
+        import fetch as fetch_mod
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        # astroquery.irsa not installed → returns []
+        result = fetch_mod.fetch_ztf_alerts(180.0, 10.0, 0.5, 2460000.0, 2460010.0)
+        assert isinstance(result, list)
+
+    def test_returns_list_type(self, tmp_path, monkeypatch):
+        import fetch as fetch_mod
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        result = fetch_mod.fetch_ztf_alerts(180.0, 10.0, 1.0, 2460000.0, 2460010.0)
+        assert isinstance(result, list)
+
+    def test_returns_from_cache(self, tmp_path, monkeypatch):
+        import hashlib
+
+        import fetch as fetch_mod
+        from schemas import Observation
+
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        ra, dec, radius = 180.0, 10.0, 0.5
+        start_jd, end_jd = 2460000.0, 2460010.0
+        cache_key = hashlib.md5(
+            f"ztf_irsa_{ra:.5f}_{dec:.5f}_{radius:.4f}"
+            f"_{start_jd:.3f}_{end_jd:.3f}".encode()
+        ).hexdigest()
+        obs = Observation(
+            obs_id="ztf_cached_001", ra_deg=ra, dec_deg=dec, jd=2460005.0,
+            mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF",
+        )
+        fetch_mod._save_cache(cache_key, [obs.model_dump()])
+        result = fetch_mod.fetch_ztf_alerts(ra, dec, radius, start_jd, end_jd)
+        assert len(result) == 1
+        assert result[0].obs_id == "ztf_cached_001"
+
+    def test_force_refresh_bypasses_cache(self, tmp_path, monkeypatch):
+        import hashlib
+
+        import fetch as fetch_mod
+        from schemas import Observation
+
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        ra, dec, radius = 10.0, 5.0, 0.5
+        start_jd, end_jd = 2460000.0, 2460010.0
+        cache_key = hashlib.md5(
+            f"ztf_irsa_{ra:.5f}_{dec:.5f}_{radius:.4f}"
+            f"_{start_jd:.3f}_{end_jd:.3f}".encode()
+        ).hexdigest()
+        obs = Observation(
+            obs_id="stale", ra_deg=ra, dec_deg=dec, jd=2460005.0,
+            mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF",
+        )
+        fetch_mod._save_cache(cache_key, [obs.model_dump()])
+        # force_refresh=True bypasses cache; irsa not available → returns []
+        result = fetch_mod.fetch_ztf_alerts(ra, dec, radius, start_jd, end_jd, force_refresh=True)
+        assert result == []
+
+    def test_bad_cached_entry_skipped(self, tmp_path, monkeypatch):
+        import hashlib
+
+        import fetch as fetch_mod
+
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        ra, dec, radius = 30.0, -5.0, 0.5
+        start_jd, end_jd = 2460000.0, 2460010.0
+        cache_key = hashlib.md5(
+            f"ztf_irsa_{ra:.5f}_{dec:.5f}_{radius:.4f}"
+            f"_{start_jd:.3f}_{end_jd:.3f}".encode()
+        ).hexdigest()
+        fetch_mod._save_cache(cache_key, [{"invalid": "garbage"}])
+        result = fetch_mod.fetch_ztf_alerts(ra, dec, radius, start_jd, end_jd)
+        assert result == []
+
+
+class TestFetchZtfAlertsIrsaPath:
+    """Cover lines 812-835: the IRSA query + row parsing path."""
+
+    def test_successful_irsa_query(self, tmp_path, monkeypatch):
+        from unittest.mock import MagicMock, patch
+
+        import fetch as fetch_mod
+
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        # Build a fake Irsa result table row
+        mock_row = MagicMock()
+        mock_row.__getitem__ = MagicMock(side_effect=lambda k: {
+            "jd": 2460005.0,
+            "ra": 180.001,
+            "dec": 10.001,
+        }[k])
+        mock_row.get = MagicMock(side_effect=lambda k, d=None: {
+            "candid": "ztf_abc123",
+            "magpsf": 19.0,
+            "sigmapsf": 0.05,
+            "fid": "r",
+            "rb": 0.9,
+        }.get(k, d))
+
+        mock_table = MagicMock()
+        mock_table.__iter__ = MagicMock(return_value=iter([mock_row]))
+
+        mock_irsa_cls = MagicMock()
+        mock_irsa_cls.query_region.return_value = mock_table
+
+        mock_irsa_mod = MagicMock()
+        mock_irsa_mod.Irsa = mock_irsa_cls
+
+        mock_astropy_units = MagicMock()
+        mock_astropy_units.deg = "deg"
+
+        mock_skycoord = MagicMock()
+
+        with patch.dict("sys.modules", {
+            "astroquery.irsa": mock_irsa_mod,
+            "astropy.units": mock_astropy_units,
+            "astropy.coordinates": MagicMock(SkyCoord=mock_skycoord),
+        }):
+            result = fetch_mod.fetch_ztf_alerts(180.0, 10.0, 0.5, 2460000.0, 2460010.0)
+
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0].obs_id == "ztf_abc123"
+
+    def test_row_outside_jd_window_excluded(self, tmp_path, monkeypatch):
+        from unittest.mock import MagicMock, patch
+
+        import fetch as fetch_mod
+
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        mock_row = MagicMock()
+        mock_row.__getitem__ = MagicMock(side_effect=lambda k: {
+            "jd": 2459000.0,  # outside [2460000, 2460010]
+        }[k] if k == "jd" else 0.0)
+        mock_row.get = MagicMock(return_value=None)
+
+        mock_table = MagicMock()
+        mock_table.__iter__ = MagicMock(return_value=iter([mock_row]))
+
+        mock_irsa_mod = MagicMock()
+        mock_irsa_mod.Irsa.query_region.return_value = mock_table
+
+        with patch.dict("sys.modules", {
+            "astroquery.irsa": mock_irsa_mod,
+            "astropy.units": MagicMock(deg="deg"),
+            "astropy.coordinates": MagicMock(SkyCoord=MagicMock()),
+        }):
+            result = fetch_mod.fetch_ztf_alerts(180.0, 10.0, 0.5, 2460000.0, 2460010.0)
+
+        assert result == []
+
+    def test_bad_row_skipped_with_exception(self, tmp_path, monkeypatch):
+        from unittest.mock import MagicMock, patch
+
+        import fetch as fetch_mod
+
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        mock_row = MagicMock()
+        mock_row.__getitem__ = MagicMock(side_effect=KeyError("jd"))
+
+        mock_table = MagicMock()
+        mock_table.__iter__ = MagicMock(return_value=iter([mock_row]))
+
+        mock_irsa_mod = MagicMock()
+        mock_irsa_mod.Irsa.query_region.return_value = mock_table
+
+        with patch.dict("sys.modules", {
+            "astroquery.irsa": mock_irsa_mod,
+            "astropy.units": MagicMock(deg="deg"),
+            "astropy.coordinates": MagicMock(SkyCoord=MagicMock()),
+        }):
+            result = fetch_mod.fetch_ztf_alerts(180.0, 10.0, 0.5, 2460000.0, 2460010.0)
+
+        assert result == []

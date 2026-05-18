@@ -5,7 +5,8 @@ from __future__ import annotations
 __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "followup_priority_table", "pha_candidates", "compute_statistics",
            "close_approach_candidates", "absolute_magnitude_from_diameter",
-           "compute_impact_energy", "compute_novelty_score", "compute_threat_score"]
+           "compute_impact_energy", "compute_novelty_score",
+           "compute_threat_score", "filter_by_alert_pathway"]
 
 import math
 import uuid
@@ -622,3 +623,18 @@ def compute_threat_score(neo: ScoredNEO) -> float:
     if product <= 0.0:
         return 0.0
     return round(product ** (1.0 / 3.0), 4)
+
+
+def filter_by_alert_pathway(neos: list[ScoredNEO], pathway: str) -> list[ScoredNEO]:
+    """Filter a list of ScoredNEOs to those with a specific alert pathway.
+
+    Args:
+        neos: List of :class:`~schemas.ScoredNEO` objects.
+        pathway: The alert pathway to filter on (e.g. ``"mpc_submission"``,
+            ``"nasa_pdco_notify"``, ``"internal_candidate"``).
+
+    Returns:
+        Filtered list containing only NEOs whose ``hazard.alert_pathway``
+        matches ``pathway`` exactly.
+    """
+    return [n for n in neos if n.hazard.alert_pathway == pathway]

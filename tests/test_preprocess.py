@@ -823,3 +823,69 @@ class TestNormalizePhotometry:
         obs = [self._make_obs(18.0)]
         result = normalize_photometry(obs, zero_point=23.0, reference_zero_point=24.0)
         assert result[0].mag == pytest.approx(19.0, abs=0.001)
+
+
+class TestComputeImageQualityMetrics:
+    def _make_obs_with_cutout(self, mag=19.0):
+        import base64
+
+        import numpy as np
+
+        from .conftest import build_observation
+        arr = np.random.default_rng(42).uniform(0, 1, (63, 63)).astype(np.float32)
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        return build_observation(mag=mag, cutout_difference=b64)
+
+    def test_returns_dict(self):
+        from preprocess import compute_image_quality_metrics
+        result = compute_image_quality_metrics([])
+        assert isinstance(result, dict)
+
+    def test_has_required_keys(self):
+        from preprocess import compute_image_quality_metrics
+        result = compute_image_quality_metrics([])
+        for key in ["n_sources", "mean_fwhm_arcsec", "median_fwhm_arcsec",
+                    "mean_snr", "background_rms"]:
+            assert key in result
+
+    def test_empty_observations_none_metrics(self):
+        from preprocess import compute_image_quality_metrics
+        result = compute_image_quality_metrics([])
+        assert result["n_sources"] == 0
+        assert result["mean_fwhm_arcsec"] is None
+        assert result["mean_snr"] is None
+
+    def test_counts_sources(self):
+        from preprocess import compute_image_quality_metrics
+        obs = [self._make_obs_with_cutout() for _ in range(3)]
+        result = compute_image_quality_metrics(obs)
+        assert result["n_sources"] == 3
+
+    def test_background_rms_with_cutout(self):
+        from preprocess import compute_image_quality_metrics
+        obs = [self._make_obs_with_cutout()]
+        result = compute_image_quality_metrics(obs)
+        assert result["background_rms"] is not None
+        assert result["background_rms"] >= 0.0
+
+
+class TestComputeImageQualityMetricsBranches:
+    """Cover lines 503 and 510-511 in compute_image_quality_metrics."""
+
+    def test_obs_without_cutout_skipped_for_bg(self):
+        from preprocess import compute_image_quality_metrics
+
+        from .conftest import build_observation
+        # No cutout → line 503 (continue) hit
+        obs = build_observation()
+        result = compute_image_quality_metrics([obs])
+        assert result["background_rms"] is None
+
+    def test_bad_cutout_triggers_except(self):
+        from preprocess import compute_image_quality_metrics
+
+        from .conftest import build_observation
+        # Invalid base64 → line 510-511 (except continue) hit
+        obs = build_observation(cutout_difference="!!!invalid_base64!!!")
+        result = compute_image_quality_metrics([obs])
+        assert result["background_rms"] is None

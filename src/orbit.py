@@ -6,7 +6,8 @@ __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
            "propagate_orbit", "predict_ephemeris", "close_approach_table",
            "compute_orbital_period", "classify_neo_class", "tisserand_parameter",
            "batch_predict_ephemeris", "resonance_check", "ephemeris_uncertainty",
-           "orbital_energy", "compute_phase_angle", "compute_heliocentric_distance"]
+           "orbital_energy", "compute_phase_angle",
+           "compute_heliocentric_distance", "compute_synodic_period"]
 
 import math
 from typing import NamedTuple
@@ -857,3 +858,28 @@ def compute_heliocentric_distance(elements: OrbitalElements, target_jd: float) -
         return round(float(r), 6)
     except Exception:
         return float("nan")
+
+
+def compute_synodic_period(elements: OrbitalElements) -> float:
+    """Compute the synodic period of the object relative to Earth in days.
+
+    Uses the formula 1/P_syn = |1/P_obj - 1/P_earth| where P is the sidereal
+    period in years.  Returns infinity when the object's period equals Earth's
+    (a = 1 AU exactly) and when the semi-major axis is non-positive.
+
+    Args:
+        elements: Orbital elements of the target object.
+
+    Returns:
+        Synodic period in days, or ``math.inf`` for degenerate cases.
+    """
+    a = elements.semi_major_axis_au
+    if a <= 0.0:
+        return math.inf
+    p_obj = math.sqrt(a ** 3)  # sidereal period in years (Kepler's 3rd law)
+    p_earth = 1.0  # Earth's sidereal period in years
+    diff = abs(1.0 / p_obj - 1.0 / p_earth)
+    if diff == 0.0:
+        return math.inf
+    p_syn_years = 1.0 / diff
+    return round(p_syn_years * 365.25, 4)

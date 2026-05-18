@@ -1194,3 +1194,125 @@ class TestFetchAtlasDataSkill:
     def test_module_has_main(self):
         mod = self._load_skill()
         assert hasattr(mod, "main")
+
+
+class TestPlotCalibrationSkill:
+    def _skill_path(self):
+        import pathlib
+        return str(pathlib.Path(__file__).resolve().parents[1] / "Skills")
+
+    def _load_skill(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "plot_calibration",
+            f"{self._skill_path()}/plot_calibration.py",
+        )
+        mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+        return mod
+
+    def test_module_has_main(self):
+        mod = self._load_skill()
+        assert hasattr(mod, "main")
+
+    def test_plot_calibration_returns_int(self, tmp_path):
+        import json
+        mod = self._load_skill()
+        data = [{"prob": 0.8, "label": 1}, {"prob": 0.2, "label": 0}]
+        f = tmp_path / "probs.json"
+        f.write_text(json.dumps(data))
+        out = tmp_path / "out.png"
+        result = mod.plot_calibration(str(f), str(out))
+        assert isinstance(result, int)
+
+    def test_missing_file_returns_nonzero(self, tmp_path):
+        mod = self._load_skill()
+        result = mod.plot_calibration(str(tmp_path / "nonexistent.json"), str(tmp_path / "out.png"))
+        assert result != 0
+
+    def test_scored_neo_format(self, tmp_path):
+        import json
+        mod = self._load_skill()
+        data = [
+            {
+                "posterior": {"neo_candidate": 0.8},
+                "hazard": {"hazard_flag": "pha_candidate"},
+            },
+            {
+                "posterior": {"neo_candidate": 0.1},
+                "hazard": {"hazard_flag": "nominal"},
+            },
+        ]
+        f = tmp_path / "neos.json"
+        f.write_text(json.dumps(data))
+        result = mod.plot_calibration(str(f), str(tmp_path / "out.png"))
+        assert isinstance(result, int)
+
+
+class TestExportSurveySummarySkill:
+    def _skill_path(self):
+        import pathlib
+        return str(pathlib.Path(__file__).resolve().parents[1] / "Skills")
+
+    def _load_skill(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "export_survey_summary",
+            f"{self._skill_path()}/export_survey_summary.py",
+        )
+        mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+        return mod
+
+    def _sample_neo_data(self):
+        return [
+            {
+                "tracklet": {
+                    "object_id": "2026-AB1",
+                    "arc_days": 2.0,
+                    "observations": [{"mission": "ZTF"}, {"mission": "ZTF"}],
+                },
+                "hazard": {
+                    "hazard_flag": "pha_candidate",
+                    "alert_pathway": "mpc_submission",
+                    "moid_au": 0.03,
+                    "absolute_magnitude_h": 21.5,
+                    "neo_class": "apollo",
+                },
+                "metadata": {"discovery_priority": 0.8},
+            }
+        ]
+
+    def test_module_has_main(self):
+        mod = self._load_skill()
+        assert hasattr(mod, "main")
+
+    def test_csv_export(self, tmp_path):
+        import json
+        mod = self._load_skill()
+        f = tmp_path / "neos.json"
+        f.write_text(json.dumps(self._sample_neo_data()))
+        out = tmp_path / "summary.csv"
+        result = mod.export_summary(str(f), str(out), fmt="csv")
+        assert result == 0
+        assert out.exists()
+        content = out.read_text()
+        assert "2026-AB1" in content
+
+    def test_html_export(self, tmp_path):
+        import json
+        mod = self._load_skill()
+        f = tmp_path / "neos.json"
+        f.write_text(json.dumps(self._sample_neo_data()))
+        out = tmp_path / "summary.html"
+        result = mod.export_summary(str(f), str(out), fmt="html")
+        assert result == 0
+        assert "<table" in out.read_text()
+
+    def test_empty_data_returns_nonzero(self, tmp_path):
+        import json
+        mod = self._load_skill()
+        f = tmp_path / "empty.json"
+        f.write_text(json.dumps([]))
+        result = mod.export_summary(str(f), None, fmt="csv")
+        assert result != 0

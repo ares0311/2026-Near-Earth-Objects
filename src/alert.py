@@ -19,6 +19,7 @@ __all__ = [
     "format_alert_summary",
     "generate_observation_request",
     "generate_mpc_cover_letter",
+    "format_impact_notification",
 ]
 
 import json
@@ -840,3 +841,65 @@ def generate_mpc_cover_letter(neo: ScoredNEO) -> str:
         "=" * 70,
     ]
     return "\n".join(lines)
+
+
+def format_impact_notification(neo: ScoredNEO) -> dict:
+    """Format a PDCO-ready impact notification package as a structured dict.
+
+    Produces a structured notification package for submission to NASA PDCO
+    and IAU CBAT when CNEOS Scout/Sentry confirms a non-trivial impact
+    probability.  This function does NOT transmit — it returns a dict that
+    must be reviewed and approved by authorised personnel before use.
+
+    The package includes full provenance, guardrail statements, and all
+    required observation and orbital data.
+
+    Args:
+        neo: A :class:`~schemas.ScoredNEO` object with full hazard assessment.
+
+    Returns:
+        Dict with keys: ``object_id``, ``generated_utc``, ``hazard_flag``,
+        ``alert_pathway``, ``moid_au``, ``neo_class``, ``n_observations``,
+        ``arc_days``, ``pipeline_version``, ``guardrails``, ``observations``.
+    """
+    from datetime import UTC, datetime
+
+    obj_id = neo.tracklet.object_id
+    haz = neo.hazard
+    meta = neo.metadata
+    now_utc = datetime.now(UTC).isoformat()
+
+    obs_records = [
+        {
+            "obs_id": o.obs_id,
+            "ra_deg": o.ra_deg,
+            "dec_deg": o.dec_deg,
+            "jd": o.jd,
+            "mag": o.mag,
+            "filter_band": o.filter_band,
+            "mission": o.mission,
+        }
+        for o in neo.tracklet.observations
+    ]
+
+    return {
+        "object_id": obj_id,
+        "generated_utc": now_utc,
+        "hazard_flag": haz.hazard_flag,
+        "alert_pathway": haz.alert_pathway,
+        "moid_au": haz.moid_au,
+        "absolute_magnitude_h": haz.absolute_magnitude_h,
+        "estimated_diameter_m": haz.estimated_diameter_m,
+        "neo_class": haz.neo_class,
+        "n_observations": len(neo.tracklet.observations),
+        "arc_days": neo.tracklet.arc_days,
+        "pipeline_version": meta.scorer_version,
+        "pipeline_run_id": meta.pipeline_run_id,
+        "guardrails": [
+            "This notification is PRELIMINARY and requires authorised human review.",
+            "Do NOT publicly announce any impact probability.",
+            "All hazard significance must be confirmed by CNEOS Scout/Sentry.",
+            "Independent confirmation by ≥2 observatories is required (alert protocol step 2).",
+        ],
+        "observations": obs_records,
+    }

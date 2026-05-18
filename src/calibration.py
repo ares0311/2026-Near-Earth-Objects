@@ -9,6 +9,7 @@ __all__ = [
     "cross_validate_calibration",
     "compute_log_loss",
     "reliability_diagram",
+    "calibration_report",
 ]
 
 import math
@@ -455,4 +456,49 @@ def reliability_diagram(
         "bin_centers": centers,
         "fraction_positive": fractions,
         "bin_counts": counts,
+    }
+
+
+def calibration_report(
+    probs: np.ndarray | list,
+    labels: np.ndarray | list,
+) -> dict:
+    """Produce a comprehensive calibration quality report.
+
+    Combines Brier score, Expected Calibration Error (ECE), binary cross-entropy
+    log-loss, and summary statistics into a single dict.  Useful for comparing
+    calibrators or tracking calibration quality over time.
+
+    Args:
+        probs: Array of predicted probabilities in [0, 1], shape (N,).
+        labels: Array of binary labels (0 or 1), shape (N,).
+
+    Returns:
+        Dict with keys:
+          - ``"n_samples"``: number of samples.
+          - ``"mean_prob"``: mean predicted probability.
+          - ``"fraction_positive"``: fraction of positive labels.
+          - ``"brier_score"``: mean squared calibration error.
+          - ``"ece"``: Expected Calibration Error (10 equal-width bins).
+          - ``"log_loss"``: binary cross-entropy.
+    """
+    probs_arr = np.asarray(probs, dtype=float)
+    labels_arr = np.asarray(labels, dtype=float)
+    n = len(probs_arr)
+    if n == 0:
+        return {
+            "n_samples": 0,
+            "mean_prob": None,
+            "fraction_positive": None,
+            "brier_score": None,
+            "ece": None,
+            "log_loss": None,
+        }
+    return {
+        "n_samples": n,
+        "mean_prob": round(float(probs_arr.mean()), 6),
+        "fraction_positive": round(float(labels_arr.mean()), 6),
+        "brier_score": round(brier_score(probs_arr, labels_arr), 6),
+        "ece": round(expected_calibration_error(probs_arr, labels_arr), 6),
+        "log_loss": round(compute_log_loss(probs_arr, labels_arr), 6),
     }

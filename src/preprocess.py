@@ -4,7 +4,8 @@ from __future__ import annotations
 
 __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_sources",
            "compute_color_index", "estimate_source_density", "compute_source_snr",
-           "detect_bad_pixels", "compute_astrometric_scatter", "normalize_photometry"]
+           "detect_bad_pixels", "compute_astrometric_scatter",
+           "normalize_photometry", "compute_image_quality_metrics"]
 
 import base64
 import math
@@ -459,3 +460,62 @@ def normalize_photometry(
             continue
         result.append(obs.model_copy(update={"mag": round(corrected, 4)}))
     return result
+
+
+def compute_image_quality_metrics(observations: list) -> dict:
+    """Compute aggregate image quality metrics for a collection of observations.
+
+    Computes PSF FWHM statistics, source elongation, background RMS, and
+    source count from the available observations.  Uses ``compute_psf_fwhm``
+    and ``compute_source_snr`` from this module for per-observation metrics.
+
+    Args:
+        observations: List of :class:`~schemas.Observation` objects.
+
+    Returns:
+        Dict with keys:
+          - ``"n_sources"``: total number of observations.
+          - ``"mean_fwhm_arcsec"``: mean PSF FWHM in arcsec; None if unavailable.
+          - ``"median_fwhm_arcsec"``: median PSF FWHM in arcsec; None if unavailable.
+          - ``"mean_snr"``: mean peak-to-background SNR; None if unavailable.
+          - ``"background_rms"``: RMS of background-level pixel values; None if unavailable.
+    """
+    from detect import compute_psf_fwhm  # lazy import to avoid circular dependency
+
+    fwhms = []
+    snrs = []
+    for obs in observations:
+        fwhm = compute_psf_fwhm(obs)
+        if fwhm is not None:
+            fwhms.append(fwhm)
+        snr = compute_source_snr(obs)
+        if snr is not None:
+            snrs.append(snr)
+
+    mean_fwhm = round(float(np.mean(fwhms)), 4) if fwhms else None
+    median_fwhm = round(float(np.median(fwhms)), 4) if fwhms else None
+    mean_snr = round(float(np.mean(snrs)), 4) if snrs else None
+
+    # background_rms: std of all pixel values from cutouts
+    bg_vals: list[float] = []
+    for obs in observations:
+        cutout_b64 = getattr(obs, "cutout_difference", None)
+        if not cutout_b64:
+            continue
+        try:
+            import base64
+            raw = base64.b64decode(cutout_b64)
+            arr = np.frombuffer(raw, dtype=np.float32).copy()
+            if arr.size >= 4:
+                bg_vals.extend(arr.tolist())
+        except Exception:
+            continue
+    bg_rms = round(float(np.std(bg_vals)), 6) if len(bg_vals) >= 4 else None
+
+    return {
+        "n_sources": len(observations),
+        "mean_fwhm_arcsec": mean_fwhm,
+        "median_fwhm_arcsec": median_fwhm,
+        "mean_snr": mean_snr,
+        "background_rms": bg_rms,
+    }

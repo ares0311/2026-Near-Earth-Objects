@@ -1095,3 +1095,57 @@ class TestComputeHeliocentricDistance:
         with patch("orbit.predict_ephemeris", return_value=fake_ephem2):
             r = compute_heliocentric_distance(el, 2460010.5)
         assert r == pytest.approx(1.234568, abs=1e-6)
+
+
+class TestComputeSynodicPeriod:
+    def _make_elements(self, a=1.5, **kwargs):
+        from schemas import OrbitalElements
+        defaults = dict(
+            semi_major_axis_au=a, eccentricity=0.2, inclination_deg=5.0,
+            longitude_ascending_node_deg=30.0, argument_perihelion_deg=60.0,
+            mean_anomaly_deg=90.0, epoch_jd=2460000.5,
+            perihelion_au=1.2, aphelion_au=1.8, quality_code=2,
+        )
+        defaults.update(kwargs)
+        return OrbitalElements(**defaults)
+
+    def test_returns_float(self):
+        from orbit import compute_synodic_period
+        assert isinstance(compute_synodic_period(self._make_elements()), float)
+
+    def test_positive_for_typical_neo(self):
+        from orbit import compute_synodic_period
+        result = compute_synodic_period(self._make_elements(a=1.5))
+        assert result > 0.0
+
+    def test_inf_for_zero_semi_major_axis(self):
+        import math
+
+        from orbit import compute_synodic_period
+        assert math.isinf(compute_synodic_period(self._make_elements(a=0.0)))
+
+    def test_inf_for_negative_semi_major_axis(self):
+        import math
+
+        from orbit import compute_synodic_period
+        assert math.isinf(compute_synodic_period(self._make_elements(a=-1.0)))
+
+    def test_inf_for_a_equals_1(self):
+        import math
+
+        from orbit import compute_synodic_period
+        # a=1 AU → same period as Earth → infinite synodic period
+        result = compute_synodic_period(self._make_elements(a=1.0))
+        assert math.isinf(result)
+
+    def test_mars_like_orbit_around_780_days(self):
+        from orbit import compute_synodic_period
+        # Mars a≈1.524 AU → synodic period ≈780 days
+        result = compute_synodic_period(self._make_elements(a=1.524))
+        assert 600.0 < result < 1000.0
+
+    def test_inner_neo_under_one_year(self):
+        from orbit import compute_synodic_period
+        # Aten (a=0.8 AU) → synodic period around 584 days
+        result = compute_synodic_period(self._make_elements(a=0.8))
+        assert result > 300.0
