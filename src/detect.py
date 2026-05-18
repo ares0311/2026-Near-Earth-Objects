@@ -5,7 +5,7 @@ from __future__ import annotations
 __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus",
            "compute_streak_metric", "cluster_detections", "compute_trail_length",
            "compute_psf_fwhm", "estimate_sky_background", "compute_detection_efficiency",
-           "count_detections_by_filter"]
+           "count_detections_by_filter", "compute_motion_vector"]
 
 import math
 import uuid
@@ -600,3 +600,37 @@ def count_detections_by_filter(observations: tuple | list) -> dict:
             band = "unknown"
         counts[band] = counts.get(band, 0) + 1
     return counts
+
+
+def compute_motion_vector(obs1: Observation, obs2: Observation) -> dict:
+    """Compute the apparent motion vector between two observations.
+
+    Returns the RA and Dec components of the motion rate in arcsec/hr,
+    the total rate, and the position angle.
+
+    Args:
+        obs1: First (earlier) observation.
+        obs2: Second (later) observation.
+
+    Returns:
+        Dict with keys:
+          - ``"dra_arcsec_hr"``: RA motion rate component (arcsec/hr, cos-dec corrected).
+          - ``"ddec_arcsec_hr"``: Dec motion rate component (arcsec/hr).
+          - ``"rate_arcsec_hr"``: Total apparent motion rate (arcsec/hr).
+          - ``"pa_deg"``: Position angle of motion in degrees E of N.
+    """
+    dt_hr = (obs2.jd - obs1.jd) * 24.0
+    if abs(dt_hr) < 1e-9:
+        return {"dra_arcsec_hr": 0.0, "ddec_arcsec_hr": 0.0,
+                "rate_arcsec_hr": 0.0, "pa_deg": 0.0}
+    cos_dec = math.cos(math.radians((obs1.dec_deg + obs2.dec_deg) / 2.0))
+    dra = (obs2.ra_deg - obs1.ra_deg) * 3600.0 * cos_dec / dt_hr
+    ddec = (obs2.dec_deg - obs1.dec_deg) * 3600.0 / dt_hr
+    rate = math.hypot(dra, ddec)
+    pa = math.degrees(math.atan2(dra, ddec)) % 360.0
+    return {
+        "dra_arcsec_hr": round(dra, 6),
+        "ddec_arcsec_hr": round(ddec, 6),
+        "rate_arcsec_hr": round(rate, 6),
+        "pa_deg": round(pa, 4),
+    }

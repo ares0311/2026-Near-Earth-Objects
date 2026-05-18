@@ -21,6 +21,7 @@ __all__ = [
     "generate_mpc_cover_letter",
     "format_impact_notification",
     "count_pending_alerts",
+    "format_submission_checklist",
 ]
 
 import json
@@ -924,3 +925,54 @@ def count_pending_alerts(neos: list) -> dict:
         pathway = neo.hazard.alert_pathway
         counts[pathway] = counts.get(pathway, 0) + 1
     return counts
+
+
+def format_submission_checklist(neo: ScoredNEO) -> str:
+    """Generate a plain-text submission checklist for a scored NEO candidate.
+
+    Evaluates each required gate condition from the alert protocol and marks
+    it as passed (✓) or failed (✗).  Designed for human review before any
+    external report is filed.
+
+    Args:
+        neo: A :class:`~schemas.ScoredNEO` object.
+
+    Returns:
+        Multi-line plain-text string with one checklist item per line.
+    """
+    haz = neo.hazard
+    feat = neo.features
+    post = neo.posterior
+
+    def gate(label: str, passed: bool) -> str:
+        mark = "✓" if passed else "✗"
+        return f"  [{mark}] {label}"
+
+    rb = feat.real_bogus_score
+    orbit_elem = haz.orbital_elements
+    quality = int(orbit_elem.quality_code) if orbit_elem else 0
+    moid = haz.moid_au
+    known = (feat.known_object_score or 0.0) < 0.8
+
+    lines = [
+        f"Submission checklist for: {neo.tracklet.object_id}",
+        f"  Hazard flag   : {haz.hazard_flag}",
+        f"  Alert pathway : {haz.alert_pathway}",
+        "",
+        "Gate conditions (alert protocol):",
+        gate("real_bogus_score ≥ 0.90", rb is not None and rb >= 0.90),
+        gate("orbit quality code ≥ 2", quality >= 2),
+        gate("MOID ≤ 0.05 AU (computed)", moid is not None and moid <= 0.05),
+        gate("not matched to MPC known object", known),
+        gate("neo_candidate probability ≥ 0.50", post.neo_candidate >= 0.50),
+        "",
+        "Required steps before external reporting:",
+        gate("Step 1: Submit to MPC", haz.alert_pathway in ("mpc_submission", "nasa_pdco_notify")),
+        gate("Step 2: Await NEOCP confirmation (≥24 hr or ≥2 obs.)",
+             haz.alert_pathway == "nasa_pdco_notify"),
+        gate("Step 3: NASA PDCO notify (if Scout/Sentry impact prob ≥ 0.01%)",
+             haz.alert_pathway == "nasa_pdco_notify"),
+        "",
+        "GUARDRAIL: Do NOT publicly announce any impact probability.",
+    ]
+    return "\n".join(lines)

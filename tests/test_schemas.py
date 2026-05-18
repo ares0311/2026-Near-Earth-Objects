@@ -684,3 +684,39 @@ class TestPhotometricSolution:
         from schemas import PhotometricSolution
         with pytest.raises(Exception):
             PhotometricSolution(zero_point=25.0, n_stars=-1)
+
+
+class TestObservationStatistics:
+    def test_instantiation_minimal(self):
+        from schemas import ObservationStatistics
+        s = ObservationStatistics(n_obs=5)
+        assert s.n_obs == 5
+
+    def test_defaults(self):
+        from schemas import ObservationStatistics
+        s = ObservationStatistics(n_obs=0)
+        assert s.mean_mag is None
+        assert s.mag_range is None
+        assert s.mean_real_bogus is None
+        assert s.n_filters == 0
+        assert s.arc_days == 0.0
+
+    def test_frozen(self):
+        from schemas import ObservationStatistics
+        s = ObservationStatistics(n_obs=3)
+        with pytest.raises(Exception):
+            s.n_obs = 4  # type: ignore[misc]
+
+    def test_all_fields(self):
+        from schemas import ObservationStatistics
+        s = ObservationStatistics(
+            n_obs=10, mean_mag=19.5, mag_range=1.2,
+            mean_real_bogus=0.85, n_filters=2, arc_days=3.5,
+        )
+        assert s.mean_mag == pytest.approx(19.5)
+        assert s.n_filters == 2
+
+    def test_n_obs_nonnegative(self):
+        from schemas import ObservationStatistics
+        with pytest.raises(Exception):
+            ObservationStatistics(n_obs=-1)

@@ -971,3 +971,50 @@ class TestComputeFollowupUrgency:
         from score import compute_followup_urgency
         result = compute_followup_urgency(self._make_neo())
         assert isinstance(result, str)
+
+
+class TestComputeDiscoveryScore:
+    def _make_neo(self, priority=0.5, orbit_q=0.5, brightness=0.5):
+        from .conftest import build_scored_neo
+        neo = build_scored_neo()
+        import types
+        neo_ns = types.SimpleNamespace(
+            metadata=types.SimpleNamespace(discovery_priority=priority),
+            features=types.SimpleNamespace(
+                orbit_quality_score=orbit_q, brightness_score=brightness,
+            ),
+            hazard=neo.hazard,
+            tracklet=neo.tracklet,
+            posterior=neo.posterior,
+        )
+        return neo_ns
+
+    def test_returns_float(self):
+        from score import compute_discovery_score
+        result = compute_discovery_score(self._make_neo())
+        assert isinstance(result, float)
+
+    def test_range_0_1(self):
+        from score import compute_discovery_score
+        result = compute_discovery_score(self._make_neo())
+        assert 0.0 <= result <= 1.0
+
+    def test_zero_inputs_zero_score(self):
+        from score import compute_discovery_score
+        result = compute_discovery_score(self._make_neo(priority=0.0, orbit_q=0.0, brightness=0.0))
+        assert result == pytest.approx(0.0)
+
+    def test_max_inputs_near_one(self):
+        from score import compute_discovery_score
+        result = compute_discovery_score(self._make_neo(priority=1.0, orbit_q=1.0, brightness=1.0))
+        assert result == pytest.approx(1.0)
+
+    def test_none_scores_treated_as_zero(self):
+        from score import compute_discovery_score
+        result = compute_discovery_score(self._make_neo(orbit_q=None, brightness=None))
+        assert result == pytest.approx(0.5 * 0.5, abs=0.001)
+
+    def test_weights_blend(self):
+        from score import compute_discovery_score
+        result = compute_discovery_score(self._make_neo(priority=0.4, orbit_q=0.0, brightness=0.0))
+        assert result == pytest.approx(0.5 * 0.4, abs=0.001)

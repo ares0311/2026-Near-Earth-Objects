@@ -6,7 +6,8 @@ __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fet
            "fetch_batch", "estimate_limiting_magnitude", "summarise_fetch_result",
            "merge_survey_alerts", "filter_alerts_by_motion", "build_observation_window",
            "count_known_objects_in_field", "fetch_mpc_observations",
-           "fetch_atlas_forced", "fetch_ztf_alerts", "estimate_survey_depth"]
+           "fetch_atlas_forced", "fetch_ztf_alerts", "estimate_survey_depth",
+           "filter_by_survey"]
 
 import json
 import os
@@ -863,3 +864,19 @@ def estimate_survey_depth(fetch_result: FetchResult) -> float | None:
     if not mags:
         return None
     return round(float(np.percentile(mags, 95)), 4)
+
+
+def filter_by_survey(fetch_result: FetchResult, surveys: list[str]) -> FetchResult:
+    """Return a new FetchResult containing only alerts from the specified surveys.
+
+    Args:
+        fetch_result: Source :class:`~schemas.FetchResult`.
+        surveys: List of survey name strings to keep (e.g. ``["ZTF", "ATLAS"]``).
+
+    Returns:
+        New :class:`~schemas.FetchResult` with filtered alerts.  Provenance is
+        unchanged.  If ``surveys`` is empty, all alerts are excluded.
+    """
+    allowed = set(surveys)
+    filtered = tuple(obs for obs in fetch_result.alerts if obs.mission in allowed)
+    return FetchResult(alerts=filtered, provenance=fetch_result.provenance)

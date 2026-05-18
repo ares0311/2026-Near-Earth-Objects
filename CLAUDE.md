@@ -468,9 +468,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.23.0)
+## Current State (v0.24.0)
 
-All 10 pipeline modules are complete. 1167 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified manual CLI with top-level SQLite logs and auditable signoff readiness.
+All 10 pipeline modules are complete. 1242 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified manual CLI with top-level SQLite logs and auditable signoff readiness.
 
 ### Skills
 
@@ -521,6 +521,8 @@ All 10 pipeline modules are complete. 1167 tests passing (100% coverage). CI gre
 | `Skills/export_survey_summary.py` | Export per-candidate detection summary from pipeline run JSON to CSV or HTML |
 | `Skills/compute_apparent_magnitudes.py` | Batch apparent magnitude at JD from tracklet JSON; `--jd`, `--albedo`, `--json` flags |
 | `Skills/triage_candidates.py` | Urgency-sorted triage table from scored NEO JSON; `--urgency`, `--pathway`, `--json` flags |
+| `Skills/compute_discovery_scores.py` | Batch discovery score table from scored NEO JSON; `--threshold`, `--sort`, `--json` flags |
+| `Skills/format_submission_checklists.py` | Submission checklists for candidates above `--min-priority`; `--json` flag |
 
 ### Docs
 
@@ -539,6 +541,7 @@ All 10 pipeline modules are complete. 1167 tests passing (100% coverage). CI gre
 | `docs/THREAT_ASSESSMENT.md` | Technical reference for threat score formula, components, interpretation guidelines, and CLI usage |
 | `docs/DETECTION_GUIDE.md` | Technical reference for detect.py: RB threshold, streak detection, clustering, known-object matching, detection efficiency, DetectionSummary |
 | `docs/LINKING_GUIDE.md` | Technical reference for link.py: tracklet formation, arc statistics, satellite trail rejection, deduplication, quality grades |
+| `docs/FETCH_GUIDE.md` | Technical reference for fetch.py: ZTF/ATLAS/MPC/Horizons retrieval, caching, depth estimation, survey merging, filtering |
 
 ### Data
 
@@ -582,6 +585,24 @@ All 10 pipeline modules are complete. 1167 tests passing (100% coverage). CI gre
 - Collect labeled training data via `Skills/generate_training_labels.py`
 - Integrate live ZTF alert stream (Milestone 4)
 - Train and evaluate Tier 2 CNN on real cutouts (Milestone 5)
+
+### Key Changes in v0.24.0
+
+- `orbit.py`: added `compute_absolute_magnitude(observed_mag, r_au, delta_au, phase_deg, g=0.15)` — inverse IAU HG phase function; returns H from apparent magnitude, distances, and phase angle; NaN for degenerate geometry.
+- `detect.py`: added `compute_motion_vector(obs1, obs2)` — dict with dra_arcsec_hr, ddec_arcsec_hr, rate_arcsec_hr, pa_deg; cosine-Dec-corrected; zero vector for identical JDs.
+- `link.py`: added `merge_overlapping_tracklets(tracklets)` — union-find merge of tracklets sharing ≥1 obs_id; picks longest-arc representative; deduplicates and recomputes arc_days.
+- `classify.py`: added `compute_neo_probability(features)` — log-score model probability for neo_candidate hypothesis vs all others; uses CLAUDE.md feature weights; [0, 1].
+- `score.py`: added `compute_discovery_score(neo)` — weighted combination of discovery_priority (0.5), orbit_quality_score (0.3), brightness_score (0.2); clamped [0, 1].
+- `alert.py`: added `format_submission_checklist(neo)` — multi-line checklist with ✓/✗ per alert-protocol gate condition (rb≥0.90, quality≥2, MOID≤0.05, not known, neo_prob≥0.50) plus Step 1/2/3 status.
+- `fetch.py`: added `filter_by_survey(fetch_result, surveys)` — return new FetchResult containing only observations whose mission is in the supplied list.
+- `preprocess.py`: added `estimate_zero_point(observations, catalog_mags)` — median(obs.mag − catalog_mag) zero-point offset; None if <2 valid pairs; excludes sentinel mags ≥ 90.
+- `schemas.py`: added `ObservationStatistics` — frozen model: n_obs, mean_mag, mag_range, mean_real_bogus, n_filters, arc_days.
+- `calibration.py`: added `compute_roc_auc(probs, labels)` — ROC AUC via trapezoidal rule; 0.5 for single-class or empty input; NumPy 1.x/2.x compatible.
+- `Skills/compute_discovery_scores.py`: new — batch discovery score table; `--threshold`, `--sort`, `--json` flags.
+- `Skills/format_submission_checklists.py`: new — submission checklists for candidates above `--min-priority`; `--json` flag.
+- `docs/FETCH_GUIDE.md`: new — technical reference for fetch.py: ZTF/ATLAS/MPC/Horizons retrieval, caching, depth estimation, merging, filtering.
+- 75 new tests (1242 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.24.0.
 
 ### Key Changes in v0.23.0
 

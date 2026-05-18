@@ -1077,3 +1077,61 @@ class TestFilterByNightsObserved:
         from link import filter_by_nights_observed
         result = filter_by_nights_observed([self._make_tracklet()], min_nights=1)
         assert isinstance(result, list)
+
+
+class TestMergeOverlappingTracklets:
+    def _make_tracklet(self, object_id, obs_ids, base_jd=2460000.5):
+        from schemas import Tracklet
+
+        from .conftest import build_observation
+        obs = tuple(
+            build_observation(obs_id=oid, jd=base_jd + i * 1.0)
+            for i, oid in enumerate(obs_ids)
+        )
+        arc = obs[-1].jd - obs[0].jd if len(obs) > 1 else 0.0
+        return Tracklet(
+            object_id=object_id, observations=obs, arc_days=arc,
+            motion_rate_arcsec_per_hour=1.0, motion_pa_degrees=90.0,
+        )
+
+    def test_empty_returns_empty(self):
+        from link import merge_overlapping_tracklets
+        assert merge_overlapping_tracklets([]) == []
+
+    def test_no_overlap_unchanged(self):
+        from link import merge_overlapping_tracklets
+        t1 = self._make_tracklet("A", ["obs1", "obs2"])
+        t2 = self._make_tracklet("B", ["obs3", "obs4"])
+        result = merge_overlapping_tracklets([t1, t2])
+        assert len(result) == 2
+
+    def test_overlapping_tracklets_merged(self):
+        from link import merge_overlapping_tracklets
+        t1 = self._make_tracklet("A", ["obs1", "obs2", "obs3"])
+        t2 = self._make_tracklet("B", ["obs3", "obs4", "obs5"])
+        result = merge_overlapping_tracklets([t1, t2])
+        assert len(result) == 1
+        merged_ids = {o.obs_id for o in result[0].observations}
+        assert merged_ids == {"obs1", "obs2", "obs3", "obs4", "obs5"}
+
+    def test_merged_takes_longer_arc_object_id(self):
+        from link import merge_overlapping_tracklets
+        t1 = self._make_tracklet("long", ["obs1", "obs2", "obs3"])
+        t2 = self._make_tracklet("short", ["obs3", "obs4"])
+        result = merge_overlapping_tracklets([t1, t2])
+        assert result[0].object_id == "long"
+
+    def test_single_tracklet_unchanged(self):
+        from link import merge_overlapping_tracklets
+        t = self._make_tracklet("A", ["obs1", "obs2"])
+        result = merge_overlapping_tracklets([t])
+        assert len(result) == 1
+        assert result[0].object_id == "A"
+
+    def test_observations_deduped(self):
+        from link import merge_overlapping_tracklets
+        t1 = self._make_tracklet("A", ["obs1", "obs2"])
+        t2 = self._make_tracklet("B", ["obs2", "obs3"])
+        result = merge_overlapping_tracklets([t1, t2])
+        obs_ids = [o.obs_id for o in result[0].observations]
+        assert len(obs_ids) == len(set(obs_ids))

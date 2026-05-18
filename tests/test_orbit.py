@@ -1253,3 +1253,74 @@ class TestComputeApparentMagnitude:
              patch("orbit.predict_ephemeris", return_value={"helio_dist_au": 1.5}):
             result = compute_apparent_magnitude(el, 2460010.5)
         assert math.isnan(result)
+
+
+class TestComputeAbsoluteMagnitude:
+    def test_returns_float(self):
+        from orbit import compute_absolute_magnitude
+        result = compute_absolute_magnitude(19.0, 1.5, 0.5, 30.0)
+        assert isinstance(result, float)
+
+    def test_zero_r_au_returns_nan(self):
+        import math
+
+        from orbit import compute_absolute_magnitude
+        assert math.isnan(compute_absolute_magnitude(19.0, 0.0, 0.5, 30.0))
+
+    def test_zero_delta_au_returns_nan(self):
+        import math
+
+        from orbit import compute_absolute_magnitude
+        assert math.isnan(compute_absolute_magnitude(19.0, 1.5, 0.0, 30.0))
+
+    def test_negative_r_au_returns_nan(self):
+        import math
+
+        from orbit import compute_absolute_magnitude
+        assert math.isnan(compute_absolute_magnitude(19.0, -1.0, 0.5, 30.0))
+
+    def test_negative_tan_half_returns_nan(self):
+        import math
+
+        from orbit import compute_absolute_magnitude
+        # phase_deg=270 → tan(135°) = -1 < 0
+        assert math.isnan(compute_absolute_magnitude(19.0, 1.5, 0.5, 270.0))
+
+    def test_zero_phase_angle(self):
+        import math
+
+        from orbit import compute_absolute_magnitude
+        result = compute_absolute_magnitude(19.0, 1.0, 1.0, 0.0)
+        # At r=1, delta=1, phase=0: phi1=phi2=1, correction=0
+        assert not math.isnan(result)
+
+    def test_roundtrip_with_apparent_magnitude(self):
+        import math
+        from unittest.mock import patch
+
+        from orbit import compute_absolute_magnitude, compute_apparent_magnitude
+        from schemas import OrbitalElements
+        el = OrbitalElements(
+            semi_major_axis_au=1.5, eccentricity=0.2, inclination_deg=5.0,
+            longitude_ascending_node_deg=30.0, argument_perihelion_deg=60.0,
+            mean_anomaly_deg=90.0, epoch_jd=2460000.5,
+            perihelion_au=1.2, aphelion_au=1.8, quality_code=2,
+        )
+        r, delta, phase = 1.5, 0.6, 25.0
+        with patch("orbit.compute_phase_angle", return_value=phase), \
+             patch("orbit.predict_ephemeris", return_value={"helio_dist_au": r}):
+            v_mag = compute_apparent_magnitude(el, 2460010.5, albedo=0.14)
+        if not math.isnan(v_mag):
+            h_back = compute_absolute_magnitude(
+                v_mag, r, delta, phase)
+            assert isinstance(h_back, float)
+
+    def test_exception_returns_nan(self):
+        import math
+        from unittest.mock import patch
+
+        from orbit import compute_absolute_magnitude
+        with patch("orbit.math") as mock_math:
+            mock_math.radians.side_effect = RuntimeError("forced")
+            result = compute_absolute_magnitude(19.0, 1.5, 0.5, 30.0)
+        assert math.isnan(result)

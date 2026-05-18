@@ -7,7 +7,7 @@ __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "close_approach_candidates", "absolute_magnitude_from_diameter",
            "compute_impact_energy", "compute_novelty_score",
            "compute_threat_score", "filter_by_alert_pathway",
-           "compute_followup_urgency"]
+           "compute_followup_urgency", "compute_discovery_score"]
 
 import math
 import uuid
@@ -679,3 +679,28 @@ def compute_followup_urgency(neo: ScoredNEO) -> str:
         return "MEDIUM"
 
     return "ROUTINE"
+
+
+def compute_discovery_score(neo: ScoredNEO) -> float:
+    """Compute a composite discovery value score for a scored NEO.
+
+    Blends discovery priority, orbit quality, and brightness into a single
+    [0, 1] score that ranks candidates by their combined scientific and
+    operational value.  Returns 0.0 when all inputs are None.
+
+    Components:
+    - discovery_priority (weight 0.5)
+    - orbit_quality_score (weight 0.3; None → 0.0)
+    - brightness_score (weight 0.2; None → 0.0)
+
+    Args:
+        neo: A :class:`~schemas.ScoredNEO` object.
+
+    Returns:
+        Composite discovery score in [0, 1].
+    """
+    priority = getattr(neo.metadata, "discovery_priority", None) or 0.0
+    orbit_q = neo.features.orbit_quality_score or 0.0
+    brightness = neo.features.brightness_score or 0.0
+    score = 0.5 * priority + 0.3 * orbit_q + 0.2 * brightness
+    return round(min(1.0, max(0.0, float(score))), 4)

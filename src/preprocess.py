@@ -6,7 +6,7 @@ __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_
            "compute_color_index", "estimate_source_density", "compute_source_snr",
            "detect_bad_pixels", "compute_astrometric_scatter",
            "normalize_photometry", "compute_image_quality_metrics",
-           "compute_photometric_scatter"]
+           "compute_photometric_scatter", "estimate_zero_point"]
 
 import base64
 import math
@@ -546,3 +546,35 @@ def compute_photometric_scatter(observations: tuple | list) -> float | None:
         return None
     arr = np.array(mags, dtype=float)
     return round(float(np.sqrt(np.mean((arr - arr.mean()) ** 2))), 6)
+
+
+def estimate_zero_point(
+    observations: tuple | list,
+    catalog_mags: list[float],
+) -> float | None:
+    """Estimate the photometric zero-point offset from matched catalog sources.
+
+    Computes the median difference (instrumental − catalog) for each paired
+    observation/catalog magnitude.  Returns None when fewer than 2 valid pairs
+    are available.
+
+    Args:
+        observations: Iterable of :class:`~schemas.Observation` objects.
+        catalog_mags: List of corresponding catalog magnitudes (same order and
+            length as ``observations``).
+
+    Returns:
+        Median zero-point offset in magnitudes, or ``None`` if <2 valid pairs.
+    """
+    obs_list = list(observations)
+    n = min(len(obs_list), len(catalog_mags))
+    diffs = []
+    for i in range(n):
+        obs_mag = getattr(obs_list[i], "mag", None)
+        cat_mag = catalog_mags[i]
+        if obs_mag is not None and obs_mag < 90.0 and cat_mag is not None:
+            diffs.append(obs_mag - cat_mag)
+    if len(diffs) < 2:
+        return None
+    import numpy as np
+    return round(float(np.median(diffs)), 6)
