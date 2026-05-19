@@ -172,6 +172,33 @@ def test_launchd_plist_wraps_one_run_command():
     assert "<key>OMP_NUM_THREADS</key>" in plist
 
 
+def test_record_automation_readiness_writes_sqlite_log(monkeypatch, tmp_path):
+    monkeypatch.delenv("ZTF_IRSA_TOKEN", raising=False)
+    monkeypatch.delenv("ATLAS_TOKEN", raising=False)
+    db_path = tmp_path / "Logs" / "background.sqlite"
+
+    entry = background.record_automation_readiness(Path("background/config.json"), db_path)
+    summary = background.automation_readiness_log_summary(db_path)
+
+    assert table_count(db_path, "automation_readiness_log") == 1
+    assert entry["scheduler_ready"] is True
+    assert entry["live_mode_ready"] is False
+    assert "MISSING_REQUIRED_CREDENTIALS" in entry["live_mode_blockers"]
+    assert summary["total_readiness_checks"] == 1
+    assert summary["blocker_counts"]["scheduler_not_ready"] == 0
+    assert summary["blocker_counts"]["live_mode_not_ready"] == 1
+    assert summary["latest"]["readiness_id"] == entry["readiness_id"]
+
+
+def test_automation_readiness_log_summary_empty(tmp_path):
+    db_path = tmp_path / "Logs" / "background.sqlite"
+
+    summary = background.automation_readiness_log_summary(db_path)
+
+    assert summary["total_readiness_checks"] == 0
+    assert summary["latest"] is None
+
+
 def test_gitignore_excludes_generated_background_artifacts():
     text = Path(".gitignore").read_text()
 
@@ -506,6 +533,7 @@ def test_background_cli_subcommands(tmp_path):
 def test_background_cli_automation_commands(tmp_path):
     repo = Path(__file__).resolve().parents[1]
     config_path = repo / "background" / "config.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
     env = {**os.environ, "PYTHONPATH": str(repo / "src")}
 
     readiness = subprocess.run(
@@ -536,9 +564,41 @@ def test_background_cli_automation_commands(tmp_path):
         capture_output=True,
         check=True,
     )
+    recorded = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "record-automation-readiness",
+            "--config",
+            str(config_path),
+            "--db",
+            str(db_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    summary = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "automation-readiness-log-summary",
+            "--db",
+            str(db_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
 
     assert json.loads(readiness.stdout)["scheduler_ready"] is True
     assert "org.neo-detection.background" in plist.stdout
+    assert json.loads(recorded.stdout)["live_mode_ready"] is False
+    assert json.loads(summary.stdout)["total_readiness_checks"] == 1
 
 
 def test_deprecated_background_wrappers_are_removed():
@@ -592,7 +652,12 @@ def test_init_log_db_migrates_existing_ledger(tmp_path):
             for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
         }
     assert {"run_mode", "config_path", "failure_reason"} <= columns
-    assert {"schema_metadata", "run_lock", "human_signoff_log"} <= tables
+    assert {
+        "schema_metadata",
+        "run_lock",
+        "human_signoff_log",
+        "automation_readiness_log",
+    } <= tables
 
 
 def test_report_text_rejects_forbidden_language():

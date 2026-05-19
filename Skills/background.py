@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Unified manual-first background automation CLI."""
+"""Unified conservative background automation CLI."""
 
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ from background import (
     DEFAULT_CONFIG_PATH,
     DEFAULT_DB_PATH,
     DEFAULT_INPUT_PATH,
+    automation_readiness_log_summary,
     automation_readiness_summary,
     background_run_once,
     follow_up_test_summary,
@@ -22,6 +23,7 @@ from background import (
     launchd_plist,
     ledger_summary,
     needs_follow_up_summary,
+    record_automation_readiness,
     record_human_signoff,
     reviewed_log_summary,
     run_detail,
@@ -41,7 +43,7 @@ def _print_json(payload: Any) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Manual-first background automation")
+    parser = argparse.ArgumentParser(description="Conservative background automation")
     sub = parser.add_subparsers(dest="command", required=True)
 
     run = sub.add_parser("run-once", help="Run one bounded background cycle")
@@ -57,6 +59,13 @@ def main() -> None:
     readiness = sub.add_parser("automation-readiness", help="Inspect scheduler/live readiness")
     readiness.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
 
+    record_readiness = sub.add_parser(
+        "record-automation-readiness",
+        help="Persist scheduler/live readiness to SQLite",
+    )
+    record_readiness.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
+    record_readiness.add_argument("--db", type=Path, default=DEFAULT_DB_PATH)
+
     launchd = sub.add_parser("launchd-plist", help="Print a macOS launchd plist template")
     launchd.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
 
@@ -69,6 +78,7 @@ def main() -> None:
         "validation-summary",
         "human-signoff-summary",
         "signoff-readiness",
+        "automation-readiness-log-summary",
         "unsigned-follow-up",
     ):
         cmd = sub.add_parser(name)
@@ -103,6 +113,8 @@ def main() -> None:
         _print_json(target_priority_summary(args.input, args.db))
     elif args.command == "automation-readiness":
         _print_json(automation_readiness_summary(args.config))
+    elif args.command == "record-automation-readiness":
+        _print_json(record_automation_readiness(args.config, args.db))
     elif args.command == "launchd-plist":
         print(launchd_plist(args.config), end="")
     elif args.command == "ledger-summary":
@@ -121,6 +133,8 @@ def main() -> None:
         _print_json(human_signoff_summary(args.db))
     elif args.command == "signoff-readiness":
         _print_json(signoff_readiness_summary(args.db))
+    elif args.command == "automation-readiness-log-summary":
+        _print_json(automation_readiness_log_summary(args.db))
     elif args.command == "unsigned-follow-up":
         readiness = signoff_readiness_summary(args.db)
         _print_json({

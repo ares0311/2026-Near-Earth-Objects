@@ -5,6 +5,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## v0.27.0
+
+- `background.py`: added `automation_readiness_log_summary(db_path)` and
+  `record_automation_readiness(config_path, db_path)`.
+- `init_log_db`: added top-level SQLite table `automation_readiness_log` for
+  scheduler/live-readiness snapshots.
+- `Skills/background.py`: added `record-automation-readiness` and
+  `automation-readiness-log-summary` subcommands.
+- `docs/BACKGROUND_SEARCH_AUTOMATION.md` and `docs/API_REFERENCE.md`: documented
+  persisted readiness checks and new CLI/API entries.
+- 2 new tests (1335 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.27.0.
+
 ## v0.26.0
 
 - `schemas.py`: `BackgroundRunMode` now supports `automated`; `BackgroundConfig`

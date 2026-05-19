@@ -364,6 +364,11 @@ def run_detail(run_id: str, db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
 def target_history(target_id: str, db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
 def signoff_readiness_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
 def automation_readiness_summary(config_path: Path = DEFAULT_CONFIG_PATH) -> dict[str, Any]
+def record_automation_readiness(
+    config_path: Path = DEFAULT_CONFIG_PATH,
+    db_path: Path = DEFAULT_DB_PATH,
+) -> dict[str, Any]
+def automation_readiness_log_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
 def launchd_plist(config_path: Path = DEFAULT_CONFIG_PATH) -> str
 ```
 
@@ -372,8 +377,9 @@ recommendations, human signoffs, report readiness, and log invariants for
 manual or scheduled review. The supported command-line entrypoint is
 `Skills/background.py` with subcommands; deprecated one-file wrappers have been
 removed. Use `automation_readiness_summary(config_path)` to inspect scheduler
-and live-mode blockers without performing network actions, and
-`launchd_plist(config_path)` to render a macOS scheduler template.
+and live-mode blockers without performing network actions,
+`record_automation_readiness(config_path, db_path)` to persist that snapshot to
+SQLite, and `launchd_plist(config_path)` to render a macOS scheduler template.
 
 Default background log path:
 
@@ -635,7 +641,7 @@ Lightweight summary of a `ScoredNEO` for display or export.
 
 ---
 
-## v0.16.0 through v0.26.0 Public API Additions
+## v0.16.0 through v0.27.0 Public API Additions
 
 These releases added conservative helper APIs around live-data retrieval,
 preprocessing quality, detection triage, linking, orbit review, classification
@@ -745,8 +751,9 @@ claim confirmation or impact probability.
 | v0.25.0 | `calibration.py` | `compute_precision_recall_curve` |
 | v0.26.0 | `background.py` | `automation_readiness_summary`, `launchd_plist` |
 | v0.26.0 | `schemas.py` | `BackgroundRunMode` supports `automated`; `BackgroundConfig` scheduler/live-readiness fields |
+| v0.27.0 | `background.py` | `record_automation_readiness`, `automation_readiness_log_summary` |
 
-### Skills and CLI additions in v0.16.0 through v0.26.0
+### Skills and CLI additions in v0.16.0 through v0.27.0
 
 `export_candidate_report.py`, `tag_neo_class.py`, `check_tisserand.py`,
 `export_followup_requests.py`, `ephemeris_check.py`,
@@ -757,5 +764,7 @@ claim confirmation or impact probability.
 `compute_apparent_magnitudes.py`, `triage_candidates.py`,
 `compute_discovery_scores.py`, `format_submission_checklists.py`,
 `validate_pipeline_run.py`, `export_atlas_lightcurve.py`, plus
-`Skills/background.py automation-readiness` and
+`Skills/background.py automation-readiness`,
+`Skills/background.py record-automation-readiness`,
+`Skills/background.py automation-readiness-log-summary`, and
 `Skills/background.py launchd-plist`.

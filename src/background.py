@@ -27,6 +27,8 @@ __all__ = [
     "validation_summary",
     "audit_report",
     "automation_readiness_summary",
+    "record_automation_readiness",
+    "automation_readiness_log_summary",
     "launchd_plist",
 ]
 
@@ -67,7 +69,7 @@ DEFAULT_INPUT_PATH = _ROOT / "background" / "targets.json"
 DEFAULT_DB_PATH = _ROOT / "Logs" / "background.sqlite"
 DEFAULT_REPORT_DIR = _ROOT / "Logs" / "reports"
 _SCHEMA_VERSION = "background-v1"
-_CODE_VERSION = "0.26.0"
+_CODE_VERSION = "0.27.0"
 _FOLLOW_UP_THRESHOLD = 0.45
 _LOCK_ID = 1
 
@@ -202,6 +204,21 @@ def init_log_db(db_path: Path = DEFAULT_DB_PATH) -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS automation_readiness_log (
+                readiness_id TEXT PRIMARY KEY,
+                checked_at_utc TEXT NOT NULL,
+                config_path TEXT NOT NULL,
+                scheduler_ready INTEGER NOT NULL,
+                live_mode_ready INTEGER NOT NULL,
+                scheduler_blockers_json TEXT NOT NULL,
+                live_mode_blockers_json TEXT NOT NULL,
+                missing_credential_env_json TEXT NOT NULL,
+                entry_json TEXT NOT NULL
+            )
+            """
+        )
 
 
 def _model_json(model: Any) -> str:
@@ -304,7 +321,7 @@ def _resolve_project_path(raw: str) -> Path:
 
 
 def load_config(config_path: Path = DEFAULT_CONFIG_PATH) -> BackgroundConfig:
-    """Load manual-first background configuration."""
+    """Load conservative background automation configuration."""
     if not config_path.exists():
         return BackgroundConfig(
             input_path=str(DEFAULT_INPUT_PATH),
@@ -1307,6 +1324,74 @@ def automation_readiness_summary(config_path: Path = DEFAULT_CONFIG_PATH) -> dic
         "external_submission_enabled": False,
         "log_backend": "sqlite",
     }
+
+
+def record_automation_readiness(
+    config_path: Path = DEFAULT_CONFIG_PATH,
+    db_path: Path = DEFAULT_DB_PATH,
+) -> dict[str, Any]:
+    """Write an automation-readiness snapshot to the SQLite audit log."""
+    init_log_db(db_path)
+    summary = automation_readiness_summary(config_path)
+    entry = {
+        "readiness_id": str(uuid.uuid4()),
+        "checked_at_utc": _utc_now(),
+        **summary,
+    }
+    with _connect(db_path) as conn:
+        conn.execute(
+            """
+            INSERT INTO automation_readiness_log (
+                readiness_id, checked_at_utc, config_path, scheduler_ready,
+                live_mode_ready, scheduler_blockers_json, live_mode_blockers_json,
+                missing_credential_env_json, entry_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                entry["readiness_id"],
+                entry["checked_at_utc"],
+                entry["config_path"],
+                int(entry["scheduler_ready"]),
+                int(entry["live_mode_ready"]),
+                json.dumps(entry["scheduler_blockers"]),
+                json.dumps(entry["live_mode_blockers"]),
+                json.dumps(entry["missing_credential_env"]),
+                json.dumps(entry),
+            ),
+        )
+    return entry
+
+
+def automation_readiness_log_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]:
+    """Summarize persisted automation-readiness checks."""
+    init_log_db(db_path)
+    with _connect(db_path) as conn:
+        latest = conn.execute(
+            """
+            SELECT entry_json
+            FROM automation_readiness_log
+            ORDER BY checked_at_utc DESC
+            LIMIT 1
+            """
+        ).fetchone()
+        blocker_counts = {
+            "scheduler_not_ready": int(
+                conn.execute(
+                    "SELECT COUNT(*) FROM automation_readiness_log WHERE scheduler_ready = 0"
+                ).fetchone()[0]
+            ),
+            "live_mode_not_ready": int(
+                conn.execute(
+                    "SELECT COUNT(*) FROM automation_readiness_log WHERE live_mode_ready = 0"
+                ).fetchone()[0]
+            ),
+        }
+        return {
+            "db_path": str(db_path),
+            "total_readiness_checks": _count_rows(conn, "automation_readiness_log"),
+            "blocker_counts": blocker_counts,
+            "latest": json.loads(latest["entry_json"]) if latest else None,
+        }
 
 
 def launchd_plist(config_path: Path = DEFAULT_CONFIG_PATH) -> str:

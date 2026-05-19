@@ -50,6 +50,13 @@ The readiness report includes the one-run command, scheduler blockers, live-mode
 blockers, missing credential environment variables, and confirms that external
 submission is disabled.
 
+Persist the same readiness snapshot to the top-level SQLite log:
+
+```bash
+PYTHONPATH=src python Skills/background.py record-automation-readiness
+PYTHONPATH=src python Skills/background.py automation-readiness-log-summary
+```
+
 ## Top-Level SQLite Logs
 
 Background logs live at the repository top level:
@@ -68,6 +75,7 @@ The SQLite database contains three append-only operational tables:
 | `reviewed_log` | Outcome row when no follow-up is warranted |
 | `needs_follow_up_log` | Outcome row when follow-up, tests, or review are required |
 | `human_signoff_log` | Manual reviewer signoff records |
+| `automation_readiness_log` | Scheduler/live-readiness snapshots |
 | `run_lock` | Prevents overlapping invocations |
 | `schema_metadata` | SQLite schema version metadata |
 
@@ -86,6 +94,8 @@ PYTHONPATH=src python Skills/background.py submission-recommendation-summary
 PYTHONPATH=src python Skills/background.py validation-summary
 PYTHONPATH=src python Skills/background.py human-signoff-summary
 PYTHONPATH=src python Skills/background.py signoff-readiness
+PYTHONPATH=src python Skills/background.py record-automation-readiness
+PYTHONPATH=src python Skills/background.py automation-readiness-log-summary
 PYTHONPATH=src python Skills/background.py unsigned-follow-up
 PYTHONPATH=src python Skills/background.py run-detail --run-id <run-id>
 PYTHONPATH=src python Skills/background.py target-history --target-id <target-id>
