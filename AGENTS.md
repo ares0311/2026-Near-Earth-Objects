@@ -431,6 +431,9 @@ python -m mypy src
 # Tests
 PYTHONPATH=src python -m pytest
 
+# macOS local runs with XGBoost/OpenMP may need deterministic threading
+OMP_NUM_THREADS=1 PYTHONPATH=src python -m pytest
+
 # All three
 ruff check . && python -m mypy src && PYTHONPATH=src python -m pytest
 ```
@@ -468,9 +471,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.10.0)
+## Current State (v0.25.0)
 
-All 10 pipeline modules are complete. 346 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified manual CLI with top-level SQLite logs and auditable signoff readiness.
+All 10 pipeline modules are complete. 1329 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified manual CLI with top-level SQLite logs and auditable signoff readiness.
 
 ### Skills
 
@@ -490,6 +493,41 @@ All 10 pipeline modules are complete. 346 tests passing (100% coverage). CI gree
 | `Skills/train_tier3_transformer.py` | Train Transformer on MPC tracklet CSV; saves `models/tier3_transformer.pt` |
 | `Skills/tune_linker.py` | Parametric sweep of `position_tolerance_arcsec` × `chi2_threshold` vs link/score rate |
 | `Skills/background.py` | Unified background automation CLI with run, summary, detail, history, and signoff subcommands |
+| `Skills/stress_test_high_motion.py` | Stress-test linker across 3 motion bins (1–10, 10–30, 30–60 arcsec/hr); saves results to `data/` |
+| `Skills/build_cutout_dataset.py` | Convert ZTF alert JSON (base64 cutouts) to `.npz` + CSV index for Tier 2 CNN training |
+| `Skills/build_sequence_dataset.py` | Convert tracklet JSON to flat token CSV for Tier 3 Transformer training |
+| `Skills/validate_mpc_report.py` | Validate MPC 80-column observation report files; CLI with `--json` flag |
+| `Skills/diagnose_pipeline.py` | Run each pipeline stage with synthetic data; report pass/fail per stage |
+| `Skills/compare_baselines.py` | Compare two injection-recovery JSON baselines; exits 1 on regression |
+| `Skills/simulate_survey.py` | Generate synthetic ZTF-like survey observations for a sky field |
+| `Skills/export_ranked_table.py` | Export a ranked ScoredNEO table to CSV or HTML |
+| `Skills/check_orbit_quality.py` | Check orbit quality and fit preliminary orbit for tracklets from JSON |
+| `Skills/generate_obs_schedule.py` | Generate prioritized follow-up observation schedule with urgency tiers |
+| `Skills/photometric_calibration.py` | Per-field photometric zero-point fit and magnitude correction |
+| `Skills/export_mpc_bulk.py` | Bulk export MPC 80-column reports for a list of ScoredNEOs to a directory |
+| `Skills/filter_candidates.py` | Filter scored NEO JSON by hazard flag, alert pathway, or minimum priority |
+| `Skills/summarise_run.py` | Print or JSON-export a pipeline run summary from scored NEO JSON |
+| `Skills/plot_sky_coverage.py` | RA/Dec scatter plot of tracklet positions colour-coded by hazard flag |
+| `Skills/export_candidate_report.py` | Per-candidate plain-text reports from scored NEO JSON; `--split` writes one file per candidate |
+| `Skills/tag_neo_class.py` | Batch-tag NEO class for tracklets or ScoredNEO dicts using `classify_neo_class` from orbit.py |
+| `Skills/check_tisserand.py` | Batch-compute Tisserand parameter for tracklets/ScoredNEO dicts; flags T_J < threshold as comet-like |
+| `Skills/export_followup_requests.py` | Generate NEOCP follow-up request files for candidates above priority threshold; supports `--obs-code` and `--out-dir` |
+| `Skills/ephemeris_check.py` | Predict sky positions for tracklets at a given JD; observer-ready RA/Dec/dist table; `--jd` and `--json` flags |
+| `Skills/flag_comet_candidates.py` | Combined Tisserand + eccentricity comet-candidate flag; `--threshold`, `--min-ecc`, `--json` flags |
+| `Skills/compute_orbital_energy.py` | Batch orbital energy computation; bound/parabolic/hyperbolic label; `--json` flag |
+| `Skills/assess_survey_coverage.py` | Survey field coverage report (area, limiting mag, source count, fields per night); `--json` flag |
+| `Skills/grade_tracklets.py` | Batch-grade tracklets from JSON (A/B/C/D) using arc, nights, and astrometric RMS; `--json` flag |
+| `Skills/query_mpc_observations.py` | Query MPC observation history for a designation; prints table or JSON |
+| `Skills/compute_threat_scores.py` | Batch-compute threat scores for ScoredNEOs from JSON; `--threshold` and `--json` flags |
+| `Skills/fetch_atlas_data.py` | Fetch ATLAS forced photometry for a sky position; `--token`, `--force-refresh`, `--json` flags |
+| `Skills/plot_calibration.py` | Plot reliability diagram from scored NEO or prob/label JSON; saves PNG; prints Brier/ECE/log-loss |
+| `Skills/export_survey_summary.py` | Export per-candidate detection summary from pipeline run JSON to CSV or HTML |
+| `Skills/compute_apparent_magnitudes.py` | Batch apparent magnitude at JD from tracklet JSON; `--jd`, `--albedo`, `--json` flags |
+| `Skills/triage_candidates.py` | Urgency-sorted triage table from scored NEO JSON; `--urgency`, `--pathway`, `--json` flags |
+| `Skills/compute_discovery_scores.py` | Batch discovery score table from scored NEO JSON; `--threshold`, `--sort`, `--json` flags |
+| `Skills/format_submission_checklists.py` | Submission checklists for candidates above `--min-priority`; `--json` flag |
+| `Skills/validate_pipeline_run.py` | Validate pipeline run JSON for required keys, MOID plausibility, and no impact-probability phrases; `--json` flag |
+| `Skills/export_atlas_lightcurve.py` | Export ATLAS forced-photometry lightcurve for a sky position; `--format png\|csv\|json`, `--out`, `--token`, `--force-refresh` flags |
 
 ### Docs
 
@@ -497,9 +535,19 @@ All 10 pipeline modules are complete. 346 tests passing (100% coverage). CI gree
 |---|---|
 | `docs/PIPELINE_SPEC.md` | Full stage-by-stage pipeline specification |
 | `docs/SCORING_MODEL.md` | Bayesian scoring model: hypotheses, priors, feature weights |
+| `docs/TRAINING_GUIDE.md` | Step-by-step ML training guide: Tier 1–3 training, calibration, injection-recovery |
 | `docs/DATA_SOURCES.md` | External data sources: ZTF, ATLAS, MPC, JPL Horizons, Gaia DR3 |
 | `docs/API_REFERENCE.md` | Public function signatures and schema field reference for all modules |
 | `docs/BACKGROUND_SEARCH_AUTOMATION.md` | Implemented one-run background automation, SQLite logs, and scheduler notes |
+| `docs/ORBIT_FITTING.md` | Technical reference for orbit fitting: Gauss's method, differential correction, MOID, Tisserand parameter |
+| `docs/ALERT_PROTOCOL.md` | Technical reference for alert-pathway decision tree, gate conditions, MPC submission, NEOCP monitoring, NASA PDCO notification |
+| `docs/CLASSIFICATION_GUIDE.md` | Technical reference for three-tier ML classification, morphology, ensemble stacking, calibration, and conservative classification policy |
+| `docs/QUALITY_METRICS.md` | Reference for all pipeline quality metrics: detection, astrometric, photometric, orbital, calibration, and hazard scoring |
+| `docs/THREAT_ASSESSMENT.md` | Technical reference for threat score formula, components, interpretation guidelines, and CLI usage |
+| `docs/DETECTION_GUIDE.md` | Technical reference for detect.py: RB threshold, streak detection, clustering, known-object matching, detection efficiency, DetectionSummary |
+| `docs/LINKING_GUIDE.md` | Technical reference for link.py: tracklet formation, arc statistics, satellite trail rejection, deduplication, quality grades |
+| `docs/FETCH_GUIDE.md` | Technical reference for fetch.py: ZTF/ATLAS/MPC/Horizons retrieval, caching, depth estimation, survey merging, filtering |
+| `docs/PREPROCESS_GUIDE.md` | Technical reference for preprocess.py: difference image quality, photometry, astrometric calibration, SNR, scatter, zero-point |
 
 ### Data
 
@@ -508,11 +556,13 @@ All 10 pipeline modules are complete. 346 tests passing (100% coverage). CI gree
 | `data/sample_tracklets.json` | Two synthetic tracklets for testing batch Skills |
 | `data/README.md` | Data directory documentation and format reference |
 | `data/injection_recovery_baseline.json` | Injection-recovery results (n=50, seed=42): 100% detection, 62% link, 62% score |
+| `data/injection_recovery_n200.json` | Injection-recovery results (n=200, seed=42): 100% detection, 100% link, 100% score |
+| `data/stress_test_high_motion.json` | Stress-test results: 100% link rate across all three motion bins |
 | `background/config.json` | Manual-first background automation configuration |
 | `background/config.schema.json` | JSON Schema for manual-first background config |
 | `background/targets.json` | Stable background automation fixture manifest |
 
-### Coverage by Module (v0.10.0)
+### Coverage by Module (v0.25.0)
 
 | Module | Coverage |
 |---|---|
@@ -527,21 +577,292 @@ All 10 pipeline modules are complete. 346 tests passing (100% coverage). CI gree
 | `classify.py` | 100% |
 | `fetch.py` | 100% (ztfquery, ATLAS, astroquery.mpc, jplhorizons all mocked) |
 
-### What Is Not Yet Built (Milestones 4–7)
+### Remaining Operational Milestones
 
 | Milestone | Description |
 |---|---|
-| 4 | Live ZTF/ATLAS data integration (requires network + API tokens) |
-| 5 | CNN image classifier Tier 2 (requires GPU + labeled cutouts) |
-| 6 | Transformer tracklet model Tier 3 (requires multi-night training set) |
-| 7 | Ensemble calibration + injection-recovery testing |
+| 4 | Production live ZTF/ATLAS/Pan-STARRS runs with real credentials and scheduler policy |
+| 5 | Trained Tier 2 CNN weights from labeled ZTF cutouts |
+| 6 | Trained Tier 3 Transformer weights from multi-night MPC/ZTF sequences |
+| 7 | Production ensemble calibration on fresh labeled survey data |
 
 ### Immediate Next Steps
 
-- Collect labeled training data via `Skills/generate_training_labels.py`
-- Integrate live ZTF alert stream (Milestone 4)
-- Train and evaluate Tier 2 CNN on real cutouts (Milestone 5)
-- Investigate remaining 38% of unlinked synthetic tracklets (likely high-motion or chi² outliers)
+- Sync docs and changelog after each version bump so `AGENTS.md`, `CLAUDE.md`, `README.md`, and `CHANGELOG.md` stay aligned.
+- Collect labeled training data via `Skills/generate_training_labels.py`.
+- Run credentialed live-data dry runs for ZTF/ATLAS/Pan-STARRS only when tokens and review policy are explicitly configured.
+- Train and evaluate Tier 2/Tier 3 model weights on real labeled data.
+
+### Key Changes in v0.25.0
+
+- `orbit.py`: added `compute_perihelion_date(elements)` — next perihelion passage JD from mean anomaly and orbital period; None for hyperbolic/parabolic orbits or non-positive period.
+- `detect.py`: added `flag_moving_sources(observations, min_rate_arcsec_hr)` — return observations with apparent motion rate ≥ threshold; uses `compute_motion_vector` pairwise; cosine-Dec-corrected.
+- `link.py`: added `validate_tracklet(tracklet)` — (bool, reasons) tuple checking ≥2 obs, non-negative arc/rate, sorted JDs, no duplicate obs_ids.
+- `classify.py`: added `compute_artifact_probability(features)` — log-score artifact probability [0, 1] using stellar_artifact_score, psf_quality_score, real_bogus_score, streak_score, motion_consistency_score.
+- `score.py`: added `compute_observation_priority(neo)` — [0, 1] urgency score weighting last-observation gap (0.3), discovery_priority (0.4), and orbit uncertainty (0.3).
+- `alert.py`: added `validate_alert_package(package)` — (bool, issues) tuple enforcing required keys, non-empty observations, valid alert_pathway, and guardrail_statement containing "NOT".
+- `fetch.py`: added `fetch_panstarrs_catalog(ra_deg, dec_deg, radius_deg, epoch_jd, force_refresh)` — PanSTARRS DR2 cone search via astroquery.mast; disk-cached; returns list[Observation].
+- `preprocess.py`: added `compute_difference_image_snr(obs)` — peak-to-background RMS SNR from 63×63 difference-image cutout; None if no cutout or zero background.
+- `schemas.py`: added `AlertPackage` — frozen model: neo_id, alert_pathway, moid_au, observations, submission_timestamp_jd, guardrail_statement.
+- `calibration.py`: added `compute_precision_recall_curve(probs, labels)` — PR curve dict with precisions, recalls, thresholds, average_precision; anchored at (recall=0, precision=1) for correct AP.
+- `Skills/validate_pipeline_run.py`: new — validate pipeline run JSON for required keys, MOID plausibility [0, 10] AU, no impact-probability phrases, valid pathways; exits 0/1; `--json` flag.
+- `Skills/export_atlas_lightcurve.py`: new — ATLAS forced-photometry lightcurve export; `--format png|csv|json`, `--out`, `--token`, `--force-refresh` flags.
+- `docs/PREPROCESS_GUIDE.md`: new — technical reference for preprocess.py: difference image quality, photometry, astrometric calibration, SNR, scatter, zero-point.
+- 87 new tests (1329 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.25.0.
+
+### Key Changes in v0.24.0
+
+- `orbit.py`: added `compute_absolute_magnitude(observed_mag, r_au, delta_au, phase_deg, g=0.15)` — inverse IAU HG phase function; returns H from apparent magnitude, distances, and phase angle; NaN for degenerate geometry.
+- `detect.py`: added `compute_motion_vector(obs1, obs2)` — dict with dra_arcsec_hr, ddec_arcsec_hr, rate_arcsec_hr, pa_deg; cosine-Dec-corrected; zero vector for identical JDs.
+- `link.py`: added `merge_overlapping_tracklets(tracklets)` — union-find merge of tracklets sharing ≥1 obs_id; picks longest-arc representative; deduplicates and recomputes arc_days.
+- `classify.py`: added `compute_neo_probability(features)` — log-score model probability for neo_candidate hypothesis vs all others; uses CLAUDE.md feature weights; [0, 1].
+- `score.py`: added `compute_discovery_score(neo)` — weighted combination of discovery_priority (0.5), orbit_quality_score (0.3), brightness_score (0.2); clamped [0, 1].
+- `alert.py`: added `format_submission_checklist(neo)` — multi-line checklist with ✓/✗ per alert-protocol gate condition (rb≥0.90, quality≥2, MOID≤0.05, not known, neo_prob≥0.50) plus Step 1/2/3 status.
+- `fetch.py`: added `filter_by_survey(fetch_result, surveys)` — return new FetchResult containing only observations whose mission is in the supplied list.
+- `preprocess.py`: added `estimate_zero_point(observations, catalog_mags)` — median(obs.mag − catalog_mag) zero-point offset; None if <2 valid pairs; excludes sentinel mags ≥ 90.
+- `schemas.py`: added `ObservationStatistics` — frozen model: n_obs, mean_mag, mag_range, mean_real_bogus, n_filters, arc_days.
+- `calibration.py`: added `compute_roc_auc(probs, labels)` — ROC AUC via trapezoidal rule; 0.5 for single-class or empty input; NumPy 1.x/2.x compatible.
+- `Skills/compute_discovery_scores.py`: new — batch discovery score table; `--threshold`, `--sort`, `--json` flags.
+- `Skills/format_submission_checklists.py`: new — submission checklists for candidates above `--min-priority`; `--json` flag.
+- `docs/FETCH_GUIDE.md`: new — technical reference for fetch.py: ZTF/ATLAS/MPC/Horizons retrieval, caching, depth estimation, merging, filtering.
+- 75 new tests (1242 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.24.0.
+
+### Key Changes in v0.23.0
+
+- `orbit.py`: added `compute_apparent_magnitude(elements, target_jd, albedo=0.14)` — approximate V-band apparent magnitude using IAU HG phase function; returns NaN for degenerate geometry.
+- `detect.py`: added `count_detections_by_filter(observations)` — dict mapping filter_band → count; None filter_band mapped to "unknown".
+- `link.py`: added `filter_by_nights_observed(tracklets, min_nights=2)` — keep only tracklets spanning ≥ min distinct integer-JD nights.
+- `classify.py`: added `get_posterior_vector(posterior)` — 5-element numpy array [neo_candidate, known_object, main_belt_asteroid, stellar_artifact, other_solar_system].
+- `score.py`: added `compute_followup_urgency(neo)` — URGENT/HIGH/MEDIUM/ROUTINE tier based on hazard_flag, MOID, and discovery_priority.
+- `alert.py`: added `count_pending_alerts(neos)` — dict of alert_pathway → count; only pathways with ≥1 candidate included.
+- `fetch.py`: added `estimate_survey_depth(fetch_result)` — 95th-percentile magnitude from valid alerts; None if no valid magnitudes.
+- `preprocess.py`: added `compute_photometric_scatter(observations)` — RMS scatter of magnitudes; None for <2 valid observations.
+- `schemas.py`: added `PhotometricSolution` — frozen model: zero_point, color_coeff, extinction_coeff, rms_scatter, n_stars, filter_band, epoch_jd.
+- `calibration.py`: added `compare_calibrators(probs_list, labels, names)` — dict of name → calibration_report for multiple calibrator comparisons.
+- `Skills/compute_apparent_magnitudes.py`: new — batch apparent magnitude at JD from tracklet JSON; `--jd`, `--albedo`, `--json` flags.
+- `Skills/triage_candidates.py`: new — urgency-sorted triage table; `--urgency`, `--pathway`, `--json` flags.
+- `docs/LINKING_GUIDE.md`: new — tracklet formation, arc statistics, satellite trail rejection, deduplication, quality grades.
+- 78 new tests (1167 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.23.0.
+
+### Key Changes in v0.22.0
+
+- `orbit.py`: added `compute_synodic_period(elements)` — synodic period vs Earth in days; inf for a ≤ 0 or a = 1 AU.
+- `detect.py`: added `compute_detection_efficiency(observations, limiting_mag)` — fraction of obs brighter than limiting_mag; 0.0 if empty; sentinel mag ≥ 90 counts as missed.
+- `link.py`: added `summarize_arc_statistics(tracklets)` — aggregate dict: n_tracklets, mean/max arc_days, fraction_multi_night.
+- `classify.py`: added `compute_classification_table(neos)` — list of dicts per NEO: object_id, dominant_hypothesis, probability, entropy_bits.
+- `score.py`: added `filter_by_alert_pathway(neos, pathway)` — filter ScoredNEO list by exact alert_pathway match.
+- `alert.py`: added `format_impact_notification(neo)` — PDCO-ready notification dict with full provenance, observation list, and guardrail statements.
+- `fetch.py`: added `fetch_ztf_alerts(ra, dec, radius, start_jd, end_jd, force_refresh)` — ZTF IRSA cone search; disk-cached; returns list[Observation].
+- `preprocess.py`: added `compute_image_quality_metrics(observations)` — dict: n_sources, mean/median_fwhm_arcsec, mean_snr, background_rms.
+- `schemas.py`: added `DetectionSummary` — frozen model: field_id, epoch_jd, survey, n_candidates, n_known_matches, n_new, limiting_mag.
+- `calibration.py`: added `calibration_report(probs, labels)` — comprehensive dict: brier_score, ece, log_loss, n_samples, mean_prob, fraction_positive.
+- `Skills/plot_calibration.py`: new — reliability diagram plot from scored NEO or prob/label JSON; saves PNG; prints Brier/ECE/log-loss.
+- `Skills/export_survey_summary.py`: new — per-candidate detection summary export to CSV or HTML; sorted by discovery_priority.
+- `docs/DETECTION_GUIDE.md`: new — technical reference for detect.py: RB threshold, streak/trail detection, clustering, known-object matching, detection efficiency, DetectionSummary.
+- 71 new tests (1089 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.22.0.
+
+### Key Changes in v0.21.0
+
+- `orbit.py`: added `compute_heliocentric_distance(elements, target_jd)` — heliocentric distance in AU at target JD via `predict_ephemeris`; inf for non-positive semi-major axis; NaN on error.
+- `detect.py`: added `estimate_sky_background(observations, percentile)` — percentile of pixel values across difference-image cutouts; None if no valid cutouts.
+- `link.py`: added `filter_by_arc_length(tracklets, min_arc_days)` — keep only tracklets with arc_days ≥ threshold (default 1.0).
+- `classify.py`: added `calibrate_posterior(posterior, calibrator)` — re-calibrate NEOPosterior with Laplace smoothing (alpha=0.05) or optional calibrator; always normalised to 1.0.
+- `score.py`: added `compute_threat_score(neo)` — geometric mean of MOID proximity, H-magnitude size proxy, and orbit quality; [0, 1]; 0.5 sentinel for unknown components.
+- `alert.py`: added `generate_mpc_cover_letter(neo)` — formal plain-text MPC submission cover letter with mandatory guardrail "Do NOT publicly announce any impact probability."
+- `fetch.py`: added `fetch_atlas_forced(ra_deg, dec_deg, start_jd, end_jd, atlas_token, force_refresh)` — ATLAS forced photometry via REST API with task queuing, polling, and disk cache.
+- `preprocess.py`: added `normalize_photometry(observations, zero_point, reference_zero_point)` — zero-point correction; drops corrected mags outside [0, 35]; returns new Observation list.
+- `schemas.py`: added `ObservationBatch` — frozen Pydantic model grouping Observations from the same survey field and night (batch_id, field_id, night_jd, mission, observations, limiting_mag).
+- `calibration.py`: added `reliability_diagram(probs, labels, n_bins)` — equal-width bin reliability diagram; returns dict with bin_centers, fraction_positive, bin_counts; empty bins excluded.
+- `Skills/compute_threat_scores.py`: new — batch threat score table from ScoredNEO JSON; `--threshold` and `--json` flags.
+- `Skills/fetch_atlas_data.py`: new — ATLAS forced photometry CLI; `--token`, `--force-refresh`, `--json` flags.
+- `docs/THREAT_ASSESSMENT.md`: new — threat score formula, component breakdowns, interpretation table, alert gate conditions.
+- 69 new tests (1018 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.21.0.
+
+### Key Changes in v0.20.0
+
+- `orbit.py`: added `compute_phase_angle(elements, target_jd)` — Sun–target–observer phase angle via law of cosines; returns NaN on degenerate geometry.
+- `detect.py`: added `compute_psf_fwhm(obs)` — PSF FWHM in arcsec from 2D Gaussian moment fit; returns None if no cutout or degenerate.
+- `link.py`: added `compute_tracklet_grade(tracklet)` — A/B/C/D quality grade from arc length, nights observed, and astrometric RMS.
+- `classify.py`: added `summarize_classifications(neos)` — aggregate summary dict: total, dominant_hypothesis_counts, mean_entropy_bits, mean_real_bogus_score, pha_candidate_count.
+- `score.py`: added `compute_novelty_score(neo, catalog_elements)` — orbital distance from nearest known NEO in (a, e, i) space; 1.0 = fully novel.
+- `alert.py`: added `generate_observation_request(neo, obs_code)` — structured NEOCP follow-up request with urgency tier (URGENT/HIGH/MEDIUM/ROUTINE) and guardrail.
+- `fetch.py`: added `fetch_mpc_observations(designation)` — query MPC observation history for a designation; caches to disk; returns list[Observation].
+- `preprocess.py`: added `compute_astrometric_scatter(observations)` — RMS of linear RA/Dec fit residuals in arcsec; None for <2 obs or identical JDs.
+- `schemas.py`: added `PipelineConfig` — frozen Pydantic model capturing sky position, time window, survey selection, and detection thresholds for a pipeline run.
+- `calibration.py`: added `compute_log_loss(probs, labels, eps)` — binary cross-entropy with clipping; returns 0.0 for empty inputs.
+- `Skills/grade_tracklets.py`: new — batch-grade tracklets from JSON; `--json` flag.
+- `Skills/query_mpc_observations.py`: new — query MPC observation history for a designation; `--json` flag.
+- `docs/QUALITY_METRICS.md`: new — comprehensive quality metrics reference for all pipeline stages.
+- 69 new tests (949 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.20.0.
+
+### Key Changes in v0.19.0
+
+- `orbit.py`: added `orbital_energy(elements)` — specific orbital energy in AU²/yr²; negative = bound, inf for a ≤ 0.
+- `detect.py`: added `compute_trail_length(obs)` — trail length in arcsec from difference-image second moments.
+- `link.py`: added `assess_link_confidence(tracklet)` — [0, 1] confidence from linear-fit RMS residual vs 10 arcsec reference.
+- `classify.py`: added `batch_morphology(tracklet)` — modal_class, class_counts, streak_fraction across all observations.
+- `score.py`: added `compute_impact_energy(diameter_m, velocity_km_s, density_kg_m3)` — kinetic impact energy in megatons TNT.
+- `alert.py`: added `format_alert_summary(neos, max_rows)` — plain-text ranked summary table with hazard flag, pathway, MOID, priority.
+- `fetch.py`: added `count_known_objects_in_field(ra_deg, dec_deg, radius_deg)` — count MPC known objects in a circular field; returns 0 on failure.
+- `preprocess.py`: added `detect_bad_pixels(obs, sigma_threshold)` — MAD-based sigma clipping; returns list of (row, col) tuples.
+- `schemas.py`: added `SurveyField` — frozen Pydantic model for survey field metadata (field_id, ra_deg, dec_deg, radius_deg, limiting_mag, n_sources, jd).
+- `calibration.py`: added `cross_validate_calibration(probs, labels, n_folds, metric)` — K-fold CV returning (mean, std). Fixed `bootstrap_confidence_interval` empty-guard for numpy arrays.
+- `Skills/compute_orbital_energy.py`: new — batch orbital energy CLI; `--json` flag.
+- `Skills/assess_survey_coverage.py`: new — survey field coverage report; `--json` flag.
+- `docs/CLASSIFICATION_GUIDE.md`: new — three-tier ML classification reference.
+- 81 new tests (880 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.19.0.
+
+### Key Changes in v0.18.0
+
+- `orbit.py`: added `ephemeris_uncertainty(elements, target_jd)` — sky-plane uncertainty propagated from quality code; scales with propagation time.
+- `detect.py`: added `cluster_detections(observations, radius_arcsec)` — greedy spatial clustering; returns list of Observation tuples.
+- `link.py`: added `compute_arc_statistics(tracklet)` — summary dict: n_observations, n_nights, arc_days, mean_motion_arcsec_hr, motion_pa_std_deg.
+- `classify.py`: added `classify_morphology(obs)` — source morphology from image moments: 'point_source', 'extended', or 'streak'.
+- `score.py`: added `absolute_magnitude_from_diameter(diameter_m, albedo)` — H from diameter and albedo; returns inf for zero/negative inputs. Fixed formula.
+- `alert.py`: added `format_discovery_circular(neo)` — IAU CBET-style discovery circular; does not transmit.
+- `fetch.py`: added `build_observation_window(ra_deg, dec_deg, ...)` — validated ObservationWindow factory with ValueError for bad inputs.
+- `preprocess.py`: added `compute_source_snr(obs)` — peak-to-background SNR from difference-image cutout.
+- `schemas.py`: added `CloseApproachEvent` — frozen model for a close approach event.
+- `calibration.py`: added `bootstrap_confidence_interval(probs, labels, n_bootstrap, metric)` — bootstrap 95% CI for Brier or ECE.
+- `Skills/ephemeris_check.py`: new — ephemeris prediction table at user-specified JD.
+- `Skills/flag_comet_candidates.py`: new — combined T_J + eccentricity comet-candidate flag.
+- `docs/ALERT_PROTOCOL.md`: new — alert pathway technical reference.
+- 70 new tests (799 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.18.0.
+
+### Key Changes in v0.17.0
+
+- `orbit.py`: added `batch_predict_ephemeris(elements_list, target_jd)` — batch sky-position prediction; per-element error isolation.
+- `orbit.py`: added `resonance_check(elements, tolerance)` — mean-motion resonance detection with Jupiter; checks T_J/T_asteroid ratio against p:q pairs; returns resonance label or None.
+- `detect.py`: added `compute_streak_metric(obs)` — streak severity from difference-image second moments; [0, 1]; handles degenerate zero-eigenvalue (perfectly elongated) case.
+- `link.py`: added `split_tracklet(tracklet, split_jd)` — split tracklet at a JD boundary into two sub-tracklets; raises ValueError if either part has fewer than 2 observations.
+- `classify.py`: added `dominant_hypothesis(posterior)` — return (name, probability) for highest-probability class; ("unknown", 0.0) for all-zero posterior.
+- `score.py`: added `close_approach_candidates(neos, max_moid_au)` — filter by MOID ≤ threshold; None MOID excluded.
+- `alert.py`: added `ready_for_submission(neo)` — boolean gate for all alert-protocol preconditions; returns (bool, unmet list); fixed field name orbit_quality_code → quality_code.
+- `fetch.py`: added `filter_alerts_by_motion(alerts, min_rate, max_rate)` — filter by ssdistnr-based motion proxy; observations without ssdistnr pass through.
+- `preprocess.py`: added `estimate_source_density(observations, field_radius_deg)` — source count per square degree via great-circle centroid.
+- `schemas.py`: added `TrackletSummary` — lightweight frozen model for tracklet display/export.
+- `Skills/check_tisserand.py`: new — batch Tisserand parameter check; comet-like flag; `--threshold` and `--json` CLI flags.
+- `Skills/export_followup_requests.py`: new — NEOCP follow-up request generator; `--min-priority`, `--out-dir`, `--obs-code`, `--summary` CLI flags.
+- `docs/ORBIT_FITTING.md`: new — orbit fitting technical reference.
+- 146 new tests (729 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.17.0.
+
+### Key Changes in v0.16.0
+
+- `orbit.py`: added `classify_neo_class(elements)` — derive NEO dynamical class from orbital elements.
+- `orbit.py`: added `tisserand_parameter(elements)` — Tisserand parameter relative to Jupiter; T_J < 3 distinguishes comets.
+- `detect.py`: added `filter_by_real_bogus(result, threshold)` — filter DetectResult by max real/bogus score.
+- `link.py`: added `deduplicate_tracklets(tracklets)` — remove tracklets with ≥ 50% overlapping obs_ids; longer arc wins.
+- `score.py`: added `pha_candidates(neos)` — filter to PHA candidates only.
+- `score.py`: added `compute_statistics(neos)` — aggregate NEOStatistics (counts, priority, class distribution).
+- `classify.py`: added `posterior_entropy(posterior)` — Shannon entropy of NEOPosterior in bits.
+- `alert.py`: added `format_neocp_report(neo, obs_code)` — plain-text NEOCP follow-up request with guardrails.
+- `fetch.py`: added `merge_survey_alerts(results)` — merge and deduplicate multiple FetchResults.
+- `preprocess.py`: added `compute_color_index(obs1, obs2)` — magnitude difference for observations in different bands.
+- `schemas.py`: added `NEOStatistics` — frozen Pydantic model for aggregate pipeline statistics.
+- `Skills/export_candidate_report.py`: new — per-candidate plain-text reports; `--split` writes one file per candidate.
+- `Skills/tag_neo_class.py`: new — batch-tag NEO class using `classify_neo_class`.
+- `docs/TRAINING_GUIDE.md`: new — step-by-step ML training guide (Tier 1–3, calibration, injection-recovery).
+- 77 new tests; 660 total; 100% coverage maintained.
+- Version bumped to 0.16.0.
+
+### Key Changes in v0.15.0
+
+- `orbit.py`: added `compute_orbital_period` — Kepler's third law; T = 365.25 × √(a³) days.
+- `link.py`: added `filter_high_motion(tracklets, min_rate_arcsec_hr)` — filter by motion rate threshold (default 10 arcsec/hr).
+- `score.py`: added `followup_priority_table(neos)` — flat ranked table dict list sorted by discovery priority.
+- `classify.py`: added `batch_explain(tracklets)` — batch version of `explain_classification`.
+- `alert.py`: added `alert_summary_table(neos)` — flat per-NEO alert summary with ready_to_submit flag.
+- `fetch.py`: added `summarise_fetch_result(result)` — summary dict of a FetchResult.
+- `preprocess.py`: added `flag_saturated_sources(result, saturation_mag)` — return obs_ids of likely saturated sources.
+- `schemas.py`: added `CandidateSummary` — lightweight frozen Pydantic model for NEO display/export.
+- `Skills/filter_candidates.py`: new — filter scored NEO JSON by hazard flag, pathway, or priority.
+- `Skills/summarise_run.py`: new — human-readable or JSON pipeline run summary.
+- `Skills/plot_sky_coverage.py`: new — RA/Dec scatter plot colour-coded by hazard flag (matplotlib).
+- `docs/API_REFERENCE.md`: updated with all v0.14.0 and v0.15.0 APIs.
+- 55 new tests; 583 total; 100% coverage maintained.
+- Version bumped to 0.15.0.
+
+### Key Changes in v0.14.0
+
+- `orbit.py`: added `close_approach_table` — tabulate geocentric distance over a time window.
+- `link.py`: added `estimate_motion_uncertainty` — rate and PA error from linear fit residuals.
+- `score.py`: added `discovery_report` — comprehensive nested summary dict for human review.
+- `classify.py`: added `explain_classification` — structured classification breakdown with Tier 1 importances. Fixed Pydantic v2.11 `model_fields` deprecation.
+- `alert.py`: added `draft_mpc_submission` — complete MPC submission bundle with guardrail cover letter.
+- `schemas.py`: added `ObservationWindow` — frozen typed model for sky/time search queries.
+- `fetch.py`: added `estimate_limiting_magnitude` — survey depth proxy from faint-end magnitude tail.
+- `preprocess.py`: added `quality_summary` — per-field PSF quality, background RMS, and elongation statistics.
+- `detect.py`: added `streak_candidates` — filter `DetectResult` for streak/trail detections only.
+- `background.py`: added `audit_report` — consolidated cross-log audit report.
+- `Skills/generate_obs_schedule.py`: prioritized follow-up observation schedule with urgency tiers.
+- `Skills/photometric_calibration.py`: per-field photometric zero-point fit via Gaia DR3.
+- `Skills/export_mpc_bulk.py`: bulk MPC 80-column report export with manifest.
+- `docs/SCORING_MODEL.md`: updated with ranking, discovery report, motion uncertainty, close-approach table, and photometric calibration.
+- 63 new tests; 528 total; 100% coverage maintained.
+- Version bumped to 0.14.0.
+
+### Key Changes in v0.13.0
+
+- `fetch.py`: added `fetch_batch` — fetch multiple sky positions in one call.
+- `preprocess.py`: added `preprocess_batch` — batch preprocessing from `FetchResult` list.
+- `detect.py`: added `detect_batch` — batch detection from `PreprocessResult` list.
+- `link.py`: added `merge_tracklets` — merge two tracklets into a longer deduplicated arc.
+- `orbit.py`: added `propagate_orbit` (Keplerian propagation), `predict_ephemeris` (geocentric RA/Dec at target JD).
+- `score.py`: added `rank_candidates` — sort `ScoredNEO` list by priority with PHA tier.
+- `alert.py`: added `generate_alert_package` — bundle all alert artifacts into one dict.
+- `schemas.py`: added `PipelineResult` — immutable top-level pipeline run container.
+- `Skills/simulate_survey.py`: synthetic ZTF-like survey generator.
+- `Skills/export_ranked_table.py`: CSV/HTML ranked table export.
+- `Skills/check_orbit_quality.py`: orbit quality CLI for tracklet JSON.
+- `tests/conftest.py`: extended with `build_raw_candidate`, `build_scored_neo`, and `scored_neo`/`raw_candidate` fixtures.
+- `docs/PIPELINE_SPEC.md`: updated with all v0.13.0 APIs and `PipelineResult` container.
+- 54 new tests; 465 total; 100% coverage maintained.
+- Version bumped to 0.13.0.
+
+### Key Changes in v0.12.0
+
+- `link.py`: added `_is_satellite_trail` — rejects purely E-W or N-S fast-moving pairs (≥30 arcsec/hr) as satellite/debris trails.
+- `classify.py`: added `classify_batch` and `get_tier1_feature_importances` public APIs.
+- `orbit.py`: added `arc_quality_report` — returns quality dict with codes 1–4.
+- `score.py`: added `score_batch`; `ScoringMetadata.close_approach_au` now populated from MOID when orbit quality ≥ 2.
+- `schemas.py`: added `close_approach_au: float | None = None` to `ScoringMetadata`.
+- `alert.py`: added `format_mpc_json` and `batch_process_alerts` public APIs.
+- `Skills/validate_mpc_report.py`: new — validate MPC 80-column report format.
+- `Skills/diagnose_pipeline.py`: new — per-stage diagnostic runner with synthetic data.
+- `Skills/compare_baselines.py`: new — compare injection-recovery baselines; regression detection.
+- `docs/API_REFERENCE.md`: updated with all v0.12.0 public APIs.
+- 34 new tests; 411 total; 100% coverage maintained.
+- Version bumped to 0.12.0.
+
+### Key Changes in v0.11.0
+
+- `link.py`: fixed chi² error proxy (`max(mag_err * 0.1, 0.1)` → `max(mag_err, 0.5)`) — link rate 62% → 100%
+- `link.py`: added `_predict_from_arc` (quadratic polyfit for ≥3 obs, linear fallback) for more accurate position prediction
+- `fetch.py`: added `force_refresh` flag to bypass on-disk cache; ATLAS token now falls back to `ATLAS_TOKEN` env var
+- `alert.py`: added public `monitor_neocp` with injectable sleep for NEOCP polling loop
+- `classify.py`: added `retrain_tier1` and `retrain_stacker` public APIs for incremental retraining
+- `Skills/run_pipeline.py`: added `--atlas-token`, `--force-refresh`, `--neocp-timeout-hours`, `--neocp-poll-interval` flags
+- `Skills/stress_test_high_motion.py`: stress-test linker across 3 motion bins; all bins 100%
+- `Skills/build_cutout_dataset.py`: build `.npz` + CSV index from ZTF alert JSON for Tier 2 training
+- `Skills/build_sequence_dataset.py`: build flat token CSV from tracklet JSON for Tier 3 training
+- `Skills/train_tier2_cnn.py`: updated to read `.npz` cutout files from `cutout_path` column
+- `Skills/train_tier3_transformer.py`: updated to read flat `tok_i_j` columns
+- `Skills/smoke_test.py`: added `monitor_neocp` and `retrain` smoke tests
+- `Skills/check_mpc_known.py`: added `--neocp` CLI flag and `check_neocp` function
+- `data/injection_recovery_n200.json`: n=200 baseline: 100% detection, link, score
+- `data/stress_test_high_motion.json`: stress-test results
+- CHANGELOG.md: full Keep-a-Changelog history added (v0.1.0–v0.11.0)
+- 31 new tests; 377 total; 100% coverage maintained
+- Version bumped to 0.11.0.
 
 ### Key Changes in v0.10.0
 

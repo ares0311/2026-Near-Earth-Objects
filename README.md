@@ -1,9 +1,9 @@
 # 2026 Near-Earth Object Detection & Ranking Pipeline
 
 ![Status](https://img.shields.io/badge/status-active%20development-blue)
-![Version](https://img.shields.io/badge/version-0.10.0-informational)
+![Version](https://img.shields.io/badge/version-0.25.0-informational)
 ![License](https://img.shields.io/badge/license-Apache%202.0-green)
-![Tests](https://img.shields.io/badge/tests-346%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-1329%20passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
 ![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)
 ![CI](https://img.shields.io/badge/CI-passing-brightgreen)
@@ -57,7 +57,7 @@ This repository implements a complete, research-grade automated detection and ra
 4. **Independent confirmation before alert** — the NASA PDCO notification pathway is gated on MPC submission *and* independent observatory confirmation, not on pipeline confidence alone.
 5. **No autonomous impact claims** — the system produces ranked candidates and hazard flags; it defers all authoritative impact probability statements to CNEOS Scout and Sentry.
 
-The pipeline follows the build order: `schemas` → `fetch` → `preprocess` → `detect` → `link` → `classify` → `orbit` → `score` → `alert` → `calibration`. Each stage consumes the immutable, typed output of all prior stages. As of v0.10.0, all ten modules are complete with 346 tests, 100% code coverage, and a validated injection-recovery baseline of 100% detection rate and 62% link rate on $n = 50$ synthetic NEO tracklets.
+The pipeline follows the build order: `schemas` → `fetch` → `preprocess` → `detect` → `link` → `classify` → `orbit` → `score` → `alert` → `calibration`. Each stage consumes the immutable, typed output of all prior stages. As of v0.25.0, all ten pipeline modules plus background automation are complete with 1329 tests, 100% code coverage, and validated injection-recovery baselines of 100% detection, link, and score rates on $n = 200$ synthetic NEO tracklets.
 
 ---
 
@@ -109,7 +109,7 @@ The pipeline implements a strict directed acyclic graph (DAG) of processing stag
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    NEO DETECTION PIPELINE  v0.10.0                  │
+│                    NEO DETECTION PIPELINE  v0.25.0                  │
 └─────────────────────────────────────────────────────────────────────┘
 
   External Data Sources
@@ -521,7 +521,7 @@ The diagram below shows how data and artifacts move between the repository's top
 2026-Near-Earth-Objects/
 │
 ├── src/                          # Core pipeline modules (Python 3.11+)
-│   ├── __init__.py               # Package version (0.10.0)
+│   ├── __init__.py               # Package version (0.25.0)
 │   ├── schemas.py                # All Pydantic data models (frozen=True)
 │   ├── fetch.py                  # ZTF/ATLAS/MPC/Horizons data retrieval
 │   ├── preprocess.py             # Difference image handling; Gaia astrometry
@@ -534,7 +534,7 @@ The diagram below shows how data and artifacts move between the repository's top
 │   ├── calibration.py            # Platt / isotonic PAVA calibration
 │   └── py.typed                  # PEP 561 type information marker
 │
-├── tests/                        # pytest suite (346 tests; 100% coverage)
+├── tests/                        # pytest suite (1329 tests; 100% coverage)
 │   ├── conftest.py               # Shared fixtures and synthetic tracklet factories
 │   ├── test_schemas.py
 │   ├── test_fetch.py
@@ -563,6 +563,8 @@ The diagram below shows how data and artifacts move between the repository's top
 │   ├── benchmark_pipeline.py     # Time classify + score on N synthetic tracklets
 │   ├── train_tier2_cnn.py        # Fine-tune CNN on labeled ZTF cutout CSV
 │   ├── train_tier3_transformer.py # Train Transformer on MPC tracklet CSV
+│   ├── validate_pipeline_run.py  # Validate run JSON and guardrail language
+│   ├── export_atlas_lightcurve.py # Export ATLAS forced-photometry lightcurves
 │   └── background.py              # Unified background CLI with subcommands
 │
 ├── Logs/                         # Top-level SQLite background automation logs
@@ -572,14 +574,26 @@ The diagram below shows how data and artifacts move between the repository's top
 ├── data/                         # Reference data and baselines
 │   ├── README.md                 # Data format reference
 │   ├── sample_tracklets.json     # Two synthetic tracklets for testing
-│   └── injection_recovery_baseline.json  # n=50, seed=42 baseline results
+│   ├── injection_recovery_baseline.json  # n=50, seed=42 baseline results
+│   ├── injection_recovery_n200.json      # n=200, seed=42 baseline results
+│   └── stress_test_high_motion.json      # high-motion linker stress baseline
 │
 ├── docs/                         # Extended documentation
 │   ├── PIPELINE_SPEC.md          # Stage-by-stage pipeline specification
 │   ├── SCORING_MODEL.md          # Full Bayesian scoring model documentation
 │   ├── DATA_SOURCES.md           # External data source reference
 │   ├── API_REFERENCE.md          # Public function signatures and schema fields
-│   └── BACKGROUND_SEARCH_AUTOMATION.md
+│   ├── BACKGROUND_SEARCH_AUTOMATION.md
+│   ├── ALERT_PROTOCOL.md
+│   ├── TRAINING_GUIDE.md
+│   ├── ORBIT_FITTING.md
+│   ├── CLASSIFICATION_GUIDE.md
+│   ├── QUALITY_METRICS.md
+│   ├── THREAT_ASSESSMENT.md
+│   ├── DETECTION_GUIDE.md
+│   ├── LINKING_GUIDE.md
+│   ├── FETCH_GUIDE.md
+│   └── PREPROCESS_GUIDE.md
 │
 ├── background/                    # Manual-first background automation config
 │   ├── config.json
@@ -864,7 +878,7 @@ Compare the output against the baseline in `data/injection_recovery_baseline.jso
 | 5. Calibrator refit | `evaluate_calibration.py` | ECE ≤ 0.05; Brier ≤ 0.10 |
 | 6. Linker tuned (if needed) | `tune_linker.py` | Link rate ≥ baseline − 5% |
 | 7. Injection-recovery passed | `injection_recovery.py` | Link + score rate ≥ baseline − 5% |
-| 8. Full test suite passes | `pytest` | 346 / 346 tests pass |
+| 8. Full test suite passes | `pytest` | 1329 / 1329 tests pass |
 | 9. Models committed | `git add models/` | New weights in version control |
 
 ---
@@ -937,8 +951,8 @@ PYTHONPATH=src python Skills/smoke_test.py
 ### 11.2 Run the Full Test Suite
 
 ```bash
-PYTHONPATH=src python -m pytest -q
-# Expected: 346 passed in ~N seconds
+OMP_NUM_THREADS=1 PYTHONPATH=src python -m pytest -q
+# Expected: 1329 passed in ~N seconds
 ```
 
 ### 11.3 Score a Batch of Tracklets
@@ -953,7 +967,7 @@ PYTHONPATH=src python Skills/batch_score.py data/sample_tracklets.json
 ```bash
 # Inject 50 synthetic NEOs (default), run through full pipeline, report recovery rates
 PYTHONPATH=src python Skills/injection_recovery.py --n 50 --seed 42 --json results/ir_run.json
-# Expected baseline: ~100% detect, ~62% link, ~62% score
+# Expected baseline: 100% detect, 100% link, 100% score on the n=200 baseline
 ```
 
 ### 11.5 Parametric Linker Sweep
@@ -1013,6 +1027,7 @@ PYTHONPATH=src python -m pytest     # Full test suite + coverage gate
 ```
 
 The coverage gate is set to **100%**; any line not exercised by at least one test fails CI.
+On macOS local environments, set `OMP_NUM_THREADS=1` if XGBoost/OpenMP emits native loader or threading errors.
 
 ### 12.2 Classifier Calibration Metrics
 
@@ -1036,16 +1051,16 @@ Calibration curves and reliability diagrams are generated by `Skills/evaluate_ca
 
 Injection-recovery testing is the primary empirical validation of end-to-end pipeline performance. Synthetic NEO tracklets with known orbital elements are injected into the ZTF alert stream simulator and processed by the full pipeline. The following rates are tracked:
 
-| Metric | Definition | v0.10.0 Baseline |
+| Metric | Definition | v0.25.0 Baseline |
 |---|---|---|
-| **Detection rate** | Fraction of injected NEOs producing ≥1 detection | 100% ($n=50$, seed=42) |
-| **Link rate** | Fraction of injected NEOs producing a valid tracklet | 62% |
-| **Score rate** | Fraction of injected NEOs appearing in the ranked output | 62% |
+| **Detection rate** | Fraction of injected NEOs producing ≥1 detection | 100% ($n=200$, seed=42) |
+| **Link rate** | Fraction of injected NEOs producing a valid tracklet | 100% |
+| **Score rate** | Fraction of injected NEOs appearing in the ranked output | 100% |
 | **PHA recovery rate** | Fraction of injected PHAs correctly flagged | Measured separately per orbit class |
 
-The 38% unlinked fraction is under active investigation; preliminary analysis indicates the majority are high-motion candidates ($\dot\theta > 30$ arcsec hr$^{-1}$) where the linear position-prediction model in `link.py` accumulates sufficient error to exceed the $\chi^2$ threshold.
+The older n=50 baseline remains in `data/injection_recovery_baseline.json` for historical comparison. The current n=200 baseline and high-motion stress baseline both report 100% linking after the v0.11.0 linker fixes.
 
-### 12.4 Module Coverage Summary (v0.10.0)
+### 12.4 Module Coverage Summary (v0.25.0)
 
 | Module | Statements | Coverage |
 |---|---|---|
@@ -1059,7 +1074,7 @@ The 38% unlinked fraction is under active investigation; preliminary analysis in
 | `score.py` | — | 100% |
 | `alert.py` | — | 100% |
 | `calibration.py` | — | 100% |
-| **Total** | **346 tests** | **100%** |
+| **Total** | **1329 tests** | **100%** |
 
 ---
 
@@ -1074,22 +1089,22 @@ The 38% unlinked fraction is under active investigation; preliminary analysis in
 | **M3** | `orbit` → `score` → `alert`; MPC 80-column formatting | Complete |
 | **M3b** | `calibration.py`; CNN (Tier 2) + Transformer (Tier 3) architecture | Complete |
 | **M3c** | Ensemble meta-learner; NASA PDCO alert pathway; 100% coverage | Complete |
-| **M3d** | `link.py` prediction bug fix ($2\% \to 62\%$ link rate); injection-recovery baseline | Complete |
+| **M3d** | `link.py` prediction bug fix and later high-motion fixes; injection-recovery link rate now 100% on n=200 baseline | Complete |
 
 ### 13.2 Upcoming Milestones
 
 | Milestone | Description | Dependency |
 |---|---|---|
-| **M4** | Live ZTF alert stream ingestion via IRSA API | API token + network access |
+| **M4** | Production live ZTF/ATLAS/Pan-STARRS dry runs with credentials and explicit scheduler policy | API tokens + network access + human review policy |
 | **M5** | CNN Tier 2 fine-tuning on real ZTF cutouts | Labeled cutout dataset + GPU |
 | **M6** | Transformer Tier 3 training on MPC multi-night observations | Multi-night training set |
-| **M7** | Ensemble calibration on real data; injection-recovery tuning on live stream | M4 + M5 + M6 |
+| **M7** | Ensemble calibration on fresh real data and monitored live-stream baselines | M4 + M5 + M6 |
 
 ### 13.3 Known Limitations
 
-- **Link rate 62%**: The remaining 38% are predominantly high-motion or short-arc candidates that exceed the $\chi^2$ threshold under the linear prediction model. A quadratic extrapolation or orbit-constrained predictor is planned for M7.
-- **No live data**: All current validation uses synthetic data. Real ZTF/ATLAS integration is M4.
-- **Tier 2/3 weights untrained**: CNN and Transformer architectures are fully implemented but weights are randomly initialised. Real classification performance requires M5/M6.
+- **Live operations not production-certified**: Live ZTF, ATLAS, MPC, Pan-STARRS, and Horizons interfaces exist, but production use still requires credentials, scheduler policy, rate-limit review, and human approval procedures.
+- **Tier 2/3 weights need real training runs**: CNN and Transformer architectures and dataset builders are implemented, but production classification performance requires labeled cutouts and multi-night sequence training.
+- **Model calibration is survey-dependent**: The 100% synthetic baselines do not replace real-survey holdout validation, calibration drift monitoring, or MPC/CNEOS authority.
 - **MOID accuracy**: Orbital arcs shorter than 24 hours produce MOID estimates with uncertainties of several tenths of an AU. The quality-code gate mitigates but does not eliminate this limitation.
 
 ---

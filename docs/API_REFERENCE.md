@@ -627,3 +627,126 @@ Lightweight summary of a `ScoredNEO` for display or export.
 | `Skills/filter_candidates.py` | Filter scored NEO JSON by hazard flag, pathway, or minimum priority |
 | `Skills/summarise_run.py` | Print/JSON summary of a pipeline run from scored NEO JSON |
 | `Skills/plot_sky_coverage.py` | RA/Dec scatter plot of tracklet positions colour-coded by hazard flag |
+
+---
+
+## v0.16.0 through v0.25.0 Public API Additions
+
+These releases added conservative helper APIs around live-data retrieval,
+preprocessing quality, detection triage, linking, orbit review, classification
+explanation, scoring, alert packaging, and calibration. All functions remain
+guarded by the project policy that internally computed data must not be used to
+claim confirmation or impact probability.
+
+| Version | Module | Public additions |
+|---|---|---|
+| v0.16.0 | `orbit.py` | `classify_neo_class`, `tisserand_parameter` |
+| v0.16.0 | `detect.py` | `filter_by_real_bogus` |
+| v0.16.0 | `link.py` | `deduplicate_tracklets` |
+| v0.16.0 | `score.py` | `pha_candidates`, `compute_statistics` |
+| v0.16.0 | `classify.py` | `posterior_entropy` |
+| v0.16.0 | `alert.py` | `format_neocp_report` |
+| v0.16.0 | `fetch.py` | `merge_survey_alerts` |
+| v0.16.0 | `preprocess.py` | `compute_color_index` |
+| v0.16.0 | `schemas.py` | `NEOStatistics` |
+| v0.17.0 | `orbit.py` | `batch_predict_ephemeris`, `resonance_check` |
+| v0.17.0 | `detect.py` | `compute_streak_metric` |
+| v0.17.0 | `link.py` | `split_tracklet` |
+| v0.17.0 | `classify.py` | `dominant_hypothesis` |
+| v0.17.0 | `score.py` | `close_approach_candidates` |
+| v0.17.0 | `alert.py` | `ready_for_submission` |
+| v0.17.0 | `fetch.py` | `filter_alerts_by_motion` |
+| v0.17.0 | `preprocess.py` | `estimate_source_density` |
+| v0.17.0 | `schemas.py` | `TrackletSummary` |
+| v0.18.0 | `orbit.py` | `ephemeris_uncertainty` |
+| v0.18.0 | `detect.py` | `cluster_detections` |
+| v0.18.0 | `link.py` | `compute_arc_statistics` |
+| v0.18.0 | `classify.py` | `classify_morphology` |
+| v0.18.0 | `score.py` | `absolute_magnitude_from_diameter` |
+| v0.18.0 | `alert.py` | `format_discovery_circular` |
+| v0.18.0 | `fetch.py` | `build_observation_window` |
+| v0.18.0 | `preprocess.py` | `compute_source_snr` |
+| v0.18.0 | `schemas.py` | `CloseApproachEvent` |
+| v0.18.0 | `calibration.py` | `bootstrap_confidence_interval` |
+| v0.19.0 | `orbit.py` | `orbital_energy` |
+| v0.19.0 | `detect.py` | `compute_trail_length` |
+| v0.19.0 | `link.py` | `assess_link_confidence` |
+| v0.19.0 | `classify.py` | `batch_morphology` |
+| v0.19.0 | `score.py` | `compute_impact_energy` |
+| v0.19.0 | `alert.py` | `format_alert_summary` |
+| v0.19.0 | `fetch.py` | `count_known_objects_in_field` |
+| v0.19.0 | `preprocess.py` | `detect_bad_pixels` |
+| v0.19.0 | `schemas.py` | `SurveyField` |
+| v0.19.0 | `calibration.py` | `cross_validate_calibration` |
+| v0.20.0 | `orbit.py` | `compute_phase_angle` |
+| v0.20.0 | `detect.py` | `compute_psf_fwhm` |
+| v0.20.0 | `link.py` | `compute_tracklet_grade` |
+| v0.20.0 | `classify.py` | `summarize_classifications` |
+| v0.20.0 | `score.py` | `compute_novelty_score` |
+| v0.20.0 | `alert.py` | `generate_observation_request` |
+| v0.20.0 | `fetch.py` | `fetch_mpc_observations` |
+| v0.20.0 | `preprocess.py` | `compute_astrometric_scatter` |
+| v0.20.0 | `schemas.py` | `PipelineConfig` |
+| v0.20.0 | `calibration.py` | `compute_log_loss` |
+| v0.21.0 | `orbit.py` | `compute_heliocentric_distance` |
+| v0.21.0 | `detect.py` | `estimate_sky_background` |
+| v0.21.0 | `link.py` | `filter_by_arc_length` |
+| v0.21.0 | `classify.py` | `calibrate_posterior` |
+| v0.21.0 | `score.py` | `compute_threat_score` |
+| v0.21.0 | `alert.py` | `generate_mpc_cover_letter` |
+| v0.21.0 | `fetch.py` | `fetch_atlas_forced` |
+| v0.21.0 | `preprocess.py` | `normalize_photometry` |
+| v0.21.0 | `schemas.py` | `ObservationBatch` |
+| v0.21.0 | `calibration.py` | `reliability_diagram` |
+| v0.22.0 | `orbit.py` | `compute_synodic_period` |
+| v0.22.0 | `detect.py` | `compute_detection_efficiency` |
+| v0.22.0 | `link.py` | `summarize_arc_statistics` |
+| v0.22.0 | `classify.py` | `compute_classification_table` |
+| v0.22.0 | `score.py` | `filter_by_alert_pathway` |
+| v0.22.0 | `alert.py` | `format_impact_notification` |
+| v0.22.0 | `fetch.py` | `fetch_ztf_alerts` |
+| v0.22.0 | `preprocess.py` | `compute_image_quality_metrics` |
+| v0.22.0 | `schemas.py` | `DetectionSummary` |
+| v0.22.0 | `calibration.py` | `calibration_report` |
+| v0.23.0 | `orbit.py` | `compute_apparent_magnitude` |
+| v0.23.0 | `detect.py` | `count_detections_by_filter` |
+| v0.23.0 | `link.py` | `filter_by_nights_observed` |
+| v0.23.0 | `classify.py` | `get_posterior_vector` |
+| v0.23.0 | `score.py` | `compute_followup_urgency` |
+| v0.23.0 | `alert.py` | `count_pending_alerts` |
+| v0.23.0 | `fetch.py` | `estimate_survey_depth` |
+| v0.23.0 | `preprocess.py` | `compute_photometric_scatter` |
+| v0.23.0 | `schemas.py` | `PhotometricSolution` |
+| v0.23.0 | `calibration.py` | `compare_calibrators` |
+| v0.24.0 | `orbit.py` | `compute_absolute_magnitude` |
+| v0.24.0 | `detect.py` | `compute_motion_vector` |
+| v0.24.0 | `link.py` | `merge_overlapping_tracklets` |
+| v0.24.0 | `classify.py` | `compute_neo_probability` |
+| v0.24.0 | `score.py` | `compute_discovery_score` |
+| v0.24.0 | `alert.py` | `format_submission_checklist` |
+| v0.24.0 | `fetch.py` | `filter_by_survey` |
+| v0.24.0 | `preprocess.py` | `estimate_zero_point` |
+| v0.24.0 | `schemas.py` | `ObservationStatistics` |
+| v0.24.0 | `calibration.py` | `compute_roc_auc` |
+| v0.25.0 | `orbit.py` | `compute_perihelion_date` |
+| v0.25.0 | `detect.py` | `flag_moving_sources` |
+| v0.25.0 | `link.py` | `validate_tracklet` |
+| v0.25.0 | `classify.py` | `compute_artifact_probability` |
+| v0.25.0 | `score.py` | `compute_observation_priority` |
+| v0.25.0 | `alert.py` | `validate_alert_package` |
+| v0.25.0 | `fetch.py` | `fetch_panstarrs_catalog` |
+| v0.25.0 | `preprocess.py` | `compute_difference_image_snr` |
+| v0.25.0 | `schemas.py` | `AlertPackage` |
+| v0.25.0 | `calibration.py` | `compute_precision_recall_curve` |
+
+### Skills added in v0.16.0 through v0.25.0
+
+`export_candidate_report.py`, `tag_neo_class.py`, `check_tisserand.py`,
+`export_followup_requests.py`, `ephemeris_check.py`,
+`flag_comet_candidates.py`, `compute_orbital_energy.py`,
+`assess_survey_coverage.py`, `grade_tracklets.py`,
+`query_mpc_observations.py`, `compute_threat_scores.py`,
+`fetch_atlas_data.py`, `plot_calibration.py`, `export_survey_summary.py`,
+`compute_apparent_magnitudes.py`, `triage_candidates.py`,
+`compute_discovery_scores.py`, `format_submission_checklists.py`,
+`validate_pipeline_run.py`, and `export_atlas_lightcurve.py`.

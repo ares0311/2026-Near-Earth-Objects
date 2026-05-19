@@ -431,6 +431,9 @@ python -m mypy src
 # Tests
 PYTHONPATH=src python -m pytest
 
+# macOS local runs with XGBoost/OpenMP may need deterministic threading
+OMP_NUM_THREADS=1 PYTHONPATH=src python -m pytest
+
 # All three
 ruff check . && python -m mypy src && PYTHONPATH=src python -m pytest
 ```
@@ -559,7 +562,7 @@ All 10 pipeline modules are complete. 1329 tests passing (100% coverage). CI gre
 | `background/config.schema.json` | JSON Schema for manual-first background config |
 | `background/targets.json` | Stable background automation fixture manifest |
 
-### Coverage by Module (v0.13.0)
+### Coverage by Module (v0.25.0)
 
 | Module | Coverage |
 |---|---|
@@ -574,20 +577,21 @@ All 10 pipeline modules are complete. 1329 tests passing (100% coverage). CI gre
 | `classify.py` | 100% |
 | `fetch.py` | 100% (ztfquery, ATLAS, astroquery.mpc, jplhorizons all mocked) |
 
-### What Is Not Yet Built (Milestones 4–7)
+### Remaining Operational Milestones
 
 | Milestone | Description |
 |---|---|
-| 4 | Live ZTF/ATLAS data integration (requires network + API tokens) |
-| 5 | CNN image classifier Tier 2 (requires GPU + labeled cutouts) |
-| 6 | Transformer tracklet model Tier 3 (requires multi-night training set) |
-| 7 | Ensemble calibration + injection-recovery testing |
+| 4 | Production live ZTF/ATLAS/Pan-STARRS runs with real credentials and scheduler policy |
+| 5 | Trained Tier 2 CNN weights from labeled ZTF cutouts |
+| 6 | Trained Tier 3 Transformer weights from multi-night MPC/ZTF sequences |
+| 7 | Production ensemble calibration on fresh labeled survey data |
 
 ### Immediate Next Steps
 
-- Collect labeled training data via `Skills/generate_training_labels.py`
-- Integrate live ZTF alert stream (Milestone 4)
-- Train and evaluate Tier 2 CNN on real cutouts (Milestone 5)
+- Sync docs and changelog after each version bump so `AGENTS.md`, `CLAUDE.md`, `README.md`, and `CHANGELOG.md` stay aligned.
+- Collect labeled training data via `Skills/generate_training_labels.py`.
+- Run credentialed live-data dry runs for ZTF/ATLAS/Pan-STARRS only when tokens and review policy are explicitly configured.
+- Train and evaluate Tier 2/Tier 3 model weights on real labeled data.
 
 ### Key Changes in v0.25.0
 

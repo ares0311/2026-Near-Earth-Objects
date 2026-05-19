@@ -5,6 +5,79 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## v0.25.0
+
+- Added `compute_perihelion_date`, `flag_moving_sources`, `validate_tracklet`,
+  `compute_artifact_probability`, `compute_observation_priority`,
+  `validate_alert_package`, `fetch_panstarrs_catalog`,
+  `compute_difference_image_snr`, `AlertPackage`, and
+  `compute_precision_recall_curve`.
+- Added `Skills/validate_pipeline_run.py` and
+  `Skills/export_atlas_lightcurve.py`.
+- Added `docs/PREPROCESS_GUIDE.md`.
+- 87 new tests (1329 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.25.0.
+
+## v0.24.0
+
+- Added `compute_absolute_magnitude`, `compute_motion_vector`,
+  `merge_overlapping_tracklets`, `compute_neo_probability`,
+  `compute_discovery_score`, `format_submission_checklist`,
+  `filter_by_survey`, `estimate_zero_point`, `ObservationStatistics`, and
+  `compute_roc_auc`.
+- Added `Skills/compute_discovery_scores.py` and
+  `Skills/format_submission_checklists.py`.
+- Added `docs/FETCH_GUIDE.md`.
+- 75 new tests (1242 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.24.0.
+
+## v0.23.0
+
+- Added `compute_apparent_magnitude`, `count_detections_by_filter`,
+  `filter_by_nights_observed`, `get_posterior_vector`,
+  `compute_followup_urgency`, `count_pending_alerts`, `estimate_survey_depth`,
+  `compute_photometric_scatter`, `PhotometricSolution`, and
+  `compare_calibrators`.
+- Added `Skills/compute_apparent_magnitudes.py` and
+  `Skills/triage_candidates.py`.
+- Added `docs/LINKING_GUIDE.md`.
+- 78 new tests (1167 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.23.0.
+
+## v0.22.0
+
+- Added `compute_synodic_period`, `compute_detection_efficiency`,
+  `summarize_arc_statistics`, `compute_classification_table`,
+  `filter_by_alert_pathway`, `format_impact_notification`,
+  `fetch_ztf_alerts`, `compute_image_quality_metrics`, `DetectionSummary`,
+  and `calibration_report`.
+- Added `Skills/plot_calibration.py` and `Skills/export_survey_summary.py`.
+- Added `docs/DETECTION_GUIDE.md`.
+- 71 new tests (1089 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.22.0.
+
+## v0.21.0
+
+- Added `compute_heliocentric_distance`, `estimate_sky_background`,
+  `filter_by_arc_length`, `calibrate_posterior`, `compute_threat_score`,
+  `generate_mpc_cover_letter`, `fetch_atlas_forced`, `normalize_photometry`,
+  `ObservationBatch`, and `reliability_diagram`.
+- Added `Skills/compute_threat_scores.py` and `Skills/fetch_atlas_data.py`.
+- Added `docs/THREAT_ASSESSMENT.md`.
+- 69 new tests (1018 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.21.0.
+
+## v0.20.0
+
+- Added `compute_phase_angle`, `compute_psf_fwhm`, `compute_tracklet_grade`,
+  `summarize_classifications`, `compute_novelty_score`,
+  `generate_observation_request`, `fetch_mpc_observations`,
+  `compute_astrometric_scatter`, `PipelineConfig`, and `compute_log_loss`.
+- Added `Skills/grade_tracklets.py` and `Skills/query_mpc_observations.py`.
+- Added `docs/QUALITY_METRICS.md`.
+- 69 new tests (949 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.20.0.
+
 ## v0.19.0
 
 - `orbit.py`: added `orbital_energy(elements)` — specific orbital energy in AU²/yr² using two-body formula E = −4π²/(2a); negative = bound, 0 = parabolic, positive = hyperbolic; returns inf for a ≤ 0; added to `__all__`.
