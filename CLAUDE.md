@@ -471,9 +471,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.25.0)
+## Current State (v0.26.0)
 
-All 10 pipeline modules are complete. 1329 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified manual CLI with top-level SQLite logs and auditable signoff readiness.
+All 10 pipeline modules are complete. 1333 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified CLI with automated offline scheduling readiness, top-level SQLite logs, live-mode blockers, and auditable signoff readiness.
 
 ### Skills
 
@@ -558,11 +558,11 @@ All 10 pipeline modules are complete. 1329 tests passing (100% coverage). CI gre
 | `data/injection_recovery_baseline.json` | Injection-recovery results (n=50, seed=42): 100% detection, 62% link, 62% score |
 | `data/injection_recovery_n200.json` | Injection-recovery results (n=200, seed=42): 100% detection, 100% link, 100% score |
 | `data/stress_test_high_motion.json` | Stress-test results: 100% link rate across all three motion bins |
-| `background/config.json` | Manual-first background automation configuration |
-| `background/config.schema.json` | JSON Schema for manual-first background config |
+| `background/config.json` | Automated offline background automation configuration |
+| `background/config.schema.json` | JSON Schema for background automation config |
 | `background/targets.json` | Stable background automation fixture manifest |
 
-### Coverage by Module (v0.25.0)
+### Coverage by Module (v0.26.0)
 
 | Module | Coverage |
 |---|---|
@@ -592,6 +592,16 @@ All 10 pipeline modules are complete. 1329 tests passing (100% coverage). CI gre
 - Collect labeled training data via `Skills/generate_training_labels.py`.
 - Run credentialed live-data dry runs for ZTF/ATLAS/Pan-STARRS only when tokens and review policy are explicitly configured.
 - Train and evaluate Tier 2/Tier 3 model weights on real labeled data.
+
+### Key Changes in v0.26.0
+
+- `schemas.py`: `BackgroundRunMode` now supports `automated`; `BackgroundConfig` added scheduler readiness fields, live review policy, and required credential environment variable names.
+- `background.py`: added `automation_readiness_summary(config_path)` and `launchd_plist(config_path)`; live network mode now reports explicit blockers before any network action.
+- `Skills/background.py`: added `automation-readiness` and `launchd-plist` subcommands.
+- `background/config.json`: default mode is automated offline scheduling with live network disabled and required credential names declared.
+- `docs/BACKGROUND_SEARCH_AUTOMATION.md`: updated scheduler guidance for automated offline runs and macOS launchd template generation.
+- 4 new tests (1333 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.26.0.
 
 ### Key Changes in v0.25.0
 

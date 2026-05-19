@@ -56,7 +56,7 @@ OrbitQualityCode = Literal[1, 2, 3, 4]
 
 BackgroundOutcome = Literal["reviewed", "needs_follow_up"]
 
-BackgroundRunMode = Literal["manual"]
+BackgroundRunMode = Literal["manual", "automated"]
 
 FollowUpTestStatus = Literal["pass", "fail", "blocked", "uncertain"]
 
@@ -452,6 +452,10 @@ class BackgroundConfig(BaseModel):
     live_network_enabled: bool = False
     require_human_signoff: bool = True
     required_approval_count: int = Field(ge=1, default=1)
+    scheduler_enabled: bool = False
+    scheduler_interval_minutes: int = Field(ge=15, default=60)
+    live_review_policy: str | None = None
+    required_credential_env: tuple[str, ...] = ()
 
 
 class HumanSignoffEntry(BaseModel):

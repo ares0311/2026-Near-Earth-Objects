@@ -15,9 +15,11 @@ from background import (
     DEFAULT_CONFIG_PATH,
     DEFAULT_DB_PATH,
     DEFAULT_INPUT_PATH,
+    automation_readiness_summary,
     background_run_once,
     follow_up_test_summary,
     human_signoff_summary,
+    launchd_plist,
     ledger_summary,
     needs_follow_up_summary,
     record_human_signoff,
@@ -51,6 +53,12 @@ def main() -> None:
     priority = sub.add_parser("target-priority-summary", help="Summarize target priorities")
     priority.add_argument("--input", type=Path, default=DEFAULT_INPUT_PATH)
     priority.add_argument("--db", type=Path, default=DEFAULT_DB_PATH)
+
+    readiness = sub.add_parser("automation-readiness", help="Inspect scheduler/live readiness")
+    readiness.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
+
+    launchd = sub.add_parser("launchd-plist", help="Print a macOS launchd plist template")
+    launchd.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
 
     for name in (
         "ledger-summary",
@@ -93,6 +101,10 @@ def main() -> None:
         _print_json(background_run_once(args.input, args.db, args.report_dir, args.config))
     elif args.command == "target-priority-summary":
         _print_json(target_priority_summary(args.input, args.db))
+    elif args.command == "automation-readiness":
+        _print_json(automation_readiness_summary(args.config))
+    elif args.command == "launchd-plist":
+        print(launchd_plist(args.config), end="")
     elif args.command == "ledger-summary":
         _print_json(ledger_summary(args.db))
     elif args.command == "reviewed-summary":

@@ -5,6 +5,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## v0.26.0
+
+- `schemas.py`: `BackgroundRunMode` now supports `automated`; `BackgroundConfig`
+  added scheduler readiness fields, live review policy, and required credential
+  environment variable names.
+- `background.py`: added `automation_readiness_summary(config_path)` and
+  `launchd_plist(config_path)`; live network mode reports explicit blockers
+  before any network action.
+- `Skills/background.py`: added `automation-readiness` and `launchd-plist`
+  subcommands.
+- `background/config.json`: default mode is automated offline scheduling with
+  live network disabled and required credential names declared.
+- `docs/BACKGROUND_SEARCH_AUTOMATION.md`: updated scheduler guidance for
+  automated offline runs and macOS launchd template generation.
+- `README.md`: refreshed stale abstract from v0.10.0 / 346 tests / 62% link rate
+  to v0.26.0 / 1333 tests / n=200 100% synthetic baseline.
+- 4 new tests (1333 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.26.0.
+
 ## v0.25.0
 
 - Added `compute_perihelion_date`, `flag_moving_sources`, `validate_tracklet`,

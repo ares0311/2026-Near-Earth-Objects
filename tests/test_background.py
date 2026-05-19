@@ -135,6 +135,41 @@ def test_load_config_defaults_to_manual_and_one_approval(tmp_path):
     assert cfg.run_mode == "manual"
     assert cfg.live_network_enabled is False
     assert cfg.required_approval_count == 1
+    assert cfg.scheduler_enabled is False
+
+
+def test_project_config_is_automated_offline():
+    cfg = background.load_config(Path("background/config.json"))
+
+    assert cfg.run_mode == "automated"
+    assert cfg.scheduler_enabled is True
+    assert cfg.live_network_enabled is False
+    assert cfg.required_credential_env == ("ZTF_IRSA_TOKEN", "ATLAS_TOKEN")
+
+
+def test_automation_readiness_is_scheduler_ready_but_live_blocked(monkeypatch):
+    monkeypatch.delenv("ZTF_IRSA_TOKEN", raising=False)
+    monkeypatch.delenv("ATLAS_TOKEN", raising=False)
+
+    readiness = background.automation_readiness_summary(Path("background/config.json"))
+
+    assert readiness["scheduler_ready"] is True
+    assert readiness["scheduler_blockers"] == []
+    assert readiness["live_mode_ready"] is False
+    assert "LIVE_NETWORK_DISABLED" in readiness["live_mode_blockers"]
+    assert "MISSING_REQUIRED_CREDENTIALS" in readiness["live_mode_blockers"]
+    assert readiness["missing_credential_env"] == ("ZTF_IRSA_TOKEN", "ATLAS_TOKEN")
+    assert "Skills/background.py run-once" in readiness["one_run_command"]
+
+
+def test_launchd_plist_wraps_one_run_command():
+    plist = background.launchd_plist(Path("background/config.json"))
+
+    assert "org.neo-detection.background" in plist
+    assert "<string>run-once</string>" in plist
+    assert "<key>StartInterval</key>" in plist
+    assert "<integer>3600</integer>" in plist
+    assert "<key>OMP_NUM_THREADS</key>" in plist
 
 
 def test_gitignore_excludes_generated_background_artifacts():
@@ -468,6 +503,44 @@ def test_background_cli_subcommands(tmp_path):
     assert json.loads(unsigned.stdout)["unsigned_follow_up_runs"] == []
 
 
+def test_background_cli_automation_commands(tmp_path):
+    repo = Path(__file__).resolve().parents[1]
+    config_path = repo / "background" / "config.json"
+    env = {**os.environ, "PYTHONPATH": str(repo / "src")}
+
+    readiness = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "automation-readiness",
+            "--config",
+            str(config_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    plist = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "launchd-plist",
+            "--config",
+            str(config_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+
+    assert json.loads(readiness.stdout)["scheduler_ready"] is True
+    assert "org.neo-detection.background" in plist.stdout
+
+
 def test_deprecated_background_wrappers_are_removed():
     repo = Path(__file__).resolve().parents[1]
 
@@ -702,7 +775,8 @@ def test_background_run_once_raises_on_live_network(tmp_path):
     # RuntimeError is caught internally and logged as a run failure
     assert result.ledger.target_id == "RUN_FAILURE"
     assert result.ledger.failure_reason is not None
-    assert "not enabled" in result.ledger.failure_reason
+    assert "blocked" in result.ledger.failure_reason
+    assert "LIVE_REVIEW_POLICY_MISSING" in result.ledger.failure_reason
 
 
 def test_audit_report_returns_required_keys(tmp_path):

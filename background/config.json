@@ -3,8 +3,15 @@
   "db_path": "Logs/background.sqlite",
   "report_dir": "Logs/reports",
   "follow_up_threshold": 0.45,
-  "run_mode": "manual",
+  "run_mode": "automated",
   "live_network_enabled": false,
   "require_human_signoff": true,
-  "required_approval_count": 1
+  "required_approval_count": 1,
+  "scheduler_enabled": true,
+  "scheduler_interval_minutes": 60,
+  "live_review_policy": null,
+  "required_credential_env": [
+    "ZTF_IRSA_TOKEN",
+    "ATLAS_TOKEN"
+  ]
 }

@@ -12,7 +12,11 @@
     "run_mode",
     "live_network_enabled",
     "require_human_signoff",
-    "required_approval_count"
+    "required_approval_count",
+    "scheduler_enabled",
+    "scheduler_interval_minutes",
+    "live_review_policy",
+    "required_credential_env"
   ],
   "properties": {
     "input_path": {
@@ -30,7 +34,10 @@
       "maximum": 1
     },
     "run_mode": {
-      "const": "manual"
+      "enum": [
+        "manual",
+        "automated"
+      ]
     },
     "live_network_enabled": {
       "const": false
@@ -41,6 +48,26 @@
     "required_approval_count": {
       "type": "integer",
       "minimum": 1
+    },
+    "scheduler_enabled": {
+      "type": "boolean"
+    },
+    "scheduler_interval_minutes": {
+      "type": "integer",
+      "minimum": 15
+    },
+    "live_review_policy": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "required_credential_env": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
     }
   }
 }

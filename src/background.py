@@ -26,9 +26,12 @@ __all__ = [
     "submission_recommendation_summary",
     "validation_summary",
     "audit_report",
+    "automation_readiness_summary",
+    "launchd_plist",
 ]
 
 import json
+import os
 import sqlite3
 import uuid
 from contextlib import contextmanager
@@ -42,6 +45,7 @@ from schemas import (
     BackgroundConfig,
     BackgroundOutcome,
     BackgroundRunLedgerEntry,
+    BackgroundRunMode,
     BackgroundRunResult,
     BackgroundTarget,
     FollowUpTestResult,
@@ -63,7 +67,7 @@ DEFAULT_INPUT_PATH = _ROOT / "background" / "targets.json"
 DEFAULT_DB_PATH = _ROOT / "Logs" / "background.sqlite"
 DEFAULT_REPORT_DIR = _ROOT / "Logs" / "reports"
 _SCHEMA_VERSION = "background-v1"
-_CODE_VERSION = "0.10.0"
+_CODE_VERSION = "0.26.0"
 _FOLLOW_UP_THRESHOLD = 0.45
 _LOCK_ID = 1
 
@@ -677,6 +681,8 @@ def _empty_reviewed_entry(
     when: str,
     input_path: Path,
     config_path: Path | None = None,
+    run_mode: BackgroundRunMode = "manual",
+    live_network_enabled: bool = False,
 ) -> tuple[BackgroundRunLedgerEntry, ReviewedLogEntry]:
     ledger = BackgroundRunLedgerEntry(
         run_id=run_id,
@@ -689,7 +695,9 @@ def _empty_reviewed_entry(
         outcome="reviewed",
         selected_score=0.0,
         reason_codes=("NO_TARGETS_AVAILABLE",),
+        run_mode=run_mode,
         config_path=str(config_path) if config_path else None,
+        live_network_enabled=live_network_enabled,
     )
     reviewed = ReviewedLogEntry(
         run_id=run_id,
@@ -709,6 +717,8 @@ def _failure_reviewed_entry(
     input_path: Path,
     exc: Exception,
     config_path: Path | None = None,
+    run_mode: BackgroundRunMode = "manual",
+    live_network_enabled: bool = False,
 ) -> tuple[BackgroundRunLedgerEntry, ReviewedLogEntry]:
     message = f"{type(exc).__name__}: {exc}"
     ledger = BackgroundRunLedgerEntry(
@@ -722,8 +732,10 @@ def _failure_reviewed_entry(
         outcome="reviewed",
         selected_score=0.0,
         reason_codes=("RUN_FAILED_BLOCKED",),
+        run_mode=run_mode,
         config_path=str(config_path) if config_path else None,
         failure_reason=message,
+        live_network_enabled=live_network_enabled,
     )
     reviewed = ReviewedLogEntry(
         run_id=run_id,
@@ -748,11 +760,18 @@ def background_run_once(
     actual_input_path = input_path or DEFAULT_INPUT_PATH
     actual_db_path = db_path or DEFAULT_DB_PATH
     actual_report_dir = report_dir or DEFAULT_REPORT_DIR
+    config: BackgroundConfig | None = None
 
     try:
         config = load_config(config_path)
         if config.live_network_enabled:
-            raise RuntimeError("Live network mode is not enabled for background automation.")
+            readiness = automation_readiness_summary(config_path)
+            blockers = readiness["live_mode_blockers"]
+            if blockers:
+                raise RuntimeError(
+                    "Live network mode is blocked for background automation: "
+                    + ", ".join(blockers)
+                )
         actual_input_path = input_path or _resolve_project_path(config.input_path)
         actual_db_path = db_path or _resolve_project_path(config.db_path)
         actual_report_dir = report_dir or _resolve_project_path(config.report_dir)
@@ -772,6 +791,8 @@ def background_run_once(
                         started_at,
                         actual_input_path,
                         config_path,
+                        config.run_mode,
+                        config.live_network_enabled,
                     )
                     _insert_ledger(conn, ledger)
                     _insert_reviewed(conn, reviewed)
@@ -794,6 +815,7 @@ def background_run_once(
                     outcome=outcome,
                     selected_score=target.priority.composite_score,
                     reason_codes=reason_codes or ("BELOW_FOLLOW_UP_THRESHOLD",),
+                    run_mode=config.run_mode,
                     config_path=str(config_path),
                     live_network_enabled=config.live_network_enabled,
                 )
@@ -837,6 +859,8 @@ def background_run_once(
                 actual_input_path,
                 exc,
                 config_path,
+                config.run_mode if config else "manual",
+                config.live_network_enabled if config else False,
             )
             if not _ledger_exists(conn, run_id):
                 _insert_ledger(conn, ledger)
@@ -1235,3 +1259,96 @@ def audit_report(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]:
         "has_unreviewed_runs": outcome_count < total_runs,
         "integrity_ok": validation.get("integrity_ok", True),
     }
+
+
+def _one_run_command(config_path: Path = DEFAULT_CONFIG_PATH) -> str:
+    return f"PYTHONPATH=src python Skills/background.py run-once --config {config_path}"
+
+
+def automation_readiness_summary(config_path: Path = DEFAULT_CONFIG_PATH) -> dict[str, Any]:
+    """Report scheduler and live-mode readiness without performing network actions."""
+    config = load_config(config_path)
+    missing_credentials = tuple(
+        name for name in config.required_credential_env if not os.environ.get(name)
+    )
+
+    scheduler_blockers: list[str] = []
+    if config.run_mode != "automated":
+        scheduler_blockers.append("RUN_MODE_NOT_AUTOMATED")
+    if not config.scheduler_enabled:
+        scheduler_blockers.append("SCHEDULER_NOT_ENABLED")
+
+    live_blockers: list[str] = []
+    if not config.live_network_enabled:
+        live_blockers.append("LIVE_NETWORK_DISABLED")
+    if missing_credentials:
+        live_blockers.append("MISSING_REQUIRED_CREDENTIALS")
+    if not config.live_review_policy:
+        live_blockers.append("LIVE_REVIEW_POLICY_MISSING")
+    if not config.require_human_signoff:
+        live_blockers.append("HUMAN_SIGNOFF_NOT_REQUIRED")
+
+    return {
+        "config_path": str(config_path),
+        "run_mode": config.run_mode,
+        "scheduler_enabled": config.scheduler_enabled,
+        "scheduler_interval_minutes": config.scheduler_interval_minutes,
+        "scheduler_ready": not scheduler_blockers,
+        "scheduler_blockers": scheduler_blockers,
+        "one_run_command": _one_run_command(config_path),
+        "live_network_enabled": config.live_network_enabled,
+        "live_mode_ready": config.live_network_enabled and not live_blockers,
+        "live_mode_blockers": live_blockers,
+        "required_credential_env": config.required_credential_env,
+        "missing_credential_env": missing_credentials,
+        "live_review_policy": config.live_review_policy,
+        "require_human_signoff": config.require_human_signoff,
+        "required_approval_count": config.required_approval_count,
+        "external_submission_enabled": False,
+        "log_backend": "sqlite",
+    }
+
+
+def launchd_plist(config_path: Path = DEFAULT_CONFIG_PATH) -> str:
+    """Build a macOS launchd plist that invokes the one-run background command."""
+    config = load_config(config_path)
+    root = _ROOT
+    script = root / "Skills" / "background.py"
+    stdout = root / "Logs" / "background_launchd.log"
+    stderr = root / "Logs" / "background_launchd.err.log"
+    interval_seconds = config.scheduler_interval_minutes * 60
+    return f"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>org.neo-detection.background</string>
+  <key>WorkingDirectory</key>
+  <string>{root}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>python</string>
+    <string>{script}</string>
+    <string>run-once</string>
+    <string>--config</string>
+    <string>{config_path}</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PYTHONPATH</key>
+    <string>{root / "src"}</string>
+    <key>OMP_NUM_THREADS</key>
+    <string>1</string>
+  </dict>
+  <key>StartInterval</key>
+  <integer>{interval_seconds}</integer>
+  <key>StandardOutPath</key>
+  <string>{stdout}</string>
+  <key>StandardErrorPath</key>
+  <string>{stderr}</string>
+  <key>RunAtLoad</key>
+  <false/>
+</dict>
+</plist>
+"""
