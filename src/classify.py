@@ -22,6 +22,7 @@ __all__ = [
     "get_posterior_vector",
     "compute_neo_probability",
     "compute_artifact_probability",
+    "compute_confusion_matrix",
 ]
 
 import base64
@@ -1216,3 +1217,47 @@ def compute_artifact_probability(features: CandidateFeatures) -> float:
     exp_other = _math.exp(log_other - log_max)
     prob = exp_art / (exp_art + exp_other)
     return round(float(prob), 6)
+
+
+def compute_confusion_matrix(
+    predicted_labels: list | tuple,
+    true_labels: list | tuple,
+) -> dict:
+    """Compute a confusion matrix from predicted and true string labels.
+
+    Args:
+        predicted_labels: Sequence of predicted class label strings.
+        true_labels: Sequence of true (ground-truth) class label strings.
+
+    Returns:
+        Dict with keys:
+
+        - ``"labels"``: Sorted list of unique labels (union of predicted and
+          true).
+        - ``"matrix"``: List of lists of counts where rows correspond to true
+          labels and columns correspond to predicted labels.
+        - ``"accuracy"``: Fraction of correct predictions in [0, 1]; 0.0 for
+          empty input.
+    """
+    pred = list(predicted_labels)
+    true = list(true_labels)
+
+    if not pred and not true:
+        return {"labels": [], "matrix": [], "accuracy": 0.0}
+
+    all_labels = sorted(set(pred) | set(true))
+    label_idx = {lbl: i for i, lbl in enumerate(all_labels)}
+    n = len(all_labels)
+
+    matrix = [[0] * n for _ in range(n)]
+    correct = 0
+    total = min(len(pred), len(true))
+    for p, t in zip(pred, true):
+        row = label_idx.get(t, 0)
+        col = label_idx.get(p, 0)
+        matrix[row][col] += 1
+        if p == t:
+            correct += 1
+
+    accuracy = correct / total if total > 0 else 0.0
+    return {"labels": all_labels, "matrix": matrix, "accuracy": round(accuracy, 6)}

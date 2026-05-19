@@ -8,7 +8,7 @@ __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "compute_impact_energy", "compute_novelty_score",
            "compute_threat_score", "filter_by_alert_pathway",
            "compute_followup_urgency", "compute_discovery_score",
-           "compute_observation_priority"]
+           "compute_observation_priority", "compute_size_estimate"]
 
 import math
 import uuid
@@ -741,3 +741,40 @@ def compute_observation_priority(neo: ScoredNEO) -> float:
 
     score = 0.3 * gap_score + 0.4 * float(priority) + 0.3 * orbit_urgency
     return round(min(1.0, max(0.0, float(score))), 4)
+
+
+def compute_size_estimate(neo: ScoredNEO) -> dict | None:
+    """Estimate diameter range from absolute magnitude H.
+
+    Uses the standard H–D relation: ``d = 1329 / sqrt(p_v) * 10^(-H/5) km``
+    with albedo bounds p_v ∈ [0.05, 0.30] to derive minimum and maximum
+    diameter estimates.
+
+    Args:
+        neo: A :class:`~schemas.ScoredNEO` object.
+
+    Returns:
+        Dict with keys:
+
+        - ``"min_m"``: Minimum diameter estimate in metres (p_v = 0.30).
+        - ``"max_m"``: Maximum diameter estimate in metres (p_v = 0.05).
+        - ``"assumed_albedo_range"``: ``[0.05, 0.30]``
+
+        Returns ``None`` if ``absolute_magnitude_h`` is ``None`` or not finite.
+    """
+    h = neo.hazard.absolute_magnitude_h
+    if h is None or not math.isfinite(h):
+        return None
+
+    # d = 1329 / sqrt(p_v) * 10^(-H/5) km
+    def _diam_km(p_v: float) -> float:
+        return 1329.0 / math.sqrt(p_v) * 10.0 ** (-h / 5.0)
+
+    min_km = _diam_km(0.30)  # high albedo → smaller diameter
+    max_km = _diam_km(0.05)  # low albedo → larger diameter
+
+    return {
+        "min_m": round(min_km * 1000.0, 2),
+        "max_m": round(max_km * 1000.0, 2),
+        "assumed_albedo_range": [0.05, 0.30],
+    }

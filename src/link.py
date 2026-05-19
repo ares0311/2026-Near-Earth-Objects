@@ -7,7 +7,7 @@ __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "split_tracklet", "compute_arc_statistics", "assess_link_confidence",
            "compute_tracklet_grade", "filter_by_arc_length", "summarize_arc_statistics",
            "filter_by_nights_observed", "merge_overlapping_tracklets",
-           "validate_tracklet"]
+           "validate_tracklet", "compute_great_circle_residual"]
 
 import math
 import uuid
@@ -750,3 +750,40 @@ def validate_tracklet(tracklet: object) -> tuple[bool, list[str]]:
             reasons.append("duplicate obs_id values found")
 
     return (len(reasons) == 0, reasons)
+
+
+def compute_great_circle_residual(tracklet: object) -> float | None:
+    """Fit a great-circle (linear RA/Dec) model and return RMS positional residual.
+
+    Performs independent linear (polyfit degree-1) fits to (JD, RA) and
+    (JD, Dec), then computes the RMS of the vector residuals in arcsec.
+    RA residuals are cos-Dec corrected.
+
+    Args:
+        tracklet: A :class:`~schemas.Tracklet` object.
+
+    Returns:
+        RMS residual in arcsec, or ``None`` for fewer than 2 observations.
+    """
+    obs = getattr(tracklet, "observations", ())
+    if len(obs) < 2:
+        return None
+
+    jds = np.array([o.jd for o in obs], dtype=float)
+    ras = np.array([o.ra_deg for o in obs], dtype=float)
+    decs = np.array([o.dec_deg for o in obs], dtype=float)
+    mean_dec_rad = float(np.mean(decs)) * math.pi / 180.0
+    cos_dec = math.cos(mean_dec_rad)
+
+    # Linear fits
+    ra_coeff = np.polyfit(jds, ras, 1)
+    dec_coeff = np.polyfit(jds, decs, 1)
+
+    ra_pred = np.polyval(ra_coeff, jds)
+    dec_pred = np.polyval(dec_coeff, jds)
+
+    dra_arcsec = (ras - ra_pred) * 3600.0 * cos_dec
+    ddec_arcsec = (decs - dec_pred) * 3600.0
+
+    rms = float(np.sqrt(np.mean(dra_arcsec ** 2 + ddec_arcsec ** 2)))
+    return round(rms, 6)
