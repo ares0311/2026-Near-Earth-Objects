@@ -50,7 +50,7 @@ def write_manifest_fixture(path: Path, object_ids: tuple[str, ...] = ("T001",)) 
     path.write_text(json.dumps({"schema_version": "background-targets-v1", "targets": rows}))
 
 
-def write_live_policy(path: Path, approved: bool = True) -> None:
+def write_live_policy(path: Path, approved: bool = True, min_seconds: int = 1) -> None:
     path.write_text(json.dumps({
         "schema_version": "live-review-policy-v1",
         "policy_name": "test-live-policy",
@@ -58,7 +58,7 @@ def write_live_policy(path: Path, approved: bool = True) -> None:
         "approved_for_live_network": approved,
         "allowed_surveys": ["ZTF", "ATLAS", "PanSTARRS"],
         "max_queries_per_run": 3,
-        "min_seconds_between_queries": 0,
+        "min_seconds_between_queries": min_seconds,
         "dry_run_scope": {
             "ra_deg": 180.0,
             "dec_deg": 0.0,
@@ -198,6 +198,7 @@ def test_automation_readiness_is_scheduler_ready_but_live_blocked(monkeypatch):
     assert readiness["live_mode_ready"] is False
     assert "LIVE_NETWORK_DISABLED" in readiness["live_mode_blockers"]
     assert "MISSING_REQUIRED_CREDENTIALS" in readiness["live_mode_blockers"]
+    assert "LIVE_PROVIDER_NOT_READY" in readiness["live_mode_blockers"]
     assert "LIVE_REVIEW_POLICY_NOT_APPROVED" in readiness["live_mode_blockers"]
     assert readiness["missing_credential_env"] == (
         "ZTF_IRSA_TOKEN",
@@ -210,6 +211,60 @@ def test_automation_readiness_is_scheduler_ready_but_live_blocked(monkeypatch):
         "PanSTARRS",
     )
     assert "Skills/background.py run-once" in readiness["one_run_command"]
+
+
+def test_live_provider_readiness_default_config_is_blocked(monkeypatch):
+    monkeypatch.delenv("ZTF_IRSA_TOKEN", raising=False)
+    monkeypatch.delenv("ATLAS_TOKEN", raising=False)
+    monkeypatch.delenv("MAST_API_TOKEN", raising=False)
+
+    providers = background.live_provider_readiness(Path("background/config.json"))
+
+    assert [provider["survey"] for provider in providers] == ["ZTF", "ATLAS", "PanSTARRS"]
+    assert all(provider["network_access_performed"] is False for provider in providers)
+    assert all(provider["external_submission_enabled"] is False for provider in providers)
+    assert all(provider["ready"] is False for provider in providers)
+    assert all("PROVIDER_CREDENTIAL_MISSING" in provider["blockers"] for provider in providers)
+
+
+def test_live_provider_readiness_approved_config_is_ready(monkeypatch, tmp_path):
+    policy_path = tmp_path / "policy.json"
+    config_path = tmp_path / "config.json"
+    write_live_policy(policy_path, approved=True)
+    write_live_config(config_path, policy_path, live_network_enabled=True)
+    monkeypatch.setenv("ZTF_IRSA_TOKEN", "ztf-token")
+    monkeypatch.setenv("ATLAS_TOKEN", "atlas-token")
+    monkeypatch.setenv("MAST_API_TOKEN", "mast-token")
+
+    providers = background.live_provider_readiness(config_path)
+
+    assert all(provider["ready"] is True for provider in providers)
+    assert all(provider["credential_present"] is True for provider in providers)
+    assert all(provider["policy_approved"] is True for provider in providers)
+    assert {provider["fetch_api"] for provider in providers} == {
+        "fetch_ztf_alerts",
+        "fetch_atlas_forced",
+        "fetch_panstarrs_catalog",
+    }
+
+
+def test_live_provider_readiness_flags_rate_limit_gap(monkeypatch, tmp_path):
+    policy_path = tmp_path / "policy.json"
+    config_path = tmp_path / "config.json"
+    write_live_policy(policy_path, approved=True, min_seconds=0)
+    write_live_config(config_path, policy_path, live_network_enabled=True)
+    monkeypatch.setenv("ZTF_IRSA_TOKEN", "ztf-token")
+    monkeypatch.setenv("ATLAS_TOKEN", "atlas-token")
+    monkeypatch.setenv("MAST_API_TOKEN", "mast-token")
+
+    readiness = background.automation_readiness_summary(config_path)
+
+    assert readiness["live_mode_ready"] is False
+    assert "LIVE_PROVIDER_NOT_READY" in readiness["live_mode_blockers"]
+    assert all(
+        "PROVIDER_RATE_LIMIT_TOO_FAST" in provider["blockers"]
+        for provider in readiness["live_provider_readiness"]
+    )
 
 
 def test_launchd_plist_wraps_one_run_command():

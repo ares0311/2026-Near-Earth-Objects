@@ -29,6 +29,8 @@ __all__ = [
     "automation_readiness_summary",
     "record_automation_readiness",
     "automation_readiness_log_summary",
+    "live_provider_capabilities",
+    "live_provider_readiness",
     "live_dry_run_plan",
     "record_live_dry_run_plan",
     "live_dry_run_plan_log_summary",
@@ -78,8 +80,37 @@ DEFAULT_INPUT_PATH = _ROOT / "background" / "targets.json"
 DEFAULT_DB_PATH = _ROOT / "Logs" / "background.sqlite"
 DEFAULT_REPORT_DIR = _ROOT / "Logs" / "reports"
 _SCHEMA_VERSION = "background-v1"
-_CODE_VERSION = "0.30.0"
+_CODE_VERSION = "0.31.0"
 _SUPPORTED_LIVE_SURVEYS = ("ZTF", "ATLAS", "PanSTARRS")
+_LIVE_PROVIDER_CAPABILITIES = {
+    "ZTF": {
+        "survey": "ZTF",
+        "credential_env": "ZTF_IRSA_TOKEN",
+        "fetch_api": "fetch_ztf_alerts",
+        "network_mode": "credentialed",
+        "supports_live_query": True,
+        "supports_external_submission": False,
+        "min_seconds_between_queries": 1,
+    },
+    "ATLAS": {
+        "survey": "ATLAS",
+        "credential_env": "ATLAS_TOKEN",
+        "fetch_api": "fetch_atlas_forced",
+        "network_mode": "credentialed",
+        "supports_live_query": True,
+        "supports_external_submission": False,
+        "min_seconds_between_queries": 1,
+    },
+    "PanSTARRS": {
+        "survey": "PanSTARRS",
+        "credential_env": "MAST_API_TOKEN",
+        "fetch_api": "fetch_panstarrs_catalog",
+        "network_mode": "credentialed",
+        "supports_live_query": True,
+        "supports_external_submission": False,
+        "min_seconds_between_queries": 1,
+    },
+}
 _REQUIRED_POLICY_FIELDS = (
     "schema_version",
     "reviewer",
@@ -1404,10 +1435,60 @@ def _load_live_review_policy(config: BackgroundConfig) -> tuple[dict[str, Any] |
     return policy, list(dict.fromkeys(blockers))
 
 
+def live_provider_capabilities() -> tuple[dict[str, Any], ...]:
+    """Return the no-network live-provider capability registry."""
+    return tuple(dict(_LIVE_PROVIDER_CAPABILITIES[survey]) for survey in _SUPPORTED_LIVE_SURVEYS)
+
+
+def _policy_allowed_surveys(policy: dict[str, Any] | None) -> tuple[str, ...]:
+    if not policy or not isinstance(policy.get("allowed_surveys"), list):
+        return ()
+    return tuple(policy["allowed_surveys"])
+
+
+def live_provider_readiness(
+    config_path: Path = DEFAULT_CONFIG_PATH,
+) -> tuple[dict[str, Any], ...]:
+    """Report provider-specific live readiness without contacting external services."""
+    config = load_config(config_path)
+    policy, _policy_blockers = _load_live_review_policy(config)
+    allowed_surveys = _policy_allowed_surveys(policy)
+    policy_min_seconds = policy.get("min_seconds_between_queries") if policy else None
+    readiness = []
+    for capability in live_provider_capabilities():
+        survey = capability["survey"]
+        credential_env = capability["credential_env"]
+        blockers: list[str] = []
+        if survey not in allowed_surveys:
+            blockers.append("PROVIDER_NOT_POLICY_APPROVED")
+        if not os.environ.get(credential_env):
+            blockers.append("PROVIDER_CREDENTIAL_MISSING")
+        if capability["supports_external_submission"]:
+            blockers.append("PROVIDER_EXTERNAL_SUBMISSION_CAPABLE")
+        if not capability["supports_live_query"]:
+            blockers.append("PROVIDER_LIVE_QUERY_UNSUPPORTED")
+        min_seconds = capability["min_seconds_between_queries"]
+        if not isinstance(policy_min_seconds, int | float):
+            blockers.append("PROVIDER_RATE_LIMIT_POLICY_MISSING")
+        elif policy_min_seconds < min_seconds:
+            blockers.append("PROVIDER_RATE_LIMIT_TOO_FAST")
+        readiness.append({
+            **capability,
+            "policy_approved": survey in allowed_surveys,
+            "credential_present": bool(os.environ.get(credential_env)),
+            "ready": not blockers,
+            "blockers": tuple(blockers),
+            "network_access_performed": False,
+            "external_submission_enabled": False,
+        })
+    return tuple(readiness)
+
+
 def automation_readiness_summary(config_path: Path = DEFAULT_CONFIG_PATH) -> dict[str, Any]:
     """Report scheduler and live-mode readiness without performing network actions."""
     config = load_config(config_path)
     policy, policy_blockers = _load_live_review_policy(config)
+    provider_readiness = live_provider_readiness(config_path)
     missing_credentials = tuple(
         name for name in config.required_credential_env if not os.environ.get(name)
     )
@@ -1423,6 +1504,8 @@ def automation_readiness_summary(config_path: Path = DEFAULT_CONFIG_PATH) -> dic
         live_blockers.append("LIVE_NETWORK_DISABLED")
     if missing_credentials:
         live_blockers.append("MISSING_REQUIRED_CREDENTIALS")
+    if any(not provider["ready"] for provider in provider_readiness):
+        live_blockers.append("LIVE_PROVIDER_NOT_READY")
     live_blockers.extend(policy_blockers)
     if not config.require_human_signoff:
         live_blockers.append("HUMAN_SIGNOFF_NOT_REQUIRED")
@@ -1440,6 +1523,7 @@ def automation_readiness_summary(config_path: Path = DEFAULT_CONFIG_PATH) -> dic
         "live_mode_blockers": live_blockers,
         "required_credential_env": config.required_credential_env,
         "missing_credential_env": missing_credentials,
+        "live_provider_readiness": provider_readiness,
         "live_review_policy": str(_policy_path(config)) if _policy_path(config) else None,
         "live_review_policy_summary": _policy_summary(policy),
         "require_human_signoff": config.require_human_signoff,
@@ -1540,6 +1624,7 @@ def live_dry_run_plan(config_path: Path = DEFAULT_CONFIG_PATH) -> dict[str, Any]
     config = load_config(config_path)
     policy, policy_blockers = _load_live_review_policy(config)
     readiness = automation_readiness_summary(config_path)
+    provider_readiness = live_provider_readiness(config_path)
     policy_summary = _policy_summary(policy)
     allowed_surveys = tuple(policy_summary["allowed_surveys"]) if policy_summary else ()
     scope = policy_summary["dry_run_scope"] if policy_summary else None
@@ -1573,6 +1658,7 @@ def live_dry_run_plan(config_path: Path = DEFAULT_CONFIG_PATH) -> dict[str, Any]
         ),
         "dry_run_scope": scope,
         "queries": queries,
+        "live_provider_readiness": provider_readiness,
         "network_access_performed": False,
         "external_submission_enabled": False,
     }
@@ -1632,7 +1718,7 @@ def live_dry_run_plan_log_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, 
 class LiveDryRunProvider(Protocol):
     """Provider contract for one dry-run survey probe.
 
-    v0.30.0 supports injected/mock providers only. Implementations must not
+    v0.31.0 supports injected/mock providers only. Implementations must not
     contact external services or enable submissions.
     """
 

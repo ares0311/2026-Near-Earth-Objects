@@ -155,6 +155,12 @@ mock-only execution attempt. Injected dry-run providers must report
 provider result that violates those fields is rejected. None of these commands
 submit observations, notify external parties, or assert impact probabilities.
 
+Provider readiness is reported per survey before any live attempt. ZTF uses
+`ZTF_IRSA_TOKEN` and `fetch_ztf_alerts`, ATLAS uses `ATLAS_TOKEN` and
+`fetch_atlas_forced`, and Pan-STARRS uses `MAST_API_TOKEN` and
+`fetch_panstarrs_catalog`. These mappings are readiness metadata only; they do
+not trigger live data retrieval.
+
 ---
 
 ## Local Cache

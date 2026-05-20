@@ -50,6 +50,13 @@ The readiness report includes the one-run command, scheduler blockers, live-mode
 blockers, missing credential environment variables, and confirms that external
 submission is disabled.
 
+Readiness also includes provider-specific entries for ZTF, ATLAS, and
+Pan-STARRS. Each entry records the credential environment variable, fetch API,
+policy approval state, minimum cadence requirement, and blockers such as
+`PROVIDER_CREDENTIAL_MISSING`, `PROVIDER_NOT_POLICY_APPROVED`, or
+`PROVIDER_RATE_LIMIT_TOO_FAST`. This is metadata only; it performs no network
+queries.
+
 Persist the same readiness snapshot to the top-level SQLite log:
 
 ```bash
@@ -86,6 +93,10 @@ Internally, dry-run execution now routes through a small provider interface:
 `MockLiveDryRunProvider` instances for ZTF, ATLAS, and Pan-STARRS. Tests may
 inject providers to validate aggregation, but provider results are rejected if
 they claim network access or external submission.
+
+`live_dry_run_plan` persists the same provider-readiness details alongside the
+planned no-network queries so a reviewer can see which survey would be blocked
+before any live run is attempted.
 
 ## Top-Level SQLite Logs
 

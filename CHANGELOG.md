@@ -5,6 +5,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## v0.31.0
+
+- `background.py`: added `live_provider_capabilities()` and
+  `live_provider_readiness(config_path)` for no-network provider-specific M4
+  readiness checks.
+- `automation_readiness_summary` and `live_dry_run_plan`: now include
+  provider-by-provider credential, policy, rate-limit, and submission-safety
+  readiness details.
+- Live mode now reports `LIVE_PROVIDER_NOT_READY` when any provider has missing
+  credentials, policy approval gaps, unsupported live queries, submission
+  capability, or insufficient rate-limit policy.
+- 3 new tests (1343 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.31.0.
+
 ## v0.30.0
 
 - `background.py`: added `LiveDryRunProvider` and `MockLiveDryRunProvider` for

@@ -471,9 +471,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.30.0)
+## Current State (v0.31.0)
 
-All 10 pipeline modules are complete. 1340 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified CLI with automated offline scheduling readiness, top-level SQLite logs for runs, readiness checks, no-network live dry-run plans, mock-only provider execution attempts, and auditable signoff readiness.
+All 10 pipeline modules are complete. 1343 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified CLI with automated offline scheduling readiness, provider-specific live readiness, top-level SQLite logs for runs, readiness checks, no-network live dry-run plans, mock-only provider execution attempts, and auditable signoff readiness.
 
 ### Skills
 
@@ -564,7 +564,7 @@ All 10 pipeline modules are complete. 1340 tests passing (100% coverage). CI gre
 | `background/live_review_policy.schema.json` | JSON Schema for live dry-run review policy |
 | `background/targets.json` | Stable background automation fixture manifest |
 
-### Coverage by Module (v0.30.0)
+### Coverage by Module (v0.31.0)
 
 | Module | Coverage |
 |---|---|
@@ -594,6 +594,14 @@ All 10 pipeline modules are complete. 1340 tests passing (100% coverage). CI gre
 - Collect labeled training data via `Skills/generate_training_labels.py`.
 - Run credentialed live-data dry runs for ZTF/ATLAS/Pan-STARRS only when tokens and review policy are explicitly configured.
 - Train and evaluate Tier 2/Tier 3 model weights on real labeled data.
+
+### Key Changes in v0.31.0
+
+- `background.py`: added `live_provider_capabilities()` and `live_provider_readiness(config_path)` for no-network provider-specific M4 readiness checks.
+- `automation_readiness_summary` and `live_dry_run_plan`: now include provider-by-provider credential, policy, rate-limit, and submission-safety readiness details.
+- Live mode now reports `LIVE_PROVIDER_NOT_READY` when any provider has missing credentials, policy approval gaps, unsupported live queries, submission capability, or insufficient rate-limit policy.
+- 3 new tests (1343 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.31.0.
 
 ### Key Changes in v0.30.0
 
