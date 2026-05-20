@@ -32,6 +32,9 @@ __all__ = [
     "live_dry_run_plan",
     "record_live_dry_run_plan",
     "live_dry_run_plan_log_summary",
+    "live_dry_run_execute",
+    "record_live_execution_attempt",
+    "live_execution_log_summary",
     "launchd_plist",
 ]
 
@@ -72,7 +75,7 @@ DEFAULT_INPUT_PATH = _ROOT / "background" / "targets.json"
 DEFAULT_DB_PATH = _ROOT / "Logs" / "background.sqlite"
 DEFAULT_REPORT_DIR = _ROOT / "Logs" / "reports"
 _SCHEMA_VERSION = "background-v1"
-_CODE_VERSION = "0.28.0"
+_CODE_VERSION = "0.29.0"
 _SUPPORTED_LIVE_SURVEYS = ("ZTF", "ATLAS", "PanSTARRS")
 _REQUIRED_POLICY_FIELDS = (
     "schema_version",
@@ -250,6 +253,21 @@ def init_log_db(db_path: Path = DEFAULT_DB_PATH) -> None:
                 executable INTEGER NOT NULL,
                 planned_surveys_json TEXT NOT NULL,
                 blockers_json TEXT NOT NULL,
+                entry_json TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS live_execution_log (
+                attempt_id TEXT PRIMARY KEY,
+                attempted_at_utc TEXT NOT NULL,
+                config_path TEXT NOT NULL,
+                executable INTEGER NOT NULL,
+                outcome TEXT NOT NULL,
+                blockers_json TEXT NOT NULL,
+                query_results_json TEXT NOT NULL,
+                external_submission_enabled INTEGER NOT NULL,
                 entry_json TEXT NOT NULL
             )
             """
@@ -1604,6 +1622,110 @@ def live_dry_run_plan_log_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, 
         return {
             "db_path": str(db_path),
             "total_live_dry_run_plans": _count_rows(conn, "live_dry_run_plan_log"),
+            "latest": json.loads(latest["entry_json"]) if latest else None,
+        }
+
+
+def _execute_live_dry_run_queries(plan: dict[str, Any]) -> tuple[dict[str, Any], ...]:
+    """Mock-only execution hook; real network access requires a future explicit change."""
+    return tuple(
+        {
+            "rank": query["rank"],
+            "survey": query["survey"],
+            "status": "mocked_success",
+            "network_action": "mocked_not_executed",
+        }
+        for query in plan["queries"]
+    )
+
+
+def live_dry_run_execute(config_path: Path = DEFAULT_CONFIG_PATH) -> dict[str, Any]:
+    """Run the live dry-run preflight and execute only the mock query hook."""
+    plan = live_dry_run_plan(config_path)
+    if not plan["executable"]:
+        return {
+            "config_path": str(config_path),
+            "attempted_at_utc": _utc_now(),
+            "executable": False,
+            "outcome": "blocked",
+            "blockers": plan["blockers"],
+            "planned_surveys": plan["planned_surveys"],
+            "query_results": (),
+            "network_access_performed": False,
+            "external_submission_enabled": False,
+        }
+
+    query_results = _execute_live_dry_run_queries(plan)
+    return {
+        "config_path": str(config_path),
+        "attempted_at_utc": _utc_now(),
+        "executable": True,
+        "outcome": "mock_executed",
+        "blockers": (),
+        "planned_surveys": plan["planned_surveys"],
+        "query_results": query_results,
+        "network_access_performed": False,
+        "external_submission_enabled": False,
+    }
+
+
+def record_live_execution_attempt(
+    config_path: Path = DEFAULT_CONFIG_PATH,
+    db_path: Path = DEFAULT_DB_PATH,
+) -> dict[str, Any]:
+    """Persist a mock-only live dry-run execution attempt to SQLite."""
+    init_log_db(db_path)
+    result = live_dry_run_execute(config_path)
+    entry = {
+        "attempt_id": str(uuid.uuid4()),
+        **result,
+    }
+    with _connect(db_path) as conn:
+        conn.execute(
+            """
+            INSERT INTO live_execution_log (
+                attempt_id, attempted_at_utc, config_path, executable,
+                outcome, blockers_json, query_results_json,
+                external_submission_enabled, entry_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                entry["attempt_id"],
+                entry["attempted_at_utc"],
+                entry["config_path"],
+                int(entry["executable"]),
+                entry["outcome"],
+                json.dumps(entry["blockers"]),
+                json.dumps(entry["query_results"]),
+                int(entry["external_submission_enabled"]),
+                json.dumps(entry),
+            ),
+        )
+    return entry
+
+
+def live_execution_log_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]:
+    """Summarize persisted live dry-run execution attempts."""
+    init_log_db(db_path)
+    with _connect(db_path) as conn:
+        latest = conn.execute(
+            """
+            SELECT entry_json
+            FROM live_execution_log
+            ORDER BY attempted_at_utc DESC
+            LIMIT 1
+            """
+        ).fetchone()
+        by_outcome = {
+            row["outcome"]: row["n"]
+            for row in conn.execute(
+                "SELECT outcome, COUNT(*) AS n FROM live_execution_log GROUP BY outcome"
+            )
+        }
+        return {
+            "db_path": str(db_path),
+            "total_live_execution_attempts": _count_rows(conn, "live_execution_log"),
+            "by_outcome": by_outcome,
             "latest": json.loads(latest["entry_json"]) if latest else None,
         }
 

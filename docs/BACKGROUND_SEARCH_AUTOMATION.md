@@ -69,6 +69,18 @@ The plan is derived from `background/live_review_policy.example.json` until a
 reviewer replaces it with an approved policy. The example policy deliberately
 sets `approved_for_live_network` to `false`.
 
+Record a mock-only live dry-run execution attempt:
+
+```bash
+PYTHONPATH=src python Skills/background.py live-dry-run-execute
+PYTHONPATH=src python Skills/background.py live-execution-log-summary
+```
+
+This command runs the same preflight gates as the plan command and persists the
+attempt to SQLite. It does not contact survey services, download data, submit
+observations, or enable any external alert pathway. Real live network execution
+requires a separate explicit implementation and review.
+
 ## Top-Level SQLite Logs
 
 Background logs live at the repository top level:
@@ -79,7 +91,7 @@ Logs/
   reports/
 ```
 
-The SQLite database contains three append-only operational tables:
+The SQLite database contains append-only operational tables:
 
 | Table | Purpose |
 |---|---|
@@ -89,6 +101,7 @@ The SQLite database contains three append-only operational tables:
 | `human_signoff_log` | Manual reviewer signoff records |
 | `automation_readiness_log` | Scheduler/live-readiness snapshots |
 | `live_dry_run_plan_log` | No-network live dry-run query plans |
+| `live_execution_log` | Mock-only live dry-run execution attempts |
 | `run_lock` | Prevents overlapping invocations |
 | `schema_metadata` | SQLite schema version metadata |
 
@@ -112,6 +125,8 @@ PYTHONPATH=src python Skills/background.py automation-readiness-log-summary
 PYTHONPATH=src python Skills/background.py live-dry-run-plan
 PYTHONPATH=src python Skills/background.py record-live-dry-run-plan
 PYTHONPATH=src python Skills/background.py live-dry-run-plan-log-summary
+PYTHONPATH=src python Skills/background.py live-dry-run-execute
+PYTHONPATH=src python Skills/background.py live-execution-log-summary
 PYTHONPATH=src python Skills/background.py unsigned-follow-up
 PYTHONPATH=src python Skills/background.py run-detail --run-id <run-id>
 PYTHONPATH=src python Skills/background.py target-history --target-id <target-id>

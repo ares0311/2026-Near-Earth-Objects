@@ -471,9 +471,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.28.0)
+## Current State (v0.29.0)
 
-All 10 pipeline modules are complete. 1336 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified CLI with automated offline scheduling readiness, top-level SQLite logs for runs and readiness checks, live-mode blockers, and auditable signoff readiness.
+All 10 pipeline modules are complete. 1338 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified CLI with automated offline scheduling readiness, top-level SQLite logs for runs, readiness checks, no-network live dry-run plans, mock-only execution attempts, and auditable signoff readiness.
 
 ### Skills
 
@@ -492,7 +492,7 @@ All 10 pipeline modules are complete. 1336 tests passing (100% coverage). CI gre
 | `Skills/train_tier2_cnn.py` | Fine-tune CNN on labeled ZTF cutout CSV; saves `models/tier2_cnn.pt` |
 | `Skills/train_tier3_transformer.py` | Train Transformer on MPC tracklet CSV; saves `models/tier3_transformer.pt` |
 | `Skills/tune_linker.py` | Parametric sweep of `position_tolerance_arcsec` × `chi2_threshold` vs link/score rate |
-| `Skills/background.py` | Unified background automation CLI with run, readiness, summary, detail, history, and signoff subcommands |
+| `Skills/background.py` | Unified background automation CLI with run, readiness, live dry-run, summary, detail, history, and signoff subcommands |
 | `Skills/stress_test_high_motion.py` | Stress-test linker across 3 motion bins (1–10, 10–30, 30–60 arcsec/hr); saves results to `data/` |
 | `Skills/build_cutout_dataset.py` | Convert ZTF alert JSON (base64 cutouts) to `.npz` + CSV index for Tier 2 CNN training |
 | `Skills/build_sequence_dataset.py` | Convert tracklet JSON to flat token CSV for Tier 3 Transformer training |
@@ -564,7 +564,7 @@ All 10 pipeline modules are complete. 1336 tests passing (100% coverage). CI gre
 | `background/live_review_policy.schema.json` | JSON Schema for live dry-run review policy |
 | `background/targets.json` | Stable background automation fixture manifest |
 
-### Coverage by Module (v0.28.0)
+### Coverage by Module (v0.29.0)
 
 | Module | Coverage |
 |---|---|
@@ -594,6 +594,15 @@ All 10 pipeline modules are complete. 1336 tests passing (100% coverage). CI gre
 - Collect labeled training data via `Skills/generate_training_labels.py`.
 - Run credentialed live-data dry runs for ZTF/ATLAS/Pan-STARRS only when tokens and review policy are explicitly configured.
 - Train and evaluate Tier 2/Tier 3 model weights on real labeled data.
+
+### Key Changes in v0.29.0
+
+- `background.py`: added `live_dry_run_execute(config_path)`, `record_live_execution_attempt(config_path, db_path)`, and `live_execution_log_summary(db_path)`.
+- `init_log_db`: added top-level SQLite table `live_execution_log` for auditable dry-run execution attempts.
+- `Skills/background.py`: added `live-dry-run-execute` and `live-execution-log-summary` subcommands.
+- Live dry-run execution remains mock-only: no network access is performed and external submission remains disabled.
+- 2 new tests (1338 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.29.0.
 
 ### Key Changes in v0.28.0
 

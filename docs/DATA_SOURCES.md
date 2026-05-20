@@ -146,9 +146,12 @@ human reviewer must set `approved_for_live_network` to `true`, keep
 `no_external_submission_confirmed` and `no_impact_probability_claims` true, and
 define allowed surveys, a dry-run sky/time scope, and per-run rate limits.
 
-No live dry-run planning or readiness check contacts external services. Use
-`Skills/background.py live-dry-run-plan` to inspect planned queries and
-`Skills/background.py record-live-dry-run-plan` to persist the plan to SQLite.
+No live dry-run planning, readiness check, or mock execution contacts external
+services. Use `Skills/background.py live-dry-run-plan` to inspect planned
+queries, `Skills/background.py record-live-dry-run-plan` to persist the plan to
+SQLite, and `Skills/background.py live-dry-run-execute` to record a mock-only
+execution attempt. None of these commands submit observations, notify external
+parties, or assert impact probabilities.
 
 ---
 

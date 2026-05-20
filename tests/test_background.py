@@ -50,6 +50,44 @@ def write_manifest_fixture(path: Path, object_ids: tuple[str, ...] = ("T001",)) 
     path.write_text(json.dumps({"schema_version": "background-targets-v1", "targets": rows}))
 
 
+def write_live_policy(path: Path, approved: bool = True) -> None:
+    path.write_text(json.dumps({
+        "schema_version": "live-review-policy-v1",
+        "policy_name": "test-live-policy",
+        "reviewer": "Dr. Reviewer",
+        "approved_for_live_network": approved,
+        "allowed_surveys": ["ZTF", "ATLAS", "PanSTARRS"],
+        "max_queries_per_run": 3,
+        "min_seconds_between_queries": 0,
+        "dry_run_scope": {
+            "ra_deg": 180.0,
+            "dec_deg": 0.0,
+            "radius_deg": 0.1,
+            "start_jd": 2460000.5,
+            "end_jd": 2460001.5,
+        },
+        "no_external_submission_confirmed": True,
+        "no_impact_probability_claims": True,
+    }))
+
+
+def write_live_config(path: Path, policy_path: Path, live_network_enabled: bool = True) -> None:
+    path.write_text(json.dumps({
+        "input_path": "background/targets.json",
+        "db_path": "Logs/background.sqlite",
+        "report_dir": "Logs/reports",
+        "follow_up_threshold": 0.45,
+        "run_mode": "automated",
+        "live_network_enabled": live_network_enabled,
+        "require_human_signoff": True,
+        "required_approval_count": 1,
+        "scheduler_enabled": True,
+        "scheduler_interval_minutes": 60,
+        "live_review_policy": str(policy_path),
+        "required_credential_env": ["ZTF_IRSA_TOKEN", "ATLAS_TOKEN", "MAST_API_TOKEN"],
+    }))
+
+
 def make_scored(
     object_id: str = "T001",
     neo_prob: float = 0.65,
@@ -220,6 +258,51 @@ def test_live_dry_run_plan_is_no_network_and_persisted(tmp_path):
     assert table_count(db_path, "live_dry_run_plan_log") == 1
     assert summary["total_live_dry_run_plans"] == 1
     assert summary["latest"]["plan_id"] == entry["plan_id"]
+
+
+def test_live_dry_run_execute_blocked_by_default(monkeypatch, tmp_path):
+    db_path = tmp_path / "Logs" / "background.sqlite"
+
+    def fail_if_called(plan):
+        raise AssertionError("network execution hook should not run")
+
+    monkeypatch.setattr(background, "_execute_live_dry_run_queries", fail_if_called)
+    entry = background.record_live_execution_attempt(Path("background/config.json"), db_path)
+    summary = background.live_execution_log_summary(db_path)
+
+    assert entry["outcome"] == "blocked"
+    assert entry["executable"] is False
+    assert entry["network_access_performed"] is False
+    assert entry["external_submission_enabled"] is False
+    assert "LIVE_NETWORK_DISABLED" in entry["blockers"]
+    assert table_count(db_path, "live_execution_log") == 1
+    assert summary["by_outcome"] == {"blocked": 1}
+
+
+def test_live_dry_run_execute_approved_config_uses_mock_hook(monkeypatch, tmp_path):
+    policy_path = tmp_path / "policy.json"
+    config_path = tmp_path / "config.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
+    write_live_policy(policy_path, approved=True)
+    write_live_config(config_path, policy_path, live_network_enabled=True)
+    monkeypatch.setenv("ZTF_IRSA_TOKEN", "ztf-token")
+    monkeypatch.setenv("ATLAS_TOKEN", "atlas-token")
+    monkeypatch.setenv("MAST_API_TOKEN", "mast-token")
+    calls = []
+
+    def fake_execute(plan):
+        calls.append(plan)
+        return ({"survey": "ZTF", "status": "mocked_success"},)
+
+    monkeypatch.setattr(background, "_execute_live_dry_run_queries", fake_execute)
+    entry = background.record_live_execution_attempt(config_path, db_path)
+
+    assert entry["outcome"] == "mock_executed"
+    assert entry["executable"] is True
+    assert entry["network_access_performed"] is False
+    assert entry["external_submission_enabled"] is False
+    assert len(calls) == 1
+    assert calls[0]["executable"] is True
 
 
 def test_automation_readiness_log_summary_empty(tmp_path):
@@ -670,6 +753,36 @@ def test_background_cli_automation_commands(tmp_path):
         capture_output=True,
         check=True,
     )
+    execution = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "live-dry-run-execute",
+            "--config",
+            str(config_path),
+            "--db",
+            str(db_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    execution_summary = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "live-execution-log-summary",
+            "--db",
+            str(db_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
 
     assert json.loads(readiness.stdout)["scheduler_ready"] is True
     assert "org.neo-detection.background" in plist.stdout
@@ -678,6 +791,8 @@ def test_background_cli_automation_commands(tmp_path):
     assert json.loads(plan.stdout)["network_access_performed"] is False
     assert json.loads(recorded_plan.stdout)["query_count"] == 3
     assert json.loads(plan_summary.stdout)["total_live_dry_run_plans"] == 1
+    assert json.loads(execution.stdout)["outcome"] == "blocked"
+    assert json.loads(execution_summary.stdout)["total_live_execution_attempts"] == 1
 
 
 def test_deprecated_background_wrappers_are_removed():
@@ -737,6 +852,7 @@ def test_init_log_db_migrates_existing_ledger(tmp_path):
         "human_signoff_log",
         "automation_readiness_log",
         "live_dry_run_plan_log",
+        "live_execution_log",
     } <= tables
 
 

@@ -24,10 +24,12 @@ from background import (
     ledger_summary,
     live_dry_run_plan,
     live_dry_run_plan_log_summary,
+    live_execution_log_summary,
     needs_follow_up_summary,
     record_automation_readiness,
     record_human_signoff,
     record_live_dry_run_plan,
+    record_live_execution_attempt,
     reviewed_log_summary,
     run_detail,
     signoff_readiness_summary,
@@ -82,6 +84,13 @@ def main() -> None:
     record_dry_run.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
     record_dry_run.add_argument("--db", type=Path, default=DEFAULT_DB_PATH)
 
+    execute_dry_run = sub.add_parser(
+        "live-dry-run-execute",
+        help="Run mock-only live dry-run preflight and persist the attempt",
+    )
+    execute_dry_run.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
+    execute_dry_run.add_argument("--db", type=Path, default=DEFAULT_DB_PATH)
+
     for name in (
         "ledger-summary",
         "reviewed-summary",
@@ -93,6 +102,7 @@ def main() -> None:
         "signoff-readiness",
         "automation-readiness-log-summary",
         "live-dry-run-plan-log-summary",
+        "live-execution-log-summary",
         "unsigned-follow-up",
     ):
         cmd = sub.add_parser(name)
@@ -135,6 +145,8 @@ def main() -> None:
         _print_json(live_dry_run_plan(args.config))
     elif args.command == "record-live-dry-run-plan":
         _print_json(record_live_dry_run_plan(args.config, args.db))
+    elif args.command == "live-dry-run-execute":
+        _print_json(record_live_execution_attempt(args.config, args.db))
     elif args.command == "ledger-summary":
         _print_json(ledger_summary(args.db))
     elif args.command == "reviewed-summary":
@@ -155,6 +167,8 @@ def main() -> None:
         _print_json(automation_readiness_log_summary(args.db))
     elif args.command == "live-dry-run-plan-log-summary":
         _print_json(live_dry_run_plan_log_summary(args.db))
+    elif args.command == "live-execution-log-summary":
+        _print_json(live_execution_log_summary(args.db))
     elif args.command == "unsigned-follow-up":
         readiness = signoff_readiness_summary(args.db)
         _print_json({

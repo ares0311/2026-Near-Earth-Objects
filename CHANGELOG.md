@@ -5,6 +5,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## v0.29.0
+
+- `background.py`: added `live_dry_run_execute(config_path)`,
+  `record_live_execution_attempt(config_path, db_path)`, and
+  `live_execution_log_summary(db_path)` for mock-only live dry-run execution
+  attempts.
+- `init_log_db`: added top-level SQLite table `live_execution_log` for
+  auditable dry-run execution attempts.
+- `Skills/background.py`: added `live-dry-run-execute` and
+  `live-execution-log-summary` subcommands.
+- Live dry-run execution remains explicitly mock-only: no network access is
+  performed and no external submission can be enabled by this command.
+- 2 new tests (1338 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.29.0.
+
 ## v0.28.0
 
 - `background.py`: added `live_dry_run_plan(config_path)`,
