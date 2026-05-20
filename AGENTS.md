@@ -471,9 +471,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.31.0)
+## Current State (v0.32.0)
 
-All 10 pipeline modules are complete. 1343 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified CLI with automated offline scheduling readiness, provider-specific live readiness, top-level SQLite logs for runs, readiness checks, no-network live dry-run plans, mock-only provider execution attempts, and auditable signoff readiness.
+All 10 pipeline modules are complete. 1346 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified CLI with automated offline scheduling readiness, live policy contract validation, provider-specific live readiness, top-level SQLite logs for runs, readiness checks, no-network live dry-run plans, mock-only provider execution attempts, and auditable signoff readiness.
 
 ### Skills
 
@@ -564,7 +564,7 @@ All 10 pipeline modules are complete. 1343 tests passing (100% coverage). CI gre
 | `background/live_review_policy.schema.json` | JSON Schema for live dry-run review policy |
 | `background/targets.json` | Stable background automation fixture manifest |
 
-### Coverage by Module (v0.31.0)
+### Coverage by Module (v0.32.0)
 
 | Module | Coverage |
 |---|---|
@@ -594,6 +594,14 @@ All 10 pipeline modules are complete. 1343 tests passing (100% coverage). CI gre
 - Collect labeled training data via `Skills/generate_training_labels.py`.
 - Run credentialed live-data dry runs for ZTF/ATLAS/Pan-STARRS only when tokens and review policy are explicitly configured.
 - Train and evaluate Tier 2/Tier 3 model weights on real labeled data.
+
+### Key Changes in v0.32.0
+
+- `background.py`: added `live_policy_contract_summary(config_path)` for no-network validation of the live review policy file and schema contract.
+- `automation_readiness_summary` and `live_dry_run_plan`: now include live review policy contract status and report `LIVE_REVIEW_POLICY_CONTRACT_INVALID` for structural policy failures.
+- The intentionally unapproved example policy remains contract-valid, while unsafe policies that allow external submission or omit required files are blocked before any live action.
+- 3 new tests (1346 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.32.0.
 
 ### Key Changes in v0.31.0
 

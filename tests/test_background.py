@@ -210,7 +210,49 @@ def test_automation_readiness_is_scheduler_ready_but_live_blocked(monkeypatch):
         "ATLAS",
         "PanSTARRS",
     )
+    assert readiness["live_review_policy_contract"]["contract_valid"] is True
+    assert readiness["live_review_policy_contract"]["network_access_performed"] is False
     assert "Skills/background.py run-once" in readiness["one_run_command"]
+
+
+def test_live_policy_contract_summary_default_policy_is_valid():
+    summary = background.live_policy_contract_summary(Path("background/config.json"))
+
+    assert summary["schema_valid"] is True
+    assert summary["policy_contract_valid"] is True
+    assert summary["contract_valid"] is True
+    assert summary["schema_blockers"] == ()
+    assert summary["policy_blockers"] == ()
+    assert summary["external_submission_enabled"] is False
+
+
+def test_live_policy_contract_summary_rejects_submission_policy(tmp_path):
+    policy_path = tmp_path / "policy.json"
+    config_path = tmp_path / "config.json"
+    write_live_policy(policy_path, approved=True)
+    policy = json.loads(policy_path.read_text())
+    policy["no_external_submission_confirmed"] = False
+    policy_path.write_text(json.dumps(policy))
+    write_live_config(config_path, policy_path, live_network_enabled=True)
+
+    summary = background.automation_readiness_summary(config_path)
+
+    assert summary["live_review_policy_contract"]["contract_valid"] is False
+    assert "LIVE_REVIEW_POLICY_ALLOWS_EXTERNAL_SUBMISSION" in (
+        summary["live_review_policy_contract"]["policy_blockers"]
+    )
+    assert "LIVE_REVIEW_POLICY_CONTRACT_INVALID" in summary["live_mode_blockers"]
+
+
+def test_live_policy_contract_summary_rejects_missing_policy(tmp_path):
+    config_path = tmp_path / "config.json"
+    write_live_config(config_path, tmp_path / "missing_policy.json", live_network_enabled=True)
+
+    summary = background.live_policy_contract_summary(config_path)
+
+    assert summary["schema_valid"] is True
+    assert summary["policy_contract_valid"] is False
+    assert summary["policy_blockers"] == ("LIVE_REVIEW_POLICY_NOT_FOUND",)
 
 
 def test_live_provider_readiness_default_config_is_blocked(monkeypatch):

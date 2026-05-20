@@ -145,6 +145,9 @@ The example policy is intentionally not approved for live network access. A
 human reviewer must set `approved_for_live_network` to `true`, keep
 `no_external_submission_confirmed` and `no_impact_probability_claims` true, and
 define allowed surveys, a dry-run sky/time scope, and per-run rate limits.
+The readiness command validates this policy contract and the policy schema
+without contacting external services. A policy may be contract-valid while still
+blocked for live use because it is intentionally unapproved.
 
 No live dry-run planning, readiness check, or mock provider execution contacts
 external services. Use `Skills/background.py live-dry-run-plan` to inspect

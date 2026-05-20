@@ -29,6 +29,7 @@ __all__ = [
     "automation_readiness_summary",
     "record_automation_readiness",
     "automation_readiness_log_summary",
+    "live_policy_contract_summary",
     "live_provider_capabilities",
     "live_provider_readiness",
     "live_dry_run_plan",
@@ -80,7 +81,8 @@ DEFAULT_INPUT_PATH = _ROOT / "background" / "targets.json"
 DEFAULT_DB_PATH = _ROOT / "Logs" / "background.sqlite"
 DEFAULT_REPORT_DIR = _ROOT / "Logs" / "reports"
 _SCHEMA_VERSION = "background-v1"
-_CODE_VERSION = "0.31.0"
+_CODE_VERSION = "0.32.0"
+_LIVE_REVIEW_POLICY_SCHEMA_PATH = _ROOT / "background" / "live_review_policy.schema.json"
 _SUPPORTED_LIVE_SURVEYS = ("ZTF", "ATLAS", "PanSTARRS")
 _LIVE_PROVIDER_CAPABILITIES = {
     "ZTF": {
@@ -1387,6 +1389,65 @@ def _load_live_review_policy(config: BackgroundConfig) -> tuple[dict[str, Any] |
     except json.JSONDecodeError:
         return None, ["LIVE_REVIEW_POLICY_INVALID_JSON"]
 
+    return _load_live_review_policy_from_dict(policy)
+
+
+def _load_json_contract(
+    path: Path,
+    missing_code: str,
+    invalid_code: str,
+) -> tuple[Any | None, list[str]]:
+    if not path.exists():
+        return None, [missing_code]
+    try:
+        with path.open() as handle:
+            return json.load(handle), []
+    except json.JSONDecodeError:
+        return None, [invalid_code]
+
+
+def _live_policy_schema_blockers(schema: Any) -> tuple[str, ...]:
+    blockers: list[str] = []
+    if not isinstance(schema, dict):
+        return ("LIVE_REVIEW_POLICY_SCHEMA_INVALID",)
+    if schema.get("$id") != "live-review-policy-v1":
+        blockers.append("LIVE_REVIEW_POLICY_SCHEMA_ID_INVALID")
+    if schema.get("type") != "object":
+        blockers.append("LIVE_REVIEW_POLICY_SCHEMA_TYPE_INVALID")
+    if schema.get("additionalProperties") is not False:
+        blockers.append("LIVE_REVIEW_POLICY_SCHEMA_ALLOWS_EXTRA_FIELDS")
+    required = schema.get("required", ())
+    if not isinstance(required, list) or any(
+        field not in required for field in _REQUIRED_POLICY_FIELDS
+    ):
+        blockers.append("LIVE_REVIEW_POLICY_SCHEMA_REQUIRED_FIELDS_INCOMPLETE")
+    survey_enum = (
+        schema.get("properties", {})
+        .get("allowed_surveys", {})
+        .get("items", {})
+        .get("enum", ())
+    )
+    if tuple(survey_enum) != _SUPPORTED_LIVE_SURVEYS:
+        blockers.append("LIVE_REVIEW_POLICY_SCHEMA_SURVEY_ENUM_MISMATCH")
+    external_const = schema.get("properties", {}).get("no_external_submission_confirmed", {})
+    impact_const = schema.get("properties", {}).get("no_impact_probability_claims", {})
+    if external_const.get("const") is not True:
+        blockers.append("LIVE_REVIEW_POLICY_SCHEMA_EXTERNAL_SUBMISSION_GUARD_MISSING")
+    if impact_const.get("const") is not True:
+        blockers.append("LIVE_REVIEW_POLICY_SCHEMA_IMPACT_CLAIM_GUARD_MISSING")
+    return tuple(dict.fromkeys(blockers))
+
+
+def _live_policy_contract_blockers(policy: Any) -> tuple[str, ...]:
+    if not isinstance(policy, dict):
+        return ("LIVE_REVIEW_POLICY_INVALID_JSON",)
+    _policy, blockers = _load_live_review_policy_from_dict(policy)
+    return tuple(blocker for blocker in blockers if blocker != "LIVE_REVIEW_POLICY_NOT_APPROVED")
+
+
+def _load_live_review_policy_from_dict(
+    policy: dict[str, Any],
+) -> tuple[dict[str, Any], list[str]]:
     blockers: list[str] = []
     missing = [field for field in _REQUIRED_POLICY_FIELDS if field not in policy]
     if missing:
@@ -1433,6 +1494,48 @@ def _load_live_review_policy(config: BackgroundConfig) -> tuple[dict[str, Any] |
             blockers.append("LIVE_REVIEW_POLICY_SCOPE_INVALID")
 
     return policy, list(dict.fromkeys(blockers))
+
+
+def live_policy_contract_summary(config_path: Path = DEFAULT_CONFIG_PATH) -> dict[str, Any]:
+    """Validate the live-review policy contract without network access."""
+    config = load_config(config_path)
+    policy_path = _policy_path(config)
+    schema, schema_load_blockers = _load_json_contract(
+        _LIVE_REVIEW_POLICY_SCHEMA_PATH,
+        "LIVE_REVIEW_POLICY_SCHEMA_FILE_NOT_FOUND",
+        "LIVE_REVIEW_POLICY_SCHEMA_FILE_INVALID_JSON",
+    )
+    schema_blockers = (
+        tuple(schema_load_blockers)
+        if schema_load_blockers
+        else _live_policy_schema_blockers(schema)
+    )
+    policy_blockers: tuple[str, ...]
+    if policy_path is None:
+        policy_blockers = ("LIVE_REVIEW_POLICY_MISSING",)
+    else:
+        policy, policy_load_blockers = _load_json_contract(
+            policy_path,
+            "LIVE_REVIEW_POLICY_NOT_FOUND",
+            "LIVE_REVIEW_POLICY_INVALID_JSON",
+        )
+        policy_blockers = (
+            tuple(policy_load_blockers)
+            if policy_load_blockers
+            else _live_policy_contract_blockers(policy)
+        )
+    return {
+        "config_path": str(config_path),
+        "schema_path": str(_LIVE_REVIEW_POLICY_SCHEMA_PATH),
+        "policy_path": str(policy_path) if policy_path else None,
+        "schema_valid": not schema_blockers,
+        "policy_contract_valid": not policy_blockers,
+        "contract_valid": not schema_blockers and not policy_blockers,
+        "schema_blockers": schema_blockers,
+        "policy_blockers": policy_blockers,
+        "network_access_performed": False,
+        "external_submission_enabled": False,
+    }
 
 
 def live_provider_capabilities() -> tuple[dict[str, Any], ...]:
@@ -1488,6 +1591,7 @@ def automation_readiness_summary(config_path: Path = DEFAULT_CONFIG_PATH) -> dic
     """Report scheduler and live-mode readiness without performing network actions."""
     config = load_config(config_path)
     policy, policy_blockers = _load_live_review_policy(config)
+    policy_contract = live_policy_contract_summary(config_path)
     provider_readiness = live_provider_readiness(config_path)
     missing_credentials = tuple(
         name for name in config.required_credential_env if not os.environ.get(name)
@@ -1506,6 +1610,8 @@ def automation_readiness_summary(config_path: Path = DEFAULT_CONFIG_PATH) -> dic
         live_blockers.append("MISSING_REQUIRED_CREDENTIALS")
     if any(not provider["ready"] for provider in provider_readiness):
         live_blockers.append("LIVE_PROVIDER_NOT_READY")
+    if not policy_contract["contract_valid"]:
+        live_blockers.append("LIVE_REVIEW_POLICY_CONTRACT_INVALID")
     live_blockers.extend(policy_blockers)
     if not config.require_human_signoff:
         live_blockers.append("HUMAN_SIGNOFF_NOT_REQUIRED")
@@ -1525,6 +1631,7 @@ def automation_readiness_summary(config_path: Path = DEFAULT_CONFIG_PATH) -> dic
         "missing_credential_env": missing_credentials,
         "live_provider_readiness": provider_readiness,
         "live_review_policy": str(_policy_path(config)) if _policy_path(config) else None,
+        "live_review_policy_contract": policy_contract,
         "live_review_policy_summary": _policy_summary(policy),
         "require_human_signoff": config.require_human_signoff,
         "required_approval_count": config.required_approval_count,
@@ -1624,6 +1731,7 @@ def live_dry_run_plan(config_path: Path = DEFAULT_CONFIG_PATH) -> dict[str, Any]
     config = load_config(config_path)
     policy, policy_blockers = _load_live_review_policy(config)
     readiness = automation_readiness_summary(config_path)
+    policy_contract = live_policy_contract_summary(config_path)
     provider_readiness = live_provider_readiness(config_path)
     policy_summary = _policy_summary(policy)
     allowed_surveys = tuple(policy_summary["allowed_surveys"]) if policy_summary else ()
@@ -1658,6 +1766,7 @@ def live_dry_run_plan(config_path: Path = DEFAULT_CONFIG_PATH) -> dict[str, Any]
         ),
         "dry_run_scope": scope,
         "queries": queries,
+        "live_review_policy_contract": policy_contract,
         "live_provider_readiness": provider_readiness,
         "network_access_performed": False,
         "external_submission_enabled": False,

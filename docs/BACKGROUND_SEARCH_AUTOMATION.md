@@ -50,6 +50,12 @@ The readiness report includes the one-run command, scheduler blockers, live-mode
 blockers, missing credential environment variables, and confirms that external
 submission is disabled.
 
+Readiness validates the live review policy contract without contacting external
+services. The default example policy is contract-valid even though it is not
+approved for live network access. Missing policy files, invalid schema files,
+or policy settings that permit external submission are reported as
+`LIVE_REVIEW_POLICY_CONTRACT_INVALID`.
+
 Readiness also includes provider-specific entries for ZTF, ATLAS, and
 Pan-STARRS. Each entry records the credential environment variable, fetch API,
 policy approval state, minimum cadence requirement, and blockers such as
@@ -97,6 +103,9 @@ they claim network access or external submission.
 `live_dry_run_plan` persists the same provider-readiness details alongside the
 planned no-network queries so a reviewer can see which survey would be blocked
 before any live run is attempted.
+
+The dry-run plan also includes the live review policy contract summary, making
+policy/schema validation auditable in the same top-level SQLite plan log.
 
 ## Top-Level SQLite Logs
 

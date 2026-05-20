@@ -5,6 +5,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## v0.32.0
+
+- `background.py`: added `live_policy_contract_summary(config_path)` for
+  no-network validation of the live review policy file and schema contract.
+- `automation_readiness_summary` and `live_dry_run_plan`: now include live
+  review policy contract status and report
+  `LIVE_REVIEW_POLICY_CONTRACT_INVALID` for structural policy failures.
+- The intentionally unapproved example policy remains contract-valid, while
+  unsafe policies that allow external submission or omit required files are
+  blocked before any live action.
+- 3 new tests (1346 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.32.0.
+
 ## v0.31.0
 
 - `background.py`: added `live_provider_capabilities()` and
