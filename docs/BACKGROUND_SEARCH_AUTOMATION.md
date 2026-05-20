@@ -81,6 +81,12 @@ attempt to SQLite. It does not contact survey services, download data, submit
 observations, or enable any external alert pathway. Real live network execution
 requires a separate explicit implementation and review.
 
+Internally, dry-run execution now routes through a small provider interface:
+`LiveDryRunProvider.execute(query)`. The default providers are
+`MockLiveDryRunProvider` instances for ZTF, ATLAS, and Pan-STARRS. Tests may
+inject providers to validate aggregation, but provider results are rejected if
+they claim network access or external submission.
+
 ## Top-Level SQLite Logs
 
 Background logs live at the repository top level:

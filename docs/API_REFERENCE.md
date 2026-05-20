@@ -375,10 +375,22 @@ def record_live_dry_run_plan(
     db_path: Path = DEFAULT_DB_PATH,
 ) -> dict[str, Any]
 def live_dry_run_plan_log_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
-def live_dry_run_execute(config_path: Path = DEFAULT_CONFIG_PATH) -> dict[str, Any]
+class LiveDryRunProvider(Protocol):
+    survey: str
+    def execute(self, query: Mapping[str, Any]) -> Mapping[str, Any]: ...
+
+class MockLiveDryRunProvider:
+    def __init__(self, survey: str) -> None: ...
+    def execute(self, query: Mapping[str, Any]) -> Mapping[str, Any]: ...
+
+def live_dry_run_execute(
+    config_path: Path = DEFAULT_CONFIG_PATH,
+    providers: Mapping[str, LiveDryRunProvider] | None = None,
+) -> dict[str, Any]
 def record_live_execution_attempt(
     config_path: Path = DEFAULT_CONFIG_PATH,
     db_path: Path = DEFAULT_DB_PATH,
+    providers: Mapping[str, LiveDryRunProvider] | None = None,
 ) -> dict[str, Any]
 def live_execution_log_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
 def launchd_plist(config_path: Path = DEFAULT_CONFIG_PATH) -> str
@@ -394,7 +406,9 @@ and live-mode blockers without performing network actions,
 SQLite, `live_dry_run_plan(config_path)` to produce an auditable no-network
 query plan, `record_live_execution_attempt(config_path, db_path)` to persist a
 mock-only execution attempt with no network access and no external submission,
-and `launchd_plist(config_path)` to render a macOS scheduler template.
+and `launchd_plist(config_path)` to render a macOS scheduler template. Injected
+live dry-run providers are accepted only as no-network probes; any provider
+result that claims network access or external submission is rejected.
 
 Default background log path:
 
@@ -656,7 +670,7 @@ Lightweight summary of a `ScoredNEO` for display or export.
 
 ---
 
-## v0.16.0 through v0.29.0 Public API Additions
+## v0.16.0 through v0.30.0 Public API Additions
 
 These releases added conservative helper APIs around live-data retrieval,
 preprocessing quality, detection triage, linking, orbit review, classification
@@ -769,8 +783,9 @@ claim confirmation or impact probability.
 | v0.27.0 | `background.py` | `record_automation_readiness`, `automation_readiness_log_summary` |
 | v0.28.0 | `background.py` | `live_dry_run_plan`, `record_live_dry_run_plan`, `live_dry_run_plan_log_summary` |
 | v0.29.0 | `background.py` | `live_dry_run_execute`, `record_live_execution_attempt`, `live_execution_log_summary` |
+| v0.30.0 | `background.py` | `LiveDryRunProvider`, `MockLiveDryRunProvider`; provider injection for live dry-run execution |
 
-### Skills and CLI additions in v0.16.0 through v0.29.0
+### Skills and CLI additions in v0.16.0 through v0.30.0
 
 `export_candidate_report.py`, `tag_neo_class.py`, `check_tisserand.py`,
 `export_followup_requests.py`, `ephemeris_check.py`,

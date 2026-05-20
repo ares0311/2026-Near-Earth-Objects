@@ -5,6 +5,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## v0.30.0
+
+- `background.py`: added `LiveDryRunProvider` and `MockLiveDryRunProvider` for
+  injected no-network survey dry-run probes.
+- `live_dry_run_execute(config_path, providers)` and
+  `record_live_execution_attempt(config_path, db_path, providers)` now accept an
+  optional provider map, aggregate per-survey query results, and report missing
+  providers.
+- Provider results are rejected if they claim network access or external
+  submission, preserving the M4 no-submission guardrail.
+- 2 new tests (1340 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.30.0.
+
 ## v0.29.0
 
 - `background.py`: added `live_dry_run_execute(config_path)`,

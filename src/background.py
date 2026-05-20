@@ -32,6 +32,8 @@ __all__ = [
     "live_dry_run_plan",
     "record_live_dry_run_plan",
     "live_dry_run_plan_log_summary",
+    "LiveDryRunProvider",
+    "MockLiveDryRunProvider",
     "live_dry_run_execute",
     "record_live_execution_attempt",
     "live_execution_log_summary",
@@ -42,10 +44,11 @@ import json
 import os
 import sqlite3
 import uuid
+from collections.abc import Mapping
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from classify import classify, extract_features
 from orbit import fit_orbit
@@ -75,7 +78,7 @@ DEFAULT_INPUT_PATH = _ROOT / "background" / "targets.json"
 DEFAULT_DB_PATH = _ROOT / "Logs" / "background.sqlite"
 DEFAULT_REPORT_DIR = _ROOT / "Logs" / "reports"
 _SCHEMA_VERSION = "background-v1"
-_CODE_VERSION = "0.29.0"
+_CODE_VERSION = "0.30.0"
 _SUPPORTED_LIVE_SURVEYS = ("ZTF", "ATLAS", "PanSTARRS")
 _REQUIRED_POLICY_FIELDS = (
     "schema_version",
@@ -1626,21 +1629,97 @@ def live_dry_run_plan_log_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, 
         }
 
 
-def _execute_live_dry_run_queries(plan: dict[str, Any]) -> tuple[dict[str, Any], ...]:
-    """Mock-only execution hook; real network access requires a future explicit change."""
-    return tuple(
-        {
+class LiveDryRunProvider(Protocol):
+    """Provider contract for one dry-run survey probe.
+
+    v0.30.0 supports injected/mock providers only. Implementations must not
+    contact external services or enable submissions.
+    """
+
+    survey: str
+
+    def execute(self, query: Mapping[str, Any]) -> Mapping[str, Any]:
+        """Return a structured dry-run result for one planned query."""
+
+
+class MockLiveDryRunProvider:
+    """No-network provider used by the default live dry-run execution path."""
+
+    def __init__(self, survey: str) -> None:
+        self.survey = survey
+
+    def execute(self, query: Mapping[str, Any]) -> Mapping[str, Any]:
+        """Return a deterministic no-network result for one planned query."""
+        return {
             "rank": query["rank"],
-            "survey": query["survey"],
+            "survey": self.survey,
             "status": "mocked_success",
+            "provider": "mock",
             "network_action": "mocked_not_executed",
+            "result_count": 0,
+            "network_access_performed": False,
+            "external_submission_enabled": False,
         }
-        for query in plan["queries"]
+
+
+def _default_live_dry_run_providers(plan: Mapping[str, Any]) -> dict[str, LiveDryRunProvider]:
+    return {survey: MockLiveDryRunProvider(survey) for survey in plan["planned_surveys"]}
+
+
+def _normalize_live_query_result(
+    query: Mapping[str, Any],
+    raw_result: Mapping[str, Any],
+) -> dict[str, Any]:
+    result = {
+        "rank": query["rank"],
+        "survey": query["survey"],
+        **dict(raw_result),
+    }
+    result.setdefault("provider", "injected")
+    result.setdefault("network_action", "mocked_not_executed")
+    result.setdefault("result_count", 0)
+    result.setdefault("network_access_performed", False)
+    result.setdefault("external_submission_enabled", False)
+    if result["network_access_performed"] is not False:
+        raise ValueError("LIVE_PROVIDER_NETWORK_ACCESS_NOT_ALLOWED")
+    if result["external_submission_enabled"] is not False:
+        raise ValueError("LIVE_PROVIDER_EXTERNAL_SUBMISSION_NOT_ALLOWED")
+    return result
+
+
+def _execute_live_dry_run_queries(
+    plan: dict[str, Any],
+    providers: Mapping[str, LiveDryRunProvider] | None = None,
+) -> tuple[dict[str, Any], ...]:
+    """Execute a dry-run plan through no-network providers."""
+    provider_map = (
+        dict(providers) if providers is not None else _default_live_dry_run_providers(plan)
     )
+    results = []
+    for query in plan["queries"]:
+        survey = query["survey"]
+        provider = provider_map.get(survey)
+        if provider is None:
+            results.append({
+                "rank": query["rank"],
+                "survey": survey,
+                "status": "provider_missing",
+                "provider": "none",
+                "network_action": "not_executed",
+                "result_count": 0,
+                "network_access_performed": False,
+                "external_submission_enabled": False,
+            })
+            continue
+        results.append(_normalize_live_query_result(query, provider.execute(query)))
+    return tuple(results)
 
 
-def live_dry_run_execute(config_path: Path = DEFAULT_CONFIG_PATH) -> dict[str, Any]:
-    """Run the live dry-run preflight and execute only the mock query hook."""
+def live_dry_run_execute(
+    config_path: Path = DEFAULT_CONFIG_PATH,
+    providers: Mapping[str, LiveDryRunProvider] | None = None,
+) -> dict[str, Any]:
+    """Run the live dry-run preflight and execute only no-network providers."""
     plan = live_dry_run_plan(config_path)
     if not plan["executable"]:
         return {
@@ -1655,7 +1734,11 @@ def live_dry_run_execute(config_path: Path = DEFAULT_CONFIG_PATH) -> dict[str, A
             "external_submission_enabled": False,
         }
 
-    query_results = _execute_live_dry_run_queries(plan)
+    query_results = _execute_live_dry_run_queries(plan, providers)
+    successful_queries = sum(1 for result in query_results if result["status"] == "mocked_success")
+    missing_provider_queries = sum(
+        1 for result in query_results if result["status"] == "provider_missing"
+    )
     return {
         "config_path": str(config_path),
         "attempted_at_utc": _utc_now(),
@@ -1664,6 +1747,8 @@ def live_dry_run_execute(config_path: Path = DEFAULT_CONFIG_PATH) -> dict[str, A
         "blockers": (),
         "planned_surveys": plan["planned_surveys"],
         "query_results": query_results,
+        "successful_queries": successful_queries,
+        "missing_provider_queries": missing_provider_queries,
         "network_access_performed": False,
         "external_submission_enabled": False,
     }
@@ -1672,10 +1757,11 @@ def live_dry_run_execute(config_path: Path = DEFAULT_CONFIG_PATH) -> dict[str, A
 def record_live_execution_attempt(
     config_path: Path = DEFAULT_CONFIG_PATH,
     db_path: Path = DEFAULT_DB_PATH,
+    providers: Mapping[str, LiveDryRunProvider] | None = None,
 ) -> dict[str, Any]:
     """Persist a mock-only live dry-run execution attempt to SQLite."""
     init_log_db(db_path)
-    result = live_dry_run_execute(config_path)
+    result = live_dry_run_execute(config_path, providers)
     entry = {
         "attempt_id": str(uuid.uuid4()),
         **result,

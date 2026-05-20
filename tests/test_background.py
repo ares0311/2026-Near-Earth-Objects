@@ -263,11 +263,18 @@ def test_live_dry_run_plan_is_no_network_and_persisted(tmp_path):
 def test_live_dry_run_execute_blocked_by_default(monkeypatch, tmp_path):
     db_path = tmp_path / "Logs" / "background.sqlite"
 
-    def fail_if_called(plan):
-        raise AssertionError("network execution hook should not run")
+    class FailProvider:
+        survey = "ZTF"
 
-    monkeypatch.setattr(background, "_execute_live_dry_run_queries", fail_if_called)
-    entry = background.record_live_execution_attempt(Path("background/config.json"), db_path)
+        def execute(self, query):
+            raise AssertionError("provider should not run for blocked config")
+
+    monkeypatch.setenv("ZTF_IRSA_TOKEN", "ztf-token")
+    entry = background.record_live_execution_attempt(
+        Path("background/config.json"),
+        db_path,
+        providers={"ZTF": FailProvider()},
+    )
     summary = background.live_execution_log_summary(db_path)
 
     assert entry["outcome"] == "blocked"
@@ -290,19 +297,96 @@ def test_live_dry_run_execute_approved_config_uses_mock_hook(monkeypatch, tmp_pa
     monkeypatch.setenv("MAST_API_TOKEN", "mast-token")
     calls = []
 
-    def fake_execute(plan):
-        calls.append(plan)
-        return ({"survey": "ZTF", "status": "mocked_success"},)
+    class CountingProvider:
+        survey = "ZTF"
 
-    monkeypatch.setattr(background, "_execute_live_dry_run_queries", fake_execute)
-    entry = background.record_live_execution_attempt(config_path, db_path)
+        def __init__(self, survey: str):
+            self.survey = survey
+
+        def execute(self, query):
+            calls.append(query)
+            return {
+                "survey": self.survey,
+                "status": "mocked_success",
+                "provider": "test",
+                "network_access_performed": False,
+                "external_submission_enabled": False,
+            }
+
+    providers = {
+        "ZTF": CountingProvider("ZTF"),
+        "ATLAS": CountingProvider("ATLAS"),
+        "PanSTARRS": CountingProvider("PanSTARRS"),
+    }
+    entry = background.record_live_execution_attempt(config_path, db_path, providers=providers)
 
     assert entry["outcome"] == "mock_executed"
     assert entry["executable"] is True
     assert entry["network_access_performed"] is False
     assert entry["external_submission_enabled"] is False
-    assert len(calls) == 1
-    assert calls[0]["executable"] is True
+    assert entry["successful_queries"] == 3
+    assert entry["missing_provider_queries"] == 0
+    assert len(calls) == 3
+    assert {result["provider"] for result in entry["query_results"]} == {"test"}
+
+
+def test_live_dry_run_execute_records_missing_injected_providers(monkeypatch, tmp_path):
+    policy_path = tmp_path / "policy.json"
+    config_path = tmp_path / "config.json"
+    write_live_policy(policy_path, approved=True)
+    write_live_config(config_path, policy_path, live_network_enabled=True)
+    monkeypatch.setenv("ZTF_IRSA_TOKEN", "ztf-token")
+    monkeypatch.setenv("ATLAS_TOKEN", "atlas-token")
+    monkeypatch.setenv("MAST_API_TOKEN", "mast-token")
+
+    class ZtfOnlyProvider:
+        survey = "ZTF"
+
+        def execute(self, query):
+            return {
+                "status": "mocked_success",
+                "provider": "ztf-only",
+                "network_access_performed": False,
+                "external_submission_enabled": False,
+            }
+
+    result = background.live_dry_run_execute(config_path, providers={"ZTF": ZtfOnlyProvider()})
+
+    assert result["outcome"] == "mock_executed"
+    assert result["successful_queries"] == 1
+    assert result["missing_provider_queries"] == 2
+    assert [item["status"] for item in result["query_results"]] == [
+        "mocked_success",
+        "provider_missing",
+        "provider_missing",
+    ]
+
+
+def test_live_dry_run_execute_rejects_network_provider(monkeypatch, tmp_path):
+    policy_path = tmp_path / "policy.json"
+    config_path = tmp_path / "config.json"
+    write_live_policy(policy_path, approved=True)
+    write_live_config(config_path, policy_path, live_network_enabled=True)
+    monkeypatch.setenv("ZTF_IRSA_TOKEN", "ztf-token")
+    monkeypatch.setenv("ATLAS_TOKEN", "atlas-token")
+    monkeypatch.setenv("MAST_API_TOKEN", "mast-token")
+
+    class BadProvider:
+        survey = "ZTF"
+
+        def execute(self, query):
+            return {
+                "status": "live_attempted",
+                "network_access_performed": True,
+                "external_submission_enabled": False,
+            }
+
+    try:
+        background.live_dry_run_execute(config_path, providers={"ZTF": BadProvider()})
+    except ValueError as exc:
+        assert str(exc) == "LIVE_PROVIDER_NETWORK_ACCESS_NOT_ALLOWED"
+    else:
+        raise AssertionError("network-capable provider result should be rejected")
 
 
 def test_automation_readiness_log_summary_empty(tmp_path):

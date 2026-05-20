@@ -471,9 +471,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.29.0)
+## Current State (v0.30.0)
 
-All 10 pipeline modules are complete. 1338 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified CLI with automated offline scheduling readiness, top-level SQLite logs for runs, readiness checks, no-network live dry-run plans, mock-only execution attempts, and auditable signoff readiness.
+All 10 pipeline modules are complete. 1340 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified CLI with automated offline scheduling readiness, top-level SQLite logs for runs, readiness checks, no-network live dry-run plans, mock-only provider execution attempts, and auditable signoff readiness.
 
 ### Skills
 
@@ -564,7 +564,7 @@ All 10 pipeline modules are complete. 1338 tests passing (100% coverage). CI gre
 | `background/live_review_policy.schema.json` | JSON Schema for live dry-run review policy |
 | `background/targets.json` | Stable background automation fixture manifest |
 
-### Coverage by Module (v0.29.0)
+### Coverage by Module (v0.30.0)
 
 | Module | Coverage |
 |---|---|
@@ -594,6 +594,14 @@ All 10 pipeline modules are complete. 1338 tests passing (100% coverage). CI gre
 - Collect labeled training data via `Skills/generate_training_labels.py`.
 - Run credentialed live-data dry runs for ZTF/ATLAS/Pan-STARRS only when tokens and review policy are explicitly configured.
 - Train and evaluate Tier 2/Tier 3 model weights on real labeled data.
+
+### Key Changes in v0.30.0
+
+- `background.py`: added `LiveDryRunProvider` and `MockLiveDryRunProvider` for injected no-network survey dry-run probes.
+- `live_dry_run_execute` and `record_live_execution_attempt`: now accept an optional provider map, aggregate per-survey query results, and report missing providers.
+- Provider results are rejected if they claim network access or external submission, preserving the M4 no-submission guardrail.
+- 2 new tests (1340 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.30.0.
 
 ### Key Changes in v0.29.0
 
