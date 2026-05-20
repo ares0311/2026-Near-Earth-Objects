@@ -369,6 +369,12 @@ def record_automation_readiness(
     db_path: Path = DEFAULT_DB_PATH,
 ) -> dict[str, Any]
 def automation_readiness_log_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
+def live_dry_run_plan(config_path: Path = DEFAULT_CONFIG_PATH) -> dict[str, Any]
+def record_live_dry_run_plan(
+    config_path: Path = DEFAULT_CONFIG_PATH,
+    db_path: Path = DEFAULT_DB_PATH,
+) -> dict[str, Any]
+def live_dry_run_plan_log_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
 def launchd_plist(config_path: Path = DEFAULT_CONFIG_PATH) -> str
 ```
 
@@ -379,7 +385,9 @@ manual or scheduled review. The supported command-line entrypoint is
 removed. Use `automation_readiness_summary(config_path)` to inspect scheduler
 and live-mode blockers without performing network actions,
 `record_automation_readiness(config_path, db_path)` to persist that snapshot to
-SQLite, and `launchd_plist(config_path)` to render a macOS scheduler template.
+SQLite, `live_dry_run_plan(config_path)` to produce an auditable no-network
+query plan, and `launchd_plist(config_path)` to render a macOS scheduler
+template.
 
 Default background log path:
 
@@ -641,7 +649,7 @@ Lightweight summary of a `ScoredNEO` for display or export.
 
 ---
 
-## v0.16.0 through v0.27.0 Public API Additions
+## v0.16.0 through v0.28.0 Public API Additions
 
 These releases added conservative helper APIs around live-data retrieval,
 preprocessing quality, detection triage, linking, orbit review, classification
@@ -752,8 +760,9 @@ claim confirmation or impact probability.
 | v0.26.0 | `background.py` | `automation_readiness_summary`, `launchd_plist` |
 | v0.26.0 | `schemas.py` | `BackgroundRunMode` supports `automated`; `BackgroundConfig` scheduler/live-readiness fields |
 | v0.27.0 | `background.py` | `record_automation_readiness`, `automation_readiness_log_summary` |
+| v0.28.0 | `background.py` | `live_dry_run_plan`, `record_live_dry_run_plan`, `live_dry_run_plan_log_summary` |
 
-### Skills and CLI additions in v0.16.0 through v0.27.0
+### Skills and CLI additions in v0.16.0 through v0.28.0
 
 `export_candidate_report.py`, `tag_neo_class.py`, `check_tisserand.py`,
 `export_followup_requests.py`, `ephemeris_check.py`,
@@ -767,4 +776,7 @@ claim confirmation or impact probability.
 `Skills/background.py automation-readiness`,
 `Skills/background.py record-automation-readiness`,
 `Skills/background.py automation-readiness-log-summary`, and
+`Skills/background.py live-dry-run-plan`,
+`Skills/background.py record-live-dry-run-plan`,
+`Skills/background.py live-dry-run-plan-log-summary`, and
 `Skills/background.py launchd-plist`.

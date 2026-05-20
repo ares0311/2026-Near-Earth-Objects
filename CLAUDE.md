@@ -471,9 +471,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.27.0)
+## Current State (v0.28.0)
 
-All 10 pipeline modules are complete. 1335 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified CLI with automated offline scheduling readiness, top-level SQLite logs for runs and readiness checks, live-mode blockers, and auditable signoff readiness.
+All 10 pipeline modules are complete. 1336 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified CLI with automated offline scheduling readiness, top-level SQLite logs for runs and readiness checks, live-mode blockers, and auditable signoff readiness.
 
 ### Skills
 
@@ -560,9 +560,11 @@ All 10 pipeline modules are complete. 1335 tests passing (100% coverage). CI gre
 | `data/stress_test_high_motion.json` | Stress-test results: 100% link rate across all three motion bins |
 | `background/config.json` | Automated offline background automation configuration |
 | `background/config.schema.json` | JSON Schema for background automation config |
+| `background/live_review_policy.example.json` | Example M4 live dry-run review policy; not approved for live network by default |
+| `background/live_review_policy.schema.json` | JSON Schema for live dry-run review policy |
 | `background/targets.json` | Stable background automation fixture manifest |
 
-### Coverage by Module (v0.27.0)
+### Coverage by Module (v0.28.0)
 
 | Module | Coverage |
 |---|---|
@@ -592,6 +594,16 @@ All 10 pipeline modules are complete. 1335 tests passing (100% coverage). CI gre
 - Collect labeled training data via `Skills/generate_training_labels.py`.
 - Run credentialed live-data dry runs for ZTF/ATLAS/Pan-STARRS only when tokens and review policy are explicitly configured.
 - Train and evaluate Tier 2/Tier 3 model weights on real labeled data.
+
+### Key Changes in v0.28.0
+
+- `background.py`: added `live_dry_run_plan(config_path)`, `record_live_dry_run_plan(config_path, db_path)`, and `live_dry_run_plan_log_summary(db_path)`.
+- `background/live_review_policy.example.json` and `background/live_review_policy.schema.json`: added a formal live review policy contract for M4 dry-run approval.
+- `background/config.json`: declares `MAST_API_TOKEN` along with ZTF/ATLAS credentials and points to the example review policy.
+- `Skills/background.py`: added `live-dry-run-plan`, `record-live-dry-run-plan`, and `live-dry-run-plan-log-summary` subcommands.
+- `automation_readiness_summary`: now validates live review policy fields and reports policy-specific blockers before any network access.
+- 1 new test (1336 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.28.0.
 
 ### Key Changes in v0.27.0
 

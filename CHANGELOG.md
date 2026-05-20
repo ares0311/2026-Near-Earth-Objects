@@ -5,6 +5,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## v0.28.0
+
+- `background.py`: added `live_dry_run_plan(config_path)`,
+  `record_live_dry_run_plan(config_path, db_path)`, and
+  `live_dry_run_plan_log_summary(db_path)`.
+- `background/live_review_policy.example.json` and
+  `background/live_review_policy.schema.json`: added a formal live review
+  policy contract for M4 dry-run approval.
+- `background/config.json`: declares `MAST_API_TOKEN` along with ZTF/ATLAS
+  credentials and points to the example review policy.
+- `Skills/background.py`: added `live-dry-run-plan`,
+  `record-live-dry-run-plan`, and `live-dry-run-plan-log-summary` subcommands.
+- `automation_readiness_summary`: now validates live review policy fields and
+  reports policy-specific blockers before any network access.
+- 1 new test (1336 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.28.0.
+
 ## v0.27.0
 
 - `background.py`: added `automation_readiness_log_summary(db_path)` and

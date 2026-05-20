@@ -123,6 +123,35 @@ Used in `preprocess.py` for astrometric correction of ZTF source positions relat
 
 ---
 
+## Credential And Live Dry-Run Policy
+
+Automated live dry-run planning is offline by default. Before any network query
+is allowed, `Skills/background.py automation-readiness` checks:
+
+| Source | Environment variable |
+|---|---|
+| ZTF / IRSA | `ZTF_IRSA_TOKEN` |
+| ATLAS forced photometry | `ATLAS_TOKEN` |
+| Pan-STARRS / MAST | `MAST_API_TOKEN` |
+
+The review contract lives in:
+
+```text
+background/live_review_policy.example.json
+background/live_review_policy.schema.json
+```
+
+The example policy is intentionally not approved for live network access. A
+human reviewer must set `approved_for_live_network` to `true`, keep
+`no_external_submission_confirmed` and `no_impact_probability_claims` true, and
+define allowed surveys, a dry-run sky/time scope, and per-run rate limits.
+
+No live dry-run planning or readiness check contacts external services. Use
+`Skills/background.py live-dry-run-plan` to inspect planned queries and
+`Skills/background.py record-live-dry-run-plan` to persist the plan to SQLite.
+
+---
+
 ## Local Cache
 
 All fetch results are cached to disk under `.neo_cache/` to avoid repeated network requests. Cache keys are MD5 hashes of the query parameters. Cache files are plain JSON and can be inspected or deleted manually.

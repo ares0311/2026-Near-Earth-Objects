@@ -144,12 +144,14 @@ def test_project_config_is_automated_offline():
     assert cfg.run_mode == "automated"
     assert cfg.scheduler_enabled is True
     assert cfg.live_network_enabled is False
-    assert cfg.required_credential_env == ("ZTF_IRSA_TOKEN", "ATLAS_TOKEN")
+    assert cfg.required_credential_env == ("ZTF_IRSA_TOKEN", "ATLAS_TOKEN", "MAST_API_TOKEN")
+    assert cfg.live_review_policy == "background/live_review_policy.example.json"
 
 
 def test_automation_readiness_is_scheduler_ready_but_live_blocked(monkeypatch):
     monkeypatch.delenv("ZTF_IRSA_TOKEN", raising=False)
     monkeypatch.delenv("ATLAS_TOKEN", raising=False)
+    monkeypatch.delenv("MAST_API_TOKEN", raising=False)
 
     readiness = background.automation_readiness_summary(Path("background/config.json"))
 
@@ -158,7 +160,17 @@ def test_automation_readiness_is_scheduler_ready_but_live_blocked(monkeypatch):
     assert readiness["live_mode_ready"] is False
     assert "LIVE_NETWORK_DISABLED" in readiness["live_mode_blockers"]
     assert "MISSING_REQUIRED_CREDENTIALS" in readiness["live_mode_blockers"]
-    assert readiness["missing_credential_env"] == ("ZTF_IRSA_TOKEN", "ATLAS_TOKEN")
+    assert "LIVE_REVIEW_POLICY_NOT_APPROVED" in readiness["live_mode_blockers"]
+    assert readiness["missing_credential_env"] == (
+        "ZTF_IRSA_TOKEN",
+        "ATLAS_TOKEN",
+        "MAST_API_TOKEN",
+    )
+    assert readiness["live_review_policy_summary"]["allowed_surveys"] == (
+        "ZTF",
+        "ATLAS",
+        "PanSTARRS",
+    )
     assert "Skills/background.py run-once" in readiness["one_run_command"]
 
 
@@ -175,6 +187,7 @@ def test_launchd_plist_wraps_one_run_command():
 def test_record_automation_readiness_writes_sqlite_log(monkeypatch, tmp_path):
     monkeypatch.delenv("ZTF_IRSA_TOKEN", raising=False)
     monkeypatch.delenv("ATLAS_TOKEN", raising=False)
+    monkeypatch.delenv("MAST_API_TOKEN", raising=False)
     db_path = tmp_path / "Logs" / "background.sqlite"
 
     entry = background.record_automation_readiness(Path("background/config.json"), db_path)
@@ -188,6 +201,25 @@ def test_record_automation_readiness_writes_sqlite_log(monkeypatch, tmp_path):
     assert summary["blocker_counts"]["scheduler_not_ready"] == 0
     assert summary["blocker_counts"]["live_mode_not_ready"] == 1
     assert summary["latest"]["readiness_id"] == entry["readiness_id"]
+
+
+def test_live_dry_run_plan_is_no_network_and_persisted(tmp_path):
+    db_path = tmp_path / "Logs" / "background.sqlite"
+
+    plan = background.live_dry_run_plan(Path("background/config.json"))
+    entry = background.record_live_dry_run_plan(Path("background/config.json"), db_path)
+    summary = background.live_dry_run_plan_log_summary(db_path)
+
+    assert plan["network_access_performed"] is False
+    assert plan["external_submission_enabled"] is False
+    assert plan["executable"] is False
+    assert plan["planned_surveys"] == ("ZTF", "ATLAS", "PanSTARRS")
+    assert plan["query_count"] == 3
+    assert all(query["network_action"] == "not_executed" for query in plan["queries"])
+    assert "LIVE_REVIEW_POLICY_NOT_APPROVED" in plan["blockers"]
+    assert table_count(db_path, "live_dry_run_plan_log") == 1
+    assert summary["total_live_dry_run_plans"] == 1
+    assert summary["latest"]["plan_id"] == entry["plan_id"]
 
 
 def test_automation_readiness_log_summary_empty(tmp_path):
@@ -594,11 +626,58 @@ def test_background_cli_automation_commands(tmp_path):
         capture_output=True,
         check=True,
     )
+    plan = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "live-dry-run-plan",
+            "--config",
+            str(config_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    recorded_plan = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "record-live-dry-run-plan",
+            "--config",
+            str(config_path),
+            "--db",
+            str(db_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    plan_summary = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "live-dry-run-plan-log-summary",
+            "--db",
+            str(db_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
 
     assert json.loads(readiness.stdout)["scheduler_ready"] is True
     assert "org.neo-detection.background" in plist.stdout
     assert json.loads(recorded.stdout)["live_mode_ready"] is False
     assert json.loads(summary.stdout)["total_readiness_checks"] == 1
+    assert json.loads(plan.stdout)["network_access_performed"] is False
+    assert json.loads(recorded_plan.stdout)["query_count"] == 3
+    assert json.loads(plan_summary.stdout)["total_live_dry_run_plans"] == 1
 
 
 def test_deprecated_background_wrappers_are_removed():
@@ -657,6 +736,7 @@ def test_init_log_db_migrates_existing_ledger(tmp_path):
         "run_lock",
         "human_signoff_log",
         "automation_readiness_log",
+        "live_dry_run_plan_log",
     } <= tables
 
 

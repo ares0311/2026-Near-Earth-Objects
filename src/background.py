@@ -29,6 +29,9 @@ __all__ = [
     "automation_readiness_summary",
     "record_automation_readiness",
     "automation_readiness_log_summary",
+    "live_dry_run_plan",
+    "record_live_dry_run_plan",
+    "live_dry_run_plan_log_summary",
     "launchd_plist",
 ]
 
@@ -69,7 +72,26 @@ DEFAULT_INPUT_PATH = _ROOT / "background" / "targets.json"
 DEFAULT_DB_PATH = _ROOT / "Logs" / "background.sqlite"
 DEFAULT_REPORT_DIR = _ROOT / "Logs" / "reports"
 _SCHEMA_VERSION = "background-v1"
-_CODE_VERSION = "0.27.0"
+_CODE_VERSION = "0.28.0"
+_SUPPORTED_LIVE_SURVEYS = ("ZTF", "ATLAS", "PanSTARRS")
+_REQUIRED_POLICY_FIELDS = (
+    "schema_version",
+    "reviewer",
+    "approved_for_live_network",
+    "allowed_surveys",
+    "max_queries_per_run",
+    "min_seconds_between_queries",
+    "dry_run_scope",
+    "no_external_submission_confirmed",
+    "no_impact_probability_claims",
+)
+_REQUIRED_DRY_RUN_SCOPE_FIELDS = (
+    "ra_deg",
+    "dec_deg",
+    "radius_deg",
+    "start_jd",
+    "end_jd",
+)
 _FOLLOW_UP_THRESHOLD = 0.45
 _LOCK_ID = 1
 
@@ -215,6 +237,19 @@ def init_log_db(db_path: Path = DEFAULT_DB_PATH) -> None:
                 scheduler_blockers_json TEXT NOT NULL,
                 live_mode_blockers_json TEXT NOT NULL,
                 missing_credential_env_json TEXT NOT NULL,
+                entry_json TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS live_dry_run_plan_log (
+                plan_id TEXT PRIMARY KEY,
+                planned_at_utc TEXT NOT NULL,
+                config_path TEXT NOT NULL,
+                executable INTEGER NOT NULL,
+                planned_surveys_json TEXT NOT NULL,
+                blockers_json TEXT NOT NULL,
                 entry_json TEXT NOT NULL
             )
             """
@@ -1282,9 +1317,76 @@ def _one_run_command(config_path: Path = DEFAULT_CONFIG_PATH) -> str:
     return f"PYTHONPATH=src python Skills/background.py run-once --config {config_path}"
 
 
+def _policy_path(config: BackgroundConfig) -> Path | None:
+    if not config.live_review_policy:
+        return None
+    return _resolve_project_path(config.live_review_policy)
+
+
+def _load_live_review_policy(config: BackgroundConfig) -> tuple[dict[str, Any] | None, list[str]]:
+    path = _policy_path(config)
+    if path is None:
+        return None, ["LIVE_REVIEW_POLICY_MISSING"]
+    if not path.exists():
+        return None, ["LIVE_REVIEW_POLICY_NOT_FOUND"]
+    try:
+        with path.open() as handle:
+            policy = json.load(handle)
+    except json.JSONDecodeError:
+        return None, ["LIVE_REVIEW_POLICY_INVALID_JSON"]
+
+    blockers: list[str] = []
+    missing = [field for field in _REQUIRED_POLICY_FIELDS if field not in policy]
+    if missing:
+        blockers.append("LIVE_REVIEW_POLICY_MISSING_FIELDS")
+
+    if policy.get("schema_version") != "live-review-policy-v1":
+        blockers.append("LIVE_REVIEW_POLICY_SCHEMA_UNSUPPORTED")
+    if not policy.get("approved_for_live_network"):
+        blockers.append("LIVE_REVIEW_POLICY_NOT_APPROVED")
+    if not policy.get("reviewer"):
+        blockers.append("LIVE_REVIEW_POLICY_REVIEWER_MISSING")
+    if policy.get("no_external_submission_confirmed") is not True:
+        blockers.append("LIVE_REVIEW_POLICY_ALLOWS_EXTERNAL_SUBMISSION")
+    if policy.get("no_impact_probability_claims") is not True:
+        blockers.append("LIVE_REVIEW_POLICY_ALLOWS_IMPACT_CLAIMS")
+
+    allowed = policy.get("allowed_surveys", ())
+    if not isinstance(allowed, list) or not allowed:
+        blockers.append("LIVE_REVIEW_POLICY_SURVEYS_INVALID")
+    elif any(survey not in _SUPPORTED_LIVE_SURVEYS for survey in allowed):
+        blockers.append("LIVE_REVIEW_POLICY_SURVEYS_UNSUPPORTED")
+
+    max_queries = policy.get("max_queries_per_run")
+    if not isinstance(max_queries, int) or max_queries < 1:
+        blockers.append("LIVE_REVIEW_POLICY_RATE_LIMIT_INVALID")
+    min_seconds = policy.get("min_seconds_between_queries")
+    if not isinstance(min_seconds, int | float) or min_seconds < 0:
+        blockers.append("LIVE_REVIEW_POLICY_CADENCE_INVALID")
+
+    scope = policy.get("dry_run_scope", {})
+    if not isinstance(scope, dict):
+        blockers.append("LIVE_REVIEW_POLICY_SCOPE_INVALID")
+    else:
+        missing_scope = [
+            field for field in _REQUIRED_DRY_RUN_SCOPE_FIELDS if field not in scope
+        ]
+        if missing_scope:
+            blockers.append("LIVE_REVIEW_POLICY_SCOPE_MISSING_FIELDS")
+        elif not all(
+            isinstance(scope[field], int | float) for field in _REQUIRED_DRY_RUN_SCOPE_FIELDS
+        ):
+            blockers.append("LIVE_REVIEW_POLICY_SCOPE_INVALID")
+        elif scope["end_jd"] <= scope["start_jd"] or scope["radius_deg"] <= 0:
+            blockers.append("LIVE_REVIEW_POLICY_SCOPE_INVALID")
+
+    return policy, list(dict.fromkeys(blockers))
+
+
 def automation_readiness_summary(config_path: Path = DEFAULT_CONFIG_PATH) -> dict[str, Any]:
     """Report scheduler and live-mode readiness without performing network actions."""
     config = load_config(config_path)
+    policy, policy_blockers = _load_live_review_policy(config)
     missing_credentials = tuple(
         name for name in config.required_credential_env if not os.environ.get(name)
     )
@@ -1300,8 +1402,7 @@ def automation_readiness_summary(config_path: Path = DEFAULT_CONFIG_PATH) -> dic
         live_blockers.append("LIVE_NETWORK_DISABLED")
     if missing_credentials:
         live_blockers.append("MISSING_REQUIRED_CREDENTIALS")
-    if not config.live_review_policy:
-        live_blockers.append("LIVE_REVIEW_POLICY_MISSING")
+    live_blockers.extend(policy_blockers)
     if not config.require_human_signoff:
         live_blockers.append("HUMAN_SIGNOFF_NOT_REQUIRED")
 
@@ -1318,11 +1419,30 @@ def automation_readiness_summary(config_path: Path = DEFAULT_CONFIG_PATH) -> dic
         "live_mode_blockers": live_blockers,
         "required_credential_env": config.required_credential_env,
         "missing_credential_env": missing_credentials,
-        "live_review_policy": config.live_review_policy,
+        "live_review_policy": str(_policy_path(config)) if _policy_path(config) else None,
+        "live_review_policy_summary": _policy_summary(policy),
         "require_human_signoff": config.require_human_signoff,
         "required_approval_count": config.required_approval_count,
         "external_submission_enabled": False,
         "log_backend": "sqlite",
+    }
+
+
+def _policy_summary(policy: dict[str, Any] | None) -> dict[str, Any] | None:
+    if policy is None:
+        return None
+    scope = policy.get("dry_run_scope", {})
+    return {
+        "schema_version": policy.get("schema_version"),
+        "policy_name": policy.get("policy_name"),
+        "reviewer": policy.get("reviewer"),
+        "approved_for_live_network": bool(policy.get("approved_for_live_network")),
+        "allowed_surveys": tuple(policy.get("allowed_surveys", ())),
+        "max_queries_per_run": policy.get("max_queries_per_run"),
+        "min_seconds_between_queries": policy.get("min_seconds_between_queries"),
+        "dry_run_scope": scope if isinstance(scope, dict) else None,
+        "no_external_submission_confirmed": policy.get("no_external_submission_confirmed"),
+        "no_impact_probability_claims": policy.get("no_impact_probability_claims"),
     }
 
 
@@ -1390,6 +1510,100 @@ def automation_readiness_log_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[st
             "db_path": str(db_path),
             "total_readiness_checks": _count_rows(conn, "automation_readiness_log"),
             "blocker_counts": blocker_counts,
+            "latest": json.loads(latest["entry_json"]) if latest else None,
+        }
+
+
+def live_dry_run_plan(config_path: Path = DEFAULT_CONFIG_PATH) -> dict[str, Any]:
+    """Build a no-network dry-run query plan from config and review policy."""
+    config = load_config(config_path)
+    policy, policy_blockers = _load_live_review_policy(config)
+    readiness = automation_readiness_summary(config_path)
+    policy_summary = _policy_summary(policy)
+    allowed_surveys = tuple(policy_summary["allowed_surveys"]) if policy_summary else ()
+    scope = policy_summary["dry_run_scope"] if policy_summary else None
+    queries = []
+    if scope:
+        for rank, survey in enumerate(allowed_surveys, start=1):
+            queries.append({
+                "rank": rank,
+                "survey": survey,
+                "ra_deg": scope["ra_deg"],
+                "dec_deg": scope["dec_deg"],
+                "radius_deg": scope["radius_deg"],
+                "start_jd": scope["start_jd"],
+                "end_jd": scope["end_jd"],
+                "network_action": "not_executed",
+            })
+    blockers = tuple(dict.fromkeys((
+        *readiness["live_mode_blockers"],
+        *policy_blockers,
+    )))
+    return {
+        "config_path": str(config_path),
+        "planned_at_utc": _utc_now(),
+        "executable": readiness["live_mode_ready"],
+        "blockers": blockers,
+        "planned_surveys": allowed_surveys,
+        "query_count": len(queries),
+        "max_queries_per_run": policy_summary["max_queries_per_run"] if policy_summary else None,
+        "min_seconds_between_queries": (
+            policy_summary["min_seconds_between_queries"] if policy_summary else None
+        ),
+        "dry_run_scope": scope,
+        "queries": queries,
+        "network_access_performed": False,
+        "external_submission_enabled": False,
+    }
+
+
+def record_live_dry_run_plan(
+    config_path: Path = DEFAULT_CONFIG_PATH,
+    db_path: Path = DEFAULT_DB_PATH,
+) -> dict[str, Any]:
+    """Persist a no-network live dry-run plan to SQLite."""
+    init_log_db(db_path)
+    plan = live_dry_run_plan(config_path)
+    entry = {
+        "plan_id": str(uuid.uuid4()),
+        **plan,
+    }
+    with _connect(db_path) as conn:
+        conn.execute(
+            """
+            INSERT INTO live_dry_run_plan_log (
+                plan_id, planned_at_utc, config_path, executable,
+                planned_surveys_json, blockers_json, entry_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                entry["plan_id"],
+                entry["planned_at_utc"],
+                entry["config_path"],
+                int(entry["executable"]),
+                json.dumps(entry["planned_surveys"]),
+                json.dumps(entry["blockers"]),
+                json.dumps(entry),
+            ),
+        )
+    return entry
+
+
+def live_dry_run_plan_log_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]:
+    """Summarize persisted no-network live dry-run plans."""
+    init_log_db(db_path)
+    with _connect(db_path) as conn:
+        latest = conn.execute(
+            """
+            SELECT entry_json
+            FROM live_dry_run_plan_log
+            ORDER BY planned_at_utc DESC
+            LIMIT 1
+            """
+        ).fetchone()
+        return {
+            "db_path": str(db_path),
+            "total_live_dry_run_plans": _count_rows(conn, "live_dry_run_plan_log"),
             "latest": json.loads(latest["entry_json"]) if latest else None,
         }
 

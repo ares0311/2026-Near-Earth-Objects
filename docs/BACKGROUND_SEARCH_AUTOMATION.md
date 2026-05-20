@@ -57,6 +57,18 @@ PYTHONPATH=src python Skills/background.py record-automation-readiness
 PYTHONPATH=src python Skills/background.py automation-readiness-log-summary
 ```
 
+Generate and persist a no-network live dry-run plan:
+
+```bash
+PYTHONPATH=src python Skills/background.py live-dry-run-plan
+PYTHONPATH=src python Skills/background.py record-live-dry-run-plan
+PYTHONPATH=src python Skills/background.py live-dry-run-plan-log-summary
+```
+
+The plan is derived from `background/live_review_policy.example.json` until a
+reviewer replaces it with an approved policy. The example policy deliberately
+sets `approved_for_live_network` to `false`.
+
 ## Top-Level SQLite Logs
 
 Background logs live at the repository top level:
@@ -76,6 +88,7 @@ The SQLite database contains three append-only operational tables:
 | `needs_follow_up_log` | Outcome row when follow-up, tests, or review are required |
 | `human_signoff_log` | Manual reviewer signoff records |
 | `automation_readiness_log` | Scheduler/live-readiness snapshots |
+| `live_dry_run_plan_log` | No-network live dry-run query plans |
 | `run_lock` | Prevents overlapping invocations |
 | `schema_metadata` | SQLite schema version metadata |
 
@@ -96,6 +109,9 @@ PYTHONPATH=src python Skills/background.py human-signoff-summary
 PYTHONPATH=src python Skills/background.py signoff-readiness
 PYTHONPATH=src python Skills/background.py record-automation-readiness
 PYTHONPATH=src python Skills/background.py automation-readiness-log-summary
+PYTHONPATH=src python Skills/background.py live-dry-run-plan
+PYTHONPATH=src python Skills/background.py record-live-dry-run-plan
+PYTHONPATH=src python Skills/background.py live-dry-run-plan-log-summary
 PYTHONPATH=src python Skills/background.py unsigned-follow-up
 PYTHONPATH=src python Skills/background.py run-detail --run-id <run-id>
 PYTHONPATH=src python Skills/background.py target-history --target-id <target-id>

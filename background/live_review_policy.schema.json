@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "live-review-policy-v1",
+  "title": "Live Review Policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "policy_name",
+    "reviewer",
+    "approved_for_live_network",
+    "allowed_surveys",
+    "max_queries_per_run",
+    "min_seconds_between_queries",
+    "dry_run_scope",
+    "no_external_submission_confirmed",
+    "no_impact_probability_claims"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "live-review-policy-v1"
+    },
+    "policy_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reviewer": {
+      "type": "string",
+      "minLength": 1
+    },
+    "approved_for_live_network": {
+      "type": "boolean"
+    },
+    "allowed_surveys": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "ZTF",
+          "ATLAS",
+          "PanSTARRS"
+        ]
+      }
+    },
+    "max_queries_per_run": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "min_seconds_between_queries": {
+      "type": "number",
+      "minimum": 0
+    },
+    "dry_run_scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ra_deg",
+        "dec_deg",
+        "radius_deg",
+        "start_jd",
+        "end_jd"
+      ],
+      "properties": {
+        "ra_deg": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 360
+        },
+        "dec_deg": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        },
+        "radius_deg": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "start_jd": {
+          "type": "number"
+        },
+        "end_jd": {
+          "type": "number"
+        }
+      }
+    },
+    "no_external_submission_confirmed": {
+      "const": true
+    },
+    "no_impact_probability_claims": {
+      "const": true
+    },
+    "notes": {
+      "type": "string"
+    }
+  }
+}
