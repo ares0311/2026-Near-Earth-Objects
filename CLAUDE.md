@@ -471,9 +471,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.34.0)
+## Current State (v0.35.0)
 
-All 10 pipeline modules are complete. 1348 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified CLI with automated offline scheduling readiness, live policy contract validation, provider-specific live readiness summaries, top-level SQLite logs for runs, readiness checks, no-network live dry-run plans, mock-only provider execution attempts, and auditable signoff readiness.
+All 10 pipeline modules are complete. 1351 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified CLI with automated offline scheduling readiness, live policy contract validation, provider-specific live readiness summaries, no-network live dry-run approval bundles, top-level SQLite logs for runs, readiness checks, no-network live dry-run plans, mock-only provider execution attempts, and auditable signoff readiness.
 
 ### Skills
 
@@ -564,7 +564,7 @@ All 10 pipeline modules are complete. 1348 tests passing (100% coverage). CI gre
 | `background/live_review_policy.schema.json` | JSON Schema for live dry-run review policy |
 | `background/targets.json` | Stable background automation fixture manifest |
 
-### Coverage by Module (v0.34.0)
+### Coverage by Module (v0.35.0)
 
 | Module | Coverage |
 |---|---|
@@ -594,6 +594,13 @@ All 10 pipeline modules are complete. 1348 tests passing (100% coverage). CI gre
 - Collect labeled training data via `Skills/generate_training_labels.py`.
 - Run credentialed live-data dry runs for ZTF/ATLAS/Pan-STARRS only when tokens and review policy are explicitly configured.
 - Train and evaluate Tier 2/Tier 3 model weights on real labeled data.
+
+### Key Changes in v0.35.0
+
+- `background.py`: added `live_dry_run_approval_bundle(config_path)` to aggregate scheduler readiness, policy contract validation, provider readiness, dry-run planning, and blocker status into one no-network review object.
+- `Skills/background.py`: added `live-dry-run-approval-bundle` for operator review before any mock live dry-run execution attempt.
+- 3 new tests (1351 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.35.0.
 
 ### Key Changes in v0.34.0
 

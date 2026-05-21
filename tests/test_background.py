@@ -888,6 +888,20 @@ def test_background_cli_automation_commands(tmp_path):
         capture_output=True,
         check=True,
     )
+    approval_bundle = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "live-dry-run-approval-bundle",
+            "--config",
+            str(config_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
     recorded = subprocess.run(
         [
             sys.executable,
@@ -1001,6 +1015,11 @@ def test_background_cli_automation_commands(tmp_path):
     assert [provider["survey"] for provider in provider_payload] == ["ZTF", "ATLAS", "PanSTARRS"]
     assert all(provider["network_access_performed"] is False for provider in provider_payload)
     assert all(provider["external_submission_enabled"] is False for provider in provider_payload)
+    bundle_payload = json.loads(approval_bundle.stdout)
+    assert bundle_payload["approved_to_attempt_live_dry_run"] is False
+    assert bundle_payload["network_access_performed"] is False
+    assert bundle_payload["external_submission_enabled"] is False
+    assert "LIVE_NETWORK_DISABLED" in bundle_payload["blockers"]
     assert json.loads(recorded.stdout)["live_mode_ready"] is False
     assert json.loads(summary.stdout)["total_readiness_checks"] == 1
     assert json.loads(plan.stdout)["network_access_performed"] is False
@@ -1074,6 +1093,81 @@ def test_background_cli_live_provider_readiness_approved_config(monkeypatch, tmp
     assert all(provider["policy_approved"] is True for provider in payload)
     assert all(provider["network_access_performed"] is False for provider in payload)
     assert all(provider["external_submission_enabled"] is False for provider in payload)
+
+
+def test_live_dry_run_approval_bundle_default_config_is_blocked():
+    bundle = background.live_dry_run_approval_bundle(Path("background/config.json"))
+
+    assert bundle["approved_to_attempt_live_dry_run"] is False
+    assert bundle["next_action"] == "resolve_blockers"
+    assert bundle["scheduler_ready"] is True
+    assert bundle["live_mode_ready"] is False
+    assert bundle["policy_contract_valid"] is True
+    assert bundle["network_access_performed"] is False
+    assert bundle["external_submission_enabled"] is False
+    assert "LIVE_NETWORK_DISABLED" in bundle["blockers"]
+    assert "LIVE_REVIEW_POLICY_NOT_APPROVED" in bundle["blockers"]
+    assert "PROVIDER_CREDENTIAL_MISSING" in bundle["blockers"]
+
+
+def test_background_cli_live_dry_run_approval_bundle_approved_config(
+    monkeypatch,
+    tmp_path,
+):
+    repo = Path(__file__).resolve().parents[1]
+    policy_path = tmp_path / "policy.json"
+    config_path = tmp_path / "config.json"
+    write_live_policy(policy_path, approved=True)
+    write_live_config(config_path, policy_path, live_network_enabled=True)
+    monkeypatch.setenv("ZTF_IRSA_TOKEN", "ztf-token")
+    monkeypatch.setenv("ATLAS_TOKEN", "atlas-token")
+    monkeypatch.setenv("MAST_API_TOKEN", "mast-token")
+    env = {**os.environ, "PYTHONPATH": str(repo / "src")}
+
+    approval = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "live-dry-run-approval-bundle",
+            "--config",
+            str(config_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    payload = json.loads(approval.stdout)
+
+    assert payload["approved_to_attempt_live_dry_run"] is True
+    assert payload["next_action"] == "run_mock_live_dry_run_execute"
+    assert payload["blockers"] == []
+    assert payload["planned_query_count"] == 3
+    assert payload["planned_surveys"] == ["ZTF", "ATLAS", "PanSTARRS"]
+    assert payload["network_access_performed"] is False
+    assert payload["external_submission_enabled"] is False
+
+
+def test_live_dry_run_approval_bundle_blocks_unsafe_policy(monkeypatch, tmp_path):
+    policy_path = tmp_path / "policy.json"
+    config_path = tmp_path / "config.json"
+    write_live_policy(policy_path, approved=True)
+    policy = json.loads(policy_path.read_text())
+    policy["no_external_submission_confirmed"] = False
+    policy_path.write_text(json.dumps(policy))
+    write_live_config(config_path, policy_path, live_network_enabled=True)
+    monkeypatch.setenv("ZTF_IRSA_TOKEN", "ztf-token")
+    monkeypatch.setenv("ATLAS_TOKEN", "atlas-token")
+    monkeypatch.setenv("MAST_API_TOKEN", "mast-token")
+
+    bundle = background.live_dry_run_approval_bundle(config_path)
+
+    assert bundle["approved_to_attempt_live_dry_run"] is False
+    assert bundle["policy_contract_valid"] is False
+    assert bundle["network_access_performed"] is False
+    assert bundle["external_submission_enabled"] is False
+    assert "LIVE_REVIEW_POLICY_ALLOWS_EXTERNAL_SUBMISSION" in bundle["blockers"]
 
 
 def test_deprecated_background_wrappers_are_removed():

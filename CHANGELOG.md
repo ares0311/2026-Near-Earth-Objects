@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## v0.35.0
+
+- `background.py`: added `live_dry_run_approval_bundle(config_path)` to
+  aggregate scheduler readiness, policy contract validation, provider
+  readiness, dry-run planning, and blocker status into one no-network review
+  object.
+- `Skills/background.py`: added `live-dry-run-approval-bundle` for operator
+  review before any mock live dry-run execution attempt.
+- 3 new tests (1351 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.35.0.
+
 ## v0.34.0
 
 - `Skills/background.py`: added `live-provider-readiness-summary` to expose

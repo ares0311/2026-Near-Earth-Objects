@@ -32,6 +32,7 @@ __all__ = [
     "live_policy_contract_summary",
     "live_provider_capabilities",
     "live_provider_readiness",
+    "live_dry_run_approval_bundle",
     "live_dry_run_plan",
     "record_live_dry_run_plan",
     "live_dry_run_plan_log_summary",
@@ -81,7 +82,7 @@ DEFAULT_INPUT_PATH = _ROOT / "background" / "targets.json"
 DEFAULT_DB_PATH = _ROOT / "Logs" / "background.sqlite"
 DEFAULT_REPORT_DIR = _ROOT / "Logs" / "reports"
 _SCHEMA_VERSION = "background-v1"
-_CODE_VERSION = "0.32.0"
+_CODE_VERSION = "0.35.0"
 _LIVE_REVIEW_POLICY_SCHEMA_PATH = _ROOT / "background" / "live_review_policy.schema.json"
 _SUPPORTED_LIVE_SURVEYS = ("ZTF", "ATLAS", "PanSTARRS")
 _LIVE_PROVIDER_CAPABILITIES = {
@@ -1587,6 +1588,17 @@ def live_provider_readiness(
     return tuple(readiness)
 
 
+def _dedupe_codes(*groups: Any) -> tuple[str, ...]:
+    codes: list[str] = []
+    for group in groups:
+        if not group:
+            continue
+        for code in group:
+            if isinstance(code, str):
+                codes.append(code)
+    return tuple(dict.fromkeys(codes))
+
+
 def automation_readiness_summary(config_path: Path = DEFAULT_CONFIG_PATH) -> dict[str, Any]:
     """Report scheduler and live-mode readiness without performing network actions."""
     config = load_config(config_path)
@@ -1768,6 +1780,54 @@ def live_dry_run_plan(config_path: Path = DEFAULT_CONFIG_PATH) -> dict[str, Any]
         "queries": queries,
         "live_review_policy_contract": policy_contract,
         "live_provider_readiness": provider_readiness,
+        "network_access_performed": False,
+        "external_submission_enabled": False,
+    }
+
+
+def live_dry_run_approval_bundle(config_path: Path = DEFAULT_CONFIG_PATH) -> dict[str, Any]:
+    """Build one no-network review bundle for deciding whether a dry run is ready."""
+    readiness = automation_readiness_summary(config_path)
+    policy_contract = live_policy_contract_summary(config_path)
+    provider_readiness = live_provider_readiness(config_path)
+    plan = live_dry_run_plan(config_path)
+    provider_blockers = _dedupe_codes(
+        *(provider["blockers"] for provider in provider_readiness)
+    )
+    blockers = _dedupe_codes(
+        readiness["scheduler_blockers"],
+        readiness["live_mode_blockers"],
+        policy_contract["schema_blockers"],
+        policy_contract["policy_blockers"],
+        provider_blockers,
+        plan["blockers"],
+    )
+    approved = bool(
+        readiness["scheduler_ready"]
+        and readiness["live_mode_ready"]
+        and policy_contract["contract_valid"]
+        and plan["executable"]
+        and provider_readiness
+        and all(provider["ready"] for provider in provider_readiness)
+        and not blockers
+    )
+    return {
+        "config_path": str(config_path),
+        "reviewed_at_utc": _utc_now(),
+        "approved_to_attempt_live_dry_run": approved,
+        "blockers": blockers,
+        "next_action": "run_mock_live_dry_run_execute" if approved else "resolve_blockers",
+        "scheduler_ready": readiness["scheduler_ready"],
+        "live_mode_ready": readiness["live_mode_ready"],
+        "policy_contract_valid": policy_contract["contract_valid"],
+        "all_providers_ready": bool(provider_readiness)
+        and all(provider["ready"] for provider in provider_readiness),
+        "planned_query_count": plan["query_count"],
+        "planned_surveys": plan["planned_surveys"],
+        "automation_readiness": readiness,
+        "live_review_policy_contract": policy_contract,
+        "live_provider_readiness": provider_readiness,
+        "live_dry_run_plan": plan,
         "network_access_performed": False,
         "external_submission_enabled": False,
     }

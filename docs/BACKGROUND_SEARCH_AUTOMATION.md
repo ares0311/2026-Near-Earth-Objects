@@ -75,6 +75,17 @@ Inspect just the provider readiness details:
 PYTHONPATH=src python Skills/background.py live-provider-readiness-summary
 ```
 
+Inspect the combined no-network live dry-run approval bundle:
+
+```bash
+PYTHONPATH=src python Skills/background.py live-dry-run-approval-bundle
+```
+
+The approval bundle aggregates scheduler readiness, live review policy
+contract status, provider readiness, the dry-run query plan, and deduplicated
+blockers. It exposes `approved_to_attempt_live_dry_run`, but still performs no
+network query and enables no external submission.
+
 Persist the same readiness snapshot to the top-level SQLite log:
 
 ```bash
@@ -167,6 +178,7 @@ PYTHONPATH=src python Skills/background.py live-dry-run-execute
 PYTHONPATH=src python Skills/background.py live-execution-log-summary
 PYTHONPATH=src python Skills/background.py live-policy-contract-summary
 PYTHONPATH=src python Skills/background.py live-provider-readiness-summary
+PYTHONPATH=src python Skills/background.py live-dry-run-approval-bundle
 PYTHONPATH=src python Skills/background.py unsigned-follow-up
 PYTHONPATH=src python Skills/background.py run-detail --run-id <run-id>
 PYTHONPATH=src python Skills/background.py target-history --target-id <target-id>
