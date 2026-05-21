@@ -5,6 +5,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## v0.34.0
+
+- `Skills/background.py`: added `live-provider-readiness-summary` to expose
+  no-network provider readiness from the unified CLI.
+- CLI coverage now checks default blocked provider output and approved
+  temporary-config readiness with credentials.
+- 1 new test (1348 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.34.0.
+
 ## v0.33.0
 
 - `Skills/background.py`: added `live-policy-contract-summary` to expose

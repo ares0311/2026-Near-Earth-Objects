@@ -69,6 +69,12 @@ policy approval state, minimum cadence requirement, and blockers such as
 `PROVIDER_RATE_LIMIT_TOO_FAST`. This is metadata only; it performs no network
 queries.
 
+Inspect just the provider readiness details:
+
+```bash
+PYTHONPATH=src python Skills/background.py live-provider-readiness-summary
+```
+
 Persist the same readiness snapshot to the top-level SQLite log:
 
 ```bash
@@ -159,6 +165,8 @@ PYTHONPATH=src python Skills/background.py record-live-dry-run-plan
 PYTHONPATH=src python Skills/background.py live-dry-run-plan-log-summary
 PYTHONPATH=src python Skills/background.py live-dry-run-execute
 PYTHONPATH=src python Skills/background.py live-execution-log-summary
+PYTHONPATH=src python Skills/background.py live-policy-contract-summary
+PYTHONPATH=src python Skills/background.py live-provider-readiness-summary
 PYTHONPATH=src python Skills/background.py unsigned-follow-up
 PYTHONPATH=src python Skills/background.py run-detail --run-id <run-id>
 PYTHONPATH=src python Skills/background.py target-history --target-id <target-id>

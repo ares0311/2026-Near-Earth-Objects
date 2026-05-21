@@ -874,6 +874,20 @@ def test_background_cli_automation_commands(tmp_path):
         capture_output=True,
         check=True,
     )
+    provider_readiness = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "live-provider-readiness-summary",
+            "--config",
+            str(config_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
     recorded = subprocess.run(
         [
             sys.executable,
@@ -983,6 +997,10 @@ def test_background_cli_automation_commands(tmp_path):
     assert "org.neo-detection.background" in plist.stdout
     assert json.loads(policy_contract.stdout)["contract_valid"] is True
     assert json.loads(policy_contract.stdout)["network_access_performed"] is False
+    provider_payload = json.loads(provider_readiness.stdout)
+    assert [provider["survey"] for provider in provider_payload] == ["ZTF", "ATLAS", "PanSTARRS"]
+    assert all(provider["network_access_performed"] is False for provider in provider_payload)
+    assert all(provider["external_submission_enabled"] is False for provider in provider_payload)
     assert json.loads(recorded.stdout)["live_mode_ready"] is False
     assert json.loads(summary.stdout)["total_readiness_checks"] == 1
     assert json.loads(plan.stdout)["network_access_performed"] is False
@@ -1022,6 +1040,40 @@ def test_background_cli_live_policy_contract_invalid_policy(tmp_path):
     assert payload["contract_valid"] is False
     assert payload["external_submission_enabled"] is False
     assert "LIVE_REVIEW_POLICY_ALLOWS_EXTERNAL_SUBMISSION" in payload["policy_blockers"]
+
+
+def test_background_cli_live_provider_readiness_approved_config(monkeypatch, tmp_path):
+    repo = Path(__file__).resolve().parents[1]
+    policy_path = tmp_path / "policy.json"
+    config_path = tmp_path / "config.json"
+    write_live_policy(policy_path, approved=True)
+    write_live_config(config_path, policy_path, live_network_enabled=True)
+    monkeypatch.setenv("ZTF_IRSA_TOKEN", "ztf-token")
+    monkeypatch.setenv("ATLAS_TOKEN", "atlas-token")
+    monkeypatch.setenv("MAST_API_TOKEN", "mast-token")
+    env = {**os.environ, "PYTHONPATH": str(repo / "src")}
+
+    readiness = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "live-provider-readiness-summary",
+            "--config",
+            str(config_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    payload = json.loads(readiness.stdout)
+
+    assert all(provider["ready"] is True for provider in payload)
+    assert all(provider["credential_present"] is True for provider in payload)
+    assert all(provider["policy_approved"] is True for provider in payload)
+    assert all(provider["network_access_performed"] is False for provider in payload)
+    assert all(provider["external_submission_enabled"] is False for provider in payload)
 
 
 def test_deprecated_background_wrappers_are_removed():
