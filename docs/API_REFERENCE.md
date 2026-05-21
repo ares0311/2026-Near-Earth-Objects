@@ -677,7 +677,7 @@ Lightweight summary of a `ScoredNEO` for display or export.
 
 ---
 
-## v0.16.0 through v0.32.0 Public API Additions
+## v0.16.0 through v0.33.0 Public API Additions
 
 These releases added conservative helper APIs around live-data retrieval,
 preprocessing quality, detection triage, linking, orbit review, classification
@@ -793,8 +793,9 @@ claim confirmation or impact probability.
 | v0.30.0 | `background.py` | `LiveDryRunProvider`, `MockLiveDryRunProvider`; provider injection for live dry-run execution |
 | v0.31.0 | `background.py` | `live_provider_capabilities`, `live_provider_readiness`; provider readiness in automation summaries and dry-run plans |
 | v0.32.0 | `background.py` | `live_policy_contract_summary`; live review policy contract status in readiness summaries and dry-run plans |
+| v0.33.0 | `Skills/background.py` | `live-policy-contract-summary` CLI command |
 
-### Skills and CLI additions in v0.16.0 through v0.32.0
+### Skills and CLI additions in v0.16.0 through v0.33.0
 
 `export_candidate_report.py`, `tag_neo_class.py`, `check_tisserand.py`,
 `export_followup_requests.py`, `ephemeris_check.py`,
@@ -808,6 +809,7 @@ claim confirmation or impact probability.
 `Skills/background.py automation-readiness`,
 `Skills/background.py record-automation-readiness`,
 `Skills/background.py automation-readiness-log-summary`, and
+`Skills/background.py live-policy-contract-summary`,
 `Skills/background.py live-dry-run-plan`,
 `Skills/background.py record-live-dry-run-plan`,
 `Skills/background.py live-dry-run-plan-log-summary`,

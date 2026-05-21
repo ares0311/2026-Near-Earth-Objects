@@ -56,6 +56,12 @@ approved for live network access. Missing policy files, invalid schema files,
 or policy settings that permit external submission are reported as
 `LIVE_REVIEW_POLICY_CONTRACT_INVALID`.
 
+Inspect just the live review policy contract:
+
+```bash
+PYTHONPATH=src python Skills/background.py live-policy-contract-summary
+```
+
 Readiness also includes provider-specific entries for ZTF, ATLAS, and
 Pan-STARRS. Each entry records the credential environment variable, fetch API,
 policy approval state, minimum cadence requirement, and blockers such as

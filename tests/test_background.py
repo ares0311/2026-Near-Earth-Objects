@@ -860,6 +860,20 @@ def test_background_cli_automation_commands(tmp_path):
         capture_output=True,
         check=True,
     )
+    policy_contract = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "live-policy-contract-summary",
+            "--config",
+            str(config_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
     recorded = subprocess.run(
         [
             sys.executable,
@@ -967,6 +981,8 @@ def test_background_cli_automation_commands(tmp_path):
 
     assert json.loads(readiness.stdout)["scheduler_ready"] is True
     assert "org.neo-detection.background" in plist.stdout
+    assert json.loads(policy_contract.stdout)["contract_valid"] is True
+    assert json.loads(policy_contract.stdout)["network_access_performed"] is False
     assert json.loads(recorded.stdout)["live_mode_ready"] is False
     assert json.loads(summary.stdout)["total_readiness_checks"] == 1
     assert json.loads(plan.stdout)["network_access_performed"] is False
@@ -974,6 +990,38 @@ def test_background_cli_automation_commands(tmp_path):
     assert json.loads(plan_summary.stdout)["total_live_dry_run_plans"] == 1
     assert json.loads(execution.stdout)["outcome"] == "blocked"
     assert json.loads(execution_summary.stdout)["total_live_execution_attempts"] == 1
+
+
+def test_background_cli_live_policy_contract_invalid_policy(tmp_path):
+    repo = Path(__file__).resolve().parents[1]
+    policy_path = tmp_path / "policy.json"
+    config_path = tmp_path / "config.json"
+    write_live_policy(policy_path, approved=True)
+    policy = json.loads(policy_path.read_text())
+    policy["no_external_submission_confirmed"] = False
+    policy_path.write_text(json.dumps(policy))
+    write_live_config(config_path, policy_path, live_network_enabled=True)
+    env = {**os.environ, "PYTHONPATH": str(repo / "src")}
+
+    contract = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "live-policy-contract-summary",
+            "--config",
+            str(config_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    payload = json.loads(contract.stdout)
+
+    assert payload["contract_valid"] is False
+    assert payload["external_submission_enabled"] is False
+    assert "LIVE_REVIEW_POLICY_ALLOWS_EXTERNAL_SUBMISSION" in payload["policy_blockers"]
 
 
 def test_deprecated_background_wrappers_are_removed():

@@ -5,6 +5,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## v0.33.0
+
+- `Skills/background.py`: added `live-policy-contract-summary` to expose
+  no-network live review policy contract validation from the unified CLI.
+- CLI coverage now checks both a valid default policy contract and an unsafe
+  policy that allows external submission.
+- 1 new test (1347 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.33.0.
+
 ## v0.32.0
 
 - `background.py`: added `live_policy_contract_summary(config_path)` for

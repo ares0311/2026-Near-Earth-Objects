@@ -25,6 +25,7 @@ from background import (
     live_dry_run_plan,
     live_dry_run_plan_log_summary,
     live_execution_log_summary,
+    live_policy_contract_summary,
     needs_follow_up_summary,
     record_automation_readiness,
     record_human_signoff,
@@ -73,6 +74,12 @@ def main() -> None:
 
     launchd = sub.add_parser("launchd-plist", help="Print a macOS launchd plist template")
     launchd.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
+
+    policy_contract = sub.add_parser(
+        "live-policy-contract-summary",
+        help="Inspect live review policy contract without network access",
+    )
+    policy_contract.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
 
     dry_run = sub.add_parser("live-dry-run-plan", help="Print a no-network live query plan")
     dry_run.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
@@ -141,6 +148,8 @@ def main() -> None:
         _print_json(record_automation_readiness(args.config, args.db))
     elif args.command == "launchd-plist":
         print(launchd_plist(args.config), end="")
+    elif args.command == "live-policy-contract-summary":
+        _print_json(live_policy_contract_summary(args.config))
     elif args.command == "live-dry-run-plan":
         _print_json(live_dry_run_plan(args.config))
     elif args.command == "record-live-dry-run-plan":
