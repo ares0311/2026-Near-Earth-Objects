@@ -1170,6 +1170,95 @@ def test_live_dry_run_approval_bundle_blocks_unsafe_policy(monkeypatch, tmp_path
     assert "LIVE_REVIEW_POLICY_ALLOWS_EXTERNAL_SUBMISSION" in bundle["blockers"]
 
 
+def test_record_live_dry_run_approval_bundle_default_config_is_blocked(tmp_path):
+    db_path = tmp_path / "Logs" / "background.sqlite"
+
+    entry = background.record_live_dry_run_approval_bundle(
+        Path("background/config.json"),
+        db_path,
+    )
+    summary = background.live_dry_run_approval_bundle_log_summary(db_path)
+
+    assert entry["approved_to_attempt_live_dry_run"] is False
+    assert entry["network_access_performed"] is False
+    assert entry["external_submission_enabled"] is False
+    assert "LIVE_NETWORK_DISABLED" in entry["blockers"]
+    assert summary["total_live_approval_bundles"] == 1
+    assert summary["approval_ready_count"] == 0
+    assert summary["blocked_count"] == 1
+    assert summary["latest"]["bundle_id"] == entry["bundle_id"]
+
+
+def test_record_live_dry_run_approval_bundle_approved_config(monkeypatch, tmp_path):
+    db_path = tmp_path / "Logs" / "background.sqlite"
+    policy_path = tmp_path / "policy.json"
+    config_path = tmp_path / "config.json"
+    write_live_policy(policy_path, approved=True)
+    write_live_config(config_path, policy_path, live_network_enabled=True)
+    monkeypatch.setenv("ZTF_IRSA_TOKEN", "ztf-token")
+    monkeypatch.setenv("ATLAS_TOKEN", "atlas-token")
+    monkeypatch.setenv("MAST_API_TOKEN", "mast-token")
+
+    entry = background.record_live_dry_run_approval_bundle(config_path, db_path)
+    summary = background.live_dry_run_approval_bundle_log_summary(db_path)
+
+    assert entry["approved_to_attempt_live_dry_run"] is True
+    assert entry["blockers"] == ()
+    assert entry["planned_surveys"] == ("ZTF", "ATLAS", "PanSTARRS")
+    assert entry["network_access_performed"] is False
+    assert entry["external_submission_enabled"] is False
+    assert summary["total_live_approval_bundles"] == 1
+    assert summary["approval_ready_count"] == 1
+    assert summary["blocked_count"] == 0
+    assert summary["latest"]["approved_to_attempt_live_dry_run"] is True
+
+
+def test_background_cli_live_dry_run_approval_bundle_log_commands(tmp_path):
+    repo = Path(__file__).resolve().parents[1]
+    config_path = repo / "background" / "config.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
+    env = {**os.environ, "PYTHONPATH": str(repo / "src")}
+
+    recorded = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "record-live-dry-run-approval-bundle",
+            "--config",
+            str(config_path),
+            "--db",
+            str(db_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    summary = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "live-dry-run-approval-bundle-log-summary",
+            "--db",
+            str(db_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+
+    recorded_payload = json.loads(recorded.stdout)
+    summary_payload = json.loads(summary.stdout)
+    assert recorded_payload["approved_to_attempt_live_dry_run"] is False
+    assert recorded_payload["network_access_performed"] is False
+    assert recorded_payload["external_submission_enabled"] is False
+    assert summary_payload["total_live_approval_bundles"] == 1
+    assert summary_payload["blocked_count"] == 1
+
+
 def test_deprecated_background_wrappers_are_removed():
     repo = Path(__file__).resolve().parents[1]
 
@@ -1226,6 +1315,7 @@ def test_init_log_db_migrates_existing_ledger(tmp_path):
         "run_lock",
         "human_signoff_log",
         "automation_readiness_log",
+        "live_approval_bundle_log",
         "live_dry_run_plan_log",
         "live_execution_log",
     } <= tables

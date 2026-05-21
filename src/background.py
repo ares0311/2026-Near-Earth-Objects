@@ -33,6 +33,8 @@ __all__ = [
     "live_provider_capabilities",
     "live_provider_readiness",
     "live_dry_run_approval_bundle",
+    "record_live_dry_run_approval_bundle",
+    "live_dry_run_approval_bundle_log_summary",
     "live_dry_run_plan",
     "record_live_dry_run_plan",
     "live_dry_run_plan_log_summary",
@@ -82,7 +84,7 @@ DEFAULT_INPUT_PATH = _ROOT / "background" / "targets.json"
 DEFAULT_DB_PATH = _ROOT / "Logs" / "background.sqlite"
 DEFAULT_REPORT_DIR = _ROOT / "Logs" / "reports"
 _SCHEMA_VERSION = "background-v1"
-_CODE_VERSION = "0.35.0"
+_CODE_VERSION = "0.36.0"
 _LIVE_REVIEW_POLICY_SCHEMA_PATH = _ROOT / "background" / "live_review_policy.schema.json"
 _SUPPORTED_LIVE_SURVEYS = ("ZTF", "ATLAS", "PanSTARRS")
 _LIVE_PROVIDER_CAPABILITIES = {
@@ -290,6 +292,19 @@ def init_log_db(db_path: Path = DEFAULT_DB_PATH) -> None:
                 executable INTEGER NOT NULL,
                 planned_surveys_json TEXT NOT NULL,
                 blockers_json TEXT NOT NULL,
+                entry_json TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS live_approval_bundle_log (
+                bundle_id TEXT PRIMARY KEY,
+                reviewed_at_utc TEXT NOT NULL,
+                config_path TEXT NOT NULL,
+                approved_to_attempt_live_dry_run INTEGER NOT NULL,
+                blockers_json TEXT NOT NULL,
+                planned_surveys_json TEXT NOT NULL,
                 entry_json TEXT NOT NULL
             )
             """
@@ -1831,6 +1846,78 @@ def live_dry_run_approval_bundle(config_path: Path = DEFAULT_CONFIG_PATH) -> dic
         "network_access_performed": False,
         "external_submission_enabled": False,
     }
+
+
+def record_live_dry_run_approval_bundle(
+    config_path: Path = DEFAULT_CONFIG_PATH,
+    db_path: Path = DEFAULT_DB_PATH,
+) -> dict[str, Any]:
+    """Persist a no-network live dry-run approval bundle to SQLite."""
+    init_log_db(db_path)
+    bundle = live_dry_run_approval_bundle(config_path)
+    entry = {
+        "bundle_id": str(uuid.uuid4()),
+        **bundle,
+    }
+    with _connect(db_path) as conn:
+        conn.execute(
+            """
+            INSERT INTO live_approval_bundle_log (
+                bundle_id, reviewed_at_utc, config_path,
+                approved_to_attempt_live_dry_run, blockers_json,
+                planned_surveys_json, entry_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                entry["bundle_id"],
+                entry["reviewed_at_utc"],
+                entry["config_path"],
+                int(entry["approved_to_attempt_live_dry_run"]),
+                json.dumps(entry["blockers"]),
+                json.dumps(entry["planned_surveys"]),
+                json.dumps(entry),
+            ),
+        )
+    return entry
+
+
+def live_dry_run_approval_bundle_log_summary(
+    db_path: Path = DEFAULT_DB_PATH,
+) -> dict[str, Any]:
+    """Summarize persisted no-network live dry-run approval bundles."""
+    init_log_db(db_path)
+    with _connect(db_path) as conn:
+        latest = conn.execute(
+            """
+            SELECT entry_json
+            FROM live_approval_bundle_log
+            ORDER BY reviewed_at_utc DESC
+            LIMIT 1
+            """
+        ).fetchone()
+        return {
+            "db_path": str(db_path),
+            "total_live_approval_bundles": _count_rows(conn, "live_approval_bundle_log"),
+            "approval_ready_count": int(
+                conn.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM live_approval_bundle_log
+                    WHERE approved_to_attempt_live_dry_run = 1
+                    """
+                ).fetchone()[0]
+            ),
+            "blocked_count": int(
+                conn.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM live_approval_bundle_log
+                    WHERE approved_to_attempt_live_dry_run = 0
+                    """
+                ).fetchone()[0]
+            ),
+            "latest": json.loads(latest["entry_json"]) if latest else None,
+        }
 
 
 def record_live_dry_run_plan(

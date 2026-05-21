@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## v0.36.0
+
+- `background.py`: added `record_live_dry_run_approval_bundle(config_path, db_path)`
+  and `live_dry_run_approval_bundle_log_summary(db_path)` to persist no-network
+  approval-bundle reviews in top-level SQLite logs.
+- `Skills/background.py`: added `record-live-dry-run-approval-bundle` and
+  `live-dry-run-approval-bundle-log-summary` subcommands.
+- 3 new tests (1354 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.36.0.
+
 ## v0.35.0
 
 - `background.py`: added `live_dry_run_approval_bundle(config_path)` to

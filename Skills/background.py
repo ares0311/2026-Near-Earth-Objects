@@ -23,6 +23,7 @@ from background import (
     launchd_plist,
     ledger_summary,
     live_dry_run_approval_bundle,
+    live_dry_run_approval_bundle_log_summary,
     live_dry_run_plan,
     live_dry_run_plan_log_summary,
     live_execution_log_summary,
@@ -31,6 +32,7 @@ from background import (
     needs_follow_up_summary,
     record_automation_readiness,
     record_human_signoff,
+    record_live_dry_run_approval_bundle,
     record_live_dry_run_plan,
     record_live_execution_attempt,
     reviewed_log_summary,
@@ -95,6 +97,13 @@ def main() -> None:
     )
     approval_bundle.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
 
+    record_approval_bundle = sub.add_parser(
+        "record-live-dry-run-approval-bundle",
+        help="Persist all live dry-run approval gates to SQLite",
+    )
+    record_approval_bundle.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
+    record_approval_bundle.add_argument("--db", type=Path, default=DEFAULT_DB_PATH)
+
     dry_run = sub.add_parser("live-dry-run-plan", help="Print a no-network live query plan")
     dry_run.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
 
@@ -122,6 +131,7 @@ def main() -> None:
         "human-signoff-summary",
         "signoff-readiness",
         "automation-readiness-log-summary",
+        "live-dry-run-approval-bundle-log-summary",
         "live-dry-run-plan-log-summary",
         "live-execution-log-summary",
         "unsigned-follow-up",
@@ -168,6 +178,8 @@ def main() -> None:
         _print_json(live_provider_readiness(args.config))
     elif args.command == "live-dry-run-approval-bundle":
         _print_json(live_dry_run_approval_bundle(args.config))
+    elif args.command == "record-live-dry-run-approval-bundle":
+        _print_json(record_live_dry_run_approval_bundle(args.config, args.db))
     elif args.command == "live-dry-run-plan":
         _print_json(live_dry_run_plan(args.config))
     elif args.command == "record-live-dry-run-plan":
@@ -192,6 +204,8 @@ def main() -> None:
         _print_json(signoff_readiness_summary(args.db))
     elif args.command == "automation-readiness-log-summary":
         _print_json(automation_readiness_log_summary(args.db))
+    elif args.command == "live-dry-run-approval-bundle-log-summary":
+        _print_json(live_dry_run_approval_bundle_log_summary(args.db))
     elif args.command == "live-dry-run-plan-log-summary":
         _print_json(live_dry_run_plan_log_summary(args.db))
     elif args.command == "live-execution-log-summary":

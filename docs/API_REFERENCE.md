@@ -373,6 +373,13 @@ def live_policy_contract_summary(config_path: Path = DEFAULT_CONFIG_PATH) -> dic
 def live_provider_capabilities() -> tuple[dict[str, Any], ...]
 def live_provider_readiness(config_path: Path = DEFAULT_CONFIG_PATH) -> tuple[dict[str, Any], ...]
 def live_dry_run_approval_bundle(config_path: Path = DEFAULT_CONFIG_PATH) -> dict[str, Any]
+def record_live_dry_run_approval_bundle(
+    config_path: Path = DEFAULT_CONFIG_PATH,
+    db_path: Path = DEFAULT_DB_PATH,
+) -> dict[str, Any]
+def live_dry_run_approval_bundle_log_summary(
+    db_path: Path = DEFAULT_DB_PATH,
+) -> dict[str, Any]
 def live_dry_run_plan(config_path: Path = DEFAULT_CONFIG_PATH) -> dict[str, Any]
 def record_live_dry_run_plan(
     config_path: Path = DEFAULT_CONFIG_PATH,
@@ -419,7 +426,8 @@ file and schema contract without network access, and
 policy, rate-limit, and submission-safety blockers. Use
 `live_dry_run_approval_bundle(config_path)` to inspect the combined scheduler,
 policy, provider, and dry-run plan gates before any mock live dry-run execution
-attempt.
+attempt, and `record_live_dry_run_approval_bundle(config_path, db_path)` to
+persist that review object in SQLite.
 
 Default background log path:
 
@@ -681,7 +689,7 @@ Lightweight summary of a `ScoredNEO` for display or export.
 
 ---
 
-## v0.16.0 through v0.35.0 Public API Additions
+## v0.16.0 through v0.36.0 Public API Additions
 
 These releases added conservative helper APIs around live-data retrieval,
 preprocessing quality, detection triage, linking, orbit review, classification
@@ -800,8 +808,9 @@ claim confirmation or impact probability.
 | v0.33.0 | `Skills/background.py` | `live-policy-contract-summary` CLI command |
 | v0.34.0 | `Skills/background.py` | `live-provider-readiness-summary` CLI command |
 | v0.35.0 | `background.py` / `Skills/background.py` | `live_dry_run_approval_bundle`; `live-dry-run-approval-bundle` CLI command |
+| v0.36.0 | `background.py` / `Skills/background.py` | `record_live_dry_run_approval_bundle`, `live_dry_run_approval_bundle_log_summary`; persisted approval-bundle CLI commands |
 
-### Skills and CLI additions in v0.16.0 through v0.35.0
+### Skills and CLI additions in v0.16.0 through v0.36.0
 
 `export_candidate_report.py`, `tag_neo_class.py`, `check_tisserand.py`,
 `export_followup_requests.py`, `ephemeris_check.py`,
@@ -818,6 +827,8 @@ claim confirmation or impact probability.
 `Skills/background.py live-policy-contract-summary`,
 `Skills/background.py live-provider-readiness-summary`,
 `Skills/background.py live-dry-run-approval-bundle`,
+`Skills/background.py record-live-dry-run-approval-bundle`,
+`Skills/background.py live-dry-run-approval-bundle-log-summary`,
 `Skills/background.py live-dry-run-plan`,
 `Skills/background.py record-live-dry-run-plan`,
 `Skills/background.py live-dry-run-plan-log-summary`,

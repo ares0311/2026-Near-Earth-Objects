@@ -86,6 +86,13 @@ contract status, provider readiness, the dry-run query plan, and deduplicated
 blockers. It exposes `approved_to_attempt_live_dry_run`, but still performs no
 network query and enables no external submission.
 
+Persist the same approval-bundle review to the top-level SQLite log:
+
+```bash
+PYTHONPATH=src python Skills/background.py record-live-dry-run-approval-bundle
+PYTHONPATH=src python Skills/background.py live-dry-run-approval-bundle-log-summary
+```
+
 Persist the same readiness snapshot to the top-level SQLite log:
 
 ```bash
@@ -149,6 +156,7 @@ The SQLite database contains append-only operational tables:
 | `needs_follow_up_log` | Outcome row when follow-up, tests, or review are required |
 | `human_signoff_log` | Manual reviewer signoff records |
 | `automation_readiness_log` | Scheduler/live-readiness snapshots |
+| `live_approval_bundle_log` | No-network live dry-run approval reviews |
 | `live_dry_run_plan_log` | No-network live dry-run query plans |
 | `live_execution_log` | Mock-only live dry-run execution attempts |
 | `run_lock` | Prevents overlapping invocations |
@@ -179,6 +187,8 @@ PYTHONPATH=src python Skills/background.py live-execution-log-summary
 PYTHONPATH=src python Skills/background.py live-policy-contract-summary
 PYTHONPATH=src python Skills/background.py live-provider-readiness-summary
 PYTHONPATH=src python Skills/background.py live-dry-run-approval-bundle
+PYTHONPATH=src python Skills/background.py record-live-dry-run-approval-bundle
+PYTHONPATH=src python Skills/background.py live-dry-run-approval-bundle-log-summary
 PYTHONPATH=src python Skills/background.py unsigned-follow-up
 PYTHONPATH=src python Skills/background.py run-detail --run-id <run-id>
 PYTHONPATH=src python Skills/background.py target-history --target-id <target-id>
