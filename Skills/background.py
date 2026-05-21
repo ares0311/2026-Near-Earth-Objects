@@ -15,6 +15,7 @@ from background import (
     DEFAULT_CONFIG_PATH,
     DEFAULT_DB_PATH,
     DEFAULT_INPUT_PATH,
+    DEFAULT_REPORT_DIR,
     automation_readiness_log_summary,
     automation_readiness_summary,
     background_run_once,
@@ -24,6 +25,7 @@ from background import (
     ledger_summary,
     live_dry_run_approval_bundle,
     live_dry_run_approval_bundle_log_summary,
+    live_dry_run_operator_handoff,
     live_dry_run_plan,
     live_dry_run_plan_log_summary,
     live_execution_log_summary,
@@ -42,6 +44,7 @@ from background import (
     target_history,
     target_priority_summary,
     validation_summary,
+    write_live_dry_run_operator_handoff,
 )
 
 
@@ -103,6 +106,19 @@ def main() -> None:
     )
     record_approval_bundle.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
     record_approval_bundle.add_argument("--db", type=Path, default=DEFAULT_DB_PATH)
+
+    operator_handoff = sub.add_parser(
+        "live-dry-run-operator-handoff",
+        help="Print a conservative live dry-run operator handoff",
+    )
+    operator_handoff.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
+
+    write_operator_handoff = sub.add_parser(
+        "write-live-dry-run-operator-handoff",
+        help="Write a conservative live dry-run operator handoff Markdown file",
+    )
+    write_operator_handoff.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
+    write_operator_handoff.add_argument("--report-dir", type=Path, default=DEFAULT_REPORT_DIR)
 
     dry_run = sub.add_parser("live-dry-run-plan", help="Print a no-network live query plan")
     dry_run.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
@@ -180,6 +196,10 @@ def main() -> None:
         _print_json(live_dry_run_approval_bundle(args.config))
     elif args.command == "record-live-dry-run-approval-bundle":
         _print_json(record_live_dry_run_approval_bundle(args.config, args.db))
+    elif args.command == "live-dry-run-operator-handoff":
+        _print_json(live_dry_run_operator_handoff(args.config))
+    elif args.command == "write-live-dry-run-operator-handoff":
+        _print_json(write_live_dry_run_operator_handoff(args.config, args.report_dir))
     elif args.command == "live-dry-run-plan":
         _print_json(live_dry_run_plan(args.config))
     elif args.command == "record-live-dry-run-plan":

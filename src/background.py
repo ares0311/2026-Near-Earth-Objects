@@ -35,6 +35,8 @@ __all__ = [
     "live_dry_run_approval_bundle",
     "record_live_dry_run_approval_bundle",
     "live_dry_run_approval_bundle_log_summary",
+    "live_dry_run_operator_handoff",
+    "write_live_dry_run_operator_handoff",
     "live_dry_run_plan",
     "record_live_dry_run_plan",
     "live_dry_run_plan_log_summary",
@@ -84,7 +86,7 @@ DEFAULT_INPUT_PATH = _ROOT / "background" / "targets.json"
 DEFAULT_DB_PATH = _ROOT / "Logs" / "background.sqlite"
 DEFAULT_REPORT_DIR = _ROOT / "Logs" / "reports"
 _SCHEMA_VERSION = "background-v1"
-_CODE_VERSION = "0.36.0"
+_CODE_VERSION = "0.37.0"
 _LIVE_REVIEW_POLICY_SCHEMA_PATH = _ROOT / "background" / "live_review_policy.schema.json"
 _SUPPORTED_LIVE_SURVEYS = ("ZTF", "ATLAS", "PanSTARRS")
 _LIVE_PROVIDER_CAPABILITIES = {
@@ -1918,6 +1920,115 @@ def live_dry_run_approval_bundle_log_summary(
             ),
             "latest": json.loads(latest["entry_json"]) if latest else None,
         }
+
+
+def _csv_or_none(values: Any) -> str:
+    if not values:
+        return "None"
+    return ", ".join(str(value) for value in values)
+
+
+def _live_dry_run_handoff_text(bundle: Mapping[str, Any]) -> str:
+    readiness = bundle["automation_readiness"]
+    policy = readiness.get("live_review_policy_summary") or {}
+    missing_credentials = readiness.get("missing_credential_env", ())
+    provider_lines = [
+        (
+            f"- {provider['survey']}: "
+            f"{'ready' if provider['ready'] else 'blocked'}"
+            f"; credential {provider['credential_env']}"
+            f"; blockers: {_csv_or_none(provider['blockers'])}"
+        )
+        for provider in bundle["live_provider_readiness"]
+    ]
+    scope = bundle["live_dry_run_plan"].get("dry_run_scope") or {}
+    scope_text = (
+        "Unavailable"
+        if not scope
+        else (
+            f"RA {scope['ra_deg']}, Dec {scope['dec_deg']}, "
+            f"radius {scope['radius_deg']} deg, JD {scope['start_jd']} to {scope['end_jd']}"
+        )
+    )
+    lines = [
+        "# Live Dry-Run Operator Handoff",
+        "",
+        "## Status",
+        "Internal review only. This handoff does not authorize external contact or public claims.",
+        f"- Ready for mock dry-run attempt: {bundle['approved_to_attempt_live_dry_run']}",
+        f"- Next action: {bundle['next_action']}",
+        f"- Network access performed: {bundle['network_access_performed']}",
+        f"- External submission enabled: {bundle['external_submission_enabled']}",
+        "",
+        "## Blockers",
+        *(
+            [f"- {blocker}" for blocker in bundle["blockers"]]
+            if bundle["blockers"]
+            else ["- None"]
+        ),
+        "",
+        "## Policy",
+        f"- Policy approved for live network: {policy.get('approved_for_live_network', False)}",
+        f"- Reviewer: {policy.get('reviewer') or 'Not set'}",
+        f"- Allowed surveys: {_csv_or_none(policy.get('allowed_surveys', ())) }",
+        "",
+        "## Credentials",
+        f"- Missing credential environment variables: {_csv_or_none(missing_credentials)}",
+        "",
+        "## Providers",
+        *provider_lines,
+        "",
+        "## Dry-Run Scope",
+        f"- Planned surveys: {_csv_or_none(bundle['planned_surveys'])}",
+        f"- Planned query count: {bundle['planned_query_count']}",
+        f"- Scope: {scope_text}",
+        "",
+        "## Guardrails",
+        "- Use this handoff for local operator review only.",
+        "- Resolve blockers before attempting the mock dry-run command.",
+        "- Do not contact outside parties from this handoff.",
+        "- Defer authoritative hazard assessment to MPC, CNEOS, and NASA processes.",
+    ]
+    text = "\n".join(lines) + "\n"
+    lowered = text.lower()
+    for phrase in _FORBIDDEN_REPORT_PHRASES:
+        if phrase in lowered:
+            raise ValueError(f"Handoff contains forbidden phrase: {phrase}")
+    return text
+
+
+def live_dry_run_operator_handoff(config_path: Path = DEFAULT_CONFIG_PATH) -> dict[str, Any]:
+    """Build a conservative no-network Markdown handoff for live dry-run review."""
+    bundle = live_dry_run_approval_bundle(config_path)
+    text = _live_dry_run_handoff_text(bundle)
+    return {
+        "config_path": str(config_path),
+        "created_at_utc": _utc_now(),
+        "approved_to_attempt_live_dry_run": bundle["approved_to_attempt_live_dry_run"],
+        "blockers": bundle["blockers"],
+        "next_action": bundle["next_action"],
+        "planned_surveys": bundle["planned_surveys"],
+        "planned_query_count": bundle["planned_query_count"],
+        "handoff_text": text,
+        "network_access_performed": False,
+        "external_submission_enabled": False,
+    }
+
+
+def write_live_dry_run_operator_handoff(
+    config_path: Path = DEFAULT_CONFIG_PATH,
+    report_dir: Path = DEFAULT_REPORT_DIR,
+) -> dict[str, Any]:
+    """Write a conservative no-network live dry-run handoff Markdown file."""
+    handoff = live_dry_run_operator_handoff(config_path)
+    report_dir.mkdir(parents=True, exist_ok=True)
+    stamp = handoff["created_at_utc"].replace(":", "").replace("+", "_")
+    path = report_dir / f"live_dry_run_operator_handoff_{stamp}.md"
+    path.write_text(handoff["handoff_text"])
+    return {
+        **handoff,
+        "report_path": str(path),
+    }
 
 
 def record_live_dry_run_plan(

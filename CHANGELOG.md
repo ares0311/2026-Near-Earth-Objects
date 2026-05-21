@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## v0.37.0
+
+- `background.py`: added `live_dry_run_operator_handoff(config_path)` and
+  `write_live_dry_run_operator_handoff(config_path, report_dir)` to render a
+  conservative no-network Markdown handoff for operator review.
+- `Skills/background.py`: added `live-dry-run-operator-handoff` and
+  `write-live-dry-run-operator-handoff` subcommands.
+- 4 new tests (1358 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.37.0.
+
 ## v0.36.0
 
 - `background.py`: added `record_live_dry_run_approval_bundle(config_path, db_path)`

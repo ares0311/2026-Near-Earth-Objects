@@ -86,6 +86,17 @@ contract status, provider readiness, the dry-run query plan, and deduplicated
 blockers. It exposes `approved_to_attempt_live_dry_run`, but still performs no
 network query and enables no external submission.
 
+Generate an internal operator handoff from the same approval bundle:
+
+```bash
+PYTHONPATH=src python Skills/background.py live-dry-run-operator-handoff
+PYTHONPATH=src python Skills/background.py write-live-dry-run-operator-handoff
+```
+
+The handoff is Markdown for local review. It summarizes blockers, credentials,
+policy approval state, provider readiness, planned surveys, and dry-run scope.
+It is not a submission artifact and does not contact outside parties.
+
 Persist the same approval-bundle review to the top-level SQLite log:
 
 ```bash
@@ -189,6 +200,8 @@ PYTHONPATH=src python Skills/background.py live-provider-readiness-summary
 PYTHONPATH=src python Skills/background.py live-dry-run-approval-bundle
 PYTHONPATH=src python Skills/background.py record-live-dry-run-approval-bundle
 PYTHONPATH=src python Skills/background.py live-dry-run-approval-bundle-log-summary
+PYTHONPATH=src python Skills/background.py live-dry-run-operator-handoff
+PYTHONPATH=src python Skills/background.py write-live-dry-run-operator-handoff
 PYTHONPATH=src python Skills/background.py unsigned-follow-up
 PYTHONPATH=src python Skills/background.py run-detail --run-id <run-id>
 PYTHONPATH=src python Skills/background.py target-history --target-id <target-id>

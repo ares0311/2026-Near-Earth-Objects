@@ -7,6 +7,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 import background
 from schemas import (
     BackgroundConfig,
@@ -1257,6 +1259,108 @@ def test_background_cli_live_dry_run_approval_bundle_log_commands(tmp_path):
     assert recorded_payload["external_submission_enabled"] is False
     assert summary_payload["total_live_approval_bundles"] == 1
     assert summary_payload["blocked_count"] == 1
+
+
+def _assert_no_forbidden_handoff_language(text: str) -> None:
+    lowered = text.lower()
+    assert "confirmed neo" not in lowered
+    assert "confirmed discovery" not in lowered
+    assert "impact probability" not in lowered
+
+
+def test_live_dry_run_operator_handoff_default_config_is_blocked():
+    handoff = background.live_dry_run_operator_handoff(Path("background/config.json"))
+    text = handoff["handoff_text"]
+
+    assert handoff["approved_to_attempt_live_dry_run"] is False
+    assert handoff["network_access_performed"] is False
+    assert handoff["external_submission_enabled"] is False
+    assert "LIVE_NETWORK_DISABLED" in text
+    assert "ZTF_IRSA_TOKEN" in text
+    assert "Internal review only" in text
+    _assert_no_forbidden_handoff_language(text)
+
+
+def test_write_live_dry_run_operator_handoff_approved_config(monkeypatch, tmp_path):
+    report_dir = tmp_path / "reports"
+    policy_path = tmp_path / "policy.json"
+    config_path = tmp_path / "config.json"
+    write_live_policy(policy_path, approved=True)
+    write_live_config(config_path, policy_path, live_network_enabled=True)
+    monkeypatch.setenv("ZTF_IRSA_TOKEN", "ztf-token")
+    monkeypatch.setenv("ATLAS_TOKEN", "atlas-token")
+    monkeypatch.setenv("MAST_API_TOKEN", "mast-token")
+
+    handoff = background.write_live_dry_run_operator_handoff(config_path, report_dir)
+    path = Path(handoff["report_path"])
+    text = path.read_text()
+
+    assert handoff["approved_to_attempt_live_dry_run"] is True
+    assert handoff["network_access_performed"] is False
+    assert handoff["external_submission_enabled"] is False
+    assert path.exists()
+    assert "Ready for mock dry-run attempt: True" in text
+    assert "Missing credential environment variables: None" in text
+    _assert_no_forbidden_handoff_language(text)
+
+
+def test_background_cli_live_dry_run_operator_handoff_commands(tmp_path):
+    repo = Path(__file__).resolve().parents[1]
+    config_path = repo / "background" / "config.json"
+    report_dir = tmp_path / "reports"
+    env = {**os.environ, "PYTHONPATH": str(repo / "src")}
+
+    printed = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "live-dry-run-operator-handoff",
+            "--config",
+            str(config_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    written = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "write-live-dry-run-operator-handoff",
+            "--config",
+            str(config_path),
+            "--report-dir",
+            str(report_dir),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+
+    printed_payload = json.loads(printed.stdout)
+    written_payload = json.loads(written.stdout)
+    assert printed_payload["approved_to_attempt_live_dry_run"] is False
+    assert "Internal review only" in printed_payload["handoff_text"]
+    assert written_payload["network_access_performed"] is False
+    assert written_payload["external_submission_enabled"] is False
+    assert Path(written_payload["report_path"]).exists()
+    _assert_no_forbidden_handoff_language(written_payload["handoff_text"])
+
+
+def test_live_dry_run_operator_handoff_rejects_forbidden_language(monkeypatch):
+    bundle = background.live_dry_run_approval_bundle(Path("background/config.json"))
+    bad_bundle = {
+        **bundle,
+        "blockers": (*bundle["blockers"], "confirmed discovery"),
+    }
+    monkeypatch.setattr(background, "live_dry_run_approval_bundle", lambda _path: bad_bundle)
+
+    with pytest.raises(ValueError, match="forbidden phrase"):
+        background.live_dry_run_operator_handoff(Path("background/config.json"))
 
 
 def test_deprecated_background_wrappers_are_removed():
