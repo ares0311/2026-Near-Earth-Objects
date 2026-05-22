@@ -1768,3 +1768,377 @@ def test_audit_report_has_unreviewed_when_runs_present(tmp_path):
     result = audit_report(db)
     assert result["total_runs"] >= 1
     assert result["has_unreviewed_runs"] is True
+
+
+# ---------------------------------------------------------------------------
+# Coverage gap tests: background.py private helpers and edge branches
+# ---------------------------------------------------------------------------
+
+class TestLoadLiveReviewPolicy:
+    def test_policy_file_not_found(self, tmp_path):
+        from background import _load_live_review_policy, load_config
+        config_path = tmp_path / "config.json"
+        policy_path = tmp_path / "missing_policy.json"
+        config_path.write_text(json.dumps({
+            "input_path": "background/targets.json",
+            "db_path": "Logs/background.sqlite",
+            "report_dir": "Logs/reports",
+            "follow_up_threshold": 0.45,
+            "live_review_policy": str(policy_path),
+        }))
+        config = load_config(config_path)
+        policy, blockers = _load_live_review_policy(config)
+        assert policy is None
+        assert "LIVE_REVIEW_POLICY_NOT_FOUND" in blockers
+
+    def test_policy_file_invalid_json(self, tmp_path):
+        from background import _load_live_review_policy, load_config
+        config_path = tmp_path / "config.json"
+        policy_path = tmp_path / "bad_policy.json"
+        policy_path.write_text("not { valid json }")
+        config_path.write_text(json.dumps({
+            "input_path": "background/targets.json",
+            "db_path": "Logs/background.sqlite",
+            "report_dir": "Logs/reports",
+            "follow_up_threshold": 0.45,
+            "live_review_policy": str(policy_path),
+        }))
+        config = load_config(config_path)
+        policy, blockers = _load_live_review_policy(config)
+        assert policy is None
+        assert "LIVE_REVIEW_POLICY_INVALID_JSON" in blockers
+
+
+class TestLoadJsonContract:
+    def test_invalid_json_returns_error_code(self, tmp_path):
+        from background import _load_json_contract
+        bad_file = tmp_path / "bad.json"
+        bad_file.write_text("{not valid}")
+        result, blockers = _load_json_contract(bad_file, "MISSING", "INVALID_JSON")
+        assert result is None
+        assert "INVALID_JSON" in blockers
+
+
+class TestLivePolicySchemaBlockers:
+    def test_schema_not_dict(self):
+        from background import _live_policy_schema_blockers
+        result = _live_policy_schema_blockers("not-a-dict")
+        assert "LIVE_REVIEW_POLICY_SCHEMA_INVALID" in result
+
+    def test_schema_id_invalid(self):
+        from background import _live_policy_schema_blockers
+        schema = {
+            "$id": "wrong-id",
+            "type": "object",
+            "additionalProperties": False,
+            "required": list(background._REQUIRED_POLICY_FIELDS),
+            "properties": {
+                "allowed_surveys": {"items": {"enum": list(background._SUPPORTED_LIVE_SURVEYS)}},
+                "no_external_submission_confirmed": {"const": True},
+                "no_impact_probability_claims": {"const": True},
+            },
+        }
+        result = _live_policy_schema_blockers(schema)
+        assert "LIVE_REVIEW_POLICY_SCHEMA_ID_INVALID" in result
+
+    def test_schema_type_invalid(self):
+        from background import _live_policy_schema_blockers
+        schema = {
+            "$id": "live-review-policy-v1",
+            "type": "array",
+            "additionalProperties": False,
+            "required": list(background._REQUIRED_POLICY_FIELDS),
+            "properties": {
+                "allowed_surveys": {"items": {"enum": list(background._SUPPORTED_LIVE_SURVEYS)}},
+                "no_external_submission_confirmed": {"const": True},
+                "no_impact_probability_claims": {"const": True},
+            },
+        }
+        result = _live_policy_schema_blockers(schema)
+        assert "LIVE_REVIEW_POLICY_SCHEMA_TYPE_INVALID" in result
+
+    def test_schema_allows_extra_fields(self):
+        from background import _live_policy_schema_blockers
+        schema = {
+            "$id": "live-review-policy-v1",
+            "type": "object",
+            "additionalProperties": True,
+            "required": list(background._REQUIRED_POLICY_FIELDS),
+            "properties": {
+                "allowed_surveys": {"items": {"enum": list(background._SUPPORTED_LIVE_SURVEYS)}},
+                "no_external_submission_confirmed": {"const": True},
+                "no_impact_probability_claims": {"const": True},
+            },
+        }
+        result = _live_policy_schema_blockers(schema)
+        assert "LIVE_REVIEW_POLICY_SCHEMA_ALLOWS_EXTRA_FIELDS" in result
+
+    def test_schema_required_fields_incomplete(self):
+        from background import _live_policy_schema_blockers
+        schema = {
+            "$id": "live-review-policy-v1",
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["schema_version"],  # missing many required fields
+            "properties": {
+                "allowed_surveys": {"items": {"enum": list(background._SUPPORTED_LIVE_SURVEYS)}},
+                "no_external_submission_confirmed": {"const": True},
+                "no_impact_probability_claims": {"const": True},
+            },
+        }
+        result = _live_policy_schema_blockers(schema)
+        assert "LIVE_REVIEW_POLICY_SCHEMA_REQUIRED_FIELDS_INCOMPLETE" in result
+
+    def test_schema_survey_enum_mismatch(self):
+        from background import _live_policy_schema_blockers
+        schema = {
+            "$id": "live-review-policy-v1",
+            "type": "object",
+            "additionalProperties": False,
+            "required": list(background._REQUIRED_POLICY_FIELDS),
+            "properties": {
+                "allowed_surveys": {"items": {"enum": ["ZTF"]}},  # incomplete enum
+                "no_external_submission_confirmed": {"const": True},
+                "no_impact_probability_claims": {"const": True},
+            },
+        }
+        result = _live_policy_schema_blockers(schema)
+        assert "LIVE_REVIEW_POLICY_SCHEMA_SURVEY_ENUM_MISMATCH" in result
+
+    def test_schema_external_submission_guard_missing(self):
+        from background import _live_policy_schema_blockers
+        schema = {
+            "$id": "live-review-policy-v1",
+            "type": "object",
+            "additionalProperties": False,
+            "required": list(background._REQUIRED_POLICY_FIELDS),
+            "properties": {
+                "allowed_surveys": {"items": {"enum": list(background._SUPPORTED_LIVE_SURVEYS)}},
+                "no_external_submission_confirmed": {"const": False},  # wrong value
+                "no_impact_probability_claims": {"const": True},
+            },
+        }
+        result = _live_policy_schema_blockers(schema)
+        assert "LIVE_REVIEW_POLICY_SCHEMA_EXTERNAL_SUBMISSION_GUARD_MISSING" in result
+
+    def test_schema_impact_claim_guard_missing(self):
+        from background import _live_policy_schema_blockers
+        schema = {
+            "$id": "live-review-policy-v1",
+            "type": "object",
+            "additionalProperties": False,
+            "required": list(background._REQUIRED_POLICY_FIELDS),
+            "properties": {
+                "allowed_surveys": {"items": {"enum": list(background._SUPPORTED_LIVE_SURVEYS)}},
+                "no_external_submission_confirmed": {"const": True},
+                "no_impact_probability_claims": {},  # missing const
+            },
+        }
+        result = _live_policy_schema_blockers(schema)
+        assert "LIVE_REVIEW_POLICY_SCHEMA_IMPACT_CLAIM_GUARD_MISSING" in result
+
+
+class TestLivePolicyContractBlockers:
+    def test_policy_not_dict(self):
+        from background import _live_policy_contract_blockers
+        result = _live_policy_contract_blockers("not-a-dict")
+        assert "LIVE_REVIEW_POLICY_INVALID_JSON" in result
+
+
+class TestLoadLiveReviewPolicyFromDict:
+    def _good_policy(self):
+        return {
+            "schema_version": "live-review-policy-v1",
+            "policy_name": "test",
+            "reviewer": "Dr. Test",
+            "approved_for_live_network": True,
+            "allowed_surveys": ["ZTF", "ATLAS", "PanSTARRS"],
+            "max_queries_per_run": 3,
+            "min_seconds_between_queries": 1,
+            "dry_run_scope": {
+                "ra_deg": 180.0, "dec_deg": 0.0, "radius_deg": 0.1,
+                "start_jd": 2460000.5, "end_jd": 2460001.5,
+            },
+            "no_external_submission_confirmed": True,
+            "no_impact_probability_claims": True,
+        }
+
+    def test_missing_fields(self):
+        from background import _load_live_review_policy_from_dict
+        _, blockers = _load_live_review_policy_from_dict({})
+        assert "LIVE_REVIEW_POLICY_MISSING_FIELDS" in blockers
+
+    def test_schema_version_wrong(self):
+        from background import _load_live_review_policy_from_dict
+        policy = self._good_policy()
+        policy["schema_version"] = "bad-version"
+        _, blockers = _load_live_review_policy_from_dict(policy)
+        assert "LIVE_REVIEW_POLICY_SCHEMA_UNSUPPORTED" in blockers
+
+    def test_reviewer_missing(self):
+        from background import _load_live_review_policy_from_dict
+        policy = self._good_policy()
+        policy["reviewer"] = ""
+        _, blockers = _load_live_review_policy_from_dict(policy)
+        assert "LIVE_REVIEW_POLICY_REVIEWER_MISSING" in blockers
+
+    def test_impact_claims_not_true(self):
+        from background import _load_live_review_policy_from_dict
+        policy = self._good_policy()
+        policy["no_impact_probability_claims"] = False
+        _, blockers = _load_live_review_policy_from_dict(policy)
+        assert "LIVE_REVIEW_POLICY_ALLOWS_IMPACT_CLAIMS" in blockers
+
+    def test_surveys_invalid_not_list(self):
+        from background import _load_live_review_policy_from_dict
+        policy = self._good_policy()
+        policy["allowed_surveys"] = "ZTF"
+        _, blockers = _load_live_review_policy_from_dict(policy)
+        assert "LIVE_REVIEW_POLICY_SURVEYS_INVALID" in blockers
+
+    def test_surveys_unsupported(self):
+        from background import _load_live_review_policy_from_dict
+        policy = self._good_policy()
+        policy["allowed_surveys"] = ["ZTF", "UNKNOWN_SURVEY"]
+        _, blockers = _load_live_review_policy_from_dict(policy)
+        assert "LIVE_REVIEW_POLICY_SURVEYS_UNSUPPORTED" in blockers
+
+    def test_max_queries_invalid(self):
+        from background import _load_live_review_policy_from_dict
+        policy = self._good_policy()
+        policy["max_queries_per_run"] = 0
+        _, blockers = _load_live_review_policy_from_dict(policy)
+        assert "LIVE_REVIEW_POLICY_RATE_LIMIT_INVALID" in blockers
+
+    def test_min_seconds_invalid(self):
+        from background import _load_live_review_policy_from_dict
+        policy = self._good_policy()
+        policy["min_seconds_between_queries"] = -1
+        _, blockers = _load_live_review_policy_from_dict(policy)
+        assert "LIVE_REVIEW_POLICY_CADENCE_INVALID" in blockers
+
+    def test_scope_not_dict(self):
+        from background import _load_live_review_policy_from_dict
+        policy = self._good_policy()
+        policy["dry_run_scope"] = "not-a-dict"
+        _, blockers = _load_live_review_policy_from_dict(policy)
+        assert "LIVE_REVIEW_POLICY_SCOPE_INVALID" in blockers
+
+    def test_scope_missing_fields(self):
+        from background import _load_live_review_policy_from_dict
+        policy = self._good_policy()
+        policy["dry_run_scope"] = {"ra_deg": 0.0}
+        _, blockers = _load_live_review_policy_from_dict(policy)
+        assert "LIVE_REVIEW_POLICY_SCOPE_MISSING_FIELDS" in blockers
+
+    def test_scope_fields_not_numbers(self):
+        from background import _load_live_review_policy_from_dict
+        policy = self._good_policy()
+        policy["dry_run_scope"] = {
+            "ra_deg": "bad", "dec_deg": 0.0, "radius_deg": 0.1,
+            "start_jd": 2460000.5, "end_jd": 2460001.5,
+        }
+        _, blockers = _load_live_review_policy_from_dict(policy)
+        assert "LIVE_REVIEW_POLICY_SCOPE_INVALID" in blockers
+
+    def test_scope_end_jd_before_start_jd(self):
+        from background import _load_live_review_policy_from_dict
+        policy = self._good_policy()
+        policy["dry_run_scope"] = {
+            "ra_deg": 180.0, "dec_deg": 0.0, "radius_deg": 0.1,
+            "start_jd": 2460001.5, "end_jd": 2460000.5,  # end before start
+        }
+        _, blockers = _load_live_review_policy_from_dict(policy)
+        assert "LIVE_REVIEW_POLICY_SCOPE_INVALID" in blockers
+
+
+class TestLiveProviderReadinessEdgeCases:
+    def test_provider_external_submission_capable(self, tmp_path, monkeypatch):
+        from background import live_provider_readiness
+        config_path = tmp_path / "config.json"
+        policy_path = tmp_path / "policy.json"
+        write_live_policy(policy_path, approved=True)
+        write_live_config(config_path, policy_path)
+        # Patch _LIVE_PROVIDER_CAPABILITIES so one provider has external_submission=True
+        fake_caps = {
+            "ZTF": {
+                **background._LIVE_PROVIDER_CAPABILITIES["ZTF"],
+                "supports_external_submission": True,
+            },
+            "ATLAS": background._LIVE_PROVIDER_CAPABILITIES["ATLAS"],
+            "PanSTARRS": background._LIVE_PROVIDER_CAPABILITIES["PanSTARRS"],
+        }
+        monkeypatch.setattr(background, "_LIVE_PROVIDER_CAPABILITIES", fake_caps)
+        results = live_provider_readiness(config_path)
+        ztf = next(r for r in results if r["survey"] == "ZTF")
+        assert "PROVIDER_EXTERNAL_SUBMISSION_CAPABLE" in ztf["blockers"]
+
+    def test_provider_live_query_unsupported(self, tmp_path, monkeypatch):
+        from background import live_provider_readiness
+        config_path = tmp_path / "config.json"
+        policy_path = tmp_path / "policy.json"
+        write_live_policy(policy_path, approved=True)
+        write_live_config(config_path, policy_path)
+        fake_caps = {
+            "ZTF": {
+                **background._LIVE_PROVIDER_CAPABILITIES["ZTF"],
+                "supports_live_query": False,
+            },
+            "ATLAS": background._LIVE_PROVIDER_CAPABILITIES["ATLAS"],
+            "PanSTARRS": background._LIVE_PROVIDER_CAPABILITIES["PanSTARRS"],
+        }
+        monkeypatch.setattr(background, "_LIVE_PROVIDER_CAPABILITIES", fake_caps)
+        results = live_provider_readiness(config_path)
+        ztf = next(r for r in results if r["survey"] == "ZTF")
+        assert "PROVIDER_LIVE_QUERY_UNSUPPORTED" in ztf["blockers"]
+
+
+class TestAutomationReadinessHumanSignoff:
+    def test_human_signoff_not_required_blocker(self, tmp_path):
+        from background import automation_readiness_summary
+        config_path = tmp_path / "config.json"
+        policy_path = tmp_path / "policy.json"
+        write_live_policy(policy_path, approved=True)
+        config_path.write_text(json.dumps({
+            "input_path": "background/targets.json",
+            "db_path": "Logs/background.sqlite",
+            "report_dir": "Logs/reports",
+            "follow_up_threshold": 0.45,
+            "run_mode": "automated",
+            "live_network_enabled": True,
+            "require_human_signoff": False,
+            "required_approval_count": 1,
+            "scheduler_enabled": True,
+            "scheduler_interval_minutes": 60,
+            "live_review_policy": str(policy_path),
+            "required_credential_env": [],
+        }))
+        result = automation_readiness_summary(config_path)
+        assert "HUMAN_SIGNOFF_NOT_REQUIRED" in result["live_mode_blockers"]
+
+
+class TestMockLiveDryRunProvider:
+    def test_init_and_execute(self):
+        from background import MockLiveDryRunProvider
+        provider = MockLiveDryRunProvider("ZTF")
+        assert provider.survey == "ZTF"
+        query = {"rank": 1, "survey": "ZTF", "ra_deg": 180.0, "dec_deg": 0.0}
+        result = provider.execute(query)
+        assert result["survey"] == "ZTF"
+        assert result["status"] == "mocked_success"
+        assert result["network_access_performed"] is False
+        assert result["external_submission_enabled"] is False
+
+    def test_default_live_dry_run_providers(self):
+        from background import _default_live_dry_run_providers
+        plan = {"planned_surveys": ["ZTF", "ATLAS"]}
+        providers = _default_live_dry_run_providers(plan)
+        assert "ZTF" in providers
+        assert "ATLAS" in providers
+
+    def test_normalize_live_query_result_rejects_external_submission(self):
+        from background import _normalize_live_query_result
+        query = {"rank": 1, "survey": "ZTF"}
+        raw = {"external_submission_enabled": True}
+        with pytest.raises(ValueError, match="LIVE_PROVIDER_EXTERNAL_SUBMISSION_NOT_ALLOWED"):
+            _normalize_live_query_result(query, raw)
