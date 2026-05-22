@@ -1505,3 +1505,48 @@ class TestScoreTrackletQuality:
     def test_in_all(self):
         from link import __all__
         assert "score_tracklet_quality" in __all__
+
+
+class TestComputeNightSpan:
+    """Tests for compute_night_span."""
+
+    def _make_tracklet(self, jd_list):
+        from schemas import Observation, Tracklet
+        obs = tuple(
+            Observation(
+                obs_id=f"ns{i}", ra_deg=180.0 + i * 0.01, dec_deg=0.0,
+                jd=jd, mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF",
+            )
+            for i, jd in enumerate(jd_list)
+        )
+        return Tracklet(
+            object_id="ns_test", observations=obs,
+            arc_days=jd_list[-1] - jd_list[0] if len(jd_list) > 1 else 0.0,
+            motion_rate_arcsec_per_hour=1.0, motion_pa_degrees=90.0,
+        )
+
+    def test_empty_tracklet_returns_zero(self):
+        from types import SimpleNamespace
+
+        from link import compute_night_span
+        t = SimpleNamespace(observations=())
+        assert compute_night_span(t) == 0
+
+    def test_single_night(self):
+        from link import compute_night_span
+        t = self._make_tracklet([2460000.5, 2460000.7, 2460000.9])
+        assert compute_night_span(t) == 1
+
+    def test_two_nights(self):
+        from link import compute_night_span
+        t = self._make_tracklet([2460000.5, 2460001.5])
+        assert compute_night_span(t) == 2
+
+    def test_multiple_nights(self):
+        from link import compute_night_span
+        t = self._make_tracklet([2460000.1, 2460001.2, 2460002.3, 2460002.8])
+        assert compute_night_span(t) == 3
+
+    def test_in_all(self):
+        from link import __all__
+        assert "compute_night_span" in __all__

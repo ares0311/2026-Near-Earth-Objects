@@ -808,3 +808,64 @@ class TestComputeCalibrationSharpness:
     def test_in_all(self):
         from calibration import __all__
         assert "compute_calibration_sharpness" in __all__
+
+
+class TestComputeBrierSkillScore:
+    """Tests for compute_brier_skill_score."""
+
+    def test_perfect_forecast(self):
+        from calibration import compute_brier_skill_score
+        probs = [1.0, 1.0, 0.0, 0.0]
+        labels = [1, 1, 0, 0]
+        result = compute_brier_skill_score(probs, labels)
+        assert result == 1.0
+
+    def test_empty_input(self):
+        from calibration import compute_brier_skill_score
+        assert compute_brier_skill_score([], []) == 0.0
+
+    def test_all_same_labels_returns_zero(self):
+        from calibration import compute_brier_skill_score
+        # climatology = 0 * (1-0) = 0 → returns 0.0
+        probs = [0.5, 0.5, 0.5]
+        labels = [0, 0, 0]
+        result = compute_brier_skill_score(probs, labels)
+        assert result == 0.0
+
+    def test_worse_than_climatology(self):
+        from calibration import compute_brier_skill_score
+        # always predict wrong → BSS < 0
+        probs = [0.0, 0.0, 1.0, 1.0]
+        labels = [1, 1, 0, 0]
+        result = compute_brier_skill_score(probs, labels)
+        assert result < 0.0
+
+    def test_climatology_forecast_is_zero(self):
+        from calibration import compute_brier_skill_score
+        # predict base rate exactly → BSS == 0
+        labels = [1, 1, 0, 0]
+        base_rate = 0.5
+        probs = [base_rate] * 4
+        result = compute_brier_skill_score(probs, labels)
+        assert abs(result) < 1e-9
+
+    def test_returns_float_rounded_6dp(self):
+        from calibration import compute_brier_skill_score
+        probs = [0.9, 0.8, 0.2, 0.1]
+        labels = [1, 1, 0, 0]
+        result = compute_brier_skill_score(probs, labels)
+        assert isinstance(result, float)
+        assert round(result, 6) == result
+
+    def test_numpy_arrays_accepted(self):
+        import numpy as np
+
+        from calibration import compute_brier_skill_score
+        probs = np.array([0.9, 0.1])
+        labels = np.array([1, 0])
+        result = compute_brier_skill_score(probs, labels)
+        assert isinstance(result, float)
+
+    def test_in_all(self):
+        from calibration import __all__
+        assert "compute_brier_skill_score" in __all__

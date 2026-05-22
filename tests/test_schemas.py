@@ -953,3 +953,57 @@ class TestSurveyStatistics:
     def test_in_all(self):
         from schemas import __all__
         assert "SurveyStatistics" in __all__
+
+
+class TestEphemerisPoint:
+    """Tests for EphemerisPoint schema."""
+
+    def test_basic_construction(self):
+        from schemas import EphemerisPoint
+        ep = EphemerisPoint(
+            object_id="NEO001",
+            jd=2460000.5,
+            ra_deg=180.0,
+            dec_deg=10.0,
+        )
+        assert ep.object_id == "NEO001"
+        assert ep.jd == 2460000.5
+        assert ep.ra_deg == 180.0
+        assert ep.dec_deg == 10.0
+
+    def test_defaults(self):
+        from schemas import EphemerisPoint
+        ep = EphemerisPoint(object_id="X", jd=2460000.5, ra_deg=0.0, dec_deg=0.0)
+        assert ep.delta_au == 1.0
+        assert ep.r_au == 1.0
+        assert ep.phase_deg is None
+        assert ep.mag is None
+
+    def test_with_all_fields(self):
+        from schemas import EphemerisPoint
+        ep = EphemerisPoint(
+            object_id="NEO002",
+            jd=2460010.0,
+            ra_deg=90.0,
+            dec_deg=-15.0,
+            delta_au=0.8,
+            r_au=1.1,
+            phase_deg=35.0,
+            mag=18.5,
+        )
+        assert ep.delta_au == 0.8
+        assert ep.r_au == 1.1
+        assert ep.phase_deg == 35.0
+        assert ep.mag == 18.5
+
+    def test_is_frozen(self):
+        import pytest
+
+        from schemas import EphemerisPoint
+        ep = EphemerisPoint(object_id="Y", jd=2460000.5, ra_deg=0.0, dec_deg=0.0)
+        with pytest.raises(Exception):
+            ep.ra_deg = 99.0  # type: ignore[misc]
+
+    def test_in_all(self):
+        from schemas import __all__
+        assert "EphemerisPoint" in __all__

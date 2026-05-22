@@ -1576,3 +1576,47 @@ class TestComputeMeanMotion:
     def test_in_all(self):
         from orbit import __all__
         assert "compute_mean_motion" in __all__
+
+
+class TestComputeLongitudeOfPerihelion:
+    """Tests for compute_longitude_of_perihelion."""
+
+    def _make_elements(self, omega_node=30.0, omega_peri=60.0):
+        from types import SimpleNamespace
+        return SimpleNamespace(
+            longitude_of_ascending_node_deg=omega_node,
+            argument_of_perihelion_deg=omega_peri,
+        )
+
+    def test_basic_sum(self):
+        from orbit import compute_longitude_of_perihelion
+        el = self._make_elements(omega_node=30.0, omega_peri=60.0)
+        assert compute_longitude_of_perihelion(el) == 90.0
+
+    def test_modulo_360(self):
+        from orbit import compute_longitude_of_perihelion
+        el = self._make_elements(omega_node=300.0, omega_peri=200.0)
+        result = compute_longitude_of_perihelion(el)
+        assert result == round((300.0 + 200.0) % 360.0, 6)
+
+    def test_zero_values(self):
+        from orbit import compute_longitude_of_perihelion
+        el = self._make_elements(omega_node=0.0, omega_peri=0.0)
+        assert compute_longitude_of_perihelion(el) == 0.0
+
+    def test_missing_attrs_default_to_zero(self):
+        from types import SimpleNamespace
+
+        from orbit import compute_longitude_of_perihelion
+        el = SimpleNamespace()  # no attrs
+        assert compute_longitude_of_perihelion(el) == 0.0
+
+    def test_result_in_range(self):
+        from orbit import compute_longitude_of_perihelion
+        el = self._make_elements(omega_node=350.0, omega_peri=350.0)
+        result = compute_longitude_of_perihelion(el)
+        assert 0.0 <= result < 360.0
+
+    def test_in_all(self):
+        from orbit import __all__
+        assert "compute_longitude_of_perihelion" in __all__

@@ -8,7 +8,8 @@ __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_
            "normalize_photometry", "compute_image_quality_metrics",
            "compute_photometric_scatter", "estimate_zero_point",
            "compute_difference_image_snr", "compute_cutout_entropy", "compute_background_level",
-           "compute_pixel_histogram"]
+           "compute_pixel_histogram",
+           "compute_cutout_contrast"]
 
 import base64
 import math
@@ -709,5 +710,43 @@ def compute_pixel_histogram(obs: Observation) -> list[int] | None:
         arr_norm = (arr - arr_min) / (arr_max - arr_min + 1e-9)
         counts, _ = np.histogram(arr_norm, bins=256, range=(0.0, 1.0))
         return [int(c) for c in counts]
+    except Exception:
+        return None
+
+
+def compute_cutout_contrast(obs: object) -> float | None:
+    """Compute the Michelson contrast of a difference-image cutout.
+
+    Michelson contrast = (I_max − I_min) / (I_max + I_min), which is bounded
+    in [0, 1].  A high-contrast cutout (contrast near 1) indicates a clear
+    point-source detection; near-zero contrast suggests a uniform background
+    with no real source.
+
+    Returns ``None`` if no cutout is present, decoding fails, or the pixel
+    range is zero (uniform array).
+
+    Args:
+        obs: An :class:`~schemas.Observation` with an optional
+            ``cutout_difference`` base64 attribute.
+
+    Returns:
+        Michelson contrast in [0, 1], rounded to 6 decimal places, or
+        ``None`` if the cutout is unavailable or degenerate.
+    """
+    import base64
+
+    cutout = getattr(obs, "cutout_difference", None)
+    if cutout is None:
+        return None
+    try:
+        raw = base64.b64decode(cutout)
+        arr = np.frombuffer(raw, dtype=np.float32).reshape(63, 63)
+        i_max = float(arr.max())
+        i_min = float(arr.min())
+        denom = i_max + i_min
+        if denom == 0.0:
+            return None
+        contrast = (i_max - i_min) / denom
+        return round(float(contrast), 6)
     except Exception:
         return None

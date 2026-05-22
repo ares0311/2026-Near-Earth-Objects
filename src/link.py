@@ -8,7 +8,8 @@ __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "compute_tracklet_grade", "filter_by_arc_length", "summarize_arc_statistics",
            "filter_by_nights_observed", "merge_overlapping_tracklets",
            "validate_tracklet", "compute_great_circle_residual",
-           "compute_position_angle_consistency", "score_tracklet_quality"]
+           "compute_position_angle_consistency", "score_tracklet_quality",
+           "compute_night_span"]
 
 import math
 import uuid
@@ -857,3 +858,18 @@ def score_tracklet_quality(tracklet: object) -> float:
 
     quality = 0.4 * grade_score + 0.3 * arc_score + 0.3 * link_confidence
     return round(float(quality), 4)
+
+
+def compute_night_span(tracklet: object) -> int:
+    """Count distinct integer-JD nights covered by a tracklet's observations.
+
+    Args:
+        tracklet: A :class:`~schemas.Tracklet` object.
+
+    Returns:
+        Number of distinct nights (≥ 0).
+    """
+    obs = list(getattr(tracklet, "observations", ()))
+    if not obs:
+        return 0
+    return len({int(o.jd) for o in obs})

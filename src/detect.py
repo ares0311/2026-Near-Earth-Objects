@@ -7,7 +7,7 @@ __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus"
            "compute_psf_fwhm", "estimate_sky_background", "compute_detection_efficiency",
            "count_detections_by_filter", "compute_motion_vector",
            "flag_moving_sources", "compute_source_extent", "estimate_observation_depth",
-           "filter_by_magnitude"]
+           "filter_by_magnitude", "compute_streak_density"]
 
 import math
 import uuid
@@ -785,3 +785,26 @@ def filter_by_magnitude(observations: list[Observation], mag_limit: float) -> li
         if mag < mag_limit:
             result.append(obs)
     return result
+
+
+def compute_streak_density(observations: list) -> float:
+    """Compute the fraction of observations classified as streaks.
+
+    An observation is a streak when :func:`compute_streak_metric` returns a
+    value ≥ 0.5.  A ``None`` result counts as non-streak.
+
+    Args:
+        observations: List of :class:`~schemas.Observation` objects.
+
+    Returns:
+        Streak fraction in [0, 1], rounded to 4 decimal places.
+        Returns 0.0 for an empty list.
+    """
+    if not observations:
+        return 0.0
+    streak_count = 0
+    for obs in observations:
+        metric = compute_streak_metric(obs)
+        if metric is not None and metric >= 0.5:
+            streak_count += 1
+    return round(streak_count / len(observations), 4)

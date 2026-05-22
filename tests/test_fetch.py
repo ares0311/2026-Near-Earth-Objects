@@ -2406,3 +2406,82 @@ class TestFetchRecentMpcNeos:
     def test_in_all(self):
         from fetch import __all__
         assert "fetch_recent_mpc_neos" in __all__
+
+
+class TestEstimateFieldCompleteness:
+    """Tests for estimate_field_completeness."""
+
+    def _make_fetch_result(self, mags):
+        from schemas import FetchProvenance, FetchResult, Observation
+        obs = tuple(
+            Observation(
+                obs_id=f"fc{i}",
+                ra_deg=180.0,
+                dec_deg=10.0,
+                jd=2460000.5 + i * 0.1,
+                mag=m,
+                mag_err=0.05,
+                filter_band="r",
+                mission="ZTF",
+            )
+            for i, m in enumerate(mags)
+        )
+        prov = FetchProvenance(surveys=("ZTF",), start_jd=2460000.0, end_jd=2460001.0)
+        return FetchResult(alerts=obs, provenance=prov)
+
+    def test_empty_alerts_returns_zero(self):
+        from schemas import FetchProvenance, FetchResult
+        prov = FetchProvenance(surveys=("ZTF",), start_jd=2460000.0, end_jd=2460001.0)
+        fr = FetchResult(alerts=(), provenance=prov)
+        from fetch import estimate_field_completeness
+        assert estimate_field_completeness(fr) == 0.0
+
+    def test_explicit_limiting_mag(self):
+        from fetch import estimate_field_completeness
+        # 3 obs at 18, 19, 20 — threshold is 20.5; all three < 20.5 → 100%
+        fr = self._make_fetch_result([18.0, 19.0, 20.0])
+        result = estimate_field_completeness(fr, limiting_mag=21.0)
+        assert result == 1.0
+
+    def test_partial_completeness(self):
+        from fetch import estimate_field_completeness
+        # 2 obs bright (17, 18) + 1 faint (20.8) → threshold 20.5; 2/3 complete
+        fr = self._make_fetch_result([17.0, 18.0, 20.8])
+        result = estimate_field_completeness(fr, limiting_mag=21.0)
+        assert abs(result - round(2 / 3, 4)) < 0.001
+
+    def test_sentinel_mags_excluded(self):
+        from fetch import estimate_field_completeness
+        # sentinel mag ≥ 90 should be ignored
+        fr = self._make_fetch_result([17.0, 99.0])
+        result = estimate_field_completeness(fr, limiting_mag=20.0)
+        # only obs with mag=17.0 is valid; 17.0 <= 19.5 → 1/1 = 1.0
+        assert result == 1.0
+
+    def test_no_limiting_mag_derived(self):
+        from fetch import estimate_field_completeness
+        from schemas import FetchProvenance, FetchResult, Observation
+        # all sentinel mags → estimate_survey_depth returns None → 0.0
+        obs = tuple(
+            Observation(
+                obs_id=f"fcx{i}", ra_deg=180.0, dec_deg=10.0,
+                jd=2460000.5 + i * 0.1, mag=99.0, mag_err=0.05,
+                filter_band="r", mission="ZTF",
+            )
+            for i in range(5)
+        )
+        prov = FetchProvenance(surveys=("ZTF",), start_jd=2460000.0, end_jd=2460001.0)
+        fr = FetchResult(alerts=obs, provenance=prov)
+        result = estimate_field_completeness(fr)
+        assert result == 0.0
+
+    def test_all_sentinel_with_explicit_lim_returns_zero(self):
+        from fetch import estimate_field_completeness
+        # all mags >= 90 but explicit limiting_mag given → no valid obs → 0.0
+        fr = self._make_fetch_result([99.0, 99.0, 99.0])
+        result = estimate_field_completeness(fr, limiting_mag=21.0)
+        assert result == 0.0
+
+    def test_in_all(self):
+        from fetch import __all__
+        assert "estimate_field_completeness" in __all__

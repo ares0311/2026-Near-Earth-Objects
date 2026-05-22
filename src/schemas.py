@@ -15,6 +15,7 @@ __all__ = [
     "ObservationStatistics",
     "AlertPackage",
     "OrbitalElementsSummary", "CandidateReport",
+    "EphemerisPoint",
     "SurveyStatistics",
     "BackgroundOutcome", "BackgroundRunMode", "FollowUpTestStatus", "HumanReviewStatus",
     "RecommendationAction", "SignoffDecision",
@@ -798,6 +799,35 @@ class OrbitalElementsSummary(BaseModel):
     moid_au: float | None = None
     quality_code: int = 1
     epoch_jd: float
+
+
+class EphemerisPoint(BaseModel):
+    """A single predicted sky position from an ephemeris computation.
+
+    Represents one time-step in an ephemeris table produced by
+    :func:`~orbit.predict_ephemeris` or similar routines.
+
+    Attributes:
+        object_id: Pipeline object identifier.
+        jd: Julian Date for this prediction.
+        ra_deg: Predicted right ascension in degrees [0, 360).
+        dec_deg: Predicted declination in degrees (−90, +90].
+        delta_au: Geocentric distance in AU at the prediction epoch.
+        r_au: Heliocentric distance in AU at the prediction epoch.
+        phase_deg: Sun–target–observer phase angle in degrees; None if unknown.
+        mag: Predicted apparent magnitude; None if unknown.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    object_id: str
+    jd: float
+    ra_deg: float
+    dec_deg: float
+    delta_au: float = 1.0
+    r_au: float = 1.0
+    phase_deg: float | None = None
+    mag: float | None = None
 
 
 class CandidateReport(BaseModel):

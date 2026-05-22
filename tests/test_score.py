@@ -1262,3 +1262,64 @@ class TestComputeCombinedPriority:
     def test_in_all(self):
         from score import __all__
         assert "compute_combined_priority" in __all__
+
+
+class TestComputeWeightedPriority:
+    """Tests for compute_weighted_priority."""
+
+    def _neo(self, discovery_priority=0.5, moid=0.1, hazard_flag="nominal"):
+        from tests.conftest import build_scored_neo
+        neo = build_scored_neo()
+        hazard = neo.hazard.model_copy(update={"moid_au": moid, "hazard_flag": hazard_flag})
+        meta = neo.metadata.model_copy(update={"discovery_priority": discovery_priority})
+        return neo.model_copy(update={"hazard": hazard, "metadata": meta})
+
+    def test_default_weights_returns_float(self):
+        from score import compute_weighted_priority
+        neo = self._neo(discovery_priority=0.5, moid=0.1)
+        result = compute_weighted_priority(neo)
+        assert isinstance(result, float)
+        assert 0.0 <= result <= 1.0
+
+    def test_custom_weights_single_component(self):
+        from score import compute_threat_score, compute_weighted_priority
+        neo = self._neo(discovery_priority=0.6, moid=0.05)
+        # weight only threat
+        result = compute_weighted_priority(neo, weights={"threat": 1.0})
+        expected = compute_threat_score(neo)
+        assert abs(result - expected) < 0.001
+
+    def test_zero_weights_returns_zero(self):
+        from score import compute_weighted_priority
+        neo = self._neo()
+        result = compute_weighted_priority(neo, weights={})
+        assert result == 0.0
+
+    def test_equal_weights_same_as_default(self):
+        from score import compute_weighted_priority
+        neo = self._neo(discovery_priority=0.5, moid=0.1)
+        default = compute_weighted_priority(neo)
+        equal = compute_weighted_priority(
+            neo,
+            weights={
+                "discovery": 0.25, "threat": 0.25,
+                "observation": 0.25, "close_approach": 0.25,
+            },
+        )
+        assert abs(default - equal) < 1e-6
+
+    def test_clamped_to_0_1(self):
+        from score import compute_weighted_priority
+        neo = self._neo(discovery_priority=1.0, moid=0.0, hazard_flag="pha_candidate")
+        result = compute_weighted_priority(neo)
+        assert 0.0 <= result <= 1.0
+
+    def test_returns_4dp(self):
+        from score import compute_weighted_priority
+        neo = self._neo()
+        result = compute_weighted_priority(neo)
+        assert round(result, 4) == result
+
+    def test_in_all(self):
+        from score import __all__
+        assert "compute_weighted_priority" in __all__

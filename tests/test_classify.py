@@ -1762,3 +1762,61 @@ class TestBatchClassifyMorphology:
     def test_in_all(self):
         from classify import __all__
         assert "batch_classify_morphology" in __all__
+
+
+class TestComputeClassEntropyStats:
+    """Tests for compute_class_entropy_stats."""
+
+    def _make_neo(self, probs=(0.4, 0.3, 0.1, 0.1, 0.1)):
+        from schemas import NEOPosterior
+        from tests.conftest import build_scored_neo
+        posterior = NEOPosterior(
+            neo_candidate=probs[0],
+            known_object=probs[1],
+            main_belt_asteroid=probs[2],
+            stellar_artifact=probs[3],
+            other_solar_system=probs[4],
+        )
+        neo = build_scored_neo()
+        return neo.model_copy(update={"posterior": posterior})
+
+    def test_empty_list(self):
+        from classify import compute_class_entropy_stats
+        result = compute_class_entropy_stats([])
+        assert result["n_total"] == 0
+        assert result["mean_entropy"] == 0.0
+        assert result["max_entropy"] == 0.0
+        assert result["min_entropy"] == 0.0
+        assert result["n_high_entropy"] == 0
+
+    def test_single_neo(self):
+        from classify import compute_class_entropy_stats
+        neo = self._make_neo((0.2, 0.2, 0.2, 0.2, 0.2))  # uniform → max entropy
+        result = compute_class_entropy_stats([neo])
+        assert result["n_total"] == 1
+        assert result["mean_entropy"] == result["max_entropy"] == result["min_entropy"]
+        assert result["mean_entropy"] > 0.0
+
+    def test_high_entropy_count(self):
+        from classify import compute_class_entropy_stats, posterior_entropy
+        # uniform distribution has entropy ~2.32 bits (≥ 2.0)
+        neo_high = self._make_neo((0.2, 0.2, 0.2, 0.2, 0.2))
+        # peaked distribution has low entropy
+        neo_low = self._make_neo((0.95, 0.01, 0.01, 0.02, 0.01))
+        result = compute_class_entropy_stats([neo_high, neo_low])
+        assert result["n_total"] == 2
+        h_high = posterior_entropy(neo_high.posterior)
+        h_low = posterior_entropy(neo_low.posterior)
+        expected_n_high = sum(1 for e in [h_high, h_low] if e >= 2.0)
+        assert result["n_high_entropy"] == expected_n_high
+
+    def test_keys_present(self):
+        from classify import compute_class_entropy_stats
+        neo = self._make_neo()
+        result = compute_class_entropy_stats([neo])
+        for key in ("mean_entropy", "max_entropy", "min_entropy", "n_high_entropy", "n_total"):
+            assert key in result
+
+    def test_in_all(self):
+        from classify import __all__
+        assert "compute_class_entropy_stats" in __all__

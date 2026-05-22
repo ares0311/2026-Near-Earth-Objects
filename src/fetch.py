@@ -8,7 +8,8 @@ __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fet
            "count_known_objects_in_field", "fetch_mpc_observations",
            "fetch_atlas_forced", "fetch_ztf_alerts", "estimate_survey_depth",
            "filter_by_survey", "fetch_panstarrs_catalog", "fetch_css_alerts",
-           "fetch_panstarrs_moving_objects", "fetch_recent_mpc_neos"]
+           "fetch_panstarrs_moving_objects", "fetch_recent_mpc_neos",
+           "estimate_field_completeness"]
 
 import json
 import os
@@ -1201,3 +1202,45 @@ def fetch_recent_mpc_neos(n_days: int = 30, force_refresh: bool = False) -> list
         return result_list
     except Exception:
         return []
+
+
+def estimate_field_completeness(
+    fetch_result: object,
+    limiting_mag: float | None = None,
+) -> float:
+    """Estimate the fractional completeness of a survey field.
+
+    Completeness is defined as the fraction of observations whose magnitude is
+    at least 0.5 mag brighter than the field's limiting magnitude (i.e. well
+    above the detection threshold).  Observations with sentinel magnitudes
+    ≥ 90 are treated as non-detections.
+
+    If *limiting_mag* is not supplied, :func:`estimate_survey_depth` is used
+    to derive it from the fetch result.  If no limiting magnitude can be
+    determined, returns 0.0.
+
+    Args:
+        fetch_result: A :class:`~schemas.FetchResult` object.
+        limiting_mag: Optional override for the field limiting magnitude.
+
+    Returns:
+        Completeness fraction in [0, 1], rounded to 4 decimal places.
+        Returns 0.0 for empty or missing observations.
+    """
+    alerts = list(getattr(fetch_result, "alerts", []) or [])
+    if not alerts:
+        return 0.0
+
+    lim = limiting_mag
+    if lim is None:
+        lim = estimate_survey_depth(fetch_result)
+    if lim is None:
+        return 0.0
+
+    threshold = lim - 0.5
+    valid = [o for o in alerts if float(getattr(o, "mag", 99.0)) < 90.0]
+    if not valid:
+        return 0.0
+
+    bright = sum(1 for o in valid if float(getattr(o, "mag", 99.0)) <= threshold)
+    return round(bright / len(valid), 4)
