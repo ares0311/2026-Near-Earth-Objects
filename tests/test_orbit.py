@@ -1404,3 +1404,73 @@ class TestComputePerihelionDate:
         with patch("orbit.compute_orbital_period", return_value=0.0):
             result = compute_perihelion_date(el)
         assert result is None
+
+
+class TestComputeEccentricAnomaly:
+    def test_circular_orbit_returns_m(self):
+        import math
+
+        from orbit import compute_eccentric_anomaly
+        M = math.pi / 3.0
+        E = compute_eccentric_anomaly(M, 0.0)
+        assert abs(E - M) < 1e-9
+
+    def test_known_value_e_half(self):
+        import math
+
+        from orbit import compute_eccentric_anomaly
+        M = math.pi / 2.0
+        E = compute_eccentric_anomaly(M, 0.5)
+        # Verify Kepler's equation M = E - e*sin(E)
+        assert abs(M - (E - 0.5 * math.sin(E))) < 1e-9
+
+    def test_near_zero_mean_anomaly(self):
+        from orbit import compute_eccentric_anomaly
+        E = compute_eccentric_anomaly(0.0, 0.3)
+        assert abs(E) < 1e-8
+
+    def test_full_orbit(self):
+        import math
+
+        from orbit import compute_eccentric_anomaly
+        M = 2.0 * math.pi
+        E = compute_eccentric_anomaly(M, 0.2)
+        assert abs(E % (2 * math.pi)) < 1e-8
+
+    def test_high_eccentricity(self):
+        import math
+
+        from orbit import compute_eccentric_anomaly
+        M = 1.0
+        E = compute_eccentric_anomaly(M, 0.95)
+        assert abs(M - (E - 0.95 * math.sin(E))) < 1e-8
+
+    def test_raises_for_e_one(self):
+        import pytest
+
+        from orbit import compute_eccentric_anomaly
+        with pytest.raises(ValueError):
+            compute_eccentric_anomaly(1.0, 1.0)
+
+    def test_raises_for_e_negative(self):
+        import pytest
+
+        from orbit import compute_eccentric_anomaly
+        with pytest.raises(ValueError):
+            compute_eccentric_anomaly(1.0, -0.1)
+
+    def test_raises_for_e_greater_than_one(self):
+        import pytest
+
+        from orbit import compute_eccentric_anomaly
+        with pytest.raises(ValueError):
+            compute_eccentric_anomaly(1.0, 1.5)
+
+    def test_non_convergence_raises(self):
+        import math
+
+        import pytest
+
+        from orbit import compute_eccentric_anomaly
+        with pytest.raises(ValueError, match="did not converge"):
+            compute_eccentric_anomaly(math.pi / 2.0, 0.5, max_iter=0)

@@ -9,7 +9,7 @@ __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
            "orbital_energy", "compute_phase_angle",
            "compute_heliocentric_distance", "compute_synodic_period",
            "compute_apparent_magnitude", "compute_absolute_magnitude",
-           "compute_perihelion_date"]
+           "compute_perihelion_date", "compute_eccentric_anomaly"]
 
 import math
 from typing import NamedTuple
@@ -1022,3 +1022,35 @@ def compute_perihelion_date(elements: OrbitalElements) -> float | None:
         return round(elements.epoch_jd + days_to_perihelion, 4)
     except Exception:
         return None
+
+
+def compute_eccentric_anomaly(
+    M_rad: float,
+    e: float,
+    tol: float = 1e-10,
+    max_iter: int = 50,
+) -> float:
+    """Solve Kepler's equation M = E - e·sin(E) via Newton-Raphson.
+
+    Args:
+        M_rad: Mean anomaly in radians.
+        e: Orbital eccentricity (must be in [0, 1) for elliptic orbits).
+        tol: Convergence tolerance on |ΔE|.
+        max_iter: Maximum Newton-Raphson iterations.
+
+    Returns:
+        Eccentric anomaly E in radians (same range as M_rad unwrapped).
+
+    Raises:
+        ValueError: If eccentricity is out of range [0, 1) or convergence fails.
+    """
+    if not (0.0 <= e < 1.0):
+        raise ValueError(f"eccentricity must be in [0, 1) for elliptic orbit, got {e}")
+    M = M_rad % (2.0 * math.pi)
+    E = M + e * math.sin(M) * (1.0 + e * math.cos(M))
+    for _ in range(max_iter):
+        dE = (M - E + e * math.sin(E)) / (1.0 - e * math.cos(E))
+        E += dE
+        if abs(dE) < tol:
+            return E
+    raise ValueError(f"Kepler's equation did not converge after {max_iter} iterations")

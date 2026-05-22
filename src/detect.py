@@ -6,7 +6,7 @@ __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus"
            "compute_streak_metric", "cluster_detections", "compute_trail_length",
            "compute_psf_fwhm", "estimate_sky_background", "compute_detection_efficiency",
            "count_detections_by_filter", "compute_motion_vector",
-           "flag_moving_sources"]
+           "flag_moving_sources", "compute_source_extent"]
 
 import math
 import uuid
@@ -681,3 +681,49 @@ def flag_moving_sources(
             moving.append(obs)
 
     return moving
+
+
+def compute_source_extent(obs: object) -> float | None:
+    """Estimate source semi-major axis in arcsec from difference-image second moments.
+
+    Uses the eigenvalue of the 2-D intensity-weighted covariance matrix of the
+    63×63 cutout pixels.  Returns the square-root of the largest eigenvalue
+    scaled to arcsec (assuming 1 px = 1 arcsec).
+
+    Args:
+        obs: An Observation-like object with an optional ``cutout_difference``
+             attribute (base64-encoded 63×63 float32 array).
+
+    Returns:
+        Semi-major axis in arcsec, or ``None`` if no cutout is available or the
+        moments are degenerate (all-zero / non-positive eigenvalue).
+    """
+    import base64
+
+    cutout_b64 = getattr(obs, "cutout_difference", None)
+    if cutout_b64 is None:
+        return None
+    try:
+        raw = base64.b64decode(cutout_b64)
+        arr = np.frombuffer(raw, dtype=np.float32).reshape(63, 63)
+        total = float(arr.sum())
+        if total <= 0.0:
+            return None
+        ys, xs = np.mgrid[0:63, 0:63]
+        w = arr / total
+        x_bar = float((w * xs).sum())
+        y_bar = float((w * ys).sum())
+        dx = xs - x_bar
+        dy = ys - y_bar
+        mxx = float((w * dx * dx).sum())
+        myy = float((w * dy * dy).sum())
+        mxy = float((w * dx * dy).sum())
+        trace = mxx + myy
+        det = mxx * myy - mxy * mxy
+        discriminant = max(0.0, (trace / 2.0) ** 2 - det)
+        lambda_max = trace / 2.0 + math.sqrt(discriminant)
+        if lambda_max <= 0.0:
+            return None
+        return round(math.sqrt(lambda_max), 4)
+    except Exception:
+        return None

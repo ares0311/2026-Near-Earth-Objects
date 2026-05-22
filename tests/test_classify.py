@@ -1585,3 +1585,65 @@ class TestComputeArtifactProbability:
         low = self._make_features(motion_consistency_score=0.0)
         high = self._make_features(motion_consistency_score=1.0)
         assert compute_artifact_probability(high) < compute_artifact_probability(low)
+
+
+class TestComputeConfusionMatrix:
+    def test_empty_input_returns_zeros(self):
+        from classify import compute_confusion_matrix
+        result = compute_confusion_matrix([], [])
+        assert result == {"labels": [], "matrix": [], "accuracy": 0.0}
+
+    def test_perfect_predictions(self):
+        from classify import compute_confusion_matrix
+        labels = ["a", "b", "a", "b"]
+        result = compute_confusion_matrix(labels, labels)
+        assert result["accuracy"] == pytest.approx(1.0)
+
+    def test_sorted_labels(self):
+        from classify import compute_confusion_matrix
+        result = compute_confusion_matrix(["b", "a"], ["a", "b"])
+        assert result["labels"] == ["a", "b"]
+
+    def test_matrix_shape(self):
+        from classify import compute_confusion_matrix
+        pred = ["a", "b", "c"]
+        true = ["a", "b", "c"]
+        result = compute_confusion_matrix(pred, true)
+        n = len(result["labels"])
+        assert len(result["matrix"]) == n
+        assert all(len(row) == n for row in result["matrix"])
+
+    def test_single_class(self):
+        from classify import compute_confusion_matrix
+        result = compute_confusion_matrix(["a", "a"], ["a", "a"])
+        assert result["accuracy"] == pytest.approx(1.0)
+        assert result["labels"] == ["a"]
+
+    def test_all_wrong_predictions(self):
+        from classify import compute_confusion_matrix
+        result = compute_confusion_matrix(["b", "a"], ["a", "b"])
+        assert result["accuracy"] == pytest.approx(0.0)
+
+    def test_partial_accuracy(self):
+        from classify import compute_confusion_matrix
+        pred = ["a", "a", "b", "b"]
+        true = ["a", "b", "a", "b"]
+        result = compute_confusion_matrix(pred, true)
+        assert 0.0 < result["accuracy"] < 1.0
+
+    def test_union_of_labels(self):
+        from classify import compute_confusion_matrix
+        # pred has label "c" that true doesn't, and vice versa
+        result = compute_confusion_matrix(["a", "c"], ["a", "b"])
+        assert "b" in result["labels"]
+        assert "c" in result["labels"]
+
+    def test_diagonal_counts_correct_predictions(self):
+        from classify import compute_confusion_matrix
+        pred = ["a", "a", "b"]
+        true = ["a", "b", "b"]
+        result = compute_confusion_matrix(pred, true)
+        # labels = ["a", "b"]; diagonal = [TP_a, TP_b]
+        matrix = result["matrix"]
+        diag_sum = sum(matrix[i][i] for i in range(len(result["labels"])))
+        assert diag_sum == 2  # 2 correct: (a,a) and (b,b)

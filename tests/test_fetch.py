@@ -1985,3 +1985,122 @@ class TestFetchPanstarrsCatalogParsing:
              patch.dict("sys.modules", {"astroquery.mast": mock_mast}):
             result = fetch_panstarrs_catalog(45.0, -5.0, 0.3, force_refresh=True)
         assert isinstance(result, list)
+
+
+class TestFetchCssAlerts:
+    def test_returns_empty_on_import_error(self, tmp_path):
+        from unittest.mock import patch
+
+        from fetch import fetch_css_alerts
+        with patch("fetch._CACHE_DIR", tmp_path / ".neo_cache"), \
+             patch.dict("sys.modules", {"astroquery.mpc": None}):
+            result = fetch_css_alerts(180.0, 0.0, 0.5, force_refresh=True)
+        assert result == []
+
+    def test_returns_list(self, tmp_path):
+        from unittest.mock import patch
+
+        from fetch import fetch_css_alerts
+        with patch("fetch._CACHE_DIR", tmp_path / ".neo_cache"), \
+             patch.dict("sys.modules", {"astroquery.mpc": None}):
+            result = fetch_css_alerts(10.0, 5.0, 1.0, force_refresh=True)
+        assert isinstance(result, list)
+
+    def test_cache_hit(self, tmp_path):
+        import hashlib
+        import json
+
+        from fetch import fetch_css_alerts
+        cache_dir = tmp_path / ".neo_cache"
+        cache_dir.mkdir()
+        key = hashlib.md5(b"css:180.000000:0.000000:0.500000").hexdigest()
+        data = [{
+            "obs_id": "css_001", "jd": 2460000.5, "ra_deg": 180.0, "dec_deg": 0.0,
+            "mag": 19.0, "mag_err": 0.1, "filter_band": "V", "mission": "CSS",
+        }]
+        (cache_dir / f"{key}.json").write_text(json.dumps(data))
+        from unittest.mock import patch
+        with patch("fetch._CACHE_DIR", cache_dir):
+            result = fetch_css_alerts(180.0, 0.0, 0.5)
+        assert len(result) == 1
+        assert result[0].mission == "CSS"
+
+    def test_filters_non_703(self, tmp_path):
+        from unittest.mock import MagicMock, patch
+
+        from fetch import fetch_css_alerts
+        mock_row = {
+            "obs_code": "500", "submission_info": "other",
+            "obs_id": "x", "epoch": 2460000.5, "ra": 180.0, "dec": 0.0,
+            "mag": 18.0, "band": "V",
+        }
+        mock_mpc = MagicMock()
+        mock_mpc.MPC.query_observations_by_position.return_value = [mock_row]
+        with patch("fetch._CACHE_DIR", tmp_path / ".neo_cache"), \
+             patch.dict("sys.modules", {"astroquery.mpc": mock_mpc}):
+            result = fetch_css_alerts(180.0, 0.0, 0.5, force_refresh=True)
+        assert result == []
+
+    def test_includes_703_rows(self, tmp_path):
+        from unittest.mock import MagicMock, patch
+
+        from fetch import fetch_css_alerts
+        mock_row = {
+            "obs_code": "703", "submission_info": "",
+            "obs_id": "css_valid", "epoch": 2460000.5,
+            "ra": 180.0, "dec": 0.0, "mag": 19.5, "band": "V",
+        }
+        mock_mpc = MagicMock()
+        mock_mpc.MPC.query_observations_by_position.return_value = [mock_row]
+        with patch("fetch._CACHE_DIR", tmp_path / ".neo_cache"), \
+             patch.dict("sys.modules", {"astroquery.mpc": mock_mpc}):
+            result = fetch_css_alerts(180.0, 0.0, 0.5, force_refresh=True)
+        assert len(result) == 1
+        assert result[0].mission == "CSS"
+
+    def test_cache_write_failure_silently_ignored(self, tmp_path):
+        from unittest.mock import MagicMock, patch
+
+        from fetch import fetch_css_alerts
+        mock_mpc = MagicMock()
+        mock_mpc.MPC.query_observations_by_position.return_value = []
+        with patch("fetch._CACHE_DIR", tmp_path / ".neo_cache"), \
+             patch("json.dump", side_effect=OSError("no space")), \
+             patch.dict("sys.modules", {"astroquery.mpc": mock_mpc}):
+            result = fetch_css_alerts(90.0, 30.0, 0.3, force_refresh=True)
+        assert isinstance(result, list)
+
+    def test_corrupted_cache_falls_through(self, tmp_path):
+        import hashlib
+        from unittest.mock import MagicMock, patch
+
+        from fetch import fetch_css_alerts
+        cache_dir = tmp_path / ".neo_cache"
+        cache_dir.mkdir()
+        key = hashlib.md5(b"css:45.000000:10.000000:0.200000").hexdigest()
+        (cache_dir / f"{key}.json").write_text("not valid json {{")
+        mock_mpc = MagicMock()
+        mock_mpc.MPC.query_observations_by_position.return_value = []
+        with patch("fetch._CACHE_DIR", cache_dir), \
+             patch.dict("sys.modules", {"astroquery.mpc": mock_mpc}):
+            result = fetch_css_alerts(45.0, 10.0, 0.2)
+        assert isinstance(result, list)
+
+
+class TestFetchCssAlertsEdgeCases:
+    def test_row_with_bad_ra_skipped(self, tmp_path):
+        """703 row with bad ra value → exception → row skipped."""
+        from unittest.mock import MagicMock, patch
+
+        from fetch import fetch_css_alerts
+        bad_row = {
+            "obs_code": "703", "submission_info": "",
+            "obs_id": "bad", "epoch": 2460000.5,
+            "ra": "not_a_float", "dec": 0.0, "mag": 19.0, "band": "V",
+        }
+        mock_mpc = MagicMock()
+        mock_mpc.MPC.query_observations_by_position.return_value = [bad_row]
+        with patch("fetch._CACHE_DIR", tmp_path / ".neo_cache"), \
+             patch.dict("sys.modules", {"astroquery.mpc": mock_mpc}):
+            result = fetch_css_alerts(180.0, 0.0, 0.5, force_refresh=True)
+        assert result == []

@@ -1107,3 +1107,58 @@ class TestComputeObservationPriority:
         )
         result = compute_observation_priority(stub)
         assert 0.0 <= result <= 1.0
+
+
+class TestComputeSizeEstimate:
+    def _make_neo_with_h(self, h_val):
+        from tests.conftest import build_scored_neo
+        neo = build_scored_neo()
+        hazard = neo.hazard.model_copy(update={"absolute_magnitude_h": h_val})
+        return neo.model_copy(update={"hazard": hazard})
+
+    def test_returns_dict_for_valid_h(self):
+        from score import compute_size_estimate
+        neo = self._make_neo_with_h(22.0)
+        result = compute_size_estimate(neo)
+        assert result is not None
+        assert "min_m" in result and "max_m" in result
+
+    def test_none_for_none_h(self):
+        from score import compute_size_estimate
+        neo = self._make_neo_with_h(None)
+        assert compute_size_estimate(neo) is None
+
+    def test_none_for_inf_h(self):
+        import math
+
+        from score import compute_size_estimate
+        neo = self._make_neo_with_h(math.inf)
+        assert compute_size_estimate(neo) is None
+
+    def test_max_gt_min(self):
+        from score import compute_size_estimate
+        neo = self._make_neo_with_h(22.0)
+        result = compute_size_estimate(neo)
+        assert result["max_m"] > result["min_m"]
+
+    def test_albedo_range_key(self):
+        from score import compute_size_estimate
+        neo = self._make_neo_with_h(20.0)
+        result = compute_size_estimate(neo)
+        assert result["assumed_albedo_range"] == [0.05, 0.30]
+
+    def test_h22_diameter_range(self):
+        from score import compute_size_estimate
+        neo = self._make_neo_with_h(22.0)
+        result = compute_size_estimate(neo)
+        # H=22 → ~140m; allow wide tolerance
+        assert result["min_m"] > 50.0
+        assert result["max_m"] > result["min_m"]
+
+    def test_brighter_object_larger_diameter(self):
+        from score import compute_size_estimate
+        neo_small = self._make_neo_with_h(25.0)
+        neo_large = self._make_neo_with_h(15.0)
+        r_small = compute_size_estimate(neo_small)
+        r_large = compute_size_estimate(neo_large)
+        assert r_large["min_m"] > r_small["min_m"]

@@ -13,6 +13,7 @@ __all__ = [
     "compare_calibrators",
     "compute_roc_auc",
     "compute_precision_recall_curve",
+    "compute_f1_score",
 ]
 
 import math
@@ -656,4 +657,55 @@ def compute_precision_recall_curve(
         "recalls": recalls_arr,
         "thresholds": thresholds_arr,
         "average_precision": round(ap, 6),
+    }
+
+
+def compute_f1_score(
+    probs: list | np.ndarray,
+    labels: list | np.ndarray,
+    threshold: float = 0.5,
+) -> dict:
+    """Compute precision, recall, and F1 score at a given probability threshold.
+
+    Binarizes the predicted probabilities at ``threshold`` and computes the
+    standard binary classification metrics.  All metrics are reported as
+    floats in [0, 1].
+
+    Args:
+        probs: Predicted probabilities for the positive class (values in [0, 1]).
+        labels: Binary ground-truth labels (0 or 1).
+        threshold: Decision threshold for binarizing probabilities (default 0.5).
+
+    Returns:
+        Dict with keys:
+
+        - ``"precision"``: TP / (TP + FP); 0.0 if no positive predictions.
+        - ``"recall"``: TP / (TP + FN); 0.0 if no positive examples.
+        - ``"f1"``: Harmonic mean of precision and recall; 0.0 if both are zero.
+        - ``"threshold"``: The decision threshold used.
+        - ``"n_samples"``: Total number of samples evaluated.
+    """
+    probs_arr = np.asarray(probs, dtype=float)
+    labels_arr = np.asarray(labels, dtype=float)
+    n = len(probs_arr)
+
+    if n == 0:
+        return {"precision": 0.0, "recall": 0.0, "f1": 0.0, "threshold": threshold, "n_samples": 0}
+
+    predicted = (probs_arr >= threshold).astype(float)
+
+    tp = float(np.sum((predicted == 1) & (labels_arr == 1)))
+    fp = float(np.sum((predicted == 1) & (labels_arr == 0)))
+    fn = float(np.sum((predicted == 0) & (labels_arr == 1)))
+
+    precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+    recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+    f1 = (2 * precision * recall / (precision + recall)) if (precision + recall) > 0 else 0.0
+
+    return {
+        "precision": round(precision, 6),
+        "recall": round(recall, 6),
+        "f1": round(f1, 6),
+        "threshold": threshold,
+        "n_samples": n,
     }

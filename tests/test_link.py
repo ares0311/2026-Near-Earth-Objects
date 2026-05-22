@@ -1221,3 +1221,88 @@ class TestValidateTracklet:
         valid, reasons = validate_tracklet(t)
         assert valid is False
         assert len(reasons) >= 2
+
+
+class TestComputeGreatCircleResidual:
+    def _make_tracklet(self, n_obs=4, jd_start=2460000.5, scatter=0.0):
+        from schemas import Observation, Tracklet
+        obs = tuple(
+            Observation(
+                obs_id=f"gr_{i}", jd=jd_start + i,
+                ra_deg=180.0 + i * 0.001 + scatter * (i % 2 - 0.5),
+                dec_deg=10.0 + i * 0.0005,
+                mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF",
+            )
+            for i in range(n_obs)
+        )
+        return Tracklet(
+            object_id="T1", observations=obs, arc_days=float(n_obs - 1),
+            motion_rate_arcsec_per_hour=1.0, motion_pa_degrees=90.0,
+        )
+
+    def test_returns_float_for_valid_tracklet(self):
+        from link import compute_great_circle_residual
+        t = self._make_tracklet(n_obs=4)
+        result = compute_great_circle_residual(t)
+        assert isinstance(result, float)
+
+    def test_none_for_single_obs(self):
+        from link import compute_great_circle_residual
+        from schemas import Observation, Tracklet
+        obs = (Observation(obs_id="a", jd=2460000.5, ra_deg=180.0, dec_deg=10.0,
+                           mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF"),)
+        t = Tracklet(object_id="T", observations=obs, arc_days=0.0,
+                     motion_rate_arcsec_per_hour=0.0, motion_pa_degrees=0.0)
+        assert compute_great_circle_residual(t) is None
+
+    def test_none_for_empty_obs(self):
+        from link import compute_great_circle_residual
+        from schemas import Tracklet
+        t = Tracklet(object_id="T", observations=(), arc_days=0.0,
+                     motion_rate_arcsec_per_hour=0.0, motion_pa_degrees=0.0)
+        assert compute_great_circle_residual(t) is None
+
+    def test_perfect_linear_motion_near_zero_residual(self):
+        from link import compute_great_circle_residual
+        # Exactly linear: residual should be ~0
+        t = self._make_tracklet(n_obs=5, scatter=0.0)
+        result = compute_great_circle_residual(t)
+        assert result is not None
+        assert result < 0.01  # near-zero for perfect linear motion
+
+    def test_scattered_tracklet_has_nonzero_residual(self):
+        from link import compute_great_circle_residual
+        t = self._make_tracklet(n_obs=5, scatter=0.01)
+        result = compute_great_circle_residual(t)
+        assert result is not None
+        assert result >= 0.0
+
+    def test_result_in_arcsec_scale(self):
+        from link import compute_great_circle_residual
+        t = self._make_tracklet(n_obs=4)
+        result = compute_great_circle_residual(t)
+        assert result is not None
+        assert result < 1e6  # sanity: not in degrees
+
+    def test_two_obs_perfect_linear(self):
+        from link import compute_great_circle_residual
+        from schemas import Observation, Tracklet
+        obs = (
+            Observation(obs_id="a", jd=2460000.5, ra_deg=180.0, dec_deg=10.0,
+                        mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF"),
+            Observation(obs_id="b", jd=2460001.5, ra_deg=180.001, dec_deg=10.0005,
+                        mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF"),
+        )
+        t = Tracklet(object_id="T", observations=obs, arc_days=1.0,
+                     motion_rate_arcsec_per_hour=1.0, motion_pa_degrees=90.0)
+        # With 2 obs a line fits perfectly — residual is 0
+        result = compute_great_circle_residual(t)
+        assert result is not None
+        assert result == pytest.approx(0.0, abs=1e-5)
+
+    def test_returns_nonnegative(self):
+        from link import compute_great_circle_residual
+        t = self._make_tracklet(n_obs=6, scatter=0.005)
+        result = compute_great_circle_residual(t)
+        assert result is not None
+        assert result >= 0.0

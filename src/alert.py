@@ -23,6 +23,7 @@ __all__ = [
     "count_pending_alerts",
     "format_submission_checklist",
     "validate_alert_package",
+    "estimate_followup_window",
 ]
 
 import json
@@ -1035,3 +1036,50 @@ def validate_alert_package(package: dict) -> tuple[bool, list[str]]:
             )
 
     return (len(issues) == 0, issues)
+
+
+def estimate_followup_window(neo: Any) -> dict:
+    """Estimate the observational follow-up time window for a scored NEO.
+
+    Assigns an urgency window based on hazard flag and alert pathway, then
+    returns the start and end Julian Dates of that window.
+
+    Urgency rules (in priority order):
+
+    1. ``hazard_flag == "pha_candidate"`` → **24 hours**
+    2. ``alert_pathway == "neocp_followup"`` → **48 hours**
+    3. Otherwise → ``72.0 * (1.0 − discovery_priority)`` hours, clamped to
+       [24, 168] hours.
+
+    The start JD is fixed at ``2460000.0`` for deterministic testing.
+
+    Args:
+        neo: A :class:`~schemas.ScoredNEO` object.
+
+    Returns:
+        Dict with keys:
+
+        - ``"start_jd"``: Fixed reference epoch (2460000.0).
+        - ``"end_jd"``: start_jd + urgency_hours / 24.0.
+        - ``"urgency_hours"``: Follow-up window length in hours.
+    """
+    haz = neo.hazard
+    meta = neo.metadata
+    discovery_priority = getattr(meta, "discovery_priority", 0.0) or 0.0
+
+    if haz.hazard_flag == "pha_candidate":
+        urgency_hours = 24.0
+    elif haz.alert_pathway == "neocp_followup":
+        urgency_hours = 48.0
+    else:
+        raw = 72.0 * (1.0 - float(discovery_priority))
+        urgency_hours = max(24.0, min(168.0, raw))
+
+    start_jd = 2460000.0
+    end_jd = start_jd + urgency_hours / 24.0
+
+    return {
+        "start_jd": start_jd,
+        "end_jd": round(end_jd, 6),
+        "urgency_hours": urgency_hours,
+    }
