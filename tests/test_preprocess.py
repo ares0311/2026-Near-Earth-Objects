@@ -1199,3 +1199,72 @@ class TestComputeBackgroundLevel:
         result = compute_background_level(obs)
         assert result is not None
         assert result < 0.0
+
+
+class TestComputePixelHistogram:
+    """Tests for compute_pixel_histogram."""
+
+    def _make_cutout_obs(self, uniform=False):
+        import base64
+
+        import numpy as np
+
+        from schemas import Observation
+        if uniform:
+            arr = np.ones((63, 63), dtype=np.float32) * 5.0
+        else:
+            rng = np.random.default_rng(42)
+            arr = rng.normal(0.0, 1.0, (63, 63)).astype(np.float32)
+            arr[31, 31] = 50.0
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        return Observation(
+            obs_id="hist_o1", ra_deg=180.0, dec_deg=0.0, jd=2460000.5,
+            mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF",
+            cutout_difference=b64,
+        )
+
+    def test_valid_cutout_returns_256_ints(self):
+        from preprocess import compute_pixel_histogram
+        obs = self._make_cutout_obs()
+        result = compute_pixel_histogram(obs)
+        assert result is not None
+        assert len(result) == 256
+        assert all(isinstance(c, int) for c in result)
+
+    def test_counts_sum_to_63x63(self):
+        from preprocess import compute_pixel_histogram
+        obs = self._make_cutout_obs()
+        result = compute_pixel_histogram(obs)
+        assert result is not None
+        assert sum(result) == 63 * 63
+
+    def test_no_cutout_returns_none(self):
+        from preprocess import compute_pixel_histogram
+        from schemas import Observation
+        obs = Observation(
+            obs_id="no_cutout", ra_deg=180.0, dec_deg=0.0, jd=2460000.5,
+            mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF",
+        )
+        assert compute_pixel_histogram(obs) is None
+
+    def test_bad_base64_returns_none(self):
+        from preprocess import compute_pixel_histogram
+        from schemas import Observation
+        obs = Observation(
+            obs_id="bad", ra_deg=180.0, dec_deg=0.0, jd=2460000.5,
+            mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF",
+            cutout_difference="not_valid_base64!!!",
+        )
+        assert compute_pixel_histogram(obs) is None
+
+    def test_uniform_array_all_in_one_bin(self):
+        from preprocess import compute_pixel_histogram
+        obs = self._make_cutout_obs(uniform=True)
+        result = compute_pixel_histogram(obs)
+        assert result is not None
+        # Uniform array: after normalization all values near same bin
+        assert sum(result) == 63 * 63
+
+    def test_in_all(self):
+        from preprocess import __all__
+        assert "compute_pixel_histogram" in __all__

@@ -1207,3 +1207,58 @@ class TestComputeCloseApproachScore:
     def test_in_all(self):
         from score import __all__
         assert "compute_close_approach_score" in __all__
+
+
+class TestComputeCombinedPriority:
+    """Tests for compute_combined_priority."""
+
+    def _neo(self, discovery_priority=0.5, moid=0.1, hazard_flag="nominal"):
+        from tests.conftest import build_scored_neo
+        neo = build_scored_neo()
+        hazard = neo.hazard.model_copy(update={"moid_au": moid, "hazard_flag": hazard_flag})
+        meta = neo.metadata.model_copy(update={"discovery_priority": discovery_priority})
+        return neo.model_copy(update={"hazard": hazard, "metadata": meta})
+
+    def test_high_priority_pha(self):
+        from score import compute_combined_priority
+        neo = self._neo(discovery_priority=0.9, moid=0.01, hazard_flag="pha_candidate")
+        cp = compute_combined_priority(neo)
+        assert 0.0 <= cp <= 1.0
+        assert cp > 0.5  # high priority
+
+    def test_zero_priority(self):
+        from score import compute_combined_priority
+        neo = self._neo(discovery_priority=0.0, moid=None, hazard_flag="nominal")
+        cp = compute_combined_priority(neo)
+        assert 0.0 <= cp <= 1.0
+
+    def test_formula_components(self):
+        """Verify formula: 0.5*discovery + 0.3*obs_priority + 0.2*close_approach."""
+        from score import (
+            compute_close_approach_score,
+            compute_combined_priority,
+            compute_observation_priority,
+        )
+        neo = self._neo(discovery_priority=0.8, moid=0.05, hazard_flag="nominal")
+        disc = 0.8
+        obs = compute_observation_priority(neo)
+        ca = compute_close_approach_score(neo)
+        expected = round(min(1.0, max(0.0, 0.5 * disc + 0.3 * obs + 0.2 * ca)), 4)
+        assert compute_combined_priority(neo) == expected
+
+    def test_clamped_to_0_1(self):
+        from score import compute_combined_priority
+        neo = self._neo(discovery_priority=1.0, moid=0.0, hazard_flag="pha_candidate")
+        cp = compute_combined_priority(neo)
+        assert 0.0 <= cp <= 1.0
+
+    def test_returns_4dp(self):
+        from score import compute_combined_priority
+        neo = self._neo(discovery_priority=0.7, moid=0.05)
+        cp = compute_combined_priority(neo)
+        assert isinstance(cp, float)
+        assert round(cp, 4) == cp
+
+    def test_in_all(self):
+        from score import __all__
+        assert "compute_combined_priority" in __all__

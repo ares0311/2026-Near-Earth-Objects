@@ -7,7 +7,8 @@ __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_
            "detect_bad_pixels", "compute_astrometric_scatter",
            "normalize_photometry", "compute_image_quality_metrics",
            "compute_photometric_scatter", "estimate_zero_point",
-           "compute_difference_image_snr", "compute_cutout_entropy", "compute_background_level"]
+           "compute_difference_image_snr", "compute_cutout_entropy", "compute_background_level",
+           "compute_pixel_histogram"]
 
 import base64
 import math
@@ -677,5 +678,36 @@ def compute_background_level(obs: object) -> float | None:
         mask[:, -border:] = True
         bg_pixels = arr[mask]
         return round(float(np.median(bg_pixels)), 4)
+    except Exception:
+        return None
+
+
+def compute_pixel_histogram(obs: Observation) -> list[int] | None:
+    """Compute a 256-bin pixel value histogram from the difference-image cutout.
+
+    Decodes the base64 ``cutout_difference`` field, reshapes to (63, 63) float32,
+    normalizes pixel values to [0, 1] using min-max normalization, then computes
+    a 256-bin histogram.
+
+    Args:
+        obs: An :class:`~schemas.Observation` object with optional ``cutout_difference``.
+
+    Returns:
+        List of 256 integers (bin counts) summing to 63×63=3969, or ``None``
+        if no cutout is present or decoding fails.
+    """
+    import base64
+
+    cutout = getattr(obs, "cutout_difference", None)
+    if cutout is None:
+        return None
+    try:
+        raw = base64.b64decode(cutout)
+        arr = np.frombuffer(raw, dtype=np.float32).reshape(63, 63)
+        arr_min = float(arr.min())
+        arr_max = float(arr.max())
+        arr_norm = (arr - arr_min) / (arr_max - arr_min + 1e-9)
+        counts, _ = np.histogram(arr_norm, bins=256, range=(0.0, 1.0))
+        return [int(c) for c in counts]
     except Exception:
         return None

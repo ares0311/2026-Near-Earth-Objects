@@ -1336,3 +1336,49 @@ class TestFormatCandidateDossier:
     def test_in_all(self):
         from alert import __all__
         assert "format_candidate_dossier" in __all__
+
+
+class TestCountAlertsByFlag:
+    """Tests for count_alerts_by_flag."""
+
+    def _neo(self, hazard_flag="nominal"):
+        from .conftest import build_scored_neo
+        neo = build_scored_neo()
+        hazard = neo.hazard.model_copy(update={"hazard_flag": hazard_flag})
+        return neo.model_copy(update={"hazard": hazard})
+
+    def test_empty_list(self):
+        from alert import count_alerts_by_flag
+        assert count_alerts_by_flag([]) == {}
+
+    def test_single_flag(self):
+        from alert import count_alerts_by_flag
+        neos = [self._neo("nominal"), self._neo("nominal"), self._neo("nominal")]
+        result = count_alerts_by_flag(neos)
+        assert result == {"nominal": 3}
+
+    def test_mixed_flags(self):
+        from alert import count_alerts_by_flag
+        neos = [
+            self._neo("pha_candidate"),
+            self._neo("nominal"),
+            self._neo("close_approach"),
+            self._neo("nominal"),
+            self._neo("pha_candidate"),
+        ]
+        result = count_alerts_by_flag(neos)
+        assert result["pha_candidate"] == 2
+        assert result["nominal"] == 2
+        assert result["close_approach"] == 1
+        assert "unknown" not in result
+
+    def test_no_zero_count_entries(self):
+        from alert import count_alerts_by_flag
+        neos = [self._neo("pha_candidate")]
+        result = count_alerts_by_flag(neos)
+        # Only pha_candidate should appear
+        assert list(result.keys()) == ["pha_candidate"]
+
+    def test_in_all(self):
+        from alert import __all__
+        assert "count_alerts_by_flag" in __all__

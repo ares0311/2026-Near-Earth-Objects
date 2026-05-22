@@ -8,7 +8,7 @@ __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "compute_tracklet_grade", "filter_by_arc_length", "summarize_arc_statistics",
            "filter_by_nights_observed", "merge_overlapping_tracklets",
            "validate_tracklet", "compute_great_circle_residual",
-           "compute_position_angle_consistency"]
+           "compute_position_angle_consistency", "score_tracklet_quality"]
 
 import math
 import uuid
@@ -830,3 +830,30 @@ def compute_position_angle_consistency(tracklet: object) -> float | None:
     if len(pas) < 2:
         return None
     return round(float(np.std(pas, ddof=0)), 4)
+
+
+def score_tracklet_quality(tracklet: object) -> float:
+    """Compute a scalar quality score in [0, 1] for a linked tracklet.
+
+    Combines three components:
+    - **Grade score**: A=1.0, B=0.75, C=0.5, D=0.25 (weight 0.4)
+    - **Arc score**: min(1.0, arc_days / 7.0) (weight 0.3)
+    - **Link confidence**: from :func:`assess_link_confidence` (weight 0.3)
+
+    Args:
+        tracklet: A :class:`~schemas.Tracklet` object.
+
+    Returns:
+        Quality score rounded to 4 decimal places, in [0, 1].
+    """
+    grade = compute_tracklet_grade(tracklet)
+    grade_map = {"A": 1.0, "B": 0.75, "C": 0.5, "D": 0.25}
+    grade_score = grade_map.get(grade, 0.25)
+
+    arc_days = float(getattr(tracklet, "arc_days", 0.0))
+    arc_score = min(1.0, arc_days / 7.0)
+
+    link_confidence = assess_link_confidence(tracklet)
+
+    quality = 0.4 * grade_score + 0.3 * arc_score + 0.3 * link_confidence
+    return round(float(quality), 4)

@@ -756,3 +756,55 @@ class TestComputeAveragePrecision:
     def test_in_all(self):
         from calibration import __all__
         assert "compute_average_precision" in __all__
+
+
+class TestComputeCalibrationSharpness:
+    """Tests for compute_calibration_sharpness."""
+
+    def test_all_half_returns_half(self):
+        from calibration import compute_calibration_sharpness
+        probs = [0.5] * 10
+        result = compute_calibration_sharpness(probs)
+        assert result == 0.5
+
+    def test_all_one_returns_one(self):
+        from calibration import compute_calibration_sharpness
+        probs = [1.0] * 10
+        result = compute_calibration_sharpness(probs)
+        assert result == 1.0
+
+    def test_all_zero_returns_one(self):
+        from calibration import compute_calibration_sharpness
+        # max(0, 1-0) = 1.0
+        probs = [0.0] * 10
+        result = compute_calibration_sharpness(probs)
+        assert result == 1.0
+
+    def test_mixed_values(self):
+        from calibration import compute_calibration_sharpness
+        probs = [0.9, 0.1, 0.8, 0.2]
+        # confidences: [0.9, 0.9, 0.8, 0.8]; mean = 0.85
+        result = compute_calibration_sharpness(probs)
+        assert abs(result - 0.85) < 0.0001
+
+    def test_empty_returns_half(self):
+        from calibration import compute_calibration_sharpness
+        assert compute_calibration_sharpness([]) == 0.5
+
+    def test_range_is_0_5_to_1(self):
+        import random
+
+        from calibration import compute_calibration_sharpness
+        rng = random.Random(42)
+        probs = [rng.random() for _ in range(100)]
+        result = compute_calibration_sharpness(probs)
+        assert 0.5 <= result <= 1.0
+
+    def test_returns_4dp(self):
+        from calibration import compute_calibration_sharpness
+        result = compute_calibration_sharpness([0.73, 0.27, 0.6])
+        assert round(result, 4) == result
+
+    def test_in_all(self):
+        from calibration import __all__
+        assert "compute_calibration_sharpness" in __all__

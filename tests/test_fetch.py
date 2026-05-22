@@ -2210,3 +2210,199 @@ class TestFetchPanstarrMovingObjectsEdge:
              patch.dict("sys.modules", {"astroquery.mast": mock_mast}):
             result = fetch_panstarrs_moving_objects(90.0, 0.0, 0.3)
         assert isinstance(result, list)
+
+
+class TestFetchRecentMpcNeos:
+    """Tests for fetch_recent_mpc_neos."""
+
+    def _make_mock_row(self, ra=180.0, dec=10.0, h=18.0, disc_days_ago=5):
+        from datetime import date, timedelta
+        row = {
+            "ra": ra,
+            "dec": dec,
+            "h": h,
+            "discovery_date": date.today() - timedelta(days=disc_days_ago),
+        }
+        return row
+
+    def test_normal_mock_mpc(self, tmp_path, monkeypatch):
+        import sys
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        mock_row = self._make_mock_row()
+        mock_mpc_cls = MagicMock()
+        mock_mpc_cls.query_objects.return_value = [mock_row]
+        mock_mpc_mod = MagicMock()
+        mock_mpc_mod.MPC = mock_mpc_cls
+        monkeypatch.setitem(sys.modules, "astroquery.mpc", mock_mpc_mod)
+
+        import importlib
+
+        import fetch as fm
+        importlib.reload(fm)
+        monkeypatch.setattr(fm, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        result = fm.fetch_recent_mpc_neos(n_days=30)
+        assert len(result) == 1
+        assert result[0].mission == "MPC"
+        assert result[0].filter_band == "V"
+
+    def test_import_error_returns_empty(self, tmp_path, monkeypatch):
+        import sys
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        # Block astroquery.mpc import
+        monkeypatch.setitem(sys.modules, "astroquery.mpc", None)
+
+        import importlib
+
+        import fetch as fm
+        importlib.reload(fm)
+        monkeypatch.setattr(fm, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        result = fm.fetch_recent_mpc_neos(n_days=30)
+        assert result == []
+
+    def test_query_error_returns_empty(self, tmp_path, monkeypatch):
+        import sys
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        mock_mpc_cls = MagicMock()
+        mock_mpc_cls.query_objects.side_effect = RuntimeError("network error")
+        mock_mpc_mod = MagicMock()
+        mock_mpc_mod.MPC = mock_mpc_cls
+        monkeypatch.setitem(sys.modules, "astroquery.mpc", mock_mpc_mod)
+
+        import importlib
+
+        import fetch as fm
+        importlib.reload(fm)
+        monkeypatch.setattr(fm, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        result = fm.fetch_recent_mpc_neos(n_days=30)
+        assert result == []
+
+    def test_force_refresh_bypasses_cache(self, tmp_path, monkeypatch):
+        import hashlib
+        import sys
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        # Seed cache with one entry
+        from schemas import Observation
+        obs = Observation(
+            obs_id="mpc_recent_0", ra_deg=10.0, dec_deg=5.0, jd=2460000.5,
+            mag=18.0, mag_err=0.1, filter_band="V", mission="MPC", real_bogus=1.0,
+        )
+        cache_key = hashlib.md5(b"mpc_recent_neos:30").hexdigest()
+        fetch_mod._save_cache(cache_key, [obs.model_dump()])
+
+        # force_refresh bypasses cache; MPC query returns nothing
+        mock_mpc_cls = MagicMock()
+        mock_mpc_cls.query_objects.return_value = []
+        mock_mpc_mod = MagicMock()
+        mock_mpc_mod.MPC = mock_mpc_cls
+        monkeypatch.setitem(sys.modules, "astroquery.mpc", mock_mpc_mod)
+
+        import importlib
+
+        import fetch as fm
+        importlib.reload(fm)
+        monkeypatch.setattr(fm, "_CACHE_DIR", tmp_path / ".neo_cache")
+        # Seed the already-reloaded fm's cache
+        fm._save_cache(cache_key, [obs.model_dump()])
+
+        result = fm.fetch_recent_mpc_neos(n_days=30, force_refresh=True)
+        assert result == []  # fresh query returned nothing
+
+    def test_cached_result_returned(self, tmp_path, monkeypatch):
+        import hashlib
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        from schemas import Observation
+        obs = Observation(
+            obs_id="mpc_recent_0", ra_deg=10.0, dec_deg=5.0, jd=2460000.5,
+            mag=18.0, mag_err=0.1, filter_band="V", mission="MPC", real_bogus=1.0,
+        )
+        cache_key = hashlib.md5(b"mpc_recent_neos:30").hexdigest()
+        fetch_mod._save_cache(cache_key, [obs.model_dump()])
+
+        result = fetch_mod.fetch_recent_mpc_neos(n_days=30)
+        assert len(result) == 1
+        assert result[0].obs_id == "mpc_recent_0"
+
+    def test_old_discovery_filtered_out(self, tmp_path, monkeypatch):
+        import sys
+        from datetime import date, timedelta
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        old_row = {
+            "ra": 180.0, "dec": 10.0, "h": 18.0,
+            "discovery_date": date.today() - timedelta(days=60),
+        }
+        mock_mpc_cls = MagicMock()
+        mock_mpc_cls.query_objects.return_value = [old_row]
+        mock_mpc_mod = MagicMock()
+        mock_mpc_mod.MPC = mock_mpc_cls
+        monkeypatch.setitem(sys.modules, "astroquery.mpc", mock_mpc_mod)
+
+        import importlib
+
+        import fetch as fm
+        importlib.reload(fm)
+        monkeypatch.setattr(fm, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        result = fm.fetch_recent_mpc_neos(n_days=30)
+        assert result == []
+
+    def test_corrupted_cache_skipped(self, tmp_path, monkeypatch):
+        import hashlib
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        # Save a cache entry with a missing required field so Observation(**d) raises
+        cache_key = hashlib.md5(b"mpc_recent_neos:30").hexdigest()
+        fetch_mod._save_cache(cache_key, [{"bad_field": "bad"}])
+        result = fetch_mod.fetch_recent_mpc_neos(n_days=30)
+        assert result == []
+
+    def test_string_discovery_date_parsed(self, tmp_path, monkeypatch):
+        import sys
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        # Row with discovery_date as a string (not a date object) triggers strptime path
+        from datetime import date, timedelta
+        disc_str = (date.today() - timedelta(days=3)).strftime("%Y-%m-%d")
+        row = {"ra": 180.0, "dec": 10.0, "h": 18.0, "discovery_date": disc_str}
+        mock_mpc_cls = MagicMock()
+        mock_mpc_cls.query_objects.return_value = [row]
+        mock_mpc_mod = MagicMock()
+        mock_mpc_mod.MPC = mock_mpc_cls
+        monkeypatch.setitem(sys.modules, "astroquery.mpc", mock_mpc_mod)
+        import importlib
+
+        import fetch as fm
+        importlib.reload(fm)
+        monkeypatch.setattr(fm, "_CACHE_DIR", tmp_path / ".neo_cache")
+        result = fm.fetch_recent_mpc_neos(n_days=30)
+        assert len(result) == 1
+
+    def test_bad_row_data_skipped(self, tmp_path, monkeypatch):
+        import sys
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        # Row with non-numeric ra triggers the per-row except handler
+        from datetime import date, timedelta
+        disc_str = (date.today() - timedelta(days=3)).strftime("%Y-%m-%d")
+        bad_row = {"ra": "not_a_number", "dec": "also_bad", "h": 18.0,
+                   "discovery_date": disc_str}
+        mock_mpc_cls = MagicMock()
+        mock_mpc_cls.query_objects.return_value = [bad_row]
+        mock_mpc_mod = MagicMock()
+        mock_mpc_mod.MPC = mock_mpc_cls
+        monkeypatch.setitem(sys.modules, "astroquery.mpc", mock_mpc_mod)
+        import importlib
+
+        import fetch as fm
+        importlib.reload(fm)
+        monkeypatch.setattr(fm, "_CACHE_DIR", tmp_path / ".neo_cache")
+        result = fm.fetch_recent_mpc_neos(n_days=30)
+        assert result == []
+
+    def test_in_all(self):
+        from fetch import __all__
+        assert "fetch_recent_mpc_neos" in __all__

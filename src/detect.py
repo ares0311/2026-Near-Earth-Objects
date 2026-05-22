@@ -6,7 +6,8 @@ __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus"
            "compute_streak_metric", "cluster_detections", "compute_trail_length",
            "compute_psf_fwhm", "estimate_sky_background", "compute_detection_efficiency",
            "count_detections_by_filter", "compute_motion_vector",
-           "flag_moving_sources", "compute_source_extent", "estimate_observation_depth"]
+           "flag_moving_sources", "compute_source_extent", "estimate_observation_depth",
+           "filter_by_magnitude"]
 
 import math
 import uuid
@@ -758,3 +759,29 @@ def estimate_observation_depth(
     if not mags:
         return None
     return round(float(np.percentile(mags, percentile)), 4)
+
+
+def filter_by_magnitude(observations: list[Observation], mag_limit: float) -> list[Observation]:
+    """Keep observations brighter than mag_limit (lower magnitude = brighter).
+
+    Excludes observations with None magnitude and sentinel magnitudes ≥ 90.
+    Only includes observations where ``obs.mag < mag_limit``.
+
+    Args:
+        observations: List of :class:`~schemas.Observation` objects.
+        mag_limit: Magnitude limit (exclusive upper bound); brighter objects
+            have smaller magnitudes.
+
+    Returns:
+        Filtered list of observations with ``mag < mag_limit``.
+    """
+    result = []
+    for obs in observations:
+        mag = obs.mag
+        if mag is None:
+            continue
+        if mag >= 90.0:
+            continue
+        if mag < mag_limit:
+            result.append(obs)
+    return result

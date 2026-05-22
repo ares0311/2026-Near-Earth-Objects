@@ -8,7 +8,7 @@ __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fet
            "count_known_objects_in_field", "fetch_mpc_observations",
            "fetch_atlas_forced", "fetch_ztf_alerts", "estimate_survey_depth",
            "filter_by_survey", "fetch_panstarrs_catalog", "fetch_css_alerts",
-           "fetch_panstarrs_moving_objects"]
+           "fetch_panstarrs_moving_objects", "fetch_recent_mpc_neos"]
 
 import json
 import os
@@ -1128,3 +1128,76 @@ def fetch_panstarrs_moving_objects(
         pass
 
     return observations
+
+
+def fetch_recent_mpc_neos(n_days: int = 30, force_refresh: bool = False) -> list[Observation]:
+    """Fetch recently announced NEOs from the MPC catalog.
+
+    Queries ``astroquery.mpc.MPC`` for NEO asteroids and filters to objects
+    discovered within the last ``n_days`` days based on the ``discovery_date``
+    column.  Results are disk-cached per ``n_days`` value.
+
+    Args:
+        n_days: Number of days to look back for recent discoveries (default 30).
+        force_refresh: If True, bypass the on-disk cache.
+
+    Returns:
+        List of :class:`~schemas.Observation` objects, one per result row.
+        Returns an empty list if the import or query fails.
+    """
+    import hashlib
+
+    cache_key = hashlib.md5(f"mpc_recent_neos:{n_days}".encode()).hexdigest()
+    cached = _load_cache(cache_key, force_refresh=force_refresh)
+    if cached is not None:
+        obs_list: list[Observation] = []
+        for d in cached:
+            try:
+                obs_list.append(Observation(**d))
+            except Exception:
+                pass
+        return obs_list
+
+    try:
+        from astroquery.mpc import MPC  # type: ignore[import]
+    except ImportError:
+        return []
+
+    try:
+        from datetime import date, timedelta
+
+        table = MPC.query_objects("asteroid", is_neo=True)
+        cutoff = date.today() - timedelta(days=n_days)
+        result_list: list[Observation] = []
+        for i, row in enumerate(table):
+            try:
+                disc_raw = row.get("discovery_date") or row.get("disc_date")
+                if disc_raw is not None:
+                    if hasattr(disc_raw, "isoformat"):
+                        disc_date = disc_raw
+                    else:
+                        from datetime import datetime as _dt
+                        disc_date = _dt.strptime(str(disc_raw)[:10], "%Y-%m-%d").date()
+                    if disc_date < cutoff:
+                        continue
+                ra_val = row.get("ra") or row.get("RA") or 0.0
+                dec_val = row.get("dec") or row.get("Dec") or 0.0
+                h_val = row.get("h") or row.get("H") or 99.0
+                obs = Observation(
+                    obs_id=f"mpc_recent_{i}",
+                    ra_deg=float(ra_val),
+                    dec_deg=float(dec_val),
+                    jd=2460000.5,
+                    mag=float(h_val) if h_val is not None else 99.0,
+                    mag_err=0.1,
+                    filter_band="V",
+                    mission="MPC",
+                    real_bogus=1.0,
+                )
+                result_list.append(obs)
+            except Exception:
+                pass
+        _save_cache(cache_key, [o.model_dump() for o in result_list])
+        return result_list
+    except Exception:
+        return []

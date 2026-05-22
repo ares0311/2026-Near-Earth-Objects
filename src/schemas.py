@@ -15,6 +15,7 @@ __all__ = [
     "ObservationStatistics",
     "AlertPackage",
     "OrbitalElementsSummary", "CandidateReport",
+    "SurveyStatistics",
     "BackgroundOutcome", "BackgroundRunMode", "FollowUpTestStatus", "HumanReviewStatus",
     "RecommendationAction", "SignoffDecision",
     "PriorityFactors", "BackgroundTarget", "FollowUpTestResult",
@@ -834,3 +835,34 @@ class CandidateReport(BaseModel):
     n_observations: int = 0
     arc_days: float = 0.0
     generated_jd: float = 2460000.5
+
+
+class SurveyStatistics(BaseModel):
+    """Aggregate statistics for a single survey over one pipeline run.
+
+    Captures headline numbers for a survey provider (ZTF, ATLAS, etc.) in
+    a single pipeline execution: total alerts, candidates after real/bogus
+    filtering, known-object matches, genuinely new candidates, and optional
+    quality indicators.
+
+    Attributes:
+        survey: Survey identifier (e.g. ``"ZTF"``, ``"ATLAS"``).
+        n_alerts: Total number of raw alerts downloaded.
+        n_candidates: Alerts passing the real/bogus threshold.
+        n_known: Candidates matched to MPC known objects.
+        n_new: Candidates not matched to any known object.
+        mean_rb: Mean real/bogus score across all alerts; None if unavailable.
+        limiting_mag: Estimated limiting magnitude of the survey field; None if unknown.
+        epoch_jd: Reference Julian Date for this statistics block.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    survey: str
+    n_alerts: int = 0
+    n_candidates: int = 0
+    n_known: int = 0
+    n_new: int = 0
+    mean_rb: float | None = None
+    limiting_mag: float | None = None
+    epoch_jd: float = 2460000.5

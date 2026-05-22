@@ -1532,3 +1532,47 @@ class TestComputeTrueAnomaly:
     def test_in_all(self):
         from orbit import __all__
         assert "compute_true_anomaly" in __all__
+
+
+class TestComputeMeanMotion:
+    """Tests for compute_mean_motion."""
+
+    def test_earth_like_orbit(self):
+        from orbit import compute_mean_motion
+        el = make_elements(semi_major_axis_au=1.0, perihelion_au=1.0, aphelion_au=1.0)
+        n = compute_mean_motion(el)
+        # Earth: T = 365.25 days, n = 360 / 365.25 ≈ 0.9856 deg/day
+        assert abs(n - 0.9856) < 0.001
+
+    def test_normal_neo_orbit(self):
+        from orbit import compute_mean_motion
+        el = make_elements(semi_major_axis_au=1.5)
+        n = compute_mean_motion(el)
+        # T = 365.25 * sqrt(1.5^3) ≈ 669.9 days; n ≈ 0.5375 deg/day
+        expected = 360.0 / (365.25 * math.sqrt(1.5 ** 3))
+        assert abs(n - expected) < 1e-6
+
+    def test_very_small_a(self):
+        from orbit import compute_mean_motion
+        el = make_elements(semi_major_axis_au=0.1, perihelion_au=0.08, aphelion_au=0.12)
+        n = compute_mean_motion(el)
+        # Very small orbit → very large n
+        expected = 360.0 / (365.25 * math.sqrt(0.1 ** 3))
+        assert abs(n - expected) < 1e-4
+        assert n > 10.0  # much faster than Earth
+
+    def test_raises_for_zero_a(self):
+        from orbit import compute_mean_motion
+        el = make_elements(semi_major_axis_au=0.0)
+        with pytest.raises(ValueError, match="semi-major axis must be positive"):
+            compute_mean_motion(el)
+
+    def test_raises_for_negative_a(self):
+        from orbit import compute_mean_motion
+        el = make_elements(semi_major_axis_au=-1.0)
+        with pytest.raises(ValueError):
+            compute_mean_motion(el)
+
+    def test_in_all(self):
+        from orbit import __all__
+        assert "compute_mean_motion" in __all__

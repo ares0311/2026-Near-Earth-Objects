@@ -9,7 +9,7 @@ __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "compute_threat_score", "filter_by_alert_pathway",
            "compute_followup_urgency", "compute_discovery_score",
            "compute_observation_priority", "compute_size_estimate",
-           "compute_close_approach_score"]
+           "compute_close_approach_score", "compute_combined_priority"]
 
 import math
 import uuid
@@ -803,3 +803,27 @@ def compute_close_approach_score(neo: ScoredNEO) -> float:
 
     bonus = 0.2 if neo.hazard.hazard_flag == "pha_candidate" else 0.0
     return round(min(1.0, proximity + bonus), 4)
+
+
+def compute_combined_priority(neo: ScoredNEO) -> float:
+    """Compute a weighted combination of three priority scores.
+
+    Formula:
+        combined = 0.5 * discovery_priority
+                 + 0.3 * compute_observation_priority(neo)
+                 + 0.2 * compute_close_approach_score(neo)
+
+    Result is clamped to [0, 1] and rounded to 4 decimal places.
+
+    Args:
+        neo: A :class:`~schemas.ScoredNEO` object.
+
+    Returns:
+        Combined priority score in [0, 1].
+    """
+    discovery = float(getattr(neo.metadata, "discovery_priority", 0.0) or 0.0)
+    observation = compute_observation_priority(neo)
+    close_approach = compute_close_approach_score(neo)
+
+    combined = 0.5 * discovery + 0.3 * observation + 0.2 * close_approach
+    return round(min(1.0, max(0.0, combined)), 4)

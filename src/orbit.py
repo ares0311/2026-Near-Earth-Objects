@@ -10,7 +10,7 @@ __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
            "compute_heliocentric_distance", "compute_synodic_period",
            "compute_apparent_magnitude", "compute_absolute_magnitude",
            "compute_perihelion_date", "compute_eccentric_anomaly",
-           "compute_true_anomaly"]
+           "compute_true_anomaly", "compute_mean_motion"]
 
 import math
 from typing import NamedTuple
@@ -1075,3 +1075,26 @@ def compute_true_anomaly(E_rad: float, e: float) -> float:
     sqrt_factor = math.sqrt((1.0 + e) / (1.0 - e))
     nu = 2.0 * math.atan(sqrt_factor * math.tan(E_rad / 2.0))
     return nu % (2.0 * math.pi)
+
+
+def compute_mean_motion(elements: OrbitalElements) -> float:
+    """Compute mean motion n in degrees per day from orbital elements.
+
+    Mean motion is the average angular velocity:
+        n = 360.0 / T
+    where T is the orbital period in days (Kepler's third law).
+
+    Args:
+        elements: Orbital elements containing the semi-major axis.
+
+    Returns:
+        Mean motion in degrees per day.
+
+    Raises:
+        ValueError: If semi-major axis is ≤ 0.
+    """
+    a = elements.semi_major_axis_au
+    if a <= 0.0:
+        raise ValueError(f"semi-major axis must be positive, got {a}")
+    T_days = 365.25 * math.sqrt(a ** 3)
+    return 360.0 / T_days
