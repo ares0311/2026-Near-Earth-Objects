@@ -7,7 +7,8 @@ __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "split_tracklet", "compute_arc_statistics", "assess_link_confidence",
            "compute_tracklet_grade", "filter_by_arc_length", "summarize_arc_statistics",
            "filter_by_nights_observed", "merge_overlapping_tracklets",
-           "validate_tracklet", "compute_great_circle_residual"]
+           "validate_tracklet", "compute_great_circle_residual",
+           "compute_position_angle_consistency"]
 
 import math
 import uuid
@@ -787,3 +788,45 @@ def compute_great_circle_residual(tracklet: object) -> float | None:
 
     rms = float(np.sqrt(np.mean(dra_arcsec ** 2 + ddec_arcsec ** 2)))
     return round(rms, 6)
+
+
+def compute_position_angle_consistency(tracklet: object) -> float | None:
+    """Compute the standard deviation of position angles across consecutive observation pairs.
+
+    A low value indicates nearly linear (constant-direction) motion; a high
+    value suggests curved motion or measurement scatter.  Useful as a feature
+    for artifact rejection and orbit quality estimation.
+
+    Args:
+        tracklet: A :class:`~schemas.Tracklet`-like object with an
+            ``observations`` attribute containing at least 2 observations.
+
+    Returns:
+        Standard deviation of position angles in degrees, or ``None`` if fewer
+        than 2 observations are present or all pairs have zero separation.
+    """
+    import math
+
+    import numpy as np
+
+    obs = list(getattr(tracklet, "observations", ()))
+    if len(obs) < 2:
+        return None
+
+    pas: list[float] = []
+    for i in range(len(obs) - 1):
+        o1, o2 = obs[i], obs[i + 1]
+        dt = o2.jd - o1.jd
+        if dt == 0.0:
+            continue
+        cos_dec = math.cos(math.radians((o1.dec_deg + o2.dec_deg) / 2.0))
+        dra = (o2.ra_deg - o1.ra_deg) * cos_dec * 3600.0
+        ddec = (o2.dec_deg - o1.dec_deg) * 3600.0
+        if dra == 0.0 and ddec == 0.0:
+            continue
+        pa = math.degrees(math.atan2(dra, ddec)) % 360.0
+        pas.append(pa)
+
+    if len(pas) < 2:
+        return None
+    return round(float(np.std(pas, ddof=0)), 4)

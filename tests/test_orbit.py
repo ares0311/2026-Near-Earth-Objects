@@ -1474,3 +1474,61 @@ class TestComputeEccentricAnomaly:
         from orbit import compute_eccentric_anomaly
         with pytest.raises(ValueError, match="did not converge"):
             compute_eccentric_anomaly(math.pi / 2.0, 0.5, max_iter=0)
+
+
+class TestComputeTrueAnomaly:
+    def test_zero_mean_anomaly(self):
+        from orbit import compute_true_anomaly
+        nu = compute_true_anomaly(0.0, 0.3)
+        assert abs(nu) < 1e-9
+
+    def test_circular_orbit_e_zero(self):
+        import math
+
+        from orbit import compute_true_anomaly
+        E = math.pi / 3.0
+        nu = compute_true_anomaly(E, 0.0)
+        assert abs(nu - E) < 1e-9
+
+    def test_full_orbit_returns_zero_or_twopi(self):
+        import math
+
+        from orbit import compute_true_anomaly
+        nu = compute_true_anomaly(2.0 * math.pi, 0.2)
+        assert abs(nu % (2.0 * math.pi)) < 1e-8
+
+    def test_in_range_zero_to_two_pi(self):
+        import math
+
+        from orbit import compute_true_anomaly
+        for E in [0.1, 1.0, 2.5, 4.0, 5.5]:
+            nu = compute_true_anomaly(E, 0.4)
+            assert 0.0 <= nu < 2.0 * math.pi + 1e-9
+
+    def test_raises_for_e_one(self):
+        import pytest
+
+        from orbit import compute_true_anomaly
+        with pytest.raises(ValueError):
+            compute_true_anomaly(1.0, 1.0)
+
+    def test_raises_for_e_negative(self):
+        import pytest
+
+        from orbit import compute_true_anomaly
+        with pytest.raises(ValueError):
+            compute_true_anomaly(1.0, -0.1)
+
+    def test_high_eccentricity(self):
+        import math
+
+        from orbit import compute_eccentric_anomaly, compute_true_anomaly
+        M = 1.0
+        e = 0.9
+        E = compute_eccentric_anomaly(M, e)
+        nu = compute_true_anomaly(E, e)
+        assert 0.0 <= nu < 2.0 * math.pi + 1e-9
+
+    def test_in_all(self):
+        from orbit import __all__
+        assert "compute_true_anomaly" in __all__

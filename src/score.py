@@ -8,7 +8,8 @@ __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "compute_impact_energy", "compute_novelty_score",
            "compute_threat_score", "filter_by_alert_pathway",
            "compute_followup_urgency", "compute_discovery_score",
-           "compute_observation_priority", "compute_size_estimate"]
+           "compute_observation_priority", "compute_size_estimate",
+           "compute_close_approach_score"]
 
 import math
 import uuid
@@ -778,3 +779,27 @@ def compute_size_estimate(neo: ScoredNEO) -> dict | None:
         "max_m": round(max_km * 1000.0, 2),
         "assumed_albedo_range": [0.05, 0.30],
     }
+
+
+def compute_close_approach_score(neo: ScoredNEO) -> float:
+    """Compute a [0, 1] close-approach score from MOID and hazard flag.
+
+    Combines the MOID proximity with the PHA status into a single urgency
+    scalar suitable for ranking and triage.  MOID = 0.0 → score 1.0;
+    MOID ≥ 0.3 AU → score 0.0.  PHAs receive a 0.2 bonus, clamped to 1.0.
+
+    Args:
+        neo: A :class:`~schemas.ScoredNEO` object.
+
+    Returns:
+        Close-approach score in [0, 1].  Returns 0.5 if MOID is unknown.
+    """
+    moid = neo.hazard.moid_au
+    if moid is None:
+        return 0.5
+
+    max_moid = 0.3
+    proximity = max(0.0, 1.0 - float(moid) / max_moid)
+
+    bonus = 0.2 if neo.hazard.hazard_flag == "pha_candidate" else 0.0
+    return round(min(1.0, proximity + bonus), 4)

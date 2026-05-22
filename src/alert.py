@@ -24,6 +24,7 @@ __all__ = [
     "format_submission_checklist",
     "validate_alert_package",
     "estimate_followup_window",
+    "format_candidate_dossier",
 ]
 
 import json
@@ -1083,3 +1084,57 @@ def estimate_followup_window(neo: Any) -> dict:
         "end_jd": round(end_jd, 6),
         "urgency_hours": urgency_hours,
     }
+
+
+def format_candidate_dossier(neo: ScoredNEO) -> str:
+    """Generate a single-page plain-text dossier for a NEO candidate.
+
+    Consolidates the key outputs from all pipeline stages into a compact,
+    human-readable summary suitable for operator review or filing.
+
+    Args:
+        neo: A :class:`~schemas.ScoredNEO` object.
+
+    Returns:
+        Multi-line plain-text string.  Does not transmit or publish anything.
+    """
+    haz = neo.hazard
+    meta = neo.metadata
+    post = neo.posterior
+    track = neo.tracklet
+
+    lines = [
+        "=" * 72,
+        f"NEO CANDIDATE DOSSIER — {track.object_id}",
+        "=" * 72,
+        "",
+        "[ HAZARD ASSESSMENT ]",
+        f"  Hazard flag    : {haz.hazard_flag}",
+        f"  Alert pathway  : {haz.alert_pathway}",
+        f"  NEO class      : {haz.neo_class}",
+        f"  MOID (AU)      : {haz.moid_au}",
+        f"  Abs. mag. H    : {haz.absolute_magnitude_h}",
+        f"  Diameter (m)   : {haz.estimated_diameter_m}",
+        "",
+        "[ POSTERIOR PROBABILITIES ]",
+        f"  neo_candidate       : {post.neo_candidate:.4f}",
+        f"  known_object        : {post.known_object:.4f}",
+        f"  main_belt_asteroid  : {post.main_belt_asteroid:.4f}",
+        f"  stellar_artifact    : {post.stellar_artifact:.4f}",
+        f"  other_solar_system  : {post.other_solar_system:.4f}",
+        "",
+        "[ SCORING METADATA ]",
+        f"  Discovery priority  : {getattr(meta, 'discovery_priority', 'N/A')}",
+        f"  Orbit quality       : {getattr(haz, 'explanation', '') or 'N/A'}",
+        "",
+        "[ TRACKLET ]",
+        f"  Arc (days)          : {track.arc_days:.3f}",
+        f"  Motion rate (″/hr)  : {track.motion_rate_arcsec_per_hour:.2f}",
+        f"  Observations        : {len(track.observations)}",
+        "",
+        "[ GUARDRAIL ]",
+        "  Do NOT publicly announce any impact probability.",
+        "  Defer all public communication to NASA/CNEOS.",
+        "=" * 72,
+    ]
+    return "\n".join(lines)

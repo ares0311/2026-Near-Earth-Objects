@@ -1647,3 +1647,63 @@ class TestComputeConfusionMatrix:
         matrix = result["matrix"]
         diag_sum = sum(matrix[i][i] for i in range(len(result["labels"])))
         assert diag_sum == 2  # 2 correct: (a,a) and (b,b)
+
+
+class TestComputeCalibrationGain:
+    def _posterior(self, neo=0.5, ko=0.2, mba=0.2, art=0.05, other=0.05):
+        from schemas import NEOPosterior
+        return NEOPosterior(
+            neo_candidate=neo, known_object=ko, main_belt_asteroid=mba,
+            stellar_artifact=art, other_solar_system=other,
+        )
+
+    def test_identical_posteriors_zero(self):
+        from classify import compute_calibration_gain
+        p = self._posterior()
+        result = compute_calibration_gain(p, p)
+        assert abs(result) < 1e-4
+
+    def test_returns_float(self):
+        from classify import compute_calibration_gain
+        p1 = self._posterior(neo=0.1, ko=0.6)
+        p2 = self._posterior(neo=0.6, ko=0.1)
+        result = compute_calibration_gain(p1, p2)
+        assert isinstance(result, float)
+
+    def test_nonnegative(self):
+        from classify import compute_calibration_gain
+        p1 = self._posterior()
+        p2 = self._posterior(neo=0.9, ko=0.05, mba=0.03, art=0.01, other=0.01)
+        result = compute_calibration_gain(p1, p2)
+        assert result >= 0.0
+
+    def test_zero_posterior_before_returns_zero(self):
+        from classify import compute_calibration_gain
+        from schemas import NEOPosterior
+        zero = NEOPosterior(
+            neo_candidate=0.0, known_object=0.0, main_belt_asteroid=0.0,
+            stellar_artifact=0.0, other_solar_system=0.0,
+        )
+        p2 = self._posterior()
+        assert compute_calibration_gain(zero, p2) == 0.0
+
+    def test_zero_posterior_after_returns_zero(self):
+        from classify import compute_calibration_gain
+        from schemas import NEOPosterior
+        p1 = self._posterior()
+        zero = NEOPosterior(
+            neo_candidate=0.0, known_object=0.0, main_belt_asteroid=0.0,
+            stellar_artifact=0.0, other_solar_system=0.0,
+        )
+        assert compute_calibration_gain(p1, zero) == 0.0
+
+    def test_large_shift_larger_gain(self):
+        from classify import compute_calibration_gain
+        p_uniform = self._posterior(0.2, 0.2, 0.2, 0.2, 0.2)
+        p_concentrated = self._posterior(0.96, 0.01, 0.01, 0.01, 0.01)
+        gain = compute_calibration_gain(p_uniform, p_concentrated)
+        assert gain > 0.5
+
+    def test_in_all(self):
+        from classify import __all__
+        assert "compute_calibration_gain" in __all__

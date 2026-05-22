@@ -841,3 +841,58 @@ class TestOrbitalElementsSummary:
         s2 = s.model_copy(update={"quality_code": 3})
         assert s2.quality_code == 3
         assert s.quality_code == 2
+
+
+class TestCandidateReport:
+    def _make_report(self, **kwargs):
+        from schemas import CandidateReport
+        defaults = dict(
+            object_id="test_neo_001",
+            neo_class="apollo",
+            hazard_flag="pha_candidate",
+            alert_pathway="mpc_submission",
+            moid_au=0.02,
+            absolute_magnitude_h=21.5,
+            estimated_diameter_m=180.0,
+            discovery_priority=0.85,
+            neo_candidate_prob=0.78,
+            n_observations=6,
+            arc_days=3.2,
+            generated_jd=2460100.0,
+        )
+        defaults.update(kwargs)
+        return CandidateReport(**defaults)
+
+    def test_basic_construction(self):
+        r = self._make_report()
+        assert r.object_id == "test_neo_001"
+        assert r.neo_class == "apollo"
+
+    def test_frozen(self):
+        import pytest
+        r = self._make_report()
+        with pytest.raises(Exception):
+            r.object_id = "other"
+
+    def test_optional_moid(self):
+        r = self._make_report(moid_au=None)
+        assert r.moid_au is None
+
+    def test_defaults(self):
+        from schemas import CandidateReport
+        r = CandidateReport(
+            object_id="x", neo_class="amor", hazard_flag="nominal",
+            alert_pathway="internal_candidate",
+        )
+        assert r.discovery_priority == 0.0
+        assert r.n_observations == 0
+
+    def test_model_copy(self):
+        r = self._make_report()
+        r2 = r.model_copy(update={"n_observations": 10})
+        assert r2.n_observations == 10
+        assert r.n_observations == 6
+
+    def test_in_all(self):
+        from schemas import __all__
+        assert "CandidateReport" in __all__

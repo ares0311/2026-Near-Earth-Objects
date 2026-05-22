@@ -23,6 +23,7 @@ __all__ = [
     "compute_neo_probability",
     "compute_artifact_probability",
     "compute_confusion_matrix",
+    "compute_calibration_gain",
 ]
 
 import base64
@@ -1261,3 +1262,43 @@ def compute_confusion_matrix(
 
     accuracy = correct / total if total > 0 else 0.0
     return {"labels": all_labels, "matrix": matrix, "accuracy": round(accuracy, 6)}
+
+
+def compute_calibration_gain(
+    posterior_before: NEOPosterior,
+    posterior_after: NEOPosterior,
+) -> float:
+    """Compute KL divergence from posterior_before to posterior_after.
+
+    Measures the information gain (in nats) from applying a calibration step.
+    A value of 0 means the two posteriors are identical; higher values indicate
+    greater change.
+
+    Args:
+        posterior_before: :class:`~schemas.NEOPosterior` before calibration.
+        posterior_after: :class:`~schemas.NEOPosterior` after calibration.
+
+    Returns:
+        KL divergence D_KL(after ‖ before) in nats, rounded to 6 decimal places.
+        Returns 0.0 if either posterior is degenerate (all zeros).
+    """
+    import numpy as np
+
+    fields = [
+        "neo_candidate", "known_object", "main_belt_asteroid",
+        "stellar_artifact", "other_solar_system",
+    ]
+    q = np.array([float(getattr(posterior_before, f, 0.0)) for f in fields], dtype=float)
+    p = np.array([float(getattr(posterior_after, f, 0.0)) for f in fields], dtype=float)
+
+    q_sum = q.sum()
+    p_sum = p.sum()
+    if q_sum <= 0.0 or p_sum <= 0.0:
+        return 0.0
+
+    q = q / q_sum
+    p = p / p_sum
+
+    eps = 1e-12
+    kl = float(np.sum(p * np.log((p + eps) / (q + eps))))
+    return round(kl, 6)

@@ -9,7 +9,8 @@ __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
            "orbital_energy", "compute_phase_angle",
            "compute_heliocentric_distance", "compute_synodic_period",
            "compute_apparent_magnitude", "compute_absolute_magnitude",
-           "compute_perihelion_date", "compute_eccentric_anomaly"]
+           "compute_perihelion_date", "compute_eccentric_anomaly",
+           "compute_true_anomaly"]
 
 import math
 from typing import NamedTuple
@@ -1054,3 +1055,23 @@ def compute_eccentric_anomaly(
         if abs(dE) < tol:
             return E
     raise ValueError(f"Kepler's equation did not converge after {max_iter} iterations")
+
+
+def compute_true_anomaly(E_rad: float, e: float) -> float:
+    """Compute true anomaly from eccentric anomaly via the half-angle formula.
+
+    Args:
+        E_rad: Eccentric anomaly in radians.
+        e: Orbital eccentricity in [0, 1).
+
+    Returns:
+        True anomaly in radians, in the range [0, 2π).
+
+    Raises:
+        ValueError: If eccentricity is not in [0, 1).
+    """
+    if not (0.0 <= e < 1.0):
+        raise ValueError(f"eccentricity must be in [0, 1), got {e}")
+    sqrt_factor = math.sqrt((1.0 + e) / (1.0 - e))
+    nu = 2.0 * math.atan(sqrt_factor * math.tan(E_rad / 2.0))
+    return nu % (2.0 * math.pi)

@@ -13,7 +13,7 @@ __all__ = [
     "compare_calibrators",
     "compute_roc_auc",
     "compute_precision_recall_curve",
-    "compute_f1_score",
+    "compute_f1_score", "compute_average_precision",
 ]
 
 import math
@@ -709,3 +709,24 @@ def compute_f1_score(
         "threshold": threshold,
         "n_samples": n,
     }
+
+
+def compute_average_precision(
+    probs: list | np.ndarray,
+    labels: list | np.ndarray,
+) -> float:
+    """Compute Average Precision (AP) from predicted probabilities and binary labels.
+
+    Convenience wrapper around :func:`compute_precision_recall_curve` that
+    returns only the scalar AP value.  The PR curve is anchored at
+    (recall=0, precision=1) so that AP is the area under the full curve.
+
+    Args:
+        probs: Predicted probabilities for the positive class, values in [0, 1].
+        labels: Binary ground-truth labels (0 or 1).
+
+    Returns:
+        Average precision in [0, 1]; 0.0 for empty input or single-class labels.
+    """
+    result = compute_precision_recall_curve(probs, labels)
+    return float(result["average_precision"])
