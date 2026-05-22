@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## v0.38.0
+
+- `background.py`: added
+  `record_live_dry_run_operator_handoff(config_path, db_path, report_dir)` and
+  `live_dry_run_operator_handoff_log_summary(db_path)` to write operator
+  handoffs and persist them in top-level SQLite logs.
+- `Skills/background.py`: added `record-live-dry-run-operator-handoff` and
+  `live-dry-run-operator-handoff-log-summary` subcommands.
+- 3 new tests (1361 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.38.0.
+
 ## v0.37.0
 
 - `background.py`: added `live_dry_run_operator_handoff(config_path)` and

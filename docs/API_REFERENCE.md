@@ -385,6 +385,14 @@ def write_live_dry_run_operator_handoff(
     config_path: Path = DEFAULT_CONFIG_PATH,
     report_dir: Path = DEFAULT_REPORT_DIR,
 ) -> dict[str, Any]
+def record_live_dry_run_operator_handoff(
+    config_path: Path = DEFAULT_CONFIG_PATH,
+    db_path: Path = DEFAULT_DB_PATH,
+    report_dir: Path = DEFAULT_REPORT_DIR,
+) -> dict[str, Any]
+def live_dry_run_operator_handoff_log_summary(
+    db_path: Path = DEFAULT_DB_PATH,
+) -> dict[str, Any]
 def live_dry_run_plan(config_path: Path = DEFAULT_CONFIG_PATH) -> dict[str, Any]
 def record_live_dry_run_plan(
     config_path: Path = DEFAULT_CONFIG_PATH,
@@ -435,7 +443,11 @@ attempt, and `record_live_dry_run_approval_bundle(config_path, db_path)` to
 persist that review object in SQLite. Use
 `live_dry_run_operator_handoff(config_path)` and
 `write_live_dry_run_operator_handoff(config_path, report_dir)` to render an
-internal Markdown handoff for operator review without network access.
+internal Markdown handoff for operator review without network access. Use
+`record_live_dry_run_operator_handoff(config_path, db_path, report_dir)` to
+write that handoff and persist the review entry in SQLite, and
+`live_dry_run_operator_handoff_log_summary(db_path)` to summarize persisted
+operator handoffs.
 
 Default background log path:
 
@@ -697,7 +709,7 @@ Lightweight summary of a `ScoredNEO` for display or export.
 
 ---
 
-## v0.16.0 through v0.37.0 Public API Additions
+## v0.16.0 through v0.38.0 Public API Additions
 
 These releases added conservative helper APIs around live-data retrieval,
 preprocessing quality, detection triage, linking, orbit review, classification
@@ -818,8 +830,9 @@ claim confirmation or impact probability.
 | v0.35.0 | `background.py` / `Skills/background.py` | `live_dry_run_approval_bundle`; `live-dry-run-approval-bundle` CLI command |
 | v0.36.0 | `background.py` / `Skills/background.py` | `record_live_dry_run_approval_bundle`, `live_dry_run_approval_bundle_log_summary`; persisted approval-bundle CLI commands |
 | v0.37.0 | `background.py` / `Skills/background.py` | `live_dry_run_operator_handoff`, `write_live_dry_run_operator_handoff`; operator handoff CLI commands |
+| v0.38.0 | `background.py` / `Skills/background.py` | `record_live_dry_run_operator_handoff`, `live_dry_run_operator_handoff_log_summary`; persisted operator handoff CLI commands |
 
-### Skills and CLI additions in v0.16.0 through v0.37.0
+### Skills and CLI additions in v0.16.0 through v0.38.0
 
 `export_candidate_report.py`, `tag_neo_class.py`, `check_tisserand.py`,
 `export_followup_requests.py`, `ephemeris_check.py`,
@@ -840,6 +853,8 @@ claim confirmation or impact probability.
 `Skills/background.py live-dry-run-approval-bundle-log-summary`,
 `Skills/background.py live-dry-run-operator-handoff`,
 `Skills/background.py write-live-dry-run-operator-handoff`,
+`Skills/background.py record-live-dry-run-operator-handoff`,
+`Skills/background.py live-dry-run-operator-handoff-log-summary`,
 `Skills/background.py live-dry-run-plan`,
 `Skills/background.py record-live-dry-run-plan`,
 `Skills/background.py live-dry-run-plan-log-summary`,

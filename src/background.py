@@ -37,6 +37,8 @@ __all__ = [
     "live_dry_run_approval_bundle_log_summary",
     "live_dry_run_operator_handoff",
     "write_live_dry_run_operator_handoff",
+    "record_live_dry_run_operator_handoff",
+    "live_dry_run_operator_handoff_log_summary",
     "live_dry_run_plan",
     "record_live_dry_run_plan",
     "live_dry_run_plan_log_summary",
@@ -86,7 +88,7 @@ DEFAULT_INPUT_PATH = _ROOT / "background" / "targets.json"
 DEFAULT_DB_PATH = _ROOT / "Logs" / "background.sqlite"
 DEFAULT_REPORT_DIR = _ROOT / "Logs" / "reports"
 _SCHEMA_VERSION = "background-v1"
-_CODE_VERSION = "0.37.0"
+_CODE_VERSION = "0.38.0"
 _LIVE_REVIEW_POLICY_SCHEMA_PATH = _ROOT / "background" / "live_review_policy.schema.json"
 _SUPPORTED_LIVE_SURVEYS = ("ZTF", "ATLAS", "PanSTARRS")
 _LIVE_PROVIDER_CAPABILITIES = {
@@ -304,6 +306,20 @@ def init_log_db(db_path: Path = DEFAULT_DB_PATH) -> None:
                 bundle_id TEXT PRIMARY KEY,
                 reviewed_at_utc TEXT NOT NULL,
                 config_path TEXT NOT NULL,
+                approved_to_attempt_live_dry_run INTEGER NOT NULL,
+                blockers_json TEXT NOT NULL,
+                planned_surveys_json TEXT NOT NULL,
+                entry_json TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS live_operator_handoff_log (
+                handoff_id TEXT PRIMARY KEY,
+                created_at_utc TEXT NOT NULL,
+                config_path TEXT NOT NULL,
+                report_path TEXT NOT NULL,
                 approved_to_attempt_live_dry_run INTEGER NOT NULL,
                 blockers_json TEXT NOT NULL,
                 planned_surveys_json TEXT NOT NULL,
@@ -2029,6 +2045,83 @@ def write_live_dry_run_operator_handoff(
         **handoff,
         "report_path": str(path),
     }
+
+
+def record_live_dry_run_operator_handoff(
+    config_path: Path = DEFAULT_CONFIG_PATH,
+    db_path: Path = DEFAULT_DB_PATH,
+    report_dir: Path = DEFAULT_REPORT_DIR,
+) -> dict[str, Any]:
+    """Write and persist a conservative no-network operator handoff."""
+    init_log_db(db_path)
+    handoff = write_live_dry_run_operator_handoff(config_path, report_dir)
+    entry = {
+        "handoff_id": str(uuid.uuid4()),
+        **handoff,
+    }
+    with _connect(db_path) as conn:
+        conn.execute(
+            """
+            INSERT INTO live_operator_handoff_log (
+                handoff_id, created_at_utc, config_path, report_path,
+                approved_to_attempt_live_dry_run, blockers_json,
+                planned_surveys_json, entry_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                entry["handoff_id"],
+                entry["created_at_utc"],
+                entry["config_path"],
+                entry["report_path"],
+                int(entry["approved_to_attempt_live_dry_run"]),
+                json.dumps(entry["blockers"]),
+                json.dumps(entry["planned_surveys"]),
+                json.dumps(entry),
+            ),
+        )
+    return entry
+
+
+def live_dry_run_operator_handoff_log_summary(
+    db_path: Path = DEFAULT_DB_PATH,
+) -> dict[str, Any]:
+    """Summarize persisted no-network live dry-run operator handoffs."""
+    init_log_db(db_path)
+    with _connect(db_path) as conn:
+        latest = conn.execute(
+            """
+            SELECT entry_json
+            FROM live_operator_handoff_log
+            ORDER BY created_at_utc DESC
+            LIMIT 1
+            """
+        ).fetchone()
+        return {
+            "db_path": str(db_path),
+            "total_live_operator_handoffs": _count_rows(
+                conn,
+                "live_operator_handoff_log",
+            ),
+            "approval_ready_count": int(
+                conn.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM live_operator_handoff_log
+                    WHERE approved_to_attempt_live_dry_run = 1
+                    """
+                ).fetchone()[0]
+            ),
+            "blocked_count": int(
+                conn.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM live_operator_handoff_log
+                    WHERE approved_to_attempt_live_dry_run = 0
+                    """
+                ).fetchone()[0]
+            ),
+            "latest": json.loads(latest["entry_json"]) if latest else None,
+        }
 
 
 def record_live_dry_run_plan(
