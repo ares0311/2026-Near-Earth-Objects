@@ -7,7 +7,8 @@ __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fet
            "merge_survey_alerts", "filter_alerts_by_motion", "build_observation_window",
            "count_known_objects_in_field", "fetch_mpc_observations",
            "fetch_atlas_forced", "fetch_ztf_alerts", "estimate_survey_depth",
-           "filter_by_survey", "fetch_panstarrs_catalog", "fetch_css_alerts"]
+           "filter_by_survey", "fetch_panstarrs_catalog", "fetch_css_alerts",
+           "fetch_panstarrs_moving_objects"]
 
 import json
 import os
@@ -1033,6 +1034,85 @@ def fetch_css_alerts(
                     mag_err=0.1,
                     filter_band=band,
                     mission="CSS",
+                )
+                observations.append(obs)
+            except Exception:
+                continue
+    except Exception:
+        pass
+
+    try:
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        with cache_path.open("w") as f:
+            json.dump([o.model_dump() for o in observations], f)
+    except Exception:
+        pass
+
+    return observations
+
+
+def fetch_panstarrs_moving_objects(
+    ra_deg: float,
+    dec_deg: float,
+    radius_deg: float,
+    force_refresh: bool = False,
+) -> list:
+    """Fetch PanSTARRS moving-object detections near a sky position via MAST.
+
+    Queries the PanSTARRS PS1 moving-object catalog (MAST "PANSTARRS" catalog,
+    "detection" table) filtered to rows with non-null ``ssObjectId``, which
+    flags solar-system object detections.  Results are disk-cached.
+
+    Args:
+        ra_deg: Right ascension of the search centre in degrees.
+        dec_deg: Declination of the search centre in degrees.
+        radius_deg: Search radius in degrees.
+        force_refresh: Bypass the on-disk cache if ``True``.
+
+    Returns:
+        List of :class:`~schemas.Observation` objects from PanSTARRS with
+        ``mission="PanSTARRS"``.  Returns an empty list on failure.
+    """
+    import hashlib
+
+    cache_key = hashlib.md5(
+        f"ps1_moving:{ra_deg:.6f}:{dec_deg:.6f}:{radius_deg:.6f}".encode()
+    ).hexdigest()
+    cache_path = _CACHE_DIR / f"{cache_key}.json"
+
+    if not force_refresh and cache_path.exists():
+        try:
+            with cache_path.open() as f:
+                raw = json.load(f)
+            return [Observation(**item) for item in raw]
+        except Exception:
+            pass
+
+    observations: list = []
+    try:
+        from astroquery.mast import Catalogs  # type: ignore[import]
+
+        results = Catalogs.query_region(
+            f"{ra_deg} {dec_deg}",
+            radius=radius_deg,
+            catalog="PanSTARRS",
+            data_release="dr2",
+            table="detection",
+        )
+        for row in results:
+            try:
+                ss_id = row.get("ssObjectId") or row.get("ssobjectid")
+                if not ss_id:
+                    continue
+                obs = Observation(
+                    obs_id=f"ps1_mo_{row.get('detectID') or row.get('detectionID') or 'unk'}",
+                    jd=float(row.get("obsTime") or row.get("epochMjdTai", 0.0)) + 2400000.5,
+                    ra_deg=float(row.get("ra") or row.get("raMean") or ra_deg),
+                    dec_deg=float(row.get("dec") or row.get("decMean") or dec_deg),
+                    mag=float(row.get("psfFlux") or row.get("rMeanPSFMag") or 99.0),
+                    mag_err=float(row.get("psfFluxErr") or 0.1),
+                    filter_band=str(row.get("filterID") or "r"),
+                    mission="PanSTARRS",
                 )
                 observations.append(obs)
             except Exception:

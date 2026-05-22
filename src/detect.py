@@ -6,7 +6,7 @@ __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus"
            "compute_streak_metric", "cluster_detections", "compute_trail_length",
            "compute_psf_fwhm", "estimate_sky_background", "compute_detection_efficiency",
            "count_detections_by_filter", "compute_motion_vector",
-           "flag_moving_sources", "compute_source_extent"]
+           "flag_moving_sources", "compute_source_extent", "estimate_observation_depth"]
 
 import math
 import uuid
@@ -727,3 +727,34 @@ def compute_source_extent(obs: object) -> float | None:
         return round(math.sqrt(lambda_max), 4)
     except Exception:
         return None
+
+
+def estimate_observation_depth(
+    observations: tuple | list,
+    percentile: float = 95.0,
+) -> float | None:
+    """Estimate the limiting magnitude of an observation set from faint-end statistics.
+
+    Computes the given percentile of valid (non-sentinel) magnitudes across the
+    supplied observations.  Magnitudes ≥ 90 are treated as non-detections and
+    excluded.
+
+    Args:
+        observations: Iterable of Observation-like objects with a ``mag``
+            attribute.
+        percentile: Percentile to use as the depth proxy (default 95th).
+
+    Returns:
+        Limiting magnitude estimate, or ``None`` if no valid magnitudes are
+        found.
+    """
+    import numpy as np
+
+    mags = [
+        float(getattr(o, "mag", 99.0))
+        for o in observations
+        if getattr(o, "mag", 99.0) is not None and float(getattr(o, "mag", 99.0)) < 90.0
+    ]
+    if not mags:
+        return None
+    return round(float(np.percentile(mags, percentile)), 4)

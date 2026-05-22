@@ -1290,3 +1290,49 @@ class TestEstimateFollowupWindow:
         neo = self._make_neo()
         result = estimate_followup_window(neo)
         assert "start_jd" in result and "end_jd" in result and "urgency_hours" in result
+
+
+class TestFormatCandidateDossier:
+    def _neo(self):
+        from tests.conftest import build_scored_neo
+        return build_scored_neo()
+
+    def test_returns_string(self):
+        from alert import format_candidate_dossier
+        neo = self._neo()
+        result = format_candidate_dossier(neo)
+        assert isinstance(result, str)
+
+    def test_contains_object_id(self):
+        from alert import format_candidate_dossier
+        neo = self._neo()
+        result = format_candidate_dossier(neo)
+        assert neo.tracklet.object_id in result
+
+    def test_contains_guardrail(self):
+        from alert import format_candidate_dossier
+        neo = self._neo()
+        result = format_candidate_dossier(neo)
+        assert "NOT" in result.upper()
+
+    def test_contains_hazard_flag(self):
+        from alert import format_candidate_dossier
+        neo = self._neo()
+        result = format_candidate_dossier(neo)
+        assert neo.hazard.hazard_flag in result
+
+    def test_contains_posterior_fields(self):
+        from alert import format_candidate_dossier
+        neo = self._neo()
+        result = format_candidate_dossier(neo)
+        assert "neo_candidate" in result
+
+    def test_multi_line(self):
+        from alert import format_candidate_dossier
+        neo = self._neo()
+        result = format_candidate_dossier(neo)
+        assert result.count("\n") > 5
+
+    def test_in_all(self):
+        from alert import __all__
+        assert "format_candidate_dossier" in __all__

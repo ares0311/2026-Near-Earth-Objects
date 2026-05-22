@@ -1853,3 +1853,159 @@ class TestExportAtlasLightcurveSkill:
         assert out_file.exists()
         content = _json.loads(out_file.read_text())
         assert isinstance(content, list)
+
+
+class TestComputeTrueAnomalySkill:
+    def _load_skill(self):
+        import importlib.util
+        from pathlib import Path
+        skill_path = Path(__file__).parent.parent / "Skills" / "compute_true_anomaly.py"
+        spec = importlib.util.spec_from_file_location("compute_true_anomaly", skill_path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def test_missing_file_exits_1(self, tmp_path):
+        import pytest
+        mod = self._load_skill()
+        with pytest.raises(SystemExit) as exc_info:
+            mod.main([str(tmp_path / "nonexistent.json")])
+        assert exc_info.value.code == 1
+
+    def test_no_orbital_elements_skipped(self, tmp_path):
+        import json
+
+        import pytest
+        data = [{"object_id": "neo_001", "tracklet": {"object_id": "neo_001"}}]
+        f = tmp_path / "track.json"
+        f.write_text(json.dumps(data))
+        mod = self._load_skill()
+        with pytest.raises(SystemExit) as exc_info:
+            mod.main([str(f)])
+        assert exc_info.value.code == 0
+
+    def test_json_flag_output(self, tmp_path, capsys):
+        import json
+
+        import pytest
+        el = {"mean_anomaly_deg": 90.0, "eccentricity": 0.3}
+        data = [{"object_id": "neo_001", "orbital_elements": el}]
+        f = tmp_path / "track.json"
+        f.write_text(json.dumps(data))
+        mod = self._load_skill()
+        with pytest.raises(SystemExit):
+            mod.main([str(f), "--json"])
+        captured = capsys.readouterr()
+        result = json.loads(captured.out)
+        assert isinstance(result, list)
+        assert result[0]["nu_deg"] is not None
+
+    def test_table_output(self, tmp_path, capsys):
+        import json
+
+        import pytest
+        el = {"mean_anomaly_deg": 45.0, "eccentricity": 0.2}
+        data = [{"object_id": "neo_001", "orbital_elements": el}]
+        f = tmp_path / "track.json"
+        f.write_text(json.dumps(data))
+        mod = self._load_skill()
+        with pytest.raises(SystemExit):
+            mod.main([str(f)])
+        captured = capsys.readouterr()
+        assert "neo_001" in captured.out
+
+    def test_bad_eccentricity_note(self, tmp_path, capsys):
+        import json
+
+        import pytest
+        el_bad = {"mean_anomaly_deg": 1.0, "eccentricity": 1.5}
+        data = [{"object_id": "bad", "orbital_elements": el_bad}]
+        f = tmp_path / "track.json"
+        f.write_text(json.dumps(data))
+        mod = self._load_skill()
+        with pytest.raises(SystemExit):
+            mod.main([str(f), "--json"])
+        captured = capsys.readouterr()
+        result = json.loads(captured.out)
+        assert result[0]["nu_deg"] is None
+
+
+class TestExportCandidateDossiersSkill:
+    def _load_skill(self):
+        import importlib.util
+        from pathlib import Path
+        skill_path = Path(__file__).parent.parent / "Skills" / "export_candidate_dossiers.py"
+        spec = importlib.util.spec_from_file_location("export_candidate_dossiers", skill_path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def _sample_neo(self):
+        return {
+            "object_id": "neo_001",
+            "tracklet": {"object_id": "neo_001", "arc_days": 2.5,
+                         "motion_rate_arcsec_per_hour": 1.5, "observations": []},
+            "hazard": {"hazard_flag": "nominal", "alert_pathway": "internal_candidate",
+                       "neo_class": "apollo", "moid_au": 0.1,
+                       "absolute_magnitude_h": 22.0, "estimated_diameter_m": 150.0},
+            "posterior": {"neo_candidate": 0.5, "known_object": 0.2, "main_belt_asteroid": 0.2,
+                          "stellar_artifact": 0.05, "other_solar_system": 0.05},
+            "metadata": {"discovery_priority": 0.7},
+        }
+
+    def test_missing_file_exits_1(self, tmp_path):
+        import pytest
+        mod = self._load_skill()
+        with pytest.raises(SystemExit) as exc_info:
+            mod.main([str(tmp_path / "nonexistent.json")])
+        assert exc_info.value.code == 1
+
+    def test_stdout_output(self, tmp_path, capsys):
+        import json
+
+        import pytest
+        f = tmp_path / "neos.json"
+        f.write_text(json.dumps([self._sample_neo()]))
+        mod = self._load_skill()
+        with pytest.raises(SystemExit):
+            mod.main([str(f)])
+        captured = capsys.readouterr()
+        assert "neo_001" in captured.out
+
+    def test_json_flag(self, tmp_path, capsys):
+        import json
+
+        import pytest
+        f = tmp_path / "neos.json"
+        f.write_text(json.dumps([self._sample_neo()]))
+        mod = self._load_skill()
+        with pytest.raises(SystemExit):
+            mod.main([str(f), "--json"])
+        captured = capsys.readouterr()
+        result = json.loads(captured.out)
+        assert isinstance(result, list)
+        assert result[0]["object_id"] == "neo_001"
+
+    def test_out_dir(self, tmp_path):
+        import json
+
+        import pytest
+        f = tmp_path / "neos.json"
+        f.write_text(json.dumps([self._sample_neo()]))
+        out_dir = tmp_path / "dossiers"
+        mod = self._load_skill()
+        with pytest.raises(SystemExit):
+            mod.main([str(f), "--out-dir", str(out_dir)])
+        assert (out_dir / "neo_001.txt").exists()
+
+    def test_guardrail_in_output(self, tmp_path, capsys):
+        import json
+
+        import pytest
+        f = tmp_path / "neos.json"
+        f.write_text(json.dumps([self._sample_neo()]))
+        mod = self._load_skill()
+        with pytest.raises(SystemExit):
+            mod.main([str(f)])
+        captured = capsys.readouterr()
+        assert "NOT" in captured.out.upper()

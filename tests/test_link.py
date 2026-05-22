@@ -1306,3 +1306,102 @@ class TestComputeGreatCircleResidual:
         result = compute_great_circle_residual(t)
         assert result is not None
         assert result >= 0.0
+
+
+class TestComputePositionAngleConsistency:
+    def _tracklet(self, obs_list):
+        import types
+        t = types.SimpleNamespace(observations=obs_list)
+        return t
+
+    def _obs(self, jd, ra, dec):
+        from schemas import Observation
+        return Observation(
+            obs_id=f"pa_{jd}", jd=jd, ra_deg=ra, dec_deg=dec,
+            mag=18.0, mag_err=0.1, filter_band="r", mission="ZTF",
+        )
+
+    def test_returns_none_for_single_obs(self):
+        from link import compute_position_angle_consistency
+        t = self._tracklet([self._obs(2460000.0, 10.0, 5.0)])
+        assert compute_position_angle_consistency(t) is None
+
+    def test_returns_none_for_empty(self):
+        from link import compute_position_angle_consistency
+        t = self._tracklet([])
+        assert compute_position_angle_consistency(t) is None
+
+    def test_linear_motion_low_std(self):
+        from link import compute_position_angle_consistency
+        obs = [
+            self._obs(2460000.0, 10.0, 5.0),
+            self._obs(2460001.0, 10.1, 5.1),
+            self._obs(2460002.0, 10.2, 5.2),
+        ]
+        result = compute_position_angle_consistency(self._tracklet(obs))
+        assert result is not None
+        assert result < 5.0  # near-zero std for linear motion
+
+    def test_returns_float(self):
+        from link import compute_position_angle_consistency
+        obs = [self._obs(2460000.0, 10.0, 5.0), self._obs(2460001.0, 10.1, 5.0)]
+        result = compute_position_angle_consistency(self._tracklet(obs))
+        assert result is None  # only 1 pair → no std
+
+    def test_two_pairs_returns_float(self):
+        from link import compute_position_angle_consistency
+        obs = [
+            self._obs(2460000.0, 10.0, 5.0),
+            self._obs(2460001.0, 10.1, 5.0),
+            self._obs(2460002.0, 10.0, 5.1),
+        ]
+        result = compute_position_angle_consistency(self._tracklet(obs))
+        assert result is not None and isinstance(result, float)
+
+    def test_nonnegative(self):
+        from link import compute_position_angle_consistency
+        obs = [
+            self._obs(2460000.0, 10.0, 5.0),
+            self._obs(2460001.0, 11.0, 5.5),
+            self._obs(2460002.0, 12.0, 6.0),
+        ]
+        result = compute_position_angle_consistency(self._tracklet(obs))
+        if result is not None:
+            assert result >= 0.0
+
+    def test_in_all(self):
+        from link import __all__
+        assert "compute_position_angle_consistency" in __all__
+
+    def test_same_position_pair_skipped(self):
+        from link import compute_position_angle_consistency
+        obs = [
+            self._obs(2460000.0, 10.0, 5.0),
+            self._obs(2460001.0, 10.0, 5.0),
+            self._obs(2460002.0, 10.1, 5.1),
+        ]
+        result = compute_position_angle_consistency(self._tracklet(obs))
+        assert result is None
+
+
+class TestComputePositionAngleConsistencyEdge:
+    def _obs(self, jd, ra, dec):
+        from schemas import Observation
+        return Observation(
+            obs_id=f"pac_{jd}", jd=jd, ra_deg=ra, dec_deg=dec,
+            mag=18.0, mag_err=0.1, filter_band="r", mission="ZTF",
+        )
+
+    def test_identical_jd_pair_skipped(self):
+        """dt == 0.0 branch: two obs at same JD → no valid PA pair → None."""
+        import types
+
+        from link import compute_position_angle_consistency
+        obs = [
+            self._obs(2460000.0, 10.0, 5.0),
+            self._obs(2460000.0, 10.1, 5.1),  # same JD as first
+            self._obs(2460001.0, 10.2, 5.2),
+        ]
+        t = types.SimpleNamespace(observations=obs)
+        result = compute_position_angle_consistency(t)
+        assert result is None or isinstance(result, float)

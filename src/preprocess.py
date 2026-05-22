@@ -7,7 +7,7 @@ __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_
            "detect_bad_pixels", "compute_astrometric_scatter",
            "normalize_photometry", "compute_image_quality_metrics",
            "compute_photometric_scatter", "estimate_zero_point",
-           "compute_difference_image_snr", "compute_cutout_entropy"]
+           "compute_difference_image_snr", "compute_cutout_entropy", "compute_background_level"]
 
 import base64
 import math
@@ -643,5 +643,39 @@ def compute_cutout_entropy(obs: object) -> float | None:
         pk = counts[counts > 0] / float(counts.sum())
         entropy = float(-np.sum(pk * np.log2(pk)))
         return round(entropy, 4)
+    except Exception:
+        return None
+
+
+def compute_background_level(obs: object) -> float | None:
+    """Estimate the median background level from the outer ring of a difference-image cutout.
+
+    Uses the outer 20 % of pixels (rows/columns in the 12-pixel-wide border of
+    the 63×63 array) as a background sample, excluding the central source region.
+
+    Args:
+        obs: An :class:`~schemas.Observation`-like object with an optional
+            ``cutout_difference`` base64-encoded float32 cutout.
+
+    Returns:
+        Median background level as a float, or ``None`` if no cutout is
+        available or decoding fails.
+    """
+    import base64
+
+    cutout = getattr(obs, "cutout_difference", None)
+    if cutout is None:
+        return None
+    try:
+        raw = base64.b64decode(cutout)
+        arr = np.frombuffer(raw, dtype=np.float32).reshape(63, 63)
+        border = 12
+        mask = np.zeros((63, 63), dtype=bool)
+        mask[:border, :] = True
+        mask[-border:, :] = True
+        mask[:, :border] = True
+        mask[:, -border:] = True
+        bg_pixels = arr[mask]
+        return round(float(np.median(bg_pixels)), 4)
     except Exception:
         return None

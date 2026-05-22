@@ -471,9 +471,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.39.0)
+## Current State (v0.40.0)
 
-All 10 pipeline modules are complete. 1439 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified CLI with automated offline scheduling readiness, live policy contract validation, provider-specific live readiness summaries, no-network live dry-run approval bundles, operator handoff exports, persisted operator handoff logs, top-level SQLite logs for runs, readiness checks, approval bundles, no-network live dry-run plans, mock-only provider execution attempts, and auditable signoff readiness.
+All 10 pipeline modules are complete. 1520 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified CLI with automated offline scheduling readiness, live policy contract validation, provider-specific live readiness summaries, no-network live dry-run approval bundles, operator handoff exports, persisted operator handoff logs, top-level SQLite logs for runs, readiness checks, approval bundles, no-network live dry-run plans, mock-only provider execution attempts, and auditable signoff readiness.
 
 ### Skills
 
@@ -530,6 +530,8 @@ All 10 pipeline modules are complete. 1439 tests passing (100% coverage). CI gre
 | `Skills/export_atlas_lightcurve.py` | Export ATLAS forced-photometry lightcurve for a sky position; `--format png\|csv\|json`, `--out`, `--token`, `--force-refresh` flags |
 | `Skills/compute_eccentric_anomaly.py` | Batch compute eccentric anomaly for tracklets with orbital elements from JSON; `--json` flag |
 | `Skills/analyze_field_detections.py` | Analyze field-level detection statistics (obs counts, filter/mission breakdown, RB scores) from tracklet JSON; `--json` flag |
+| `Skills/compute_true_anomaly.py` | Batch compute true anomaly for tracklets with orbital elements from JSON; `--json` flag |
+| `Skills/export_candidate_dossiers.py` | Export one plain-text candidate dossier per NEO from a ScoredNEO JSON; `--out-dir`, `--json` flags |
 
 ### Docs
 
@@ -551,6 +553,7 @@ All 10 pipeline modules are complete. 1439 tests passing (100% coverage). CI gre
 | `docs/FETCH_GUIDE.md` | Technical reference for fetch.py: ZTF/ATLAS/MPC/Horizons retrieval, caching, depth estimation, survey merging, filtering |
 | `docs/PREPROCESS_GUIDE.md` | Technical reference for preprocess.py: difference image quality, photometry, astrometric calibration, SNR, scatter, zero-point |
 | `docs/CALIBRATION_GUIDE.md` | Technical reference for calibration.py: Platt/isotonic calibration, ECE, ROC AUC, PR curve, F1, log loss, bootstrap CI, CV |
+| `docs/SCORING_MODEL_V2.md` | Updated scoring reference: size estimate, close-approach score, observation priority, true anomaly |
 
 ### Data
 
@@ -701,6 +704,24 @@ All 10 pipeline modules are complete. 1439 tests passing (100% coverage). CI gre
 - `docs/BACKGROUND_SEARCH_AUTOMATION.md`: updated scheduler guidance for automated offline runs and macOS launchd template generation.
 - 4 new tests (1333 total); 100% coverage maintained; ruff + mypy clean.
 - Version bumped to 0.26.0.
+
+### Key Changes in v0.40.0
+
+- `orbit.py`: added `compute_true_anomaly(E_rad, e)` — true anomaly from eccentric anomaly via half-angle formula; [0, 2π); raises ValueError for e ≥ 1.
+- `detect.py`: added `estimate_observation_depth(observations, percentile)` — field limiting magnitude from percentile of valid obs magnitudes; excludes sentinel mags ≥ 90.
+- `link.py`: added `compute_position_angle_consistency(tracklet)` — std dev of position angles across consecutive pairs; low = linear motion.
+- `classify.py`: added `compute_calibration_gain(posterior_before, posterior_after)` — KL divergence measuring information gained from calibration; 0.0 for degenerate inputs.
+- `score.py`: added `compute_close_approach_score(neo)` — [0, 1] urgency from MOID proximity + 0.2 PHA bonus; 0.5 for unknown MOID.
+- `alert.py`: added `format_candidate_dossier(neo)` — single-page plain-text dossier with all pipeline stage outputs and guardrail statement.
+- `fetch.py`: added `fetch_panstarrs_moving_objects(ra_deg, dec_deg, radius_deg, force_refresh)` — PanSTARRS moving-object detections via MAST (ssObjectId-filtered); disk-cached.
+- `preprocess.py`: added `compute_background_level(obs)` — median of outer 12-pixel border of 63×63 difference-image cutout.
+- `schemas.py`: added `CandidateReport` — frozen model: object_id, neo_class, hazard_flag, alert_pathway, moid_au, H, diameter, priority, prob, n_obs, arc_days, generated_jd.
+- `calibration.py`: added `compute_average_precision(probs, labels)` — AP scalar convenience wrapper over compute_precision_recall_curve.
+- `Skills/compute_true_anomaly.py`: new — batch true anomaly table from tracklet JSON; `--json` flag.
+- `Skills/export_candidate_dossiers.py`: new — one dossier file per candidate; `--out-dir`, `--json` flags.
+- `docs/SCORING_MODEL_V2.md`: new — updated scoring reference with size estimate, close-approach score, observation priority, true anomaly.
+- 81 new tests (1520 total); 100% coverage maintained on all 10 pipeline modules; ruff + mypy clean.
+- Version bumped to 0.40.0.
 
 ### Key Changes in v0.39.0
 

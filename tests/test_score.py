@@ -1162,3 +1162,48 @@ class TestComputeSizeEstimate:
         r_small = compute_size_estimate(neo_small)
         r_large = compute_size_estimate(neo_large)
         assert r_large["min_m"] > r_small["min_m"]
+
+
+class TestComputeCloseApproachScore:
+    def _neo(self, moid, hazard_flag="nominal"):
+        from tests.conftest import build_scored_neo
+        neo = build_scored_neo()
+        hazard = neo.hazard.model_copy(update={"moid_au": moid, "hazard_flag": hazard_flag})
+        return neo.model_copy(update={"hazard": hazard})
+
+    def test_zero_moid_returns_one(self):
+        from score import compute_close_approach_score
+        neo = self._neo(moid=0.0)
+        assert compute_close_approach_score(neo) == 1.0
+
+    def test_none_moid_returns_half(self):
+        from score import compute_close_approach_score
+        neo = self._neo(moid=None)
+        assert compute_close_approach_score(neo) == 0.5
+
+    def test_moid_0_3_returns_zero(self):
+        from score import compute_close_approach_score
+        neo = self._neo(moid=0.3)
+        assert compute_close_approach_score(neo) == 0.0
+
+    def test_pha_bonus(self):
+        from score import compute_close_approach_score
+        neo_pha = self._neo(moid=0.05, hazard_flag="pha_candidate")
+        neo_nom = self._neo(moid=0.05, hazard_flag="nominal")
+        assert compute_close_approach_score(neo_pha) > compute_close_approach_score(neo_nom)
+
+    def test_score_in_zero_one(self):
+        from score import compute_close_approach_score
+        for moid in [0.0, 0.01, 0.05, 0.1, 0.2, 0.3, 0.5]:
+            s = compute_close_approach_score(self._neo(moid=moid))
+            assert 0.0 <= s <= 1.0
+
+    def test_larger_moid_smaller_score(self):
+        from score import compute_close_approach_score
+        s1 = compute_close_approach_score(self._neo(moid=0.01))
+        s2 = compute_close_approach_score(self._neo(moid=0.15))
+        assert s1 > s2
+
+    def test_in_all(self):
+        from score import __all__
+        assert "compute_close_approach_score" in __all__

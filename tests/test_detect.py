@@ -1239,3 +1239,54 @@ class TestComputeSourceExtentEdgeCases:
             cutout_difference="!!!not_valid_base64!!!",
         )
         assert compute_source_extent(obs) is None
+
+
+class TestEstimateObservationDepth:
+    def _obs(self, mag: float, jd: float = 2460000.5):
+        from schemas import Observation
+        return Observation(
+            obs_id=f"od_{jd}", jd=jd, ra_deg=10.0, dec_deg=5.0,
+            mag=mag, mag_err=0.1, filter_band="r", mission="ZTF",
+        )
+
+    def test_returns_float(self):
+        from detect import estimate_observation_depth
+        obs = [self._obs(18.0), self._obs(19.0), self._obs(20.0)]
+        result = estimate_observation_depth(obs)
+        assert result is not None and isinstance(result, float)
+
+    def test_none_for_empty(self):
+        from detect import estimate_observation_depth
+        assert estimate_observation_depth([]) is None
+
+    def test_excludes_sentinel_mags(self):
+        from detect import estimate_observation_depth
+        obs = [self._obs(99.0), self._obs(99.5)]
+        assert estimate_observation_depth(obs) is None
+
+    def test_95th_percentile(self):
+        import numpy as np
+
+        from detect import estimate_observation_depth
+        mags = [18.0, 18.5, 19.0, 19.5, 20.0, 20.5, 21.0, 21.5, 22.0, 22.5]
+        obs = [self._obs(m) for m in mags]
+        result = estimate_observation_depth(obs, percentile=95.0)
+        expected = round(float(np.percentile(mags, 95.0)), 4)
+        assert result == expected
+
+    def test_custom_percentile(self):
+        from detect import estimate_observation_depth
+        obs = [self._obs(m) for m in [18.0, 19.0, 20.0, 21.0]]
+        r50 = estimate_observation_depth(obs, percentile=50.0)
+        r95 = estimate_observation_depth(obs, percentile=95.0)
+        assert r95 >= r50
+
+    def test_in_all(self):
+        from detect import __all__
+        assert "estimate_observation_depth" in __all__
+
+    def test_single_obs(self):
+        from detect import estimate_observation_depth
+        obs = [self._obs(20.0)]
+        result = estimate_observation_depth(obs)
+        assert result == 20.0

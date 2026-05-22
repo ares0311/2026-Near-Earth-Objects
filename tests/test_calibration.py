@@ -727,3 +727,32 @@ class TestComputeF1Score:
         result = compute_f1_score([0.9, 0.1], [1, 0])
         for k in ("precision", "recall", "f1", "threshold", "n_samples"):
             assert k in result
+
+
+class TestComputeAveragePrecision:
+    def test_perfect_classifier(self):
+        from calibration import compute_average_precision
+        result = compute_average_precision([0.95, 0.9, 0.1, 0.05], [1, 1, 0, 0])
+        assert result > 0.9
+
+    def test_empty_returns_zero(self):
+        from calibration import compute_average_precision
+        assert compute_average_precision([], []) == 0.0
+
+    def test_single_class_returns_zero(self):
+        from calibration import compute_average_precision
+        assert compute_average_precision([0.9, 0.8, 0.7], [0, 0, 0]) == 0.0
+
+    def test_range_zero_to_one(self):
+        from calibration import compute_average_precision
+        result = compute_average_precision([0.8, 0.6, 0.4, 0.2], [1, 0, 1, 0])
+        assert 0.0 <= result <= 1.0
+
+    def test_returns_float(self):
+        from calibration import compute_average_precision
+        result = compute_average_precision([0.9, 0.5, 0.2], [1, 1, 0])
+        assert isinstance(result, float)
+
+    def test_in_all(self):
+        from calibration import __all__
+        assert "compute_average_precision" in __all__

@@ -1139,3 +1139,63 @@ class TestComputeCutoutEntropyEdgeCases:
             cutout_difference="!!!not_valid_base64!!!",
         )
         assert compute_cutout_entropy(obs) is None
+
+
+class TestComputeBackgroundLevel:
+    def _make_obs(self, bg: float = 0.5, peak: float = 100.0) -> object:
+        import base64
+
+        import numpy as np
+
+        from schemas import Observation
+        arr = np.full((63, 63), bg, dtype=np.float32)
+        arr[31, 31] = peak
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        return Observation(
+            obs_id="bg_test", jd=2460000.5, ra_deg=0.0, dec_deg=0.0,
+            mag=18.0, mag_err=0.1, filter_band="r", mission="ZTF",
+            cutout_difference=b64,
+        )
+
+    def test_returns_float(self):
+        from preprocess import compute_background_level
+        obs = self._make_obs()
+        result = compute_background_level(obs)
+        assert result is not None and isinstance(result, float)
+
+    def test_none_without_cutout(self):
+        from preprocess import compute_background_level
+        from schemas import Observation
+        obs = Observation(
+            obs_id="nc", jd=2460000.5, ra_deg=0.0, dec_deg=0.0,
+            mag=18.0, mag_err=0.1, filter_band="r", mission="ZTF",
+        )
+        assert compute_background_level(obs) is None
+
+    def test_matches_background_value(self):
+        from preprocess import compute_background_level
+        obs = self._make_obs(bg=3.14)
+        result = compute_background_level(obs)
+        assert result is not None
+        assert abs(result - 3.14) < 0.1
+
+    def test_bad_base64_returns_none(self):
+        from preprocess import compute_background_level
+        from schemas import Observation
+        obs = Observation(
+            obs_id="bad", jd=2460000.5, ra_deg=0.0, dec_deg=0.0,
+            mag=18.0, mag_err=0.1, filter_band="r", mission="ZTF",
+            cutout_difference="!!!not_valid!!!",
+        )
+        assert compute_background_level(obs) is None
+
+    def test_in_all(self):
+        from preprocess import __all__
+        assert "compute_background_level" in __all__
+
+    def test_negative_background(self):
+        from preprocess import compute_background_level
+        obs = self._make_obs(bg=-2.0, peak=50.0)
+        result = compute_background_level(obs)
+        assert result is not None
+        assert result < 0.0

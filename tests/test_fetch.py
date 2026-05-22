@@ -2104,3 +2104,109 @@ class TestFetchCssAlertsEdgeCases:
              patch.dict("sys.modules", {"astroquery.mpc": mock_mpc}):
             result = fetch_css_alerts(180.0, 0.0, 0.5, force_refresh=True)
         assert result == []
+
+
+class TestFetchPanstarrMovingObjects:
+    def test_returns_empty_on_import_error(self, tmp_path):
+        from unittest.mock import patch
+
+        from fetch import fetch_panstarrs_moving_objects
+        with patch("fetch._CACHE_DIR", tmp_path / ".neo_cache"), \
+             patch.dict("sys.modules", {"astroquery.mast": None}):
+            result = fetch_panstarrs_moving_objects(180.0, 0.0, 0.5, force_refresh=True)
+        assert result == []
+
+    def test_returns_list(self, tmp_path):
+        from unittest.mock import patch
+
+        from fetch import fetch_panstarrs_moving_objects
+        with patch("fetch._CACHE_DIR", tmp_path / ".neo_cache"), \
+             patch.dict("sys.modules", {"astroquery.mast": None}):
+            result = fetch_panstarrs_moving_objects(10.0, 5.0, 1.0)
+        assert isinstance(result, list)
+
+    def test_filters_non_solar_system_rows(self, tmp_path):
+        from unittest.mock import MagicMock, patch
+
+        from fetch import fetch_panstarrs_moving_objects
+        mock_row = {"ssObjectId": None, "detectID": 1, "obsTime": 57000.0,
+                    "ra": 180.0, "dec": 0.0, "psfFlux": 1000.0, "psfFluxErr": 10.0, "filterID": "r"}
+        mock_mast = MagicMock()
+        mock_mast.Catalogs.query_region.return_value = [mock_row]
+        with patch("fetch._CACHE_DIR", tmp_path / ".neo_cache"), \
+             patch.dict("sys.modules", {"astroquery.mast": mock_mast}):
+            result = fetch_panstarrs_moving_objects(180.0, 0.0, 0.5, force_refresh=True)
+        assert result == []
+
+    def test_includes_solar_system_rows(self, tmp_path):
+        from unittest.mock import MagicMock, patch
+
+        from fetch import fetch_panstarrs_moving_objects
+        mock_row = {"ssObjectId": 12345, "detectID": 99, "obsTime": 57000.0,
+                    "ra": 180.0, "dec": 0.0, "psfFlux": 1000.0, "psfFluxErr": 10.0, "filterID": "r"}
+        mock_mast = MagicMock()
+        mock_mast.Catalogs.query_region.return_value = [mock_row]
+        with patch("fetch._CACHE_DIR", tmp_path / ".neo_cache"), \
+             patch.dict("sys.modules", {"astroquery.mast": mock_mast}):
+            result = fetch_panstarrs_moving_objects(180.0, 0.0, 0.5, force_refresh=True)
+        assert len(result) == 1
+        assert result[0].mission == "PanSTARRS"
+
+    def test_cache_write_failure_ignored(self, tmp_path):
+        from unittest.mock import MagicMock, patch
+
+        from fetch import fetch_panstarrs_moving_objects
+        mock_mast = MagicMock()
+        mock_mast.Catalogs.query_region.return_value = []
+        with patch("fetch._CACHE_DIR", tmp_path / ".neo_cache"), \
+             patch("json.dump", side_effect=OSError("disk full")), \
+             patch.dict("sys.modules", {"astroquery.mast": mock_mast}):
+            result = fetch_panstarrs_moving_objects(45.0, 10.0, 0.3, force_refresh=True)
+        assert isinstance(result, list)
+
+    def test_bad_row_skipped(self, tmp_path):
+        from unittest.mock import MagicMock, patch
+
+        from fetch import fetch_panstarrs_moving_objects
+        bad_row = {"ssObjectId": 99, "detectID": "x", "obsTime": "bad",
+                   "ra": "not_float", "dec": 0.0, "psfFlux": None, "filterID": "r"}
+        mock_mast = MagicMock()
+        mock_mast.Catalogs.query_region.return_value = [bad_row]
+        with patch("fetch._CACHE_DIR", tmp_path / ".neo_cache"), \
+             patch.dict("sys.modules", {"astroquery.mast": mock_mast}):
+            result = fetch_panstarrs_moving_objects(180.0, 0.0, 0.5, force_refresh=True)
+        assert isinstance(result, list)
+
+    def test_cache_hit(self, tmp_path):
+        import hashlib
+        import json
+
+        from fetch import fetch_panstarrs_moving_objects
+        cache_dir = tmp_path / ".neo_cache"
+        cache_dir.mkdir()
+        key = hashlib.md5(b"ps1_moving:180.000000:0.000000:0.500000").hexdigest()
+        data = [{"obs_id": "ps1_mo_1", "jd": 2460000.5, "ra_deg": 180.0, "dec_deg": 0.0,
+                 "mag": 20.0, "mag_err": 0.1, "filter_band": "r", "mission": "PanSTARRS"}]
+        (cache_dir / f"{key}.json").write_text(json.dumps(data))
+        from unittest.mock import patch
+        with patch("fetch._CACHE_DIR", cache_dir):
+            result = fetch_panstarrs_moving_objects(180.0, 0.0, 0.5)
+        assert len(result) == 1 and result[0].mission == "PanSTARRS"
+
+
+class TestFetchPanstarrMovingObjectsEdge:
+    def test_corrupted_cache_falls_through(self, tmp_path):
+        import hashlib
+        from unittest.mock import MagicMock, patch
+
+        from fetch import fetch_panstarrs_moving_objects
+        cache_dir = tmp_path / ".neo_cache"
+        cache_dir.mkdir()
+        key = hashlib.md5(b"ps1_moving:90.000000:0.000000:0.300000").hexdigest()
+        (cache_dir / f"{key}.json").write_text("not valid json {{{{")
+        mock_mast = MagicMock()
+        mock_mast.Catalogs.query_region.return_value = []
+        with patch("fetch._CACHE_DIR", cache_dir), \
+             patch.dict("sys.modules", {"astroquery.mast": mock_mast}):
+            result = fetch_panstarrs_moving_objects(90.0, 0.0, 0.3)
+        assert isinstance(result, list)

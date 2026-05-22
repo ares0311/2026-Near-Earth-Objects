@@ -14,7 +14,7 @@ __all__ = [
     "PhotometricSolution",
     "ObservationStatistics",
     "AlertPackage",
-    "OrbitalElementsSummary",
+    "OrbitalElementsSummary", "CandidateReport",
     "BackgroundOutcome", "BackgroundRunMode", "FollowUpTestStatus", "HumanReviewStatus",
     "RecommendationAction", "SignoffDecision",
     "PriorityFactors", "BackgroundTarget", "FollowUpTestResult",
@@ -797,3 +797,40 @@ class OrbitalElementsSummary(BaseModel):
     moid_au: float | None = None
     quality_code: int = 1
     epoch_jd: float
+
+
+class CandidateReport(BaseModel):
+    """Complete per-candidate export summary for operator review and filing.
+
+    Aggregates the key outputs of all pipeline stages for a single NEO
+    candidate into one frozen, serialisable model.
+
+    Attributes:
+        object_id: Pipeline object identifier.
+        neo_class: Dynamical classification result.
+        hazard_flag: Hazard assessment flag.
+        alert_pathway: Recommended alert pathway.
+        moid_au: Minimum Orbit Intersection Distance in AU; None if unknown.
+        absolute_magnitude_h: Absolute magnitude; None if unknown.
+        estimated_diameter_m: Estimated diameter in metres; None if unknown.
+        discovery_priority: Discovery priority score [0, 1].
+        neo_candidate_prob: Posterior probability of being a new NEO.
+        n_observations: Number of observations in the tracklet.
+        arc_days: Tracklet arc length in days.
+        generated_jd: Julian Date when this report was generated.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    object_id: str
+    neo_class: NEOClass
+    hazard_flag: HazardFlag
+    alert_pathway: AlertPathway
+    moid_au: float | None = None
+    absolute_magnitude_h: float | None = None
+    estimated_diameter_m: float | None = None
+    discovery_priority: float = 0.0
+    neo_candidate_prob: float = 0.0
+    n_observations: int = 0
+    arc_days: float = 0.0
+    generated_jd: float = 2460000.5
