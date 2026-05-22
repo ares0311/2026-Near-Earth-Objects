@@ -10,7 +10,8 @@ __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
            "compute_heliocentric_distance", "compute_synodic_period",
            "compute_apparent_magnitude", "compute_absolute_magnitude",
            "compute_perihelion_date", "compute_eccentric_anomaly",
-           "compute_true_anomaly", "compute_mean_motion"]
+           "compute_true_anomaly", "compute_mean_motion",
+           "compute_longitude_of_perihelion"]
 
 import math
 from typing import NamedTuple
@@ -1098,3 +1099,18 @@ def compute_mean_motion(elements: OrbitalElements) -> float:
         raise ValueError(f"semi-major axis must be positive, got {a}")
     T_days = 365.25 * math.sqrt(a ** 3)
     return 360.0 / T_days
+
+
+def compute_longitude_of_perihelion(elements: object) -> float:
+    """Compute the longitude of perihelion ϖ = Ω + ω (mod 360°).
+
+    Args:
+        elements: Orbital elements with ``longitude_of_ascending_node_deg`` (Ω)
+            and ``argument_of_perihelion_deg`` (ω); defaults to 0.0 if absent.
+
+    Returns:
+        Longitude of perihelion in degrees, in [0, 360).
+    """
+    omega_node = float(getattr(elements, "longitude_of_ascending_node_deg", 0.0))
+    omega_peri = float(getattr(elements, "argument_of_perihelion_deg", 0.0))
+    return round((omega_node + omega_peri) % 360.0, 6)

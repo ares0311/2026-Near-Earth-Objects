@@ -26,6 +26,7 @@ __all__ = [
     "estimate_followup_window",
     "format_candidate_dossier",
     "count_alerts_by_flag",
+    "format_bulk_summary",
 ]
 
 import json
@@ -1158,3 +1159,69 @@ def count_alerts_by_flag(neos: list[ScoredNEO]) -> dict[str, int]:
         flag = neo.hazard.hazard_flag
         counts[flag] = counts.get(flag, 0) + 1
     return counts
+
+
+def format_bulk_summary(neos: list[ScoredNEO], title: str = "Pipeline Run Summary") -> str:
+    """Format a multi-line plain-text bulk summary for a list of scored NEOs.
+
+    The output includes overall counts (total, PHA candidates, NEOCP follow-ups,
+    known objects, alerts ready for submission), a flag breakdown, and a ranked
+    table of the top-10 candidates by discovery priority.
+
+    Guardrail statement is appended to every summary.
+
+    Args:
+        neos: List of :class:`~schemas.ScoredNEO` objects.
+        title: Header title for the summary block.
+
+    Returns:
+        Formatted plain-text string.  Returns a minimal header for empty input.
+    """
+    lines: list[str] = [title, "=" * len(title)]
+
+    if not neos:
+        lines.append("No candidates.")
+        lines.append(
+            "GUARDRAIL: This pipeline does NOT assert Earth-impact probability. "
+            "Defer to MPC/CNEOS."
+        )
+        return "\n".join(lines)
+
+    n_total = len(neos)
+    n_pha = sum(1 for n in neos if n.hazard.hazard_flag == "pha_candidate")
+    n_neocp = sum(1 for n in neos if n.hazard.alert_pathway == "neocp_followup")
+    n_known = sum(1 for n in neos if n.hazard.alert_pathway == "known_object")
+    ready_list = [n for n in neos if ready_for_submission(n)[0]]
+
+    lines += [
+        f"Total candidates  : {n_total}",
+        f"PHA candidates    : {n_pha}",
+        f"NEOCP follow-ups  : {n_neocp}",
+        f"Known objects     : {n_known}",
+        f"Ready to submit   : {len(ready_list)}",
+        "",
+        "Hazard flag breakdown:",
+    ]
+    for flag, count in sorted(count_alerts_by_flag(neos).items()):
+        lines.append(f"  {flag:<20s}: {count}")
+
+    header = f"  {'Object':<20s} {'Flag':<16s} {'Pathway':<22s} {'Priority':>8s}"
+    lines += ["", "Top-10 by discovery priority:", header]
+    sorted_neos = sorted(
+        neos,
+        key=lambda n: float(getattr(n.metadata, "discovery_priority", 0.0) or 0.0),
+        reverse=True,
+    )
+    for neo in sorted_neos[:10]:
+        prio = float(getattr(neo.metadata, "discovery_priority", 0.0) or 0.0)
+        lines.append(
+            f"  {neo.tracklet.object_id:<20s} {neo.hazard.hazard_flag:<16s} "
+            f"{neo.hazard.alert_pathway:<22s} {prio:>8.3f}"
+        )
+
+    lines += [
+        "",
+        "GUARDRAIL: This pipeline does NOT assert Earth-impact probability. "
+        "Defer to MPC/CNEOS.",
+    ]
+    return "\n".join(lines)

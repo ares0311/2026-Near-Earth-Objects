@@ -1355,3 +1355,52 @@ class TestFilterByMagnitude:
     def test_in_all(self):
         from detect import __all__
         assert "filter_by_magnitude" in __all__
+
+
+class TestComputeStreakDensity:
+    """Tests for compute_streak_density."""
+
+    def _make_cutout_b64(self, vals, shape=(63, 63)):
+        import base64
+
+        import numpy as np
+        flat = list(vals) + [0.0] * (shape[0] * shape[1] - len(vals))
+        arr = np.array(flat[:shape[0] * shape[1]], dtype=np.float32).reshape(shape)
+        return base64.b64encode(arr.tobytes()).decode()
+
+    def _make_obs(self, cutout=None):
+        from .conftest import build_observation
+        return build_observation(cutout_difference=cutout)
+
+    def test_empty_list_returns_zero(self):
+        from detect import compute_streak_density
+        assert compute_streak_density([]) == 0.0
+
+    def test_no_streaks(self):
+        from detect import compute_streak_density
+        # no cutout → compute_streak_metric returns 0.0 (< 0.5)
+        obs = [self._make_obs(None), self._make_obs(None)]
+        result = compute_streak_density(obs)
+        assert result == 0.0
+
+    def test_all_streaks(self):
+        import numpy as np
+
+        from detect import compute_streak_density
+        # Build a very elongated array (single row spike) to force streak
+        arr = np.zeros((63, 63), dtype=np.float32)
+        arr[31, :] = 1.0  # horizontal stripe → should trigger streak detection
+        b64 = self._make_cutout_b64(arr.flatten().tolist())
+        obs = [self._make_obs(b64)]
+        result = compute_streak_density(obs)
+        assert 0.0 <= result <= 1.0
+
+    def test_returns_4dp(self):
+        from detect import compute_streak_density
+        obs = [self._make_obs(None)]
+        result = compute_streak_density(obs)
+        assert round(result, 4) == result
+
+    def test_in_all(self):
+        from detect import __all__
+        assert "compute_streak_density" in __all__

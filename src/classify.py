@@ -25,6 +25,7 @@ __all__ = [
     "compute_confusion_matrix",
     "compute_calibration_gain",
     "batch_classify_morphology",
+    "compute_class_entropy_stats",
 ]
 
 import base64
@@ -1328,3 +1329,35 @@ def batch_classify_morphology(tracklets: list[Tracklet]) -> list[dict[str, Any]]
             "n_observations": len(tracklet.observations),
         })
     return results
+
+
+def compute_class_entropy_stats(neos: list) -> dict[str, Any]:
+    """Aggregate entropy statistics across a list of scored NEO posteriors.
+
+    Computes mean, max, and min Shannon entropy (bits) from each NEO's
+    :class:`~schemas.NEOPosterior`, plus a count of high-entropy candidates
+    (entropy ≥ 2.0 bits).
+
+    Args:
+        neos: List of :class:`~schemas.ScoredNEO` objects.
+
+    Returns:
+        Dict with keys ``mean_entropy``, ``max_entropy``, ``min_entropy``,
+        ``n_high_entropy``, and ``n_total``.  All zeros for empty input.
+    """
+    if not neos:
+        return {
+            "mean_entropy": 0.0,
+            "max_entropy": 0.0,
+            "min_entropy": 0.0,
+            "n_high_entropy": 0,
+            "n_total": 0,
+        }
+    entropies = [posterior_entropy(neo.posterior) for neo in neos]
+    return {
+        "mean_entropy": round(sum(entropies) / len(entropies), 4),
+        "max_entropy": round(max(entropies), 4),
+        "min_entropy": round(min(entropies), 4),
+        "n_high_entropy": sum(1 for e in entropies if e >= 2.0),
+        "n_total": len(neos),
+    }

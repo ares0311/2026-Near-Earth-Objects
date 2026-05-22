@@ -1382,3 +1382,62 @@ class TestCountAlertsByFlag:
     def test_in_all(self):
         from alert import __all__
         assert "count_alerts_by_flag" in __all__
+
+
+class TestFormatBulkSummary:
+    """Tests for format_bulk_summary."""
+
+    def _make_neo(self, hazard_flag="nominal", pathway="internal_candidate", priority=0.5):
+        from tests.conftest import build_scored_neo
+        neo = build_scored_neo()
+        hazard = neo.hazard.model_copy(update={
+            "hazard_flag": hazard_flag,
+            "alert_pathway": pathway,
+        })
+        meta = neo.metadata.model_copy(update={"discovery_priority": priority})
+        return neo.model_copy(update={"hazard": hazard, "metadata": meta})
+
+    def test_empty_list(self):
+        from alert import format_bulk_summary
+        result = format_bulk_summary([])
+        assert "No candidates" in result
+        assert "GUARDRAIL" in result
+
+    def test_single_nominal(self):
+        from alert import format_bulk_summary
+        neo = self._make_neo()
+        result = format_bulk_summary([neo])
+        assert "Total candidates" in result
+        assert "1" in result
+        assert "GUARDRAIL" in result
+
+    def test_pha_counted(self):
+        from alert import format_bulk_summary
+        neos = [
+            self._make_neo(hazard_flag="pha_candidate", pathway="nasa_pdco_notify"),
+            self._make_neo(hazard_flag="nominal"),
+        ]
+        result = format_bulk_summary(neos)
+        assert "PHA candidates    : 1" in result
+
+    def test_custom_title(self):
+        from alert import format_bulk_summary
+        result = format_bulk_summary([], title="My Title")
+        assert result.startswith("My Title")
+
+    def test_guardrail_present(self):
+        from alert import format_bulk_summary
+        neos = [self._make_neo() for _ in range(3)]
+        result = format_bulk_summary(neos)
+        assert "GUARDRAIL" in result
+        assert "MPC/CNEOS" in result
+
+    def test_top10_table(self):
+        from alert import format_bulk_summary
+        neos = [self._make_neo(priority=float(i) / 10) for i in range(5)]
+        result = format_bulk_summary(neos)
+        assert "Top-10" in result
+
+    def test_in_all(self):
+        from alert import __all__
+        assert "format_bulk_summary" in __all__

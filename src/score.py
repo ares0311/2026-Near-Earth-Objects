@@ -9,7 +9,8 @@ __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "compute_threat_score", "filter_by_alert_pathway",
            "compute_followup_urgency", "compute_discovery_score",
            "compute_observation_priority", "compute_size_estimate",
-           "compute_close_approach_score", "compute_combined_priority"]
+           "compute_close_approach_score", "compute_combined_priority",
+           "compute_weighted_priority"]
 
 import math
 import uuid
@@ -827,3 +828,53 @@ def compute_combined_priority(neo: ScoredNEO) -> float:
 
     combined = 0.5 * discovery + 0.3 * observation + 0.2 * close_approach
     return round(min(1.0, max(0.0, combined)), 4)
+
+
+def compute_weighted_priority(neo: ScoredNEO, weights: dict | None = None) -> float:
+    """Compute a customisable weighted priority score for a NEO candidate.
+
+    Combines up to four sub-scores with caller-supplied weights (defaulting to
+    equal weights of 0.25 each):
+
+    - ``discovery``: discovery_priority from :attr:`~schemas.ScoringMetadata`
+    - ``threat``: :func:`compute_threat_score`
+    - ``observation``: :func:`compute_observation_priority`
+    - ``close_approach``: :func:`compute_close_approach_score`
+
+    If *weights* is provided it must be a dict with any subset of the four
+    keys above; missing keys default to 0.0.  The weights are normalised so
+    they always sum to 1.0 before the dot product is computed.
+
+    Result is clamped to [0, 1] and rounded to 4 decimal places.
+
+    Args:
+        neo: A :class:`~schemas.ScoredNEO` object.
+        weights: Optional mapping of component name → weight (non-negative).
+
+    Returns:
+        Weighted priority score in [0, 1].
+    """
+    default_weights: dict[str, float] = {
+        "discovery": 0.25,
+        "threat": 0.25,
+        "observation": 0.25,
+        "close_approach": 0.25,
+    }
+    if weights is not None:
+        resolved = {k: float(weights.get(k, 0.0)) for k in default_weights}
+    else:
+        resolved = dict(default_weights)
+
+    total_weight = sum(resolved.values())
+    if total_weight <= 0.0:
+        return 0.0
+
+    scores: dict[str, float] = {
+        "discovery": float(getattr(neo.metadata, "discovery_priority", 0.0) or 0.0),
+        "threat": compute_threat_score(neo),
+        "observation": compute_observation_priority(neo),
+        "close_approach": compute_close_approach_score(neo),
+    }
+
+    weighted = sum(resolved[k] * scores[k] for k in resolved) / total_weight
+    return round(min(1.0, max(0.0, weighted)), 4)

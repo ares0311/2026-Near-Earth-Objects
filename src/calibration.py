@@ -15,6 +15,7 @@ __all__ = [
     "compute_precision_recall_curve",
     "compute_f1_score", "compute_average_precision",
     "compute_calibration_sharpness",
+    "compute_brier_skill_score",
 ]
 
 import math
@@ -753,3 +754,43 @@ def compute_calibration_sharpness(probs: list[float]) -> float:
         return 0.5
     confidences = [max(p, 1.0 - p) for p in probs]
     return round(float(sum(confidences) / len(confidences)), 4)
+
+
+def compute_brier_skill_score(
+    probs: list[float] | np.ndarray,
+    labels: list[int] | np.ndarray,
+) -> float:
+    """Compute the Brier Skill Score (BSS) relative to a climatological baseline.
+
+    BSS = 1 − (BS_model / BS_climatology), where BS_climatology is the Brier
+    score of a naive model that always predicts the base rate (fraction of
+    positive labels).
+
+    - BSS = 1.0  → perfect forecast
+    - BSS = 0.0  → no skill over climatology
+    - BSS < 0.0  → worse than climatology
+
+    Returns 0.0 for empty inputs or when BS_climatology is zero (all-same-label
+    datasets where climatology is also a perfect predictor).
+
+    Args:
+        probs: Predicted probabilities in [0, 1].
+        labels: True binary labels (0 or 1).
+
+    Returns:
+        Brier Skill Score, rounded to 6 decimal places.
+    """
+    p = np.asarray(probs, dtype=float)
+    y = np.asarray(labels, dtype=float)
+    if p.size == 0:
+        return 0.0
+
+    bs_model = float(np.mean((p - y) ** 2))
+    base_rate = float(np.mean(y))
+    bs_clim = float(base_rate * (1.0 - base_rate))
+
+    if bs_clim == 0.0:
+        return 0.0
+
+    bss = 1.0 - bs_model / bs_clim
+    return round(bss, 6)

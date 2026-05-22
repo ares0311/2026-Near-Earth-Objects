@@ -1268,3 +1268,88 @@ class TestComputePixelHistogram:
     def test_in_all(self):
         from preprocess import __all__
         assert "compute_pixel_histogram" in __all__
+
+
+class TestComputeCutoutContrast:
+    """Tests for compute_cutout_contrast."""
+
+    def _make_obs(self, arr=None, cutout=None):
+        import base64
+
+        import numpy as np
+
+        from schemas import Observation
+        if arr is not None:
+            raw = base64.b64encode(arr.astype(np.float32).tobytes()).decode()
+        else:
+            raw = cutout
+        return Observation(
+            obs_id="cc_test",
+            ra_deg=180.0,
+            dec_deg=0.0,
+            jd=2460000.5,
+            mag=19.0,
+            mag_err=0.05,
+            filter_band="r",
+            mission="ZTF",
+            cutout_difference=raw,
+        )
+
+    def test_no_cutout_returns_none(self):
+        from preprocess import compute_cutout_contrast
+        from schemas import Observation
+        obs = Observation(
+            obs_id="no_cut", ra_deg=0.0, dec_deg=0.0, jd=2460000.5,
+            mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF",
+        )
+        assert compute_cutout_contrast(obs) is None
+
+    def test_uniform_array_returns_zero(self):
+        import numpy as np
+
+        from preprocess import compute_cutout_contrast
+        arr = np.ones((63, 63), dtype=np.float32)
+        obs = self._make_obs(arr=arr)
+        # (max - min) / (max + min) = 0 / 2 = 0.0
+        assert compute_cutout_contrast(obs) == 0.0
+
+    def test_all_zero_array_returns_none(self):
+        import numpy as np
+
+        from preprocess import compute_cutout_contrast
+        arr = np.zeros((63, 63), dtype=np.float32)
+        obs = self._make_obs(arr=arr)
+        # i_max + i_min = 0 → denom zero → None
+        assert compute_cutout_contrast(obs) is None
+
+    def test_high_contrast_array(self):
+        import numpy as np
+
+        from preprocess import compute_cutout_contrast
+        arr = np.zeros((63, 63), dtype=np.float32)
+        arr[31, 31] = 1.0  # one bright pixel
+        obs = self._make_obs(arr=arr)
+        result = compute_cutout_contrast(obs)
+        assert result is not None
+        assert 0.0 < result <= 1.0
+
+    def test_known_contrast_value(self):
+        import numpy as np
+
+        from preprocess import compute_cutout_contrast
+        # arr with i_max=3, i_min=1 → contrast = (3-1)/(3+1) = 0.5
+        arr = np.full((63, 63), 1.0, dtype=np.float32)
+        arr[0, 0] = 3.0
+        obs = self._make_obs(arr=arr)
+        result = compute_cutout_contrast(obs)
+        assert result is not None
+        assert abs(result - 0.5) < 0.0001
+
+    def test_invalid_base64_returns_none(self):
+        from preprocess import compute_cutout_contrast
+        obs = self._make_obs(cutout="!!!invalid!!!")
+        assert compute_cutout_contrast(obs) is None
+
+    def test_in_all(self):
+        from preprocess import __all__
+        assert "compute_cutout_contrast" in __all__
