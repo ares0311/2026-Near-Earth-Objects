@@ -1061,3 +1061,81 @@ class TestComputeDifferenceImageSnr:
         snr_high = compute_difference_image_snr(high)
         assert snr_high is not None and snr_low is not None
         assert snr_high > snr_low
+
+
+class TestComputeCutoutEntropy:
+    def _make_obs(self, noise_std: float = 1.0, peak: float = 100.0) -> object:
+        import base64
+
+        import numpy as np
+
+        from schemas import Observation
+        rng = np.random.default_rng(0)
+        arr = rng.normal(0.0, noise_std, (63, 63)).astype(np.float32)
+        arr[31, 31] = peak
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        return Observation(
+            obs_id="ent_test", jd=2460000.5, ra_deg=0.0, dec_deg=0.0,
+            mag=18.0, mag_err=0.1, filter_band="r", mission="ZTF",
+            cutout_difference=b64,
+        )
+
+    def test_returns_float(self):
+        from preprocess import compute_cutout_entropy
+        obs = self._make_obs()
+        result = compute_cutout_entropy(obs)
+        assert result is not None
+        assert isinstance(result, float)
+
+    def test_entropy_positive(self):
+        from preprocess import compute_cutout_entropy
+        obs = self._make_obs()
+        assert compute_cutout_entropy(obs) > 0.0
+
+    def test_entropy_bounded(self):
+        from preprocess import compute_cutout_entropy
+        obs = self._make_obs()
+        result = compute_cutout_entropy(obs)
+        assert result is not None
+        assert result <= 8.0  # max for 256 bins
+
+    def test_none_for_no_cutout(self):
+        from preprocess import compute_cutout_entropy
+        from schemas import Observation
+        obs = Observation(
+            obs_id="nc", jd=2460000.5, ra_deg=0.0, dec_deg=0.0,
+            mag=18.0, mag_err=0.1, filter_band="r", mission="ZTF",
+        )
+        assert compute_cutout_entropy(obs) is None
+
+    def test_none_for_uniform_array(self):
+        import base64
+
+        import numpy as np
+
+        from preprocess import compute_cutout_entropy
+        from schemas import Observation
+        arr = np.ones((63, 63), dtype=np.float32) * 5.0
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        obs = Observation(
+            obs_id="uni", jd=2460000.5, ra_deg=0.0, dec_deg=0.0,
+            mag=18.0, mag_err=0.1, filter_band="r", mission="ZTF",
+            cutout_difference=b64,
+        )
+        assert compute_cutout_entropy(obs) is None
+
+    def test_in_all(self):
+        from preprocess import __all__
+        assert "compute_cutout_entropy" in __all__
+
+
+class TestComputeCutoutEntropyEdgeCases:
+    def test_bad_base64_returns_none(self):
+        from preprocess import compute_cutout_entropy
+        from schemas import Observation
+        obs = Observation(
+            obs_id="bad", jd=2460000.5, ra_deg=0.0, dec_deg=0.0,
+            mag=18.0, mag_err=0.1, filter_band="r", mission="ZTF",
+            cutout_difference="!!!not_valid_base64!!!",
+        )
+        assert compute_cutout_entropy(obs) is None

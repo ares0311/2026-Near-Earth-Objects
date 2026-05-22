@@ -678,3 +678,52 @@ class TestComputePrecisionRecallCurve:
         result = compute_precision_recall_curve([0.9, 0.7, 0.4, 0.2], [1, 0, 1, 0])
         thresholds = result["thresholds"]
         assert list(thresholds) == sorted(thresholds, reverse=True)
+
+
+class TestComputeF1Score:
+    def test_perfect_predictions(self):
+        from calibration import compute_f1_score
+        result = compute_f1_score([1.0, 1.0, 0.0, 0.0], [1, 1, 0, 0])
+        assert result["f1"] == 1.0
+        assert result["precision"] == 1.0
+        assert result["recall"] == 1.0
+
+    def test_empty_input(self):
+        from calibration import compute_f1_score
+        result = compute_f1_score([], [])
+        assert result["f1"] == 0.0
+        assert result["n_samples"] == 0
+
+    def test_all_wrong(self):
+        from calibration import compute_f1_score
+        result = compute_f1_score([0.0, 0.0, 1.0, 1.0], [1, 1, 0, 0])
+        assert result["f1"] == 0.0
+
+    def test_threshold_used(self):
+        from calibration import compute_f1_score
+        result = compute_f1_score([0.6, 0.4, 0.3, 0.7], [1, 0, 0, 1], threshold=0.55)
+        assert result["threshold"] == 0.55
+        assert result["f1"] > 0.0
+
+    def test_n_samples_correct(self):
+        from calibration import compute_f1_score
+        result = compute_f1_score([0.9, 0.1, 0.8], [1, 0, 1])
+        assert result["n_samples"] == 3
+
+    def test_no_positive_predictions(self):
+        from calibration import compute_f1_score
+        result = compute_f1_score([0.1, 0.2, 0.3], [1, 1, 0], threshold=0.9)
+        assert result["precision"] == 0.0
+        assert result["f1"] == 0.0
+
+    def test_no_positive_labels(self):
+        from calibration import compute_f1_score
+        result = compute_f1_score([0.9, 0.8, 0.7], [0, 0, 0])
+        assert result["recall"] == 0.0
+        assert result["f1"] == 0.0
+
+    def test_returns_all_keys(self):
+        from calibration import compute_f1_score
+        result = compute_f1_score([0.9, 0.1], [1, 0])
+        for k in ("precision", "recall", "f1", "threshold", "n_samples"):
+            assert k in result

@@ -787,3 +787,57 @@ class TestAlertPackage:
     def test_in_all(self):
         from schemas import __all__
         assert "AlertPackage" in __all__
+
+
+class TestOrbitalElementsSummary:
+    def _make_summary(self, **kwargs):
+        from schemas import OrbitalElementsSummary
+        defaults = dict(
+            object_id="test_neo",
+            neo_class="apollo",
+            semi_major_axis_au=1.5,
+            eccentricity=0.3,
+            inclination_deg=15.0,
+            perihelion_au=1.05,
+            aphelion_au=1.95,
+            moid_au=0.02,
+            quality_code=2,
+            epoch_jd=2460000.5,
+        )
+        defaults.update(kwargs)
+        return OrbitalElementsSummary(**defaults)
+
+    def test_basic_construction(self):
+        s = self._make_summary()
+        assert s.object_id == "test_neo"
+        assert s.neo_class == "apollo"
+
+    def test_frozen(self):
+        import pytest
+        s = self._make_summary()
+        with pytest.raises(Exception):
+            s.object_id = "other"
+
+    def test_moid_none_allowed(self):
+        s = self._make_summary(moid_au=None)
+        assert s.moid_au is None
+
+    def test_default_quality_code(self):
+        from schemas import OrbitalElementsSummary
+        s = OrbitalElementsSummary(
+            object_id="x", neo_class="amor",
+            semi_major_axis_au=1.2, eccentricity=0.1,
+            inclination_deg=5.0, perihelion_au=1.1, aphelion_au=1.3,
+            epoch_jd=2460000.5,
+        )
+        assert s.quality_code == 1
+
+    def test_in_all(self):
+        from schemas import __all__
+        assert "OrbitalElementsSummary" in __all__
+
+    def test_model_copy(self):
+        s = self._make_summary()
+        s2 = s.model_copy(update={"quality_code": 3})
+        assert s2.quality_code == 3
+        assert s.quality_code == 2

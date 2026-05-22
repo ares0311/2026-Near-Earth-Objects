@@ -7,7 +7,7 @@ __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fet
            "merge_survey_alerts", "filter_alerts_by_motion", "build_observation_window",
            "count_known_objects_in_field", "fetch_mpc_observations",
            "fetch_atlas_forced", "fetch_ztf_alerts", "estimate_survey_depth",
-           "filter_by_survey", "fetch_panstarrs_catalog"]
+           "filter_by_survey", "fetch_panstarrs_catalog", "fetch_css_alerts"]
 
 import json
 import os
@@ -943,6 +943,96 @@ def fetch_panstarrs_catalog(
                     mag_err=float(row["rMeanPSFMagErr"]) if row["rMeanPSFMagErr"] else 0.0,
                     filter_band="r",
                     mission="PanSTARRS",
+                )
+                observations.append(obs)
+            except Exception:
+                continue
+    except Exception:
+        pass
+
+    try:
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        with cache_path.open("w") as f:
+            json.dump([o.model_dump() for o in observations], f)
+    except Exception:
+        pass
+
+    return observations
+
+
+def fetch_css_alerts(
+    ra_deg: float,
+    dec_deg: float,
+    radius_deg: float,
+    start_jd: float | None = None,
+    end_jd: float | None = None,
+    force_refresh: bool = False,
+) -> list:
+    """Fetch Catalina Sky Survey alerts via the MPC astroquery interface.
+
+    Queries the Minor Planet Center observation database for CSS detections
+    (observatory code 703) near a sky position.  Results are disk-cached by
+    (ra, dec, radius).
+
+    Args:
+        ra_deg: Right ascension of search centre in degrees.
+        dec_deg: Declination of search centre in degrees.
+        radius_deg: Search radius in degrees.
+        start_jd: Optional start Julian Date for time filtering (not enforced
+            by MPC API but stored for provenance).
+        end_jd: Optional end Julian Date for time filtering.
+        force_refresh: Bypass the on-disk cache if ``True``.
+
+    Returns:
+        List of :class:`~schemas.Observation` objects from CSS.
+        Returns an empty list on network failure or when no sources are found.
+    """
+    import hashlib
+
+    cache_key = hashlib.md5(
+        f"css:{ra_deg:.6f}:{dec_deg:.6f}:{radius_deg:.6f}".encode()
+    ).hexdigest()
+    cache_path = _CACHE_DIR / f"{cache_key}.json"
+
+    if not force_refresh and cache_path.exists():
+        try:
+            with cache_path.open() as f:
+                raw = json.load(f)
+            return [Observation(**item) for item in raw]
+        except Exception:
+            pass
+
+    observations: list = []
+    try:
+        from astroquery.mpc import MPC  # type: ignore[import]
+
+        results = MPC.query_observations_by_position(  # type: ignore[attr-defined]
+            ra=ra_deg, dec=dec_deg, radius=radius_deg
+        )
+        for row in results:
+            try:
+                # Keep only CSS (observatory code 703) rows
+                obs_code = str(row.get("obs_code") or row.get("observatory_code") or "")
+                submission = str(row.get("submission_info") or "")
+                if obs_code != "703" and "703" not in submission:
+                    continue
+                obs_id = str(
+                    row.get("obs_id") or row.get("id") or row.get("number") or "css_unknown"
+                )
+                jd_val = float(row.get("epoch") or row.get("jd") or 2460000.5)
+                ra_val = float(row.get("ra") or row.get("ra_deg") or ra_deg)
+                dec_val = float(row.get("dec") or row.get("dec_deg") or dec_deg)
+                mag_val = float(row.get("mag") or row.get("magnitude") or 99.0)
+                band = str(row.get("band") or row.get("filter_band") or "V")
+                obs = Observation(
+                    obs_id=f"css_{obs_id}",
+                    jd=jd_val,
+                    ra_deg=ra_val,
+                    dec_deg=dec_val,
+                    mag=mag_val,
+                    mag_err=0.1,
+                    filter_band=band,
+                    mission="CSS",
                 )
                 observations.append(obs)
             except Exception:

@@ -471,9 +471,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.38.0)
+## Current State (v0.39.0)
 
-All 10 pipeline modules are complete. 1361 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified CLI with automated offline scheduling readiness, live policy contract validation, provider-specific live readiness summaries, no-network live dry-run approval bundles, operator handoff exports, persisted operator handoff logs, top-level SQLite logs for runs, readiness checks, approval bundles, no-network live dry-run plans, mock-only provider execution attempts, and auditable signoff readiness.
+All 10 pipeline modules are complete. 1439 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified CLI with automated offline scheduling readiness, live policy contract validation, provider-specific live readiness summaries, no-network live dry-run approval bundles, operator handoff exports, persisted operator handoff logs, top-level SQLite logs for runs, readiness checks, approval bundles, no-network live dry-run plans, mock-only provider execution attempts, and auditable signoff readiness.
 
 ### Skills
 
@@ -528,6 +528,8 @@ All 10 pipeline modules are complete. 1361 tests passing (100% coverage). CI gre
 | `Skills/format_submission_checklists.py` | Submission checklists for candidates above `--min-priority`; `--json` flag |
 | `Skills/validate_pipeline_run.py` | Validate pipeline run JSON for required keys, MOID plausibility, and no impact-probability phrases; `--json` flag |
 | `Skills/export_atlas_lightcurve.py` | Export ATLAS forced-photometry lightcurve for a sky position; `--format png\|csv\|json`, `--out`, `--token`, `--force-refresh` flags |
+| `Skills/compute_eccentric_anomaly.py` | Batch compute eccentric anomaly for tracklets with orbital elements from JSON; `--json` flag |
+| `Skills/analyze_field_detections.py` | Analyze field-level detection statistics (obs counts, filter/mission breakdown, RB scores) from tracklet JSON; `--json` flag |
 
 ### Docs
 
@@ -548,6 +550,7 @@ All 10 pipeline modules are complete. 1361 tests passing (100% coverage). CI gre
 | `docs/LINKING_GUIDE.md` | Technical reference for link.py: tracklet formation, arc statistics, satellite trail rejection, deduplication, quality grades |
 | `docs/FETCH_GUIDE.md` | Technical reference for fetch.py: ZTF/ATLAS/MPC/Horizons retrieval, caching, depth estimation, survey merging, filtering |
 | `docs/PREPROCESS_GUIDE.md` | Technical reference for preprocess.py: difference image quality, photometry, astrometric calibration, SNR, scatter, zero-point |
+| `docs/CALIBRATION_GUIDE.md` | Technical reference for calibration.py: Platt/isotonic calibration, ECE, ROC AUC, PR curve, F1, log loss, bootstrap CI, CV |
 
 ### Data
 
@@ -698,6 +701,24 @@ All 10 pipeline modules are complete. 1361 tests passing (100% coverage). CI gre
 - `docs/BACKGROUND_SEARCH_AUTOMATION.md`: updated scheduler guidance for automated offline runs and macOS launchd template generation.
 - 4 new tests (1333 total); 100% coverage maintained; ruff + mypy clean.
 - Version bumped to 0.26.0.
+
+### Key Changes in v0.39.0
+
+- `orbit.py`: added `compute_eccentric_anomaly(M_rad, e, tol, max_iter)` — Newton-Raphson Kepler's equation solver; raises ValueError for e ≥ 1 or non-convergence.
+- `detect.py`: added `compute_source_extent(obs)` — source semi-major axis in arcsec from 2D intensity-weighted covariance of difference-image cutout; None if degenerate.
+- `link.py`: added `compute_great_circle_residual(tracklet)` — RMS positional residual in arcsec from linear RA/Dec fit; cos-Dec corrected; None for <2 obs.
+- `classify.py`: added `compute_confusion_matrix(predicted_labels, true_labels)` — confusion matrix dict with labels, matrix (list of lists), and accuracy.
+- `score.py`: added `compute_size_estimate(neo)` — (min_m, max_m) diameter range in metres from H magnitude assuming albedo [0.05, 0.30]; None if H unknown.
+- `alert.py`: added `estimate_followup_window(neo)` — (start_jd, end_jd, urgency_hours) follow-up window; 24h for PHA, 48h for NEOCP, 24–168h otherwise.
+- `fetch.py`: added `fetch_css_alerts(ra_deg, dec_deg, radius_deg, start_jd, end_jd, force_refresh)` — CSS alerts via MPC astroquery (obs code 703); disk-cached.
+- `preprocess.py`: added `compute_cutout_entropy(obs)` — Shannon entropy of pixel distribution in 256-bin histogram; max 8.0 bits; None if no cutout or uniform array.
+- `schemas.py`: added `OrbitalElementsSummary` — frozen model: object_id, neo_class, a/e/i/q/Q, moid_au, quality_code, epoch_jd.
+- `calibration.py`: added `compute_f1_score(probs, labels, threshold)` — F1/precision/recall dict at decision threshold; 0.0 on empty input.
+- `Skills/compute_eccentric_anomaly.py`: new — batch eccentric anomaly table from tracklet JSON; `--json` flag.
+- `Skills/analyze_field_detections.py`: new — field-level detection statistics (obs counts, filter/mission breakdown, RB scores); `--json` flag.
+- `docs/CALIBRATION_GUIDE.md`: new — technical reference for calibration.py.
+- 78 new tests (1439 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.39.0.
 
 ### Key Changes in v0.25.0
 

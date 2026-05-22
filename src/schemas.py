@@ -14,6 +14,7 @@ __all__ = [
     "PhotometricSolution",
     "ObservationStatistics",
     "AlertPackage",
+    "OrbitalElementsSummary",
     "BackgroundOutcome", "BackgroundRunMode", "FollowUpTestStatus", "HumanReviewStatus",
     "RecommendationAction", "SignoffDecision",
     "PriorityFactors", "BackgroundTarget", "FollowUpTestResult",
@@ -762,3 +763,37 @@ class AlertPackage(BaseModel):
         "Do NOT publicly announce any impact probability. "
         "Defer all public communication to NASA/CNEOS."
     )
+
+
+class OrbitalElementsSummary(BaseModel):
+    """Compact orbital elements summary for display and export.
+
+    Captures the key orbital parameters for a NEO candidate in a single
+    frozen model suitable for ranking, reporting, and cross-matching.
+    Includes optional MOID and quality annotation fields.
+
+    Attributes:
+        object_id: Pipeline object identifier.
+        neo_class: Dynamical class: amor, apollo, aten, ieo, or unknown.
+        semi_major_axis_au: Semi-major axis in AU.
+        eccentricity: Orbital eccentricity (0 ≤ e < 1 for bound orbits).
+        inclination_deg: Orbital inclination in degrees.
+        perihelion_au: Perihelion distance q = a(1-e) in AU.
+        aphelion_au: Aphelion distance Q = a(1+e) in AU.
+        moid_au: Minimum Orbit Intersection Distance in AU; None if unknown.
+        quality_code: Orbit quality code 1–4 (1=arc<1day, 4=opposition).
+        epoch_jd: Reference epoch as Julian Date.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    object_id: str
+    neo_class: NEOClass
+    semi_major_axis_au: float
+    eccentricity: float
+    inclination_deg: float
+    perihelion_au: float
+    aphelion_au: float
+    moid_au: float | None = None
+    quality_code: int = 1
+    epoch_jd: float

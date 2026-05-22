@@ -1230,3 +1230,63 @@ class TestValidateAlertPackage:
         valid, issues = validate_alert_package(pkg)
         assert valid is False
         assert any("None" in i for i in issues)
+
+
+class TestEstimateFollowupWindow:
+    def _make_neo(self, hazard_flag="nominal", alert_pathway="internal_candidate", priority=0.5):
+        from tests.conftest import build_scored_neo
+        neo = build_scored_neo()
+        hazard = neo.hazard.model_copy(update={
+            "hazard_flag": hazard_flag,
+            "alert_pathway": alert_pathway,
+        })
+        meta = neo.metadata.model_copy(update={"discovery_priority": priority})
+        return neo.model_copy(update={"hazard": hazard, "metadata": meta})
+
+    def test_pha_candidate_24h(self):
+        from alert import estimate_followup_window
+        neo = self._make_neo(hazard_flag="pha_candidate")
+        result = estimate_followup_window(neo)
+        assert result["urgency_hours"] == 24.0
+
+    def test_neocp_followup_48h(self):
+        from alert import estimate_followup_window
+        neo = self._make_neo(alert_pathway="neocp_followup")
+        result = estimate_followup_window(neo)
+        assert result["urgency_hours"] == 48.0
+
+    def test_nominal_uses_priority(self):
+        from alert import estimate_followup_window
+        neo = self._make_neo(priority=0.0)
+        result = estimate_followup_window(neo)
+        assert result["urgency_hours"] == 72.0
+
+    def test_end_jd_gt_start_jd(self):
+        from alert import estimate_followup_window
+        neo = self._make_neo()
+        result = estimate_followup_window(neo)
+        assert result["end_jd"] > result["start_jd"]
+
+    def test_start_jd_is_reference(self):
+        from alert import estimate_followup_window
+        neo = self._make_neo()
+        result = estimate_followup_window(neo)
+        assert result["start_jd"] == 2460000.0
+
+    def test_urgency_clamped_min(self):
+        from alert import estimate_followup_window
+        neo = self._make_neo(priority=1.0)
+        result = estimate_followup_window(neo)
+        assert result["urgency_hours"] >= 24.0
+
+    def test_urgency_clamped_max(self):
+        from alert import estimate_followup_window
+        neo = self._make_neo(priority=0.0)
+        result = estimate_followup_window(neo)
+        assert result["urgency_hours"] <= 168.0
+
+    def test_returns_dict_with_required_keys(self):
+        from alert import estimate_followup_window
+        neo = self._make_neo()
+        result = estimate_followup_window(neo)
+        assert "start_jd" in result and "end_jd" in result and "urgency_hours" in result

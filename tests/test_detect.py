@@ -1141,3 +1141,101 @@ class TestFlagMovingSources:
         o2 = self._obs(2460001.5, 181.0, 10.0)
         result = flag_moving_sources((o1, o2))
         assert isinstance(result, list)
+
+
+class TestComputeSourceExtent:
+    def _make_cutout_obs(self, peak: float = 100.0) -> object:
+        import base64
+
+        import numpy as np
+
+        from schemas import Observation
+        rng = np.random.default_rng(42)
+        arr = rng.normal(0.0, 1.0, (63, 63)).astype(np.float32)
+        arr[31, 31] = peak
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        return Observation(
+            obs_id="ext_test", jd=2460000.5, ra_deg=180.0, dec_deg=0.0,
+            mag=18.0, mag_err=0.1, filter_band="r", mission="ZTF",
+            cutout_difference=b64,
+        )
+
+    def test_returns_float_for_valid_cutout(self):
+        from detect import compute_source_extent
+        obs = self._make_cutout_obs()
+        result = compute_source_extent(obs)
+        assert result is not None
+        assert isinstance(result, float)
+
+    def test_returns_none_without_cutout(self):
+        from detect import compute_source_extent
+        from schemas import Observation
+        obs = Observation(
+            obs_id="no_cut", jd=2460000.5, ra_deg=10.0, dec_deg=5.0,
+            mag=19.0, mag_err=0.1, filter_band="r", mission="ZTF",
+        )
+        assert compute_source_extent(obs) is None
+
+    def test_positive_result(self):
+        from detect import compute_source_extent
+        obs = self._make_cutout_obs()
+        result = compute_source_extent(obs)
+        assert result is not None
+        assert result > 0.0
+
+    def test_zero_array_returns_none(self):
+        import base64
+
+        import numpy as np
+
+        from detect import compute_source_extent
+        from schemas import Observation
+        arr = np.zeros((63, 63), dtype=np.float32)
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        obs = Observation(
+            obs_id="zero_cut", jd=2460000.5, ra_deg=0.0, dec_deg=0.0,
+            mag=18.0, mag_err=0.1, filter_band="r", mission="ZTF",
+            cutout_difference=b64,
+        )
+        assert compute_source_extent(obs) is None
+
+    def test_in_all(self):
+        from detect import __all__
+        assert "compute_source_extent" in __all__
+
+    def test_larger_peak_gives_result(self):
+        from detect import compute_source_extent
+        obs = self._make_cutout_obs(peak=500.0)
+        result = compute_source_extent(obs)
+        assert result is not None
+        assert result > 0.0
+
+
+class TestComputeSourceExtentEdgeCases:
+    def test_single_bright_pixel_returns_none(self):
+        """Single pixel at center → zero covariance → lambda_max=0 → None."""
+        import base64
+
+        import numpy as np
+
+        from detect import compute_source_extent
+        from schemas import Observation
+        arr = np.zeros((63, 63), dtype=np.float32)
+        arr[31, 31] = 100.0
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        obs = Observation(
+            obs_id="single", jd=2460000.5, ra_deg=0.0, dec_deg=0.0,
+            mag=18.0, mag_err=0.1, filter_band="r", mission="ZTF",
+            cutout_difference=b64,
+        )
+        assert compute_source_extent(obs) is None
+
+    def test_bad_base64_returns_none(self):
+        from detect import compute_source_extent
+        from schemas import Observation
+        obs = Observation(
+            obs_id="bad64", jd=2460000.5, ra_deg=0.0, dec_deg=0.0,
+            mag=18.0, mag_err=0.1, filter_band="r", mission="ZTF",
+            cutout_difference="!!!not_valid_base64!!!",
+        )
+        assert compute_source_extent(obs) is None

@@ -7,7 +7,7 @@ __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_
            "detect_bad_pixels", "compute_astrometric_scatter",
            "normalize_photometry", "compute_image_quality_metrics",
            "compute_photometric_scatter", "estimate_zero_point",
-           "compute_difference_image_snr"]
+           "compute_difference_image_snr", "compute_cutout_entropy"]
 
 import base64
 import math
@@ -611,5 +611,37 @@ def compute_difference_image_snr(obs: object) -> float | None:
         if rms <= 0.0:
             return None
         return round(float(peak / rms), 4)
+    except Exception:
+        return None
+
+
+def compute_cutout_entropy(obs: object) -> float | None:
+    """Compute Shannon entropy of the pixel intensity distribution in a difference-image cutout.
+
+    Quantizes the 63×63 float32 difference-image cutout into 256 histogram bins
+    and computes the information entropy of the resulting distribution.  A uniform
+    distribution has maximum entropy of 8.0 bits (log₂ 256); a single-valued
+    (all-zero) array has zero entropy.
+
+    Args:
+        obs: An :class:`~schemas.Observation` object with an optional
+            ``cutout_difference`` base64-encoded float32 cutout.
+
+    Returns:
+        Shannon entropy in bits, rounded to 4 decimal places, or ``None`` if
+        no cutout is present, the array is all-zero, or decoding fails.
+    """
+    cutout = getattr(obs, "cutout_difference", None)
+    if cutout is None:
+        return None
+    try:
+        raw = base64.b64decode(cutout)
+        arr = np.frombuffer(raw, dtype=np.float32).reshape(63, 63)
+        if arr.max() == arr.min():
+            return None
+        counts, _ = np.histogram(arr, bins=256, range=(float(arr.min()), float(arr.max())))
+        pk = counts[counts > 0] / float(counts.sum())
+        entropy = float(-np.sum(pk * np.log2(pk)))
+        return round(entropy, 4)
     except Exception:
         return None
