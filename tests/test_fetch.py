@@ -2375,6 +2375,7 @@ class TestFetchRecentMpcNeos:
         mock_mpc_mod.MPC = mock_mpc_cls
         monkeypatch.setitem(sys.modules, "astroquery.mpc", mock_mpc_mod)
         import importlib
+
         import fetch as fm
         importlib.reload(fm)
         monkeypatch.setattr(fm, "_CACHE_DIR", tmp_path / ".neo_cache")
@@ -2395,6 +2396,7 @@ class TestFetchRecentMpcNeos:
         mock_mpc_mod.MPC = mock_mpc_cls
         monkeypatch.setitem(sys.modules, "astroquery.mpc", mock_mpc_mod)
         import importlib
+
         import fetch as fm
         importlib.reload(fm)
         monkeypatch.setattr(fm, "_CACHE_DIR", tmp_path / ".neo_cache")

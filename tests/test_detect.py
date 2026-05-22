@@ -1343,8 +1343,9 @@ class TestFilterByMagnitude:
         assert filter_by_magnitude([], 20.0) == []
 
     def test_none_mag_skipped(self):
-        from detect import filter_by_magnitude
         from types import SimpleNamespace
+
+        from detect import filter_by_magnitude
         obs_none = SimpleNamespace(mag=None)
         obs_real = self._obs("b", 18.0)
         result = filter_by_magnitude([obs_none, obs_real], 25.0)
