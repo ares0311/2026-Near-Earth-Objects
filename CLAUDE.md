@@ -473,7 +473,7 @@ and excluded from CI.
 
 ## Current State (v0.40.0)
 
-All 10 pipeline modules are complete. 1520 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified CLI with automated offline scheduling readiness, live policy contract validation, provider-specific live readiness summaries, no-network live dry-run approval bundles, operator handoff exports, persisted operator handoff logs, top-level SQLite logs for runs, readiness checks, approval bundles, no-network live dry-run plans, mock-only provider execution attempts, and auditable signoff readiness.
+All 10 pipeline modules are complete. 1550 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified CLI with automated offline scheduling readiness, live policy contract validation, provider-specific live readiness summaries, no-network live dry-run approval bundles, operator handoff exports, persisted operator handoff logs, top-level SQLite logs for runs, readiness checks, approval bundles, no-network live dry-run plans, mock-only provider execution attempts, and auditable signoff readiness.
 
 ### Skills
 
@@ -720,7 +720,7 @@ All 10 pipeline modules are complete. 1520 tests passing (100% coverage). CI gre
 - `Skills/compute_true_anomaly.py`: new — batch true anomaly table from tracklet JSON; `--json` flag.
 - `Skills/export_candidate_dossiers.py`: new — one dossier file per candidate; `--out-dir`, `--json` flags.
 - `docs/SCORING_MODEL_V2.md`: new — updated scoring reference with size estimate, close-approach score, observation priority, true anomaly.
-- 81 new tests (1520 total); 100% coverage maintained on all 10 pipeline modules; ruff + mypy clean.
+- 81 new tests + 30 background coverage gap tests (1550 total); 100% coverage on all modules; ruff + mypy clean.
 - Version bumped to 0.40.0.
 
 ### Key Changes in v0.39.0
