@@ -1405,3 +1405,103 @@ class TestComputePositionAngleConsistencyEdge:
         t = types.SimpleNamespace(observations=obs)
         result = compute_position_angle_consistency(t)
         assert result is None or isinstance(result, float)
+
+
+class TestScoreTrackletQuality:
+    """Tests for score_tracklet_quality."""
+
+    def _make_tracklet(self, arc_days: float, n_nights: int = 2, n_obs: int = 4):
+        from schemas import Observation, Tracklet
+        obs = []
+        for night in range(n_nights):
+            jd_base = 2460000.5 + night * (arc_days / max(n_nights - 1, 1))
+            for k in range(n_obs // n_nights):
+                obs.append(Observation(
+                    obs_id=f"o_{night}_{k}",
+                    ra_deg=180.0 + night * 0.01 + k * 0.001,
+                    dec_deg=10.0,
+                    jd=jd_base + k * 0.01,
+                    mag=19.5,
+                    mag_err=0.05,
+                    filter_band="r",
+                    mission="ZTF",
+                    real_bogus=0.9,
+                ))
+        return Tracklet(
+            object_id="T001",
+            observations=tuple(obs),
+            arc_days=arc_days,
+            motion_rate_arcsec_per_hour=1.0,
+            motion_pa_degrees=90.0,
+        )
+
+    def test_high_quality_tracklet_near_one(self):
+        from link import score_tracklet_quality
+        t = self._make_tracklet(arc_days=10.0, n_nights=3, n_obs=6)
+        score = score_tracklet_quality(t)
+        assert 0.0 <= score <= 1.0
+        # Long arc (>7 days), multiple nights → grade A or B → high score
+        assert score >= 0.5
+
+    def test_single_night_lower_score(self):
+        from link import score_tracklet_quality
+        from schemas import Observation, Tracklet
+        obs = tuple(Observation(
+            obs_id=f"o{i}",
+            ra_deg=180.0 + i * 0.001,
+            dec_deg=0.0,
+            jd=2460000.5 + i * 0.01,
+            mag=19.5,
+            mag_err=0.1,
+            filter_band="r",
+            mission="ZTF",
+            real_bogus=0.9,
+        ) for i in range(3))
+        t = Tracklet(
+            object_id="T_single",
+            observations=obs,
+            arc_days=0.02,
+            motion_rate_arcsec_per_hour=1.0,
+            motion_pa_degrees=90.0,
+        )
+        score = score_tracklet_quality(t)
+        # Very short arc → grade D, low arc_score → low quality
+        assert score < 0.6
+
+    def test_grade_d_tracklet(self):
+        from link import score_tracklet_quality
+        from schemas import Observation, Tracklet
+        # Two identical obs → linear fit perfect but arc near 0 → grade D
+        obs = tuple(Observation(
+            obs_id=f"d{i}",
+            ra_deg=180.0,
+            dec_deg=0.0,
+            jd=2460000.5 + i * 0.001,
+            mag=19.5,
+            mag_err=0.1,
+            filter_band="r",
+            mission="ZTF",
+            real_bogus=0.9,
+        ) for i in range(2))
+        t = Tracklet(
+            object_id="T_D",
+            observations=obs,
+            arc_days=0.001,
+            motion_rate_arcsec_per_hour=0.01,
+            motion_pa_degrees=90.0,
+        )
+        score = score_tracklet_quality(t)
+        # grade=D(0.25), arc_score~0, conf~1.0 → score ~ 0.4 * 0.25 + 0.3 * 0 + 0.3 * 1.0
+        assert 0.0 <= score <= 0.5
+
+    def test_returns_float_rounded_4dp(self):
+        from link import score_tracklet_quality
+        t = self._make_tracklet(arc_days=3.0)
+        score = score_tracklet_quality(t)
+        assert isinstance(score, float)
+        # Verify 4 decimal places
+        assert round(score, 4) == score
+
+    def test_in_all(self):
+        from link import __all__
+        assert "score_tracklet_quality" in __all__

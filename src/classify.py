@@ -24,6 +24,7 @@ __all__ = [
     "compute_artifact_probability",
     "compute_confusion_matrix",
     "compute_calibration_gain",
+    "batch_classify_morphology",
 ]
 
 import base64
@@ -1302,3 +1303,28 @@ def compute_calibration_gain(
     eps = 1e-12
     kl = float(np.sum(p * np.log((p + eps) / (q + eps))))
     return round(kl, 6)
+
+
+def batch_classify_morphology(tracklets: list[Tracklet]) -> list[dict[str, Any]]:
+    """Batch morphology summary across multiple tracklets.
+
+    For each tracklet calls :func:`batch_morphology` and returns a flat dict
+    with keys: ``object_id``, ``modal_class``, ``streak_fraction``, and
+    ``n_observations``.
+
+    Args:
+        tracklets: List of :class:`~schemas.Tracklet` objects.
+
+    Returns:
+        List of dicts, one per tracklet.  Empty list for empty input.
+    """
+    results: list[dict[str, Any]] = []
+    for tracklet in tracklets:
+        morph = batch_morphology(tracklet)
+        results.append({
+            "object_id": tracklet.object_id,
+            "modal_class": morph.get("modal_class", "unknown"),
+            "streak_fraction": morph.get("streak_fraction", 0.0),
+            "n_observations": len(tracklet.observations),
+        })
+    return results

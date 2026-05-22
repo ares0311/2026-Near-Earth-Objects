@@ -14,6 +14,7 @@ __all__ = [
     "compute_roc_auc",
     "compute_precision_recall_curve",
     "compute_f1_score", "compute_average_precision",
+    "compute_calibration_sharpness",
 ]
 
 import math
@@ -730,3 +731,25 @@ def compute_average_precision(
     """
     result = compute_precision_recall_curve(probs, labels)
     return float(result["average_precision"])
+
+
+def compute_calibration_sharpness(probs: list[float]) -> float:
+    """Compute calibration sharpness — mean confidence across all predictions.
+
+    For each predicted probability p, confidence = max(p, 1 − p).
+    Sharpness is the mean of these confidences across all samples.
+
+    A perfectly uncertain model (all predictions = 0.5) has sharpness 0.5.
+    A perfectly sharp model (all predictions = 0 or 1) has sharpness 1.0.
+
+    Args:
+        probs: List of predicted probabilities, each in [0, 1].
+
+    Returns:
+        Mean confidence in [0.5, 1.0], rounded to 4 decimal places.
+        Returns 0.5 for empty input.
+    """
+    if not probs:
+        return 0.5
+    confidences = [max(p, 1.0 - p) for p in probs]
+    return round(float(sum(confidences) / len(confidences)), 4)

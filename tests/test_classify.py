@@ -1707,3 +1707,58 @@ class TestComputeCalibrationGain:
     def test_in_all(self):
         from classify import __all__
         assert "compute_calibration_gain" in __all__
+
+
+class TestBatchClassifyMorphology:
+    """Tests for batch_classify_morphology."""
+
+    def _make_tracklet(self, object_id: str = "T001"):
+        from schemas import Observation, Tracklet
+        obs = tuple(Observation(
+            obs_id=f"{object_id}_o{i}",
+            ra_deg=180.0 + i * 0.01,
+            dec_deg=0.0,
+            jd=2460000.5 + i * 0.5,
+            mag=19.5,
+            mag_err=0.05,
+            filter_band="r",
+            mission="ZTF",
+            real_bogus=0.9,
+        ) for i in range(4))
+        return Tracklet(
+            object_id=object_id,
+            observations=obs,
+            arc_days=1.5,
+            motion_rate_arcsec_per_hour=1.0,
+            motion_pa_degrees=90.0,
+        )
+
+    def test_empty_list(self):
+        from classify import batch_classify_morphology
+        result = batch_classify_morphology([])
+        assert result == []
+
+    def test_single_tracklet(self):
+        from classify import batch_classify_morphology
+        t = self._make_tracklet("T001")
+        result = batch_classify_morphology([t])
+        assert len(result) == 1
+        r = result[0]
+        assert r["object_id"] == "T001"
+        assert "modal_class" in r
+        assert "streak_fraction" in r
+        assert r["n_observations"] == 4
+
+    def test_multiple_tracklets(self):
+        from classify import batch_classify_morphology
+        tracklets = [self._make_tracklet(f"T{i:03d}") for i in range(3)]
+        result = batch_classify_morphology(tracklets)
+        assert len(result) == 3
+        ids = [r["object_id"] for r in result]
+        assert "T000" in ids
+        assert "T001" in ids
+        assert "T002" in ids
+
+    def test_in_all(self):
+        from classify import __all__
+        assert "batch_classify_morphology" in __all__

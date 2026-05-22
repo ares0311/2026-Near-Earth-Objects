@@ -25,6 +25,7 @@ __all__ = [
     "validate_alert_package",
     "estimate_followup_window",
     "format_candidate_dossier",
+    "count_alerts_by_flag",
 ]
 
 import json
@@ -1138,3 +1139,22 @@ def format_candidate_dossier(neo: ScoredNEO) -> str:
         "=" * 72,
     ]
     return "\n".join(lines)
+
+
+def count_alerts_by_flag(neos: list[ScoredNEO]) -> dict[str, int]:
+    """Count the number of candidates for each hazard flag.
+
+    Only includes flags that appear in the list (no zero-count entries).
+    Returns an empty dict for an empty list.
+
+    Args:
+        neos: List of :class:`~schemas.ScoredNEO` objects.
+
+    Returns:
+        Dict mapping hazard_flag → count.
+    """
+    counts: dict[str, int] = {}
+    for neo in neos:
+        flag = neo.hazard.hazard_flag
+        counts[flag] = counts.get(flag, 0) + 1
+    return counts

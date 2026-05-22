@@ -1290,3 +1290,67 @@ class TestEstimateObservationDepth:
         obs = [self._obs(20.0)]
         result = estimate_observation_depth(obs)
         assert result == 20.0
+
+
+class TestFilterByMagnitude:
+    """Tests for filter_by_magnitude."""
+
+    def _obs(self, obs_id: str, mag: float):
+        from schemas import Observation
+        return Observation(
+            obs_id=obs_id,
+            ra_deg=180.0,
+            dec_deg=0.0,
+            jd=2460000.5,
+            mag=mag,
+            mag_err=0.05,
+            filter_band="r",
+            mission="ZTF",
+            real_bogus=0.9,
+        )
+
+    def test_normal_filter(self):
+        from detect import filter_by_magnitude
+        obs = [self._obs("a", 18.0), self._obs("b", 20.0), self._obs("c", 22.0)]
+        result = filter_by_magnitude(obs, 21.0)
+        ids = [o.obs_id for o in result]
+        assert "a" in ids
+        assert "b" in ids
+        assert "c" not in ids
+
+    def test_sentinel_excluded(self):
+        from detect import filter_by_magnitude
+        # Sentinels (mag >= 90) are excluded regardless of mag_limit
+        obs = [self._obs("a", 90.0), self._obs("b", 99.9), self._obs("c", 95.0)]
+        result = filter_by_magnitude(obs, 200.0)
+        # All have mag >= 90, so all are excluded
+        assert len(result) == 0
+
+    def test_none_qualify(self):
+        from detect import filter_by_magnitude
+        obs = [self._obs("a", 22.0), self._obs("b", 23.0)]
+        result = filter_by_magnitude(obs, 20.0)
+        assert result == []
+
+    def test_all_qualify(self):
+        from detect import filter_by_magnitude
+        obs = [self._obs("a", 18.0), self._obs("b", 19.0), self._obs("c", 20.0)]
+        result = filter_by_magnitude(obs, 25.0)
+        assert len(result) == 3
+
+    def test_empty_input(self):
+        from detect import filter_by_magnitude
+        assert filter_by_magnitude([], 20.0) == []
+
+    def test_none_mag_skipped(self):
+        from detect import filter_by_magnitude
+        from types import SimpleNamespace
+        obs_none = SimpleNamespace(mag=None)
+        obs_real = self._obs("b", 18.0)
+        result = filter_by_magnitude([obs_none, obs_real], 25.0)
+        assert len(result) == 1
+        assert result[0].obs_id == "b"
+
+    def test_in_all(self):
+        from detect import __all__
+        assert "filter_by_magnitude" in __all__
