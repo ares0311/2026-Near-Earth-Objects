@@ -11,7 +11,8 @@ __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_
            "compute_pixel_histogram",
            "compute_cutout_contrast",
            "compute_image_gradient",
-           "compute_cutout_symmetry"]
+           "compute_cutout_symmetry",
+           "compute_streak_angle"]
 
 import base64
 import math
@@ -818,5 +819,43 @@ def compute_cutout_symmetry(obs: object) -> float | None:
             return None
         score = float(np.dot(flat, rot_flat) / denom)
         return round(max(0.0, min(1.0, score)), 6)
+    except Exception:
+        return None
+
+
+def compute_streak_angle(obs: object) -> float | None:
+    """Return the elongation axis angle in degrees from the difference-image.
+
+    The angle is measured from the image second-moment ellipse as the
+    orientation of the major axis, in degrees from the positive x-axis
+    (East direction in standard orientation), in [0, 180).  Returns *None*
+    when no cutout is available, the cutout cannot be decoded, or the
+    second-moment matrix is degenerate (zero eigenvalue difference).
+    """
+    import base64
+    import math
+
+    cutout = getattr(obs, "cutout_difference", None)
+    if cutout is None:
+        return None
+    try:
+        raw = base64.b64decode(cutout)
+        arr = np.frombuffer(raw, dtype=np.float32).reshape(63, 63).astype(float)
+        total = arr.sum()
+        if total == 0.0:
+            return None
+        ys, xs = np.mgrid[0:63, 0:63]
+        cx = float((arr * xs).sum() / total)
+        cy = float((arr * ys).sum() / total)
+        dx = xs - cx
+        dy = ys - cy
+        mxx = float((arr * dx * dx).sum() / total)
+        myy = float((arr * dy * dy).sum() / total)
+        mxy = float((arr * dx * dy).sum() / total)
+        # Orientation of major axis via eigenvalue decomposition
+        diff = mxx - myy
+        angle_rad = 0.5 * math.atan2(2.0 * mxy, diff)
+        angle_deg = math.degrees(angle_rad) % 180.0
+        return round(angle_deg, 4)
     except Exception:
         return None

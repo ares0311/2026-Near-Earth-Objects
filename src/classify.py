@@ -28,6 +28,7 @@ __all__ = [
     "compute_class_entropy_stats",
     "compute_tier1_score_distribution",
     "compute_class_entropy_summary",
+    "compute_neo_class_distribution",
 ]
 
 import base64
@@ -1436,4 +1437,25 @@ def compute_class_entropy_summary(neos: list) -> dict[str, float | int]:
         "max_entropy": round(float(arr.max()), 6),
         "min_entropy": round(float(arr.min()), 6),
         "n_neos": n,
+    }
+
+
+def compute_neo_class_distribution(neos: list) -> dict[str, dict[str, float | int]]:
+    """Return the distribution of NEO dynamical classes across scored candidates.
+
+    For each distinct ``neo_class`` found in the hazard assessments of the
+    supplied *neos*, returns a dict with ``"count"`` (int) and
+    ``"fraction"`` (float, rounded to 4 d.p.).  An empty list returns an
+    empty dict.
+    """
+    counts: dict[str, int] = {}
+    for neo in neos:
+        cls = getattr(getattr(neo, "hazard", None), "neo_class", "unknown") or "unknown"
+        counts[cls] = counts.get(cls, 0) + 1
+    total = len(neos)
+    if total == 0:
+        return {}
+    return {
+        cls: {"count": cnt, "fraction": round(cnt / total, 4)}
+        for cls, cnt in counts.items()
     }

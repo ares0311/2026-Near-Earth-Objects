@@ -29,6 +29,7 @@ __all__ = [
     "format_bulk_summary",
     "count_ready_to_submit",
     "compute_alert_age_days",
+    "format_observation_log",
 ]
 
 import json
@@ -1257,3 +1258,27 @@ def compute_alert_age_days(neo: ScoredNEO, current_jd: float) -> float:
     first_jd = min(float(getattr(o, "jd", current_jd)) for o in obs)
     age = current_jd - first_jd
     return round(max(0.0, age), 4)
+
+
+def format_observation_log(neo: ScoredNEO) -> str:
+    """Return a plain-text table of all tracklet observations.
+
+    Columns: JD, RA (deg), Dec (deg), Mag, Filter, Mission.  The table
+    is sorted by Julian Date and includes a header and separator line.
+    Returns an empty-table string when the tracklet has no observations.
+    """
+    obs_list = sorted(neo.tracklet.observations, key=lambda o: o.jd)
+    header = (
+        f"{'JD':>14s}  {'RA (deg)':>10s}  {'Dec (deg)':>10s}"
+        f"  {'Mag':>6s}  {'Filter':<8s}  Mission"
+    )
+    sep = "-" * len(header)
+    lines = [header, sep]
+    for o in obs_list:
+        lines.append(
+            f"{o.jd:>14.4f}  {o.ra_deg:>10.6f}  {o.dec_deg:>10.6f}"
+            f"  {o.mag:>6.2f}  {o.filter_band:<8s}  {o.mission}"
+        )
+    lines.append(sep)
+    lines.append(f"{len(obs_list)} observation(s) for {neo.tracklet.object_id}")
+    return "\n".join(lines)

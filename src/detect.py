@@ -9,7 +9,8 @@ __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus"
            "flag_moving_sources", "compute_source_extent", "estimate_observation_depth",
            "filter_by_magnitude", "compute_streak_density",
            "compute_angular_velocity",
-           "compute_detection_gap"]
+           "compute_detection_gap",
+           "compute_observation_cadence"]
 
 import math
 import uuid
@@ -877,3 +878,21 @@ def compute_detection_gap(observations: list) -> float | None:
         if dt_hours > max_gap_hours:
             max_gap_hours = dt_hours
     return round(max_gap_hours, 4)
+
+
+def compute_observation_cadence(observations: list) -> float | None:
+    """Return the mean cadence in hours between consecutive observations.
+
+    Observations are sorted by Julian Date before computing inter-observation
+    gaps.  The cadence is the arithmetic mean of all consecutive-pair gaps.
+    Returns *None* when fewer than two observations are supplied.
+    """
+    if len(observations) < 2:
+        return None
+    sorted_obs = sorted(observations, key=lambda o: float(getattr(o, "jd", 0.0)))
+    gaps = [
+        (float(getattr(sorted_obs[i + 1], "jd", 0.0))
+         - float(getattr(sorted_obs[i], "jd", 0.0))) * 24.0
+        for i in range(len(sorted_obs) - 1)
+    ]
+    return round(sum(gaps) / len(gaps), 4)

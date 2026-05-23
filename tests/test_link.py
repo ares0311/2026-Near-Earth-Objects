@@ -1696,3 +1696,56 @@ class TestComputeInterNightGaps:
         t = self._tracklet([2460000.5, 2460100.5])
         gaps = compute_inter_night_gaps(t)
         assert gaps == [100.0]
+
+
+class TestFilterByMotionRate:
+    def _tracklet(self, rate):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import Observation, Tracklet
+        obs = tuple(
+            Observation(obs_id=f"o{i}", ra_deg=10.0, dec_deg=5.0, jd=2460000.0 + i,
+                        mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF")
+            for i in range(2)
+        )
+        return Tracklet(object_id="T1", observations=obs, arc_days=1.0,
+                        motion_rate_arcsec_per_hour=rate, motion_pa_degrees=90.0)
+
+    def test_filters_in_range(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import filter_by_motion_rate
+        tracklets = [self._tracklet(5.0), self._tracklet(25.0), self._tracklet(55.0)]
+        result = filter_by_motion_rate(tracklets, min_rate_arcsec_hr=10.0, max_rate_arcsec_hr=30.0)
+        assert len(result) == 1
+        assert result[0].motion_rate_arcsec_per_hour == 25.0
+
+    def test_all_pass_with_defaults(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import filter_by_motion_rate
+        tracklets = [self._tracklet(1.0), self._tracklet(30.0)]
+        assert len(filter_by_motion_rate(tracklets)) == 2
+
+    def test_empty_list(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import filter_by_motion_rate
+        assert filter_by_motion_rate([]) == []
+
+    def test_no_rate_attribute_excluded(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import filter_by_motion_rate
+        t = SimpleNamespace()  # no motion_rate_arcsec_per_hour
+        assert filter_by_motion_rate([t]) == []
+
+    def test_boundary_inclusive(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import filter_by_motion_rate
+        tracklets = [self._tracklet(10.0), self._tracklet(30.0)]
+        result = filter_by_motion_rate(tracklets, 10.0, 30.0)
+        assert len(result) == 2

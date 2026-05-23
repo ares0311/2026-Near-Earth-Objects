@@ -13,7 +13,8 @@ __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
            "compute_true_anomaly", "compute_mean_motion",
            "compute_longitude_of_perihelion",
            "compute_orbital_inclination_class",
-           "compute_mean_anomaly_at_jd"]
+           "compute_mean_anomaly_at_jd",
+           "compute_orbital_velocity"]
 
 import math
 from typing import NamedTuple
@@ -1171,3 +1172,32 @@ def compute_mean_anomaly_at_jd(elements: object, target_jd: float) -> float | No
     delta_t = target_jd - epoch_jd
     m_rad = (m0_rad + n_rad_per_day * delta_t) % (2.0 * math.pi)
     return round(m_rad, 8)
+
+
+def compute_orbital_velocity(elements: object, r_au: float) -> float | None:
+    """Return the orbital speed in km/s at heliocentric distance *r_au*.
+
+    Uses the vis-viva equation:
+
+    .. math::
+
+        v = \\sqrt{GM_\\odot \\left(\\frac{2}{r} - \\frac{1}{a}\\right)}
+
+    where :math:`GM_\\odot = 1.327 \\times 10^{20}` m³/s² and distances are
+    converted from AU (1 AU = 1.496 × 10¹¹ m).  Returns *None* when
+    ``semi_major_axis_au`` is non-positive or *r_au* ≤ 0.
+    """
+    import math
+
+    GM_SI = 1.327124400e20  # m³/s²
+    AU_M = 1.495978707e11   # m/AU
+
+    a = float(getattr(elements, "semi_major_axis_au", 0.0) or 0.0)
+    if a <= 0.0 or r_au <= 0.0:
+        return None
+    r_m = r_au * AU_M
+    a_m = a * AU_M
+    v2 = GM_SI * (2.0 / r_m - 1.0 / a_m)
+    if v2 < 0.0:
+        return None
+    return round(math.sqrt(v2) / 1000.0, 4)  # km/s

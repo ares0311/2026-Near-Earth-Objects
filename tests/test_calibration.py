@@ -978,3 +978,43 @@ class TestComputeResolutionScore:
         sys.path.insert(0, "src")
         import calibration
         assert "compute_resolution_score" in calibration.__all__
+
+
+class TestComputeExpectedPositiveRate:
+    def test_all_above_threshold(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_expected_positive_rate
+        assert compute_expected_positive_rate([0.8, 0.9, 0.7], 0.5) == 1.0
+
+    def test_none_above_threshold(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_expected_positive_rate
+        assert compute_expected_positive_rate([0.1, 0.2, 0.3], 0.5) == 0.0
+
+    def test_half_above(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_expected_positive_rate
+        result = compute_expected_positive_rate([0.3, 0.7, 0.3, 0.7], 0.5)
+        assert result == pytest.approx(0.5, abs=0.001)
+
+    def test_empty_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_expected_positive_rate
+        assert compute_expected_positive_rate([], 0.5) == 0.0
+
+    def test_default_threshold(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_expected_positive_rate
+        result = compute_expected_positive_rate([0.6, 0.4, 0.8])
+        assert result == pytest.approx(2 / 3, abs=0.001)
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        assert "compute_expected_positive_rate" in calibration.__all__

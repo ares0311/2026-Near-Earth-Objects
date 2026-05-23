@@ -1085,3 +1085,42 @@ class TestAstrometricResidual:
         sys.path.insert(0, "src")
         import schemas
         assert "AstrometricResidual" in schemas.__all__
+
+
+class TestResidualSummary:
+    def test_basic_construction(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import ResidualSummary
+        r = ResidualSummary(object_id="T1", n_obs=3, rms_arcsec=0.25,
+                            max_residual_arcsec=0.45, mean_ra_residual_arcsec=0.01,
+                            mean_dec_residual_arcsec=-0.02)
+        assert r.object_id == "T1"
+        assert r.n_obs == 3
+
+    def test_frozen(self):
+        import sys
+
+        import pytest
+        sys.path.insert(0, "src")
+        from schemas import ResidualSummary
+        r = ResidualSummary(object_id="x", n_obs=1, rms_arcsec=0.0,
+                            max_residual_arcsec=0.0, mean_ra_residual_arcsec=0.0,
+                            mean_dec_residual_arcsec=0.0)
+        with pytest.raises(Exception):
+            r.n_obs = 2
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        assert "ResidualSummary" in schemas.__all__
+
+    def test_zero_residuals(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import ResidualSummary
+        r = ResidualSummary(object_id="T2", n_obs=5, rms_arcsec=0.0,
+                            max_residual_arcsec=0.0, mean_ra_residual_arcsec=0.0,
+                            mean_dec_residual_arcsec=0.0)
+        assert r.rms_arcsec == 0.0

@@ -11,7 +11,8 @@ __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "compute_position_angle_consistency", "score_tracklet_quality",
            "compute_night_span",
            "compute_tracklet_velocity_dispersion",
-           "compute_inter_night_gaps"]
+           "compute_inter_night_gaps",
+           "filter_by_motion_rate"]
 
 import math
 import uuid
@@ -940,3 +941,24 @@ def compute_inter_night_gaps(tracklet: object) -> list[float]:
     if len(nights) < 2:
         return []
     return [round(float(nights[i + 1] - nights[i]), 4) for i in range(len(nights) - 1)]
+
+
+def filter_by_motion_rate(
+    tracklets: list,
+    min_rate_arcsec_hr: float = 0.0,
+    max_rate_arcsec_hr: float = 60.0,
+) -> list:
+    """Return tracklets whose motion rate is within *[min_rate, max_rate]*.
+
+    Uses the ``motion_rate_arcsec_per_hour`` attribute of each tracklet.
+    Tracklets missing this attribute are excluded.  Both bounds are
+    inclusive.
+    """
+    result = []
+    for t in tracklets:
+        rate = getattr(t, "motion_rate_arcsec_per_hour", None)
+        if rate is None:
+            continue
+        if min_rate_arcsec_hr <= float(rate) <= max_rate_arcsec_hr:
+            result.append(t)
+    return result

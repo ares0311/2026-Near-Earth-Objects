@@ -18,6 +18,7 @@ __all__ = [
     "compute_brier_skill_score",
     "compute_discrimination_score",
     "compute_resolution_score",
+    "compute_expected_positive_rate",
 ]
 
 import math
@@ -866,3 +867,22 @@ def compute_resolution_score(
         y_bar_k = float(y[mask].mean())
         resolution += n_k * (y_bar_k - clim) ** 2
     return round(resolution / total, 8)
+
+
+def compute_expected_positive_rate(
+    probs: list[float] | np.ndarray,
+    threshold: float = 0.5,
+) -> float:
+    """Return the fraction of predictions at or above *threshold*.
+
+    This is the expected positive rate (EPR) — the fraction of items that
+    would be classified as positive at the given decision threshold.
+    Useful for capacity planning: an EPR of 0.1 with 1,000 candidates
+    means roughly 100 follow-up observations are needed.
+
+    Returns 0.0 for empty inputs or when *threshold* > 1.0.
+    """
+    p = np.asarray(probs, dtype=float)
+    if p.size == 0:
+        return 0.0
+    return round(float((p >= threshold).mean()), 6)

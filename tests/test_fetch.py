@@ -2714,3 +2714,109 @@ class TestFetchNeocpObjectsMockQuery:
         assert len(result) == 1
         assert result[0]["object_id"] == "P10Abc1"
         assert "neocp_objects" in saved
+
+
+class TestFetchMpcOrbitElements:
+    def test_cache_hit_returns_dict(self, monkeypatch):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch as fm
+
+        cached = {"designation": "2020 AB1", "a": 1.5, "e": 0.1, "i": 10.0,
+                  "node": 45.0, "peri": 90.0, "M": 180.0, "epoch_jd": 2451545.0}
+        monkeypatch.setattr(fm, "_load_cache", lambda _k: cached)
+        result = fm.fetch_mpc_orbit_elements("2020 AB1")
+        assert result == cached
+
+    def test_cache_miss_non_dict_triggers_query_and_returns_none(self, monkeypatch):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch as fm
+
+        monkeypatch.setattr(fm, "_load_cache", lambda _k: [1, 2])
+        monkeypatch.setattr(fm, "_save_cache", lambda _k, _v: None)
+        result = fm.fetch_mpc_orbit_elements("2020 AB1")
+        assert result is None
+
+    def test_force_refresh_skips_cache(self, monkeypatch):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch as fm
+
+        calls = []
+        monkeypatch.setattr(fm, "_load_cache", lambda _k: calls.append("load") or None)
+        monkeypatch.setattr(fm, "_save_cache", lambda _k, _v: None)
+        fm.fetch_mpc_orbit_elements("2020 AB1", force_refresh=True)
+        assert "load" not in calls
+
+    def test_query_success_mock(self, monkeypatch):
+        import sys
+        import types as _types
+        sys.path.insert(0, "src")
+        import fetch as fm
+
+        monkeypatch.setattr(fm, "_load_cache", lambda _k: None)
+        saved = {}
+        monkeypatch.setattr(fm, "_save_cache", lambda k, v: saved.update({k: v}))
+
+        class FakeRow:
+            colnames = ["semimajor_axis", "eccentricity", "inclination",
+                        "ascending_node", "argument_of_perihelion", "mean_anomaly", "epoch_jd"]
+            def __getitem__(self, key):
+                return {"semimajor_axis": 1.5, "eccentricity": 0.1, "inclination": 10.0,
+                        "ascending_node": 45.0, "argument_of_perihelion": 90.0,
+                        "mean_anomaly": 180.0, "epoch_jd": 2451545.0}[key]
+
+        class FakeTbl:
+            def __len__(self): return 1
+            def __getitem__(self, i): return FakeRow()
+            colnames = FakeRow.colnames
+
+        class FakeMPC:
+            @staticmethod
+            def query_object(_type, designation=None):
+                return FakeTbl()
+
+        fake_mod = _types.ModuleType("astroquery.mpc")
+        fake_mod.MPC = FakeMPC
+        import sys as _sys
+        monkeypatch.setitem(_sys.modules, "astroquery.mpc", fake_mod)
+
+        result = fm.fetch_mpc_orbit_elements("2020 AB1", force_refresh=True)
+        assert result is not None
+        assert result["a"] == 1.5
+        assert "2020 AB1" in saved.get("mpc_orb_2020 AB1", {}).get("designation", "")
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+        assert "fetch_mpc_orbit_elements" in fetch.__all__
+
+
+class TestFetchMpcOrbitElementsEmptyTable:
+    def test_empty_table_returns_none(self, monkeypatch):
+        """Cover fetch.py line 1376: empty MPC query result → None."""
+        import sys
+        import types as _types
+        sys.path.insert(0, "src")
+        import fetch as fm
+
+        monkeypatch.setattr(fm, "_load_cache", lambda _k: None)
+        monkeypatch.setattr(fm, "_save_cache", lambda _k, _v: None)
+
+        class FakeEmptyTbl:
+            def __len__(self): return 0
+
+        class FakeMPC:
+            @staticmethod
+            def query_object(_type, designation=None):
+                return FakeEmptyTbl()
+
+        fake_mod = _types.ModuleType("astroquery.mpc")
+        fake_mod.MPC = FakeMPC
+        import sys as _sys
+        monkeypatch.setitem(_sys.modules, "astroquery.mpc", fake_mod)
+
+        result = fm.fetch_mpc_orbit_elements("UnknownObj", force_refresh=True)
+        assert result is None

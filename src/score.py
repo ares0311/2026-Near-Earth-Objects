@@ -12,7 +12,8 @@ __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "compute_close_approach_score", "compute_combined_priority",
            "compute_weighted_priority",
            "compute_arc_quality_bonus",
-           "compute_weighted_hazard_score"]
+           "compute_weighted_hazard_score",
+           "compute_hazard_grade"]
 
 import math
 import uuid
@@ -925,3 +926,27 @@ def compute_weighted_hazard_score(neo: ScoredNEO) -> float:
     close = compute_close_approach_score(neo)
     arc_bonus = compute_arc_quality_bonus(neo)
     return round(0.4 * threat + 0.4 * close + 0.2 * arc_bonus, 4)
+
+
+def compute_hazard_grade(neo: ScoredNEO) -> str:
+    """Return a letter grade summarising the hazard level of *neo*.
+
+    Grades are assigned from :func:`compute_weighted_hazard_score`:
+
+    ======= ============================
+    Grade   Weighted hazard score
+    ======= ============================
+    ``"A"`` ≥ 0.7 — urgent
+    ``"B"`` ≥ 0.5 — high priority
+    ``"C"`` ≥ 0.3 — medium priority
+    ``"D"`` < 0.3 — routine
+    ======= ============================
+    """
+    score = compute_weighted_hazard_score(neo)
+    if score >= 0.7:
+        return "A"
+    if score >= 0.5:
+        return "B"
+    if score >= 0.3:
+        return "C"
+    return "D"
