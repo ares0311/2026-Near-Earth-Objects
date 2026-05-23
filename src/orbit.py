@@ -11,7 +11,8 @@ __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
            "compute_apparent_magnitude", "compute_absolute_magnitude",
            "compute_perihelion_date", "compute_eccentric_anomaly",
            "compute_true_anomaly", "compute_mean_motion",
-           "compute_longitude_of_perihelion"]
+           "compute_longitude_of_perihelion",
+           "compute_orbital_inclination_class"]
 
 import math
 from typing import NamedTuple
@@ -1114,3 +1115,33 @@ def compute_longitude_of_perihelion(elements: object) -> float:
     omega_node = float(getattr(elements, "longitude_of_ascending_node_deg", 0.0))
     omega_peri = float(getattr(elements, "argument_of_perihelion_deg", 0.0))
     return round((omega_node + omega_peri) % 360.0, 6)
+
+
+def compute_orbital_inclination_class(elements: object) -> str:
+    """Classify an orbit's inclination as prograde, polar, or retrograde.
+
+    Uses the inclination attribute from *elements* (degrees):
+
+    - ``'prograde'``  — i < 85°  (direct motion, low-to-moderate inclination)
+    - ``'polar'``     — 85° ≤ i ≤ 95°  (near-polar orbit)
+    - ``'retrograde'`` — i > 95°  (reverse motion relative to Earth's orbit)
+
+    Falls back to the ``inclination_deg`` attribute name used by
+    :class:`~schemas.OrbitalElements` and also accepts the alternative
+    ``'i_deg'`` name.  Defaults to 0.0 if neither attribute is found.
+
+    Args:
+        elements: Object with an ``inclination_deg`` (or ``i_deg``) attribute.
+
+    Returns:
+        One of ``'prograde'``, ``'polar'``, or ``'retrograde'``.
+    """
+    inc = getattr(elements, "inclination_deg", None)
+    if inc is None:
+        inc = getattr(elements, "i_deg", 0.0)
+    inc = float(inc)
+    if inc < 85.0:
+        return "prograde"
+    if inc <= 95.0:
+        return "polar"
+    return "retrograde"

@@ -869,3 +869,59 @@ class TestComputeBrierSkillScore:
     def test_in_all(self):
         from calibration import __all__
         assert "compute_brier_skill_score" in __all__
+
+
+class TestComputeDiscriminationScore:
+    """Tests for compute_discrimination_score."""
+
+    def test_perfect_discrimination(self):
+        from calibration import compute_discrimination_score
+        # positives all 1.0, negatives all 0.0
+        probs = [1.0, 1.0, 0.0, 0.0]
+        labels = [1, 1, 0, 0]
+        assert compute_discrimination_score(probs, labels) == 1.0
+
+    def test_zero_discrimination(self):
+        from calibration import compute_discrimination_score
+        # same mean for both classes
+        probs = [0.5, 0.5, 0.5, 0.5]
+        labels = [1, 1, 0, 0]
+        assert compute_discrimination_score(probs, labels) == 0.0
+
+    def test_empty_input(self):
+        from calibration import compute_discrimination_score
+        assert compute_discrimination_score([], []) == 0.0
+
+    def test_only_positives(self):
+        from calibration import compute_discrimination_score
+        # no negatives → 0.0
+        probs = [0.9, 0.8]
+        labels = [1, 1]
+        assert compute_discrimination_score(probs, labels) == 0.0
+
+    def test_only_negatives(self):
+        from calibration import compute_discrimination_score
+        probs = [0.1, 0.2]
+        labels = [0, 0]
+        assert compute_discrimination_score(probs, labels) == 0.0
+
+    def test_partial_discrimination(self):
+        from calibration import compute_discrimination_score
+        probs = [0.8, 0.7, 0.3, 0.2]
+        labels = [1, 1, 0, 0]
+        # mean_pos=0.75, mean_neg=0.25, diff=0.5
+        result = compute_discrimination_score(probs, labels)
+        assert abs(result - 0.5) < 1e-6
+
+    def test_numpy_arrays_accepted(self):
+        import numpy as np
+
+        from calibration import compute_discrimination_score
+        probs = np.array([0.9, 0.1])
+        labels = np.array([1, 0])
+        result = compute_discrimination_score(probs, labels)
+        assert isinstance(result, float)
+
+    def test_in_all(self):
+        from calibration import __all__
+        assert "compute_discrimination_score" in __all__

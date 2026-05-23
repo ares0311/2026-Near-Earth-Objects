@@ -1620,3 +1620,53 @@ class TestComputeLongitudeOfPerihelion:
     def test_in_all(self):
         from orbit import __all__
         assert "compute_longitude_of_perihelion" in __all__
+
+
+class TestComputeOrbitalInclinationClass:
+    """Tests for compute_orbital_inclination_class."""
+
+    def _make_el(self, inc):
+        from types import SimpleNamespace
+        return SimpleNamespace(inclination_deg=inc)
+
+    def test_prograde_low(self):
+        from orbit import compute_orbital_inclination_class
+        assert compute_orbital_inclination_class(self._make_el(5.0)) == "prograde"
+
+    def test_prograde_boundary(self):
+        from orbit import compute_orbital_inclination_class
+        assert compute_orbital_inclination_class(self._make_el(84.9)) == "prograde"
+
+    def test_polar_lower_boundary(self):
+        from orbit import compute_orbital_inclination_class
+        assert compute_orbital_inclination_class(self._make_el(85.0)) == "polar"
+
+    def test_polar_upper_boundary(self):
+        from orbit import compute_orbital_inclination_class
+        assert compute_orbital_inclination_class(self._make_el(95.0)) == "polar"
+
+    def test_retrograde(self):
+        from orbit import compute_orbital_inclination_class
+        assert compute_orbital_inclination_class(self._make_el(120.0)) == "retrograde"
+
+    def test_retrograde_boundary(self):
+        from orbit import compute_orbital_inclination_class
+        assert compute_orbital_inclination_class(self._make_el(95.1)) == "retrograde"
+
+    def test_missing_attr_defaults_to_prograde(self):
+        from types import SimpleNamespace
+
+        from orbit import compute_orbital_inclination_class
+        el = SimpleNamespace()
+        assert compute_orbital_inclination_class(el) == "prograde"
+
+    def test_i_deg_alias(self):
+        from types import SimpleNamespace
+
+        from orbit import compute_orbital_inclination_class
+        el = SimpleNamespace(i_deg=90.0)
+        assert compute_orbital_inclination_class(el) == "polar"
+
+    def test_in_all(self):
+        from orbit import __all__
+        assert "compute_orbital_inclination_class" in __all__

@@ -1353,3 +1353,73 @@ class TestComputeCutoutContrast:
     def test_in_all(self):
         from preprocess import __all__
         assert "compute_cutout_contrast" in __all__
+
+
+class TestComputeImageGradient:
+    """Tests for compute_image_gradient."""
+
+    def _make_obs(self, arr=None, cutout=None):
+        import base64
+
+        import numpy as np
+
+        from schemas import Observation
+        if arr is not None:
+            raw = base64.b64encode(arr.astype(np.float32).tobytes()).decode()
+        else:
+            raw = cutout
+        return Observation(
+            obs_id="ig_test", ra_deg=180.0, dec_deg=0.0, jd=2460000.5,
+            mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF",
+            cutout_difference=raw,
+        )
+
+    def test_no_cutout_returns_none(self):
+        from preprocess import compute_image_gradient
+        from schemas import Observation
+        obs = Observation(
+            obs_id="no_cut", ra_deg=0.0, dec_deg=0.0, jd=2460000.5,
+            mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF",
+        )
+        assert compute_image_gradient(obs) is None
+
+    def test_uniform_array_near_zero_gradient(self):
+        import numpy as np
+
+        from preprocess import compute_image_gradient
+        arr = np.ones((63, 63), dtype=np.float32)
+        obs = self._make_obs(arr=arr)
+        result = compute_image_gradient(obs)
+        assert result is not None
+        assert result < 0.01  # uniform → near-zero gradient
+
+    def test_spike_array_high_gradient(self):
+        import numpy as np
+
+        from preprocess import compute_image_gradient
+        arr = np.zeros((63, 63), dtype=np.float32)
+        arr[31, 31] = 100.0  # sharp spike
+        obs = self._make_obs(arr=arr)
+        result = compute_image_gradient(obs)
+        assert result is not None
+        assert result > 0.0
+
+    def test_returns_float_rounded_6dp(self):
+        import numpy as np
+
+        from preprocess import compute_image_gradient
+        arr = np.zeros((63, 63), dtype=np.float32)
+        arr[20, 20] = 5.0
+        obs = self._make_obs(arr=arr)
+        result = compute_image_gradient(obs)
+        assert result is not None
+        assert round(result, 6) == result
+
+    def test_invalid_base64_returns_none(self):
+        from preprocess import compute_image_gradient
+        obs = self._make_obs(cutout="!!!invalid!!!")
+        assert compute_image_gradient(obs) is None
+
+    def test_in_all(self):
+        from preprocess import __all__
+        assert "compute_image_gradient" in __all__

@@ -1323,3 +1323,51 @@ class TestComputeWeightedPriority:
     def test_in_all(self):
         from score import __all__
         assert "compute_weighted_priority" in __all__
+
+
+class TestComputeArcQualityBonus:
+    """Tests for compute_arc_quality_bonus."""
+
+    def _neo(self, arc_days=1.0, discovery_priority=0.5):
+        from tests.conftest import build_scored_neo
+        neo = build_scored_neo()
+        from schemas import Tracklet
+        new_tracklet = Tracklet(
+            object_id=neo.tracklet.object_id,
+            observations=neo.tracklet.observations,
+            arc_days=arc_days,
+            motion_rate_arcsec_per_hour=neo.tracklet.motion_rate_arcsec_per_hour,
+            motion_pa_degrees=neo.tracklet.motion_pa_degrees,
+        )
+        return neo.model_copy(update={"tracklet": new_tracklet})
+
+    def test_returns_float_in_range(self):
+        from score import compute_arc_quality_bonus
+        neo = self._neo(arc_days=1.0)
+        result = compute_arc_quality_bonus(neo)
+        assert isinstance(result, float)
+        assert 0.0 <= result <= 1.0
+
+    def test_longer_arc_higher_bonus(self):
+        from score import compute_arc_quality_bonus
+        short = compute_arc_quality_bonus(self._neo(arc_days=0.5))
+        long_ = compute_arc_quality_bonus(self._neo(arc_days=30.0))
+        assert long_ > short
+
+    def test_zero_arc_gives_minimum(self):
+        from score import compute_arc_quality_bonus
+        neo = self._neo(arc_days=0.0)
+        result = compute_arc_quality_bonus(neo)
+        # arc_modifier = log10(1)/log10(366) = 0; quality_code defaults to 1 → 0.25
+        # bonus = 0.6*0.25 + 0.4*0 = 0.15
+        assert abs(result - 0.15) < 0.001
+
+    def test_returns_4dp(self):
+        from score import compute_arc_quality_bonus
+        neo = self._neo(arc_days=7.0)
+        result = compute_arc_quality_bonus(neo)
+        assert round(result, 4) == result
+
+    def test_in_all(self):
+        from score import __all__
+        assert "compute_arc_quality_bonus" in __all__

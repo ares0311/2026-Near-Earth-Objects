@@ -1820,3 +1820,55 @@ class TestComputeClassEntropyStats:
     def test_in_all(self):
         from classify import __all__
         assert "compute_class_entropy_stats" in __all__
+
+
+class TestComputeTier1ScoreDistribution:
+    """Tests for compute_tier1_score_distribution."""
+
+    def _make_neo(self, rb_score=0.9):
+        from tests.conftest import build_scored_neo
+        neo = build_scored_neo()
+        features = neo.features.model_copy(update={"real_bogus_score": rb_score})
+        return neo.model_copy(update={"features": features})
+
+    def test_empty_list(self):
+        from classify import compute_tier1_score_distribution
+        result = compute_tier1_score_distribution([])
+        assert result["n_total"] == 0
+        assert result["n_valid"] == 0
+        assert result["mean"] == 0.0
+
+    def test_all_none_scores(self):
+        from classify import compute_tier1_score_distribution
+        neo = self._make_neo(rb_score=None)
+        result = compute_tier1_score_distribution([neo])
+        assert result["n_total"] == 1
+        assert result["n_valid"] == 0
+        assert result["mean"] == 0.0
+
+    def test_single_neo(self):
+        from classify import compute_tier1_score_distribution
+        neo = self._make_neo(rb_score=0.8)
+        result = compute_tier1_score_distribution([neo])
+        assert result["n_valid"] == 1
+        assert result["mean"] == 0.8
+        assert result["std"] == 0.0
+
+    def test_multiple_neos(self):
+        from classify import compute_tier1_score_distribution
+        neos = [self._make_neo(rb) for rb in [0.9, 0.7, 0.5]]
+        result = compute_tier1_score_distribution(neos)
+        assert result["n_valid"] == 3
+        assert result["n_total"] == 3
+        assert result["p10"] <= result["p50"] <= result["p90"]
+
+    def test_keys_present(self):
+        from classify import compute_tier1_score_distribution
+        neo = self._make_neo(0.8)
+        result = compute_tier1_score_distribution([neo])
+        for k in ("mean", "std", "p10", "p50", "p90", "n_valid", "n_total"):
+            assert k in result
+
+    def test_in_all(self):
+        from classify import __all__
+        assert "compute_tier1_score_distribution" in __all__

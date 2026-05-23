@@ -26,6 +26,7 @@ __all__ = [
     "compute_calibration_gain",
     "batch_classify_morphology",
     "compute_class_entropy_stats",
+    "compute_tier1_score_distribution",
 ]
 
 import base64
@@ -1360,4 +1361,47 @@ def compute_class_entropy_stats(neos: list) -> dict[str, Any]:
         "min_entropy": round(min(entropies), 4),
         "n_high_entropy": sum(1 for e in entropies if e >= 2.0),
         "n_total": len(neos),
+    }
+
+
+def compute_tier1_score_distribution(neos: list) -> dict[str, Any]:
+    """Compute descriptive statistics of Tier-1 real/bogus scores across a NEO list.
+
+    Extracts ``features.real_bogus_score`` from each :class:`~schemas.ScoredNEO`
+    and returns summary statistics over valid (non-None) values.
+
+    Args:
+        neos: List of :class:`~schemas.ScoredNEO` objects.
+
+    Returns:
+        Dict with keys ``mean``, ``std``, ``p10``, ``p50``, ``p90``,
+        ``n_valid``, ``n_total``.  All float stats are 0.0 when no valid
+        scores are present.
+    """
+    import numpy as np
+
+    scores: list[float] = []
+    for neo in neos:
+        rb = getattr(getattr(neo, "features", None), "real_bogus_score", None)
+        if rb is not None:
+            scores.append(float(rb))
+
+    n_total = len(neos)
+    n_valid = len(scores)
+    if not scores:
+        return {
+            "mean": 0.0, "std": 0.0,
+            "p10": 0.0, "p50": 0.0, "p90": 0.0,
+            "n_valid": 0, "n_total": n_total,
+        }
+
+    arr = np.array(scores, dtype=float)
+    return {
+        "mean": round(float(arr.mean()), 4),
+        "std": round(float(arr.std()), 4),
+        "p10": round(float(np.percentile(arr, 10)), 4),
+        "p50": round(float(np.percentile(arr, 50)), 4),
+        "p90": round(float(np.percentile(arr, 90)), 4),
+        "n_valid": n_valid,
+        "n_total": n_total,
     }

@@ -9,7 +9,8 @@ __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "filter_by_nights_observed", "merge_overlapping_tracklets",
            "validate_tracklet", "compute_great_circle_residual",
            "compute_position_angle_consistency", "score_tracklet_quality",
-           "compute_night_span"]
+           "compute_night_span",
+           "compute_tracklet_velocity_dispersion"]
 
 import math
 import uuid
@@ -873,3 +874,51 @@ def compute_night_span(tracklet: object) -> int:
     if not obs:
         return 0
     return len({int(o.jd) for o in obs})
+
+
+def compute_tracklet_velocity_dispersion(tracklet: object) -> float | None:
+    """Compute the standard deviation of consecutive inter-observation speeds.
+
+    For each consecutive pair of observations in the tracklet the apparent
+    motion rate (arcsec/hr, cosine-Dec corrected) is computed.  The standard
+    deviation of those rates is returned as a measure of velocity uniformity.
+
+    A low value (near 0) indicates uniform linear motion — consistent with a
+    real solar system object.  A high value indicates acceleration or
+    inconsistent observations.
+
+    Returns ``None`` when fewer than 3 observations are available (need at
+    least 2 consecutive pairs to compute a meaningful dispersion).
+
+    Args:
+        tracklet: A :class:`~schemas.Tracklet` object.
+
+    Returns:
+        Standard deviation of consecutive speeds in arcsec/hr, rounded to
+        4 decimal places, or ``None`` for <3 observations.
+    """
+    import math
+
+    obs = list(getattr(tracklet, "observations", ()))
+    if len(obs) < 3:
+        return None
+
+    rates: list[float] = []
+    for i in range(len(obs) - 1):
+        o1, o2 = obs[i], obs[i + 1]
+        dt_days = float(o2.jd) - float(o1.jd)
+        if dt_days == 0.0:
+            continue
+        dt_hours = dt_days * 24.0
+        cos_dec = math.cos(math.radians((float(o1.dec_deg) + float(o2.dec_deg)) / 2.0))
+        dra = (float(o2.ra_deg) - float(o1.ra_deg)) * 3600.0 * cos_dec
+        ddec = (float(o2.dec_deg) - float(o1.dec_deg)) * 3600.0
+        rate = math.sqrt(dra**2 + ddec**2) / abs(dt_hours)
+        rates.append(rate)
+
+    if len(rates) < 2:
+        return None
+
+    mean_rate = sum(rates) / len(rates)
+    variance = sum((r - mean_rate) ** 2 for r in rates) / len(rates)
+    return round(math.sqrt(variance), 4)
