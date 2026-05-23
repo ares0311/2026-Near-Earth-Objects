@@ -10,7 +10,8 @@ __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_
            "compute_difference_image_snr", "compute_cutout_entropy", "compute_background_level",
            "compute_pixel_histogram",
            "compute_cutout_contrast",
-           "compute_image_gradient"]
+           "compute_image_gradient",
+           "compute_cutout_symmetry"]
 
 import base64
 import math
@@ -788,5 +789,34 @@ def compute_image_gradient(obs: object) -> float | None:
         grad_mag = np.sqrt(gx**2 + gy**2)
         rms = float(np.sqrt(np.mean(grad_mag**2)))
         return round(rms, 6)
+    except Exception:
+        return None
+
+
+def compute_cutout_symmetry(obs: object) -> float | None:
+    """Return a radial symmetry score in [0, 1] for a difference-image cutout.
+
+    The score is computed as the normalised cross-correlation between the
+    63×63 cutout and its 180°-rotated counterpart.  A perfectly symmetric
+    point-source PSF scores 1.0; an asymmetric artefact or cosmic ray
+    scores near 0.0.  Returns *None* when no cutout is available or the
+    cutout cannot be decoded.
+    """
+    import base64
+
+    cutout = getattr(obs, "cutout_difference", None)
+    if cutout is None:
+        return None
+    try:
+        raw = base64.b64decode(cutout)
+        arr = np.frombuffer(raw, dtype=np.float32).reshape(63, 63).astype(float)
+        rotated = arr[::-1, ::-1]
+        flat = arr.ravel()
+        rot_flat = rotated.ravel()
+        denom = np.linalg.norm(flat) * np.linalg.norm(rot_flat)
+        if denom == 0.0:
+            return None
+        score = float(np.dot(flat, rot_flat) / denom)
+        return round(max(0.0, min(1.0, score)), 6)
     except Exception:
         return None

@@ -1640,3 +1640,59 @@ class TestComputeTrackletVelocityDispersion:
             FakeObs(180.2, 0.0, 2460000.5),  # same JD → skip
         ))
         assert compute_tracklet_velocity_dispersion(t) is None
+
+
+class TestComputeInterNightGaps:
+    def _tracklet(self, jds):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import Observation, Tracklet
+        obs = tuple(
+            Observation(obs_id=f"o{i}", ra_deg=10.0, dec_deg=5.0, jd=jd,
+                        mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF")
+            for i, jd in enumerate(jds)
+        )
+        return Tracklet(object_id="T1", observations=obs,
+                        arc_days=max(jds) - min(jds),
+                        motion_rate_arcsec_per_hour=1.0,
+                        motion_pa_degrees=90.0)
+
+    def test_two_nights(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_inter_night_gaps
+        t = self._tracklet([2460000.8, 2460001.0, 2460002.1])
+        gaps = compute_inter_night_gaps(t)
+        assert gaps == [1.0, 1.0]
+
+    def test_single_night_empty_list(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_inter_night_gaps
+        t = self._tracklet([2460000.1, 2460000.5, 2460000.9])
+        assert compute_inter_night_gaps(t) == []
+
+    def test_three_nights(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_inter_night_gaps
+        t = self._tracklet([2460000.5, 2460002.5, 2460005.5])
+        gaps = compute_inter_night_gaps(t)
+        assert gaps == [2.0, 3.0]
+
+    def test_no_observations_empty(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_inter_night_gaps
+        t = SimpleNamespace(observations=())
+        assert compute_inter_night_gaps(t) == []
+
+    def test_large_gap(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_inter_night_gaps
+        t = self._tracklet([2460000.5, 2460100.5])
+        gaps = compute_inter_night_gaps(t)
+        assert gaps == [100.0]

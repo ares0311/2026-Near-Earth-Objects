@@ -27,6 +27,7 @@ __all__ = [
     "batch_classify_morphology",
     "compute_class_entropy_stats",
     "compute_tier1_score_distribution",
+    "compute_class_entropy_summary",
 ]
 
 import base64
@@ -1404,4 +1405,35 @@ def compute_tier1_score_distribution(neos: list) -> dict[str, Any]:
         "p90": round(float(np.percentile(arr, 90)), 4),
         "n_valid": n_valid,
         "n_total": n_total,
+    }
+
+
+def compute_class_entropy_summary(neos: list) -> dict[str, float | int]:
+    """Return entropy statistics across a list of *ScoredNEO* objects.
+
+    Computes :func:`posterior_entropy` for each NEO and returns a summary
+    dict with ``mean_entropy``, ``std_entropy``, ``max_entropy``,
+    ``min_entropy``, and ``n_neos``.  Entropy is in bits (log base-2).
+
+    An empty list returns zeros for all float fields and 0 for ``n_neos``.
+    """
+    entropies: list[float] = []
+    for neo in neos:
+        posterior = getattr(neo, "posterior", None)
+        if posterior is not None:
+            try:
+                entropies.append(posterior_entropy(posterior))
+            except Exception:
+                pass
+    n = len(entropies)
+    if n == 0:
+        return {"mean_entropy": 0.0, "std_entropy": 0.0,
+                "max_entropy": 0.0, "min_entropy": 0.0, "n_neos": 0}
+    arr = np.array(entropies, dtype=float)
+    return {
+        "mean_entropy": round(float(arr.mean()), 6),
+        "std_entropy": round(float(arr.std()), 6),
+        "max_entropy": round(float(arr.max()), 6),
+        "min_entropy": round(float(arr.min()), 6),
+        "n_neos": n,
     }

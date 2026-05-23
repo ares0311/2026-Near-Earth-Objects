@@ -1048,3 +1048,40 @@ class TestObservationCluster:
     def test_in_all(self):
         from schemas import __all__
         assert "ObservationCluster" in __all__
+
+
+class TestAstrometricResidual:
+    def test_basic_construction(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import AstrometricResidual
+        r = AstrometricResidual(obs_id="obs1", ra_residual_arcsec=0.2,
+                                dec_residual_arcsec=-0.1, total_arcsec=0.22,
+                                jd=2460000.5)
+        assert r.obs_id == "obs1"
+        assert r.total_arcsec == 0.22
+
+    def test_frozen(self):
+        import sys
+        sys.path.insert(0, "src")
+        import pytest
+
+        from schemas import AstrometricResidual
+        r = AstrometricResidual(obs_id="x", ra_residual_arcsec=0.0,
+                                dec_residual_arcsec=0.0, total_arcsec=0.0, jd=0.0)
+        with pytest.raises(Exception):
+            r.obs_id = "y"
+
+    def test_negative_residuals(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import AstrometricResidual
+        r = AstrometricResidual(obs_id="x", ra_residual_arcsec=-1.5,
+                                dec_residual_arcsec=-0.5, total_arcsec=1.58, jd=2460001.0)
+        assert r.ra_residual_arcsec == -1.5
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        assert "AstrometricResidual" in schemas.__all__

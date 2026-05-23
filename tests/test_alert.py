@@ -2,6 +2,8 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from alert import (
     _format_dec,
     _format_ra,
@@ -1485,3 +1487,44 @@ class TestCountReadyToSubmit:
     def test_in_all(self):
         from alert import __all__
         assert "count_ready_to_submit" in __all__
+
+
+class TestComputeAlertAgeDays:
+    def test_basic_age(self, scored_neo):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import compute_alert_age_days
+        first_jd = min(o.jd for o in scored_neo.tracklet.observations)
+        current_jd = first_jd + 3.5
+        age = compute_alert_age_days(scored_neo, current_jd)
+        assert age == pytest.approx(3.5, abs=0.0001)
+
+    def test_zero_when_current_equals_first(self, scored_neo):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import compute_alert_age_days
+        first_jd = min(o.jd for o in scored_neo.tracklet.observations)
+        assert compute_alert_age_days(scored_neo, first_jd) == 0.0
+
+    def test_negative_clamped_to_zero(self, scored_neo):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import compute_alert_age_days
+        first_jd = min(o.jd for o in scored_neo.tracklet.observations)
+        assert compute_alert_age_days(scored_neo, first_jd - 1.0) == 0.0
+
+    def test_no_observations_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from alert import compute_alert_age_days
+        tracklet = SimpleNamespace(observations=[])
+        neo = SimpleNamespace(tracklet=tracklet)
+        assert compute_alert_age_days(neo, 2460000.0) == 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+        assert "compute_alert_age_days" in alert.__all__

@@ -17,6 +17,7 @@ __all__ = [
     "compute_calibration_sharpness",
     "compute_brier_skill_score",
     "compute_discrimination_score",
+    "compute_resolution_score",
 ]
 
 import math
@@ -829,3 +830,39 @@ def compute_discrimination_score(
     mean_pos = float(p[pos_mask].mean())
     mean_neg = float(p[neg_mask].mean())
     return round(abs(mean_pos - mean_neg), 6)
+
+
+def compute_resolution_score(
+    probs: list[float] | np.ndarray,
+    labels: list[int] | np.ndarray,
+    n_bins: int = 10,
+) -> float:
+    """Return the resolution component of the Brier score decomposition.
+
+    Resolution measures how much the per-bin mean outcomes deviate from the
+    overall climatological base rate.  Higher resolution indicates better
+    discrimination ability.
+
+    Uses equal-width bins over [0, 1].  Bins with no samples are skipped.
+    Returns 0.0 for empty inputs or single-class label sets.
+
+    Formula::
+
+        resolution = (1 / n) * Σ_k  n_k * (ȳ_k - ȳ)²
+    """
+    p = np.asarray(probs, dtype=float)
+    y = np.asarray(labels, dtype=float)
+    if p.size == 0:
+        return 0.0
+    clim = float(y.mean())
+    bin_edges = np.linspace(0.0, 1.0, n_bins + 1)
+    total = float(p.size)
+    resolution = 0.0
+    for lo, hi in zip(bin_edges[:-1], bin_edges[1:]):
+        mask = (p >= lo) & (p < hi)
+        if not mask.any():
+            continue
+        n_k = float(mask.sum())
+        y_bar_k = float(y[mask].mean())
+        resolution += n_k * (y_bar_k - clim) ** 2
+    return round(resolution / total, 8)

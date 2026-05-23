@@ -11,7 +11,8 @@ __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "compute_observation_priority", "compute_size_estimate",
            "compute_close_approach_score", "compute_combined_priority",
            "compute_weighted_priority",
-           "compute_arc_quality_bonus"]
+           "compute_arc_quality_bonus",
+           "compute_weighted_hazard_score"]
 
 import math
 import uuid
@@ -907,3 +908,20 @@ def compute_arc_quality_bonus(neo: ScoredNEO) -> float:
 
     bonus = 0.6 * quality_base + 0.4 * arc_modifier
     return round(min(1.0, max(0.0, bonus)), 4)
+
+
+def compute_weighted_hazard_score(neo: ScoredNEO) -> float:
+    """Return a composite hazard score in [0, 1] for a *ScoredNEO*.
+
+    Combines three component scores with fixed weights:
+    - 0.4 × :func:`compute_threat_score` (MOID + size + orbit quality)
+    - 0.4 × :func:`compute_close_approach_score` (MOID proximity + PHA bonus)
+    - 0.2 × :func:`compute_arc_quality_bonus` (arc length + quality code)
+
+    Each component is already bounded [0, 1]; the weighted sum is therefore
+    also in [0, 1] and is rounded to 4 decimal places.
+    """
+    threat = compute_threat_score(neo)
+    close = compute_close_approach_score(neo)
+    arc_bonus = compute_arc_quality_bonus(neo)
+    return round(0.4 * threat + 0.4 * close + 0.2 * arc_bonus, 4)

@@ -925,3 +925,56 @@ class TestComputeDiscriminationScore:
     def test_in_all(self):
         from calibration import __all__
         assert "compute_discrimination_score" in __all__
+
+
+class TestComputeResolutionScore:
+    def test_empty_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_resolution_score
+        assert compute_resolution_score([], []) == 0.0
+
+    def test_perfect_discrimination(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_resolution_score
+        probs = [0.0] * 50 + [1.0] * 50
+        labels = [0] * 50 + [1] * 50
+        score = compute_resolution_score(probs, labels)
+        assert score > 0.0
+
+    def test_random_predictor_low_resolution(self):
+        import sys
+
+        import numpy as np
+        sys.path.insert(0, "src")
+        from calibration import compute_resolution_score
+        rng = np.random.default_rng(0)
+        probs = rng.uniform(0.4, 0.6, 200).tolist()
+        labels = rng.integers(0, 2, 200).tolist()
+        score = compute_resolution_score(probs, labels)
+        assert score >= 0.0
+
+    def test_result_non_negative(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_resolution_score
+        probs = [0.1, 0.5, 0.9, 0.3, 0.7]
+        labels = [0, 1, 1, 0, 1]
+        assert compute_resolution_score(probs, labels) >= 0.0
+
+    def test_custom_n_bins(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_resolution_score
+        probs = [0.2, 0.8, 0.2, 0.8]
+        labels = [0, 1, 0, 1]
+        s5 = compute_resolution_score(probs, labels, n_bins=5)
+        s20 = compute_resolution_score(probs, labels, n_bins=20)
+        assert isinstance(s5, float) and isinstance(s20, float)
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        assert "compute_resolution_score" in calibration.__all__

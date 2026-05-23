@@ -28,6 +28,7 @@ __all__ = [
     "count_alerts_by_flag",
     "format_bulk_summary",
     "count_ready_to_submit",
+    "compute_alert_age_days",
 ]
 
 import json
@@ -1241,3 +1242,18 @@ def count_ready_to_submit(neos: list[ScoredNEO]) -> int:
         Integer count of submission-ready candidates.
     """
     return sum(1 for neo in neos if ready_for_submission(neo)[0])
+
+
+def compute_alert_age_days(neo: ScoredNEO, current_jd: float) -> float:
+    """Return the number of days since the first tracklet observation.
+
+    Uses the minimum JD across all observations in the tracklet as the
+    discovery epoch.  Returns 0.0 when the tracklet contains no observations
+    or when *current_jd* is not later than the first observation.
+    """
+    obs = list(getattr(neo.tracklet, "observations", ()))
+    if not obs:
+        return 0.0
+    first_jd = min(float(getattr(o, "jd", current_jd)) for o in obs)
+    age = current_jd - first_jd
+    return round(max(0.0, age), 4)

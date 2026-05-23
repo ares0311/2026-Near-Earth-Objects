@@ -1371,3 +1371,42 @@ class TestComputeArcQualityBonus:
     def test_in_all(self):
         from score import __all__
         assert "compute_arc_quality_bonus" in __all__
+
+
+class TestComputeWeightedHazardScore:
+    def test_returns_float(self, scored_neo):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_weighted_hazard_score
+        s = compute_weighted_hazard_score(scored_neo)
+        assert isinstance(s, float)
+
+    def test_bounded_0_1(self, scored_neo):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_weighted_hazard_score
+        s = compute_weighted_hazard_score(scored_neo)
+        assert 0.0 <= s <= 1.0
+
+    def test_pha_candidate_higher(self, scored_neo):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import CandidateExplanation, HazardAssessment, ScoredNEO
+        from score import compute_weighted_hazard_score
+        pha_hazard = HazardAssessment(
+            hazard_flag="pha_candidate", moid_au=0.01,
+            estimated_diameter_m=200.0, absolute_magnitude_h=20.0,
+            neo_class="apollo", alert_pathway="nasa_pdco_notify",
+            explanation=CandidateExplanation(summary="PHA", supporting_evidence=(),
+                                              contra_evidence=(), model_version="test"),
+        )
+        pha_neo = ScoredNEO(tracklet=scored_neo.tracklet, features=scored_neo.features,
+                             posterior=scored_neo.posterior, hazard=pha_hazard,
+                             metadata=scored_neo.metadata)
+        assert compute_weighted_hazard_score(pha_neo) >= compute_weighted_hazard_score(scored_neo)
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        assert "compute_weighted_hazard_score" in score.__all__
