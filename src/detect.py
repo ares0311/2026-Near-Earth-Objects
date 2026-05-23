@@ -10,7 +10,8 @@ __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus"
            "filter_by_magnitude", "compute_streak_density",
            "compute_angular_velocity",
            "compute_detection_gap",
-           "compute_observation_cadence"]
+           "compute_observation_cadence",
+           "compute_field_source_count"]
 
 import math
 import uuid
@@ -896,3 +897,21 @@ def compute_observation_cadence(observations: list) -> float | None:
         for i in range(len(sorted_obs) - 1)
     ]
     return round(sum(gaps) / len(gaps), 4)
+
+
+def compute_field_source_count(observations: list) -> dict[str, int]:
+    """Count observations grouped by field identifier.
+
+    The field identifier is read from ``obs.obs_id`` up to the first underscore
+    (e.g. ``"ZTF_field_12345_obs_7"`` → ``"ZTF"``).  If the ``obs_id`` contains
+    no underscore the entire string is used.  Observations whose ``obs_id`` is
+    empty or ``None`` are grouped under ``"unknown"``.
+
+    Returns a dict mapping field prefix → count, sorted descending by count.
+    """
+    counts: dict[str, int] = {}
+    for obs in observations:
+        obs_id = getattr(obs, "obs_id", None) or ""
+        field = obs_id.split("_")[0] if obs_id else "unknown"
+        counts[field] = counts.get(field, 0) + 1
+    return dict(sorted(counts.items(), key=lambda kv: -kv[1]))

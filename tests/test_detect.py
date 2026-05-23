@@ -1551,3 +1551,52 @@ class TestComputeObservationCadence:
         from detect import compute_observation_cadence
         obs = [self._obs(2460001.0), self._obs(2460000.0)]
         assert compute_observation_cadence(obs) == 24.0
+
+
+class TestComputeFieldSourceCount:
+    def _obs(self, obs_id):
+        from types import SimpleNamespace
+        return SimpleNamespace(obs_id=obs_id)
+
+    def test_groups_by_prefix(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_field_source_count
+        obs = [self._obs("ZTF_001_a"), self._obs("ZTF_001_b"), self._obs("ATLAS_002_c")]
+        result = compute_field_source_count(obs)
+        assert result["ZTF"] == 2
+        assert result["ATLAS"] == 1
+
+    def test_no_underscore_uses_full_id(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_field_source_count
+        obs = [self._obs("FIELD1"), self._obs("FIELD1"), self._obs("FIELD2")]
+        result = compute_field_source_count(obs)
+        assert result["FIELD1"] == 2
+        assert result["FIELD2"] == 1
+
+    def test_empty_obs_id(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import compute_field_source_count
+        obs = [SimpleNamespace(obs_id=""), SimpleNamespace(obs_id=None)]
+        result = compute_field_source_count(obs)
+        assert result.get("unknown", 0) == 2
+
+    def test_sorted_descending(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_field_source_count
+        obs = ([self._obs("B_1")] * 3) + ([self._obs("A_1")] * 5)
+        result = compute_field_source_count(obs)
+        keys = list(result.keys())
+        assert keys[0] == "A"
+
+    def test_empty_input(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_field_source_count
+        assert compute_field_source_count([]) == {}

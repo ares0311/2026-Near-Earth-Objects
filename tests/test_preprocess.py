@@ -1562,3 +1562,52 @@ class TestComputeStreakAngle:
         from preprocess import compute_streak_angle
         obs = SimpleNamespace(cutout_difference="!!!bad!!!")
         assert compute_streak_angle(obs) is None
+
+
+class TestComputeRadialProfile:
+    def _make_obs_with_cutout(self):
+        import base64
+        import sys
+        sys.path.insert(0, "src")
+        import numpy as np
+        arr = np.zeros((63, 63), dtype=np.float32)
+        arr[31, 31] = 10.0
+        from types import SimpleNamespace
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        return SimpleNamespace(cutout_difference=b64)
+
+    def test_returns_list(self):
+        import sys
+        sys.path.insert(0, "src")
+        from preprocess import compute_radial_profile
+        obs = self._make_obs_with_cutout()
+        result = compute_radial_profile(obs)
+        assert isinstance(result, list)
+        assert len(result) == 32
+
+    def test_peak_at_center(self):
+        import sys
+        sys.path.insert(0, "src")
+        from preprocess import compute_radial_profile
+        obs = self._make_obs_with_cutout()
+        result = compute_radial_profile(obs)
+        assert result[0] > 0.0
+        assert result[1] == 0.0
+
+    def test_no_cutout_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_radial_profile
+        obs = SimpleNamespace(cutout_difference=None)
+        assert compute_radial_profile(obs) is None
+
+    def test_bad_cutout_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_radial_profile
+        obs = SimpleNamespace(cutout_difference="!!!bad!!!")
+        assert compute_radial_profile(obs) is None

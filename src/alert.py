@@ -30,6 +30,7 @@ __all__ = [
     "count_ready_to_submit",
     "compute_alert_age_days",
     "format_observation_log",
+    "format_mpc_ades_psv",
 ]
 
 import json
@@ -1281,4 +1282,62 @@ def format_observation_log(neo: ScoredNEO) -> str:
         )
     lines.append(sep)
     lines.append(f"{len(obs_list)} observation(s) for {neo.tracklet.object_id}")
+    return "\n".join(lines)
+
+
+def format_mpc_ades_psv(neo: ScoredNEO, obs_code: str = _MPC_OBS_CODE) -> str:  # type: ignore[name-defined]
+    """Format observations as an ADES pipe-separated-values (PSV) block.
+
+    Produces the header and data rows for the ADES PSV format
+    (MPC ADES v2017; see https://www.minorplanetcenter.net/iau/info/ADES.html).
+    Each observation maps to one PSV data row.  The function does **not**
+    transmit any data; it returns the formatted string only.
+
+    GUARDRAIL: Do not publicly announce any impact probability.
+    All hazard assessment must be referred to MPC/CNEOS.
+    """
+    lines: list[str] = []
+    lines.append("# version=2017")
+    lines.append("# observatory")
+    lines.append(f"! mpcCode {obs_code}")
+    lines.append("# submitter")
+    lines.append("! name NEO Detection Pipeline")
+    lines.append("# observers")
+    lines.append("! name Automated")
+    lines.append("# measurers")
+    lines.append("! name Automated")
+    lines.append("# telescope")
+    lines.append("! design Survey")
+    lines.append("! aperture 1.2")
+    lines.append("! detector CCD")
+    lines.append("# data")
+    header_fields = [
+        "permID", "provID", "obsTime", "ra", "dec",
+        "mag", "band", "stn", "remarks",
+    ]
+    lines.append("| " + " | ".join(header_fields) + " |")
+
+    obs_sorted = sorted(neo.tracklet.observations, key=lambda o: o.jd)
+    from astropy.time import Time  # type: ignore[import-untyped]
+
+    for obs in obs_sorted:
+        try:
+            t = Time(obs.jd, format="jd", scale="utc")
+            obs_time = t.isot
+        except Exception:
+            obs_time = str(obs.jd)
+        mag_str = f"{obs.mag:.2f}" if obs.mag < 90 else ""
+        row = [
+            "",                                    # permID (unknown for candidates)
+            neo.tracklet.object_id[:12],           # provID
+            obs_time,
+            f"{obs.ra_deg:.6f}",
+            f"{obs.dec_deg:.6f}",
+            mag_str,
+            obs.filter_band,
+            obs_code,
+            "",                                    # remarks
+        ]
+        lines.append("| " + " | ".join(row) + " |")
+
     return "\n".join(lines)

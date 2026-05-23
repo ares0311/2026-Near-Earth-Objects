@@ -1124,3 +1124,42 @@ class TestResidualSummary:
                             max_residual_arcsec=0.0, mean_ra_residual_arcsec=0.0,
                             mean_dec_residual_arcsec=0.0)
         assert r.rms_arcsec == 0.0
+
+
+class TestObservationCoverage:
+    def test_basic(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import ObservationCoverage
+        oc = ObservationCoverage(night_jd=2460000.5, mission="ZTF",
+                                 n_fields=5, total_area_deg2=100.0,
+                                 limiting_mag=21.5,
+                                 field_ids=("ZTF01", "ZTF02"))
+        assert oc.n_fields == 5
+        assert oc.mission == "ZTF"
+        assert oc.limiting_mag == 21.5
+        assert oc.field_ids == ("ZTF01", "ZTF02")
+
+    def test_defaults(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import ObservationCoverage
+        oc = ObservationCoverage(night_jd=2460000.5, mission="ATLAS",
+                                 n_fields=1, total_area_deg2=10.0)
+        assert oc.limiting_mag is None
+        assert oc.field_ids == ()
+
+    def test_frozen(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import ObservationCoverage
+        oc = ObservationCoverage(night_jd=2460000.5, mission="ZTF",
+                                 n_fields=1, total_area_deg2=5.0)
+        with pytest.raises(Exception):
+            oc.n_fields = 2
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        assert "ObservationCoverage" in schemas.__all__

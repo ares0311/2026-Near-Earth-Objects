@@ -1790,3 +1790,49 @@ class TestComputeOrbitalVelocity:
         # a=1 AU, r=3 AU → v² = GM(2/3 - 1) < 0
         el = SimpleNamespace(semi_major_axis_au=1.0)
         assert compute_orbital_velocity(el, 3.0) is None
+
+
+class TestComputePerihelionDistance:
+    def _el(self, a, e):
+        from types import SimpleNamespace
+        return SimpleNamespace(semi_major_axis_au=a, eccentricity=e)
+
+    def test_basic(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_perihelion_distance
+        assert compute_perihelion_distance(self._el(1.5, 0.4)) == pytest.approx(0.9, abs=1e-5)
+
+    def test_circular_orbit(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_perihelion_distance
+        assert compute_perihelion_distance(self._el(1.0, 0.0)) == pytest.approx(1.0)
+
+    def test_zero_a_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_perihelion_distance
+        assert compute_perihelion_distance(self._el(0.0, 0.5)) is None
+
+    def test_negative_a_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_perihelion_distance
+        assert compute_perihelion_distance(self._el(-1.0, 0.5)) is None
+
+    def test_missing_eccentricity_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_perihelion_distance
+        el = SimpleNamespace(semi_major_axis_au=1.5, eccentricity=None)
+        assert compute_perihelion_distance(el) is None
+
+    def test_e_greater_than_1_q_negative(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_perihelion_distance
+        # a=0.5, e=2.0 → q = 0.5*(1-2) = -0.5 → None
+        assert compute_perihelion_distance(self._el(0.5, 2.0)) is None
