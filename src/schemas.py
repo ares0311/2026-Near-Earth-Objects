@@ -23,6 +23,7 @@ __all__ = [
     "PriorityFactors", "BackgroundTarget", "FollowUpTestResult",
     "SubmissionRecommendation", "BackgroundRunLedgerEntry", "ReviewedLogEntry",
     "NeedsFollowUpLogEntry", "BackgroundConfig", "HumanSignoffEntry", "BackgroundRunResult",
+    "AstrometricResidual",
 ]
 
 from dataclasses import dataclass
@@ -923,3 +924,15 @@ class ObservationCluster(BaseModel):
     jd: float = 2460000.5
     observations: tuple[Observation, ...] = ()
     radius_arcsec: float = 0.0
+
+
+class AstrometricResidual(BaseModel):
+    """Per-observation astrometric residual from an orbit fit."""
+
+    model_config = ConfigDict(frozen=True)
+
+    obs_id: str
+    ra_residual_arcsec: float
+    dec_residual_arcsec: float
+    total_arcsec: float
+    jd: float

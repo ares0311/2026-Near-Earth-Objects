@@ -12,7 +12,8 @@ __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
            "compute_perihelion_date", "compute_eccentric_anomaly",
            "compute_true_anomaly", "compute_mean_motion",
            "compute_longitude_of_perihelion",
-           "compute_orbital_inclination_class"]
+           "compute_orbital_inclination_class",
+           "compute_mean_anomaly_at_jd"]
 
 import math
 from typing import NamedTuple
@@ -1145,3 +1146,28 @@ def compute_orbital_inclination_class(elements: object) -> str:
     if inc <= 95.0:
         return "polar"
     return "retrograde"
+
+
+def compute_mean_anomaly_at_jd(elements: object, target_jd: float) -> float | None:
+    """Return the mean anomaly in radians at *target_jd* for a Keplerian orbit.
+
+    The mean anomaly advances uniformly at the mean motion *n = 2π / T*
+    where *T* is the orbital period in days.  Returns *None* when the
+    orbital period is non-positive (hyperbolic or parabolic orbits).
+
+    The result is wrapped to [0, 2π).
+    """
+    import math
+
+    a = float(getattr(elements, "semi_major_axis_au", 0.0) or 0.0)
+    e = float(getattr(elements, "eccentricity", 0.0) or 0.0)
+    if e >= 1.0 or a <= 0.0:
+        return None
+    period_days = 365.25 * math.sqrt(a ** 3)
+    epoch_jd = float(getattr(elements, "epoch_jd", 2451545.0) or 2451545.0)
+    m0_deg = float(getattr(elements, "mean_anomaly_deg", 0.0) or 0.0)
+    m0_rad = math.radians(m0_deg)
+    n_rad_per_day = 2.0 * math.pi / period_days
+    delta_t = target_jd - epoch_jd
+    m_rad = (m0_rad + n_rad_per_day * delta_t) % (2.0 * math.pi)
+    return round(m_rad, 8)

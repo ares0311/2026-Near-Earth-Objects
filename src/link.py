@@ -10,7 +10,8 @@ __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "validate_tracklet", "compute_great_circle_residual",
            "compute_position_angle_consistency", "score_tracklet_quality",
            "compute_night_span",
-           "compute_tracklet_velocity_dispersion"]
+           "compute_tracklet_velocity_dispersion",
+           "compute_inter_night_gaps"]
 
 import math
 import uuid
@@ -922,3 +923,20 @@ def compute_tracklet_velocity_dispersion(tracklet: object) -> float | None:
     mean_rate = sum(rates) / len(rates)
     variance = sum((r - mean_rate) ** 2 for r in rates) / len(rates)
     return round(math.sqrt(variance), 4)
+
+
+def compute_inter_night_gaps(tracklet: object) -> list[float]:
+    """Return the list of inter-night gaps in days between distinct observing nights.
+
+    An observing night is identified by the integer floor of the Julian Date
+    (JD) of each observation.  Nights are sorted chronologically and gaps are
+    computed between consecutive distinct nights.
+
+    Returns an empty list when the tracklet spans fewer than two distinct
+    nights.
+    """
+    obs = list(getattr(tracklet, "observations", ()))
+    nights = sorted({int(float(getattr(o, "jd", 0.0))) for o in obs})
+    if len(nights) < 2:
+        return []
+    return [round(float(nights[i + 1] - nights[i]), 4) for i in range(len(nights) - 1)]

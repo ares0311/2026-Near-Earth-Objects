@@ -1872,3 +1872,78 @@ class TestComputeTier1ScoreDistribution:
     def test_in_all(self):
         from classify import __all__
         assert "compute_tier1_score_distribution" in __all__
+
+
+class TestComputeClassEntropySummary:
+    def test_empty_list(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_class_entropy_summary
+        result = compute_class_entropy_summary([])
+        assert result["n_neos"] == 0
+        assert result["mean_entropy"] == 0.0
+
+    def test_uniform_posteriors(self, scored_neo):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_class_entropy_summary
+        result = compute_class_entropy_summary([scored_neo, scored_neo])
+        assert result["n_neos"] == 2
+        assert result["mean_entropy"] > 0.0
+        assert result["std_entropy"] == 0.0
+
+    def test_mixed_posteriors(self, scored_neo):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_class_entropy_summary
+        from schemas import NEOPosterior, ScoredNEO
+
+        cert_post = NEOPosterior(neo_candidate=1.0, known_object=0.0,
+                                 main_belt_asteroid=0.0, stellar_artifact=0.0,
+                                 other_solar_system=0.0)
+        cert_neo = ScoredNEO(tracklet=scored_neo.tracklet, features=scored_neo.features,
+                              posterior=cert_post, hazard=scored_neo.hazard,
+                              metadata=scored_neo.metadata)
+        result = compute_class_entropy_summary([scored_neo, cert_neo])
+        assert result["n_neos"] == 2
+        assert result["max_entropy"] >= result["min_entropy"]
+
+    def test_no_posterior_skipped(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from classify import compute_class_entropy_summary
+        neos = [SimpleNamespace(posterior=None)]
+        result = compute_class_entropy_summary(neos)
+        assert result["n_neos"] == 0
+
+    def test_std_entropy_positive(self, scored_neo):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_class_entropy_summary
+        from schemas import NEOPosterior, ScoredNEO
+
+        cert_post = NEOPosterior(neo_candidate=1.0, known_object=0.0,
+                                 main_belt_asteroid=0.0, stellar_artifact=0.0,
+                                 other_solar_system=0.0)
+        cert_neo = ScoredNEO(tracklet=scored_neo.tracklet, features=scored_neo.features,
+                              posterior=cert_post, hazard=scored_neo.hazard,
+                              metadata=scored_neo.metadata)
+        result = compute_class_entropy_summary([scored_neo, cert_neo])
+        assert result["std_entropy"] >= 0.0
+
+
+class TestComputeClassEntropySummaryExtra:
+    def test_bad_posterior_skipped(self):
+        """Cover except branch in compute_class_entropy_summary."""
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from classify import compute_class_entropy_summary
+
+        bad_posterior = SimpleNamespace()  # posterior_entropy will fail
+        neos = [SimpleNamespace(posterior=bad_posterior)]
+        result = compute_class_entropy_summary(neos)
+        assert result["n_neos"] == 0

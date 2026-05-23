@@ -2616,3 +2616,101 @@ class TestFetchKnownNeoEphemerides:
     def test_in_all(self):
         from fetch import __all__
         assert "fetch_known_neo_ephemerides" in __all__
+
+
+class TestFetchNeocpObjects:
+    def test_returns_list_on_failure(self, monkeypatch):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch as fm
+
+        monkeypatch.setattr(fm, "_load_cache", lambda _k: None)
+        monkeypatch.setattr(fm, "_save_cache", lambda _k, _v: None)
+        result = fm.fetch_neocp_objects(force_refresh=True)
+        assert isinstance(result, list)
+
+    def test_cache_hit_returns_list(self, monkeypatch):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch as fm
+
+        cached = [{"object_id": "P10Xyz0", "score": 90.0, "updated": None,
+                   "ra_deg": 12.3, "dec_deg": -5.0, "mag": 19.5}]
+        monkeypatch.setattr(fm, "_load_cache", lambda _k: cached)
+        result = fm.fetch_neocp_objects()
+        assert result == cached
+
+    def test_cache_not_list_triggers_query(self, monkeypatch):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch as fm
+
+        monkeypatch.setattr(fm, "_load_cache", lambda _k: {"bad": "data"})
+        monkeypatch.setattr(fm, "_save_cache", lambda _k, _v: None)
+        result = fm.fetch_neocp_objects()
+        assert isinstance(result, list)
+
+    def test_force_refresh_skips_cache(self, monkeypatch):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch as fm
+
+        calls = []
+        monkeypatch.setattr(fm, "_load_cache", lambda _k: calls.append("load") or None)
+        monkeypatch.setattr(fm, "_save_cache", lambda _k, _v: None)
+        fm.fetch_neocp_objects(force_refresh=True)
+        assert "load" not in calls
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+        assert "fetch_neocp_objects" in fetch.__all__
+
+
+class TestFetchNeocpObjectsMockQuery:
+    def test_successful_mpc_query(self, monkeypatch):
+        """Cover the MPC query success path in fetch_neocp_objects."""
+        import sys
+        sys.path.insert(0, "src")
+        import fetch as fm
+
+        monkeypatch.setattr(fm, "_load_cache", lambda _k: None)
+        saved = {}
+        monkeypatch.setattr(fm, "_save_cache", lambda k, v: saved.update({k: v}))
+
+        mock_row = {
+            "designation": "P10Abc1",
+            "score": 85.0,
+            "updated": "2026-05-01T00:00:00",
+            "ra": 12.3,
+            "dec": -5.0,
+            "vmag": 19.5,
+        }
+
+        class FakeRow:
+            colnames = ["designation", "score", "updated", "ra", "dec", "vmag"]
+
+            def get(self, key, default=None):
+                return mock_row.get(key, default)
+
+            def __getitem__(self, key):
+                return mock_row[key]
+
+        class FakeMPC:
+            @staticmethod
+            def query_objects(_cat):
+                return [FakeRow()]
+
+        import sys as _sys
+        import types as _types
+        fake_mpc_module = _types.ModuleType("astroquery.mpc")
+        fake_mpc_module.MPC = FakeMPC
+        fake_aq = _types.ModuleType("astroquery")
+        monkeypatch.setitem(_sys.modules, "astroquery", fake_aq)
+        monkeypatch.setitem(_sys.modules, "astroquery.mpc", fake_mpc_module)
+
+        result = fm.fetch_neocp_objects(force_refresh=True)
+        assert len(result) == 1
+        assert result[0]["object_id"] == "P10Abc1"
+        assert "neocp_objects" in saved

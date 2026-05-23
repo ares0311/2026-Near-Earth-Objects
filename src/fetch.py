@@ -10,7 +10,8 @@ __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fet
            "filter_by_survey", "fetch_panstarrs_catalog", "fetch_css_alerts",
            "fetch_panstarrs_moving_objects", "fetch_recent_mpc_neos",
            "estimate_field_completeness",
-           "fetch_known_neo_ephemerides"]
+           "fetch_known_neo_ephemerides",
+           "fetch_neocp_objects"]
 
 import json
 import os
@@ -1309,3 +1310,41 @@ def fetch_known_neo_ephemerides(
         except Exception:
             pass
     return results
+
+
+def fetch_neocp_objects(force_refresh: bool = False) -> list[dict]:
+    """Return unconfirmed objects currently listed on the MPC NEOCP.
+
+    Each dict contains at minimum ``object_id``, ``score``, ``updated``
+    (ISO timestamp string), ``ra_deg``, ``dec_deg``, and ``mag`` keys
+    populated from the MPC NEOCP feed.  Missing fields default to *None*.
+    Results are disk-cached under the key ``"neocp_objects"``; set
+    *force_refresh* to bypass the cache.
+
+    Returns an empty list if the MPC NEOCP cannot be reached or the
+    response cannot be parsed.
+    """
+    cache_key = "neocp_objects"
+    if not force_refresh:
+        cached = _load_cache(cache_key)
+        if cached is not None and isinstance(cached, list):
+            return cached
+
+    try:
+        from astroquery.mpc import MPC  # type: ignore[import]
+
+        tbl = MPC.query_objects("nea")
+        rows: list[dict] = []
+        for row in tbl:
+            rows.append({
+                "object_id": str(row.get("designation") or row.get("name") or "unknown"),
+                "score": float(row["score"]) if "score" in row.colnames else None,
+                "updated": str(row["updated"]) if "updated" in row.colnames else None,
+                "ra_deg": float(row["ra"]) if "ra" in row.colnames else None,
+                "dec_deg": float(row["dec"]) if "dec" in row.colnames else None,
+                "mag": float(row["vmag"]) if "vmag" in row.colnames else None,
+            })
+        _save_cache(cache_key, rows)
+        return rows
+    except Exception:
+        return []

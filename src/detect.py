@@ -8,7 +8,8 @@ __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus"
            "count_detections_by_filter", "compute_motion_vector",
            "flag_moving_sources", "compute_source_extent", "estimate_observation_depth",
            "filter_by_magnitude", "compute_streak_density",
-           "compute_angular_velocity"]
+           "compute_angular_velocity",
+           "compute_detection_gap"]
 
 import math
 import uuid
@@ -857,3 +858,22 @@ def compute_angular_velocity(obs1: object, obs2: object) -> dict | None:
         "pa_deg": round(pa_deg, 4),
         "dt_hours": round(dt_hours, 6),
     }
+
+
+def compute_detection_gap(observations: list) -> float | None:
+    """Return the maximum time gap in hours between consecutive observations.
+
+    Observations are sorted by Julian Date before computing gaps.  Returns
+    *None* when fewer than two observations are supplied.  Useful for
+    identifying fields with interrupted coverage (e.g. weather gaps).
+    """
+    if len(observations) < 2:
+        return None
+    sorted_obs = sorted(observations, key=lambda o: float(getattr(o, "jd", 0.0)))
+    max_gap_hours = 0.0
+    for i in range(len(sorted_obs) - 1):
+        dt_hours = (float(getattr(sorted_obs[i + 1], "jd", 0.0))
+                    - float(getattr(sorted_obs[i], "jd", 0.0))) * 24.0
+        if dt_hours > max_gap_hours:
+            max_gap_hours = dt_hours
+    return round(max_gap_hours, 4)

@@ -1670,3 +1670,64 @@ class TestComputeOrbitalInclinationClass:
     def test_in_all(self):
         from orbit import __all__
         assert "compute_orbital_inclination_class" in __all__
+
+
+class TestComputeMeanAnomalyAtJd:
+    def _elements(self, a=1.5, e=0.1, m0_deg=0.0, epoch_jd=2451545.0):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import OrbitalElements
+        return OrbitalElements(
+            semi_major_axis_au=a, eccentricity=e, inclination_deg=10.0,
+            longitude_ascending_node_deg=0.0, argument_perihelion_deg=0.0,
+            mean_anomaly_deg=m0_deg, epoch_jd=epoch_jd,
+            perihelion_au=a * (1 - e), aphelion_au=a * (1 + e)
+        )
+
+    def test_at_epoch_returns_m0(self):
+        import math
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_mean_anomaly_at_jd
+        el = self._elements(m0_deg=45.0, epoch_jd=2451545.0)
+        m = compute_mean_anomaly_at_jd(el, 2451545.0)
+        assert m == pytest.approx(math.radians(45.0), abs=1e-6)
+
+    def test_one_period_later_wraps(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_mean_anomaly_at_jd
+        el = self._elements(a=1.0, e=0.0, m0_deg=0.0, epoch_jd=2451545.0)
+        period_days = 365.25
+        m = compute_mean_anomaly_at_jd(el, 2451545.0 + period_days)
+        assert m == pytest.approx(0.0, abs=1e-5)
+
+    def test_hyperbolic_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_mean_anomaly_at_jd
+        el = SimpleNamespace(semi_major_axis_au=1.5, eccentricity=1.1,
+                             mean_anomaly_deg=0.0, epoch_jd=2451545.0)
+        assert compute_mean_anomaly_at_jd(el, 2460000.0) is None
+
+    def test_zero_sma_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_mean_anomaly_at_jd
+        el = SimpleNamespace(semi_major_axis_au=0.0, eccentricity=0.1,
+                             mean_anomaly_deg=0.0, epoch_jd=2451545.0)
+        assert compute_mean_anomaly_at_jd(el, 2460000.0) is None
+
+    def test_result_in_0_2pi(self):
+        import math
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_mean_anomaly_at_jd
+        el = self._elements(a=2.5, e=0.3, m0_deg=180.0, epoch_jd=2451545.0)
+        for delta in [0, 100, 500, 1000, 5000]:
+            m = compute_mean_anomaly_at_jd(el, 2451545.0 + delta)
+            assert 0.0 <= m < 2 * math.pi + 1e-9
