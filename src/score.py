@@ -10,7 +10,8 @@ __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "compute_followup_urgency", "compute_discovery_score",
            "compute_observation_priority", "compute_size_estimate",
            "compute_close_approach_score", "compute_combined_priority",
-           "compute_weighted_priority"]
+           "compute_weighted_priority",
+           "compute_arc_quality_bonus"]
 
 import math
 import uuid
@@ -878,3 +879,31 @@ def compute_weighted_priority(neo: ScoredNEO, weights: dict | None = None) -> fl
 
     weighted = sum(resolved[k] * scores[k] for k in resolved) / total_weight
     return round(min(1.0, max(0.0, weighted)), 4)
+
+
+def compute_arc_quality_bonus(neo: ScoredNEO) -> float:
+    """Compute a [0, 1] arc-quality bonus based on orbit quality and arc length.
+
+    Rewards candidates with longer, well-constrained arcs:
+
+    - Base score from orbit quality code (1→0.25, 2→0.50, 3→0.75, 4→1.0).
+    - Arc-length modifier: log10(arc_days + 1) / log10(365 + 1), clamped [0, 1].
+    - Final bonus = 0.6 × quality_base + 0.4 × arc_modifier.
+
+    Result is clamped to [0, 1] and rounded to 4 decimal places.
+
+    Args:
+        neo: A :class:`~schemas.ScoredNEO` object.
+
+    Returns:
+        Arc quality bonus in [0, 1].
+    """
+    quality_code = int(getattr(neo.metadata, "orbit_quality_code", 1) or 1)
+    quality_base = min(quality_code, 4) / 4.0
+
+    arc_days = float(getattr(neo.tracklet, "arc_days", 0.0) or 0.0)
+    arc_modifier = math.log10(arc_days + 1.0) / math.log10(366.0)
+    arc_modifier = min(1.0, max(0.0, arc_modifier))
+
+    bonus = 0.6 * quality_base + 0.4 * arc_modifier
+    return round(min(1.0, max(0.0, bonus)), 4)

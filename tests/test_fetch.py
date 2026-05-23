@@ -2485,3 +2485,134 @@ class TestEstimateFieldCompleteness:
     def test_in_all(self):
         from fetch import __all__
         assert "estimate_field_completeness" in __all__
+
+
+class TestFetchKnownNeoEphemerides:
+    """Tests for fetch_known_neo_ephemerides."""
+
+    def test_empty_designations_returns_empty(self):
+        from fetch import fetch_known_neo_ephemerides
+        result = fetch_known_neo_ephemerides([])
+        assert result == []
+
+    def test_failed_query_skipped(self, monkeypatch):
+        import sys
+        from unittest.mock import MagicMock
+
+        import fetch as fm
+        from fetch import fetch_known_neo_ephemerides
+
+        # No cache hit → force query path
+        monkeypatch.setattr(fm, "_load_cache", lambda key: None)
+        monkeypatch.setattr(fm, "_save_cache", lambda key, val: None)
+
+        mock_horizons_mod = MagicMock()
+        mock_horizons_mod.Horizons.side_effect = Exception("network error")
+        monkeypatch.setitem(sys.modules, "astroquery.jplhorizons", mock_horizons_mod)
+        result = fetch_known_neo_ephemerides(["433"], force_refresh=True)
+        assert result == []
+
+    def test_successful_query_returns_ephemeris_point(self, monkeypatch):
+        import sys
+        from unittest.mock import MagicMock
+
+        import fetch as fm
+        from fetch import fetch_known_neo_ephemerides
+
+        monkeypatch.setattr(fm, "_load_cache", lambda key: None)
+        monkeypatch.setattr(fm, "_save_cache", lambda key, val: None)
+
+        # Mock Horizons response
+        mock_eph_table = MagicMock()
+        mock_eph_table.__getitem__ = lambda self, key: {
+            "RA": [180.5],
+            "DEC": [10.3],
+            "delta": [0.9],
+            "r": [1.2],
+            "alpha": [35.0],
+            "V": [18.5],
+        }[key]
+        mock_eph_table.colnames = ["RA", "DEC", "delta", "r", "alpha", "V"]
+
+        mock_obj = MagicMock()
+        mock_obj.ephemerides.return_value = mock_eph_table
+
+        mock_mod = MagicMock()
+        mock_mod.Horizons.return_value = mock_obj
+        monkeypatch.setitem(sys.modules, "astroquery.jplhorizons", mock_mod)
+
+        result = fetch_known_neo_ephemerides(["433"], target_jd=2460000.5, force_refresh=True)
+        assert len(result) == 1
+        ep = result[0]
+        assert ep.object_id == "433"
+        assert ep.ra_deg == 180.5
+        assert ep.phase_deg == 35.0
+
+    def test_cache_used_on_second_call(self, monkeypatch):
+        import sys
+        from unittest.mock import MagicMock
+
+        import fetch as fm
+        from fetch import fetch_known_neo_ephemerides
+
+        saved_cache: dict = {}
+
+        def mock_load(key):
+            return saved_cache.get(key)
+
+        def mock_save(key, val):
+            saved_cache[key] = val
+
+        monkeypatch.setattr(fm, "_load_cache", mock_load)
+        monkeypatch.setattr(fm, "_save_cache", mock_save)
+
+        mock_eph_table = MagicMock()
+        mock_eph_table.__getitem__ = lambda self, key: {
+            "RA": [90.0], "DEC": [5.0], "delta": [1.0], "r": [1.5],
+        }[key]
+        mock_eph_table.colnames = ["RA", "DEC", "delta", "r"]
+        mock_obj = MagicMock()
+        mock_obj.ephemerides.return_value = mock_eph_table
+        mock_mod = MagicMock()
+        mock_mod.Horizons.return_value = mock_obj
+        monkeypatch.setitem(sys.modules, "astroquery.jplhorizons", mock_mod)
+
+        # First call — queries Horizons
+        fetch_known_neo_ephemerides(["3200"], target_jd=2460001.0, force_refresh=True)
+        call_count = mock_mod.Horizons.call_count
+
+        # Second call — should use cache (load_cache returns saved data)
+        fetch_known_neo_ephemerides(["3200"], target_jd=2460001.0, force_refresh=False)
+        assert mock_mod.Horizons.call_count == call_count  # no extra calls
+
+    def test_corrupt_cache_falls_through_to_query(self, monkeypatch):
+        """Cached data that fails EphemerisPoint.model_validate is skipped; query proceeds."""
+        import sys
+        from unittest.mock import MagicMock
+
+        import fetch as fm
+        from fetch import fetch_known_neo_ephemerides
+
+        # Return invalid cache data (missing required fields)
+        monkeypatch.setattr(fm, "_load_cache", lambda key: {"bad": "data"})
+        monkeypatch.setattr(fm, "_save_cache", lambda key, val: None)
+
+        mock_eph_table = MagicMock()
+        mock_eph_table.__getitem__ = lambda self, key: {
+            "RA": [10.0], "DEC": [5.0], "delta": [1.1], "r": [1.3],
+        }[key]
+        mock_eph_table.colnames = ["RA", "DEC", "delta", "r"]
+        mock_obj = MagicMock()
+        mock_obj.ephemerides.return_value = mock_eph_table
+        mock_mod = MagicMock()
+        mock_mod.Horizons.return_value = mock_obj
+        monkeypatch.setitem(sys.modules, "astroquery.jplhorizons", mock_mod)
+
+        result = fetch_known_neo_ephemerides(["99942"], force_refresh=False)
+        # Should have fallen through to the real query
+        assert mock_mod.Horizons.call_count == 1
+        assert len(result) == 1
+
+    def test_in_all(self):
+        from fetch import __all__
+        assert "fetch_known_neo_ephemerides" in __all__

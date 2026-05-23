@@ -1441,3 +1441,47 @@ class TestFormatBulkSummary:
     def test_in_all(self):
         from alert import __all__
         assert "format_bulk_summary" in __all__
+
+
+class TestCountReadyToSubmit:
+    """Tests for count_ready_to_submit."""
+
+    def _make_neo(self, rb=0.95, quality=2, moid=0.03, known=0.0, neo_prob=0.75):
+        from tests.conftest import build_scored_neo
+        neo = build_scored_neo()
+        features = neo.features.model_copy(update={
+            "real_bogus_score": rb,
+            "orbit_quality_score": quality / 4.0,
+            "moid_score": 1.0 if moid <= 0.05 else 0.0,
+            "known_object_score": known,
+        })
+        hazard = neo.hazard.model_copy(update={"moid_au": moid})
+        return neo.model_copy(update={"features": features, "hazard": hazard})
+
+    def test_empty_list_returns_zero(self):
+        from alert import count_ready_to_submit
+        assert count_ready_to_submit([]) == 0
+
+    def test_no_ready_candidates(self):
+        from alert import count_ready_to_submit
+        # low rb score → not ready
+        neos = [self._make_neo(rb=0.5) for _ in range(3)]
+        result = count_ready_to_submit(neos)
+        assert isinstance(result, int)
+        assert result == 0
+
+    def test_returns_integer(self):
+        from alert import count_ready_to_submit
+        neos = [self._make_neo()]
+        result = count_ready_to_submit(neos)
+        assert isinstance(result, int)
+
+    def test_consistent_with_ready_for_submission(self):
+        from alert import count_ready_to_submit, ready_for_submission
+        neos = [self._make_neo(rb=0.5), self._make_neo(rb=0.95)]
+        expected = sum(1 for n in neos if ready_for_submission(n)[0])
+        assert count_ready_to_submit(neos) == expected
+
+    def test_in_all(self):
+        from alert import __all__
+        assert "count_ready_to_submit" in __all__

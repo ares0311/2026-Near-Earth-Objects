@@ -1007,3 +1007,44 @@ class TestEphemerisPoint:
     def test_in_all(self):
         from schemas import __all__
         assert "EphemerisPoint" in __all__
+
+
+class TestObservationCluster:
+    """Tests for ObservationCluster schema."""
+
+    def test_basic_construction(self):
+        from schemas import ObservationCluster
+        oc = ObservationCluster(
+            cluster_id="CL001",
+            centroid_ra_deg=180.0,
+            centroid_dec_deg=10.0,
+        )
+        assert oc.cluster_id == "CL001"
+        assert oc.centroid_ra_deg == 180.0
+        assert oc.observations == ()
+        assert oc.radius_arcsec == 0.0
+
+    def test_with_observations(self):
+        from schemas import Observation, ObservationCluster
+        obs = (Observation(
+            obs_id="o1", ra_deg=180.0, dec_deg=10.0, jd=2460000.5,
+            mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF",
+        ),)
+        oc = ObservationCluster(
+            cluster_id="CL002", centroid_ra_deg=180.0, centroid_dec_deg=10.0,
+            observations=obs, radius_arcsec=5.0, jd=2460000.5,
+        )
+        assert len(oc.observations) == 1
+        assert oc.radius_arcsec == 5.0
+
+    def test_is_frozen(self):
+        import pytest
+
+        from schemas import ObservationCluster
+        oc = ObservationCluster(cluster_id="X", centroid_ra_deg=0.0, centroid_dec_deg=0.0)
+        with pytest.raises(Exception):
+            oc.cluster_id = "Y"  # type: ignore[misc]
+
+    def test_in_all(self):
+        from schemas import __all__
+        assert "ObservationCluster" in __all__

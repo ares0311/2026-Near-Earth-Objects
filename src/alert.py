@@ -27,6 +27,7 @@ __all__ = [
     "format_candidate_dossier",
     "count_alerts_by_flag",
     "format_bulk_summary",
+    "count_ready_to_submit",
 ]
 
 import json
@@ -1225,3 +1226,18 @@ def format_bulk_summary(neos: list[ScoredNEO], title: str = "Pipeline Run Summar
         "Defer to MPC/CNEOS.",
     ]
     return "\n".join(lines)
+
+
+def count_ready_to_submit(neos: list[ScoredNEO]) -> int:
+    """Count NEO candidates that pass all alert-protocol gate conditions.
+
+    Calls :func:`ready_for_submission` on each candidate and returns the
+    number for which all gate conditions are met.  Returns 0 for an empty list.
+
+    Args:
+        neos: List of :class:`~schemas.ScoredNEO` objects.
+
+    Returns:
+        Integer count of submission-ready candidates.
+    """
+    return sum(1 for neo in neos if ready_for_submission(neo)[0])

@@ -1404,3 +1404,63 @@ class TestComputeStreakDensity:
     def test_in_all(self):
         from detect import __all__
         assert "compute_streak_density" in __all__
+
+
+class TestComputeAngularVelocity:
+    """Tests for compute_angular_velocity."""
+
+    def _make_obs(self, ra, dec, jd):
+        from schemas import Observation
+        return Observation(
+            obs_id=f"av_{jd}", ra_deg=ra, dec_deg=dec, jd=jd,
+            mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF",
+        )
+
+    def test_returns_none_for_same_jd(self):
+        from detect import compute_angular_velocity
+        o = self._make_obs(180.0, 0.0, 2460000.5)
+        assert compute_angular_velocity(o, o) is None
+
+    def test_returns_dict_keys(self):
+        from detect import compute_angular_velocity
+        o1 = self._make_obs(180.0, 0.0, 2460000.5)
+        o2 = self._make_obs(180.1, 0.1, 2460001.5)
+        result = compute_angular_velocity(o1, o2)
+        assert result is not None
+        assert set(result.keys()) == {"rate_arcsec_hr", "pa_deg", "dt_hours"}
+
+    def test_dt_hours_correct(self):
+        from detect import compute_angular_velocity
+        o1 = self._make_obs(180.0, 0.0, 2460000.5)
+        o2 = self._make_obs(180.0, 0.0, 2460001.5)
+        result = compute_angular_velocity(o1, o2)
+        assert result is not None
+        assert abs(result["dt_hours"] - 24.0) < 0.001
+
+    def test_rate_non_negative(self):
+        from detect import compute_angular_velocity
+        o1 = self._make_obs(180.0, 10.0, 2460000.5)
+        o2 = self._make_obs(180.01, 10.01, 2460001.5)
+        result = compute_angular_velocity(o1, o2)
+        assert result is not None
+        assert result["rate_arcsec_hr"] >= 0.0
+
+    def test_pa_in_range(self):
+        from detect import compute_angular_velocity
+        o1 = self._make_obs(180.0, 0.0, 2460000.5)
+        o2 = self._make_obs(181.0, 0.0, 2460001.5)
+        result = compute_angular_velocity(o1, o2)
+        assert result is not None
+        assert 0.0 <= result["pa_deg"] < 360.0
+
+    def test_zero_motion_zero_rate(self):
+        from detect import compute_angular_velocity
+        o1 = self._make_obs(180.0, 0.0, 2460000.5)
+        o2 = self._make_obs(180.0, 0.0, 2460001.5)
+        result = compute_angular_velocity(o1, o2)
+        assert result is not None
+        assert result["rate_arcsec_hr"] == 0.0
+
+    def test_in_all(self):
+        from detect import __all__
+        assert "compute_angular_velocity" in __all__

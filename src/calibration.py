@@ -16,6 +16,7 @@ __all__ = [
     "compute_f1_score", "compute_average_precision",
     "compute_calibration_sharpness",
     "compute_brier_skill_score",
+    "compute_discrimination_score",
 ]
 
 import math
@@ -794,3 +795,37 @@ def compute_brier_skill_score(
 
     bss = 1.0 - bs_model / bs_clim
     return round(bss, 6)
+
+
+def compute_discrimination_score(
+    probs: list[float] | np.ndarray,
+    labels: list[int] | np.ndarray,
+) -> float:
+    """Compute a simple discrimination score between positives and negatives.
+
+    Discrimination = |mean(p | y=1) − mean(p | y=0)|.
+
+    A perfectly discriminating model assigns mean probability 1.0 to positives
+    and 0.0 to negatives, giving a score of 1.0.  A random model gives ~0.0.
+
+    Returns 0.0 for empty inputs or when only one class is present (score is
+    undefined without both positive and negative examples).
+
+    Args:
+        probs: Predicted probabilities in [0, 1].
+        labels: True binary labels (0 or 1).
+
+    Returns:
+        Discrimination score in [0, 1], rounded to 6 decimal places.
+    """
+    p = np.asarray(probs, dtype=float)
+    y = np.asarray(labels, dtype=float)
+    if p.size == 0:
+        return 0.0
+    pos_mask = y == 1
+    neg_mask = y == 0
+    if not pos_mask.any() or not neg_mask.any():
+        return 0.0
+    mean_pos = float(p[pos_mask].mean())
+    mean_neg = float(p[neg_mask].mean())
+    return round(abs(mean_pos - mean_neg), 6)

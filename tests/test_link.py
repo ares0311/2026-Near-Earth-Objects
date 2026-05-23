@@ -1550,3 +1550,93 @@ class TestComputeNightSpan:
     def test_in_all(self):
         from link import __all__
         assert "compute_night_span" in __all__
+
+
+class TestComputeTrackletVelocityDispersion:
+    """Tests for compute_tracklet_velocity_dispersion."""
+
+    def _make_tracklet(self, jd_ra_dec_list):
+        from schemas import Observation, Tracklet
+        obs = tuple(
+            Observation(
+                obs_id=f"vd{i}", ra_deg=ra, dec_deg=dec, jd=jd,
+                mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF",
+            )
+            for i, (jd, ra, dec) in enumerate(jd_ra_dec_list)
+        )
+        arc = jd_ra_dec_list[-1][0] - jd_ra_dec_list[0][0] if len(jd_ra_dec_list) > 1 else 0.0
+        return Tracklet(
+            object_id="vd_test", observations=obs, arc_days=arc,
+            motion_rate_arcsec_per_hour=1.0, motion_pa_degrees=90.0,
+        )
+
+    def test_fewer_than_3_obs_returns_none(self):
+        from link import compute_tracklet_velocity_dispersion
+        t = self._make_tracklet([(2460000.5, 180.0, 0.0), (2460001.5, 180.01, 0.0)])
+        assert compute_tracklet_velocity_dispersion(t) is None
+
+    def test_empty_tracklet_returns_none(self):
+        from types import SimpleNamespace
+
+        from link import compute_tracklet_velocity_dispersion
+        t = SimpleNamespace(observations=())
+        assert compute_tracklet_velocity_dispersion(t) is None
+
+    def test_uniform_motion_near_zero_dispersion(self):
+        from link import compute_tracklet_velocity_dispersion
+        # linear motion: equal steps
+        obs = [
+            (2460000.5, 180.000, 0.0),
+            (2460001.5, 180.001, 0.0),
+            (2460002.5, 180.002, 0.0),
+            (2460003.5, 180.003, 0.0),
+        ]
+        t = self._make_tracklet(obs)
+        result = compute_tracklet_velocity_dispersion(t)
+        assert result is not None
+        assert result < 0.01  # near-zero for uniform motion
+
+    def test_nonuniform_motion_has_dispersion(self):
+        from link import compute_tracklet_velocity_dispersion
+        # erratic motion
+        obs = [
+            (2460000.5, 180.000, 0.0),
+            (2460001.5, 180.100, 0.0),
+            (2460002.5, 180.101, 0.0),
+            (2460003.5, 180.900, 0.0),
+        ]
+        t = self._make_tracklet(obs)
+        result = compute_tracklet_velocity_dispersion(t)
+        assert result is not None
+        assert result > 0.0
+
+    def test_returns_float_rounded_4dp(self):
+        from link import compute_tracklet_velocity_dispersion
+        obs = [(2460000.5 + i, 180.0 + i * 0.01, 0.0) for i in range(4)]
+        t = self._make_tracklet(obs)
+        result = compute_tracklet_velocity_dispersion(t)
+        assert result is not None
+        assert round(result, 4) == result
+
+    def test_in_all(self):
+        from link import __all__
+        assert "compute_tracklet_velocity_dispersion" in __all__
+
+    def test_duplicate_jd_skipped_gives_none(self):
+        """Consecutive identical JDs → all pairs skipped → rates<2 → None."""
+        from types import SimpleNamespace
+
+        from link import compute_tracklet_velocity_dispersion
+
+        class FakeObs:
+            def __init__(self, ra, dec, jd):
+                self.ra_deg = ra
+                self.dec_deg = dec
+                self.jd = jd
+
+        t = SimpleNamespace(observations=(
+            FakeObs(180.0, 0.0, 2460000.5),
+            FakeObs(180.1, 0.0, 2460000.5),  # same JD → skip
+            FakeObs(180.2, 0.0, 2460000.5),  # same JD → skip
+        ))
+        assert compute_tracklet_velocity_dispersion(t) is None

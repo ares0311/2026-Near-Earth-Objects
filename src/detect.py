@@ -7,7 +7,8 @@ __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus"
            "compute_psf_fwhm", "estimate_sky_background", "compute_detection_efficiency",
            "count_detections_by_filter", "compute_motion_vector",
            "flag_moving_sources", "compute_source_extent", "estimate_observation_depth",
-           "filter_by_magnitude", "compute_streak_density"]
+           "filter_by_magnitude", "compute_streak_density",
+           "compute_angular_velocity"]
 
 import math
 import uuid
@@ -808,3 +809,51 @@ def compute_streak_density(observations: list) -> float:
         if metric is not None and metric >= 0.5:
             streak_count += 1
     return round(streak_count / len(observations), 4)
+
+
+def compute_angular_velocity(obs1: object, obs2: object) -> dict | None:
+    """Compute the angular velocity vector between two observations.
+
+    Returns a dict with the apparent motion rate (arcsec/hr), position angle
+    (degrees east of north, [0, 360)), and time baseline (hours).  The RA
+    component is cosine-Dec corrected so the rate reflects true angular
+    separation on the sky.
+
+    Returns ``None`` if the two observations have identical Julian Dates
+    (zero time baseline).
+
+    Args:
+        obs1: First :class:`~schemas.Observation`.
+        obs2: Second :class:`~schemas.Observation`.
+
+    Returns:
+        Dict with keys ``rate_arcsec_hr``, ``pa_deg``, ``dt_hours``,
+        or ``None`` for zero time baseline.
+    """
+    import math
+
+    jd1 = float(getattr(obs1, "jd", 0.0))
+    jd2 = float(getattr(obs2, "jd", 0.0))
+    dt_days = jd2 - jd1
+    if dt_days == 0.0:
+        return None
+    dt_hours = dt_days * 24.0
+
+    ra1 = float(getattr(obs1, "ra_deg", 0.0))
+    ra2 = float(getattr(obs2, "ra_deg", 0.0))
+    dec1 = float(getattr(obs1, "dec_deg", 0.0))
+    dec2 = float(getattr(obs2, "dec_deg", 0.0))
+
+    cos_dec = math.cos(math.radians((dec1 + dec2) / 2.0))
+    dra_arcsec = (ra2 - ra1) * 3600.0 * cos_dec
+    ddec_arcsec = (dec2 - dec1) * 3600.0
+
+    rate = math.sqrt(dra_arcsec**2 + ddec_arcsec**2) / abs(dt_hours)
+    pa_rad = math.atan2(dra_arcsec, ddec_arcsec)
+    pa_deg = math.degrees(pa_rad) % 360.0
+
+    return {
+        "rate_arcsec_hr": round(rate, 4),
+        "pa_deg": round(pa_deg, 4),
+        "dt_hours": round(dt_hours, 6),
+    }

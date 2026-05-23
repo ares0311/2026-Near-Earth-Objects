@@ -9,7 +9,8 @@ __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fet
            "fetch_atlas_forced", "fetch_ztf_alerts", "estimate_survey_depth",
            "filter_by_survey", "fetch_panstarrs_catalog", "fetch_css_alerts",
            "fetch_panstarrs_moving_objects", "fetch_recent_mpc_neos",
-           "estimate_field_completeness"]
+           "estimate_field_completeness",
+           "fetch_known_neo_ephemerides"]
 
 import json
 import os
@@ -1244,3 +1245,67 @@ def estimate_field_completeness(
 
     bright = sum(1 for o in valid if float(getattr(o, "mag", 99.0)) <= threshold)
     return round(bright / len(valid), 4)
+
+
+def fetch_known_neo_ephemerides(
+    designations: list[str],
+    target_jd: float = 2460000.5,
+    force_refresh: bool = False,
+) -> list:
+    """Fetch geocentric ephemerides for a list of known NEO designations.
+
+    Queries JPL Horizons (via ``astroquery.jplhorizons``) for each designation
+    and returns a list of :class:`~schemas.EphemerisPoint` objects.  Results are
+    disk-cached per (designation, target_jd) pair; use *force_refresh* to bypass.
+
+    Failed individual queries are silently skipped — only successful results are
+    returned.  The order of returned points matches the order of *designations*
+    (absent entries are omitted).
+
+    Args:
+        designations: List of MPC/JPL designation strings, e.g. ``["433", "3200"]``.
+        target_jd: Julian Date for the ephemeris prediction (default 2460000.5).
+        force_refresh: If True, bypass disk cache and re-query.
+
+    Returns:
+        List of :class:`~schemas.EphemerisPoint` objects, one per successful query.
+    """
+    from schemas import EphemerisPoint
+
+    results: list[EphemerisPoint] = []
+    for desig in designations:
+        cache_key = f"neo_eph_{desig}_{target_jd:.2f}"
+        if not force_refresh:
+            cached = _load_cache(cache_key)
+            if cached is not None:
+                try:
+                    results.append(EphemerisPoint.model_validate(cached))
+                    continue
+                except Exception:
+                    pass
+        try:
+            from astroquery.jplhorizons import Horizons  # type: ignore[import]
+
+            obj = Horizons(id=desig, location="500", epochs=target_jd)
+            eph = obj.ephemerides()
+            ra = float(eph["RA"][0])
+            dec = float(eph["DEC"][0])
+            delta = float(eph["delta"][0])
+            r = float(eph["r"][0])
+            phase = float(eph["alpha"][0]) if "alpha" in eph.colnames else None
+            mag = float(eph["V"][0]) if "V" in eph.colnames else None
+            point = EphemerisPoint(
+                object_id=desig,
+                jd=target_jd,
+                ra_deg=ra,
+                dec_deg=dec,
+                delta_au=delta,
+                r_au=r,
+                phase_deg=phase,
+                mag=mag,
+            )
+            _save_cache(cache_key, point.model_dump())
+            results.append(point)
+        except Exception:
+            pass
+    return results

@@ -17,6 +17,7 @@ __all__ = [
     "OrbitalElementsSummary", "CandidateReport",
     "EphemerisPoint",
     "SurveyStatistics",
+    "ObservationCluster",
     "BackgroundOutcome", "BackgroundRunMode", "FollowUpTestStatus", "HumanReviewStatus",
     "RecommendationAction", "SignoffDecision",
     "PriorityFactors", "BackgroundTarget", "FollowUpTestResult",
@@ -896,3 +897,29 @@ class SurveyStatistics(BaseModel):
     mean_rb: float | None = None
     limiting_mag: float | None = None
     epoch_jd: float = 2460000.5
+
+
+class ObservationCluster(BaseModel):
+    """A group of spatially and temporally co-located observations from one field.
+
+    Clusters are produced by spatial grouping routines (e.g.
+    :func:`~detect.cluster_detections`) and capture the aggregate footprint of
+    a set of detections in a single pipeline epoch.
+
+    Attributes:
+        cluster_id: Unique identifier for this cluster.
+        centroid_ra_deg: Mean right ascension of the cluster centre in degrees.
+        centroid_dec_deg: Mean declination of the cluster centre in degrees.
+        jd: Reference Julian Date for this cluster (typically the median obs JD).
+        observations: Constituent :class:`Observation` objects.
+        radius_arcsec: Angular radius enclosing all members in arcsec.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    cluster_id: str
+    centroid_ra_deg: float
+    centroid_dec_deg: float
+    jd: float = 2460000.5
+    observations: tuple[Observation, ...] = ()
+    radius_arcsec: float = 0.0

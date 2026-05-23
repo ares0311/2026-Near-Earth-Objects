@@ -9,7 +9,8 @@ __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_
            "compute_photometric_scatter", "estimate_zero_point",
            "compute_difference_image_snr", "compute_cutout_entropy", "compute_background_level",
            "compute_pixel_histogram",
-           "compute_cutout_contrast"]
+           "compute_cutout_contrast",
+           "compute_image_gradient"]
 
 import base64
 import math
@@ -748,5 +749,44 @@ def compute_cutout_contrast(obs: object) -> float | None:
             return None
         contrast = (i_max - i_min) / denom
         return round(float(contrast), 6)
+    except Exception:
+        return None
+
+
+def compute_image_gradient(obs: object) -> float | None:
+    """Compute the RMS Sobel gradient magnitude of a difference-image cutout.
+
+    Applies 3×3 Sobel filters in the X and Y directions to the 63×63
+    difference-image cutout and returns the root-mean-square of the combined
+    gradient magnitude.  High values indicate sharp, localised features
+    consistent with a real point source; near-zero values suggest a smooth
+    background or artefact.
+
+    Args:
+        obs: An :class:`~schemas.Observation` with an optional
+            ``cutout_difference`` base64 attribute.
+
+    Returns:
+        RMS gradient in pixel units, rounded to 6 decimal places, or ``None``
+        if no cutout is present or decoding fails.
+    """
+    import base64
+
+    cutout = getattr(obs, "cutout_difference", None)
+    if cutout is None:
+        return None
+    try:
+        raw = base64.b64decode(cutout)
+        arr = np.frombuffer(raw, dtype=np.float32).reshape(63, 63).astype(float)
+        # Sobel kernels
+        kx = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], dtype=float)
+        ky = np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]], dtype=float)
+        from scipy.signal import convolve2d  # type: ignore[import]
+
+        gx = convolve2d(arr, kx, mode="same", boundary="symm")
+        gy = convolve2d(arr, ky, mode="same", boundary="symm")
+        grad_mag = np.sqrt(gx**2 + gy**2)
+        rms = float(np.sqrt(np.mean(grad_mag**2)))
+        return round(rms, 6)
     except Exception:
         return None
