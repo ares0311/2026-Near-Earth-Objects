@@ -1490,3 +1490,75 @@ class TestComputeCutoutSymmetry:
         from preprocess import compute_cutout_symmetry
         obs = SimpleNamespace(cutout_difference="!!!not_valid_base64!!!")
         assert compute_cutout_symmetry(obs) is None
+
+
+class TestComputeStreakAngle:
+    def _make_obs(self, arr=None):
+        import base64
+        import sys
+
+        import numpy as np
+        sys.path.insert(0, "src")
+        from schemas import Observation
+        if arr is None:
+            arr = np.zeros((63, 63), dtype=np.float32)
+            arr[31, 31] = 1.0
+        raw = arr.astype(np.float32).tobytes()
+        b64 = base64.b64encode(raw).decode()
+        return Observation(obs_id="o1", ra_deg=10.0, dec_deg=5.0, jd=2460000.5,
+                           mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF",
+                           cutout_difference=b64)
+
+    def test_horizontal_streak_angle(self):
+        import sys
+
+        import numpy as np
+        sys.path.insert(0, "src")
+        from preprocess import compute_streak_angle
+        arr = np.zeros((63, 63), dtype=np.float32)
+        arr[31, 10:53] = 1.0  # horizontal streak
+        obs = self._make_obs(arr)
+        angle = compute_streak_angle(obs)
+        assert angle is not None
+        assert isinstance(angle, float)
+
+    def test_no_cutout_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from preprocess import compute_streak_angle
+        from schemas import Observation
+        obs = Observation(obs_id="o2", ra_deg=10.0, dec_deg=5.0, jd=2460000.5,
+                          mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF")
+        assert compute_streak_angle(obs) is None
+
+    def test_zero_array_returns_none(self):
+        import sys
+
+        import numpy as np
+        sys.path.insert(0, "src")
+        from preprocess import compute_streak_angle
+        obs = self._make_obs(np.zeros((63, 63), dtype=np.float32))
+        assert compute_streak_angle(obs) is None
+
+    def test_result_in_0_180(self):
+        import sys
+
+        import numpy as np
+        sys.path.insert(0, "src")
+        from preprocess import compute_streak_angle
+        rng = np.random.default_rng(7)
+        arr = rng.standard_normal((63, 63)).astype(np.float32)
+        arr = np.abs(arr)
+        obs = self._make_obs(arr)
+        angle = compute_streak_angle(obs)
+        assert angle is not None
+        assert 0.0 <= angle < 180.0
+
+    def test_invalid_b64_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_streak_angle
+        obs = SimpleNamespace(cutout_difference="!!!bad!!!")
+        assert compute_streak_angle(obs) is None

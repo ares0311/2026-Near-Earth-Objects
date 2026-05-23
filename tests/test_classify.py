@@ -1947,3 +1947,48 @@ class TestComputeClassEntropySummaryExtra:
         neos = [SimpleNamespace(posterior=bad_posterior)]
         result = compute_class_entropy_summary(neos)
         assert result["n_neos"] == 0
+
+
+class TestComputeNeoClassDistribution:
+    def test_empty_returns_empty_dict(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_neo_class_distribution
+        assert compute_neo_class_distribution([]) == {}
+
+    def test_single_class(self, scored_neo):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_neo_class_distribution
+        result = compute_neo_class_distribution([scored_neo])
+        assert len(result) == 1
+        cls = scored_neo.hazard.neo_class
+        assert result[cls]["count"] == 1
+        assert result[cls]["fraction"] == 1.0
+
+    def test_multiple_classes(self, scored_neo):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_neo_class_distribution
+        from schemas import CandidateExplanation, HazardAssessment, ScoredNEO
+
+        expl = CandidateExplanation(summary="x", supporting_evidence=(),
+                                    contra_evidence=(), model_version="t")
+        amor_hazard = HazardAssessment(hazard_flag="nominal", moid_au=0.1,
+                                       estimated_diameter_m=None, absolute_magnitude_h=None,
+                                       neo_class="amor", alert_pathway="internal_candidate",
+                                       explanation=expl)
+        amor_neo = ScoredNEO(tracklet=scored_neo.tracklet, features=scored_neo.features,
+                              posterior=scored_neo.posterior, hazard=amor_hazard,
+                              metadata=scored_neo.metadata)
+        result = compute_neo_class_distribution([scored_neo, amor_neo])
+        total_count = sum(v["count"] for v in result.values())
+        assert total_count == 2
+
+    def test_fraction_sums_to_one(self, scored_neo):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_neo_class_distribution
+        result = compute_neo_class_distribution([scored_neo, scored_neo])
+        total = sum(v["fraction"] for v in result.values())
+        assert total == pytest.approx(1.0, abs=0.001)

@@ -1528,3 +1528,38 @@ class TestComputeAlertAgeDays:
         sys.path.insert(0, "src")
         import alert
         assert "compute_alert_age_days" in alert.__all__
+
+
+class TestFormatObservationLog:
+    def test_contains_header(self, scored_neo):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_observation_log
+        log = format_observation_log(scored_neo)
+        assert "JD" in log
+        assert "RA" in log
+        assert "Dec" in log
+
+    def test_contains_all_observations(self, scored_neo):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_observation_log
+        log = format_observation_log(scored_neo)
+        n_obs = len(scored_neo.tracklet.observations)
+        assert f"{n_obs} observation" in log
+
+    def test_sorted_by_jd(self, scored_neo):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_observation_log
+        log = format_observation_log(scored_neo)
+        jds = [float(line.split()[0]) for line in log.splitlines()
+               if line and line[0].isdigit()]
+        assert jds == sorted(jds)
+
+    def test_contains_object_id(self, scored_neo):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_observation_log
+        log = format_observation_log(scored_neo)
+        assert scored_neo.tracklet.object_id in log

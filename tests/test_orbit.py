@@ -1731,3 +1731,62 @@ class TestComputeMeanAnomalyAtJd:
         for delta in [0, 100, 500, 1000, 5000]:
             m = compute_mean_anomaly_at_jd(el, 2451545.0 + delta)
             assert 0.0 <= m < 2 * math.pi + 1e-9
+
+
+class TestComputeOrbitalVelocity:
+    def _elements(self, a=1.0, e=0.0):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import OrbitalElements
+        return OrbitalElements(
+            semi_major_axis_au=a, eccentricity=e, inclination_deg=0.0,
+            longitude_ascending_node_deg=0.0, argument_perihelion_deg=0.0,
+            mean_anomaly_deg=0.0, epoch_jd=2451545.0,
+            perihelion_au=a * (1 - e), aphelion_au=a * (1 + e)
+        )
+
+    def test_earth_circular_orbit(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_orbital_velocity
+        el = self._elements(a=1.0, e=0.0)
+        v = compute_orbital_velocity(el, 1.0)
+        assert v is not None
+        assert 29.0 < v < 31.0  # Earth ≈ 29.78 km/s
+
+    def test_zero_sma_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_orbital_velocity
+        el = SimpleNamespace(semi_major_axis_au=0.0)
+        assert compute_orbital_velocity(el, 1.0) is None
+
+    def test_zero_r_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_orbital_velocity
+        el = self._elements(a=1.5)
+        assert compute_orbital_velocity(el, 0.0) is None
+
+    def test_larger_sma_faster_at_same_r(self):
+        # vis-viva: v² = GM(2/r - 1/a); larger a → smaller 1/a → larger v at same r
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_orbital_velocity
+        el_near = self._elements(a=1.0)
+        el_far = self._elements(a=3.0)
+        v_near = compute_orbital_velocity(el_near, 1.0)
+        v_far = compute_orbital_velocity(el_far, 1.0)
+        assert v_far > v_near
+
+    def test_hyperbolic_negative_v2_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_orbital_velocity
+        # a=1 AU, r=3 AU → v² = GM(2/3 - 1) < 0
+        el = SimpleNamespace(semi_major_axis_au=1.0)
+        assert compute_orbital_velocity(el, 3.0) is None

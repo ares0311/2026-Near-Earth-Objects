@@ -1508,3 +1508,46 @@ class TestComputeDetectionGap:
         obs = [self._obs(2460000.0), self._obs(2460000.1), self._obs(2460002.0)]
         gap = compute_detection_gap(obs)
         assert gap == pytest.approx(45.6, abs=0.1)
+
+
+class TestComputeObservationCadence:
+    def _obs(self, jd):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import Observation
+        return Observation(obs_id=f"o{jd}", ra_deg=10.0, dec_deg=5.0, jd=jd,
+                           mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF")
+
+    def test_two_obs_cadence(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_observation_cadence
+        obs = [self._obs(2460000.0), self._obs(2460001.0)]
+        assert compute_observation_cadence(obs) == 24.0
+
+    def test_single_obs_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_observation_cadence
+        assert compute_observation_cadence([self._obs(2460000.0)]) is None
+
+    def test_empty_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_observation_cadence
+        assert compute_observation_cadence([]) is None
+
+    def test_three_obs_mean(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_observation_cadence
+        # gaps: 12h, 36h → mean = 24h
+        obs = [self._obs(2460000.0), self._obs(2460000.5), self._obs(2460002.0)]
+        assert compute_observation_cadence(obs) == pytest.approx(24.0, abs=0.01)
+
+    def test_unsorted_input(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_observation_cadence
+        obs = [self._obs(2460001.0), self._obs(2460000.0)]
+        assert compute_observation_cadence(obs) == 24.0

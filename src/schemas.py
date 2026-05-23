@@ -24,6 +24,7 @@ __all__ = [
     "SubmissionRecommendation", "BackgroundRunLedgerEntry", "ReviewedLogEntry",
     "NeedsFollowUpLogEntry", "BackgroundConfig", "HumanSignoffEntry", "BackgroundRunResult",
     "AstrometricResidual",
+    "ResidualSummary",
 ]
 
 from dataclasses import dataclass
@@ -936,3 +937,16 @@ class AstrometricResidual(BaseModel):
     dec_residual_arcsec: float
     total_arcsec: float
     jd: float
+
+
+class ResidualSummary(BaseModel):
+    """Aggregate astrometric residual statistics for a set of observations."""
+
+    model_config = ConfigDict(frozen=True)
+
+    object_id: str
+    n_obs: int
+    rms_arcsec: float
+    max_residual_arcsec: float
+    mean_ra_residual_arcsec: float
+    mean_dec_residual_arcsec: float

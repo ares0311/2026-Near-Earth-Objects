@@ -11,7 +11,8 @@ __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fet
            "fetch_panstarrs_moving_objects", "fetch_recent_mpc_neos",
            "estimate_field_completeness",
            "fetch_known_neo_ephemerides",
-           "fetch_neocp_objects"]
+           "fetch_neocp_objects",
+           "fetch_mpc_orbit_elements"]
 
 import json
 import os
@@ -33,7 +34,7 @@ def _cache_path(key: str) -> Path:
     return _CACHE_DIR / f"{key}.json"
 
 
-def _load_cache(key: str, force_refresh: bool = False) -> list[dict] | None:
+def _load_cache(key: str, force_refresh: bool = False) -> list[dict] | dict | None:
     if force_refresh:
         return None
     p = _cache_path(key)
@@ -43,7 +44,7 @@ def _load_cache(key: str, force_refresh: bool = False) -> list[dict] | None:
     return None
 
 
-def _save_cache(key: str, data: list[dict]) -> None:
+def _save_cache(key: str, data: list[dict] | dict) -> None:
     with _cache_path(key).open("w") as f:
         json.dump(data, f)
 
@@ -1348,3 +1349,44 @@ def fetch_neocp_objects(force_refresh: bool = False) -> list[dict]:
         return rows
     except Exception:
         return []
+
+
+def fetch_mpc_orbit_elements(
+    designation: str,
+    force_refresh: bool = False,
+) -> dict | None:
+    """Fetch orbital elements for *designation* from the MPC via astroquery.
+
+    Results are disk-cached under ``"mpc_orb_{designation}"``.  Set
+    *force_refresh* to bypass the cache.  Returns a dict with keys
+    ``"a"``, ``"e"``, ``"i"``, ``"node"``, ``"peri"``, ``"M"``,
+    ``"epoch_jd"`` (all floats) and ``"designation"`` (str), or
+    *None* if the object cannot be found or the query fails.
+    """
+    cache_key = f"mpc_orb_{designation}"
+    if not force_refresh:
+        cached = _load_cache(cache_key)
+        if cached is not None and isinstance(cached, dict):
+            return cached
+    try:
+        from astroquery.mpc import MPC  # type: ignore[import]
+
+        tbl = MPC.query_object("asteroid", designation=designation)
+        if tbl is None or len(tbl) == 0:
+            return None
+        row = tbl[0]
+        result = {
+            "designation": designation,
+            "a": float(row["semimajor_axis"]) if "semimajor_axis" in tbl.colnames else None,
+            "e": float(row["eccentricity"]) if "eccentricity" in tbl.colnames else None,
+            "i": float(row["inclination"]) if "inclination" in tbl.colnames else None,
+            "node": float(row["ascending_node"]) if "ascending_node" in tbl.colnames else None,
+            "peri": (float(row["argument_of_perihelion"])
+                     if "argument_of_perihelion" in tbl.colnames else None),
+            "M": float(row["mean_anomaly"]) if "mean_anomaly" in tbl.colnames else None,
+            "epoch_jd": float(row["epoch_jd"]) if "epoch_jd" in tbl.colnames else None,
+        }
+        _save_cache(cache_key, result)
+        return result
+    except Exception:
+        return None

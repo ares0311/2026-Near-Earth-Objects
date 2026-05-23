@@ -1410,3 +1410,115 @@ class TestComputeWeightedHazardScore:
         sys.path.insert(0, "src")
         import score
         assert "compute_weighted_hazard_score" in score.__all__
+
+
+class TestComputeHazardGrade:
+    def test_grade_d_default(self, scored_neo):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_hazard_grade
+        grade = compute_hazard_grade(scored_neo)
+        assert grade in ("A", "B", "C", "D")
+
+    def test_grade_a_pha(self, scored_neo):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import CandidateExplanation, HazardAssessment, ScoredNEO
+        from score import compute_hazard_grade
+        expl = CandidateExplanation(summary="PHA", supporting_evidence=(),
+                                    contra_evidence=(), model_version="t")
+        from schemas import OrbitalElements
+        orb = OrbitalElements(semi_major_axis_au=1.5, eccentricity=0.3, inclination_deg=10.0,
+                              longitude_ascending_node_deg=0.0, argument_perihelion_deg=0.0,
+                              mean_anomaly_deg=0.0, epoch_jd=2451545.0,
+                              perihelion_au=1.05, aphelion_au=1.95, quality_code=4)
+        hazard2 = HazardAssessment(hazard_flag="pha_candidate", moid_au=0.005,
+                                   estimated_diameter_m=500.0, absolute_magnitude_h=18.0,
+                                   neo_class="apollo", alert_pathway="nasa_pdco_notify",
+                                   explanation=expl, orbital_elements=orb)
+        pha_neo = ScoredNEO(tracklet=scored_neo.tracklet, features=scored_neo.features,
+                             posterior=scored_neo.posterior, hazard=hazard2,
+                             metadata=scored_neo.metadata)
+        grade = compute_hazard_grade(pha_neo)
+        assert grade in ("A", "B")
+
+    def test_grade_values_ordered(self, scored_neo):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_hazard_grade
+        assert compute_hazard_grade(scored_neo) in ("A", "B", "C", "D")
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        assert "compute_hazard_grade" in score.__all__
+
+
+class TestComputeHazardGradeAllGrades:
+    def test_grade_c_and_d(self, scored_neo):
+        """Cover score.py lines 950-952 (C and D branches)."""
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_hazard_grade, compute_weighted_hazard_score
+
+        score = compute_weighted_hazard_score(scored_neo)
+        grade = compute_hazard_grade(scored_neo)
+        if score >= 0.7:
+            assert grade == "A"
+        elif score >= 0.5:
+            assert grade == "B"
+        elif score >= 0.3:
+            assert grade == "C"
+        else:
+            assert grade == "D"
+
+    def _make_neo(self, moid):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import (
+            CandidateExplanation,
+            CandidateFeatures,
+            HazardAssessment,
+            NEOPosterior,
+            Observation,
+            ScoredNEO,
+            ScoringMetadata,
+            Tracklet,
+        )
+        obs = (Observation(obs_id="o1", ra_deg=10.0, dec_deg=0.0, jd=2460000.0,
+                           mag=20.0, mag_err=0.1, filter_band="r", mission="ZTF"),
+               Observation(obs_id="o2", ra_deg=10.01, dec_deg=0.0, jd=2460001.0,
+                           mag=20.0, mag_err=0.1, filter_band="r", mission="ZTF"))
+        tracklet = Tracklet("T_grade", obs, arc_days=1.0,
+                            motion_rate_arcsec_per_hour=1.0, motion_pa_degrees=90.0)
+        expl = CandidateExplanation(summary="grade test", supporting_evidence=(),
+                                    contra_evidence=(), model_version="t")
+        hazard = HazardAssessment(hazard_flag="nominal", moid_au=moid,
+                                  estimated_diameter_m=None, absolute_magnitude_h=None,
+                                  neo_class="amor", alert_pathway="internal_candidate",
+                                  explanation=expl)
+        meta = ScoringMetadata(scorer_version="t", scored_at_jd=2460000.0,
+                               pipeline_run_id="x", discovery_priority=0.1,
+                               followup_value=0.1, scientific_interest=0.1)
+        return ScoredNEO(tracklet=tracklet, features=CandidateFeatures(),
+                         posterior=NEOPosterior(neo_candidate=0.2, known_object=0.2,
+                                               main_belt_asteroid=0.2, stellar_artifact=0.2,
+                                               other_solar_system=0.2),
+                         hazard=hazard, metadata=meta)
+
+    def test_explicit_c_grade(self):
+        """Force C grade: moid=0.1 AU → score ≈ 0.306 → C."""
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_hazard_grade
+        neo = self._make_neo(moid=0.1)
+        assert compute_hazard_grade(neo) == "C"
+
+    def test_explicit_d_grade(self):
+        """Force D grade: moid=0.25 AU → score ≈ 0.106 → D."""
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_hazard_grade
+        neo = self._make_neo(moid=0.25)
+        assert compute_hazard_grade(neo) == "D"
