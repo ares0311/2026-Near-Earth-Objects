@@ -910,45 +910,45 @@ class TestSurveyStatistics:
     def test_construction_defaults(self):
         ss = self._make()
         assert ss.survey == "ZTF"
-        assert ss.n_alerts == 0
+        assert ss.n_fields == 0
+        assert ss.n_observations == 0
         assert ss.n_candidates == 0
-        assert ss.n_known == 0
-        assert ss.n_new == 0
-        assert ss.mean_rb is None
-        assert ss.limiting_mag is None
-        assert ss.epoch_jd == 2460000.5
+        assert ss.n_tracklets == 0
+        assert ss.mean_limiting_mag is None
+        assert ss.epoch_start_jd == 0.0
+        assert ss.epoch_end_jd == 0.0
 
     def test_construction_with_values(self):
         ss = self._make(
             survey="ATLAS",
-            n_alerts=100,
+            n_fields=50,
+            n_observations=200,
             n_candidates=20,
-            n_known=15,
-            n_new=5,
-            mean_rb=0.85,
-            limiting_mag=19.5,
-            epoch_jd=2460100.0,
+            n_tracklets=10,
+            mean_limiting_mag=19.5,
+            epoch_start_jd=2460000.0,
+            epoch_end_jd=2460100.0,
         )
         assert ss.survey == "ATLAS"
-        assert ss.n_alerts == 100
+        assert ss.n_fields == 50
+        assert ss.n_observations == 200
         assert ss.n_candidates == 20
-        assert ss.n_known == 15
-        assert ss.n_new == 5
-        assert ss.mean_rb == 0.85
-        assert ss.limiting_mag == 19.5
-        assert ss.epoch_jd == 2460100.0
+        assert ss.n_tracklets == 10
+        assert ss.mean_limiting_mag == 19.5
+        assert ss.epoch_start_jd == 2460000.0
+        assert ss.epoch_end_jd == 2460100.0
 
     def test_frozen_cannot_mutate(self):
         from pydantic import ValidationError
-        ss = self._make(survey="ZTF", n_alerts=10)
+        ss = self._make(survey="ZTF", n_fields=10)
         with pytest.raises((ValidationError, TypeError)):
-            ss.n_alerts = 99  # type: ignore[misc]
+            ss.n_fields = 99  # type: ignore[misc]
 
     def test_model_copy(self):
-        ss = self._make(n_alerts=50)
-        ss2 = ss.model_copy(update={"n_alerts": 100})
-        assert ss2.n_alerts == 100
-        assert ss.n_alerts == 50
+        ss = self._make(n_fields=50)
+        ss2 = ss.model_copy(update={"n_fields": 100})
+        assert ss2.n_fields == 100
+        assert ss.n_fields == 50
 
     def test_in_all(self):
         from schemas import __all__

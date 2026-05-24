@@ -33,6 +33,7 @@ __all__ = [
     "format_mpc_ades_psv",
     "format_discovery_report",
     "format_neocp_submission",
+    "count_observations_by_mission",
 ]
 
 import json
@@ -1439,3 +1440,26 @@ def format_neocp_submission(neo: object, obs_code: str = "Xnn") -> str:
         "Do NOT assert any impact probability without CNEOS/MPC assessment. --",
     ])
     return "\n".join(lines)
+
+
+def count_observations_by_mission(neo: object) -> dict[str, int]:
+    """Return a dict mapping mission name to observation count for a ScoredNEO.
+
+    Iterates over the tracklet observations and counts by ``obs.mission``.
+    Returns an empty dict when the NEO has no tracklet or no observations.
+
+    Args:
+        neo: ScoredNEO object (or any object with a ``tracklet`` attribute).
+
+    Returns:
+        Dict mapping mission name (str) to count (int).
+    """
+    tracklet = getattr(neo, "tracklet", None)
+    if tracklet is None:
+        return {}
+    observations = getattr(tracklet, "observations", ()) or ()
+    counts: dict[str, int] = {}
+    for obs in observations:
+        mission = str(getattr(obs, "mission", "unknown"))
+        counts[mission] = counts.get(mission, 0) + 1
+    return counts

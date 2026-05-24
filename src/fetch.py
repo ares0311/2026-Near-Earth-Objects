@@ -15,7 +15,8 @@ __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fet
            "fetch_mpc_orbit_elements",
            "fetch_known_neo_list",
            "fetch_neocp_confirmed",
-           "fetch_mpc_orbit_catalog"]
+           "fetch_mpc_orbit_catalog",
+           "compute_field_overlap"]
 
 import json
 import os
@@ -1553,3 +1554,49 @@ def fetch_mpc_orbit_catalog(force_refresh: bool = False) -> list[dict]:
         return rows
     except Exception:
         return []
+
+
+def compute_field_overlap(fetch_result1: object, fetch_result2: object) -> float:
+    """Return the fraction of observations in fetch_result1 within 0.1 deg of
+    any observation in fetch_result2.
+
+    Uses the haversine great-circle separation.  Returns 0.0 if either result
+    has no observations.
+
+    Args:
+        fetch_result1: First FetchResult (or object with ``alerts`` attribute).
+        fetch_result2: Second FetchResult (or object with ``alerts`` attribute).
+
+    Returns:
+        Fraction of alerts in fetch_result1 that are within 360 arcsec (0.1 deg)
+        of at least one alert in fetch_result2, in [0, 1].
+    """
+    import math as _math
+
+    alerts1 = list(getattr(fetch_result1, "alerts", []) or [])
+    alerts2 = list(getattr(fetch_result2, "alerts", []) or [])
+    if not alerts1 or not alerts2:
+        return 0.0
+
+    threshold_rad = _math.radians(0.1)
+
+    def _sep(ra1: float, dec1: float, ra2: float, dec2: float) -> float:
+        r1, d1, r2, d2 = (_math.radians(x) for x in (ra1, dec1, ra2, dec2))
+        hav = (
+            _math.sin((d2 - d1) / 2.0) ** 2
+            + _math.cos(d1) * _math.cos(d2) * _math.sin((r2 - r1) / 2.0) ** 2
+        )
+        return 2.0 * _math.asin(_math.sqrt(max(0.0, min(1.0, hav))))
+
+    matched = 0
+    for obs1 in alerts1:
+        ra1 = float(getattr(obs1, "ra_deg", 0.0))
+        dec1 = float(getattr(obs1, "dec_deg", 0.0))
+        for obs2 in alerts2:
+            ra2 = float(getattr(obs2, "ra_deg", 0.0))
+            dec2 = float(getattr(obs2, "dec_deg", 0.0))
+            if _sep(ra1, dec1, ra2, dec2) <= threshold_rad:
+                matched += 1
+                break
+
+    return matched / len(alerts1)

@@ -1677,3 +1677,45 @@ class TestComputeWeightedRiskScore:
         sys.path.insert(0, "src")
         import score
         assert "compute_weighted_risk_score" in score.__all__
+
+
+class TestComputeHazardSummary:
+    def test_mixed_flags(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from score import compute_hazard_summary
+
+        def make_neo(flag, priority=0.5):
+            hazard = SimpleNamespace(hazard_flag=flag)
+            meta = SimpleNamespace(discovery_priority=priority)
+            return SimpleNamespace(hazard=hazard, metadata=meta)
+
+        neos = [
+            make_neo("pha_candidate"),
+            make_neo("close_approach"),
+            make_neo("nominal"),
+            make_neo("unknown"),
+        ]
+        result = compute_hazard_summary(neos)
+        assert result["n_total"] == 4
+        assert result["n_pha_candidates"] == 1
+        assert result["n_close_approach"] == 1
+        assert result["n_nominal"] == 1
+        assert result["n_unknown"] == 1
+        assert result["mean_discovery_priority"] == pytest.approx(0.5)
+
+    def test_empty_returns_zeros(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_hazard_summary
+        result = compute_hazard_summary([])
+        assert result["n_total"] == 0
+        assert result["mean_discovery_priority"] == 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        assert "compute_hazard_summary" in score.__all__

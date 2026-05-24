@@ -32,6 +32,7 @@ __all__ = [
     "compute_posterior_update",
     "compute_tier1_confidence",
     "compute_posterior_stability",
+    "compute_class_probability_range",
 ]
 
 import base64
@@ -1559,3 +1560,47 @@ def compute_posterior_stability(posteriors: list) -> float:
             total += l1
             count += 1
     return round(total / count, 6) if count > 0 else 0.0
+
+
+def compute_class_probability_range(neos: list) -> dict:
+    """Return the min/max posterior probability for each hypothesis across all ScoredNEOs.
+
+    Returns a dict mapping each of the 5 hypothesis names to
+    ``{"min": float, "max": float}``.  Empty input yields all zeros.
+
+    Args:
+        neos: List of ScoredNEO objects (or any objects with a ``posterior`` attribute).
+
+    Returns:
+        Dict with keys ``neo_candidate``, ``known_object``, ``main_belt_asteroid``,
+        ``stellar_artifact``, ``other_solar_system``, each mapping to
+        ``{"min": float, "max": float}``.
+    """
+    _KEYS = [
+        "neo_candidate",
+        "known_object",
+        "main_belt_asteroid",
+        "stellar_artifact",
+        "other_solar_system",
+    ]
+    result: dict = {k: {"min": 0.0, "max": 0.0} for k in _KEYS}
+    if not neos:
+        return result
+    mins: dict[str, float] = {k: float("inf") for k in _KEYS}
+    maxs: dict[str, float] = {k: float("-inf") for k in _KEYS}
+    for neo in neos:
+        posterior = getattr(neo, "posterior", None)
+        if posterior is None:
+            continue
+        for k in _KEYS:
+            v = float(getattr(posterior, k, 0.0))
+            if v < mins[k]:
+                mins[k] = v
+            if v > maxs[k]:
+                maxs[k] = v
+    for k in _KEYS:
+        if mins[k] == float("inf"):
+            result[k] = {"min": 0.0, "max": 0.0}
+        else:
+            result[k] = {"min": round(mins[k], 6), "max": round(maxs[k], 6)}
+    return result

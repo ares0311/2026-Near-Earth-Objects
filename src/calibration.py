@@ -22,6 +22,7 @@ __all__ = [
     "compute_reliability_score",
     "compute_calibration_drift",
     "compute_calibration_uniformity",
+    "compute_mean_calibration_error",
 ]
 
 import math
@@ -954,3 +955,33 @@ def compute_calibration_uniformity(probs: list[float]) -> float:
     theoretical = p_sorted  # CDF of Uniform[0,1] at x is x
     ks_stat = float(np.max(np.abs(empirical - theoretical)))
     return round(float(min(1.0, ks_stat)), 6)
+
+
+def compute_mean_calibration_error(
+    probs_list: list,
+    labels_list: list,
+    n_bins: int = 10,
+) -> float:
+    """Return the mean Expected Calibration Error across multiple (probs, labels) pairs.
+
+    Computes ECE for each (probs, labels) pair and returns the arithmetic mean.
+    Returns 0.0 when *probs_list* is empty.
+
+    Args:
+        probs_list: List of probability lists, one per evaluation set.
+        labels_list: List of label lists, parallel to *probs_list*.
+        n_bins: Number of equal-width bins for ECE computation (default 10).
+
+    Returns:
+        Mean ECE as a float.
+    """
+    if not probs_list:
+        return 0.0
+    total = 0.0
+    count = 0
+    for probs, labels in zip(probs_list, labels_list):
+        p = np.asarray(probs, dtype=float)
+        y = np.asarray(labels, dtype=float)
+        total += expected_calibration_error(p, y.astype(int), n_bins=n_bins)
+        count += 1
+    return round(float(total / count), 8) if count > 0 else 0.0

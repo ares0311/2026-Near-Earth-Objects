@@ -1745,3 +1745,44 @@ class TestFormatNeocpSubmissionObsError:
                               features=None, posterior=None, metadata=None)
         result = al.format_neocp_submission(neo)
         assert "GUARDRAIL" in result
+
+
+class TestCountObservationsByMission:
+    def test_counts_missions(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from alert import count_observations_by_mission
+        obs1 = SimpleNamespace(mission="ZTF")
+        obs2 = SimpleNamespace(mission="ATLAS")
+        obs3 = SimpleNamespace(mission="ZTF")
+        tracklet = SimpleNamespace(observations=(obs1, obs2, obs3))
+        neo = SimpleNamespace(tracklet=tracklet)
+        result = count_observations_by_mission(neo)
+        assert result == {"ZTF": 2, "ATLAS": 1}
+
+    def test_no_tracklet_returns_empty(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from alert import count_observations_by_mission
+        neo = SimpleNamespace(tracklet=None)
+        assert count_observations_by_mission(neo) == {}
+
+    def test_empty_observations(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from alert import count_observations_by_mission
+        tracklet = SimpleNamespace(observations=())
+        neo = SimpleNamespace(tracklet=tracklet)
+        assert count_observations_by_mission(neo) == {}
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+        assert "count_observations_by_mission" in alert.__all__

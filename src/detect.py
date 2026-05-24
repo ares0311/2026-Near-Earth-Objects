@@ -13,7 +13,8 @@ __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus"
            "compute_observation_cadence",
            "compute_field_source_count",
            "compute_brightness_trend",
-           "compute_variability_index"]
+           "compute_variability_index",
+           "compute_angular_separation"]
 
 import math
 import uuid
@@ -978,3 +979,27 @@ def compute_variability_index(observations: list | tuple) -> float | None:
         return round(chi2 / dof, 6)
     except Exception:
         return None
+
+
+def compute_angular_separation(obs1: object, obs2: object) -> float:
+    """Return the great-circle angular separation between two observations in arcseconds.
+
+    Uses the haversine formula for numerical stability at small angles.
+
+    Args:
+        obs1: Object with ``ra_deg`` and ``dec_deg`` attributes.
+        obs2: Object with ``ra_deg`` and ``dec_deg`` attributes.
+
+    Returns:
+        Angular separation in arcseconds as a float.
+    """
+    ra1 = math.radians(float(getattr(obs1, "ra_deg", 0.0)))
+    dec1 = math.radians(float(getattr(obs1, "dec_deg", 0.0)))
+    ra2 = math.radians(float(getattr(obs2, "ra_deg", 0.0)))
+    dec2 = math.radians(float(getattr(obs2, "dec_deg", 0.0)))
+    hav = (
+        math.sin((dec2 - dec1) / 2.0) ** 2
+        + math.cos(dec1) * math.cos(dec2) * math.sin((ra2 - ra1) / 2.0) ** 2
+    )
+    sep_rad = 2.0 * math.asin(math.sqrt(max(0.0, min(1.0, hav))))
+    return float(math.degrees(sep_rad) * 3600.0)

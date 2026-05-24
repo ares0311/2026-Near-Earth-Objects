@@ -1901,3 +1901,58 @@ class TestComputeTrackletSkyDensity:
         result = compute_tracklet_sky_density([t])
         assert len(result) == 1
         assert result[0]["n_neighbors"] == 0
+
+
+class TestComputeTrackletCompleteness:
+    def test_full_coverage(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_tracklet_completeness
+        obs1 = SimpleNamespace(jd=2460000.0)
+        obs2 = SimpleNamespace(jd=2460001.0)
+        obs3 = SimpleNamespace(jd=2460002.0)
+        tracklet = SimpleNamespace(observations=(obs1, obs2, obs3))
+        result = compute_tracklet_completeness(tracklet, 3)
+        assert result == pytest.approx(1.0)
+
+    def test_partial_coverage(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_tracklet_completeness
+        obs1 = SimpleNamespace(jd=2460000.0)
+        obs2 = SimpleNamespace(jd=2460001.0)
+        tracklet = SimpleNamespace(observations=(obs1, obs2))
+        result = compute_tracklet_completeness(tracklet, 4)
+        assert result == pytest.approx(0.5)
+
+    def test_zero_expected_nights_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_tracklet_completeness
+        tracklet = SimpleNamespace(observations=())
+        assert compute_tracklet_completeness(tracklet, 0) == 0.0
+
+    def test_capped_at_one(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_tracklet_completeness
+        obs1 = SimpleNamespace(jd=2460000.0)
+        obs2 = SimpleNamespace(jd=2460001.0)
+        obs3 = SimpleNamespace(jd=2460002.0)
+        tracklet = SimpleNamespace(observations=(obs1, obs2, obs3))
+        result = compute_tracklet_completeness(tracklet, 2)
+        assert result == pytest.approx(1.0)
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+        assert "compute_tracklet_completeness" in link.__all__

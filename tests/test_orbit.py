@@ -1935,3 +1935,47 @@ class TestComputeTisserandWrtEarth:
         sys.path.insert(0, "src")
         import orbit
         assert "compute_tisserand_wrt_earth" in orbit.__all__
+
+
+class TestComputeOrbitalArcQuality:
+    def test_code1_short_arc(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_orbital_arc_quality
+        tracklet = SimpleNamespace(arc_days=0.5)
+        assert compute_orbital_arc_quality(tracklet) == 1
+
+    def test_code2_one_day(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_orbital_arc_quality
+        tracklet = SimpleNamespace(arc_days=3.0)
+        assert compute_orbital_arc_quality(tracklet) == 2
+
+    def test_code3_week(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_orbital_arc_quality
+        tracklet = SimpleNamespace(arc_days=10.0)
+        assert compute_orbital_arc_quality(tracklet) == 3
+
+    def test_code4_month(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_orbital_arc_quality
+        tracklet = SimpleNamespace(arc_days=60.0)
+        assert compute_orbital_arc_quality(tracklet) == 4
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import orbit
+        assert "compute_orbital_arc_quality" in orbit.__all__

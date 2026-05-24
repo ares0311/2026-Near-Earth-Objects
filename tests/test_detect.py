@@ -1723,3 +1723,43 @@ class TestComputeVariabilityIndex:
         obs = [self._make_obs(18.0, 0.05), self._make_obs(18.5, 0.05)]
         result = detect.compute_variability_index(obs)
         assert result is None
+
+
+class TestComputeAngularSeparation:
+    def test_same_position_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import compute_angular_separation
+        obs = SimpleNamespace(ra_deg=10.0, dec_deg=20.0)
+        assert compute_angular_separation(obs, obs) == pytest.approx(0.0, abs=1e-8)
+
+    def test_known_separation(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import compute_angular_separation
+        obs1 = SimpleNamespace(ra_deg=0.0, dec_deg=0.0)
+        obs2 = SimpleNamespace(ra_deg=0.0, dec_deg=1.0)
+        sep = compute_angular_separation(obs1, obs2)
+        assert sep == pytest.approx(3600.0, rel=1e-4)
+
+    def test_returns_float(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import compute_angular_separation
+        obs1 = SimpleNamespace(ra_deg=10.0, dec_deg=5.0)
+        obs2 = SimpleNamespace(ra_deg=10.1, dec_deg=5.1)
+        result = compute_angular_separation(obs1, obs2)
+        assert isinstance(result, float)
+        assert result > 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import detect
+        assert "compute_angular_separation" in detect.__all__
