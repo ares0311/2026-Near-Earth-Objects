@@ -877,31 +877,30 @@ class SurveyStatistics(BaseModel):
     """Aggregate statistics for a single survey over one pipeline run.
 
     Captures headline numbers for a survey provider (ZTF, ATLAS, etc.) in
-    a single pipeline execution: total alerts, candidates after real/bogus
-    filtering, known-object matches, genuinely new candidates, and optional
-    quality indicators.
+    a single pipeline execution: total fields visited, observations, candidates,
+    and tracklets formed, along with optional quality indicators.
 
     Attributes:
         survey: Survey identifier (e.g. ``"ZTF"``, ``"ATLAS"``).
-        n_alerts: Total number of raw alerts downloaded.
-        n_candidates: Alerts passing the real/bogus threshold.
-        n_known: Candidates matched to MPC known objects.
-        n_new: Candidates not matched to any known object.
-        mean_rb: Mean real/bogus score across all alerts; None if unavailable.
-        limiting_mag: Estimated limiting magnitude of the survey field; None if unknown.
-        epoch_jd: Reference Julian Date for this statistics block.
+        n_fields: Number of survey fields visited.
+        n_observations: Total number of observations collected.
+        n_candidates: Candidates passing detection thresholds.
+        n_tracklets: Number of linked tracklets formed.
+        mean_limiting_mag: Mean limiting magnitude across all fields; None if unknown.
+        epoch_start_jd: Start of the survey epoch as Julian Date.
+        epoch_end_jd: End of the survey epoch as Julian Date.
     """
 
     model_config = ConfigDict(frozen=True)
 
-    survey: str
-    n_alerts: int = 0
+    survey: Mission
+    n_fields: int = 0
+    n_observations: int = 0
     n_candidates: int = 0
-    n_known: int = 0
-    n_new: int = 0
-    mean_rb: float | None = None
-    limiting_mag: float | None = None
-    epoch_jd: float = 2460000.5
+    n_tracklets: int = 0
+    mean_limiting_mag: float | None = None
+    epoch_start_jd: float = 0.0
+    epoch_end_jd: float = 0.0
 
 
 class ObservationCluster(BaseModel):
