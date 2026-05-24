@@ -12,7 +12,8 @@ __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus"
            "compute_detection_gap",
            "compute_observation_cadence",
            "compute_field_source_count",
-           "compute_brightness_trend"]
+           "compute_brightness_trend",
+           "compute_variability_index"]
 
 import math
 import uuid
@@ -944,5 +945,36 @@ def compute_brightness_trend(observations: list | tuple) -> float | None:
             return None
         coeffs = np.polyfit(t, m, 1)
         return round(float(coeffs[0]), 8)
+    except Exception:
+        return None
+
+
+def compute_variability_index(observations: list | tuple) -> float | None:
+    """Return the reduced chi-squared variability index of magnitudes.
+
+    Values > 1 indicate variability beyond the photometric uncertainties.
+    Requires at least 2 observations with valid magnitudes (< 90) and
+    positive mag_err.  Returns None when this constraint cannot be met.
+    """
+    mags: list[float] = []
+    errs: list[float] = []
+    for obs in observations:
+        mag = getattr(obs, "mag", None)
+        err = getattr(obs, "mag_err", None)
+        if mag is not None and err is not None and float(mag) < 90.0 and float(err) > 0.0:
+            mags.append(float(mag))
+            errs.append(float(err))
+    if len(mags) < 2:
+        return None
+    try:
+        import numpy as np
+
+        m = np.asarray(mags)
+        e = np.asarray(errs)
+        w = 1.0 / e**2
+        mean_w = float((w * m).sum() / w.sum())
+        chi2 = float(((m - mean_w) ** 2 / e**2).sum())
+        dof = len(mags) - 1
+        return round(chi2 / dof, 6)
     except Exception:
         return None

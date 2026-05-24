@@ -1853,3 +1853,51 @@ class TestComputeMeanConsecutiveMotion:
         result = compute_mean_consecutive_motion(tracklet)
         assert result is not None
         assert result > 0.0
+
+
+class TestComputeTrackletSkyDensity:
+    def _make_tracklet(self, ra, dec, oid="T1"):
+        from types import SimpleNamespace
+        obs = SimpleNamespace(ra_deg=ra, dec_deg=dec, jd=2460000.0,
+                              mag=18.0, mag_err=0.05)
+        return SimpleNamespace(object_id=oid, observations=(obs,))
+
+    def test_two_nearby_tracklets(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_tracklet_sky_density
+        t1 = self._make_tracklet(10.0, 5.0, "T1")
+        t2 = self._make_tracklet(10.1, 5.0, "T2")
+        result = compute_tracklet_sky_density([t1, t2], radius_deg=1.0)
+        assert len(result) == 2
+        assert result[0]["n_neighbors"] == 1
+        assert result[1]["n_neighbors"] == 1
+
+    def test_two_distant_tracklets(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_tracklet_sky_density
+        t1 = self._make_tracklet(0.0, 0.0, "T1")
+        t2 = self._make_tracklet(90.0, 0.0, "T2")
+        result = compute_tracklet_sky_density([t1, t2], radius_deg=1.0)
+        assert result[0]["n_neighbors"] == 0
+        assert result[1]["n_neighbors"] == 0
+
+    def test_empty_observations(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_tracklet_sky_density
+        t = SimpleNamespace(object_id="T1", observations=())
+        result = compute_tracklet_sky_density([t], radius_deg=1.0)
+        assert result[0]["n_neighbors"] == 0
+
+    def test_single_tracklet(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_tracklet_sky_density
+        t = self._make_tracklet(15.0, 5.0, "T1")
+        result = compute_tracklet_sky_density([t])
+        assert len(result) == 1
+        assert result[0]["n_neighbors"] == 0

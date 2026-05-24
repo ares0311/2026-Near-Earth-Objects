@@ -1111,3 +1111,42 @@ class TestComputeCalibrationDrift:
         sys.path.insert(0, "src")
         import calibration
         assert "compute_calibration_drift" in calibration.__all__
+
+
+class TestComputeCalibrationUniformity:
+    def test_uniform_distribution_near_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        import numpy as np
+
+        from calibration import compute_calibration_uniformity
+        rng = np.random.default_rng(42)
+        probs = list(rng.uniform(0, 1, 1000))
+        result = compute_calibration_uniformity(probs)
+        assert result < 0.1
+
+    def test_all_zeros_returns_one(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_calibration_uniformity
+        result = compute_calibration_uniformity([0.0] * 100)
+        assert result == pytest.approx(1.0)
+
+    def test_empty_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_calibration_uniformity
+        assert compute_calibration_uniformity([]) == 0.0
+
+    def test_single_value(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_calibration_uniformity
+        result = compute_calibration_uniformity([0.5])
+        assert 0.0 <= result <= 1.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        assert "compute_calibration_uniformity" in calibration.__all__

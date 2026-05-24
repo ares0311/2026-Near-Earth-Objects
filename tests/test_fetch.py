@@ -3125,3 +3125,116 @@ class TestFetchNeocpConfirmed:
         assert classes["aten1"] == "aten"
         assert classes["apollo1"] == "apollo"
         assert classes["amor1"] == "amor"
+
+
+class TestFetchMpcOrbitCatalog:
+    def test_returns_empty_on_exception(self, monkeypatch, tmp_path):
+        import builtins
+        import sys
+        sys.path.insert(0, "src")
+        import fetch as fm
+        monkeypatch.setattr(fm, "_CACHE_DIR", tmp_path)
+        real_import = builtins.__import__
+        def mock_import(name, *args, **kwargs):
+            if name == "astroquery.mpc":
+                raise ImportError("mocked")
+            return real_import(name, *args, **kwargs)
+        monkeypatch.setattr(builtins, "__import__", mock_import)
+        result = fm.fetch_mpc_orbit_catalog(force_refresh=True)
+        assert result == []
+
+    def test_returns_cached(self, tmp_path):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch as fm
+        cached = [{"designation": "2026 AB1", "a_au": 1.5, "e": 0.3,
+                   "i_deg": 10.0, "q_au": 1.05, "Q_au": 1.95,
+                   "neo_class": "apollo", "absolute_magnitude_h": 20.0}]
+        fm._save_cache("mpc_orbit_catalog", cached)
+        result = fm.fetch_mpc_orbit_catalog(force_refresh=False)
+        assert isinstance(result, list)
+
+    def test_neo_class_tagging(self, monkeypatch, tmp_path):
+        import sys
+        import types
+        sys.path.insert(0, "src")
+        import fetch as fm
+        monkeypatch.setattr(fm, "_CACHE_DIR", tmp_path)
+
+        class FakeRow(dict):
+            def get(self, key, default=None):
+                return self[key] if key in self else default
+
+        class FakeTable:
+            colnames = ["designation", "semimajor_axis", "eccentricity",
+                        "inclination", "absolute_magnitude"]
+            def __iter__(self):
+                return iter([
+                    FakeRow({"designation": "apollo1", "semimajor_axis": 1.5,
+                              "eccentricity": 0.6, "inclination": 8.0,
+                              "absolute_magnitude": 19.0}),
+                    FakeRow({"designation": "amor1", "semimajor_axis": 1.4,
+                              "eccentricity": 0.15, "inclination": 7.0,
+                              "absolute_magnitude": 22.0}),
+                ])
+
+        class FakeMPC:
+            @staticmethod
+            def query_objects(_): return FakeTable()
+
+        fake_astroquery = types.ModuleType("astroquery")
+        fake_mpc_mod = types.ModuleType("astroquery.mpc")
+        fake_mpc_mod.MPC = FakeMPC
+        monkeypatch.setitem(sys.modules, "astroquery", fake_astroquery)
+        monkeypatch.setitem(sys.modules, "astroquery.mpc", fake_mpc_mod)
+
+        result = fm.fetch_mpc_orbit_catalog(force_refresh=True)
+        assert len(result) == 2
+        classes = {r["designation"]: r["neo_class"] for r in result}
+        assert classes["apollo1"] == "apollo"
+        assert classes["amor1"] == "amor"
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+        assert "fetch_mpc_orbit_catalog" in fetch.__all__
+
+    def test_ieo_and_aten_classes(self, monkeypatch, tmp_path):
+        import sys
+        import types
+        sys.path.insert(0, "src")
+        import fetch as fm
+        monkeypatch.setattr(fm, "_CACHE_DIR", tmp_path)
+
+        class FakeRow(dict):
+            def get(self, key, default=None):
+                return self[key] if key in self else default
+
+        class FakeTable:
+            colnames = ["designation", "semimajor_axis", "eccentricity",
+                        "inclination", "absolute_magnitude"]
+            def __iter__(self):
+                return iter([
+                    FakeRow({"designation": "ieo1", "semimajor_axis": 0.6,
+                              "eccentricity": 0.05, "inclination": 5.0,
+                              "absolute_magnitude": 20.0}),
+                    FakeRow({"designation": "aten1", "semimajor_axis": 0.9,
+                              "eccentricity": 0.1, "inclination": 3.0,
+                              "absolute_magnitude": 21.0}),
+                ])
+
+        class FakeMPC:
+            @staticmethod
+            def query_objects(_): return FakeTable()
+
+        fake_astroquery = types.ModuleType("astroquery")
+        fake_mpc_mod = types.ModuleType("astroquery.mpc")
+        fake_mpc_mod.MPC = FakeMPC
+        monkeypatch.setitem(sys.modules, "astroquery", fake_astroquery)
+        monkeypatch.setitem(sys.modules, "astroquery.mpc", fake_mpc_mod)
+
+        result = fm.fetch_mpc_orbit_catalog(force_refresh=True)
+        classes = {r["designation"]: r["neo_class"] for r in result}
+        assert classes["ieo1"] == "ieo"
+        assert classes["aten1"] == "aten"

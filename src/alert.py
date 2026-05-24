@@ -32,6 +32,7 @@ __all__ = [
     "format_observation_log",
     "format_mpc_ades_psv",
     "format_discovery_report",
+    "format_neocp_submission",
 ]
 
 import json
@@ -1394,3 +1395,47 @@ def format_discovery_report(neo: object) -> dict:
             "without independent MPC confirmation and CNEOS/Scout assessment."
         ),
     }
+
+
+def format_neocp_submission(neo: object, obs_code: str = "Xnn") -> str:
+    """Return a NEOCP-formatted plain-text submission for an unconfirmed candidate.
+
+    Produces a COD/OBS/TEL/ACK header followed by MPC 80-column observation
+    lines for all tracklet observations, and a mandatory guardrail footer.
+    Does not transmit; call the MPC submission endpoint separately.
+    """
+    tracklet = getattr(neo, "tracklet", None)
+    object_id = getattr(tracklet, "object_id", "UNKNOWN") if tracklet else "UNKNOWN"
+    designation = (object_id[:12] if object_id else "UNKNOWN")
+
+    lines: list[str] = [
+        f"COD {obs_code}",
+        "OBS Claude-NEO-Pipeline",
+        "MEA Claude-NEO-Pipeline",
+        "TEL 0.0-m + CCD",
+        f"ACK NEOCP {designation[:8]}",
+        "",
+    ]
+
+    observations = []
+    if tracklet is not None:
+        observations = sorted(
+            getattr(tracklet, "observations", ()) or (),
+            key=lambda o: float(getattr(o, "jd", 0.0)),
+        )
+
+    for i, obs in enumerate(observations):
+        try:
+            obs_line = format_mpc_observation(obs, designation,
+                                               is_discovery=(i == 0),
+                                               obs_code=obs_code)
+        except Exception:
+            continue
+        lines.append(obs_line)
+
+    lines.extend([
+        "",
+        "-- GUARDRAIL: This submission is for confirmation only. "
+        "Do NOT assert any impact probability without CNEOS/MPC assessment. --",
+    ])
+    return "\n".join(lines)

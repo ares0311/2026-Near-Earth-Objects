@@ -27,6 +27,7 @@ __all__ = [
     "ResidualSummary",
     "ObservationCoverage",
     "NightSummary",
+    "TrackletCluster",
 ]
 
 from dataclasses import dataclass
@@ -980,3 +981,16 @@ class NightSummary(BaseModel):
     n_pha_candidates: int
     fields_covered: tuple[str, ...] = ()
     limiting_mag: float | None = None
+
+
+class TrackletCluster(BaseModel):
+    """A group of spatially or temporally nearby tracklets."""
+
+    model_config = ConfigDict(frozen=True)
+
+    cluster_id: str
+    tracklet_ids: tuple[str, ...] = ()
+    centroid_ra_deg: float
+    centroid_dec_deg: float
+    n_tracklets: int
+    arc_span_days: float = 0.0

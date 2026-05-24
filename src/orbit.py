@@ -16,7 +16,8 @@ __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
            "compute_mean_anomaly_at_jd",
            "compute_orbital_velocity",
            "compute_perihelion_distance",
-           "compute_aphelion_distance"]
+           "compute_aphelion_distance",
+           "compute_tisserand_wrt_earth"]
 
 import math
 from typing import NamedTuple
@@ -1234,3 +1235,25 @@ def compute_aphelion_distance(elements: object) -> float | None:
     if a <= 0.0 or e < 0.0:
         return None
     return round(a * (1.0 + e), 8)
+
+
+def compute_tisserand_wrt_earth(elements: object) -> float | None:
+    """Return the Tisserand parameter relative to Earth's orbit.
+
+    Uses the standard formula with a_E = 1.0 AU:
+
+        T_E = a_E/a + 2 * cos(i) * sqrt(a/a_E * (1 - e²))
+
+    Returns None when the semi-major axis is non-positive, eccentricity is
+    negative or missing, or inclination is missing.
+    """
+    a_E = 1.0  # AU
+    a = float(getattr(elements, "semi_major_axis_au", 0.0) or 0.0)
+    e_raw = getattr(elements, "eccentricity", None)
+    e = float(e_raw) if e_raw is not None else -1.0
+    i_raw = getattr(elements, "inclination_deg", None)
+    i_deg = float(i_raw) if i_raw is not None else None
+    if a <= 0.0 or e < 0.0 or i_deg is None:
+        return None
+    t_e = a_E / a + 2.0 * math.cos(math.radians(i_deg)) * math.sqrt(a / a_E * (1.0 - e**2))
+    return round(t_e, 8)

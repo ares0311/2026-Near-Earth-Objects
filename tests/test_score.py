@@ -1631,3 +1631,49 @@ class TestComputeSurveyCompleteness:
         neo_known = self._make_neo(20.0)
         neo_unknown = types.SimpleNamespace(hazard=types.SimpleNamespace(absolute_magnitude_h=None))
         assert compute_survey_completeness([neo_known, neo_unknown], 22.0) == pytest.approx(1.0)
+
+
+class TestComputeWeightedRiskScore:
+    def _make_neo(self, moid=None, h=None, oq=None):
+        import sys
+        import types
+        sys.path.insert(0, "src")
+        hazard = types.SimpleNamespace(
+            moid_au=moid,
+            absolute_magnitude_h=h,
+            hazard_flag="pha_candidate" if (moid and moid <= 0.05) else "nominal",
+            orbital_elements=types.SimpleNamespace(quality_code=2) if oq else None,
+        )
+        features = types.SimpleNamespace(orbit_quality_score=oq)
+        return types.SimpleNamespace(hazard=hazard, features=features,
+                                     tracklet=None, posterior=None, metadata=None)
+
+    def test_result_bounded(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_weighted_risk_score
+        neo = self._make_neo(moid=0.03, h=20.0, oq=0.8)
+        result = compute_weighted_risk_score(neo)
+        assert 0.0 <= result <= 1.0
+
+    def test_unknown_moid_sentinel(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_weighted_risk_score
+        neo = self._make_neo(moid=None, h=None, oq=None)
+        result = compute_weighted_risk_score(neo)
+        assert 0.0 <= result <= 1.0
+
+    def test_pha_candidate_high_risk(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_weighted_risk_score
+        high = self._make_neo(moid=0.01, h=18.0, oq=1.0)
+        low = self._make_neo(moid=0.5, h=25.0, oq=0.1)
+        assert compute_weighted_risk_score(high) > compute_weighted_risk_score(low)
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        assert "compute_weighted_risk_score" in score.__all__
