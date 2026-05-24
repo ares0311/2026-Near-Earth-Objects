@@ -2064,3 +2064,62 @@ class TestComputePosteriorUpdate:
         )
         updated = compute_posterior_update(prior, {"neo_candidate": 2.0})
         assert updated.neo_candidate >= 0.0
+
+
+class TestComputeTier1Confidence:
+    def test_all_none_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_tier1_confidence
+        from schemas import CandidateFeatures
+        features = CandidateFeatures()
+        assert compute_tier1_confidence(features) == 0.0
+
+    def test_all_populated_returns_one(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_tier1_confidence
+        from schemas import CandidateFeatures
+        features = CandidateFeatures(
+            real_bogus_score=0.9,
+            streak_score=0.1,
+            psf_quality_score=0.8,
+            motion_consistency_score=0.7,
+            arc_coverage_score=0.5,
+            nights_observed_score=0.6,
+            brightness_score=0.4,
+            color_score=0.3,
+            lightcurve_variability_score=0.2,
+            orbit_quality_score=0.8,
+            moid_score=0.0,
+            neo_class_confidence=0.7,
+            pha_flag_confidence=0.1,
+            known_object_score=0.0,
+        )
+        assert compute_tier1_confidence(features) == pytest.approx(1.0)
+
+    def test_partial_gives_fraction(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_tier1_confidence
+        from schemas import CandidateFeatures
+        features = CandidateFeatures(real_bogus_score=0.8, streak_score=0.2)
+        result = compute_tier1_confidence(features)
+        assert 0.0 < result < 1.0
+
+    def test_namespace_object_works(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from classify import compute_tier1_confidence
+        features = SimpleNamespace(real_bogus_score=0.9, streak_score=None,
+                                   psf_quality_score=None, motion_consistency_score=None,
+                                   arc_coverage_score=None, nights_observed_score=None,
+                                   brightness_score=None, color_score=None,
+                                   lightcurve_variability_score=None,
+                                   orbit_quality_score=None, moid_score=None,
+                                   neo_class_confidence=None, pha_flag_confidence=None,
+                                   known_object_score=None)
+        result = compute_tier1_confidence(features)
+        assert result == pytest.approx(1 / 14, abs=1e-5)

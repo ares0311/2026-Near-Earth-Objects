@@ -1611,3 +1611,67 @@ class TestComputeRadialProfile:
         from preprocess import compute_radial_profile
         obs = SimpleNamespace(cutout_difference="!!!bad!!!")
         assert compute_radial_profile(obs) is None
+
+
+class TestComputePsfAsymmetry:
+    def _make_obs(self, arr=None):
+        import sys
+        sys.path.insert(0, "src")
+        import base64
+        from types import SimpleNamespace
+
+        import numpy as np
+        if arr is None:
+            arr = np.zeros((63, 63), dtype=np.float32)
+            arr[31, 31] = 1.0
+        b64 = base64.b64encode(arr.astype(np.float32).tobytes()).decode()
+        return SimpleNamespace(cutout_difference=b64)
+
+    def test_symmetric_source_returns_low_asymmetry(self):
+        import sys
+        sys.path.insert(0, "src")
+        from preprocess import compute_psf_asymmetry
+        obs = self._make_obs()
+        result = compute_psf_asymmetry(obs)
+        assert result is not None
+        assert 0.0 <= result <= 1.0
+
+    def test_no_cutout_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_psf_asymmetry
+        obs = SimpleNamespace(cutout_difference=None)
+        assert compute_psf_asymmetry(obs) is None
+
+    def test_zero_array_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        import numpy as np
+
+        from preprocess import compute_psf_asymmetry
+        obs = self._make_obs(np.zeros((63, 63), dtype=np.float32))
+        assert compute_psf_asymmetry(obs) is None
+
+    def test_result_bounded(self):
+        import sys
+        sys.path.insert(0, "src")
+        import numpy as np
+
+        from preprocess import compute_psf_asymmetry
+        rng = np.random.default_rng(42)
+        arr = rng.random((63, 63)).astype(np.float32)
+        obs = self._make_obs(arr)
+        result = compute_psf_asymmetry(obs)
+        assert result is not None
+        assert 0.0 <= result <= 1.0
+
+    def test_invalid_base64_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_psf_asymmetry
+        obs = SimpleNamespace(cutout_difference="not-valid-base64!!!")
+        assert compute_psf_asymmetry(obs) is None

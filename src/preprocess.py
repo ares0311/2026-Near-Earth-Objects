@@ -13,7 +13,8 @@ __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_
            "compute_image_gradient",
            "compute_cutout_symmetry",
            "compute_streak_angle",
-           "compute_radial_profile"]
+           "compute_radial_profile",
+           "compute_psf_asymmetry"]
 
 import base64
 import math
@@ -887,5 +888,42 @@ def compute_radial_profile(obs: object) -> list[float] | None:
             mask = (dist >= r - 0.5) & (dist < r + 0.5)
             profile.append(round(float(arr[mask].mean()) if mask.any() else 0.0, 6))
         return profile
+    except Exception:
+        return None
+
+
+def compute_psf_asymmetry(obs: object) -> float | None:
+    """Return a [0, 1] PSF asymmetry index from third-order image moments.
+
+    Computes the normalised absolute skewness in both axes of the
+    difference-image cutout.  0 = perfectly symmetric; 1 = maximally
+    asymmetric.  Returns None when no valid cutout is available.
+    """
+    try:
+        import base64
+
+        import numpy as np
+
+        cutout = getattr(obs, "cutout_difference", None)
+        if cutout is None:
+            return None
+        raw = base64.b64decode(cutout)
+        arr = np.frombuffer(raw, dtype=np.float32).reshape(63, 63).astype(float)
+        total = float(arr.sum())
+        if total == 0.0:
+            return None
+        ys, xs = np.mgrid[0 : arr.shape[0], 0 : arr.shape[1]]
+        cx = float((xs * arr).sum() / total)
+        cy = float((ys * arr).sum() / total)
+        dx = xs - cx
+        dy = ys - cy
+        m200 = float((dx**2 * arr).sum() / total)
+        m020 = float((dy**2 * arr).sum() / total)
+        m300 = float((dx**3 * arr).sum() / total)
+        m030 = float((dy**3 * arr).sum() / total)
+        sx = abs(m300) / (m200**1.5 + 1e-12)
+        sy = abs(m030) / (m020**1.5 + 1e-12)
+        asymmetry = 0.5 * (sx + sy)
+        return round(float(min(1.0, asymmetry)), 6)
     except Exception:
         return None

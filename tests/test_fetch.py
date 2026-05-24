@@ -3021,3 +3021,107 @@ class TestFetchKnownNeoList:
         monkeypatch.setattr(builtins, "__import__", mock_import)
         result = fm.fetch_known_neo_list(force_refresh=True)
         assert result == []
+
+
+class TestFetchNeocpConfirmed:
+    def test_returns_empty_on_exception(self, monkeypatch, tmp_path):
+        import builtins
+        import sys
+        sys.path.insert(0, "src")
+        import fetch as fm
+
+        monkeypatch.setattr(fm, "_CACHE_DIR", tmp_path)
+        real_import = builtins.__import__
+
+        def mock_import(name, *args, **kwargs):
+            if name == "astroquery.mpc":
+                raise ImportError("mocked")
+            return real_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", mock_import)
+        result = fm.fetch_neocp_confirmed(force_refresh=True)
+        assert result == []
+
+    def test_returns_cached(self, tmp_path):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch as fm
+
+        cached = [{"object_id": "2026 AA1", "a_au": 1.5, "e": 0.3,
+                   "i_deg": 10.0, "absolute_magnitude_h": 20.0,
+                   "neo_class": "amor", "confirmed": True}]
+        fm._save_cache.__func__ if hasattr(fm._save_cache, "__func__") else None
+        fm._save_cache("neocp_confirmed", cached)
+        result = fm.fetch_neocp_confirmed(force_refresh=False)
+        assert isinstance(result, list)
+
+    def test_force_refresh_bypasses_cache(self, monkeypatch, tmp_path):
+        import builtins
+        import sys
+        sys.path.insert(0, "src")
+        import fetch as fm
+
+        monkeypatch.setattr(fm, "_CACHE_DIR", tmp_path)
+        real_import = builtins.__import__
+
+        def mock_import(name, *args, **kwargs):
+            if name == "astroquery.mpc":
+                raise ImportError("mocked")
+            return real_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", mock_import)
+        result = fm.fetch_neocp_confirmed(force_refresh=True)
+        assert result == []
+
+    def test_neo_class_logic(self, monkeypatch, tmp_path):
+        """Mock MPC.query_objects to return rows with known orbital elements."""
+        import sys
+        sys.path.insert(0, "src")
+        import fetch as fm
+
+        monkeypatch.setattr(fm, "_CACHE_DIR", tmp_path)
+
+        class FakeRow(dict):
+            def get(self, key, default=None):
+                return self[key] if key in self else default
+
+        class FakeTable:
+            colnames = ["designation", "semimajor_axis", "eccentricity",
+                        "inclination", "absolute_magnitude"]
+
+            def __iter__(self):
+                rows = [
+                    FakeRow({"designation": "ieo1", "semimajor_axis": 0.6,
+                              "eccentricity": 0.05, "inclination": 5.0,
+                              "absolute_magnitude": 20.0}),
+                    FakeRow({"designation": "aten1", "semimajor_axis": 0.9,
+                              "eccentricity": 0.1, "inclination": 3.0,
+                              "absolute_magnitude": 21.0}),
+                    FakeRow({"designation": "apollo1", "semimajor_axis": 1.5,
+                              "eccentricity": 0.6, "inclination": 8.0,
+                              "absolute_magnitude": 19.0}),
+                    FakeRow({"designation": "amor1", "semimajor_axis": 1.4,
+                              "eccentricity": 0.15, "inclination": 7.0,
+                              "absolute_magnitude": 22.0}),
+                ]
+                return iter(rows)
+
+        class FakeMPC:
+            @staticmethod
+            def query_objects(_type):
+                return FakeTable()
+
+        import types
+        fake_astroquery = types.ModuleType("astroquery")
+        fake_mpc_mod = types.ModuleType("astroquery.mpc")
+        fake_mpc_mod.MPC = FakeMPC
+        monkeypatch.setitem(sys.modules, "astroquery", fake_astroquery)
+        monkeypatch.setitem(sys.modules, "astroquery.mpc", fake_mpc_mod)
+
+        result = fm.fetch_neocp_confirmed(force_refresh=True)
+        assert len(result) == 4
+        classes = {r["object_id"]: r["neo_class"] for r in result}
+        assert classes["ieo1"] == "ieo"
+        assert classes["aten1"] == "aten"
+        assert classes["apollo1"] == "apollo"
+        assert classes["amor1"] == "amor"

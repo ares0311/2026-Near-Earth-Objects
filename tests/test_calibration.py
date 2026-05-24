@@ -1067,3 +1067,47 @@ class TestComputeReliabilityScore:
         sys.path.insert(0, "src")
         import calibration
         assert "compute_reliability_score" in calibration.__all__
+
+
+class TestComputeCalibrationDrift:
+    def test_zero_drift_same_data(self):
+        import sys
+        sys.path.insert(0, "src")
+        import numpy as np
+
+        from calibration import compute_calibration_drift
+        rng = np.random.default_rng(0)
+        p = list(rng.random(100))
+        y = list(rng.integers(0, 2, 100))
+        drift = compute_calibration_drift(p, y, p, y)
+        assert drift == pytest.approx(0.0, abs=1e-6)
+
+    def test_empty_t0_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_calibration_drift
+        assert compute_calibration_drift([], [], [0.5], [1]) == 0.0
+
+    def test_empty_t1_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_calibration_drift
+        assert compute_calibration_drift([0.5], [1], [], []) == 0.0
+
+    def test_positive_drift_means_worse(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_calibration_drift
+        # t0: perfectly calibrated; t1: badly calibrated
+        p_t0 = [0.1] * 50 + [0.9] * 50
+        y_t0 = [0] * 50 + [1] * 50
+        p_t1 = [0.9] * 50 + [0.1] * 50  # reversed — very miscalibrated
+        y_t1 = [0] * 50 + [1] * 50
+        drift = compute_calibration_drift(p_t0, y_t0, p_t1, y_t1)
+        assert drift > 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        assert "compute_calibration_drift" in calibration.__all__

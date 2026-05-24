@@ -30,6 +30,7 @@ __all__ = [
     "compute_class_entropy_summary",
     "compute_neo_class_distribution",
     "compute_posterior_update",
+    "compute_tier1_confidence",
 ]
 
 import base64
@@ -1507,3 +1508,30 @@ def compute_posterior_update(
         stellar_artifact=round(exp_scores["stellar_artifact"] / total, 8),
         other_solar_system=round(exp_scores["other_solar_system"] / total, 8),
     )
+
+
+def compute_tier1_confidence(features: object) -> float:
+    """Return the fraction of Tier-1 feature scores that are not None.
+
+    A value of 1.0 means all tabular features are populated; 0.0 means
+    none are.  Uses the 14 ``CandidateFeatures`` fields defined in
+    ``schemas.py``.
+    """
+    _FEATURE_FIELDS = [
+        "real_bogus_score",
+        "streak_score",
+        "psf_quality_score",
+        "motion_consistency_score",
+        "arc_coverage_score",
+        "nights_observed_score",
+        "brightness_score",
+        "color_score",
+        "lightcurve_variability_score",
+        "orbit_quality_score",
+        "moid_score",
+        "neo_class_confidence",
+        "pha_flag_confidence",
+        "known_object_score",
+    ]
+    present = sum(1 for f in _FEATURE_FIELDS if getattr(features, f, None) is not None)
+    return round(present / len(_FEATURE_FIELDS), 6)

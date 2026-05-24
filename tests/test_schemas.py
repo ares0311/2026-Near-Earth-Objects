@@ -1163,3 +1163,39 @@ class TestObservationCoverage:
         sys.path.insert(0, "src")
         import schemas
         assert "ObservationCoverage" in schemas.__all__
+
+
+class TestNightSummary:
+    def test_basic(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import NightSummary
+        ns = NightSummary(night_jd=2460000.5, survey="ZTF",
+                          n_tracklets=10, n_new=3, n_known=7, n_pha_candidates=1)
+        assert ns.n_tracklets == 10
+        assert ns.survey == "ZTF"
+        assert ns.n_pha_candidates == 1
+
+    def test_defaults(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import NightSummary
+        ns = NightSummary(night_jd=2460000.5, survey="ATLAS",
+                          n_tracklets=5, n_new=2, n_known=3, n_pha_candidates=0)
+        assert ns.fields_covered == ()
+        assert ns.limiting_mag is None
+
+    def test_frozen(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import NightSummary
+        ns = NightSummary(night_jd=2460000.5, survey="ZTF",
+                          n_tracklets=1, n_new=1, n_known=0, n_pha_candidates=0)
+        with pytest.raises(Exception):
+            ns.n_tracklets = 99
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        assert "NightSummary" in schemas.__all__

@@ -14,7 +14,8 @@ __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "compute_arc_quality_bonus",
            "compute_weighted_hazard_score",
            "compute_hazard_grade",
-           "compute_priority_rank"]
+           "compute_priority_rank",
+           "compute_survey_completeness"]
 
 import math
 import uuid
@@ -982,3 +983,25 @@ def compute_priority_rank(neos: list) -> list[dict]:
         {"rank": i + 1, **r}
         for i, r in enumerate(records)
     ]
+
+
+def compute_survey_completeness(neos: list, limiting_mag: float) -> float:
+    """Return the fraction of NEOs brighter than *limiting_mag*.
+
+    Uses the absolute magnitude H as a proxy for brightness (lower H = larger
+    / brighter object).  NEOs whose H is unknown are excluded from both
+    numerator and denominator.  Returns 0.0 when no NEOs have known H.
+    """
+    total = 0
+    brighter = 0
+    for neo in neos:
+        hazard = getattr(neo, "hazard", None)
+        h = getattr(hazard, "absolute_magnitude_h", None) if hazard else None
+        if h is None:
+            continue
+        total += 1
+        if float(h) <= float(limiting_mag):
+            brighter += 1
+    if total == 0:
+        return 0.0
+    return round(brighter / total, 6)

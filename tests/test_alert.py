@@ -1636,3 +1636,49 @@ class TestFormatMpcAdesPsvTimeFallback:
         assert "version=2017" in result
         # JD value appears as string fallback
         assert "2460000" in result
+
+
+class TestFormatDiscoveryReport:
+    def test_basic_fields(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_discovery_report
+        from tests.conftest import build_scored_neo
+        neo = build_scored_neo()
+        result = format_discovery_report(neo)
+        assert "object_id" in result
+        assert "neo_class" in result
+        assert "hazard_flag" in result
+        assert "alert_pathway" in result
+        assert "guardrail_statement" in result
+        assert "NOT" in result["guardrail_statement"]
+
+    def test_guardrail_present(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from alert import format_discovery_report
+        neo = SimpleNamespace(tracklet=None, hazard=None,
+                              features=None, posterior=None, metadata=None)
+        result = format_discovery_report(neo)
+        assert "NOT" in result["guardrail_statement"]
+
+    def test_none_components(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from alert import format_discovery_report
+        neo = SimpleNamespace(tracklet=None, hazard=None,
+                              features=None, posterior=None, metadata=None)
+        result = format_discovery_report(neo)
+        assert result["object_id"] == "unknown"
+        assert result["moid_au"] is None
+        assert result["n_observations"] == 0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+        assert "format_discovery_report" in alert.__all__

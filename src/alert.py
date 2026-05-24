@@ -31,6 +31,7 @@ __all__ = [
     "compute_alert_age_days",
     "format_observation_log",
     "format_mpc_ades_psv",
+    "format_discovery_report",
 ]
 
 import json
@@ -1341,3 +1342,55 @@ def format_mpc_ades_psv(neo: ScoredNEO, obs_code: str = _MPC_OBS_CODE) -> str:  
         lines.append("| " + " | ".join(row) + " |")
 
     return "\n".join(lines)
+
+
+def format_discovery_report(neo: object) -> dict:
+    """Return a concise discovery report dict for a ScoredNEO.
+
+    Keys: object_id, neo_class, hazard_flag, alert_pathway, moid_au,
+    absolute_magnitude_h, estimated_diameter_m, discovery_priority,
+    arc_days, n_observations, neo_candidate_prob, guardrail_statement.
+    The guardrail_statement is always included and asserts that impact
+    probabilities must NOT be quoted without MPC/CNEOS confirmation.
+    """
+    tracklet = getattr(neo, "tracklet", None)
+    hazard = getattr(neo, "hazard", None)
+    features = getattr(neo, "features", None)
+    posterior = getattr(neo, "posterior", None)
+    metadata = getattr(neo, "metadata", None)
+
+    object_id = getattr(tracklet, "object_id", "unknown") if tracklet else "unknown"
+    arc_days = float(getattr(tracklet, "arc_days", 0.0) or 0.0) if tracklet else 0.0
+    obs = getattr(tracklet, "observations", ()) if tracklet else ()
+    n_obs = len(obs)
+
+    neo_class = getattr(hazard, "neo_class", "unknown") if hazard else "unknown"
+    hazard_flag = getattr(hazard, "hazard_flag", "unknown") if hazard else "unknown"
+    alert_pathway = (
+        getattr(hazard, "alert_pathway", "internal_candidate") if hazard else "internal_candidate"
+    )
+    moid_au = getattr(hazard, "moid_au", None) if hazard else None
+    h = getattr(hazard, "absolute_magnitude_h", None) if hazard else None
+    diameter_m = getattr(hazard, "estimated_diameter_m", None) if hazard else None
+
+    neo_prob = float(getattr(posterior, "neo_candidate", 0.0) or 0.0) if posterior else 0.0
+    _ = features  # available for future extension
+    priority = float(getattr(metadata, "discovery_priority", 0.0) or 0.0) if metadata else 0.0
+
+    return {
+        "object_id": object_id,
+        "neo_class": neo_class,
+        "hazard_flag": hazard_flag,
+        "alert_pathway": alert_pathway,
+        "moid_au": moid_au,
+        "absolute_magnitude_h": h,
+        "estimated_diameter_m": diameter_m,
+        "discovery_priority": round(priority, 6),
+        "arc_days": round(arc_days, 4),
+        "n_observations": n_obs,
+        "neo_candidate_prob": round(neo_prob, 6),
+        "guardrail_statement": (
+            "Pipeline output only. Do NOT assert or publish any impact probability "
+            "without independent MPC confirmation and CNEOS/Scout assessment."
+        ),
+    }

@@ -26,6 +26,7 @@ __all__ = [
     "AstrometricResidual",
     "ResidualSummary",
     "ObservationCoverage",
+    "NightSummary",
 ]
 
 from dataclasses import dataclass
@@ -964,3 +965,18 @@ class ObservationCoverage(BaseModel):
     total_area_deg2: float
     limiting_mag: float | None = None
     field_ids: tuple[str, ...] = ()
+
+
+class NightSummary(BaseModel):
+    """Summary statistics for a single survey night."""
+
+    model_config = ConfigDict(frozen=True)
+
+    night_jd: float
+    survey: Mission
+    n_tracklets: int
+    n_new: int
+    n_known: int
+    n_pha_candidates: int
+    fields_covered: tuple[str, ...] = ()
+    limiting_mag: float | None = None

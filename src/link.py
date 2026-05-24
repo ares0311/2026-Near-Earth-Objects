@@ -13,7 +13,8 @@ __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "compute_tracklet_velocity_dispersion",
            "compute_inter_night_gaps",
            "filter_by_motion_rate",
-           "compute_tracklet_arc_nights"]
+           "compute_tracklet_arc_nights",
+           "compute_mean_consecutive_motion"]
 
 import math
 import uuid
@@ -978,3 +979,35 @@ def compute_tracklet_arc_nights(tracklet: object) -> list[int]:
         if jd is not None:
             nights.add(int(float(jd)))
     return sorted(nights)
+
+
+def compute_mean_consecutive_motion(tracklet: object) -> float | None:
+    """Return the mean of consecutive pairwise motion rates in arcsec/hr.
+
+    Computes the apparent motion rate between each consecutive pair of
+    observations (sorted by JD) and returns the arithmetic mean.  Returns
+    None when fewer than two observations are present or all pairs have
+    identical JDs.
+    """
+    observations = sorted(
+        getattr(tracklet, "observations", ()) or (),
+        key=lambda o: float(getattr(o, "jd", 0.0)),
+    )
+    if len(observations) < 2:
+        return None
+    rates: list[float] = []
+    for obs1, obs2 in zip(observations, observations[1:]):
+        dt_hr = (float(getattr(obs2, "jd", 0.0)) - float(getattr(obs1, "jd", 0.0))) * 24.0
+        if dt_hr <= 0.0:
+            continue
+        dec1 = float(getattr(obs1, "dec_deg", 0.0))
+        dec2 = float(getattr(obs2, "dec_deg", 0.0))
+        cos_dec = math.cos(math.radians((dec1 + dec2) / 2.0))
+        ra1 = float(getattr(obs1, "ra_deg", 0.0))
+        ra2 = float(getattr(obs2, "ra_deg", 0.0))
+        d_ra = (ra2 - ra1) * 3600.0 * cos_dec
+        d_dec = (dec2 - dec1) * 3600.0
+        rates.append(math.hypot(d_ra, d_dec) / dt_hr)
+    if not rates:
+        return None
+    return round(sum(rates) / len(rates), 6)

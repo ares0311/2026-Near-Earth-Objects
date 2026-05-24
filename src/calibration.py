@@ -20,6 +20,7 @@ __all__ = [
     "compute_resolution_score",
     "compute_expected_positive_rate",
     "compute_reliability_score",
+    "compute_calibration_drift",
 ]
 
 import math
@@ -910,3 +911,27 @@ def compute_reliability_score(
         return 1.0
     ece = expected_calibration_error(p, y.astype(int), n_bins=n_bins)
     return round(float(max(0.0, 1.0 - ece)), 6)
+
+
+def compute_calibration_drift(
+    probs_t0: list[float],
+    labels_t0: list[int],
+    probs_t1: list[float],
+    labels_t1: list[int],
+    n_bins: int = 10,
+) -> float:
+    """Return the ECE drift between two time snapshots.
+
+    Computes ECE(t1) - ECE(t0).  A positive value means calibration has
+    degraded; negative means it has improved.  Returns 0.0 when either
+    input set is empty.
+    """
+    p0 = np.asarray(probs_t0, dtype=float)
+    y0 = np.asarray(labels_t0, dtype=float)
+    p1 = np.asarray(probs_t1, dtype=float)
+    y1 = np.asarray(labels_t1, dtype=float)
+    if p0.size == 0 or p1.size == 0:
+        return 0.0
+    ece0 = expected_calibration_error(p0, y0.astype(int), n_bins=n_bins)
+    ece1 = expected_calibration_error(p1, y1.astype(int), n_bins=n_bins)
+    return round(float(ece1 - ece0), 8)

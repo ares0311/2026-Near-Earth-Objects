@@ -1600,3 +1600,63 @@ class TestComputeFieldSourceCount:
         sys.path.insert(0, "src")
         from detect import compute_field_source_count
         assert compute_field_source_count([]) == {}
+
+
+class TestComputeBrightnessTrend:
+    def _make_obs(self, jd, mag):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+        return SimpleNamespace(jd=jd, mag=mag)
+
+    def test_fading_trend(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_brightness_trend
+        obs = [self._make_obs(2460000.0, 18.0), self._make_obs(2460001.0, 18.5),
+               self._make_obs(2460002.0, 19.0)]
+        result = compute_brightness_trend(obs)
+        assert result is not None
+        assert result > 0.0
+
+    def test_brightening_trend(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_brightness_trend
+        obs = [self._make_obs(2460000.0, 20.0), self._make_obs(2460001.0, 19.5),
+               self._make_obs(2460002.0, 19.0)]
+        result = compute_brightness_trend(obs)
+        assert result is not None
+        assert result < 0.0
+
+    def test_fewer_than_two_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_brightness_trend
+        assert compute_brightness_trend([self._make_obs(2460000.0, 18.0)]) is None
+        assert compute_brightness_trend([]) is None
+
+    def test_identical_jds_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_brightness_trend
+        obs = [self._make_obs(2460000.0, 18.0), self._make_obs(2460000.0, 18.5)]
+        assert compute_brightness_trend(obs) is None
+
+    def test_sentinel_mags_excluded(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_brightness_trend
+        obs = [self._make_obs(2460000.0, 99.0), self._make_obs(2460001.0, 99.9)]
+        assert compute_brightness_trend(obs) is None
+
+    def test_exception_returns_none(self, monkeypatch):
+        import sys
+        sys.path.insert(0, "src")
+        import numpy as np
+
+        import detect
+        monkeypatch.setattr(np, "polyfit", lambda *a, **k: (_ for _ in ()).throw(ValueError("bad")))
+        obs = [self._make_obs(2460000.0, 18.0), self._make_obs(2460001.0, 18.5)]
+        result = detect.compute_brightness_trend(obs)
+        assert result is None

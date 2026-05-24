@@ -11,7 +11,8 @@ __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus"
            "compute_angular_velocity",
            "compute_detection_gap",
            "compute_observation_cadence",
-           "compute_field_source_count"]
+           "compute_field_source_count",
+           "compute_brightness_trend"]
 
 import math
 import uuid
@@ -915,3 +916,33 @@ def compute_field_source_count(observations: list) -> dict[str, int]:
         field = obs_id.split("_")[0] if obs_id else "unknown"
         counts[field] = counts.get(field, 0) + 1
     return dict(sorted(counts.items(), key=lambda kv: -kv[1]))
+
+
+def compute_brightness_trend(observations: list | tuple) -> float | None:
+    """Return the linear brightness trend slope in magnitudes per day.
+
+    A positive slope means the object is fading; negative means brightening.
+    Requires at least 2 observations with valid magnitudes (< 90) and distinct
+    JDs.  Returns None when the constraint cannot be satisfied.
+    """
+    try:
+        import numpy as np
+
+        jds: list[float] = []
+        mags: list[float] = []
+        for obs in observations:
+            jd = getattr(obs, "jd", None)
+            mag = getattr(obs, "mag", None)
+            if jd is not None and mag is not None and float(mag) < 90.0:
+                jds.append(float(jd))
+                mags.append(float(mag))
+        if len(jds) < 2:
+            return None
+        t = np.asarray(jds)
+        m = np.asarray(mags)
+        if float(np.ptp(t)) == 0.0:
+            return None
+        coeffs = np.polyfit(t, m, 1)
+        return round(float(coeffs[0]), 8)
+    except Exception:
+        return None

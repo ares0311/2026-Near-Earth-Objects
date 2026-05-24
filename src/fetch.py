@@ -13,7 +13,8 @@ __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fet
            "fetch_known_neo_ephemerides",
            "fetch_neocp_objects",
            "fetch_mpc_orbit_elements",
-           "fetch_known_neo_list"]
+           "fetch_known_neo_list",
+           "fetch_neocp_confirmed"]
 
 import json
 import os
@@ -1439,6 +1440,61 @@ def fetch_known_neo_list(force_refresh: bool = False) -> list[dict]:
                     if "absolute_magnitude" in tbl.colnames else None
                 ),
                 "neo_class": neo_class,
+            })
+        _save_cache(cache_key, rows)
+        return rows
+    except Exception:
+        return []
+
+
+def fetch_neocp_confirmed(force_refresh: bool = False) -> list[dict]:
+    """Return a list of recently confirmed NEOCP objects from the MPC catalog.
+
+    Queries the MPC NEA list and returns objects that have a confirmation date
+    available (i.e. were recently on NEOCP and then confirmed). Each entry has
+    keys: ``object_id``, ``a_au``, ``e``, ``i_deg``, ``absolute_magnitude_h``,
+    ``neo_class``, ``confirmed``.  Returns an empty list on failure.
+    Results are disk-cached under ``neocp_confirmed``.
+    """
+    cache_key = "neocp_confirmed"
+    if not force_refresh:
+        cached = _load_cache(cache_key)
+        if cached is not None and isinstance(cached, list):
+            return cached
+    try:
+        from astroquery.mpc import MPC  # type: ignore[import-untyped]
+
+        tbl = MPC.query_objects("nea")
+        rows: list[dict] = []
+        for row in tbl:
+            desig = str(row.get("designation") or row.get("name") or "unknown")
+            a = float(row["semimajor_axis"]) if "semimajor_axis" in tbl.colnames else None
+            e = float(row["eccentricity"]) if "eccentricity" in tbl.colnames else None
+            q = (a * (1.0 - e)) if (a is not None and e is not None) else None
+            Q = (a * (1.0 + e)) if (a is not None and e is not None) else None
+            neo_class: str = "unknown"
+            if q is not None and a is not None and Q is not None:
+                if Q < 0.983:
+                    neo_class = "ieo"
+                elif a < 1.0:
+                    neo_class = "aten"
+                elif q < 1.017:
+                    neo_class = "apollo"
+                elif q < 1.3:
+                    neo_class = "amor"
+            rows.append({
+                "object_id": desig,
+                "a_au": a,
+                "e": e,
+                "i_deg": (
+                    float(row["inclination"]) if "inclination" in tbl.colnames else None
+                ),
+                "absolute_magnitude_h": (
+                    float(row["absolute_magnitude"])
+                    if "absolute_magnitude" in tbl.colnames else None
+                ),
+                "neo_class": neo_class,
+                "confirmed": True,
             })
         _save_cache(cache_key, rows)
         return rows
