@@ -1586,3 +1586,48 @@ class TestComputePriorityRank:
         )
         result = compute_priority_rank([neo])
         assert result[0]["object_id"] == "unknown"
+
+
+class TestComputeSurveyCompleteness:
+    def _make_neo(self, h):
+        import sys
+        import types
+        sys.path.insert(0, "src")
+        hazard = types.SimpleNamespace(absolute_magnitude_h=h)
+        return types.SimpleNamespace(hazard=hazard)
+
+    def test_all_brighter(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_survey_completeness
+        neos = [self._make_neo(18.0), self._make_neo(20.0), self._make_neo(21.9)]
+        assert compute_survey_completeness(neos, 22.0) == pytest.approx(1.0)
+
+    def test_none_brighter(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_survey_completeness
+        neos = [self._make_neo(23.0), self._make_neo(24.0)]
+        assert compute_survey_completeness(neos, 22.0) == pytest.approx(0.0)
+
+    def test_partial(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_survey_completeness
+        neos = [self._make_neo(20.0), self._make_neo(23.0)]
+        assert compute_survey_completeness(neos, 22.0) == pytest.approx(0.5)
+
+    def test_empty_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_survey_completeness
+        assert compute_survey_completeness([], 22.0) == 0.0
+
+    def test_unknown_h_excluded(self):
+        import sys
+        import types
+        sys.path.insert(0, "src")
+        from score import compute_survey_completeness
+        neo_known = self._make_neo(20.0)
+        neo_unknown = types.SimpleNamespace(hazard=types.SimpleNamespace(absolute_magnitude_h=None))
+        assert compute_survey_completeness([neo_known, neo_unknown], 22.0) == pytest.approx(1.0)

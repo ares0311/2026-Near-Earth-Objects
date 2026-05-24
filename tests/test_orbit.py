@@ -1836,3 +1836,51 @@ class TestComputePerihelionDistance:
         from orbit import compute_perihelion_distance
         # a=0.5, e=2.0 → q = 0.5*(1-2) = -0.5 → None
         assert compute_perihelion_distance(self._el(0.5, 2.0)) is None
+
+
+class TestComputeAphelionDistance:
+    def _el(self, a, e):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+        return SimpleNamespace(semi_major_axis_au=a, eccentricity=e)
+
+    def test_circular_orbit(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_aphelion_distance
+        assert compute_aphelion_distance(self._el(1.0, 0.0)) == pytest.approx(1.0)
+
+    def test_elliptical_orbit(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_aphelion_distance
+        # a=1.5, e=0.3 → Q=1.5*1.3=1.95
+        assert compute_aphelion_distance(self._el(1.5, 0.3)) == pytest.approx(1.95)
+
+    def test_zero_a_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_aphelion_distance
+        assert compute_aphelion_distance(self._el(0.0, 0.5)) is None
+
+    def test_negative_a_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_aphelion_distance
+        assert compute_aphelion_distance(self._el(-1.0, 0.5)) is None
+
+    def test_missing_eccentricity_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_aphelion_distance
+        el = SimpleNamespace(semi_major_axis_au=1.5, eccentricity=None)
+        assert compute_aphelion_distance(el) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import orbit
+        assert "compute_aphelion_distance" in orbit.__all__

@@ -1791,3 +1791,65 @@ class TestComputeTrackletArcNights:
         t = self._tracklet([2460005.0, 2460003.0, 2460001.0])
         result = compute_tracklet_arc_nights(t)
         assert result == [2460001, 2460003, 2460005]
+
+
+class TestComputeMeanConsecutiveMotion:
+    def _make_tracklet(self, obs_list):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+        obs = [SimpleNamespace(jd=jd, ra_deg=ra, dec_deg=dec,
+                               mag=18.0, mag_err=0.05)
+               for jd, ra, dec in obs_list]
+        return SimpleNamespace(observations=obs)
+
+    def test_two_obs_uniform_motion(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_mean_consecutive_motion
+        tracklet = self._make_tracklet([
+            (2460000.0, 10.0, 5.0),
+            (2460001.0, 10.1, 5.0),
+        ])
+        result = compute_mean_consecutive_motion(tracklet)
+        assert result is not None
+        assert result > 0.0
+
+    def test_single_obs_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_mean_consecutive_motion
+        tracklet = self._make_tracklet([(2460000.0, 10.0, 5.0)])
+        assert compute_mean_consecutive_motion(tracklet) is None
+
+    def test_empty_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_mean_consecutive_motion
+        tracklet = SimpleNamespace(observations=())
+        assert compute_mean_consecutive_motion(tracklet) is None
+
+    def test_identical_jds_skipped(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_mean_consecutive_motion
+        tracklet = self._make_tracklet([
+            (2460000.0, 10.0, 5.0),
+            (2460000.0, 10.1, 5.0),
+        ])
+        assert compute_mean_consecutive_motion(tracklet) is None
+
+    def test_three_obs_mean_rate(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_mean_consecutive_motion
+        tracklet = self._make_tracklet([
+            (2460000.0, 10.0, 5.0),
+            (2460001.0, 10.1, 5.0),
+            (2460002.0, 10.2, 5.0),
+        ])
+        result = compute_mean_consecutive_motion(tracklet)
+        assert result is not None
+        assert result > 0.0
