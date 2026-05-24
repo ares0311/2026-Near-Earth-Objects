@@ -1660,3 +1660,66 @@ class TestComputeBrightnessTrend:
         obs = [self._make_obs(2460000.0, 18.0), self._make_obs(2460001.0, 18.5)]
         result = detect.compute_brightness_trend(obs)
         assert result is None
+
+
+class TestComputeVariabilityIndex:
+    def _make_obs(self, mag, err):
+        from types import SimpleNamespace
+        return SimpleNamespace(mag=mag, mag_err=err)
+
+    def test_constant_source_near_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_variability_index
+        obs = [self._make_obs(18.0, 0.05), self._make_obs(18.0, 0.05),
+               self._make_obs(18.0, 0.05)]
+        result = compute_variability_index(obs)
+        assert result is not None
+        assert result == pytest.approx(0.0, abs=1e-4)
+
+    def test_variable_source_above_one(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_variability_index
+        obs = [self._make_obs(18.0, 0.01), self._make_obs(19.0, 0.01),
+               self._make_obs(18.5, 0.01)]
+        result = compute_variability_index(obs)
+        assert result is not None
+        assert result > 1.0
+
+    def test_single_obs_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_variability_index
+        assert compute_variability_index([self._make_obs(18.0, 0.05)]) is None
+
+    def test_empty_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_variability_index
+        assert compute_variability_index([]) is None
+
+    def test_sentinel_mags_excluded(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_variability_index
+        obs = [self._make_obs(99.0, 0.05), self._make_obs(99.9, 0.05)]
+        assert compute_variability_index(obs) is None
+
+    def test_zero_err_excluded(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_variability_index
+        obs = [self._make_obs(18.0, 0.0), self._make_obs(18.5, 0.0)]
+        assert compute_variability_index(obs) is None
+
+    def test_exception_in_numpy_returns_none(self, monkeypatch):
+        import sys
+        sys.path.insert(0, "src")
+        import numpy as np
+
+        import detect
+        monkeypatch.setattr(np, "asarray", lambda *a, **k: (_ for _ in ()).throw(ValueError("bad")))
+        obs = [self._make_obs(18.0, 0.05), self._make_obs(18.5, 0.05)]
+        result = detect.compute_variability_index(obs)
+        assert result is None

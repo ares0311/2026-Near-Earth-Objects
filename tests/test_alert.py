@@ -1682,3 +1682,66 @@ class TestFormatDiscoveryReport:
         sys.path.insert(0, "src")
         import alert
         assert "format_discovery_report" in alert.__all__
+
+
+class TestFormatNeocpSubmission:
+    def test_basic_output(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_neocp_submission
+        from tests.conftest import build_scored_neo
+        neo = build_scored_neo()
+        result = format_neocp_submission(neo, obs_code="T05")
+        assert "COD T05" in result
+        assert "GUARDRAIL" in result
+
+    def test_guardrail_present(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from alert import format_neocp_submission
+        neo = SimpleNamespace(tracklet=None, hazard=None,
+                              features=None, posterior=None, metadata=None)
+        result = format_neocp_submission(neo)
+        assert "GUARDRAIL" in result
+        assert "NOT" in result
+
+    def test_no_observations(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from alert import format_neocp_submission
+        tracklet = SimpleNamespace(object_id="NEO001", observations=())
+        neo = SimpleNamespace(tracklet=tracklet, hazard=None,
+                              features=None, posterior=None, metadata=None)
+        result = format_neocp_submission(neo)
+        assert "COD" in result
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+        assert "format_neocp_submission" in alert.__all__
+
+
+class TestFormatNeocpSubmissionObsError:
+    def test_bad_obs_skipped(self, monkeypatch):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        import alert as al
+
+        monkeypatch.setattr(al, "format_mpc_observation",
+                            lambda *a, **k: (_ for _ in ()).throw(ValueError("bad")))
+
+        obs = SimpleNamespace(jd=2460000.0, ra_deg=10.0, dec_deg=5.0,
+                              mag=18.0, mag_err=0.05, filter_band="r",
+                              obs_id="X", mission="ZTF")
+        tracklet = SimpleNamespace(object_id="T001", observations=(obs,))
+        neo = SimpleNamespace(tracklet=tracklet, hazard=None,
+                              features=None, posterior=None, metadata=None)
+        result = al.format_neocp_submission(neo)
+        assert "GUARDRAIL" in result

@@ -2123,3 +2123,48 @@ class TestComputeTier1Confidence:
                                    known_object_score=None)
         result = compute_tier1_confidence(features)
         assert result == pytest.approx(1 / 14, abs=1e-5)
+
+
+class TestComputePosteriorStability:
+    def _make_posterior(self, neo=0.2, ko=0.3, mba=0.3, art=0.15, other=0.05):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import NEOPosterior
+        return NEOPosterior(neo_candidate=neo, known_object=ko,
+                            main_belt_asteroid=mba, stellar_artifact=art,
+                            other_solar_system=other)
+
+    def test_identical_posteriors_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_posterior_stability
+        p = self._make_posterior()
+        assert compute_posterior_stability([p, p]) == pytest.approx(0.0)
+
+    def test_empty_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_posterior_stability
+        assert compute_posterior_stability([]) == 0.0
+
+    def test_single_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_posterior_stability
+        p = self._make_posterior()
+        assert compute_posterior_stability([p]) == 0.0
+
+    def test_different_posteriors_nonzero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_posterior_stability
+        p1 = self._make_posterior(neo=0.9, ko=0.05, mba=0.02, art=0.02, other=0.01)
+        p2 = self._make_posterior(neo=0.05, ko=0.05, mba=0.05, art=0.8, other=0.05)
+        result = compute_posterior_stability([p1, p2])
+        assert result > 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import classify
+        assert "compute_posterior_stability" in classify.__all__

@@ -1884,3 +1884,54 @@ class TestComputeAphelionDistance:
         sys.path.insert(0, "src")
         import orbit
         assert "compute_aphelion_distance" in orbit.__all__
+
+
+class TestComputeTisserandWrtEarth:
+    def _el(self, a, e, i_deg):
+        from types import SimpleNamespace
+        return SimpleNamespace(semi_major_axis_au=a, eccentricity=e,
+                               inclination_deg=i_deg)
+
+    def test_earth_orbit_coplanar(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_tisserand_wrt_earth
+        # a=1, e=0, i=0 → T_E = 1/1 + 2*cos(0)*sqrt(1*(1-0)) = 1 + 2 = 3
+        result = compute_tisserand_wrt_earth(self._el(1.0, 0.0, 0.0))
+        assert result == pytest.approx(3.0)
+
+    def test_inclined_orbit(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_tisserand_wrt_earth
+        result = compute_tisserand_wrt_earth(self._el(1.5, 0.3, 30.0))
+        assert result is not None
+        assert isinstance(result, float)
+
+    def test_zero_a_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_tisserand_wrt_earth
+        assert compute_tisserand_wrt_earth(self._el(0.0, 0.3, 10.0)) is None
+
+    def test_missing_inclination_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_tisserand_wrt_earth
+        el = SimpleNamespace(semi_major_axis_au=1.5, eccentricity=0.3,
+                             inclination_deg=None)
+        assert compute_tisserand_wrt_earth(el) is None
+
+    def test_negative_e_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_tisserand_wrt_earth
+        assert compute_tisserand_wrt_earth(self._el(1.5, -0.1, 10.0)) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import orbit
+        assert "compute_tisserand_wrt_earth" in orbit.__all__

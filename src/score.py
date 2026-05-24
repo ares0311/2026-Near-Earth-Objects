@@ -15,7 +15,8 @@ __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "compute_weighted_hazard_score",
            "compute_hazard_grade",
            "compute_priority_rank",
-           "compute_survey_completeness"]
+           "compute_survey_completeness",
+           "compute_weighted_risk_score"]
 
 import math
 import uuid
@@ -1005,3 +1006,18 @@ def compute_survey_completeness(neos: list, limiting_mag: float) -> float:
     if total == 0:
         return 0.0
     return round(brighter / total, 6)
+
+
+def compute_weighted_risk_score(neo: object) -> float:
+    """Return a combined risk score in [0, 1].
+
+    Weights: 0.5 × threat_score + 0.3 × close_approach_score + 0.2 × orbit_quality_score.
+    Any unknown component contributes its sentinel value (0.5 for threat and
+    close_approach; 0.0 for orbit_quality).  The result is clamped to [0, 1].
+    """
+    threat = compute_threat_score(neo)
+    ca = compute_close_approach_score(neo)
+    features = getattr(neo, "features", None)
+    oq = float(getattr(features, "orbit_quality_score", None) or 0.0) if features else 0.0
+    score = 0.5 * threat + 0.3 * ca + 0.2 * oq
+    return round(float(min(1.0, max(0.0, score))), 6)

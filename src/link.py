@@ -14,7 +14,8 @@ __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "compute_inter_night_gaps",
            "filter_by_motion_rate",
            "compute_tracklet_arc_nights",
-           "compute_mean_consecutive_motion"]
+           "compute_mean_consecutive_motion",
+           "compute_tracklet_sky_density"]
 
 import math
 import uuid
@@ -1011,3 +1012,37 @@ def compute_mean_consecutive_motion(tracklet: object) -> float | None:
     if not rates:
         return None
     return round(sum(rates) / len(rates), 6)
+
+
+def compute_tracklet_sky_density(
+    tracklets: list,
+    radius_deg: float = 1.0,
+) -> list[dict]:
+    """Count how many tracklets have centroids within *radius_deg* of each other.
+
+    Returns a list of dicts with keys ``object_id`` and ``n_neighbors``,
+    one per input tracklet, in the same order.
+    """
+    centroids: list[tuple[float, float, str]] = []
+    for t in tracklets:
+        obs = getattr(t, "observations", ()) or ()
+        if not obs:
+            oid = getattr(t, "object_id", "unknown")
+            centroids.append((0.0, 0.0, oid))
+            continue
+        ras = [float(getattr(o, "ra_deg", 0.0)) for o in obs]
+        decs = [float(getattr(o, "dec_deg", 0.0)) for o in obs]
+        oid = getattr(t, "object_id", "unknown")
+        centroids.append((sum(ras) / len(ras), sum(decs) / len(decs), oid))
+
+    results: list[dict] = []
+    for i, (ra1, dec1, oid1) in enumerate(centroids):
+        count = 0
+        for j, (ra2, dec2, _) in enumerate(centroids):
+            if i == j:
+                continue
+            sep = _sep_arcsec(ra1, dec1, ra2, dec2) / 3600.0
+            if sep <= radius_deg:
+                count += 1
+        results.append({"object_id": oid1, "n_neighbors": count})
+    return results

@@ -1675,3 +1675,66 @@ class TestComputePsfAsymmetry:
         from preprocess import compute_psf_asymmetry
         obs = SimpleNamespace(cutout_difference="not-valid-base64!!!")
         assert compute_psf_asymmetry(obs) is None
+
+
+class TestComputeSourceCompactness:
+    def _make_obs(self, arr=None):
+        import sys
+        sys.path.insert(0, "src")
+        import base64
+        from types import SimpleNamespace
+
+        import numpy as np
+        if arr is None:
+            arr = np.zeros((63, 63), dtype=np.float32)
+            arr[31, 31] = 10.0
+        b64 = base64.b64encode(arr.astype(np.float32).tobytes()).decode()
+        return SimpleNamespace(cutout_difference=b64)
+
+    def test_point_source_high_compactness(self):
+        import sys
+        sys.path.insert(0, "src")
+        from preprocess import compute_source_compactness
+        obs = self._make_obs()
+        result = compute_source_compactness(obs)
+        assert result is not None
+        assert result == pytest.approx(1.0)
+
+    def test_uniform_array_low_compactness(self):
+        import sys
+        sys.path.insert(0, "src")
+        import numpy as np
+
+        from preprocess import compute_source_compactness
+        arr = np.ones((63, 63), dtype=np.float32)
+        obs = self._make_obs(arr)
+        result = compute_source_compactness(obs)
+        assert result is not None
+        assert result < 0.01
+
+    def test_no_cutout_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_source_compactness
+        obs = SimpleNamespace(cutout_difference=None)
+        assert compute_source_compactness(obs) is None
+
+    def test_zero_array_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        import numpy as np
+
+        from preprocess import compute_source_compactness
+        obs = self._make_obs(np.zeros((63, 63), dtype=np.float32))
+        assert compute_source_compactness(obs) is None
+
+    def test_invalid_base64_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_source_compactness
+        obs = SimpleNamespace(cutout_difference="!!!notbase64!!!")
+        assert compute_source_compactness(obs) is None

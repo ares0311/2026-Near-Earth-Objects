@@ -1199,3 +1199,39 @@ class TestNightSummary:
         sys.path.insert(0, "src")
         import schemas
         assert "NightSummary" in schemas.__all__
+
+
+class TestTrackletCluster:
+    def test_basic(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import TrackletCluster
+        tc = TrackletCluster(cluster_id="C1", tracklet_ids=("A", "B"),
+                             centroid_ra_deg=15.0, centroid_dec_deg=-5.0,
+                             n_tracklets=2)
+        assert tc.n_tracklets == 2
+        assert tc.cluster_id == "C1"
+
+    def test_defaults(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import TrackletCluster
+        tc = TrackletCluster(cluster_id="C2", centroid_ra_deg=0.0,
+                             centroid_dec_deg=0.0, n_tracklets=1)
+        assert tc.tracklet_ids == ()
+        assert tc.arc_span_days == 0.0
+
+    def test_frozen(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import TrackletCluster
+        tc = TrackletCluster(cluster_id="C3", centroid_ra_deg=0.0,
+                             centroid_dec_deg=0.0, n_tracklets=1)
+        with pytest.raises(Exception):
+            tc.n_tracklets = 5
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        assert "TrackletCluster" in schemas.__all__

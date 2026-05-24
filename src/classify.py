@@ -31,6 +31,7 @@ __all__ = [
     "compute_neo_class_distribution",
     "compute_posterior_update",
     "compute_tier1_confidence",
+    "compute_posterior_stability",
 ]
 
 import base64
@@ -1535,3 +1536,26 @@ def compute_tier1_confidence(features: object) -> float:
     ]
     present = sum(1 for f in _FEATURE_FIELDS if getattr(features, f, None) is not None)
     return round(present / len(_FEATURE_FIELDS), 6)
+
+
+def compute_posterior_stability(posteriors: list) -> float:
+    """Return the mean pairwise L1 distance across a list of NEOPosterior objects.
+
+    0.0 = all posteriors identical; higher = more variable.  Returns 0.0
+    when fewer than 2 posteriors are supplied.
+    """
+    _KEYS = ["neo_candidate", "known_object", "main_belt_asteroid",
+             "stellar_artifact", "other_solar_system"]
+    if len(posteriors) < 2:
+        return 0.0
+    total = 0.0
+    count = 0
+    for i in range(len(posteriors)):
+        for j in range(i + 1, len(posteriors)):
+            p = posteriors[i]
+            q = posteriors[j]
+            l1 = sum(abs(float(getattr(p, k, 0.0)) - float(getattr(q, k, 0.0)))
+                     for k in _KEYS)
+            total += l1
+            count += 1
+    return round(total / count, 6) if count > 0 else 0.0

@@ -21,6 +21,7 @@ __all__ = [
     "compute_expected_positive_rate",
     "compute_reliability_score",
     "compute_calibration_drift",
+    "compute_calibration_uniformity",
 ]
 
 import math
@@ -935,3 +936,21 @@ def compute_calibration_drift(
     ece0 = expected_calibration_error(p0, y0.astype(int), n_bins=n_bins)
     ece1 = expected_calibration_error(p1, y1.astype(int), n_bins=n_bins)
     return round(float(ece1 - ece0), 8)
+
+
+def compute_calibration_uniformity(probs: list[float]) -> float:
+    """Return the Kolmogorov-Smirnov statistic of probabilities vs Uniform[0,1].
+
+    Measures how far the predicted probability distribution is from uniform.
+    0.0 = perfectly uniform; 1.0 = all mass at one extreme.  Returns 0.0
+    for empty input.
+    """
+    p = np.asarray(probs, dtype=float)
+    if p.size == 0:
+        return 0.0
+    p_sorted = np.sort(p)
+    n = len(p_sorted)
+    empirical = np.arange(1, n + 1) / n
+    theoretical = p_sorted  # CDF of Uniform[0,1] at x is x
+    ks_stat = float(np.max(np.abs(empirical - theoretical)))
+    return round(float(min(1.0, ks_stat)), 6)

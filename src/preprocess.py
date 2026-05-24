@@ -14,7 +14,8 @@ __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_
            "compute_cutout_symmetry",
            "compute_streak_angle",
            "compute_radial_profile",
-           "compute_psf_asymmetry"]
+           "compute_psf_asymmetry",
+           "compute_source_compactness"]
 
 import base64
 import math
@@ -925,5 +926,31 @@ def compute_psf_asymmetry(obs: object) -> float | None:
         sy = abs(m030) / (m020**1.5 + 1e-12)
         asymmetry = 0.5 * (sx + sy)
         return round(float(min(1.0, asymmetry)), 6)
+    except Exception:
+        return None
+
+
+def compute_source_compactness(obs: object) -> float | None:
+    """Return the peak-to-total flux ratio from the difference-image cutout.
+
+    A value of 1 indicates a pure point source (all flux in one pixel);
+    lower values indicate extended emission.  Returns None when no valid
+    cutout is available or the total flux is zero.
+    """
+    try:
+        import base64
+
+        import numpy as np
+
+        cutout = getattr(obs, "cutout_difference", None)
+        if cutout is None:
+            return None
+        raw = base64.b64decode(cutout)
+        arr = np.frombuffer(raw, dtype=np.float32).reshape(63, 63).astype(float)
+        total = float(arr.sum())
+        if total == 0.0:
+            return None
+        peak = float(arr.max())
+        return round(float(min(1.0, max(0.0, peak / total))), 6)
     except Exception:
         return None
