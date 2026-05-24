@@ -14,7 +14,8 @@ __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus"
            "compute_field_source_count",
            "compute_brightness_trend",
            "compute_variability_index",
-           "compute_angular_separation"]
+           "compute_angular_separation",
+           "compute_streak_orientation"]
 
 import math
 import uuid
@@ -1003,3 +1004,40 @@ def compute_angular_separation(obs1: object, obs2: object) -> float:
     )
     sep_rad = 2.0 * math.asin(math.sqrt(max(0.0, min(1.0, hav))))
     return float(math.degrees(sep_rad) * 3600.0)
+
+
+def compute_streak_orientation(obs: object) -> float | None:
+    """Compute the orientation angle (0–180 deg) of the principal axis in the difference image.
+
+    Uses 2D second-moment matrix: angle = 0.5 * arctan2(2*mu11, mu20-mu02).
+    Returns None if no cutout, decoding fails, or the moment matrix is degenerate
+    (both mu11==0 and mu20==mu02).
+    """
+    try:
+        import base64
+
+        import numpy as np
+
+        cutout = getattr(obs, "cutout_difference", None)
+        if cutout is None:
+            return None
+        raw = base64.b64decode(cutout)
+        arr = np.frombuffer(raw, dtype=np.float32).reshape(63, 63)
+        total = float(arr.sum())
+        if total == 0.0:
+            return None
+        ys, xs = np.mgrid[0:63, 0:63]
+        cx = float((xs * arr).sum()) / total
+        cy = float((ys * arr).sum()) / total
+        dx = xs - cx
+        dy = ys - cy
+        mu20 = float((dx**2 * arr).sum()) / total
+        mu02 = float((dy**2 * arr).sum()) / total
+        mu11 = float((dx * dy * arr).sum()) / total
+        if mu11 == 0.0 and mu20 == mu02:
+            return None
+        angle_rad = 0.5 * math.atan2(2.0 * mu11, mu20 - mu02)
+        angle_deg = math.degrees(angle_rad) % 180.0
+        return float(angle_deg)
+    except Exception:
+        return None

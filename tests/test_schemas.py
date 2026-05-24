@@ -1235,3 +1235,61 @@ class TestTrackletCluster:
         sys.path.insert(0, "src")
         import schemas
         assert "TrackletCluster" in schemas.__all__
+
+
+class TestCampaignSummary:
+    def test_basic(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import CampaignSummary
+        cs = CampaignSummary(
+            campaign_id="camp001",
+            start_jd=2460000.0,
+            end_jd=2460010.0,
+            n_nights=5,
+            n_tracklets=20,
+            n_pha_candidates=1,
+            surveys_used=("ZTF", "ATLAS"),
+            sky_area_deg2=100.0,
+        )
+        assert cs.campaign_id == "camp001"
+        assert cs.n_nights == 5
+        assert cs.surveys_used == ("ZTF", "ATLAS")
+        assert cs.sky_area_deg2 == 100.0
+
+    def test_optional_sky_area(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import CampaignSummary
+        cs = CampaignSummary(
+            campaign_id="c2",
+            start_jd=2460000.0,
+            end_jd=2460003.0,
+            n_nights=3,
+            n_tracklets=5,
+            n_pha_candidates=0,
+        )
+        assert cs.sky_area_deg2 is None
+
+    def test_frozen(self):
+        import sys
+        sys.path.insert(0, "src")
+        import pytest
+
+        from schemas import CampaignSummary
+        cs = CampaignSummary(
+            campaign_id="c3",
+            start_jd=2460000.0,
+            end_jd=2460005.0,
+            n_nights=2,
+            n_tracklets=3,
+            n_pha_candidates=0,
+        )
+        with pytest.raises(Exception):
+            cs.campaign_id = "changed"  # type: ignore[misc]
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        assert "CampaignSummary" in schemas.__all__

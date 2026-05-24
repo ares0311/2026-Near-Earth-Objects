@@ -1956,3 +1956,38 @@ class TestComputeTrackletCompleteness:
         sys.path.insert(0, "src")
         import link
         assert "compute_tracklet_completeness" in link.__all__
+
+
+class TestFindLongestTracklet:
+    def test_returns_longest(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import find_longest_tracklet
+        t1 = SimpleNamespace(arc_days=2.0, object_id="T1")
+        t2 = SimpleNamespace(arc_days=10.0, object_id="T2")
+        t3 = SimpleNamespace(arc_days=5.0, object_id="T3")
+        result = find_longest_tracklet([t1, t2, t3])
+        assert result is t2
+
+    def test_empty_list_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import find_longest_tracklet
+        assert find_longest_tracklet([]) is None
+
+    def test_single_tracklet(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import find_longest_tracklet
+        t = SimpleNamespace(arc_days=7.0)
+        assert find_longest_tracklet([t]) is t
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+        assert "find_longest_tracklet" in link.__all__

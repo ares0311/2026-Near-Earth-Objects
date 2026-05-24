@@ -3303,3 +3303,114 @@ class TestComputeFieldOverlap:
         r2 = self._make_result([(10.05, 0.0)])
         result = compute_field_overlap(r1, r2)
         assert result == 1.0
+
+
+class TestFetchKnownPhas:
+    def _mock_mpc(self, monkeypatch, rows, colnames):
+        import sys
+        import types
+
+        class MockTable:
+            def __init__(self):
+                self.colnames = colnames
+
+            def __iter__(self):
+                yield from rows
+
+        class MockMPC:
+            @staticmethod
+            def query_objects(kind):
+                return MockTable()
+
+        mock_astroquery = types.ModuleType("astroquery")
+        mock_mpc_mod = types.ModuleType("astroquery.mpc")
+        mock_mpc_mod.MPC = MockMPC
+        mock_astroquery.mpc = mock_mpc_mod
+        monkeypatch.setitem(sys.modules, "astroquery", mock_astroquery)
+        monkeypatch.setitem(sys.modules, "astroquery.mpc", mock_mpc_mod)
+
+    def test_returns_list(self, monkeypatch, tmp_path):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch as fe
+
+        monkeypatch.setattr(fe, "_CACHE_DIR", tmp_path / ".neo_cache")
+        self._mock_mpc(monkeypatch, [
+            {"designation": "2024 PHA1", "absolute_magnitude": 18.5,
+             "moid": 0.03, "semimajor_axis": 1.5, "eccentricity": 0.15},
+        ], ["designation", "absolute_magnitude", "moid", "semimajor_axis", "eccentricity"])
+
+        result = fe.fetch_known_phas(force_refresh=True)
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0]["designation"] == "2024 PHA1"
+        assert result[0]["absolute_magnitude_h"] == 18.5
+        assert result[0]["moid_au"] == 0.03
+        assert result[0]["neo_class"] == "amor"
+
+    def test_ieo_aten_apollo_classification(self, monkeypatch, tmp_path):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch as fe
+
+        monkeypatch.setattr(fe, "_CACHE_DIR", tmp_path / ".neo_cache")
+        rows = [
+            {"designation": "IEO1", "absolute_magnitude": 20.0, "moid": 0.01,
+             "semimajor_axis": 0.7, "eccentricity": 0.3},
+            {"designation": "ATEN1", "absolute_magnitude": 21.0, "moid": 0.02,
+             "semimajor_axis": 0.9, "eccentricity": 0.1},
+            {"designation": "APO1", "absolute_magnitude": 19.5, "moid": 0.04,
+             "semimajor_axis": 1.8, "eccentricity": 0.5},
+        ]
+        self._mock_mpc(monkeypatch, rows,
+                       ["designation", "absolute_magnitude", "moid",
+                        "semimajor_axis", "eccentricity"])
+
+        result = fe.fetch_known_phas(force_refresh=True)
+        classes = {r["designation"]: r["neo_class"] for r in result}
+        assert classes["IEO1"] == "ieo"
+        assert classes["ATEN1"] == "aten"
+        assert classes["APO1"] == "apollo"
+
+    def test_returns_empty_on_exception(self, monkeypatch, tmp_path):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch as fe
+
+        monkeypatch.setattr(fe, "_CACHE_DIR", tmp_path / ".neo_cache")
+        monkeypatch.setattr(fe, "_load_cache", lambda k: None)
+
+        import types
+        bad = types.ModuleType("astroquery")
+        bad_mpc = types.ModuleType("astroquery.mpc")
+
+        class BrokenMPC:
+            @staticmethod
+            def query_objects(kind):
+                raise RuntimeError("network down")
+
+        bad_mpc.MPC = BrokenMPC
+        bad.mpc = bad_mpc
+        monkeypatch.setitem(sys.modules, "astroquery", bad)
+        monkeypatch.setitem(sys.modules, "astroquery.mpc", bad_mpc)
+
+        result = fe.fetch_known_phas(force_refresh=True)
+        assert result == []
+
+    def test_cache_hit(self, monkeypatch, tmp_path):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch as fe
+
+        cached = [{"designation": "CACHED", "absolute_magnitude_h": 19.0,
+                   "moid_au": 0.02, "neo_class": "apollo"}]
+        monkeypatch.setattr(fe, "_load_cache", lambda k: cached)
+
+        result = fe.fetch_known_phas(force_refresh=False)
+        assert result == cached
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+        assert "fetch_known_phas" in fetch.__all__

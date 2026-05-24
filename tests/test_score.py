@@ -1719,3 +1719,51 @@ class TestComputeHazardSummary:
         sys.path.insert(0, "src")
         import score
         assert "compute_hazard_summary" in score.__all__
+
+
+class TestComputePriorityPercentile:
+    def test_basic(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from score import compute_priority_percentile
+
+        def make(p):
+            meta = SimpleNamespace(discovery_priority=p)
+            return SimpleNamespace(metadata=meta)
+
+        neos = [make(0.2), make(0.5), make(0.8), make(1.0)]
+        neo = make(0.5)
+        result = compute_priority_percentile(neo, neos)
+        assert result == pytest.approx(0.5)  # 2 of 4 have priority <= 0.5
+
+    def test_empty_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from score import compute_priority_percentile
+        neo = SimpleNamespace(metadata=SimpleNamespace(discovery_priority=0.5))
+        assert compute_priority_percentile(neo, []) == 0.0
+
+    def test_highest_priority_returns_one(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from score import compute_priority_percentile
+
+        def make(p):
+            return SimpleNamespace(metadata=SimpleNamespace(discovery_priority=p))
+
+        neos = [make(0.1), make(0.2), make(0.3)]
+        neo = make(0.9)
+        result = compute_priority_percentile(neo, neos)
+        assert result == pytest.approx(1.0)
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        assert "compute_priority_percentile" in score.__all__

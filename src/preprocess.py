@@ -16,7 +16,8 @@ __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_
            "compute_radial_profile",
            "compute_psf_asymmetry",
            "compute_source_compactness",
-           "compute_cutout_peak_position"]
+           "compute_cutout_peak_position",
+           "compute_local_background"]
 
 import base64
 import math
@@ -976,5 +977,32 @@ def compute_cutout_peak_position(obs: object) -> tuple[int, int] | None:
         arr = np.frombuffer(raw, dtype=np.float32).reshape(63, 63)
         idx = np.unravel_index(arr.argmax(), arr.shape)
         return (int(idx[0]), int(idx[1]))
+    except Exception:
+        return None
+
+
+def compute_local_background(obs: object) -> float | None:
+    """Compute median pixel value in an annular region of the difference-image cutout.
+
+    The annulus spans inner radius 20 px to outer radius 31 px from the
+    centre pixel (31, 31) of the 63×63 float32 cutout.  Returns None if
+    no cutout is available, decoding fails, or the annulus is empty.
+    """
+    try:
+        import base64
+
+        import numpy as np
+
+        cutout = getattr(obs, "cutout_difference", None)
+        if cutout is None:
+            return None
+        raw = base64.b64decode(cutout)
+        arr = np.frombuffer(raw, dtype=np.float32).reshape(63, 63)
+        cy, cx = 31, 31
+        ys, xs = np.mgrid[0:63, 0:63]
+        dist = np.sqrt((ys - cy) ** 2 + (xs - cx) ** 2)
+        mask = (dist >= 20.0) & (dist <= 31.0)
+        pixels = arr[mask]
+        return float(np.median(pixels))
     except Exception:
         return None

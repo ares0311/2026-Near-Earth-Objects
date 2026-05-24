@@ -1979,3 +1979,68 @@ class TestComputeOrbitalArcQuality:
         sys.path.insert(0, "src")
         import orbit
         assert "compute_orbital_arc_quality" in orbit.__all__
+
+
+class TestComputeMeanAnomalyAtEpoch:
+    def test_returns_float_in_range(self):
+        import sys
+        sys.path.insert(0, "src")
+        import math
+        from types import SimpleNamespace
+
+        from orbit import compute_mean_anomaly_at_epoch
+        elements = SimpleNamespace(
+            semi_major_axis_au=1.5,
+            eccentricity=0.1,
+            epoch_jd=2460000.0,
+            mean_anomaly_deg=0.0,
+        )
+        result = compute_mean_anomaly_at_epoch(elements, 2460100.0)
+        assert result is not None
+        assert 0.0 <= result < 2 * math.pi
+
+    def test_missing_epoch_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_mean_anomaly_at_epoch
+        elements = SimpleNamespace(semi_major_axis_au=1.5, eccentricity=0.1, epoch_jd=None)
+        assert compute_mean_anomaly_at_epoch(elements, 2460100.0) is None
+
+    def test_non_positive_period_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_mean_anomaly_at_epoch
+        # a=0 → period=None
+        elements = SimpleNamespace(
+            semi_major_axis_au=0.0,
+            eccentricity=0.1,
+            epoch_jd=2460000.0,
+            mean_anomaly_deg=0.0,
+        )
+        assert compute_mean_anomaly_at_epoch(elements, 2460100.0) is None
+
+    def test_at_epoch_returns_m0(self):
+        import sys
+        sys.path.insert(0, "src")
+        import math
+        from types import SimpleNamespace
+
+        from orbit import compute_mean_anomaly_at_epoch
+        elements = SimpleNamespace(
+            semi_major_axis_au=1.5,
+            eccentricity=0.1,
+            epoch_jd=2460000.0,
+            mean_anomaly_deg=45.0,
+        )
+        result = compute_mean_anomaly_at_epoch(elements, 2460000.0)
+        assert result == pytest.approx(math.radians(45.0), abs=1e-8)
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import orbit
+        assert "compute_mean_anomaly_at_epoch" in orbit.__all__

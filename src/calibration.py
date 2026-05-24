@@ -23,6 +23,7 @@ __all__ = [
     "compute_calibration_drift",
     "compute_calibration_uniformity",
     "compute_mean_calibration_error",
+    "compute_resolution",
 ]
 
 import math
@@ -985,3 +986,41 @@ def compute_mean_calibration_error(
         total += expected_calibration_error(p, y.astype(int), n_bins=n_bins)
         count += 1
     return round(float(total / count), 8) if count > 0 else 0.0
+
+
+def compute_resolution(
+    probs: list[float],
+    labels: list[int],
+    n_bins: int = 10,
+) -> float:
+    """Compute the resolution component of the Brier score decomposition.
+
+    Resolution = Σ_k (n_k / N) * (o_k - o_bar)^2, where o_k is the fraction
+    positive in bin k, o_bar is the overall fraction positive, n_k is the bin
+    count, and N is the total number of samples.  Uses equal-width bins on [0, 1].
+    Returns 0.0 for empty input or when o_bar is 0 or 1 (no resolution possible).
+    Result is rounded to 8 decimal places.
+    """
+    import numpy as np
+
+    p = np.asarray(probs, dtype=float)
+    y = np.asarray(labels, dtype=float)
+    if len(p) == 0 or len(y) == 0:
+        return 0.0
+    o_bar = float(y.mean())
+    if o_bar == 0.0 or o_bar == 1.0:
+        return 0.0
+    n_total = len(p)
+    bin_edges = np.linspace(0.0, 1.0, n_bins + 1)
+    resolution = 0.0
+    for i in range(n_bins):
+        if i < n_bins - 1:
+            mask = (p >= bin_edges[i]) & (p < bin_edges[i + 1])
+        else:
+            mask = (p >= bin_edges[i]) & (p <= bin_edges[i + 1])
+        n_k = int(mask.sum())
+        if n_k == 0:
+            continue
+        o_k = float(y[mask].mean())
+        resolution += (n_k / n_total) * (o_k - o_bar) ** 2
+    return round(float(resolution), 8)
