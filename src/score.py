@@ -16,7 +16,8 @@ __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "compute_hazard_grade",
            "compute_priority_rank",
            "compute_survey_completeness",
-           "compute_weighted_risk_score"]
+           "compute_weighted_risk_score",
+           "compute_hazard_summary"]
 
 import math
 import uuid
@@ -1021,3 +1022,46 @@ def compute_weighted_risk_score(neo: object) -> float:
     oq = float(getattr(features, "orbit_quality_score", None) or 0.0) if features else 0.0
     score = 0.5 * threat + 0.3 * ca + 0.2 * oq
     return round(float(min(1.0, max(0.0, score))), 6)
+
+
+def compute_hazard_summary(neos: list) -> dict:
+    """Return aggregate hazard statistics across a list of ScoredNEO objects.
+
+    Counts candidates by hazard flag and computes mean discovery priority.
+
+    Args:
+        neos: List of ScoredNEO objects.
+
+    Returns:
+        Dict with keys: ``n_total``, ``n_pha_candidates``, ``n_close_approach``,
+        ``n_nominal``, ``n_unknown``, ``mean_discovery_priority``.
+    """
+    n_total = len(neos)
+    n_pha = 0
+    n_ca = 0
+    n_nominal = 0
+    n_unknown = 0
+    total_priority = 0.0
+    for neo in neos:
+        hazard = getattr(neo, "hazard", None)
+        flag = getattr(hazard, "hazard_flag", "unknown") if hazard else "unknown"
+        if flag == "pha_candidate":
+            n_pha += 1
+        elif flag == "close_approach":
+            n_ca += 1
+        elif flag == "nominal":
+            n_nominal += 1
+        else:
+            n_unknown += 1
+        meta = getattr(neo, "metadata", None)
+        priority = float(getattr(meta, "discovery_priority", 0.0) or 0.0) if meta else 0.0
+        total_priority += priority
+    mean_priority = round(total_priority / n_total, 6) if n_total > 0 else 0.0
+    return {
+        "n_total": n_total,
+        "n_pha_candidates": n_pha,
+        "n_close_approach": n_ca,
+        "n_nominal": n_nominal,
+        "n_unknown": n_unknown,
+        "mean_discovery_priority": mean_priority,
+    }

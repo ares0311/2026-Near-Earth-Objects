@@ -15,7 +15,8 @@ __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "filter_by_motion_rate",
            "compute_tracklet_arc_nights",
            "compute_mean_consecutive_motion",
-           "compute_tracklet_sky_density"]
+           "compute_tracklet_sky_density",
+           "compute_tracklet_completeness"]
 
 import math
 import uuid
@@ -1046,3 +1047,28 @@ def compute_tracklet_sky_density(
                 count += 1
         results.append({"object_id": oid1, "n_neighbors": count})
     return results
+
+
+def compute_tracklet_completeness(tracklet: object, expected_nights: int) -> float:
+    """Return the fraction of expected nights on which the tracklet has observations.
+
+    Counts distinct calendar nights (integer part of JD) covered by the
+    tracklet and divides by *expected_nights*.  Returns 0.0 when
+    *expected_nights* ≤ 0.
+
+    Args:
+        tracklet: Object with an ``observations`` attribute (iterable of obs with ``jd``).
+        expected_nights: Total number of nights expected (positive integer).
+
+    Returns:
+        Fraction of expected nights covered, in [0, 1].
+    """
+    if expected_nights <= 0:
+        return 0.0
+    observations = getattr(tracklet, "observations", ()) or ()
+    nights: set[int] = set()
+    for obs in observations:
+        jd = getattr(obs, "jd", None)
+        if jd is not None:
+            nights.add(int(float(jd)))
+    return round(min(1.0, len(nights) / expected_nights), 6)

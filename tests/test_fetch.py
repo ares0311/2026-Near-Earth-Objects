@@ -3238,3 +3238,68 @@ class TestFetchMpcOrbitCatalog:
         classes = {r["designation"]: r["neo_class"] for r in result}
         assert classes["ieo1"] == "ieo"
         assert classes["aten1"] == "aten"
+
+
+class TestComputeFieldOverlap:
+    def _make_result(self, coords):
+        import sys
+        from types import SimpleNamespace
+        sys.path.insert(0, "src")
+        alerts = [SimpleNamespace(ra_deg=ra, dec_deg=dec) for ra, dec in coords]
+        return SimpleNamespace(alerts=alerts)
+
+    def test_full_overlap(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_field_overlap
+        r1 = self._make_result([(10.0, 5.0), (10.05, 5.0)])
+        r2 = self._make_result([(10.0, 5.0), (10.05, 5.0)])
+        assert compute_field_overlap(r1, r2) == 1.0
+
+    def test_no_overlap(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_field_overlap
+        r1 = self._make_result([(0.0, 0.0)])
+        r2 = self._make_result([(90.0, 45.0)])
+        assert compute_field_overlap(r1, r2) == 0.0
+
+    def test_empty_result1_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_field_overlap
+        r1 = self._make_result([])
+        r2 = self._make_result([(10.0, 5.0)])
+        assert compute_field_overlap(r1, r2) == 0.0
+
+    def test_empty_result2_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_field_overlap
+        r1 = self._make_result([(10.0, 5.0)])
+        r2 = self._make_result([])
+        assert compute_field_overlap(r1, r2) == 0.0
+
+    def test_partial_overlap(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_field_overlap
+        r1 = self._make_result([(10.0, 0.0), (90.0, 45.0)])
+        r2 = self._make_result([(10.0, 0.0)])
+        overlap = compute_field_overlap(r1, r2)
+        assert overlap == 0.5
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+        assert "compute_field_overlap" in fetch.__all__
+
+    def test_within_threshold(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_field_overlap
+        r1 = self._make_result([(10.0, 0.0)])
+        r2 = self._make_result([(10.05, 0.0)])
+        result = compute_field_overlap(r1, r2)
+        assert result == 1.0

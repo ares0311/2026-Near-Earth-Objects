@@ -2168,3 +2168,74 @@ class TestComputePosteriorStability:
         sys.path.insert(0, "src")
         import classify
         assert "compute_posterior_stability" in classify.__all__
+
+
+class TestComputeClassProbabilityRange:
+    def test_single_neo(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from classify import compute_class_probability_range
+        posterior = SimpleNamespace(
+            neo_candidate=0.6,
+            known_object=0.1,
+            main_belt_asteroid=0.1,
+            stellar_artifact=0.1,
+            other_solar_system=0.1,
+        )
+        neo = SimpleNamespace(posterior=posterior)
+        result = compute_class_probability_range([neo])
+        assert result["neo_candidate"] == {"min": 0.6, "max": 0.6}
+        assert result["known_object"] == {"min": 0.1, "max": 0.1}
+
+    def test_multiple_neos(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from classify import compute_class_probability_range
+        p1 = SimpleNamespace(
+            neo_candidate=0.3,
+            known_object=0.2,
+            main_belt_asteroid=0.2,
+            stellar_artifact=0.2,
+            other_solar_system=0.1,
+        )
+        p2 = SimpleNamespace(
+            neo_candidate=0.8,
+            known_object=0.05,
+            main_belt_asteroid=0.05,
+            stellar_artifact=0.05,
+            other_solar_system=0.05,
+        )
+        neo1 = SimpleNamespace(posterior=p1)
+        neo2 = SimpleNamespace(posterior=p2)
+        result = compute_class_probability_range([neo1, neo2])
+        assert result["neo_candidate"]["min"] == pytest.approx(0.3, abs=1e-5)
+        assert result["neo_candidate"]["max"] == pytest.approx(0.8, abs=1e-5)
+
+    def test_empty_returns_zeros(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_class_probability_range
+        result = compute_class_probability_range([])
+        for k in ["neo_candidate", "known_object", "main_belt_asteroid",
+                   "stellar_artifact", "other_solar_system"]:
+            assert result[k] == {"min": 0.0, "max": 0.0}
+
+    def test_no_posterior_skipped(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from classify import compute_class_probability_range
+        neo = SimpleNamespace(posterior=None)
+        result = compute_class_probability_range([neo])
+        assert result["neo_candidate"] == {"min": 0.0, "max": 0.0}
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import classify
+        assert "compute_class_probability_range" in classify.__all__

@@ -1557,7 +1557,8 @@ def fetch_mpc_orbit_catalog(force_refresh: bool = False) -> list[dict]:
 
 
 def compute_field_overlap(fetch_result1: object, fetch_result2: object) -> float:
-    """Return the fraction of observations in fetch_result1 within 0.1 deg of any observation in fetch_result2.
+    """Return the fraction of observations in fetch_result1 within 0.1 deg of
+    any observation in fetch_result2.
 
     Uses the haversine great-circle separation.  Returns 0.0 if either result
     has no observations.

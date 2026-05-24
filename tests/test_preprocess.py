@@ -1738,3 +1738,46 @@ class TestComputeSourceCompactness:
         from preprocess import compute_source_compactness
         obs = SimpleNamespace(cutout_difference="!!!notbase64!!!")
         assert compute_source_compactness(obs) is None
+
+
+class TestComputeCutoutPeakPosition:
+    def test_returns_peak_position(self):
+        import base64
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        import numpy as np
+
+        from preprocess import compute_cutout_peak_position
+        arr = np.zeros((63, 63), dtype=np.float32)
+        arr[10, 20] = 1.0
+        cutout_b64 = base64.b64encode(arr.tobytes()).decode()
+        obs = SimpleNamespace(cutout_difference=cutout_b64)
+        result = compute_cutout_peak_position(obs)
+        assert result == (10, 20)
+
+    def test_no_cutout_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_cutout_peak_position
+        obs = SimpleNamespace(cutout_difference=None)
+        assert compute_cutout_peak_position(obs) is None
+
+    def test_bad_cutout_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_cutout_peak_position
+        obs = SimpleNamespace(cutout_difference="notbase64!!!")
+        result = compute_cutout_peak_position(obs)
+        assert result is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import preprocess
+        assert "compute_cutout_peak_position" in preprocess.__all__

@@ -1150,3 +1150,37 @@ class TestComputeCalibrationUniformity:
         sys.path.insert(0, "src")
         import calibration
         assert "compute_calibration_uniformity" in calibration.__all__
+
+
+class TestComputeMeanCalibrationError:
+    def test_basic_mean(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_mean_calibration_error
+        probs1 = [0.1] * 50 + [0.9] * 50
+        labels1 = [0] * 50 + [1] * 50
+        probs2 = [0.2] * 50 + [0.8] * 50
+        labels2 = [0] * 50 + [1] * 50
+        result = compute_mean_calibration_error([probs1, probs2], [labels1, labels2])
+        assert 0.0 <= result <= 1.0
+
+    def test_empty_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_mean_calibration_error
+        assert compute_mean_calibration_error([], []) == 0.0
+
+    def test_single_pair(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_mean_calibration_error
+        probs = [0.5] * 100
+        labels = [0] * 50 + [1] * 50
+        result = compute_mean_calibration_error([probs], [labels])
+        assert result >= 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        assert "compute_mean_calibration_error" in calibration.__all__

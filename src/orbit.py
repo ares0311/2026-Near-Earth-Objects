@@ -17,7 +17,8 @@ __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
            "compute_orbital_velocity",
            "compute_perihelion_distance",
            "compute_aphelion_distance",
-           "compute_tisserand_wrt_earth"]
+           "compute_tisserand_wrt_earth",
+           "compute_orbital_arc_quality"]
 
 import math
 from typing import NamedTuple
@@ -1257,3 +1258,28 @@ def compute_tisserand_wrt_earth(elements: object) -> float | None:
         return None
     t_e = a_E / a + 2.0 * math.cos(math.radians(i_deg)) * math.sqrt(a / a_E * (1.0 - e**2))
     return round(t_e, 8)
+
+
+def compute_orbital_arc_quality(tracklet: object) -> int:
+    """Return an orbit quality code (1–4) based on the tracklet's arc length in days.
+
+    Quality codes follow the MPC convention:
+    - 1: arc_days < 1 (single night)
+    - 2: 1 ≤ arc_days < 7 (multi-night, within a week)
+    - 3: 7 ≤ arc_days < 30 (multi-week)
+    - 4: arc_days ≥ 30 (opposition / long arc)
+
+    Args:
+        tracklet: Object with an ``arc_days`` attribute (default 0.0 if missing).
+
+    Returns:
+        Integer quality code in {1, 2, 3, 4}.
+    """
+    arc_days = float(getattr(tracklet, "arc_days", 0.0) or 0.0)
+    if arc_days >= 30.0:
+        return 4
+    if arc_days >= 7.0:
+        return 3
+    if arc_days >= 1.0:
+        return 2
+    return 1

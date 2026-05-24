@@ -15,7 +15,8 @@ __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_
            "compute_streak_angle",
            "compute_radial_profile",
            "compute_psf_asymmetry",
-           "compute_source_compactness"]
+           "compute_source_compactness",
+           "compute_cutout_peak_position"]
 
 import base64
 import math
@@ -952,5 +953,28 @@ def compute_source_compactness(obs: object) -> float | None:
             return None
         peak = float(arr.max())
         return round(float(min(1.0, max(0.0, peak / total))), 6)
+    except Exception:
+        return None
+
+
+def compute_cutout_peak_position(obs: object) -> tuple[int, int] | None:
+    """Return the (row, col) index of the peak pixel in the difference-image cutout.
+
+    Decodes the base64 float32 63×63 cutout and returns the position of the
+    maximum value as a (row, col) tuple.  Returns None when no cutout is
+    available or decoding fails.
+    """
+    try:
+        import base64
+
+        import numpy as np
+
+        cutout = getattr(obs, "cutout_difference", None)
+        if cutout is None:
+            return None
+        raw = base64.b64decode(cutout)
+        arr = np.frombuffer(raw, dtype=np.float32).reshape(63, 63)
+        idx = np.unravel_index(arr.argmax(), arr.shape)
+        return (int(idx[0]), int(idx[1]))
     except Exception:
         return None
