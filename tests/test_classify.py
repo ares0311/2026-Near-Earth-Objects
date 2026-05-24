@@ -1992,3 +1992,75 @@ class TestComputeNeoClassDistribution:
         result = compute_neo_class_distribution([scored_neo, scored_neo])
         total = sum(v["fraction"] for v in result.values())
         assert total == pytest.approx(1.0, abs=0.001)
+
+
+class TestComputePosteriorUpdate:
+    def _prior(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import NEOPosterior
+        return NEOPosterior(
+            neo_candidate=0.05, known_object=0.30,
+            main_belt_asteroid=0.35, stellar_artifact=0.25,
+            other_solar_system=0.05,
+        )
+
+    def test_positive_weight_increases_probability(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_posterior_update
+        prior = self._prior()
+        updated = compute_posterior_update(prior, {"neo_candidate": 3.0})
+        assert updated.neo_candidate > prior.neo_candidate
+
+    def test_negative_weight_decreases_probability(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_posterior_update
+        prior = self._prior()
+        updated = compute_posterior_update(prior, {"neo_candidate": -5.0})
+        assert updated.neo_candidate < prior.neo_candidate
+
+    def test_sums_to_one(self):
+        import sys
+
+        import pytest
+        sys.path.insert(0, "src")
+        from classify import compute_posterior_update
+        prior = self._prior()
+        updated = compute_posterior_update(prior, {"stellar_artifact": 2.0})
+        total = (updated.neo_candidate + updated.known_object +
+                 updated.main_belt_asteroid + updated.stellar_artifact +
+                 updated.other_solar_system)
+        assert total == pytest.approx(1.0, abs=1e-6)
+
+    def test_empty_weights_unchanged(self):
+        import sys
+
+        import pytest
+        sys.path.insert(0, "src")
+        from classify import compute_posterior_update
+        prior = self._prior()
+        updated = compute_posterior_update(prior, {})
+        assert updated.neo_candidate == pytest.approx(prior.neo_candidate, rel=0.01)
+
+    def test_unknown_keys_ignored(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_posterior_update
+        prior = self._prior()
+        updated = compute_posterior_update(prior, {"nonexistent_key": 5.0})
+        assert updated is not None
+
+    def test_zero_prior_handled(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_posterior_update
+        from schemas import NEOPosterior
+        prior = NEOPosterior(
+            neo_candidate=0.0, known_object=0.5,
+            main_belt_asteroid=0.3, stellar_artifact=0.2,
+            other_solar_system=0.0,
+        )
+        updated = compute_posterior_update(prior, {"neo_candidate": 2.0})
+        assert updated.neo_candidate >= 0.0

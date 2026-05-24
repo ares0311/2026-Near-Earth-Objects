@@ -14,7 +14,8 @@ __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
            "compute_longitude_of_perihelion",
            "compute_orbital_inclination_class",
            "compute_mean_anomaly_at_jd",
-           "compute_orbital_velocity"]
+           "compute_orbital_velocity",
+           "compute_perihelion_distance"]
 
 import math
 from typing import NamedTuple
@@ -1201,3 +1202,20 @@ def compute_orbital_velocity(elements: object, r_au: float) -> float | None:
     if v2 < 0.0:
         return None
     return round(math.sqrt(v2) / 1000.0, 4)  # km/s
+
+
+def compute_perihelion_distance(elements: object) -> float | None:
+    """Return the perihelion distance q = a·(1 − e) in AU.
+
+    Returns ``None`` if *a* or *e* is not available, if *a* ≤ 0, or if
+    the resulting *q* would be negative (physically impossible).
+    """
+    a = float(getattr(elements, "semi_major_axis_au", 0.0) or 0.0)
+    e = float(getattr(elements, "eccentricity", -1.0) if
+              getattr(elements, "eccentricity", None) is not None else -1.0)
+    if a <= 0.0 or e < 0.0:
+        return None
+    q = a * (1.0 - e)
+    if q < 0.0:
+        return None
+    return round(q, 8)

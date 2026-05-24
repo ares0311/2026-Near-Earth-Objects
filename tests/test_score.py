@@ -1522,3 +1522,67 @@ class TestComputeHazardGradeAllGrades:
         from score import compute_hazard_grade
         neo = self._make_neo(moid=0.25)
         assert compute_hazard_grade(neo) == "D"
+
+
+class TestComputePriorityRank:
+    def _make_neo(self, object_id, priority, hazard_flag="nominal"):
+        import types
+        tracklet = types.SimpleNamespace(object_id=object_id)
+        metadata = types.SimpleNamespace(discovery_priority=priority)
+        hazard = types.SimpleNamespace(hazard_flag=hazard_flag)
+        return types.SimpleNamespace(tracklet=tracklet, metadata=metadata, hazard=hazard)
+
+    def test_rank_order(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_priority_rank
+        neos = [
+            self._make_neo("A", 0.3),
+            self._make_neo("B", 0.9),
+            self._make_neo("C", 0.1),
+        ]
+        result = compute_priority_rank(neos)
+        assert result[0]["object_id"] == "B"
+        assert result[0]["rank"] == 1
+        assert result[1]["object_id"] == "A"
+        assert result[2]["rank"] == 3
+
+    def test_includes_hazard_flag(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_priority_rank
+        neos = [self._make_neo("X", 0.5, "pha_candidate")]
+        result = compute_priority_rank(neos)
+        assert result[0]["hazard_flag"] == "pha_candidate"
+
+    def test_empty_list(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_priority_rank
+        assert compute_priority_rank([]) == []
+
+    def test_missing_metadata_uses_zero(self):
+        import sys
+        import types
+        sys.path.insert(0, "src")
+        from score import compute_priority_rank
+        neo = types.SimpleNamespace(
+            tracklet=types.SimpleNamespace(object_id="Z"),
+            metadata=None,
+            hazard=types.SimpleNamespace(hazard_flag="unknown"),
+        )
+        result = compute_priority_rank([neo])
+        assert result[0]["discovery_priority"] == 0.0
+
+    def test_no_tracklet(self):
+        import sys
+        import types
+        sys.path.insert(0, "src")
+        from score import compute_priority_rank
+        neo = types.SimpleNamespace(
+            tracklet=None,
+            metadata=types.SimpleNamespace(discovery_priority=0.5),
+            hazard=types.SimpleNamespace(hazard_flag="nominal"),
+        )
+        result = compute_priority_rank([neo])
+        assert result[0]["object_id"] == "unknown"

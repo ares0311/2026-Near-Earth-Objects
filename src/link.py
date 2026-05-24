@@ -12,7 +12,8 @@ __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "compute_night_span",
            "compute_tracklet_velocity_dispersion",
            "compute_inter_night_gaps",
-           "filter_by_motion_rate"]
+           "filter_by_motion_rate",
+           "compute_tracklet_arc_nights"]
 
 import math
 import uuid
@@ -962,3 +963,18 @@ def filter_by_motion_rate(
         if min_rate_arcsec_hr <= float(rate) <= max_rate_arcsec_hr:
             result.append(t)
     return result
+
+
+def compute_tracklet_arc_nights(tracklet: object) -> list[int]:
+    """Return the sorted list of distinct integer-JD nights in the tracklet.
+
+    Each night is the ``int()`` truncation of the observation JD.  The list
+    is sorted in ascending order and contains no duplicates.
+    """
+    observations = getattr(tracklet, "observations", ()) or ()
+    nights: set[int] = set()
+    for obs in observations:
+        jd = getattr(obs, "jd", None)
+        if jd is not None:
+            nights.add(int(float(jd)))
+    return sorted(nights)

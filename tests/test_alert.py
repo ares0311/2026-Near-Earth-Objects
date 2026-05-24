@@ -1563,3 +1563,76 @@ class TestFormatObservationLog:
         from alert import format_observation_log
         log = format_observation_log(scored_neo)
         assert scored_neo.tracklet.object_id in log
+
+
+class TestFormatMpcAdesPsv:
+    def test_basic_output(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_mpc_ades_psv
+        neo = make_scored_neo()
+        result = format_mpc_ades_psv(neo)
+        assert "version=2017" in result
+        assert "mpcCode" in result
+        assert "T001" in result
+
+    def test_contains_obs_code(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_mpc_ades_psv
+        neo = make_scored_neo()
+        result = format_mpc_ades_psv(neo, obs_code="G96")
+        assert "G96" in result
+
+    def test_psv_data_rows(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_mpc_ades_psv
+        neo = make_scored_neo()
+        result = format_mpc_ades_psv(neo)
+        lines = result.split("\n")
+        data_rows = [ln for ln in lines if ln.startswith("| ") and "permID" not in ln
+                     and "version" not in ln and "mpcCode" not in ln
+                     and "name" not in ln and "design" not in ln
+                     and "aperture" not in ln and "detector" not in ln]
+        assert len(data_rows) == 3  # 3 observations
+
+    def test_guardrail_not_in_output(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_mpc_ades_psv
+        neo = make_scored_neo()
+        result = format_mpc_ades_psv(neo)
+        assert "impact probability" not in result.lower()
+
+    def test_header_fields_present(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_mpc_ades_psv
+        neo = make_scored_neo()
+        result = format_mpc_ades_psv(neo)
+        assert "obsTime" in result
+        assert "ra" in result
+        assert "dec" in result
+
+
+class TestFormatMpcAdesPsvTimeFallback:
+    def test_astropy_time_failure_uses_str(self, monkeypatch):
+        import sys
+        import types as _types
+        sys.path.insert(0, "src")
+
+        class FakeTime:
+            def __init__(self, *a, **kw):
+                raise RuntimeError("no astropy")
+
+        fake_time_mod = _types.ModuleType("astropy.time")
+        fake_time_mod.Time = FakeTime
+        monkeypatch.setitem(sys.modules, "astropy.time", fake_time_mod)
+
+        from alert import format_mpc_ades_psv
+        neo = make_scored_neo()
+        result = format_mpc_ades_psv(neo)
+        assert "version=2017" in result
+        # JD value appears as string fallback
+        assert "2460000" in result

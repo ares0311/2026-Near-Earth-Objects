@@ -25,6 +25,7 @@ __all__ = [
     "NeedsFollowUpLogEntry", "BackgroundConfig", "HumanSignoffEntry", "BackgroundRunResult",
     "AstrometricResidual",
     "ResidualSummary",
+    "ObservationCoverage",
 ]
 
 from dataclasses import dataclass
@@ -950,3 +951,16 @@ class ResidualSummary(BaseModel):
     max_residual_arcsec: float
     mean_ra_residual_arcsec: float
     mean_dec_residual_arcsec: float
+
+
+class ObservationCoverage(BaseModel):
+    """Sky coverage summary for a single survey night."""
+
+    model_config = ConfigDict(frozen=True)
+
+    night_jd: float
+    mission: Mission
+    n_fields: int
+    total_area_deg2: float
+    limiting_mag: float | None = None
+    field_ids: tuple[str, ...] = ()

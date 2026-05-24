@@ -1749,3 +1749,45 @@ class TestFilterByMotionRate:
         tracklets = [self._tracklet(10.0), self._tracklet(30.0)]
         result = filter_by_motion_rate(tracklets, 10.0, 30.0)
         assert len(result) == 2
+
+
+class TestComputeTrackletArcNights:
+    def _obs(self, jd):
+        from types import SimpleNamespace
+        return SimpleNamespace(jd=jd)
+
+    def _tracklet(self, jds):
+        from types import SimpleNamespace
+        return SimpleNamespace(observations=[self._obs(j) for j in jds])
+
+    def test_basic(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_tracklet_arc_nights
+        t = self._tracklet([2460001.2, 2460002.8, 2460001.9])
+        result = compute_tracklet_arc_nights(t)
+        assert result == sorted(set([2460001, 2460002]))
+
+    def test_single_night(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_tracklet_arc_nights
+        t = self._tracklet([2460000.1, 2460000.5, 2460000.9])
+        assert compute_tracklet_arc_nights(t) == [2460000]
+
+    def test_empty_observations(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_tracklet_arc_nights
+        t = SimpleNamespace(observations=[])
+        assert compute_tracklet_arc_nights(t) == []
+
+    def test_sorted_output(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_tracklet_arc_nights
+        t = self._tracklet([2460005.0, 2460003.0, 2460001.0])
+        result = compute_tracklet_arc_nights(t)
+        assert result == [2460001, 2460003, 2460005]

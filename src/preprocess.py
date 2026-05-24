@@ -12,7 +12,8 @@ __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_
            "compute_cutout_contrast",
            "compute_image_gradient",
            "compute_cutout_symmetry",
-           "compute_streak_angle"]
+           "compute_streak_angle",
+           "compute_radial_profile"]
 
 import base64
 import math
@@ -857,5 +858,34 @@ def compute_streak_angle(obs: object) -> float | None:
         angle_rad = 0.5 * math.atan2(2.0 * mxy, diff)
         angle_deg = math.degrees(angle_rad) % 180.0
         return round(angle_deg, 4)
+    except Exception:
+        return None
+
+
+def compute_radial_profile(obs: object) -> list[float] | None:
+    """Compute a radial brightness profile from the difference-image cutout.
+
+    Bins pixels by integer distance (in pixels) from the cutout centre.
+    Returns the mean pixel value in each radial bin (index = radius in pixels),
+    from 0 to floor(CUTOUT_SIZE / 2).  Returns ``None`` if no cutout is
+    attached or if decoding fails.
+    """
+    import base64
+
+    cutout = getattr(obs, "cutout_difference", None)
+    if cutout is None:
+        return None
+    try:
+        raw = base64.b64decode(cutout)
+        arr = np.frombuffer(raw, dtype=np.float32).reshape(63, 63).astype(float)
+        cy, cx = 31.0, 31.0
+        ys, xs = np.mgrid[0:63, 0:63]
+        dist = np.sqrt((xs - cx) ** 2 + (ys - cy) ** 2)
+        max_r = 31
+        profile: list[float] = []
+        for r in range(max_r + 1):
+            mask = (dist >= r - 0.5) & (dist < r + 0.5)
+            profile.append(round(float(arr[mask].mean()) if mask.any() else 0.0, 6))
+        return profile
     except Exception:
         return None

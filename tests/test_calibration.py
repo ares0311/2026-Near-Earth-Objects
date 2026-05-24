@@ -1018,3 +1018,52 @@ class TestComputeExpectedPositiveRate:
         sys.path.insert(0, "src")
         import calibration
         assert "compute_expected_positive_rate" in calibration.__all__
+
+
+class TestComputeReliabilityScore:
+    def test_perfect_calibration(self):
+        import sys
+
+        import numpy as np
+        sys.path.insert(0, "src")
+        from calibration import compute_reliability_score
+        probs = np.array([0.1] * 50 + [0.9] * 50)
+        labels = np.array([0] * 50 + [1] * 50)
+        score = compute_reliability_score(probs, labels)
+        assert score > 0.8
+
+    def test_poor_calibration(self):
+        import sys
+
+        import numpy as np
+        sys.path.insert(0, "src")
+        from calibration import compute_reliability_score
+        probs = np.array([0.9] * 50 + [0.1] * 50)
+        labels = np.array([0] * 50 + [1] * 50)
+        score = compute_reliability_score(probs, labels)
+        assert score < 0.5
+
+    def test_empty_input(self):
+        import sys
+
+        import numpy as np
+        sys.path.insert(0, "src")
+        from calibration import compute_reliability_score
+        assert compute_reliability_score(np.array([]), np.array([])) == 1.0
+
+    def test_bounded_01(self):
+        import sys
+
+        import numpy as np
+        sys.path.insert(0, "src")
+        from calibration import compute_reliability_score
+        probs = np.random.default_rng(42).random(100)
+        labels = np.random.default_rng(42).integers(0, 2, 100)
+        score = compute_reliability_score(probs, labels)
+        assert 0.0 <= score <= 1.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        assert "compute_reliability_score" in calibration.__all__

@@ -29,6 +29,7 @@ __all__ = [
     "compute_tier1_score_distribution",
     "compute_class_entropy_summary",
     "compute_neo_class_distribution",
+    "compute_posterior_update",
 ]
 
 import base64
@@ -1459,3 +1460,50 @@ def compute_neo_class_distribution(neos: list) -> dict[str, dict[str, float | in
         cls: {"count": cnt, "fraction": round(cnt / total, 4)}
         for cls, cnt in counts.items()
     }
+
+
+def compute_posterior_update(
+    prior: NEOPosterior,  # type: ignore[name-defined]
+    likelihood_weights: dict[str, float],
+) -> NEOPosterior:  # type: ignore[name-defined]
+    """Update a NEOPosterior with log-likelihood weights from new evidence.
+
+    Each key in *likelihood_weights* must match a hypothesis name in the
+    posterior (``neo_candidate``, ``known_object``, ``main_belt_asteroid``,
+    ``stellar_artifact``, ``other_solar_system``).  Unknown keys are ignored.
+    The update follows the log-score model:
+
+    .. code-block:: text
+
+        log p_i ∝ log prior_i + weight_i
+
+    The result is normalised so all five probabilities sum to 1.0.
+    Missing hypothesis keys in *likelihood_weights* keep their prior unchanged.
+    Returns a new frozen ``NEOPosterior``; the original is not modified.
+    """
+    _KEYS = [
+        "neo_candidate",
+        "known_object",
+        "main_belt_asteroid",
+        "stellar_artifact",
+        "other_solar_system",
+    ]
+    import math
+
+    log_scores: dict[str, float] = {}
+    for key in _KEYS:
+        prior_val = float(getattr(prior, key, 0.0))
+        prior_val = max(prior_val, 1e-12)
+        log_scores[key] = math.log(prior_val) + float(likelihood_weights.get(key, 0.0))
+
+    log_max = max(log_scores.values())
+    exp_scores = {k: math.exp(v - log_max) for k, v in log_scores.items()}
+    total = sum(exp_scores.values())
+
+    return NEOPosterior(
+        neo_candidate=round(exp_scores["neo_candidate"] / total, 8),
+        known_object=round(exp_scores["known_object"] / total, 8),
+        main_belt_asteroid=round(exp_scores["main_belt_asteroid"] / total, 8),
+        stellar_artifact=round(exp_scores["stellar_artifact"] / total, 8),
+        other_solar_system=round(exp_scores["other_solar_system"] / total, 8),
+    )

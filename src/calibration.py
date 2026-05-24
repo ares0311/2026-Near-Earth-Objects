@@ -19,6 +19,7 @@ __all__ = [
     "compute_discrimination_score",
     "compute_resolution_score",
     "compute_expected_positive_rate",
+    "compute_reliability_score",
 ]
 
 import math
@@ -886,3 +887,26 @@ def compute_expected_positive_rate(
     if p.size == 0:
         return 0.0
     return round(float((p >= threshold).mean()), 6)
+
+
+def compute_reliability_score(
+    probs: list[float] | np.ndarray,
+    labels: list[int] | np.ndarray,
+    n_bins: int = 10,
+) -> float:
+    """Compute a reliability score defined as 1 − ECE.
+
+    Higher values (closer to 1.0) indicate better probability calibration.
+    Returns 1.0 for empty inputs (perfect by convention).
+
+    Args:
+        probs: Predicted probabilities in [0, 1].
+        labels: Binary ground-truth labels (0 or 1).
+        n_bins: Number of equal-width bins for ECE computation.
+    """
+    p = np.asarray(probs, dtype=float)
+    y = np.asarray(labels, dtype=float)
+    if p.size == 0:
+        return 1.0
+    ece = expected_calibration_error(p, y.astype(int), n_bins=n_bins)
+    return round(float(max(0.0, 1.0 - ece)), 6)

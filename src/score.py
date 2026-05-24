@@ -13,7 +13,8 @@ __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "compute_weighted_priority",
            "compute_arc_quality_bonus",
            "compute_weighted_hazard_score",
-           "compute_hazard_grade"]
+           "compute_hazard_grade",
+           "compute_priority_rank"]
 
 import math
 import uuid
@@ -950,3 +951,34 @@ def compute_hazard_grade(neo: ScoredNEO) -> str:
     if score >= 0.3:
         return "C"
     return "D"
+
+
+def compute_priority_rank(neos: list) -> list[dict]:
+    """Return a ranked list of NEO candidates sorted by discovery priority.
+
+    Each element is a dict with keys ``rank`` (1-based integer),
+    ``object_id`` (str), ``discovery_priority`` (float), and
+    ``hazard_flag`` (str).  Candidates without a ``discovery_priority``
+    attribute on their metadata are treated as priority 0.0 and sorted last.
+
+    The list is sorted descending by priority (highest priority = rank 1).
+    """
+    records = []
+    for neo in neos:
+        meta = getattr(neo, "metadata", None)
+        priority = float(getattr(meta, "discovery_priority", 0.0) or 0.0)
+        tracklet = getattr(neo, "tracklet", None)
+        object_id = getattr(tracklet, "object_id", "unknown") if tracklet else "unknown"
+        hazard = getattr(neo, "hazard", None)
+        hazard_flag = getattr(hazard, "hazard_flag", "unknown") if hazard else "unknown"
+        records.append({
+            "object_id": object_id,
+            "discovery_priority": priority,
+            "hazard_flag": hazard_flag,
+        })
+
+    records.sort(key=lambda r: -float(r["discovery_priority"]))
+    return [
+        {"rank": i + 1, **r}
+        for i, r in enumerate(records)
+    ]
