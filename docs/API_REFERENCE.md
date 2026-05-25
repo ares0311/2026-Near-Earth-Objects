@@ -709,7 +709,7 @@ Lightweight summary of a `ScoredNEO` for display or export.
 
 ---
 
-## v0.16.0 through v0.38.0 Public API Additions
+## v0.16.0 through v0.50.0 Public API Additions
 
 These releases added conservative helper APIs around live-data retrieval,
 preprocessing quality, detection triage, linking, orbit review, classification
@@ -831,8 +831,20 @@ claim confirmation or impact probability.
 | v0.36.0 | `background.py` / `Skills/background.py` | `record_live_dry_run_approval_bundle`, `live_dry_run_approval_bundle_log_summary`; persisted approval-bundle CLI commands |
 | v0.37.0 | `background.py` / `Skills/background.py` | `live_dry_run_operator_handoff`, `write_live_dry_run_operator_handoff`; operator handoff CLI commands |
 | v0.38.0 | `background.py` / `Skills/background.py` | `record_live_dry_run_operator_handoff`, `live_dry_run_operator_handoff_log_summary`; persisted operator handoff CLI commands |
+| v0.39.0 | `alert.py` / `calibration.py` / `classify.py` / `detect.py` / `fetch.py` / `link.py` / `orbit.py` / `preprocess.py` / `schemas.py` / `score.py` | `estimate_followup_window`, `compute_f1_score`, `compute_confusion_matrix`, `compute_source_extent`, `fetch_css_alerts`, `compute_great_circle_residual`, `compute_eccentric_anomaly`, `compute_cutout_entropy`, `OrbitalElementsSummary`, `compute_size_estimate` |
+| v0.40.0 | `alert.py` / `calibration.py` / `classify.py` / `detect.py` / `fetch.py` / `link.py` / `orbit.py` / `preprocess.py` / `schemas.py` / `score.py` | `format_candidate_dossier`, `compute_average_precision`, `compute_calibration_gain`, `estimate_observation_depth`, `fetch_panstarrs_moving_objects`, `compute_position_angle_consistency`, `compute_true_anomaly`, `compute_background_level`, `CandidateReport`, `compute_close_approach_score` |
+| v0.41.0 | `alert.py` / `calibration.py` / `classify.py` / `detect.py` / `fetch.py` / `link.py` / `orbit.py` / `preprocess.py` / `schemas.py` / `score.py` | `count_alerts_by_flag`, `compute_calibration_sharpness`, `batch_classify_morphology`, `filter_by_magnitude`, `fetch_recent_mpc_neos`, `score_tracklet_quality`, `compute_mean_motion`, `compute_pixel_histogram`, `SurveyStatistics`, `compute_combined_priority` |
+| v0.42.0 | `alert.py` / `calibration.py` / `classify.py` / `detect.py` / `fetch.py` / `link.py` / `orbit.py` / `preprocess.py` / `schemas.py` / `score.py` | `format_bulk_summary`, `compute_brier_skill_score`, `compute_class_entropy_stats`, `compute_streak_density`, `estimate_field_completeness`, `compute_night_span`, `compute_longitude_of_perihelion`, `compute_cutout_contrast`, `EphemerisPoint`, `compute_weighted_priority` |
+| v0.43.0 | `alert.py` / `calibration.py` / `classify.py` / `detect.py` / `fetch.py` / `link.py` / `orbit.py` / `preprocess.py` / `schemas.py` / `score.py` | `count_ready_to_submit`, `compute_discrimination_score`, `compute_tier1_score_distribution`, `compute_angular_velocity`, `fetch_known_neo_ephemerides`, `compute_tracklet_velocity_dispersion`, `compute_orbital_inclination_class`, `compute_image_gradient`, `ObservationCluster`, `compute_arc_quality_bonus` |
+| v0.44.0 | `alert.py` / `calibration.py` / `classify.py` / `detect.py` / `fetch.py` / `link.py` / `orbit.py` / `preprocess.py` / `schemas.py` / `score.py` | `compute_alert_age_days`, `compute_resolution_score`, `compute_class_entropy_summary`, `compute_detection_gap`, `fetch_neocp_objects`, `compute_inter_night_gaps`, `compute_mean_anomaly_at_jd`, `compute_cutout_symmetry`, `AstrometricResidual`, `compute_weighted_hazard_score` |
+| v0.45.0 | `alert.py` / `calibration.py` / `classify.py` / `detect.py` / `fetch.py` / `link.py` / `orbit.py` / `preprocess.py` / `schemas.py` / `score.py` | `format_observation_log`, `compute_expected_positive_rate`, `compute_neo_class_distribution`, `compute_observation_cadence`, `fetch_mpc_orbit_elements`, `filter_by_motion_rate`, `compute_orbital_velocity`, `compute_streak_angle`, `ResidualSummary`, `compute_hazard_grade` |
+| v0.46.0 | `alert.py` / `calibration.py` / `classify.py` / `detect.py` / `fetch.py` / `link.py` / `orbit.py` / `preprocess.py` / `schemas.py` / `score.py` | `format_mpc_ades_psv`, `compute_reliability_score`, `compute_posterior_update`, `compute_field_source_count`, `fetch_known_neo_list`, `compute_tracklet_arc_nights`, `compute_perihelion_distance`, `compute_radial_profile`, `ObservationCoverage`, `compute_priority_rank` |
+| v0.47.0 | `alert.py` / `calibration.py` / `classify.py` / `detect.py` / `fetch.py` / `link.py` / `orbit.py` / `preprocess.py` / `schemas.py` / `score.py` | `format_discovery_report`, `compute_calibration_drift`, `compute_tier1_confidence`, `compute_brightness_trend`, `fetch_neocp_confirmed`, `compute_mean_consecutive_motion`, `compute_aphelion_distance`, `compute_psf_asymmetry`, `NightSummary`, `compute_survey_completeness` |
+| v0.48.0 | `alert.py` / `calibration.py` / `classify.py` / `detect.py` / `fetch.py` / `link.py` / `orbit.py` / `preprocess.py` / `schemas.py` / `score.py` | `format_neocp_submission`, `compute_calibration_uniformity`, `compute_posterior_stability`, `compute_variability_index`, `fetch_mpc_orbit_catalog`, `compute_tracklet_sky_density`, `compute_tisserand_wrt_earth`, `compute_source_compactness`, `TrackletCluster`, `compute_weighted_risk_score` |
+| v0.49.0 | `alert.py` / `calibration.py` / `classify.py` / `detect.py` / `fetch.py` / `link.py` / `orbit.py` / `preprocess.py` / `score.py` | `count_observations_by_mission`, `compute_mean_calibration_error`, `compute_class_probability_range`, `compute_angular_separation`, `compute_field_overlap`, `compute_tracklet_completeness`, `compute_orbital_arc_quality`, `compute_cutout_peak_position`, `compute_hazard_summary` |
+| v0.50.0 | `alert.py` / `calibration.py` / `classify.py` / `detect.py` / `fetch.py` / `link.py` / `orbit.py` / `preprocess.py` / `schemas.py` / `score.py` | `format_close_approach_bulletin`, `compute_resolution`, `compute_ensemble_agreement`, `compute_streak_orientation`, `fetch_known_phas`, `find_longest_tracklet`, `compute_mean_anomaly_at_epoch`, `compute_local_background`, `CampaignSummary`, `compute_priority_percentile` |
 
-### Skills and CLI additions in v0.16.0 through v0.38.0
+### Skills and CLI additions in v0.16.0 through v0.50.0
 
 `export_candidate_report.py`, `tag_neo_class.py`, `check_tisserand.py`,
 `export_followup_requests.py`, `ephemeris_check.py`,
@@ -842,7 +854,19 @@ claim confirmation or impact probability.
 `fetch_atlas_data.py`, `plot_calibration.py`, `export_survey_summary.py`,
 `compute_apparent_magnitudes.py`, `triage_candidates.py`,
 `compute_discovery_scores.py`, `format_submission_checklists.py`,
-`validate_pipeline_run.py`, `export_atlas_lightcurve.py`, plus
+`validate_pipeline_run.py`, `export_atlas_lightcurve.py`,
+`analyze_field_detections.py`, `compute_eccentric_anomaly.py`,
+`compute_true_anomaly.py`, `export_candidate_dossiers.py`,
+`compute_combined_priority.py`, `fetch_recent_neos.py`,
+`compute_weighted_priority.py`, `estimate_field_completeness.py`,
+`compute_orbital_inclination_class.py`, `compute_tier1_score_distribution.py`,
+`compute_mean_anomaly.py`, `compute_weighted_hazard_scores.py`,
+`compute_hazard_grades.py`, `compute_orbital_velocity.py`,
+`compute_priority_ranks.py`, `export_ades_report.py`,
+`compute_aphelion_distances.py`, `generate_night_summary.py`,
+`compute_risk_scores.py`, `compute_variability_indices.py`,
+`compute_field_overlap.py`, `compute_hazard_summary.py`,
+`fetch_known_phas.py`, `find_longest_tracklet.py`, plus
 `Skills/background.py automation-readiness`,
 `Skills/background.py record-automation-readiness`,
 `Skills/background.py automation-readiness-log-summary`, and

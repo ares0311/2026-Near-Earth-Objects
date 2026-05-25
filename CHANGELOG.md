@@ -5,6 +5,130 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## v0.50.0
+
+- Added 10 public APIs across alert, calibration, classify, detect, fetch, link,
+  orbit, preprocess, schemas, and score modules, including close-approach
+  bulletins, calibration resolution, ensemble agreement, known PHA fetches,
+  longest-tracklet selection, campaign summaries, and priority percentiles.
+- Added `Skills/fetch_known_phas.py`, `Skills/find_longest_tracklet.py`, and
+  `docs/SCHEMA_REFERENCE.md`.
+- 2083 tests passing; 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.50.0.
+
+## v0.49.0
+
+- Added 10 public APIs for mission observation counts, mean calibration error,
+  class probability ranges, angular separation, field overlap, tracklet
+  completeness, orbital arc quality, cutout peak positions, and hazard
+  summaries.
+- Added `Skills/compute_field_overlap.py`,
+  `Skills/compute_hazard_summary.py`, and `docs/ALERT_PATHWAY_GUIDE.md`.
+- Version bumped to 0.49.0.
+
+## v0.48.0
+
+- Added 10 public APIs for NEOCP submission formatting, calibration uniformity,
+  posterior stability, variability indices, MPC orbit catalogs, tracklet sky
+  density, Earth Tisserand parameter, source compactness, tracklet clusters,
+  and weighted risk scoring.
+- Added `Skills/compute_risk_scores.py`,
+  `Skills/compute_variability_indices.py`, and
+  `docs/DATA_PIPELINE_OVERVIEW.md`.
+- 1998 tests passing; 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.48.0.
+
+## v0.47.0
+
+- Added 10 public APIs for discovery reports, calibration drift, Tier 1
+  confidence, brightness trends, NEOCP confirmations, consecutive motion,
+  aphelion distance, PSF asymmetry, night summaries, and survey completeness.
+- Added `Skills/compute_aphelion_distances.py`,
+  `Skills/generate_night_summary.py`, and `docs/CLASSIFICATION_FEATURES.md`.
+- 1948 tests passing; 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.47.0.
+
+## v0.46.0
+
+- Added 10 public APIs for ADES PSV export, reliability scoring, posterior
+  updates, field source counts, known NEO lists, tracklet arc nights,
+  perihelion distance, radial profiles, observation coverage, and priority
+  ranks.
+- Added `Skills/compute_priority_ranks.py`, `Skills/export_ades_report.py`,
+  and `docs/SCORING_REFERENCE.md`.
+- Version bumped to 0.46.0.
+
+## v0.45.0
+
+- Added 10 public APIs for observation logs, expected positive rate, NEO class
+  distribution, cadence, MPC orbit elements, motion-rate filtering, orbital
+  velocity, streak angle, residual summaries, and hazard grades.
+- Added `Skills/compute_hazard_grades.py`,
+  `Skills/compute_orbital_velocity.py`, and `docs/ORBITAL_MECHANICS.md`.
+- Version bumped to 0.45.0.
+
+## v0.44.0
+
+- Added 10 public APIs for alert age, resolution score, class entropy summary,
+  detection gaps, NEOCP object retrieval, inter-night gaps, mean anomaly at JD,
+  cutout symmetry, astrometric residuals, and weighted hazard scoring.
+- Added `Skills/compute_mean_anomaly.py`,
+  `Skills/compute_weighted_hazard_scores.py`, and `docs/HAZARD_SCORING.md`.
+- 1797 tests passing; 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.44.0.
+
+## v0.43.0
+
+- Added 10 public APIs for ready-to-submit counts, discrimination score, Tier 1
+  score distribution, angular velocity, known NEO ephemerides, velocity
+  dispersion, inclination class, image gradients, observation clusters, and
+  arc-quality bonuses.
+- Added `Skills/compute_orbital_inclination_class.py`,
+  `Skills/compute_tier1_score_distribution.py`, and
+  `docs/DETECTION_STATISTICS.md`.
+- 1746 tests passing; 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.43.0.
+
+## v0.42.0
+
+- Added 10 public APIs for bulk summaries, Brier skill score, class entropy
+  stats, streak density, field completeness, night span, longitude of
+  perihelion, cutout contrast, ephemeris points, and weighted priority.
+- Added `Skills/compute_weighted_priority.py`,
+  `Skills/estimate_field_completeness.py`, and `docs/CALIBRATION_METRICS.md`.
+- Version bumped to 0.42.0.
+
+## v0.41.0
+
+- Added 10 public APIs for alert-flag counts, calibration sharpness, batch
+  morphology, magnitude filtering, recent MPC NEO retrieval, tracklet quality,
+  mean motion, pixel histograms, survey statistics, and combined priority.
+- Added `Skills/compute_combined_priority.py`, `Skills/fetch_recent_neos.py`,
+  and `docs/ORBIT_DYNAMICS.md`.
+- 1621 tests passing; 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.41.0.
+
+## v0.40.0
+
+- Added 10 public APIs for true anomaly, observation depth, position-angle
+  consistency, calibration gain, close-approach scoring, candidate dossiers,
+  Pan-STARRS moving objects, background level, candidate reports, and average
+  precision.
+- Added `Skills/compute_true_anomaly.py`,
+  `Skills/export_candidate_dossiers.py`, and `docs/SCORING_MODEL_V2.md`.
+- 1550 tests passing; 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.40.0.
+
+## v0.39.0
+
+- Added 10 public APIs for eccentric anomaly, source extent, great-circle
+  residuals, confusion matrices, size estimates, follow-up windows, CSS
+  alerts, cutout entropy, orbital summaries, and F1 score.
+- Added `Skills/compute_eccentric_anomaly.py`,
+  `Skills/analyze_field_detections.py`, and `docs/CALIBRATION_GUIDE.md`.
+- 1439 tests passing; 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.39.0.
+
 ## v0.38.0
 
 - `background.py`: added
