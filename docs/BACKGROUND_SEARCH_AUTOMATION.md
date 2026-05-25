@@ -191,6 +191,7 @@ PYTHONPATH=src python Skills/background.py target-priority-summary
 PYTHONPATH=src python Skills/background.py follow-up-test-summary
 PYTHONPATH=src python Skills/background.py submission-recommendation-summary
 PYTHONPATH=src python Skills/background.py validation-summary
+PYTHONPATH=src python Skills/background.py blueprint-compliance-summary
 PYTHONPATH=src python Skills/background.py human-signoff-summary
 PYTHONPATH=src python Skills/background.py signoff-readiness
 PYTHONPATH=src python Skills/background.py record-automation-readiness
@@ -219,6 +220,23 @@ PYTHONPATH=src python Skills/background.py launchd-plist
 Each command prints structured JSON for scheduler notifications or manual review.
 The deprecated one-file wrapper scripts have been removed; use
 `Skills/background.py` with a subcommand for all background operations.
+
+## Blueprint Compliance Matrix
+
+The blueprint compliance summary maps the implemented background automation to
+the definition of done in `BACKGROUND_SEARCH_AUTOMATION_BLUEPRINT.md`:
+
+```bash
+PYTHONPATH=src python Skills/background.py blueprint-compliance-summary
+```
+
+The command returns one machine-readable item per blueprint requirement. Each
+item has an `id`, `status`, `evidence`, and optional `blocker`. Empty logs mark
+run-dependent requirements as `not_applicable`; once a needs-follow-up record
+exists, the summary verifies mandatory follow-up tests, report evidence,
+uncertainty and limitation language, conservative top-three recommendations,
+and the human approval gate. It performs no network access and never enables
+external submission.
 
 ## Human Signoff
 

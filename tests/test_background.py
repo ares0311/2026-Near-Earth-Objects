@@ -561,6 +561,95 @@ def test_summaries_return_latest_entries(monkeypatch, tmp_path):
     assert validation["one_outcome_per_run"] is True
 
 
+def test_blueprint_compliance_summary_empty_log(monkeypatch, tmp_path):
+    fixture = tmp_path / "targets.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
+    write_fixture(fixture)
+    monkeypatch.setattr(background, "score_tracklet", lambda tracklet, run_id: make_scored())
+
+    summary = background.background_blueprint_compliance_summary(db_path, fixture)
+    items = {item["id"]: item for item in summary["items"]}
+
+    assert summary["overall_status"] == "pass"
+    assert summary["network_access_performed"] is False
+    assert summary["external_submission_enabled"] is False
+    assert items["durable_run_ledger"]["status"] == "pass"
+    assert items["one_outcome_per_run"]["status"] == "pass"
+    assert items["target_selection_exposes_composite_factors"]["status"] == "pass"
+    assert (
+        items["needs_follow_up_records_trigger_mandatory_tests"]["status"]
+        == "not_applicable"
+    )
+
+
+def test_blueprint_compliance_summary_after_followup_run(monkeypatch, tmp_path):
+    fixture = tmp_path / "targets.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
+    report_dir = tmp_path / "reports"
+    write_fixture(fixture)
+    monkeypatch.setattr(background, "score_tracklet", lambda tracklet, run_id: make_scored())
+
+    result = background.background_run_once(
+        fixture,
+        db_path,
+        report_dir,
+        config_path=tmp_path / "missing_config.json",
+    )
+    summary = background.background_blueprint_compliance_summary(db_path, fixture)
+    items = {item["id"]: item for item in summary["items"]}
+    report_text = Path(result.needs_follow_up.report_path).read_text()
+
+    assert summary["overall_status"] == "pass"
+    assert summary["failed_items"] == []
+    assert summary["latest_needs_follow_up"]["run_id"] == result.ledger.run_id
+    assert "Uncertainty" in report_text
+    assert items["needs_follow_up_records_trigger_mandatory_tests"]["status"] == "pass"
+    assert (
+        items["reports_include_evidence_uncertainty_and_limitations"]["status"]
+        == "pass"
+    )
+    assert (
+        items["top_three_submission_recommendations_conservative"]["status"]
+        == "pass"
+    )
+    assert (
+        items["external_submission_requires_human_approval"]["evidence"][
+            "all_follow_up_entries_require_human_approval"
+        ]
+        is True
+    )
+
+
+def test_background_cli_blueprint_compliance_summary(monkeypatch, tmp_path):
+    repo = Path(__file__).resolve().parents[1]
+    fixture = tmp_path / "targets.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
+    write_fixture(fixture)
+    env = {**os.environ, "PYTHONPATH": str(repo / "src")}
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "blueprint-compliance-summary",
+            "--input",
+            str(fixture),
+            "--db",
+            str(db_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+
+    payload = json.loads(result.stdout)
+    assert payload["overall_status"] == "pass"
+    assert payload["blueprint"] == "BACKGROUND_SEARCH_AUTOMATION_BLUEPRINT.md"
+    assert payload["external_submission_enabled"] is False
+
+
 def test_select_target_uses_highest_composite():
     scored_low = make_scored("LOW", neo_prob=0.1, followup_value=0.1)
     scored_high = make_scored("HIGH", neo_prob=0.8, followup_value=0.9)

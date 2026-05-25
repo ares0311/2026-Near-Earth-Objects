@@ -25,6 +25,7 @@ __all__ = [
     "follow_up_test_summary",
     "submission_recommendation_summary",
     "validation_summary",
+    "background_blueprint_compliance_summary",
     "audit_report",
     "automation_readiness_summary",
     "record_automation_readiness",
@@ -88,7 +89,7 @@ DEFAULT_INPUT_PATH = _ROOT / "background" / "targets.json"
 DEFAULT_DB_PATH = _ROOT / "Logs" / "background.sqlite"
 DEFAULT_REPORT_DIR = _ROOT / "Logs" / "reports"
 _SCHEMA_VERSION = "background-v1"
-_CODE_VERSION = "0.50.0"
+_CODE_VERSION = "0.51.0"
 _LIVE_REVIEW_POLICY_SCHEMA_PATH = _ROOT / "background" / "live_review_policy.schema.json"
 _SUPPORTED_LIVE_SURVEYS = ("ZTF", "ATLAS", "PanSTARRS")
 _LIVE_PROVIDER_CAPABILITIES = {
@@ -773,10 +774,11 @@ def _report_text(target: BackgroundTarget, tests: tuple[FollowUpTestResult, ...]
         "## Evidence Supporting Follow-Up",
         *(f"- {item}" for item in support),
         "",
-        "## Negative Evidence And Limitations",
+        "## Negative Evidence, Uncertainty, And Limitations",
         *(f"- {item}" for item in contra),
         "- False positives remain the default hypothesis until authorities assess evidence.",
         "- Live survey, MPC, and CNEOS checks are outside this offline run.",
+        "- Required follow-up tests may remain uncertain or blocked until reviewed.",
         "",
         "## Follow-Up Tests",
         *(f"- {test.name}: {test.status} ({test.reason_code})" for test in tests),
@@ -1356,6 +1358,320 @@ def validation_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]:
         "manual_first": True,
         "external_submission_enabled": False,
         "log_backend": "sqlite",
+    }
+
+
+def _compliance_item(
+    item_id: str,
+    status: str,
+    evidence: Mapping[str, Any],
+    blocker: str | None = None,
+) -> dict[str, Any]:
+    return {
+        "id": item_id,
+        "status": status,
+        "evidence": dict(evidence),
+        "blocker": blocker,
+    }
+
+
+def _status_from_bool(value: bool, blocker: str) -> tuple[str, str | None]:
+    return ("pass", None) if value else ("fail", blocker)
+
+
+def background_blueprint_compliance_summary(
+    db_path: Path = DEFAULT_DB_PATH,
+    input_path: Path = DEFAULT_INPUT_PATH,
+) -> dict[str, Any]:
+    """Audit background automation against the implementation blueprint."""
+    validation = validation_summary(db_path)
+    priority = target_priority_summary(input_path, db_path)
+    follow_up = needs_follow_up_summary(db_path)
+    follow_up_entries: list[dict[str, Any]]
+    init_log_db(db_path)
+    with _connect(db_path) as conn:
+        rows = conn.execute(
+            """
+            SELECT entry_json
+            FROM needs_follow_up_log
+            ORDER BY recorded_at_utc ASC
+            """
+        ).fetchall()
+        follow_up_entries = [json.loads(row["entry_json"]) for row in rows]
+
+    target_rows = priority["targets"]
+    priority_keys = set(target_rows[0]["priority"]) if target_rows else set()
+    expected_priority_keys = {
+        "scientific_interest",
+        "prior_review_penalty",
+        "never_reviewed_boost",
+        "data_completeness",
+        "false_positive_risk",
+        "followup_feasibility",
+        "calibration_confidence",
+        "blocking_issue_penalty",
+        "composite_score",
+    }
+    required_tests = {
+        "provenance_check",
+        "false_positive_class_check",
+        "cross_source_consistency_check",
+        "calibration_confidence_check",
+        "reproducibility_check",
+        "human_review_checklist",
+    }
+
+    items: list[dict[str, Any]] = []
+    status, blocker = _status_from_bool(
+        validation["sqlite_integrity"] == "ok",
+        "SQLITE_INTEGRITY_CHECK_FAILED",
+    )
+    items.append(
+        _compliance_item(
+            "durable_run_ledger",
+            status,
+            {
+                "total_runs": validation["total_runs"],
+                "sqlite_integrity": validation["sqlite_integrity"],
+                "log_backend": validation["log_backend"],
+            },
+            blocker,
+        )
+    )
+
+    status, blocker = _status_from_bool(
+        validation["one_outcome_per_run"],
+        "RUN_LEDGER_OUTCOME_COUNT_MISMATCH",
+    )
+    items.append(
+        _compliance_item(
+            "one_outcome_per_run",
+            status,
+            {
+                "total_runs": validation["total_runs"],
+                "total_outcomes": validation["total_outcomes"],
+            },
+            blocker,
+        )
+    )
+
+    missing_priority = sorted(expected_priority_keys - priority_keys)
+    status, blocker = _status_from_bool(
+        not missing_priority,
+        "TARGET_PRIORITY_FACTORS_MISSING",
+    )
+    items.append(
+        _compliance_item(
+            "target_selection_exposes_composite_factors",
+            status,
+            {
+                "target_count": len(target_rows),
+                "selected_target_id": priority["selected_target_id"],
+                "missing_priority_fields": missing_priority,
+            },
+            blocker,
+        )
+    )
+
+    never_reviewed_visible = "never_reviewed_boost" in priority_keys
+    status, blocker = _status_from_bool(
+        never_reviewed_visible,
+        "NEVER_REVIEWED_BOOST_NOT_EXPOSED",
+    )
+    items.append(
+        _compliance_item(
+            "never_reviewed_targets_prioritized",
+            status,
+            {
+                "never_reviewed_boost_exposed": never_reviewed_visible,
+                "selected_target_id": priority["selected_target_id"],
+            },
+            blocker,
+        )
+    )
+
+    if not follow_up_entries:
+        items.append(
+            _compliance_item(
+                "needs_follow_up_records_trigger_mandatory_tests",
+                "not_applicable",
+                {"needs_follow_up_count": 0},
+            )
+        )
+        items.append(
+            _compliance_item(
+                "reports_include_evidence_uncertainty_and_limitations",
+                "not_applicable",
+                {"needs_follow_up_count": 0},
+            )
+        )
+        items.append(
+            _compliance_item(
+                "top_three_submission_recommendations_conservative",
+                "not_applicable",
+                {"needs_follow_up_count": 0},
+            )
+        )
+    else:
+        missing_tests_by_run = {}
+        report_gaps_by_run = {}
+        recommendation_gaps_by_run = {}
+        for entry in follow_up_entries:
+            names = {test["name"] for test in entry["required_tests"]}
+            missing = sorted(required_tests - names)
+            if missing:
+                missing_tests_by_run[entry["run_id"]] = missing
+
+            report_path = entry.get("report_path")
+            report_text = Path(report_path).read_text().lower() if report_path else ""
+            report_checks = {
+                "evidence": "evidence supporting follow-up" in report_text,
+                "negative_evidence": "negative evidence" in report_text,
+                "uncertainty": "uncertainty" in report_text,
+                "limitations": "limitations" in report_text,
+            }
+            if not all(report_checks.values()):
+                report_gaps_by_run[entry["run_id"]] = {
+                    key: value for key, value in report_checks.items() if not value
+                }
+
+            recommendations = entry["recommendations"]
+            ranks = {recommendation["rank"] for recommendation in recommendations}
+            actions = {
+                recommendation["recommended_action"]
+                for recommendation in recommendations
+            }
+            if ranks != {1, 2, 3} or "do_not_submit_yet" not in actions:
+                recommendation_gaps_by_run[entry["run_id"]] = {
+                    "ranks": sorted(ranks),
+                    "actions": sorted(actions),
+                }
+
+        status, blocker = _status_from_bool(
+            not missing_tests_by_run,
+            "MANDATORY_FOLLOW_UP_TESTS_MISSING",
+        )
+        items.append(
+            _compliance_item(
+                "needs_follow_up_records_trigger_mandatory_tests",
+                status,
+                {
+                    "needs_follow_up_count": len(follow_up_entries),
+                    "missing_tests_by_run": missing_tests_by_run,
+                },
+                blocker,
+            )
+        )
+        status, blocker = _status_from_bool(
+            not report_gaps_by_run,
+            "FOLLOW_UP_REPORT_CONTENT_GAPS",
+        )
+        items.append(
+            _compliance_item(
+                "reports_include_evidence_uncertainty_and_limitations",
+                status,
+                {
+                    "needs_follow_up_count": len(follow_up_entries),
+                    "report_gaps_by_run": report_gaps_by_run,
+                },
+                blocker,
+            )
+        )
+        status, blocker = _status_from_bool(
+            not recommendation_gaps_by_run,
+            "SUBMISSION_RECOMMENDATION_GAPS",
+        )
+        items.append(
+            _compliance_item(
+                "top_three_submission_recommendations_conservative",
+                status,
+                {
+                    "needs_follow_up_count": len(follow_up_entries),
+                    "recommendation_gaps_by_run": recommendation_gaps_by_run,
+                },
+                blocker,
+            )
+        )
+
+    follow_up_approval_flags = [
+        entry["human_approval_required"] for entry in follow_up_entries
+    ]
+    approval_required = all(follow_up_approval_flags) if follow_up_entries else True
+    status, blocker = _status_from_bool(
+        validation["external_submission_enabled"] is False and approval_required,
+        "EXTERNAL_SUBMISSION_GATE_OPEN",
+    )
+    items.append(
+        _compliance_item(
+            "external_submission_requires_human_approval",
+            status,
+            {
+                "external_submission_enabled": validation["external_submission_enabled"],
+                "all_follow_up_entries_require_human_approval": approval_required,
+            },
+            blocker,
+        )
+    )
+
+    docs_path = _ROOT / "docs" / "BACKGROUND_SEARCH_AUTOMATION.md"
+    docs_text = docs_path.read_text()
+    docs_has_scheduler = "Scheduler Examples" in docs_text
+    docs_has_safety = "external parties" in docs_text
+    status, blocker = _status_from_bool(
+        docs_has_scheduler and docs_has_safety,
+        "SCHEDULER_OR_SAFETY_DOCS_MISSING",
+    )
+    items.append(
+        _compliance_item(
+            "documentation_explains_scheduler_and_operational_safety",
+            status,
+            {
+                "docs_path": str(docs_path),
+                "scheduler_examples_present": docs_has_scheduler,
+                "operational_safety_present": docs_has_safety,
+            },
+            blocker,
+        )
+    )
+
+    tests_path = _ROOT / "tests" / "test_background.py"
+    tests_text = tests_path.read_text()
+    test_markers = {
+        "schemas": "BackgroundConfig" in tests_text,
+        "logs": "table_count" in tests_text,
+        "cli": "Skills" in tests_text and "background.py" in tests_text,
+        "guardrails": "forbidden" in tests_text.lower(),
+    }
+    status, blocker = _status_from_bool(
+        all(test_markers.values()),
+        "BACKGROUND_TEST_MARKERS_MISSING",
+    )
+    items.append(
+        _compliance_item(
+            "tests_validate_schemas_logs_cli_and_guardrails",
+            status,
+            {
+                "tests_path": str(tests_path),
+                "test_markers": test_markers,
+            },
+            blocker,
+        )
+    )
+
+    failed_items = [item["id"] for item in items if item["status"] == "fail"]
+    return {
+        "db_path": str(db_path),
+        "input_path": str(input_path),
+        "blueprint": "BACKGROUND_SEARCH_AUTOMATION_BLUEPRINT.md",
+        "overall_status": "pass" if not failed_items else "fail",
+        "failed_items": failed_items,
+        "not_applicable_items": [
+            item["id"] for item in items if item["status"] == "not_applicable"
+        ],
+        "items": items,
+        "latest_needs_follow_up": follow_up["latest"],
+        "network_access_performed": False,
+        "external_submission_enabled": False,
     }
 
 

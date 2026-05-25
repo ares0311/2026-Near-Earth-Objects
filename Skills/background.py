@@ -18,6 +18,7 @@ from background import (
     DEFAULT_REPORT_DIR,
     automation_readiness_log_summary,
     automation_readiness_summary,
+    background_blueprint_compliance_summary,
     background_run_once,
     follow_up_test_summary,
     human_signoff_summary,
@@ -147,6 +148,13 @@ def main() -> None:
     execute_dry_run.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
     execute_dry_run.add_argument("--db", type=Path, default=DEFAULT_DB_PATH)
 
+    blueprint = sub.add_parser(
+        "blueprint-compliance-summary",
+        help="Audit background automation against the implementation blueprint",
+    )
+    blueprint.add_argument("--input", type=Path, default=DEFAULT_INPUT_PATH)
+    blueprint.add_argument("--db", type=Path, default=DEFAULT_DB_PATH)
+
     for name in (
         "ledger-summary",
         "reviewed-summary",
@@ -221,6 +229,8 @@ def main() -> None:
         _print_json(record_live_dry_run_plan(args.config, args.db))
     elif args.command == "live-dry-run-execute":
         _print_json(record_live_execution_attempt(args.config, args.db))
+    elif args.command == "blueprint-compliance-summary":
+        _print_json(background_blueprint_compliance_summary(args.db, args.input))
     elif args.command == "ledger-summary":
         _print_json(ledger_summary(args.db))
     elif args.command == "reviewed-summary":

@@ -5,6 +5,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## v0.51.0
+
+- `background.py`: added
+  `background_blueprint_compliance_summary(db_path, input_path)` to audit the
+  background automation implementation against
+  `BACKGROUND_SEARCH_AUTOMATION_BLUEPRINT.md`.
+- `Skills/background.py`: added `blueprint-compliance-summary` subcommand.
+- Follow-up report drafts now explicitly include uncertainty language alongside
+  negative evidence and limitations.
+- 3 new tests (2086 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.51.0.
+
 ## v0.50.0
 
 - Added 10 public APIs across alert, calibration, classify, detect, fetch, link,
