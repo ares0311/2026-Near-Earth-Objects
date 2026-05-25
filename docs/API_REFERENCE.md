@@ -362,6 +362,11 @@ def background_blueprint_compliance_summary(
     db_path: Path = DEFAULT_DB_PATH,
     input_path: Path = DEFAULT_INPUT_PATH,
 ) -> dict[str, Any]
+def record_blueprint_compliance_summary(
+    db_path: Path = DEFAULT_DB_PATH,
+    input_path: Path = DEFAULT_INPUT_PATH,
+) -> dict[str, Any]
+def blueprint_compliance_log_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
 def record_human_signoff(...) -> HumanSignoffEntry
 def human_signoff_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
 def run_detail(run_id: str, db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
@@ -454,7 +459,10 @@ write that handoff and persist the review entry in SQLite, and
 operator handoffs. Use
 `background_blueprint_compliance_summary(db_path, input_path)` to audit the
 current SQLite logs and target priority output against the background
-automation blueprint.
+automation blueprint. Use
+`record_blueprint_compliance_summary(db_path, input_path)` to persist that audit
+snapshot and `blueprint_compliance_log_summary(db_path)` to summarize the
+append-only compliance log.
 
 Default background log path:
 
@@ -716,7 +724,7 @@ Lightweight summary of a `ScoredNEO` for display or export.
 
 ---
 
-## v0.16.0 through v0.51.0 Public API Additions
+## v0.16.0 through v0.52.0 Public API Additions
 
 These releases added conservative helper APIs around live-data retrieval,
 preprocessing quality, detection triage, linking, orbit review, classification
@@ -851,8 +859,9 @@ claim confirmation or impact probability.
 | v0.49.0 | `alert.py` / `calibration.py` / `classify.py` / `detect.py` / `fetch.py` / `link.py` / `orbit.py` / `preprocess.py` / `score.py` | `count_observations_by_mission`, `compute_mean_calibration_error`, `compute_class_probability_range`, `compute_angular_separation`, `compute_field_overlap`, `compute_tracklet_completeness`, `compute_orbital_arc_quality`, `compute_cutout_peak_position`, `compute_hazard_summary` |
 | v0.50.0 | `alert.py` / `calibration.py` / `classify.py` / `detect.py` / `fetch.py` / `link.py` / `orbit.py` / `preprocess.py` / `schemas.py` / `score.py` | `format_close_approach_bulletin`, `compute_resolution`, `compute_ensemble_agreement`, `compute_streak_orientation`, `fetch_known_phas`, `find_longest_tracklet`, `compute_mean_anomaly_at_epoch`, `compute_local_background`, `CampaignSummary`, `compute_priority_percentile` |
 | v0.51.0 | `background.py` / `Skills/background.py` | `background_blueprint_compliance_summary`; `blueprint-compliance-summary` CLI command |
+| v0.52.0 | `background.py` / `Skills/background.py` | `record_blueprint_compliance_summary`, `blueprint_compliance_log_summary`; persisted blueprint compliance CLI commands |
 
-### Skills and CLI additions in v0.16.0 through v0.51.0
+### Skills and CLI additions in v0.16.0 through v0.52.0
 
 `export_candidate_report.py`, `tag_neo_class.py`, `check_tisserand.py`,
 `export_followup_requests.py`, `ephemeris_check.py`,
@@ -892,5 +901,7 @@ claim confirmation or impact probability.
 `Skills/background.py live-dry-run-plan-log-summary`,
 `Skills/background.py live-dry-run-execute`,
 `Skills/background.py live-execution-log-summary`,
-`Skills/background.py blueprint-compliance-summary`, and
+`Skills/background.py blueprint-compliance-summary`,
+`Skills/background.py record-blueprint-compliance-summary`,
+`Skills/background.py blueprint-compliance-log-summary`, and
 `Skills/background.py launchd-plist`.

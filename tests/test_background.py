@@ -650,6 +650,91 @@ def test_background_cli_blueprint_compliance_summary(monkeypatch, tmp_path):
     assert payload["external_submission_enabled"] is False
 
 
+def test_record_blueprint_compliance_summary_empty_log(monkeypatch, tmp_path):
+    fixture = tmp_path / "targets.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
+    write_fixture(fixture)
+    monkeypatch.setattr(background, "score_tracklet", lambda tracklet, run_id: make_scored())
+
+    entry = background.record_blueprint_compliance_summary(db_path, fixture)
+    summary = background.blueprint_compliance_log_summary(db_path)
+
+    assert entry["overall_status"] == "pass"
+    assert entry["network_access_performed"] is False
+    assert entry["external_submission_enabled"] is False
+    assert table_count(db_path, "blueprint_compliance_log") == 1
+    assert summary["total_blueprint_compliance_checks"] == 1
+    assert summary["passing_checks"] == 1
+    assert summary["failing_checks"] == 0
+    assert summary["latest"]["compliance_id"] == entry["compliance_id"]
+
+
+def test_record_blueprint_compliance_summary_after_followup_run(monkeypatch, tmp_path):
+    fixture = tmp_path / "targets.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
+    write_fixture(fixture)
+    monkeypatch.setattr(background, "score_tracklet", lambda tracklet, run_id: make_scored())
+    background.background_run_once(
+        fixture,
+        db_path,
+        tmp_path / "reports",
+        config_path=tmp_path / "missing_config.json",
+    )
+
+    entry = background.record_blueprint_compliance_summary(db_path, fixture)
+    summary = background.blueprint_compliance_log_summary(db_path)
+
+    assert entry["overall_status"] == "pass"
+    assert entry["not_applicable_items"] == []
+    assert entry["latest_needs_follow_up"] is not None
+    assert summary["latest"]["latest_needs_follow_up"]["target_id"] == "T001"
+
+
+def test_background_cli_blueprint_compliance_log_commands(monkeypatch, tmp_path):
+    repo = Path(__file__).resolve().parents[1]
+    fixture = tmp_path / "targets.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
+    write_fixture(fixture)
+    env = {**os.environ, "PYTHONPATH": str(repo / "src")}
+
+    recorded = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "record-blueprint-compliance-summary",
+            "--input",
+            str(fixture),
+            "--db",
+            str(db_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    summary = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "blueprint-compliance-log-summary",
+            "--db",
+            str(db_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+
+    recorded_payload = json.loads(recorded.stdout)
+    summary_payload = json.loads(summary.stdout)
+    assert recorded_payload["overall_status"] == "pass"
+    assert summary_payload["total_blueprint_compliance_checks"] == 1
+    assert summary_payload["latest"]["compliance_id"] == recorded_payload["compliance_id"]
+
+
 def test_select_target_uses_highest_composite():
     scored_low = make_scored("LOW", neo_prob=0.1, followup_value=0.1)
     scored_high = make_scored("HIGH", neo_prob=0.8, followup_value=0.9)
@@ -1611,6 +1696,7 @@ def test_init_log_db_migrates_existing_ledger(tmp_path):
         "run_lock",
         "human_signoff_log",
         "automation_readiness_log",
+        "blueprint_compliance_log",
         "live_approval_bundle_log",
         "live_operator_handoff_log",
         "live_dry_run_plan_log",

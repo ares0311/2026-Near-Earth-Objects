@@ -20,6 +20,7 @@ from background import (
     automation_readiness_summary,
     background_blueprint_compliance_summary,
     background_run_once,
+    blueprint_compliance_log_summary,
     follow_up_test_summary,
     human_signoff_summary,
     launchd_plist,
@@ -35,6 +36,7 @@ from background import (
     live_provider_readiness,
     needs_follow_up_summary,
     record_automation_readiness,
+    record_blueprint_compliance_summary,
     record_human_signoff,
     record_live_dry_run_approval_bundle,
     record_live_dry_run_operator_handoff,
@@ -155,6 +157,13 @@ def main() -> None:
     blueprint.add_argument("--input", type=Path, default=DEFAULT_INPUT_PATH)
     blueprint.add_argument("--db", type=Path, default=DEFAULT_DB_PATH)
 
+    record_blueprint = sub.add_parser(
+        "record-blueprint-compliance-summary",
+        help="Persist a background blueprint compliance audit snapshot",
+    )
+    record_blueprint.add_argument("--input", type=Path, default=DEFAULT_INPUT_PATH)
+    record_blueprint.add_argument("--db", type=Path, default=DEFAULT_DB_PATH)
+
     for name in (
         "ledger-summary",
         "reviewed-summary",
@@ -162,6 +171,7 @@ def main() -> None:
         "follow-up-test-summary",
         "submission-recommendation-summary",
         "validation-summary",
+        "blueprint-compliance-log-summary",
         "human-signoff-summary",
         "signoff-readiness",
         "automation-readiness-log-summary",
@@ -231,6 +241,8 @@ def main() -> None:
         _print_json(record_live_execution_attempt(args.config, args.db))
     elif args.command == "blueprint-compliance-summary":
         _print_json(background_blueprint_compliance_summary(args.db, args.input))
+    elif args.command == "record-blueprint-compliance-summary":
+        _print_json(record_blueprint_compliance_summary(args.db, args.input))
     elif args.command == "ledger-summary":
         _print_json(ledger_summary(args.db))
     elif args.command == "reviewed-summary":
@@ -243,6 +255,8 @@ def main() -> None:
         _print_json(submission_recommendation_summary(args.db))
     elif args.command == "validation-summary":
         _print_json(validation_summary(args.db))
+    elif args.command == "blueprint-compliance-log-summary":
+        _print_json(blueprint_compliance_log_summary(args.db))
     elif args.command == "human-signoff-summary":
         _print_json(human_signoff_summary(args.db))
     elif args.command == "signoff-readiness":

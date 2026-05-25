@@ -26,6 +26,8 @@ __all__ = [
     "submission_recommendation_summary",
     "validation_summary",
     "background_blueprint_compliance_summary",
+    "record_blueprint_compliance_summary",
+    "blueprint_compliance_log_summary",
     "audit_report",
     "automation_readiness_summary",
     "record_automation_readiness",
@@ -89,7 +91,7 @@ DEFAULT_INPUT_PATH = _ROOT / "background" / "targets.json"
 DEFAULT_DB_PATH = _ROOT / "Logs" / "background.sqlite"
 DEFAULT_REPORT_DIR = _ROOT / "Logs" / "reports"
 _SCHEMA_VERSION = "background-v1"
-_CODE_VERSION = "0.51.0"
+_CODE_VERSION = "0.52.0"
 _LIVE_REVIEW_POLICY_SCHEMA_PATH = _ROOT / "background" / "live_review_policy.schema.json"
 _SUPPORTED_LIVE_SURVEYS = ("ZTF", "ATLAS", "PanSTARRS")
 _LIVE_PROVIDER_CAPABILITIES = {
@@ -284,6 +286,19 @@ def init_log_db(db_path: Path = DEFAULT_DB_PATH) -> None:
                 scheduler_blockers_json TEXT NOT NULL,
                 live_mode_blockers_json TEXT NOT NULL,
                 missing_credential_env_json TEXT NOT NULL,
+                entry_json TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS blueprint_compliance_log (
+                compliance_id TEXT PRIMARY KEY,
+                checked_at_utc TEXT NOT NULL,
+                input_path TEXT NOT NULL,
+                overall_status TEXT NOT NULL,
+                failed_items_json TEXT NOT NULL,
+                not_applicable_items_json TEXT NOT NULL,
                 entry_json TEXT NOT NULL
             )
             """
@@ -1660,6 +1675,7 @@ def background_blueprint_compliance_summary(
 
     failed_items = [item["id"] for item in items if item["status"] == "fail"]
     return {
+        "checked_at_utc": _utc_now(),
         "db_path": str(db_path),
         "input_path": str(input_path),
         "blueprint": "BACKGROUND_SEARCH_AUTOMATION_BLUEPRINT.md",
@@ -1673,6 +1689,80 @@ def background_blueprint_compliance_summary(
         "network_access_performed": False,
         "external_submission_enabled": False,
     }
+
+
+def record_blueprint_compliance_summary(
+    db_path: Path = DEFAULT_DB_PATH,
+    input_path: Path = DEFAULT_INPUT_PATH,
+) -> dict[str, Any]:
+    """Persist a background blueprint compliance snapshot to SQLite."""
+    init_log_db(db_path)
+    summary = background_blueprint_compliance_summary(db_path, input_path)
+    entry = {
+        "compliance_id": str(uuid.uuid4()),
+        **summary,
+    }
+    with _connect(db_path) as conn:
+        conn.execute(
+            """
+            INSERT INTO blueprint_compliance_log (
+                compliance_id, checked_at_utc, input_path, overall_status,
+                failed_items_json, not_applicable_items_json, entry_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                entry["compliance_id"],
+                entry["checked_at_utc"],
+                entry["input_path"],
+                entry["overall_status"],
+                json.dumps(entry["failed_items"]),
+                json.dumps(entry["not_applicable_items"]),
+                json.dumps(entry),
+            ),
+        )
+    return entry
+
+
+def blueprint_compliance_log_summary(
+    db_path: Path = DEFAULT_DB_PATH,
+) -> dict[str, Any]:
+    """Summarize persisted background blueprint compliance snapshots."""
+    init_log_db(db_path)
+    with _connect(db_path) as conn:
+        latest = conn.execute(
+            """
+            SELECT entry_json
+            FROM blueprint_compliance_log
+            ORDER BY checked_at_utc DESC
+            LIMIT 1
+            """
+        ).fetchone()
+        return {
+            "db_path": str(db_path),
+            "total_blueprint_compliance_checks": _count_rows(
+                conn,
+                "blueprint_compliance_log",
+            ),
+            "passing_checks": int(
+                conn.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM blueprint_compliance_log
+                    WHERE overall_status = 'pass'
+                    """
+                ).fetchone()[0]
+            ),
+            "failing_checks": int(
+                conn.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM blueprint_compliance_log
+                    WHERE overall_status = 'fail'
+                    """
+                ).fetchone()[0]
+            ),
+            "latest": json.loads(latest["entry_json"]) if latest else None,
+        }
 
 
 def audit_report(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]:

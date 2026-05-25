@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## v0.52.0
+
+- `background.py`: added
+  `record_blueprint_compliance_summary(db_path, input_path)` and
+  `blueprint_compliance_log_summary(db_path)` to persist background blueprint
+  compliance snapshots in top-level SQLite logs.
+- `Skills/background.py`: added `record-blueprint-compliance-summary` and
+  `blueprint-compliance-log-summary` subcommands.
+- 3 new tests (2089 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.52.0.
+
 ## v0.51.0
 
 - `background.py`: added

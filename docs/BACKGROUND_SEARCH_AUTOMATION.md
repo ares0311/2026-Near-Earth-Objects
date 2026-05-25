@@ -171,6 +171,7 @@ The SQLite database contains append-only operational tables:
 | `needs_follow_up_log` | Outcome row when follow-up, tests, or review are required |
 | `human_signoff_log` | Manual reviewer signoff records |
 | `automation_readiness_log` | Scheduler/live-readiness snapshots |
+| `blueprint_compliance_log` | Background blueprint compliance snapshots |
 | `live_approval_bundle_log` | No-network live dry-run approval reviews |
 | `live_operator_handoff_log` | Written no-network operator handoffs |
 | `live_dry_run_plan_log` | No-network live dry-run query plans |
@@ -192,6 +193,8 @@ PYTHONPATH=src python Skills/background.py follow-up-test-summary
 PYTHONPATH=src python Skills/background.py submission-recommendation-summary
 PYTHONPATH=src python Skills/background.py validation-summary
 PYTHONPATH=src python Skills/background.py blueprint-compliance-summary
+PYTHONPATH=src python Skills/background.py record-blueprint-compliance-summary
+PYTHONPATH=src python Skills/background.py blueprint-compliance-log-summary
 PYTHONPATH=src python Skills/background.py human-signoff-summary
 PYTHONPATH=src python Skills/background.py signoff-readiness
 PYTHONPATH=src python Skills/background.py record-automation-readiness
@@ -228,6 +231,8 @@ the definition of done in `BACKGROUND_SEARCH_AUTOMATION_BLUEPRINT.md`:
 
 ```bash
 PYTHONPATH=src python Skills/background.py blueprint-compliance-summary
+PYTHONPATH=src python Skills/background.py record-blueprint-compliance-summary
+PYTHONPATH=src python Skills/background.py blueprint-compliance-log-summary
 ```
 
 The command returns one machine-readable item per blueprint requirement. Each
@@ -237,6 +242,16 @@ exists, the summary verifies mandatory follow-up tests, report evidence,
 uncertainty and limitation language, conservative top-three recommendations,
 and the human approval gate. It performs no network access and never enables
 external submission.
+
+Persisted compliance snapshots use the same top-level SQLite log:
+
+```bash
+PYTHONPATH=src python Skills/background.py record-blueprint-compliance-summary
+PYTHONPATH=src python Skills/background.py blueprint-compliance-log-summary
+```
+
+This append-only log makes blueprint status auditable across scheduler runs
+without contacting external services or changing submission permissions.
 
 ## Human Signoff
 
