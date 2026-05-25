@@ -5,6 +5,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## v0.53.0
+
+- `background.py`: added
+  `background_operations_snapshot(config_path, db_path, input_path)`,
+  `record_background_operations_snapshot(...)`, and
+  `background_operations_snapshot_log_summary(db_path)` to aggregate and persist
+  conservative operator-facing background status snapshots.
+- `Skills/background.py`: added `operations-snapshot`,
+  `record-operations-snapshot`, and `operations-snapshot-log-summary`
+  subcommands.
+- `validation_summary`: now exposes `total_follow_up` directly for aggregate
+  operation-state consumers.
+- 4 new tests (2093 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.53.0.
+
 ## v0.52.0
 
 - `background.py`: added

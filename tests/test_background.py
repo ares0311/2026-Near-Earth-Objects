@@ -735,6 +735,157 @@ def test_background_cli_blueprint_compliance_log_commands(monkeypatch, tmp_path)
     assert summary_payload["latest"]["compliance_id"] == recorded_payload["compliance_id"]
 
 
+def test_background_operations_snapshot_empty_log(monkeypatch, tmp_path):
+    fixture = tmp_path / "targets.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
+    write_fixture(fixture)
+    monkeypatch.setattr(background, "score_tracklet", lambda tracklet, run_id: make_scored())
+
+    snapshot = background.background_operations_snapshot(
+        Path("background/config.json"),
+        db_path,
+        fixture,
+    )
+
+    assert snapshot["code_version"] == "0.53.0"
+    assert snapshot["next_action"] == "run_background_once"
+    assert snapshot["ledger"]["total_runs"] == 0
+    assert snapshot["automation_readiness"]["scheduler_ready"] is True
+    assert snapshot["blueprint_compliance"]["overall_status"] == "pass"
+    assert snapshot["guardrails"]["network_access_performed"] is False
+    assert snapshot["guardrails"]["external_submission_enabled"] is False
+    assert snapshot["network_access_performed"] is False
+    assert snapshot["external_submission_enabled"] is False
+
+
+def test_record_background_operations_snapshot_after_followup(monkeypatch, tmp_path):
+    fixture = tmp_path / "targets.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
+    write_fixture(fixture)
+    monkeypatch.setattr(background, "score_tracklet", lambda tracklet, run_id: make_scored())
+    result = background.background_run_once(
+        fixture,
+        db_path,
+        tmp_path / "reports",
+        config_path=tmp_path / "missing_config.json",
+    )
+
+    entry = background.record_background_operations_snapshot(
+        Path("background/config.json"),
+        db_path,
+        fixture,
+    )
+    summary = background.background_operations_snapshot_log_summary(db_path)
+
+    assert entry["next_action"] == "record_signoff"
+    assert entry["validation"]["total_runs"] == 1
+    assert entry["needs_follow_up"]["latest"]["run_id"] == result.ledger.run_id
+    assert table_count(db_path, "operations_snapshot_log") == 1
+    assert summary["total_operations_snapshots"] == 1
+    assert summary["by_next_action"] == {"record_signoff": 1}
+    assert summary["latest"]["snapshot_id"] == entry["snapshot_id"]
+
+
+def test_background_operations_snapshot_after_signoff(monkeypatch, tmp_path):
+    fixture = tmp_path / "targets.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
+    write_fixture(fixture)
+    monkeypatch.setattr(background, "score_tracklet", lambda tracklet, run_id: make_scored())
+    result = background.background_run_once(
+        fixture,
+        db_path,
+        tmp_path / "reports",
+        config_path=tmp_path / "missing_config.json",
+    )
+    background.record_human_signoff(
+        run_id=result.ledger.run_id,
+        target_id=result.ledger.target_id,
+        reviewer="Reviewer",
+        decision="approved_for_internal_review",
+        scope="Internal follow-up only",
+        notes="Reviewed local SQLite logs.",
+        db_path=db_path,
+    )
+
+    snapshot = background.background_operations_snapshot(
+        Path("background/config.json"),
+        db_path,
+        fixture,
+    )
+
+    assert snapshot["next_action"] == "review_follow_up"
+    assert snapshot["signoff_readiness"]["unsigned_follow_up_runs"] == []
+    assert snapshot["validation"]["all_follow_up_runs_signed"] is True
+
+
+def test_background_cli_operations_snapshot_commands(monkeypatch, tmp_path):
+    repo = Path(__file__).resolve().parents[1]
+    fixture = tmp_path / "targets.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
+    write_fixture(fixture)
+    env = {**os.environ, "PYTHONPATH": str(repo / "src")}
+
+    snapshot = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "operations-snapshot",
+            "--config",
+            str(repo / "background" / "config.json"),
+            "--input",
+            str(fixture),
+            "--db",
+            str(db_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    recorded = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "record-operations-snapshot",
+            "--config",
+            str(repo / "background" / "config.json"),
+            "--input",
+            str(fixture),
+            "--db",
+            str(db_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    summary = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "operations-snapshot-log-summary",
+            "--db",
+            str(db_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+
+    snapshot_payload = json.loads(snapshot.stdout)
+    recorded_payload = json.loads(recorded.stdout)
+    summary_payload = json.loads(summary.stdout)
+    assert snapshot_payload["next_action"] == "run_background_once"
+    assert recorded_payload["next_action"] == "run_background_once"
+    assert recorded_payload["external_submission_enabled"] is False
+    assert summary_payload["total_operations_snapshots"] == 1
+    assert summary_payload["latest"]["snapshot_id"] == recorded_payload["snapshot_id"]
+
+
 def test_select_target_uses_highest_composite():
     scored_low = make_scored("LOW", neo_prob=0.1, followup_value=0.1)
     scored_high = make_scored("HIGH", neo_prob=0.8, followup_value=0.9)
@@ -1697,6 +1848,7 @@ def test_init_log_db_migrates_existing_ledger(tmp_path):
         "human_signoff_log",
         "automation_readiness_log",
         "blueprint_compliance_log",
+        "operations_snapshot_log",
         "live_approval_bundle_log",
         "live_operator_handoff_log",
         "live_dry_run_plan_log",

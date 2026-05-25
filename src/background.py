@@ -28,6 +28,9 @@ __all__ = [
     "background_blueprint_compliance_summary",
     "record_blueprint_compliance_summary",
     "blueprint_compliance_log_summary",
+    "background_operations_snapshot",
+    "record_background_operations_snapshot",
+    "background_operations_snapshot_log_summary",
     "audit_report",
     "automation_readiness_summary",
     "record_automation_readiness",
@@ -91,7 +94,7 @@ DEFAULT_INPUT_PATH = _ROOT / "background" / "targets.json"
 DEFAULT_DB_PATH = _ROOT / "Logs" / "background.sqlite"
 DEFAULT_REPORT_DIR = _ROOT / "Logs" / "reports"
 _SCHEMA_VERSION = "background-v1"
-_CODE_VERSION = "0.52.0"
+_CODE_VERSION = "0.53.0"
 _LIVE_REVIEW_POLICY_SCHEMA_PATH = _ROOT / "background" / "live_review_policy.schema.json"
 _SUPPORTED_LIVE_SURVEYS = ("ZTF", "ATLAS", "PanSTARRS")
 _LIVE_PROVIDER_CAPABILITIES = {
@@ -299,6 +302,23 @@ def init_log_db(db_path: Path = DEFAULT_DB_PATH) -> None:
                 overall_status TEXT NOT NULL,
                 failed_items_json TEXT NOT NULL,
                 not_applicable_items_json TEXT NOT NULL,
+                entry_json TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS operations_snapshot_log (
+                snapshot_id TEXT PRIMARY KEY,
+                captured_at_utc TEXT NOT NULL,
+                config_path TEXT NOT NULL,
+                input_path TEXT NOT NULL,
+                next_action TEXT NOT NULL,
+                total_runs INTEGER NOT NULL,
+                unsigned_follow_up_count INTEGER NOT NULL,
+                scheduler_ready INTEGER NOT NULL,
+                live_mode_ready INTEGER NOT NULL,
+                blueprint_status TEXT NOT NULL,
                 entry_json TEXT NOT NULL
             )
             """
@@ -1360,6 +1380,7 @@ def validation_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]:
         "sqlite_integrity": integrity,
         "schema_version": metadata_row["value"] if metadata_row else None,
         "total_runs": total_runs,
+        "total_follow_up": total_follow_up,
         "total_outcomes": total_reviewed + total_follow_up,
         "total_signoffs": total_signoffs,
         "one_outcome_per_run": total_runs == total_reviewed + total_follow_up,
@@ -1761,6 +1782,154 @@ def blueprint_compliance_log_summary(
                     """
                 ).fetchone()[0]
             ),
+            "latest": json.loads(latest["entry_json"]) if latest else None,
+        }
+
+
+def _operations_next_action(
+    validation: Mapping[str, Any],
+    signoff: Mapping[str, Any],
+    automation: Mapping[str, Any],
+    blueprint: Mapping[str, Any],
+) -> str:
+    if validation["lock_active"]:
+        return "wait_for_active_run"
+    if validation["total_runs"] == 0:
+        return "run_background_once"
+    if blueprint["overall_status"] != "pass":
+        return "resolve_blueprint_failures"
+    if signoff["unsigned_follow_up_runs"]:
+        return "record_signoff"
+    if validation["total_follow_up"] > 0:
+        return "review_follow_up"
+    if not automation["scheduler_ready"]:
+        return "resolve_scheduler_blockers"
+    return "continue_offline_scheduler"
+
+
+def background_operations_snapshot(
+    config_path: Path = DEFAULT_CONFIG_PATH,
+    db_path: Path = DEFAULT_DB_PATH,
+    input_path: Path = DEFAULT_INPUT_PATH,
+) -> dict[str, Any]:
+    """Aggregate background operation state into one no-network review object."""
+    init_log_db(db_path)
+    ledger = ledger_summary(db_path)
+    reviewed = reviewed_log_summary(db_path)
+    follow_up = needs_follow_up_summary(db_path)
+    validation = validation_summary(db_path)
+    signoff = signoff_readiness_summary(db_path)
+    automation = automation_readiness_summary(config_path)
+    readiness_log = automation_readiness_log_summary(db_path)
+    blueprint = background_blueprint_compliance_summary(db_path, input_path)
+    blueprint_log = blueprint_compliance_log_summary(db_path)
+    live_bundle = live_dry_run_approval_bundle(config_path)
+    live_execution = live_execution_log_summary(db_path)
+    next_action = _operations_next_action(
+        validation,
+        signoff,
+        automation,
+        blueprint,
+    )
+    return {
+        "captured_at_utc": _utc_now(),
+        "code_version": _CODE_VERSION,
+        "schema_version": _SCHEMA_VERSION,
+        "config_path": str(config_path),
+        "db_path": str(db_path),
+        "input_path": str(input_path),
+        "next_action": next_action,
+        "ledger": ledger,
+        "reviewed": reviewed,
+        "needs_follow_up": follow_up,
+        "validation": validation,
+        "signoff_readiness": signoff,
+        "automation_readiness": automation,
+        "automation_readiness_log": readiness_log,
+        "blueprint_compliance": blueprint,
+        "blueprint_compliance_log": blueprint_log,
+        "live_dry_run_approval_bundle": live_bundle,
+        "live_execution_log": live_execution,
+        "guardrails": {
+            "network_access_performed": False,
+            "external_submission_enabled": False,
+            "manual_human_approval_required": True,
+            "authoritative_hazard_assessment_deferred": True,
+        },
+        "network_access_performed": False,
+        "external_submission_enabled": False,
+    }
+
+
+def record_background_operations_snapshot(
+    config_path: Path = DEFAULT_CONFIG_PATH,
+    db_path: Path = DEFAULT_DB_PATH,
+    input_path: Path = DEFAULT_INPUT_PATH,
+) -> dict[str, Any]:
+    """Persist a no-network background operations snapshot to SQLite."""
+    init_log_db(db_path)
+    snapshot = background_operations_snapshot(config_path, db_path, input_path)
+    entry = {
+        "snapshot_id": str(uuid.uuid4()),
+        **snapshot,
+    }
+    with _connect(db_path) as conn:
+        conn.execute(
+            """
+            INSERT INTO operations_snapshot_log (
+                snapshot_id, captured_at_utc, config_path, input_path,
+                next_action, total_runs, unsigned_follow_up_count,
+                scheduler_ready, live_mode_ready, blueprint_status, entry_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                entry["snapshot_id"],
+                entry["captured_at_utc"],
+                entry["config_path"],
+                entry["input_path"],
+                entry["next_action"],
+                entry["validation"]["total_runs"],
+                len(entry["signoff_readiness"]["unsigned_follow_up_runs"]),
+                int(entry["automation_readiness"]["scheduler_ready"]),
+                int(entry["automation_readiness"]["live_mode_ready"]),
+                entry["blueprint_compliance"]["overall_status"],
+                json.dumps(entry),
+            ),
+        )
+    return entry
+
+
+def background_operations_snapshot_log_summary(
+    db_path: Path = DEFAULT_DB_PATH,
+) -> dict[str, Any]:
+    """Summarize persisted no-network background operations snapshots."""
+    init_log_db(db_path)
+    with _connect(db_path) as conn:
+        latest = conn.execute(
+            """
+            SELECT entry_json
+            FROM operations_snapshot_log
+            ORDER BY captured_at_utc DESC
+            LIMIT 1
+            """
+        ).fetchone()
+        by_next_action = {
+            row["next_action"]: row["n"]
+            for row in conn.execute(
+                """
+                SELECT next_action, COUNT(*) AS n
+                FROM operations_snapshot_log
+                GROUP BY next_action
+                """
+            )
+        }
+        return {
+            "db_path": str(db_path),
+            "total_operations_snapshots": _count_rows(
+                conn,
+                "operations_snapshot_log",
+            ),
+            "by_next_action": by_next_action,
             "latest": json.loads(latest["entry_json"]) if latest else None,
         }
 

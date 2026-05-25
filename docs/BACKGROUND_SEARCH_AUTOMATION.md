@@ -172,6 +172,7 @@ The SQLite database contains append-only operational tables:
 | `human_signoff_log` | Manual reviewer signoff records |
 | `automation_readiness_log` | Scheduler/live-readiness snapshots |
 | `blueprint_compliance_log` | Background blueprint compliance snapshots |
+| `operations_snapshot_log` | Aggregated operator-facing background status snapshots |
 | `live_approval_bundle_log` | No-network live dry-run approval reviews |
 | `live_operator_handoff_log` | Written no-network operator handoffs |
 | `live_dry_run_plan_log` | No-network live dry-run query plans |
@@ -195,6 +196,9 @@ PYTHONPATH=src python Skills/background.py validation-summary
 PYTHONPATH=src python Skills/background.py blueprint-compliance-summary
 PYTHONPATH=src python Skills/background.py record-blueprint-compliance-summary
 PYTHONPATH=src python Skills/background.py blueprint-compliance-log-summary
+PYTHONPATH=src python Skills/background.py operations-snapshot
+PYTHONPATH=src python Skills/background.py record-operations-snapshot
+PYTHONPATH=src python Skills/background.py operations-snapshot-log-summary
 PYTHONPATH=src python Skills/background.py human-signoff-summary
 PYTHONPATH=src python Skills/background.py signoff-readiness
 PYTHONPATH=src python Skills/background.py record-automation-readiness
@@ -252,6 +256,27 @@ PYTHONPATH=src python Skills/background.py blueprint-compliance-log-summary
 
 This append-only log makes blueprint status auditable across scheduler runs
 without contacting external services or changing submission permissions.
+
+## Operations Snapshots
+
+The operations snapshot is the compact operator view for a background cycle:
+
+```bash
+PYTHONPATH=src python Skills/background.py operations-snapshot
+PYTHONPATH=src python Skills/background.py record-operations-snapshot
+PYTHONPATH=src python Skills/background.py operations-snapshot-log-summary
+```
+
+It aggregates the ledger, reviewed and needs-follow-up logs, validation state,
+signoff readiness, automation readiness, live dry-run approval status,
+blueprint compliance, and live execution attempts into one structured JSON
+object. The snapshot also reports a conservative `next_action`, such as
+`run_background_once`, `record_signoff`, `review_follow_up`,
+`resolve_scheduler_blockers`, or `continue_offline_scheduler`.
+
+Operations snapshots are no-network review artifacts. They persist to the
+top-level SQLite `operations_snapshot_log` table and explicitly keep
+`network_access_performed` and `external_submission_enabled` set to `false`.
 
 ## Human Signoff
 

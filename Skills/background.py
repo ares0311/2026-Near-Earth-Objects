@@ -19,6 +19,8 @@ from background import (
     automation_readiness_log_summary,
     automation_readiness_summary,
     background_blueprint_compliance_summary,
+    background_operations_snapshot,
+    background_operations_snapshot_log_summary,
     background_run_once,
     blueprint_compliance_log_summary,
     follow_up_test_summary,
@@ -36,6 +38,7 @@ from background import (
     live_provider_readiness,
     needs_follow_up_summary,
     record_automation_readiness,
+    record_background_operations_snapshot,
     record_blueprint_compliance_summary,
     record_human_signoff,
     record_live_dry_run_approval_bundle,
@@ -164,6 +167,22 @@ def main() -> None:
     record_blueprint.add_argument("--input", type=Path, default=DEFAULT_INPUT_PATH)
     record_blueprint.add_argument("--db", type=Path, default=DEFAULT_DB_PATH)
 
+    operations = sub.add_parser(
+        "operations-snapshot",
+        help="Aggregate conservative background operations status",
+    )
+    operations.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
+    operations.add_argument("--input", type=Path, default=DEFAULT_INPUT_PATH)
+    operations.add_argument("--db", type=Path, default=DEFAULT_DB_PATH)
+
+    record_operations = sub.add_parser(
+        "record-operations-snapshot",
+        help="Persist conservative background operations status to SQLite",
+    )
+    record_operations.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
+    record_operations.add_argument("--input", type=Path, default=DEFAULT_INPUT_PATH)
+    record_operations.add_argument("--db", type=Path, default=DEFAULT_DB_PATH)
+
     for name in (
         "ledger-summary",
         "reviewed-summary",
@@ -172,6 +191,7 @@ def main() -> None:
         "submission-recommendation-summary",
         "validation-summary",
         "blueprint-compliance-log-summary",
+        "operations-snapshot-log-summary",
         "human-signoff-summary",
         "signoff-readiness",
         "automation-readiness-log-summary",
@@ -243,6 +263,10 @@ def main() -> None:
         _print_json(background_blueprint_compliance_summary(args.db, args.input))
     elif args.command == "record-blueprint-compliance-summary":
         _print_json(record_blueprint_compliance_summary(args.db, args.input))
+    elif args.command == "operations-snapshot":
+        _print_json(background_operations_snapshot(args.config, args.db, args.input))
+    elif args.command == "record-operations-snapshot":
+        _print_json(record_background_operations_snapshot(args.config, args.db, args.input))
     elif args.command == "ledger-summary":
         _print_json(ledger_summary(args.db))
     elif args.command == "reviewed-summary":
@@ -257,6 +281,8 @@ def main() -> None:
         _print_json(validation_summary(args.db))
     elif args.command == "blueprint-compliance-log-summary":
         _print_json(blueprint_compliance_log_summary(args.db))
+    elif args.command == "operations-snapshot-log-summary":
+        _print_json(background_operations_snapshot_log_summary(args.db))
     elif args.command == "human-signoff-summary":
         _print_json(human_signoff_summary(args.db))
     elif args.command == "signoff-readiness":
