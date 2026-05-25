@@ -28,6 +28,7 @@ __all__ = [
     "ObservationCoverage",
     "NightSummary",
     "TrackletCluster",
+    "CampaignSummary",
 ]
 
 from dataclasses import dataclass
@@ -993,3 +994,18 @@ class TrackletCluster(BaseModel):
     centroid_dec_deg: float
     n_tracklets: int
     arc_span_days: float = 0.0
+
+
+class CampaignSummary(BaseModel):
+    """Summary of a multi-night observing campaign."""
+
+    model_config = ConfigDict(frozen=True)
+
+    campaign_id: str
+    start_jd: float
+    end_jd: float
+    n_nights: int
+    n_tracklets: int
+    n_pha_candidates: int
+    surveys_used: tuple[str, ...] = ()
+    sky_area_deg2: float | None = None

@@ -16,7 +16,8 @@ __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fet
            "fetch_known_neo_list",
            "fetch_neocp_confirmed",
            "fetch_mpc_orbit_catalog",
-           "compute_field_overlap"]
+           "compute_field_overlap",
+           "fetch_known_phas"]
 
 import json
 import os
@@ -1600,3 +1601,51 @@ def compute_field_overlap(fetch_result1: object, fetch_result2: object) -> float
                 break
 
     return matched / len(alerts1)
+
+
+def fetch_known_phas(force_refresh: bool = False) -> list[dict]:
+    """Fetch the MPC list of known Potentially Hazardous Asteroids.
+
+    Queries the MPC PHA catalog via ``astroquery.mpc`` and returns a list
+    of dicts with keys: ``designation``, ``absolute_magnitude_h``,
+    ``moid_au``, ``neo_class``.  Results are disk-cached under the key
+    ``"known_phas"``.  Returns an empty list on failure.
+    """
+    cache_key = "known_phas"
+    if not force_refresh:
+        cached = _load_cache(cache_key)
+        if cached is not None and isinstance(cached, list):
+            return cached
+    try:
+        from astroquery.mpc import MPC  # type: ignore[import]
+
+        tbl = MPC.query_objects("pha")
+        rows: list[dict] = []
+        for row in tbl:
+            desig = str(row.get("designation") or row.get("name") or "unknown")
+            h = float(row["absolute_magnitude"]) if "absolute_magnitude" in tbl.colnames else None
+            moid = float(row["moid"]) if "moid" in tbl.colnames else None
+            a = float(row["semimajor_axis"]) if "semimajor_axis" in tbl.colnames else None
+            e = float(row["eccentricity"]) if "eccentricity" in tbl.colnames else None
+            q = (a * (1.0 - e)) if (a is not None and e is not None) else None
+            Q = (a * (1.0 + e)) if (a is not None and e is not None) else None
+            neo_class: str = "unknown"
+            if q is not None and a is not None and Q is not None:
+                if Q < 0.983:
+                    neo_class = "ieo"
+                elif a < 1.0:
+                    neo_class = "aten"
+                elif q < 1.017:
+                    neo_class = "apollo"
+                elif q < 1.3:
+                    neo_class = "amor"
+            rows.append({
+                "designation": desig,
+                "absolute_magnitude_h": h,
+                "moid_au": moid,
+                "neo_class": neo_class,
+            })
+        _save_cache(cache_key, rows)
+        return rows
+    except Exception:
+        return []

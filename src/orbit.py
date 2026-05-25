@@ -18,7 +18,8 @@ __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
            "compute_perihelion_distance",
            "compute_aphelion_distance",
            "compute_tisserand_wrt_earth",
-           "compute_orbital_arc_quality"]
+           "compute_orbital_arc_quality",
+           "compute_mean_anomaly_at_epoch"]
 
 import math
 from typing import NamedTuple
@@ -1283,3 +1284,22 @@ def compute_orbital_arc_quality(tracklet: object) -> int:
     if arc_days >= 1.0:
         return 2
     return 1
+
+
+def compute_mean_anomaly_at_epoch(elements: object, target_jd: float) -> float | None:
+    """Compute mean anomaly in [0, 2π) at a target JD.
+
+    Uses the orbital period from :func:`compute_orbital_period` and the
+    reference epoch ``elements.epoch_jd``.  Returns None if the period is
+    non-positive or the epoch is not set.
+    """
+    epoch_jd = getattr(elements, "epoch_jd", None)
+    if epoch_jd is None:
+        return None
+    period_days = compute_orbital_period(elements)
+    if period_days is None or period_days <= 0.0:
+        return None
+    m0_rad = math.radians(float(getattr(elements, "mean_anomaly_deg", 0.0) or 0.0))
+    n = 2.0 * math.pi / period_days
+    m = m0_rad + n * (target_jd - float(epoch_jd))
+    return float(m % (2.0 * math.pi))

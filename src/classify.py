@@ -33,6 +33,7 @@ __all__ = [
     "compute_tier1_confidence",
     "compute_posterior_stability",
     "compute_class_probability_range",
+    "compute_ensemble_agreement",
 ]
 
 import base64
@@ -1604,3 +1605,35 @@ def compute_class_probability_range(neos: list) -> dict:
         else:
             result[k] = {"min": round(mins[k], 6), "max": round(maxs[k], 6)}
     return result
+
+
+def compute_ensemble_agreement(posterior_list: list) -> float:
+    """Compute mean pairwise agreement across a list of NEOPosterior-like objects.
+
+    Agreement for a pair is defined as 1 - L1_distance/2, where L1_distance is
+    the sum of absolute differences across the five hypothesis keys.  Returns a
+    float in [0, 1], rounded to 6 decimal places.  Returns 0.0 if fewer than
+    two posteriors are supplied.
+    """
+    _KEYS = [
+        "neo_candidate",
+        "known_object",
+        "main_belt_asteroid",
+        "stellar_artifact",
+        "other_solar_system",
+    ]
+    if len(posterior_list) < 2:
+        return 0.0
+    total = 0.0
+    count = 0
+    for i in range(len(posterior_list)):
+        for j in range(i + 1, len(posterior_list)):
+            p = posterior_list[i]
+            q = posterior_list[j]
+            l1 = sum(
+                abs(float(getattr(p, k, 0.0)) - float(getattr(q, k, 0.0)))
+                for k in _KEYS
+            )
+            total += 1.0 - l1 / 2.0
+            count += 1
+    return round(total / count, 6) if count > 0 else 0.0

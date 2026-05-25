@@ -1763,3 +1763,84 @@ class TestComputeAngularSeparation:
         sys.path.insert(0, "src")
         import detect
         assert "compute_angular_separation" in detect.__all__
+
+
+class TestComputeStreakOrientation:
+    def test_returns_angle_in_range(self):
+        import base64
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        import numpy as np
+
+        from detect import compute_streak_orientation
+
+        # Create a horizontally-oriented streak
+        arr = np.zeros((63, 63), dtype=np.float32)
+        for i in range(20, 45):
+            arr[i, i] = 1.0  # diagonal line — gives non-zero angle
+        cutout_b64 = base64.b64encode(arr.tobytes()).decode()
+        obs = SimpleNamespace(cutout_difference=cutout_b64)
+        result = compute_streak_orientation(obs)
+        assert result is not None
+        assert 0.0 <= result < 180.0
+
+    def test_degenerate_all_zero_returns_none(self):
+        import base64
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        import numpy as np
+
+        from detect import compute_streak_orientation
+
+        arr = np.zeros((63, 63), dtype=np.float32)
+        cutout_b64 = base64.b64encode(arr.tobytes()).decode()
+        obs = SimpleNamespace(cutout_difference=cutout_b64)
+        result = compute_streak_orientation(obs)
+        assert result is None
+
+    def test_circular_blob_returns_none(self):
+        import base64
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        import numpy as np
+
+        from detect import compute_streak_orientation
+
+        # Circular blob: mu20 == mu02, mu11 == 0 → degenerate
+        arr = np.zeros((63, 63), dtype=np.float32)
+        ys, xs = np.mgrid[0:63, 0:63]
+        arr[(ys - 31)**2 + (xs - 31)**2 <= 4] = 1.0
+        cutout_b64 = base64.b64encode(arr.tobytes()).decode()
+        obs = SimpleNamespace(cutout_difference=cutout_b64)
+        result = compute_streak_orientation(obs)
+        assert result is None
+
+    def test_no_cutout_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import compute_streak_orientation
+        obs = SimpleNamespace(cutout_difference=None)
+        assert compute_streak_orientation(obs) is None
+
+    def test_bad_cutout_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import compute_streak_orientation
+        obs = SimpleNamespace(cutout_difference="not_valid!!!")
+        assert compute_streak_orientation(obs) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import detect
+        assert "compute_streak_orientation" in detect.__all__

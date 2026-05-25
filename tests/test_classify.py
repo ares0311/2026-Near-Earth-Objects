@@ -2239,3 +2239,63 @@ class TestComputeClassProbabilityRange:
         sys.path.insert(0, "src")
         import classify
         assert "compute_class_probability_range" in classify.__all__
+
+
+class TestComputeEnsembleAgreement:
+    def test_identical_posteriors_return_one(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from classify import compute_ensemble_agreement
+        p = SimpleNamespace(
+            neo_candidate=0.6,
+            known_object=0.1,
+            main_belt_asteroid=0.1,
+            stellar_artifact=0.1,
+            other_solar_system=0.1,
+        )
+        result = compute_ensemble_agreement([p, p])
+        assert result == pytest.approx(1.0)
+
+    def test_opposite_posteriors_return_low(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from classify import compute_ensemble_agreement
+        p1 = SimpleNamespace(
+            neo_candidate=1.0,
+            known_object=0.0,
+            main_belt_asteroid=0.0,
+            stellar_artifact=0.0,
+            other_solar_system=0.0,
+        )
+        p2 = SimpleNamespace(
+            neo_candidate=0.0,
+            known_object=0.0,
+            main_belt_asteroid=0.0,
+            stellar_artifact=0.0,
+            other_solar_system=1.0,
+        )
+        result = compute_ensemble_agreement([p1, p2])
+        assert result < 0.5
+
+    def test_fewer_than_two_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from classify import compute_ensemble_agreement
+        p = SimpleNamespace(
+            neo_candidate=0.5, known_object=0.1, main_belt_asteroid=0.2,
+            stellar_artifact=0.1, other_solar_system=0.1,
+        )
+        assert compute_ensemble_agreement([p]) == 0.0
+        assert compute_ensemble_agreement([]) == 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import classify
+        assert "compute_ensemble_agreement" in classify.__all__

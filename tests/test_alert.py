@@ -1786,3 +1786,45 @@ class TestCountObservationsByMission:
         sys.path.insert(0, "src")
         import alert
         assert "count_observations_by_mission" in alert.__all__
+
+
+class TestFormatCloseApproachBulletin:
+    def test_contains_guardrail(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from alert import format_close_approach_bulletin
+        tracklet = SimpleNamespace(object_id="NEO001")
+        hazard = SimpleNamespace(
+            neo_class="apollo",
+            hazard_flag="pha_candidate",
+            moid_au=0.03,
+            estimated_diameter_m=200.0,
+            absolute_magnitude_h=21.5,
+            alert_pathway="mpc_submission",
+        )
+        meta = SimpleNamespace(discovery_priority=0.85)
+        neo = SimpleNamespace(tracklet=tracklet, hazard=hazard, metadata=meta)
+        result = format_close_approach_bulletin(neo)
+        assert "NOT" in result
+        assert "GUARDRAIL" in result
+        assert "NEO001" in result
+        assert "0.030000" in result
+
+    def test_handles_none_fields(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from alert import format_close_approach_bulletin
+        neo = SimpleNamespace(tracklet=None, hazard=None, metadata=None)
+        result = format_close_approach_bulletin(neo)
+        assert "unknown" in result
+        assert "NOT" in result
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+        assert "format_close_approach_bulletin" in alert.__all__

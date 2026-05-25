@@ -17,7 +17,8 @@ __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "compute_priority_rank",
            "compute_survey_completeness",
            "compute_weighted_risk_score",
-           "compute_hazard_summary"]
+           "compute_hazard_summary",
+           "compute_priority_percentile"]
 
 import math
 import uuid
@@ -1065,3 +1066,22 @@ def compute_hazard_summary(neos: list) -> dict:
         "n_unknown": n_unknown,
         "mean_discovery_priority": mean_priority,
     }
+
+
+def compute_priority_percentile(neo: object, neos: list) -> float:
+    """Return the fraction of neos with discovery_priority ≤ neo's priority.
+
+    Returns 0.0 if the list is empty.  None priorities are treated as 0.0.
+    Result is in [0, 1], rounded to 6 decimal places.
+    """
+    if not neos:
+        return 0.0
+
+    def _priority(n: object) -> float:
+        meta = getattr(n, "metadata", None)
+        val = getattr(meta, "discovery_priority", 0.0) if meta else 0.0
+        return float(val or 0.0)
+
+    ref = _priority(neo)
+    count = sum(1 for n in neos if _priority(n) <= ref)
+    return round(count / len(neos), 6)

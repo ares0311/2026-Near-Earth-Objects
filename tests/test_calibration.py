@@ -1184,3 +1184,47 @@ class TestComputeMeanCalibrationError:
         sys.path.insert(0, "src")
         import calibration
         assert "compute_mean_calibration_error" in calibration.__all__
+
+
+class TestComputeResolution:
+    def test_perfect_calibration_has_nonzero_resolution(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_resolution
+        # Two well-separated groups → high resolution
+        probs = [0.1] * 50 + [0.9] * 50
+        labels = [0] * 50 + [1] * 50
+        result = compute_resolution(probs, labels)
+        assert result > 0.0
+
+    def test_empty_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_resolution
+        assert compute_resolution([], []) == 0.0
+
+    def test_single_class_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_resolution
+        probs = [0.3, 0.5, 0.7]
+        labels = [1, 1, 1]  # all positive → o_bar=1.0 → resolution=0
+        assert compute_resolution(probs, labels) == 0.0
+
+    def test_returns_float_in_range(self):
+        import sys
+        sys.path.insert(0, "src")
+        import random
+
+        from calibration import compute_resolution
+        random.seed(42)
+        probs = [random.random() for _ in range(200)]
+        labels = [random.randint(0, 1) for _ in range(200)]
+        result = compute_resolution(probs, labels)
+        assert 0.0 <= result <= 0.25
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        assert "compute_resolution" in calibration.__all__

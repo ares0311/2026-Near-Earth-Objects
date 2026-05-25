@@ -34,6 +34,7 @@ __all__ = [
     "format_discovery_report",
     "format_neocp_submission",
     "count_observations_by_mission",
+    "format_close_approach_bulletin",
 ]
 
 import json
@@ -1463,3 +1464,45 @@ def count_observations_by_mission(neo: object) -> dict[str, int]:
         mission = str(getattr(obs, "mission", "unknown"))
         counts[mission] = counts.get(mission, 0) + 1
     return counts
+
+
+def format_close_approach_bulletin(neo: object) -> str:
+    """Return a plain-text close-approach bulletin for a ScoredNEO-like object.
+
+    Pulls values from neo.tracklet.object_id, neo.hazard.*, and
+    neo.metadata.discovery_priority.  All fields are handled gracefully
+    if None or missing.  Contains a mandatory guardrail statement.
+    """
+    tracklet = getattr(neo, "tracklet", None)
+    hazard = getattr(neo, "hazard", None)
+    metadata = getattr(neo, "metadata", None)
+
+    object_id = getattr(tracklet, "object_id", "unknown") if tracklet else "unknown"
+    neo_class = getattr(hazard, "neo_class", "unknown") if hazard else "unknown"
+    hazard_flag = getattr(hazard, "hazard_flag", "unknown") if hazard else "unknown"
+    moid_au = getattr(hazard, "moid_au", None) if hazard else None
+    diameter_m = getattr(hazard, "estimated_diameter_m", None) if hazard else None
+    h_mag = getattr(hazard, "absolute_magnitude_h", None) if hazard else None
+    pathway = getattr(hazard, "alert_pathway", "unknown") if hazard else "unknown"
+    priority = getattr(metadata, "discovery_priority", None) if metadata else None
+
+    moid_str = f"{moid_au:.6f}" if moid_au is not None else "unknown"
+    diam_str = f"{diameter_m:.1f}" if diameter_m is not None else "unknown"
+    h_str = f"{h_mag:.2f}" if h_mag is not None else "unknown"
+    prio_str = f"{priority:.4f}" if priority is not None else "unknown"
+
+    return (
+        "CLOSE APPROACH BULLETIN\n"
+        "=======================\n"
+        f"Object: {object_id}\n"
+        f"NEO Class: {neo_class}\n"
+        f"Hazard Flag: {hazard_flag}\n"
+        f"MOID (AU): {moid_str}\n"
+        f"Estimated Diameter (m): {diam_str}\n"
+        f"Absolute Magnitude H: {h_str}\n"
+        f"Alert Pathway: {pathway}\n"
+        f"Discovery Priority: {prio_str}\n"
+        "\n"
+        "GUARDRAIL: This pipeline does NOT assert any probability of Earth impact.\n"
+        "All hazard assessments must be independently confirmed by MPC/CNEOS.\n"
+    )

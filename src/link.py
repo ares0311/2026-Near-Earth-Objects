@@ -16,7 +16,8 @@ __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "compute_tracklet_arc_nights",
            "compute_mean_consecutive_motion",
            "compute_tracklet_sky_density",
-           "compute_tracklet_completeness"]
+           "compute_tracklet_completeness",
+           "find_longest_tracklet"]
 
 import math
 import uuid
@@ -1072,3 +1073,14 @@ def compute_tracklet_completeness(tracklet: object, expected_nights: int) -> flo
         if jd is not None:
             nights.add(int(float(jd)))
     return round(min(1.0, len(nights) / expected_nights), 6)
+
+
+def find_longest_tracklet(tracklets: list) -> object | None:
+    """Return the tracklet with the largest arc_days.
+
+    Returns None if the list is empty.  If multiple tracklets share the
+    maximum arc_days, the first one encountered is returned.
+    """
+    if not tracklets:
+        return None
+    return max(tracklets, key=lambda t: float(getattr(t, "arc_days", 0.0) or 0.0))

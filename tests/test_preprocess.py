@@ -1781,3 +1781,48 @@ class TestComputeCutoutPeakPosition:
         sys.path.insert(0, "src")
         import preprocess
         assert "compute_cutout_peak_position" in preprocess.__all__
+
+
+class TestComputeLocalBackground:
+    def test_returns_float(self):
+        import base64
+        import sys
+        sys.path.insert(0, "src")
+
+        import numpy as np
+
+        from preprocess import compute_local_background
+
+        arr = np.ones((63, 63), dtype=np.float32)
+        arr[31, 31] = 10.0  # bright center
+        cutout_b64 = base64.b64encode(arr.tobytes()).decode()
+        from types import SimpleNamespace
+        obs = SimpleNamespace(cutout_difference=cutout_b64)
+        result = compute_local_background(obs)
+        assert result is not None
+        assert isinstance(result, float)
+
+    def test_no_cutout_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_local_background
+        obs = SimpleNamespace(cutout_difference=None)
+        assert compute_local_background(obs) is None
+
+    def test_bad_cutout_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_local_background
+        obs = SimpleNamespace(cutout_difference="not_valid_base64!!!")
+        result = compute_local_background(obs)
+        assert result is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import preprocess
+        assert "compute_local_background" in preprocess.__all__
