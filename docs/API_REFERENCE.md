@@ -407,6 +407,14 @@ def record_signoff_from_packet(
     db_path: Path = DEFAULT_DB_PATH,
 ) -> dict[str, Any]
 def signoff_packet_decision_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
+def signoff_packet_decision_readiness(
+    db_path: Path = DEFAULT_DB_PATH,
+    required_approval_count: int = 1,
+) -> dict[str, Any]
+def latest_undecided_signoff_packet(
+    db_path: Path = DEFAULT_DB_PATH,
+    required_approval_count: int = 1,
+) -> dict[str, Any]
 def automation_readiness_summary(config_path: Path = DEFAULT_CONFIG_PATH) -> dict[str, Any]
 def record_automation_readiness(
     config_path: Path = DEFAULT_CONFIG_PATH,
@@ -513,8 +521,10 @@ from a persisted packet. Packet decisions validate the packet, unsigned
 follow-up state, and target/run match before writing a normal human signoff
 plus a packet-decision audit row, then record a post-decision operations
 snapshot. `signoff_packet_decision_summary(db_path)` summarizes those packet
-decision records. These APIs do not perform network access or enable external
-submission.
+decision records. Use `signoff_packet_decision_readiness(db_path)` and
+`latest_undecided_signoff_packet(db_path)` to inspect persisted packets that
+still need packet-linked decisions before asking a reviewer to record one.
+These APIs do not perform network access or enable external submission.
 
 Default background log path:
 
@@ -776,7 +786,7 @@ Lightweight summary of a `ScoredNEO` for display or export.
 
 ---
 
-## v0.16.0 through v0.55.0 Public API Additions
+## v0.16.0 through v0.56.0 Public API Additions
 
 These releases added conservative helper APIs around live-data retrieval,
 preprocessing quality, detection triage, linking, orbit review, classification
@@ -915,8 +925,9 @@ claim confirmation or impact probability.
 | v0.53.0 | `background.py` / `Skills/background.py` | `background_operations_snapshot`, `record_background_operations_snapshot`, `background_operations_snapshot_log_summary`; operations snapshot CLI commands |
 | v0.54.0 | `background.py` / `Skills/background.py` | `signoff_packet`, `latest_unsigned_signoff_packet`, `write_signoff_packet`, `record_signoff_packet`, `signoff_packet_log_summary`; signoff packet CLI commands |
 | v0.55.0 | `background.py` / `Skills/background.py` | `record_signoff_from_packet`, `signoff_packet_decision_summary`; packet decision CLI commands |
+| v0.56.0 | `background.py` / `Skills/background.py` | `signoff_packet_decision_readiness`, `latest_undecided_signoff_packet`; packet decision readiness CLI commands |
 
-### Skills and CLI additions in v0.16.0 through v0.55.0
+### Skills and CLI additions in v0.16.0 through v0.56.0
 
 `export_candidate_report.py`, `tag_neo_class.py`, `check_tisserand.py`,
 `export_followup_requests.py`, `ephemeris_check.py`,
@@ -968,5 +979,7 @@ claim confirmation or impact probability.
 `Skills/background.py record-signoff-packet`,
 `Skills/background.py signoff-packet-log-summary`,
 `Skills/background.py record-signoff-from-packet`,
-`Skills/background.py signoff-packet-decision-summary`, and
+`Skills/background.py signoff-packet-decision-summary`,
+`Skills/background.py signoff-packet-decision-readiness`,
+`Skills/background.py latest-undecided-signoff-packet`, and
 `Skills/background.py launchd-plist`.

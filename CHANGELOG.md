@@ -5,6 +5,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## v0.56.0
+
+- `background.py`: added `signoff_packet_decision_readiness(db_path)` and
+  `latest_undecided_signoff_packet(db_path)` for no-network review of
+  persisted packets that still need packet-linked decisions.
+- `Skills/background.py`: added `signoff-packet-decision-readiness` and
+  `latest-undecided-signoff-packet` subcommands.
+- Packet-decision readiness now reports ready, blocked, signed, and already
+  decided packet states without recording a signoff, writing a packet, or
+  enabling live/external action.
+- 5 new tests (2108 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.56.0.
+
 ## v0.55.0
 
 - `background.py`: added `record_signoff_from_packet(...)` and

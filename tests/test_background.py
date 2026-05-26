@@ -747,7 +747,7 @@ def test_background_operations_snapshot_empty_log(monkeypatch, tmp_path):
         fixture,
     )
 
-    assert snapshot["code_version"] == "0.55.0"
+    assert snapshot["code_version"] == "0.56.0"
     assert snapshot["next_action"] == "run_background_once"
     assert snapshot["ledger"]["total_runs"] == 0
     assert snapshot["automation_readiness"]["scheduler_ready"] is True
@@ -901,7 +901,7 @@ def test_signoff_packet_for_unsigned_followup(monkeypatch, tmp_path):
     packet = background.signoff_packet(result.ledger.run_id, db_path)
     latest = background.latest_unsigned_signoff_packet(db_path)
 
-    assert packet["code_version"] == "0.55.0"
+    assert packet["code_version"] == "0.56.0"
     assert packet["run_id"] == result.ledger.run_id
     assert packet["target_id"] == "T001"
     assert packet["recommended_decision"] == "review_and_optionally_sign"
@@ -1250,6 +1250,169 @@ def test_background_cli_record_signoff_from_packet(monkeypatch, tmp_path):
     assert recorded_payload["external_submission_enabled"] is False
     assert summary_payload["total_packet_decisions"] == 1
     assert summary_payload["by_decision"] == {"approved_for_internal_review": 1}
+
+
+def test_signoff_packet_decision_readiness_empty_db(tmp_path):
+    db_path = tmp_path / "Logs" / "background.sqlite"
+
+    readiness = background.signoff_packet_decision_readiness(db_path)
+    latest = background.latest_undecided_signoff_packet(db_path)
+
+    assert readiness["total_packets"] == 0
+    assert readiness["total_undecided_packets"] == 0
+    assert readiness["ready_for_decision_packets"] == []
+    assert readiness["network_access_performed"] is False
+    assert latest["packet"] is None
+    assert latest["undecided_packet_ids"] == []
+    assert table_count(db_path, "signoff_packet_decision_log") == 0
+
+
+def test_signoff_packet_decision_readiness_lists_undecided_packet(
+    monkeypatch,
+    tmp_path,
+):
+    fixture = tmp_path / "targets.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
+    write_fixture(fixture)
+    monkeypatch.setattr(background, "score_tracklet", lambda tracklet, run_id: make_scored())
+    result = background.background_run_once(
+        fixture,
+        db_path,
+        tmp_path / "reports",
+        config_path=tmp_path / "missing_config.json",
+    )
+    packet = background.record_signoff_packet(result.ledger.run_id, db_path, tmp_path / "packets")
+
+    readiness = background.signoff_packet_decision_readiness(db_path)
+    latest = background.latest_undecided_signoff_packet(db_path)
+
+    assert readiness["total_packets"] == 1
+    assert readiness["total_undecided_packets"] == 1
+    assert readiness["total_ready_for_decision"] == 1
+    assert readiness["undecided_packets"][0]["packet_id"] == packet["packet_id"]
+    assert readiness["undecided_packets"][0]["state"] == "ready_for_decision"
+    assert readiness["undecided_packets"][0]["can_record_decision"] is True
+    assert readiness["undecided_packets"][0]["decision"] is None
+    assert latest["packet"]["packet_id"] == packet["packet_id"]
+    assert latest["undecided_packet_ids"] == [packet["packet_id"]]
+
+
+def test_signoff_packet_decision_readiness_excludes_decided_packet(
+    monkeypatch,
+    tmp_path,
+):
+    fixture = tmp_path / "targets.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
+    write_fixture(fixture)
+    monkeypatch.setattr(background, "score_tracklet", lambda tracklet, run_id: make_scored())
+    result = background.background_run_once(
+        fixture,
+        db_path,
+        tmp_path / "reports",
+        config_path=tmp_path / "missing_config.json",
+    )
+    packet = background.record_signoff_packet(result.ledger.run_id, db_path, tmp_path / "packets")
+    decision = background.record_signoff_from_packet(
+        packet["packet_id"],
+        "Reviewer",
+        "needs_more_work",
+        "Internal follow-up only",
+        db_path=db_path,
+    )
+
+    readiness = background.signoff_packet_decision_readiness(db_path)
+
+    assert readiness["total_packets"] == 1
+    assert readiness["total_undecided_packets"] == 0
+    assert readiness["packets"][0]["state"] == "decided"
+    assert readiness["packets"][0]["decision"]["decision_id"] == decision["decision_id"]
+    assert readiness["packets"][0]["blockers"] == ["PACKET_ALREADY_DECIDED"]
+
+
+def test_signoff_packet_decision_readiness_blocks_already_signed_run(
+    monkeypatch,
+    tmp_path,
+):
+    fixture = tmp_path / "targets.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
+    write_fixture(fixture)
+    monkeypatch.setattr(background, "score_tracklet", lambda tracklet, run_id: make_scored())
+    result = background.background_run_once(
+        fixture,
+        db_path,
+        tmp_path / "reports",
+        config_path=tmp_path / "missing_config.json",
+    )
+    packet = background.record_signoff_packet(result.ledger.run_id, db_path, tmp_path / "packets")
+    background.record_human_signoff(
+        run_id=result.ledger.run_id,
+        target_id=result.ledger.target_id,
+        reviewer="Approver",
+        decision="approved_for_internal_review",
+        scope="Internal follow-up only",
+        db_path=db_path,
+    )
+
+    readiness = background.signoff_packet_decision_readiness(db_path)
+
+    assert readiness["total_undecided_packets"] == 1
+    assert readiness["total_ready_for_decision"] == 0
+    assert readiness["blocked_undecided_packets"][0]["packet_id"] == packet["packet_id"]
+    assert readiness["blocked_undecided_packets"][0]["state"] == "signed"
+    assert readiness["blocked_undecided_packets"][0]["blockers"] == ["RUN_ALREADY_SIGNED"]
+
+
+def test_background_cli_signoff_packet_decision_readiness(monkeypatch, tmp_path):
+    repo = Path(__file__).resolve().parents[1]
+    fixture = tmp_path / "targets.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
+    write_fixture(fixture)
+    monkeypatch.setattr(background, "score_tracklet", lambda tracklet, run_id: make_scored())
+    result = background.background_run_once(
+        fixture,
+        db_path,
+        tmp_path / "reports",
+        config_path=tmp_path / "missing_config.json",
+    )
+    packet = background.record_signoff_packet(result.ledger.run_id, db_path, tmp_path / "packets")
+    env = {**os.environ, "PYTHONPATH": str(repo / "src")}
+
+    readiness = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "signoff-packet-decision-readiness",
+            "--db",
+            str(db_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    latest = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "latest-undecided-signoff-packet",
+            "--db",
+            str(db_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+
+    readiness_payload = json.loads(readiness.stdout)
+    latest_payload = json.loads(latest.stdout)
+    assert readiness_payload["total_ready_for_decision"] == 1
+    assert readiness_payload["ready_for_decision_packets"][0]["packet_id"] == (
+        packet["packet_id"]
+    )
+    assert latest_payload["packet"]["packet_id"] == packet["packet_id"]
 
 
 def test_select_target_uses_highest_composite():

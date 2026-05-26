@@ -208,6 +208,8 @@ PYTHONPATH=src python Skills/background.py record-signoff-packet --run-id <run-i
 PYTHONPATH=src python Skills/background.py signoff-packet-log-summary
 PYTHONPATH=src python Skills/background.py record-signoff-from-packet --packet-id <packet-id> --reviewer "Reviewer Name" --decision approved_for_internal_review --scope "Internal follow-up only"
 PYTHONPATH=src python Skills/background.py signoff-packet-decision-summary
+PYTHONPATH=src python Skills/background.py signoff-packet-decision-readiness
+PYTHONPATH=src python Skills/background.py latest-undecided-signoff-packet
 PYTHONPATH=src python Skills/background.py human-signoff-summary
 PYTHONPATH=src python Skills/background.py signoff-readiness
 PYTHONPATH=src python Skills/background.py record-automation-readiness
@@ -304,6 +306,8 @@ PYTHONPATH=src python Skills/background.py record-signoff-packet --run-id <run-i
 PYTHONPATH=src python Skills/background.py signoff-packet-log-summary
 PYTHONPATH=src python Skills/background.py record-signoff-from-packet --packet-id <packet-id> --reviewer "Reviewer Name" --decision approved_for_internal_review --scope "Internal follow-up only"
 PYTHONPATH=src python Skills/background.py signoff-packet-decision-summary
+PYTHONPATH=src python Skills/background.py signoff-packet-decision-readiness
+PYTHONPATH=src python Skills/background.py latest-undecided-signoff-packet
 ```
 
 Signoff packets combine run detail, target history, required tests,
@@ -316,6 +320,9 @@ When a reviewer is ready to report a result from a persisted packet, record the
 decision from the packet rather than manually reconstructing the run metadata:
 
 ```bash
+PYTHONPATH=src python Skills/background.py signoff-packet-decision-readiness
+PYTHONPATH=src python Skills/background.py latest-undecided-signoff-packet
+
 PYTHONPATH=src python Skills/background.py record-signoff-from-packet \
   --packet-id <packet-id> \
   --reviewer "Reviewer Name" \
@@ -325,6 +332,13 @@ PYTHONPATH=src python Skills/background.py record-signoff-from-packet \
 
 PYTHONPATH=src python Skills/background.py signoff-packet-decision-summary
 ```
+
+The readiness commands are read-only operator aids. They list persisted packets
+that still need packet-linked decisions, separate packets ready for decision
+from blocked packets, and expose blockers such as already decided packets,
+already signed runs, missing follow-up rows, or missing report files. They do
+not write a signoff, write a packet, contact outside parties, enable live
+network access, or perform any external submission.
 
 Packet-based decisions validate that the packet exists, the run is still an
 unsigned follow-up run, and the packet target still matches the logged

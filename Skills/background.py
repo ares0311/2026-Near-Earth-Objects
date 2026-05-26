@@ -25,6 +25,7 @@ from background import (
     blueprint_compliance_log_summary,
     follow_up_test_summary,
     human_signoff_summary,
+    latest_undecided_signoff_packet,
     latest_unsigned_signoff_packet,
     launchd_plist,
     ledger_summary,
@@ -51,6 +52,7 @@ from background import (
     reviewed_log_summary,
     run_detail,
     signoff_packet,
+    signoff_packet_decision_readiness,
     signoff_packet_decision_summary,
     signoff_packet_log_summary,
     signoff_readiness_summary,
@@ -242,6 +244,8 @@ def main() -> None:
         "operations-snapshot-log-summary",
         "signoff-packet-log-summary",
         "signoff-packet-decision-summary",
+        "signoff-packet-decision-readiness",
+        "latest-undecided-signoff-packet",
         "human-signoff-summary",
         "signoff-readiness",
         "automation-readiness-log-summary",
@@ -356,6 +360,10 @@ def main() -> None:
         _print_json(signoff_packet_log_summary(args.db))
     elif args.command == "signoff-packet-decision-summary":
         _print_json(signoff_packet_decision_summary(args.db))
+    elif args.command == "signoff-packet-decision-readiness":
+        _print_json(signoff_packet_decision_readiness(args.db))
+    elif args.command == "latest-undecided-signoff-packet":
+        _print_json(latest_undecided_signoff_packet(args.db))
     elif args.command == "human-signoff-summary":
         _print_json(human_signoff_summary(args.db))
     elif args.command == "signoff-readiness":

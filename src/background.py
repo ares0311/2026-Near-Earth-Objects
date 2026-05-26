@@ -25,6 +25,8 @@ __all__ = [
     "signoff_packet_log_summary",
     "record_signoff_from_packet",
     "signoff_packet_decision_summary",
+    "signoff_packet_decision_readiness",
+    "latest_undecided_signoff_packet",
     "ledger_summary",
     "reviewed_log_summary",
     "needs_follow_up_summary",
@@ -101,7 +103,7 @@ DEFAULT_INPUT_PATH = _ROOT / "background" / "targets.json"
 DEFAULT_DB_PATH = _ROOT / "Logs" / "background.sqlite"
 DEFAULT_REPORT_DIR = _ROOT / "Logs" / "reports"
 _SCHEMA_VERSION = "background-v1"
-_CODE_VERSION = "0.55.0"
+_CODE_VERSION = "0.56.0"
 _LIVE_REVIEW_POLICY_SCHEMA_PATH = _ROOT / "background" / "live_review_policy.schema.json"
 _SUPPORTED_LIVE_SURVEYS = ("ZTF", "ATLAS", "PanSTARRS")
 _LIVE_PROVIDER_CAPABILITIES = {
@@ -1562,6 +1564,78 @@ def _packet_decision_exists(conn: sqlite3.Connection, packet_id: str) -> bool:
     return row is not None
 
 
+def _packet_decision_entry(
+    conn: sqlite3.Connection,
+    packet_id: str,
+) -> dict[str, Any] | None:
+    row = conn.execute(
+        "SELECT entry_json FROM signoff_packet_decision_log WHERE packet_id = ?",
+        (packet_id,),
+    ).fetchone()
+    return json.loads(row["entry_json"]) if row else None
+
+
+def _packet_decision_readiness_row(
+    conn: sqlite3.Connection,
+    packet: Mapping[str, Any],
+    required_approval_count: int,
+) -> dict[str, Any]:
+    packet_id = packet["packet_id"]
+    run_id = packet["run_id"]
+    target_id = packet["target_id"]
+    decision = _packet_decision_entry(conn, packet_id)
+    follow_up = conn.execute(
+        "SELECT entry_json FROM needs_follow_up_log WHERE run_id = ?",
+        (run_id,),
+    ).fetchone()
+    follow_up_data = json.loads(follow_up["entry_json"]) if follow_up else None
+    readiness = _run_signoff_readiness(conn, run_id, required_approval_count)
+    if follow_up_data:
+        readiness = _with_report_readiness(readiness, follow_up_data.get("report_path"))
+
+    blockers = []
+    if decision is not None:
+        state = "decided"
+        blockers.append("PACKET_ALREADY_DECIDED")
+    elif follow_up_data is None:
+        state = "blocked"
+        blockers.append("FOLLOW_UP_RECORD_MISSING")
+    elif follow_up_data["target_id"] != target_id:
+        state = "blocked"
+        blockers.append("PACKET_TARGET_MISMATCH")
+    elif readiness["is_ready"]:
+        state = "signed"
+        blockers.append("RUN_ALREADY_SIGNED")
+    elif readiness.get("report_readiness_state") == "ready_for_internal_review":
+        state = "ready_for_decision"
+    elif readiness.get("report_readiness_state") == "drafted":
+        state = "blocked"
+        blockers.append("SIGNOFF_REPORT_FILE_MISSING")
+    else:
+        state = "blocked"
+        blockers.append("SIGNOFF_REPORT_NOT_READY")
+
+    needs_decision = decision is None
+    can_record_decision = state == "ready_for_decision"
+    return {
+        "packet_id": packet_id,
+        "created_at_utc": packet["created_at_utc"],
+        "run_id": run_id,
+        "target_id": target_id,
+        "packet_path": packet.get("packet_path"),
+        "report_path": packet.get("signoff_readiness", {}).get("report_path"),
+        "recommended_decision": packet["recommended_decision"],
+        "state": state,
+        "needs_decision": needs_decision,
+        "can_record_decision": can_record_decision,
+        "blockers": blockers,
+        "decision": decision,
+        "signoff_readiness": readiness,
+        "network_access_performed": False,
+        "external_submission_enabled": False,
+    }
+
+
 def record_signoff_from_packet(
     packet_id: str,
     reviewer: str,
@@ -1702,6 +1776,76 @@ def signoff_packet_decision_summary(
             "network_access_performed": False,
             "external_submission_enabled": False,
         }
+
+
+def signoff_packet_decision_readiness(
+    db_path: Path = DEFAULT_DB_PATH,
+    required_approval_count: int = 1,
+) -> dict[str, Any]:
+    """Summarize persisted packets that still need packet-linked decisions."""
+    init_log_db(db_path)
+    with _connect(db_path) as conn:
+        rows = conn.execute(
+            """
+            SELECT entry_json
+            FROM signoff_packet_log
+            ORDER BY created_at_utc ASC
+            """
+        ).fetchall()
+        packets = [
+            _packet_decision_readiness_row(
+                conn,
+                json.loads(row["entry_json"]),
+                required_approval_count,
+            )
+            for row in rows
+        ]
+        undecided = [packet for packet in packets if packet["needs_decision"]]
+        ready = [packet for packet in undecided if packet["can_record_decision"]]
+        blocked = [
+            packet
+            for packet in undecided
+            if not packet["can_record_decision"]
+        ]
+        return {
+            "db_path": str(db_path),
+            "required_approval_count": required_approval_count,
+            "total_packets": len(packets),
+            "total_undecided_packets": len(undecided),
+            "total_ready_for_decision": len(ready),
+            "total_blocked_undecided_packets": len(blocked),
+            "packets": packets,
+            "undecided_packets": undecided,
+            "ready_for_decision_packets": ready,
+            "blocked_undecided_packets": blocked,
+            "network_access_performed": False,
+            "external_submission_enabled": False,
+        }
+
+
+def latest_undecided_signoff_packet(
+    db_path: Path = DEFAULT_DB_PATH,
+    required_approval_count: int = 1,
+) -> dict[str, Any]:
+    """Return the latest persisted packet that has no packet-linked decision."""
+    readiness = signoff_packet_decision_readiness(db_path, required_approval_count)
+    latest = None
+    if readiness["undecided_packets"]:
+        latest = sorted(
+            readiness["undecided_packets"],
+            key=lambda packet: packet["created_at_utc"],
+            reverse=True,
+        )[0]
+    return {
+        "db_path": str(db_path),
+        "required_approval_count": required_approval_count,
+        "packet": latest,
+        "undecided_packet_ids": [
+            packet["packet_id"] for packet in readiness["undecided_packets"]
+        ],
+        "network_access_performed": False,
+        "external_submission_enabled": False,
+    }
 
 
 def target_priority_summary(

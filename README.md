@@ -1,9 +1,9 @@
 # 2026 Near-Earth Object Detection & Ranking Pipeline
 
 ![Status](https://img.shields.io/badge/status-active%20development-blue)
-![Version](https://img.shields.io/badge/version-0.55.0-informational)
+![Version](https://img.shields.io/badge/version-0.56.0-informational)
 ![License](https://img.shields.io/badge/license-Apache%202.0-green)
-![Tests](https://img.shields.io/badge/tests-2103%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-2108%20passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
 ![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)
 ![CI](https://img.shields.io/badge/CI-passing-brightgreen)
@@ -12,7 +12,7 @@
 
 ## Abstract
 
-Near-Earth Objects (NEOs) — small solar system bodies with perihelion distances $q < 1.3$ AU — represent both a premier target for planetary science and the only known category of natural disaster that is, in principle, preventable. Despite three decades of systematic survey effort, population completeness models estimate that the majority of NEOs larger than 140 meters remain undetected, sustaining the need for automated, high-throughput discovery pipelines capable of operating at the cadence and scale of modern wide-field photometric surveys. This work presents a complete, research-grade automated pipeline for the detection, multi-night linking, orbital characterization, and hazard ranking of NEO candidates derived from the Zwicky Transient Facility (ZTF) alert stream, ATLAS forced photometry, and the Minor Planet Center (MPC) catalog. The system implements a seven-stage directed acyclic processing graph — fetch, preprocess, detect, link, classify, orbit, score — followed by a mandatory three-step alert protocol governing all external communications. Classification employs a three-tier ensemble architecture: a gradient-boosted tree classifier on tabular features (Tier 1), a convolutional neural network operating on 63×63-pixel ZTF image triplets following the architecture of Duev et al. (2019) (Tier 2), and a BERT-style Transformer trained on multi-night observation sequences following Lin et al. (2022) (Tier 3), with outputs combined by a logistic regression meta-learner and calibrated via Platt scaling or isotonic regression. Hazard assessment follows a Bayesian log-score model over five competing hypotheses with deliberately pessimistic priors for new NEO candidates. Preliminary orbit determination uses Gauss's method with differential correction, and Potentially Hazardous Asteroid (PHA) flags are gated on orbit quality code ≥ 2 and independently confirmed MOID ≤ 0.05 AU. As of version 0.55.0, all ten pipeline modules are complete with 2103 tests at 100% code coverage, automated offline background scheduling readiness, provider-specific live readiness summaries, no-network live dry-run approval bundles, operator handoff exports, persisted operator handoff logs, persisted blueprint compliance summaries, persisted operations snapshots, internal signoff packets, packet-linked signoff decisions, live policy contract validation, and top-level SQLite logs for runs, readiness checks, approval bundles, no-network live dry-run plans, mock-only provider execution attempts, and packet-decision audits. The project now includes expanded public APIs through v0.55.0 for calibration, orbit dynamics, survey statistics, alert packaging, schema summaries, conservative candidate prioritization, and background blueprint auditing, operations snapshots, signoff packets, and packet-linked signoff decisions. Injection-recovery validation on $n = 200$ synthetic NEO tracklets reports 100% detection, link, and score rates. The pipeline produces MPC-compatible 80-column, ADES PSV, and JSON observation reports and implements a non-negotiable three-step pathway — MPC submission, independent observatory confirmation, and conditional NASA PDCO notification — ensuring that no autonomous impact claim is ever issued.
+Near-Earth Objects (NEOs) — small solar system bodies with perihelion distances $q < 1.3$ AU — represent both a premier target for planetary science and the only known category of natural disaster that is, in principle, preventable. Despite three decades of systematic survey effort, population completeness models estimate that the majority of NEOs larger than 140 meters remain undetected, sustaining the need for automated, high-throughput discovery pipelines capable of operating at the cadence and scale of modern wide-field photometric surveys. This work presents a complete, research-grade automated pipeline for the detection, multi-night linking, orbital characterization, and hazard ranking of NEO candidates derived from the Zwicky Transient Facility (ZTF) alert stream, ATLAS forced photometry, and the Minor Planet Center (MPC) catalog. The system implements a seven-stage directed acyclic processing graph — fetch, preprocess, detect, link, classify, orbit, score — followed by a mandatory three-step alert protocol governing all external communications. Classification employs a three-tier ensemble architecture: a gradient-boosted tree classifier on tabular features (Tier 1), a convolutional neural network operating on 63×63-pixel ZTF image triplets following the architecture of Duev et al. (2019) (Tier 2), and a BERT-style Transformer trained on multi-night observation sequences following Lin et al. (2022) (Tier 3), with outputs combined by a logistic regression meta-learner and calibrated via Platt scaling or isotonic regression. Hazard assessment follows a Bayesian log-score model over five competing hypotheses with deliberately pessimistic priors for new NEO candidates. Preliminary orbit determination uses Gauss's method with differential correction, and Potentially Hazardous Asteroid (PHA) flags are gated on orbit quality code ≥ 2 and independently confirmed MOID ≤ 0.05 AU. As of version 0.56.0, all ten pipeline modules are complete with 2108 tests at 100% code coverage, automated offline background scheduling readiness, provider-specific live readiness summaries, no-network live dry-run approval bundles, operator handoff exports, persisted operator handoff logs, persisted blueprint compliance summaries, persisted operations snapshots, internal signoff packets, packet-linked signoff decisions, packet-decision readiness summaries, live policy contract validation, and top-level SQLite logs for runs, readiness checks, approval bundles, no-network live dry-run plans, mock-only provider execution attempts, and packet-decision audits. The project now includes expanded public APIs through v0.56.0 for calibration, orbit dynamics, survey statistics, alert packaging, schema summaries, conservative candidate prioritization, and background blueprint auditing, operations snapshots, signoff packets, packet-linked signoff decisions, and packet-decision readiness. Injection-recovery validation on $n = 200$ synthetic NEO tracklets reports 100% detection, link, and score rates. The pipeline produces MPC-compatible 80-column, ADES PSV, and JSON observation reports and implements a non-negotiable three-step pathway — MPC submission, independent observatory confirmation, and conditional NASA PDCO notification — ensuring that no autonomous impact claim is ever issued.
 
 **Keywords:** near-Earth objects, planetary defense, asteroid detection, automated pipeline, machine learning, real/bogus classification, orbit determination, Bayesian scoring, ZTF, Minor Planet Center
 
@@ -57,7 +57,7 @@ This repository implements a complete, research-grade automated detection and ra
 4. **Independent confirmation before alert** — the NASA PDCO notification pathway is gated on MPC submission *and* independent observatory confirmation, not on pipeline confidence alone.
 5. **No autonomous impact claims** — the system produces ranked candidates and hazard flags; it defers all authoritative impact probability statements to CNEOS Scout and Sentry.
 
-The pipeline follows the build order: `schemas` → `fetch` → `preprocess` → `detect` → `link` → `classify` → `orbit` → `score` → `alert` → `calibration`. Each stage consumes the immutable, typed output of all prior stages. As of v0.55.0, all ten pipeline modules plus background automation are complete with 2103 tests, 100% code coverage, automated offline scheduling readiness, provider-specific live readiness summaries, no-network live dry-run approval bundles, operator handoff exports, persisted operator handoff logs, persisted blueprint compliance summaries, persisted operations snapshots, internal signoff packets, packet-linked signoff decisions, live policy contract validation, persisted readiness checks and approval bundles, no-network live dry-run planning, mock-only provider execution attempt logs, expanded conservative public APIs, and validated injection-recovery baselines of 100% detection, link, and score rates on $n = 200$ synthetic NEO tracklets.
+The pipeline follows the build order: `schemas` → `fetch` → `preprocess` → `detect` → `link` → `classify` → `orbit` → `score` → `alert` → `calibration`. Each stage consumes the immutable, typed output of all prior stages. As of v0.56.0, all ten pipeline modules plus background automation are complete with 2108 tests, 100% code coverage, automated offline scheduling readiness, provider-specific live readiness summaries, no-network live dry-run approval bundles, operator handoff exports, persisted operator handoff logs, persisted blueprint compliance summaries, persisted operations snapshots, internal signoff packets, packet-linked signoff decisions, packet-decision readiness summaries, live policy contract validation, persisted readiness checks and approval bundles, no-network live dry-run planning, mock-only provider execution attempt logs, expanded conservative public APIs, and validated injection-recovery baselines of 100% detection, link, and score rates on $n = 200$ synthetic NEO tracklets.
 
 ---
 
@@ -109,7 +109,7 @@ The pipeline implements a strict directed acyclic graph (DAG) of processing stag
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    NEO DETECTION PIPELINE  v0.55.0                  │
+│                    NEO DETECTION PIPELINE  v0.56.0                  │
 └─────────────────────────────────────────────────────────────────────┘
 
   External Data Sources
@@ -521,7 +521,7 @@ The diagram below shows how data and artifacts move between the repository's top
 2026-Near-Earth-Objects/
 │
 ├── src/                          # Core pipeline modules (Python 3.11+)
-│   ├── __init__.py               # Package version (0.55.0)
+│   ├── __init__.py               # Package version (0.56.0)
 │   ├── schemas.py                # All Pydantic data models (frozen=True)
 │   ├── fetch.py                  # ZTF/ATLAS/MPC/Horizons data retrieval
 │   ├── preprocess.py             # Difference image handling; Gaia astrometry
@@ -534,7 +534,7 @@ The diagram below shows how data and artifacts move between the repository's top
 │   ├── calibration.py            # Platt / isotonic PAVA calibration
 │   └── py.typed                  # PEP 561 type information marker
 │
-├── tests/                        # pytest suite (2103 tests; 100% coverage)
+├── tests/                        # pytest suite (2108 tests; 100% coverage)
 │   ├── conftest.py               # Shared fixtures and synthetic tracklet factories
 │   ├── test_schemas.py
 │   ├── test_fetch.py
@@ -880,7 +880,7 @@ Compare the output against the baseline in `data/injection_recovery_baseline.jso
 | 5. Calibrator refit | `evaluate_calibration.py` | ECE ≤ 0.05; Brier ≤ 0.10 |
 | 6. Linker tuned (if needed) | `tune_linker.py` | Link rate ≥ baseline − 5% |
 | 7. Injection-recovery passed | `injection_recovery.py` | Link + score rate ≥ baseline − 5% |
-| 8. Full test suite passes | `pytest` | 2103 / 2103 tests pass |
+| 8. Full test suite passes | `pytest` | 2108 / 2108 tests pass |
 | 9. Models committed | `git add models/` | New weights in version control |
 
 ---
@@ -954,7 +954,7 @@ PYTHONPATH=src python Skills/smoke_test.py
 
 ```bash
 OMP_NUM_THREADS=1 PYTHONPATH=src python -m pytest -q
-# Expected: 2103 passed in ~N seconds
+# Expected: 2108 passed in ~N seconds
 ```
 
 ### 11.3 Score a Batch of Tracklets
@@ -1007,6 +1007,8 @@ PYTHONPATH=src python Skills/background.py live-dry-run-plan-log-summary
 PYTHONPATH=src python Skills/background.py live-dry-run-execute
 PYTHONPATH=src python Skills/background.py live-execution-log-summary
 PYTHONPATH=src python Skills/background.py unsigned-follow-up
+PYTHONPATH=src python Skills/background.py signoff-packet-decision-readiness
+PYTHONPATH=src python Skills/background.py latest-undecided-signoff-packet
 ```
 
 Background automation writes top-level SQLite logs to `Logs/background.sqlite`.
@@ -1021,6 +1023,10 @@ The approval-bundle command aggregates scheduler, policy, provider, and dry-run
 plan gates before any mock live dry-run execution attempt.
 The command is offline by default and does not make external submissions. Manual reviewer signoff can be recorded with
 `Skills/background.py record-signoff`; multiple signoffs per run are supported.
+Persisted signoff packets can be inspected with
+`Skills/background.py signoff-packet-decision-readiness` and
+`Skills/background.py latest-undecided-signoff-packet` before a reviewer records
+a packet-linked decision.
 Deprecated one-file background wrapper scripts have been removed.
 
 ### 11.7 Export MPC 80-Column Report
@@ -1079,7 +1085,7 @@ Calibration curves and reliability diagrams are generated by `Skills/evaluate_ca
 
 Injection-recovery testing is the primary empirical validation of end-to-end pipeline performance. Synthetic NEO tracklets with known orbital elements are injected into the ZTF alert stream simulator and processed by the full pipeline. The following rates are tracked:
 
-| Metric | Definition | v0.55.0 Baseline |
+| Metric | Definition | v0.56.0 Baseline |
 |---|---|---|
 | **Detection rate** | Fraction of injected NEOs producing ≥1 detection | 100% ($n=200$, seed=42) |
 | **Link rate** | Fraction of injected NEOs producing a valid tracklet | 100% |
@@ -1088,7 +1094,7 @@ Injection-recovery testing is the primary empirical validation of end-to-end pip
 
 The older n=50 baseline remains in `data/injection_recovery_baseline.json` for historical comparison. The current n=200 baseline and high-motion stress baseline both report 100% linking after the v0.11.0 linker fixes.
 
-### 12.4 Module Coverage Summary (v0.55.0)
+### 12.4 Module Coverage Summary (v0.56.0)
 
 | Module | Statements | Coverage |
 |---|---|---|
@@ -1102,7 +1108,7 @@ The older n=50 baseline remains in `data/injection_recovery_baseline.json` for h
 | `score.py` | — | 100% |
 | `alert.py` | — | 100% |
 | `calibration.py` | — | 100% |
-| **Total** | **2103 tests** | **100%** |
+| **Total** | **2108 tests** | **100%** |
 
 ---
 
