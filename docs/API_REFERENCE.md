@@ -385,6 +385,19 @@ def human_signoff_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
 def run_detail(run_id: str, db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
 def target_history(target_id: str, db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
 def signoff_readiness_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
+def signoff_packet(run_id: str, db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
+def latest_unsigned_signoff_packet(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
+def write_signoff_packet(
+    run_id: str,
+    db_path: Path = DEFAULT_DB_PATH,
+    report_dir: Path = DEFAULT_REPORT_DIR,
+) -> dict[str, Any]
+def record_signoff_packet(
+    run_id: str,
+    db_path: Path = DEFAULT_DB_PATH,
+    report_dir: Path = DEFAULT_REPORT_DIR,
+) -> dict[str, Any]
+def signoff_packet_log_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
 def automation_readiness_summary(config_path: Path = DEFAULT_CONFIG_PATH) -> dict[str, Any]
 def record_automation_readiness(
     config_path: Path = DEFAULT_CONFIG_PATH,
@@ -481,7 +494,11 @@ ledger, outcome, validation, signoff, scheduler, live dry-run, and blueprint
 status into one conservative no-network review object, and
 `record_background_operations_snapshot(...)` plus
 `background_operations_snapshot_log_summary(db_path)` to persist and summarize
-those operator snapshots.
+those operator snapshots. Use `signoff_packet(run_id, db_path)` and
+`latest_unsigned_signoff_packet(db_path)` to assemble internal human-review
+packets for unsigned follow-up runs. Use `write_signoff_packet(...)` and
+`record_signoff_packet(...)` to write local Markdown packets and persist packet
+metadata without recording a signoff decision.
 
 Default background log path:
 
@@ -743,7 +760,7 @@ Lightweight summary of a `ScoredNEO` for display or export.
 
 ---
 
-## v0.16.0 through v0.53.0 Public API Additions
+## v0.16.0 through v0.54.0 Public API Additions
 
 These releases added conservative helper APIs around live-data retrieval,
 preprocessing quality, detection triage, linking, orbit review, classification
@@ -880,8 +897,9 @@ claim confirmation or impact probability.
 | v0.51.0 | `background.py` / `Skills/background.py` | `background_blueprint_compliance_summary`; `blueprint-compliance-summary` CLI command |
 | v0.52.0 | `background.py` / `Skills/background.py` | `record_blueprint_compliance_summary`, `blueprint_compliance_log_summary`; persisted blueprint compliance CLI commands |
 | v0.53.0 | `background.py` / `Skills/background.py` | `background_operations_snapshot`, `record_background_operations_snapshot`, `background_operations_snapshot_log_summary`; operations snapshot CLI commands |
+| v0.54.0 | `background.py` / `Skills/background.py` | `signoff_packet`, `latest_unsigned_signoff_packet`, `write_signoff_packet`, `record_signoff_packet`, `signoff_packet_log_summary`; signoff packet CLI commands |
 
-### Skills and CLI additions in v0.16.0 through v0.53.0
+### Skills and CLI additions in v0.16.0 through v0.54.0
 
 `export_candidate_report.py`, `tag_neo_class.py`, `check_tisserand.py`,
 `export_followup_requests.py`, `ephemeris_check.py`,
@@ -926,5 +944,10 @@ claim confirmation or impact probability.
 `Skills/background.py blueprint-compliance-log-summary`,
 `Skills/background.py operations-snapshot`,
 `Skills/background.py record-operations-snapshot`,
-`Skills/background.py operations-snapshot-log-summary`, and
+`Skills/background.py operations-snapshot-log-summary`,
+`Skills/background.py signoff-packet`,
+`Skills/background.py latest-unsigned-signoff-packet`,
+`Skills/background.py write-signoff-packet`,
+`Skills/background.py record-signoff-packet`,
+`Skills/background.py signoff-packet-log-summary`, and
 `Skills/background.py launchd-plist`.

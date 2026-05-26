@@ -25,6 +25,7 @@ from background import (
     blueprint_compliance_log_summary,
     follow_up_test_summary,
     human_signoff_summary,
+    latest_unsigned_signoff_packet,
     launchd_plist,
     ledger_summary,
     live_dry_run_approval_bundle,
@@ -45,14 +46,18 @@ from background import (
     record_live_dry_run_operator_handoff,
     record_live_dry_run_plan,
     record_live_execution_attempt,
+    record_signoff_packet,
     reviewed_log_summary,
     run_detail,
+    signoff_packet,
+    signoff_packet_log_summary,
     signoff_readiness_summary,
     submission_recommendation_summary,
     target_history,
     target_priority_summary,
     validation_summary,
     write_live_dry_run_operator_handoff,
+    write_signoff_packet,
 )
 
 
@@ -183,6 +188,32 @@ def main() -> None:
     record_operations.add_argument("--input", type=Path, default=DEFAULT_INPUT_PATH)
     record_operations.add_argument("--db", type=Path, default=DEFAULT_DB_PATH)
 
+    latest_packet = sub.add_parser(
+        "latest-unsigned-signoff-packet",
+        help="Build a packet for the oldest unsigned follow-up run",
+    )
+    latest_packet.add_argument("--db", type=Path, default=DEFAULT_DB_PATH)
+
+    packet = sub.add_parser("signoff-packet", help="Build an internal signoff packet")
+    packet.add_argument("--run-id", required=True)
+    packet.add_argument("--db", type=Path, default=DEFAULT_DB_PATH)
+
+    write_packet = sub.add_parser(
+        "write-signoff-packet",
+        help="Write an internal signoff packet Markdown file",
+    )
+    write_packet.add_argument("--run-id", required=True)
+    write_packet.add_argument("--db", type=Path, default=DEFAULT_DB_PATH)
+    write_packet.add_argument("--report-dir", type=Path, default=DEFAULT_REPORT_DIR)
+
+    record_packet = sub.add_parser(
+        "record-signoff-packet",
+        help="Write and persist internal signoff packet metadata",
+    )
+    record_packet.add_argument("--run-id", required=True)
+    record_packet.add_argument("--db", type=Path, default=DEFAULT_DB_PATH)
+    record_packet.add_argument("--report-dir", type=Path, default=DEFAULT_REPORT_DIR)
+
     for name in (
         "ledger-summary",
         "reviewed-summary",
@@ -192,6 +223,7 @@ def main() -> None:
         "validation-summary",
         "blueprint-compliance-log-summary",
         "operations-snapshot-log-summary",
+        "signoff-packet-log-summary",
         "human-signoff-summary",
         "signoff-readiness",
         "automation-readiness-log-summary",
@@ -267,6 +299,14 @@ def main() -> None:
         _print_json(background_operations_snapshot(args.config, args.db, args.input))
     elif args.command == "record-operations-snapshot":
         _print_json(record_background_operations_snapshot(args.config, args.db, args.input))
+    elif args.command == "latest-unsigned-signoff-packet":
+        _print_json(latest_unsigned_signoff_packet(args.db))
+    elif args.command == "signoff-packet":
+        _print_json(signoff_packet(args.run_id, args.db))
+    elif args.command == "write-signoff-packet":
+        _print_json(write_signoff_packet(args.run_id, args.db, args.report_dir))
+    elif args.command == "record-signoff-packet":
+        _print_json(record_signoff_packet(args.run_id, args.db, args.report_dir))
     elif args.command == "ledger-summary":
         _print_json(ledger_summary(args.db))
     elif args.command == "reviewed-summary":
@@ -283,6 +323,8 @@ def main() -> None:
         _print_json(blueprint_compliance_log_summary(args.db))
     elif args.command == "operations-snapshot-log-summary":
         _print_json(background_operations_snapshot_log_summary(args.db))
+    elif args.command == "signoff-packet-log-summary":
+        _print_json(signoff_packet_log_summary(args.db))
     elif args.command == "human-signoff-summary":
         _print_json(human_signoff_summary(args.db))
     elif args.command == "signoff-readiness":

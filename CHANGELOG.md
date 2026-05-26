@@ -5,6 +5,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## v0.54.0
+
+- `background.py`: added `signoff_packet(run_id, db_path)`,
+  `latest_unsigned_signoff_packet(db_path)`, `write_signoff_packet(...)`,
+  `record_signoff_packet(...)`, and `signoff_packet_log_summary(db_path)` for
+  internal human-review packets that do not record signoff decisions.
+- `Skills/background.py`: added `signoff-packet`,
+  `latest-unsigned-signoff-packet`, `write-signoff-packet`,
+  `record-signoff-packet`, and `signoff-packet-log-summary` subcommands.
+- `init_log_db`: added top-level SQLite table `signoff_packet_log` for
+  persisted signoff packet metadata.
+- 5 new tests (2098 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.54.0.
+
 ## v0.53.0
 
 - `background.py`: added

@@ -18,6 +18,11 @@ __all__ = [
     "run_detail",
     "target_history",
     "signoff_readiness_summary",
+    "signoff_packet",
+    "latest_unsigned_signoff_packet",
+    "write_signoff_packet",
+    "record_signoff_packet",
+    "signoff_packet_log_summary",
     "ledger_summary",
     "reviewed_log_summary",
     "needs_follow_up_summary",
@@ -94,7 +99,7 @@ DEFAULT_INPUT_PATH = _ROOT / "background" / "targets.json"
 DEFAULT_DB_PATH = _ROOT / "Logs" / "background.sqlite"
 DEFAULT_REPORT_DIR = _ROOT / "Logs" / "reports"
 _SCHEMA_VERSION = "background-v1"
-_CODE_VERSION = "0.53.0"
+_CODE_VERSION = "0.54.0"
 _LIVE_REVIEW_POLICY_SCHEMA_PATH = _ROOT / "background" / "live_review_policy.schema.json"
 _SUPPORTED_LIVE_SURVEYS = ("ZTF", "ATLAS", "PanSTARRS")
 _LIVE_PROVIDER_CAPABILITIES = {
@@ -319,6 +324,21 @@ def init_log_db(db_path: Path = DEFAULT_DB_PATH) -> None:
                 scheduler_ready INTEGER NOT NULL,
                 live_mode_ready INTEGER NOT NULL,
                 blueprint_status TEXT NOT NULL,
+                entry_json TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS signoff_packet_log (
+                packet_id TEXT PRIMARY KEY,
+                created_at_utc TEXT NOT NULL,
+                run_id TEXT NOT NULL,
+                target_id TEXT NOT NULL,
+                packet_path TEXT NOT NULL,
+                report_path TEXT,
+                report_readiness_state TEXT NOT NULL,
+                recommended_decision TEXT NOT NULL,
                 entry_json TEXT NOT NULL
             )
             """
@@ -1295,6 +1315,216 @@ def signoff_readiness_summary(
             "unsigned_follow_up_runs": [
                 run["run_id"] for run in runs if not run["is_ready"]
             ],
+        }
+
+
+def _signoff_packet_decision(readiness: Mapping[str, Any]) -> str:
+    if readiness.get("is_ready"):
+        return "already_signed"
+    state = readiness.get("report_readiness_state")
+    if state == "ready_for_internal_review":
+        return "review_and_optionally_sign"
+    if state == "drafted":
+        return "inspect_missing_report_file"
+    return "resolve_packet_blockers"
+
+
+def _signoff_packet_text(packet: Mapping[str, Any]) -> str:
+    run = packet["run_detail"]
+    follow_up = run.get("needs_follow_up") or {}
+    readiness = packet["signoff_readiness"]
+    operations = packet["operations_snapshot"]
+    tests = follow_up.get("required_tests") or ()
+    recommendations = follow_up.get("recommendations") or ()
+    lines = [
+        f"# Internal Signoff Packet: {packet['target_id']}",
+        "",
+        "## Status",
+        "Internal review only. This packet does not authorize external contact or public claims.",
+        f"- Run id: {packet['run_id']}",
+        f"- Target id: {packet['target_id']}",
+        f"- Report readiness: {readiness['report_readiness_state']}",
+        f"- Recommended decision: {packet['recommended_decision']}",
+        f"- Next operations action: {operations['next_action']}",
+        f"- Network access performed: {packet['network_access_performed']}",
+        f"- External submission enabled: {packet['external_submission_enabled']}",
+        "",
+        "## Required Tests",
+        *(
+            [
+                f"- {test['name']}: {test['status']} ({test['reason_code']})"
+                for test in tests
+            ]
+            if tests
+            else ["- None recorded"]
+        ),
+        "",
+        "## Recommendations",
+        *(
+            [
+                (
+                    f"- {item['rank']}. {item['destination']}: "
+                    f"{item['recommended_action']}"
+                )
+                for item in recommendations
+            ]
+            if recommendations
+            else ["- None recorded"]
+        ),
+        "",
+        "## Evidence Paths",
+        f"- Follow-up report: {readiness.get('report_path') or 'None'}",
+        f"- Report exists: {readiness.get('report_exists', False)}",
+        "",
+        "## Guardrails",
+        "- Use this packet for local human review only.",
+        "- Do not contact outside parties from this packet.",
+        "- Do not make authoritative hazard statements from internal data.",
+        "- Defer external assessment to MPC, CNEOS, and NASA processes.",
+    ]
+    text = "\n".join(lines) + "\n"
+    lowered = text.lower()
+    for phrase in _FORBIDDEN_REPORT_PHRASES:
+        if phrase in lowered:
+            raise ValueError(f"Signoff packet contains forbidden phrase: {phrase}")
+    return text
+
+
+def signoff_packet(run_id: str, db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]:
+    """Build an internal review packet for a follow-up run without signing it."""
+    detail = run_detail(run_id, db_path)
+    if detail["ledger"] is None:
+        raise ValueError(f"Run not found: {run_id}")
+    if detail["needs_follow_up"] is None:
+        raise ValueError(f"Run does not require follow-up: {run_id}")
+    target_id = detail["ledger"]["target_id"]
+    history = target_history(target_id, db_path)
+    operations = background_operations_snapshot(
+        DEFAULT_CONFIG_PATH,
+        db_path,
+        Path(detail["ledger"]["input_path"]),
+    )
+    readiness = detail["signoff_readiness"]
+    packet = {
+        "created_at_utc": _utc_now(),
+        "code_version": _CODE_VERSION,
+        "schema_version": _SCHEMA_VERSION,
+        "db_path": str(db_path),
+        "run_id": run_id,
+        "target_id": target_id,
+        "run_detail": detail,
+        "target_history": history,
+        "signoff_readiness": readiness,
+        "operations_snapshot": operations,
+        "recommended_decision": _signoff_packet_decision(readiness),
+        "guardrails": {
+            "network_access_performed": False,
+            "external_submission_enabled": False,
+            "manual_human_approval_required": True,
+            "packet_records_no_signoff": True,
+        },
+        "network_access_performed": False,
+        "external_submission_enabled": False,
+    }
+    return {
+        **packet,
+        "packet_text": _signoff_packet_text(packet),
+    }
+
+
+def latest_unsigned_signoff_packet(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]:
+    """Build a signoff packet for the oldest unsigned follow-up run, if any."""
+    readiness = signoff_readiness_summary(db_path)
+    unsigned = readiness["unsigned_follow_up_runs"]
+    return {
+        "db_path": str(db_path),
+        "unsigned_follow_up_runs": unsigned,
+        "packet": signoff_packet(unsigned[0], db_path) if unsigned else None,
+        "network_access_performed": False,
+        "external_submission_enabled": False,
+    }
+
+
+def write_signoff_packet(
+    run_id: str,
+    db_path: Path = DEFAULT_DB_PATH,
+    report_dir: Path = DEFAULT_REPORT_DIR,
+) -> dict[str, Any]:
+    """Write an internal signoff packet Markdown file without recording a signoff."""
+    packet = signoff_packet(run_id, db_path)
+    report_dir.mkdir(parents=True, exist_ok=True)
+    stamp = packet["created_at_utc"].replace(":", "").replace("+", "_")
+    path = report_dir / f"{packet['target_id']}_signoff_packet_{stamp}.md"
+    path.write_text(packet["packet_text"])
+    return {
+        **packet,
+        "packet_path": str(path),
+    }
+
+
+def record_signoff_packet(
+    run_id: str,
+    db_path: Path = DEFAULT_DB_PATH,
+    report_dir: Path = DEFAULT_REPORT_DIR,
+) -> dict[str, Any]:
+    """Write and persist metadata for an internal signoff packet."""
+    init_log_db(db_path)
+    packet = write_signoff_packet(run_id, db_path, report_dir)
+    entry = {
+        "packet_id": str(uuid.uuid4()),
+        **packet,
+    }
+    with _connect(db_path) as conn:
+        conn.execute(
+            """
+            INSERT INTO signoff_packet_log (
+                packet_id, created_at_utc, run_id, target_id, packet_path,
+                report_path, report_readiness_state, recommended_decision,
+                entry_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                entry["packet_id"],
+                entry["created_at_utc"],
+                entry["run_id"],
+                entry["target_id"],
+                entry["packet_path"],
+                entry["signoff_readiness"].get("report_path"),
+                entry["signoff_readiness"]["report_readiness_state"],
+                entry["recommended_decision"],
+                json.dumps(entry),
+            ),
+        )
+    return entry
+
+
+def signoff_packet_log_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]:
+    """Summarize persisted internal signoff packets."""
+    init_log_db(db_path)
+    with _connect(db_path) as conn:
+        latest = conn.execute(
+            """
+            SELECT entry_json
+            FROM signoff_packet_log
+            ORDER BY created_at_utc DESC
+            LIMIT 1
+            """
+        ).fetchone()
+        by_decision = {
+            row["recommended_decision"]: row["n"]
+            for row in conn.execute(
+                """
+                SELECT recommended_decision, COUNT(*) AS n
+                FROM signoff_packet_log
+                GROUP BY recommended_decision
+                """
+            )
+        }
+        return {
+            "db_path": str(db_path),
+            "total_signoff_packets": _count_rows(conn, "signoff_packet_log"),
+            "by_recommended_decision": by_decision,
+            "latest": json.loads(latest["entry_json"]) if latest else None,
         }
 
 

@@ -747,7 +747,7 @@ def test_background_operations_snapshot_empty_log(monkeypatch, tmp_path):
         fixture,
     )
 
-    assert snapshot["code_version"] == "0.53.0"
+    assert snapshot["code_version"] == "0.54.0"
     assert snapshot["next_action"] == "run_background_once"
     assert snapshot["ledger"]["total_runs"] == 0
     assert snapshot["automation_readiness"]["scheduler_ready"] is True
@@ -884,6 +884,177 @@ def test_background_cli_operations_snapshot_commands(monkeypatch, tmp_path):
     assert recorded_payload["external_submission_enabled"] is False
     assert summary_payload["total_operations_snapshots"] == 1
     assert summary_payload["latest"]["snapshot_id"] == recorded_payload["snapshot_id"]
+
+
+def test_signoff_packet_for_unsigned_followup(monkeypatch, tmp_path):
+    fixture = tmp_path / "targets.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
+    write_fixture(fixture)
+    monkeypatch.setattr(background, "score_tracklet", lambda tracklet, run_id: make_scored())
+    result = background.background_run_once(
+        fixture,
+        db_path,
+        tmp_path / "reports",
+        config_path=tmp_path / "missing_config.json",
+    )
+
+    packet = background.signoff_packet(result.ledger.run_id, db_path)
+    latest = background.latest_unsigned_signoff_packet(db_path)
+
+    assert packet["code_version"] == "0.54.0"
+    assert packet["run_id"] == result.ledger.run_id
+    assert packet["target_id"] == "T001"
+    assert packet["recommended_decision"] == "review_and_optionally_sign"
+    assert packet["signoff_readiness"]["report_readiness_state"] == (
+        "ready_for_internal_review"
+    )
+    assert packet["operations_snapshot"]["next_action"] == "record_signoff"
+    assert packet["network_access_performed"] is False
+    assert packet["external_submission_enabled"] is False
+    assert "impact probability" not in packet["packet_text"].lower()
+    assert latest["packet"]["run_id"] == result.ledger.run_id
+
+
+def test_latest_unsigned_signoff_packet_none_after_signoff(monkeypatch, tmp_path):
+    fixture = tmp_path / "targets.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
+    write_fixture(fixture)
+    monkeypatch.setattr(background, "score_tracklet", lambda tracklet, run_id: make_scored())
+    result = background.background_run_once(
+        fixture,
+        db_path,
+        tmp_path / "reports",
+        config_path=tmp_path / "missing_config.json",
+    )
+    background.record_human_signoff(
+        run_id=result.ledger.run_id,
+        target_id=result.ledger.target_id,
+        reviewer="Reviewer",
+        decision="approved_for_internal_review",
+        scope="Internal follow-up only",
+        notes="Reviewed local SQLite logs.",
+        db_path=db_path,
+    )
+
+    latest = background.latest_unsigned_signoff_packet(db_path)
+
+    assert latest["unsigned_follow_up_runs"] == []
+    assert latest["packet"] is None
+    assert latest["network_access_performed"] is False
+    assert latest["external_submission_enabled"] is False
+
+
+def test_signoff_packet_rejects_missing_or_reviewed_run(monkeypatch, tmp_path):
+    fixture = tmp_path / "targets.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
+    fixture.write_text("[]")
+    result = background.background_run_once(
+        fixture,
+        db_path,
+        tmp_path / "reports",
+        config_path=tmp_path / "missing_config.json",
+    )
+
+    with pytest.raises(ValueError, match="Run not found"):
+        background.signoff_packet("missing-run", db_path)
+    with pytest.raises(ValueError, match="does not require follow-up"):
+        background.signoff_packet(result.ledger.run_id, db_path)
+
+
+def test_record_signoff_packet_persists_sqlite_log(monkeypatch, tmp_path):
+    fixture = tmp_path / "targets.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
+    report_dir = tmp_path / "packets"
+    write_fixture(fixture)
+    monkeypatch.setattr(background, "score_tracklet", lambda tracklet, run_id: make_scored())
+    result = background.background_run_once(
+        fixture,
+        db_path,
+        tmp_path / "reports",
+        config_path=tmp_path / "missing_config.json",
+    )
+
+    entry = background.record_signoff_packet(result.ledger.run_id, db_path, report_dir)
+    summary = background.signoff_packet_log_summary(db_path)
+
+    assert Path(entry["packet_path"]).exists()
+    assert entry["recommended_decision"] == "review_and_optionally_sign"
+    assert table_count(db_path, "signoff_packet_log") == 1
+    assert summary["total_signoff_packets"] == 1
+    assert summary["by_recommended_decision"] == {"review_and_optionally_sign": 1}
+    assert summary["latest"]["packet_id"] == entry["packet_id"]
+
+
+def test_background_cli_signoff_packet_commands(monkeypatch, tmp_path):
+    repo = Path(__file__).resolve().parents[1]
+    fixture = tmp_path / "targets.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
+    report_dir = tmp_path / "packets"
+    write_fixture(fixture)
+    monkeypatch.setattr(background, "score_tracklet", lambda tracklet, run_id: make_scored())
+    result = background.background_run_once(
+        fixture,
+        db_path,
+        tmp_path / "reports",
+        config_path=tmp_path / "missing_config.json",
+    )
+    env = {**os.environ, "PYTHONPATH": str(repo / "src")}
+
+    latest = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "latest-unsigned-signoff-packet",
+            "--db",
+            str(db_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    recorded = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "record-signoff-packet",
+            "--run-id",
+            result.ledger.run_id,
+            "--db",
+            str(db_path),
+            "--report-dir",
+            str(report_dir),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    summary = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "signoff-packet-log-summary",
+            "--db",
+            str(db_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+
+    latest_payload = json.loads(latest.stdout)
+    recorded_payload = json.loads(recorded.stdout)
+    summary_payload = json.loads(summary.stdout)
+    assert latest_payload["packet"]["run_id"] == result.ledger.run_id
+    assert recorded_payload["run_id"] == result.ledger.run_id
+    assert Path(recorded_payload["packet_path"]).exists()
+    assert summary_payload["total_signoff_packets"] == 1
+    assert summary_payload["latest"]["packet_id"] == recorded_payload["packet_id"]
 
 
 def test_select_target_uses_highest_composite():
@@ -1849,6 +2020,7 @@ def test_init_log_db_migrates_existing_ledger(tmp_path):
         "automation_readiness_log",
         "blueprint_compliance_log",
         "operations_snapshot_log",
+        "signoff_packet_log",
         "live_approval_bundle_log",
         "live_operator_handoff_log",
         "live_dry_run_plan_log",

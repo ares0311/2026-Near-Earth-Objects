@@ -170,6 +170,7 @@ The SQLite database contains append-only operational tables:
 | `reviewed_log` | Outcome row when no follow-up is warranted |
 | `needs_follow_up_log` | Outcome row when follow-up, tests, or review are required |
 | `human_signoff_log` | Manual reviewer signoff records |
+| `signoff_packet_log` | Internal human-review packet metadata |
 | `automation_readiness_log` | Scheduler/live-readiness snapshots |
 | `blueprint_compliance_log` | Background blueprint compliance snapshots |
 | `operations_snapshot_log` | Aggregated operator-facing background status snapshots |
@@ -199,6 +200,11 @@ PYTHONPATH=src python Skills/background.py blueprint-compliance-log-summary
 PYTHONPATH=src python Skills/background.py operations-snapshot
 PYTHONPATH=src python Skills/background.py record-operations-snapshot
 PYTHONPATH=src python Skills/background.py operations-snapshot-log-summary
+PYTHONPATH=src python Skills/background.py latest-unsigned-signoff-packet
+PYTHONPATH=src python Skills/background.py signoff-packet --run-id <run-id>
+PYTHONPATH=src python Skills/background.py write-signoff-packet --run-id <run-id>
+PYTHONPATH=src python Skills/background.py record-signoff-packet --run-id <run-id>
+PYTHONPATH=src python Skills/background.py signoff-packet-log-summary
 PYTHONPATH=src python Skills/background.py human-signoff-summary
 PYTHONPATH=src python Skills/background.py signoff-readiness
 PYTHONPATH=src python Skills/background.py record-automation-readiness
@@ -284,6 +290,22 @@ Signoff records are explicit and auditable. They do not submit or contact
 external parties. Multiple reviewers may record signoffs for the same run; one
 `approved_for_internal_review` record is enough for the signoff-readiness audit
 view to report the run as signed.
+
+Before recording a signoff, generate an internal signoff packet:
+
+```bash
+PYTHONPATH=src python Skills/background.py latest-unsigned-signoff-packet
+PYTHONPATH=src python Skills/background.py signoff-packet --run-id <run-id>
+PYTHONPATH=src python Skills/background.py write-signoff-packet --run-id <run-id>
+PYTHONPATH=src python Skills/background.py record-signoff-packet --run-id <run-id>
+PYTHONPATH=src python Skills/background.py signoff-packet-log-summary
+```
+
+Signoff packets combine run detail, target history, required tests,
+recommendations, operations snapshot status, and report readiness into a local
+review artifact. Writing or recording a packet does not approve anything,
+contact outside parties, enable live network access, or record a signoff
+decision. It only prepares evidence for a human reviewer.
 
 ```bash
 PYTHONPATH=src python Skills/background.py record-signoff \
