@@ -5,6 +5,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## v0.55.0
+
+- `background.py`: added `record_signoff_from_packet(...)` and
+  `signoff_packet_decision_summary(db_path)` to record reviewer decisions from
+  persisted internal signoff packets.
+- `Skills/background.py`: added `record-signoff-from-packet` and
+  `signoff-packet-decision-summary` subcommands.
+- `init_log_db`: added top-level SQLite table `signoff_packet_decision_log` for
+  packet-linked reviewer decisions and the resulting operations snapshot IDs.
+- Packet-based decisions validate the packet, unsigned follow-up state, and
+  target/run match before writing a normal human signoff plus decision audit
+  row. Each packet decision also records a post-decision operations snapshot
+  while keeping network access and external submission disabled.
+- 5 new tests (2103 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.55.0.
+
 ## v0.54.0
 
 - `background.py`: added `signoff_packet(run_id, db_path)`,

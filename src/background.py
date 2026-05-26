@@ -23,6 +23,8 @@ __all__ = [
     "write_signoff_packet",
     "record_signoff_packet",
     "signoff_packet_log_summary",
+    "record_signoff_from_packet",
+    "signoff_packet_decision_summary",
     "ledger_summary",
     "reviewed_log_summary",
     "needs_follow_up_summary",
@@ -99,7 +101,7 @@ DEFAULT_INPUT_PATH = _ROOT / "background" / "targets.json"
 DEFAULT_DB_PATH = _ROOT / "Logs" / "background.sqlite"
 DEFAULT_REPORT_DIR = _ROOT / "Logs" / "reports"
 _SCHEMA_VERSION = "background-v1"
-_CODE_VERSION = "0.54.0"
+_CODE_VERSION = "0.55.0"
 _LIVE_REVIEW_POLICY_SCHEMA_PATH = _ROOT / "background" / "live_review_policy.schema.json"
 _SUPPORTED_LIVE_SURVEYS = ("ZTF", "ATLAS", "PanSTARRS")
 _LIVE_PROVIDER_CAPABILITIES = {
@@ -339,6 +341,22 @@ def init_log_db(db_path: Path = DEFAULT_DB_PATH) -> None:
                 report_path TEXT,
                 report_readiness_state TEXT NOT NULL,
                 recommended_decision TEXT NOT NULL,
+                entry_json TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS signoff_packet_decision_log (
+                decision_id TEXT PRIMARY KEY,
+                packet_id TEXT NOT NULL UNIQUE,
+                signoff_id TEXT NOT NULL,
+                run_id TEXT NOT NULL,
+                target_id TEXT NOT NULL,
+                reviewer TEXT NOT NULL,
+                decision TEXT NOT NULL,
+                decided_at_utc TEXT NOT NULL,
+                operations_snapshot_id TEXT,
                 entry_json TEXT NOT NULL
             )
             """
@@ -1525,6 +1543,164 @@ def signoff_packet_log_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any
             "total_signoff_packets": _count_rows(conn, "signoff_packet_log"),
             "by_recommended_decision": by_decision,
             "latest": json.loads(latest["entry_json"]) if latest else None,
+        }
+
+
+def _packet_entry(conn: sqlite3.Connection, packet_id: str) -> dict[str, Any] | None:
+    row = conn.execute(
+        "SELECT entry_json FROM signoff_packet_log WHERE packet_id = ?",
+        (packet_id,),
+    ).fetchone()
+    return json.loads(row["entry_json"]) if row else None
+
+
+def _packet_decision_exists(conn: sqlite3.Connection, packet_id: str) -> bool:
+    row = conn.execute(
+        "SELECT 1 FROM signoff_packet_decision_log WHERE packet_id = ?",
+        (packet_id,),
+    ).fetchone()
+    return row is not None
+
+
+def record_signoff_from_packet(
+    packet_id: str,
+    reviewer: str,
+    decision: SignoffDecision,
+    scope: str,
+    notes: str = "",
+    db_path: Path = DEFAULT_DB_PATH,
+) -> dict[str, Any]:
+    """Record a human signoff decision from a persisted internal packet."""
+    init_log_db(db_path)
+    decision_id = str(uuid.uuid4())
+    with _connect(db_path) as conn:
+        packet = _packet_entry(conn, packet_id)
+        if packet is None:
+            raise ValueError(f"Signoff packet not found: {packet_id}")
+        if _packet_decision_exists(conn, packet_id):
+            raise ValueError(f"Signoff packet already has a decision: {packet_id}")
+
+        run_id = packet["run_id"]
+        target_id = packet["target_id"]
+        follow_up = conn.execute(
+            "SELECT entry_json FROM needs_follow_up_log WHERE run_id = ?",
+            (run_id,),
+        ).fetchone()
+        if follow_up is None:
+            raise ValueError(f"Packet run is no longer a follow-up run: {run_id}")
+        follow_up_data = json.loads(follow_up["entry_json"])
+        if follow_up_data["target_id"] != target_id:
+            raise ValueError(f"Packet target no longer matches follow-up run: {packet_id}")
+
+        readiness = _run_signoff_readiness(conn, run_id)
+        if readiness["is_ready"]:
+            raise ValueError(f"Packet run is already signed: {run_id}")
+
+        signoff = HumanSignoffEntry(
+            signoff_id=str(uuid.uuid4()),
+            run_id=run_id,
+            target_id=target_id,
+            reviewer=reviewer,
+            signed_at_utc=_utc_now(),
+            decision=decision,
+            scope=scope,
+            notes=notes,
+        )
+        _insert_human_signoff(conn, signoff)
+        entry = {
+            "decision_id": decision_id,
+            "packet_id": packet_id,
+            "signoff_id": signoff.signoff_id,
+            "run_id": run_id,
+            "target_id": target_id,
+            "reviewer": reviewer,
+            "decision": decision,
+            "decided_at_utc": signoff.signed_at_utc,
+            "scope": scope,
+            "notes": notes,
+            "packet": packet,
+            "signoff": signoff.model_dump(),
+            "operations_snapshot_id": None,
+            "network_access_performed": False,
+            "external_submission_enabled": False,
+        }
+        conn.execute(
+            """
+            INSERT INTO signoff_packet_decision_log (
+                decision_id, packet_id, signoff_id, run_id, target_id,
+                reviewer, decision, decided_at_utc, operations_snapshot_id,
+                entry_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                entry["decision_id"],
+                entry["packet_id"],
+                entry["signoff_id"],
+                entry["run_id"],
+                entry["target_id"],
+                entry["reviewer"],
+                entry["decision"],
+                entry["decided_at_utc"],
+                entry["operations_snapshot_id"],
+                json.dumps(entry),
+            ),
+        )
+
+    input_path = Path(packet["run_detail"]["ledger"]["input_path"])
+    operations = record_background_operations_snapshot(DEFAULT_CONFIG_PATH, db_path, input_path)
+    with _connect(db_path) as conn:
+        row = conn.execute(
+            "SELECT entry_json FROM signoff_packet_decision_log WHERE decision_id = ?",
+            (decision_id,),
+        ).fetchone()
+        entry = json.loads(row["entry_json"])
+        entry["operations_snapshot_id"] = operations["snapshot_id"]
+        entry["operations_snapshot"] = operations
+        conn.execute(
+            """
+            UPDATE signoff_packet_decision_log
+            SET operations_snapshot_id = ?, entry_json = ?
+            WHERE decision_id = ?
+            """,
+            (operations["snapshot_id"], json.dumps(entry), decision_id),
+        )
+    return entry
+
+
+def signoff_packet_decision_summary(
+    db_path: Path = DEFAULT_DB_PATH,
+) -> dict[str, Any]:
+    """Summarize signoff decisions recorded from persisted packets."""
+    init_log_db(db_path)
+    with _connect(db_path) as conn:
+        latest = conn.execute(
+            """
+            SELECT entry_json
+            FROM signoff_packet_decision_log
+            ORDER BY decided_at_utc DESC
+            LIMIT 1
+            """
+        ).fetchone()
+        by_decision = {
+            row["decision"]: row["n"]
+            for row in conn.execute(
+                """
+                SELECT decision, COUNT(*) AS n
+                FROM signoff_packet_decision_log
+                GROUP BY decision
+                """
+            )
+        }
+        return {
+            "db_path": str(db_path),
+            "total_packet_decisions": _count_rows(
+                conn,
+                "signoff_packet_decision_log",
+            ),
+            "by_decision": by_decision,
+            "latest": json.loads(latest["entry_json"]) if latest else None,
+            "network_access_performed": False,
+            "external_submission_enabled": False,
         }
 
 

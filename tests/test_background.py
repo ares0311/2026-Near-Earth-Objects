@@ -747,7 +747,7 @@ def test_background_operations_snapshot_empty_log(monkeypatch, tmp_path):
         fixture,
     )
 
-    assert snapshot["code_version"] == "0.54.0"
+    assert snapshot["code_version"] == "0.55.0"
     assert snapshot["next_action"] == "run_background_once"
     assert snapshot["ledger"]["total_runs"] == 0
     assert snapshot["automation_readiness"]["scheduler_ready"] is True
@@ -901,7 +901,7 @@ def test_signoff_packet_for_unsigned_followup(monkeypatch, tmp_path):
     packet = background.signoff_packet(result.ledger.run_id, db_path)
     latest = background.latest_unsigned_signoff_packet(db_path)
 
-    assert packet["code_version"] == "0.54.0"
+    assert packet["code_version"] == "0.55.0"
     assert packet["run_id"] == result.ledger.run_id
     assert packet["target_id"] == "T001"
     assert packet["recommended_decision"] == "review_and_optionally_sign"
@@ -1055,6 +1055,201 @@ def test_background_cli_signoff_packet_commands(monkeypatch, tmp_path):
     assert Path(recorded_payload["packet_path"]).exists()
     assert summary_payload["total_signoff_packets"] == 1
     assert summary_payload["latest"]["packet_id"] == recorded_payload["packet_id"]
+
+
+def test_record_signoff_from_packet_approves_and_snapshots(monkeypatch, tmp_path):
+    fixture = tmp_path / "targets.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
+    report_dir = tmp_path / "packets"
+    write_fixture(fixture)
+    monkeypatch.setattr(background, "score_tracklet", lambda tracklet, run_id: make_scored())
+    result = background.background_run_once(
+        fixture,
+        db_path,
+        tmp_path / "reports",
+        config_path=tmp_path / "missing_config.json",
+    )
+    packet = background.record_signoff_packet(result.ledger.run_id, db_path, report_dir)
+
+    decision = background.record_signoff_from_packet(
+        packet_id=packet["packet_id"],
+        reviewer="Reviewer",
+        decision="approved_for_internal_review",
+        scope="Internal follow-up only",
+        notes="Reviewed signoff packet.",
+        db_path=db_path,
+    )
+    summary = background.signoff_packet_decision_summary(db_path)
+    readiness = background.signoff_readiness_summary(db_path)
+
+    assert decision["packet_id"] == packet["packet_id"]
+    assert decision["decision"] == "approved_for_internal_review"
+    assert decision["operations_snapshot"]["next_action"] == "review_follow_up"
+    assert table_count(db_path, "human_signoff_log") == 1
+    assert table_count(db_path, "signoff_packet_decision_log") == 1
+    assert summary["total_packet_decisions"] == 1
+    assert summary["by_decision"] == {"approved_for_internal_review": 1}
+    assert readiness["unsigned_follow_up_runs"] == []
+
+
+@pytest.mark.parametrize("decision", ["needs_more_work", "rejected"])
+def test_record_signoff_from_packet_nonapproval_keeps_run_unsigned(
+    monkeypatch,
+    tmp_path,
+    decision,
+):
+    fixture = tmp_path / "targets.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
+    write_fixture(fixture)
+    monkeypatch.setattr(background, "score_tracklet", lambda tracklet, run_id: make_scored())
+    result = background.background_run_once(
+        fixture,
+        db_path,
+        tmp_path / "reports",
+        config_path=tmp_path / "missing_config.json",
+    )
+    packet = background.record_signoff_packet(result.ledger.run_id, db_path, tmp_path / "packets")
+
+    entry = background.record_signoff_from_packet(
+        packet["packet_id"],
+        "Reviewer",
+        decision,
+        "Internal follow-up only",
+        "Reviewed signoff packet.",
+        db_path,
+    )
+    readiness = background.signoff_readiness_summary(db_path)
+
+    assert entry["decision"] == decision
+    assert entry["operations_snapshot"]["next_action"] == "record_signoff"
+    assert readiness["unsigned_follow_up_runs"] == [result.ledger.run_id]
+
+
+def test_record_signoff_from_packet_rejects_missing_duplicate_and_signed(
+    monkeypatch,
+    tmp_path,
+):
+    fixture = tmp_path / "targets.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
+    write_fixture(fixture)
+    monkeypatch.setattr(background, "score_tracklet", lambda tracklet, run_id: make_scored())
+    result = background.background_run_once(
+        fixture,
+        db_path,
+        tmp_path / "reports",
+        config_path=tmp_path / "missing_config.json",
+    )
+    packet = background.record_signoff_packet(result.ledger.run_id, db_path, tmp_path / "packets")
+
+    with pytest.raises(ValueError, match="Signoff packet not found"):
+        background.record_signoff_from_packet(
+            "missing-packet",
+            "Reviewer",
+            "approved_for_internal_review",
+            "Internal follow-up only",
+            db_path=db_path,
+        )
+
+    background.record_signoff_from_packet(
+        packet["packet_id"],
+        "Reviewer",
+        "needs_more_work",
+        "Internal follow-up only",
+        db_path=db_path,
+    )
+    with pytest.raises(ValueError, match="already has a decision"):
+        background.record_signoff_from_packet(
+            packet["packet_id"],
+            "Reviewer",
+            "approved_for_internal_review",
+            "Internal follow-up only",
+            db_path=db_path,
+        )
+
+    second_packet = background.record_signoff_packet(
+        result.ledger.run_id,
+        db_path,
+        tmp_path / "packets",
+    )
+    background.record_human_signoff(
+        run_id=result.ledger.run_id,
+        target_id=result.ledger.target_id,
+        reviewer="Approver",
+        decision="approved_for_internal_review",
+        scope="Internal follow-up only",
+        db_path=db_path,
+    )
+    with pytest.raises(ValueError, match="already signed"):
+        background.record_signoff_from_packet(
+            second_packet["packet_id"],
+            "Reviewer",
+            "approved_for_internal_review",
+            "Internal follow-up only",
+            db_path=db_path,
+        )
+
+
+def test_background_cli_record_signoff_from_packet(monkeypatch, tmp_path):
+    repo = Path(__file__).resolve().parents[1]
+    fixture = tmp_path / "targets.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
+    write_fixture(fixture)
+    monkeypatch.setattr(background, "score_tracklet", lambda tracklet, run_id: make_scored())
+    result = background.background_run_once(
+        fixture,
+        db_path,
+        tmp_path / "reports",
+        config_path=tmp_path / "missing_config.json",
+    )
+    packet = background.record_signoff_packet(result.ledger.run_id, db_path, tmp_path / "packets")
+    env = {**os.environ, "PYTHONPATH": str(repo / "src")}
+
+    recorded = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "record-signoff-from-packet",
+            "--packet-id",
+            packet["packet_id"],
+            "--reviewer",
+            "Reviewer",
+            "--decision",
+            "approved_for_internal_review",
+            "--scope",
+            "Internal follow-up only",
+            "--notes",
+            "Reviewed signoff packet.",
+            "--db",
+            str(db_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    summary = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "signoff-packet-decision-summary",
+            "--db",
+            str(db_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+
+    recorded_payload = json.loads(recorded.stdout)
+    summary_payload = json.loads(summary.stdout)
+    assert recorded_payload["packet_id"] == packet["packet_id"]
+    assert recorded_payload["network_access_performed"] is False
+    assert recorded_payload["external_submission_enabled"] is False
+    assert summary_payload["total_packet_decisions"] == 1
+    assert summary_payload["by_decision"] == {"approved_for_internal_review": 1}
 
 
 def test_select_target_uses_highest_composite():
@@ -2021,6 +2216,7 @@ def test_init_log_db_migrates_existing_ledger(tmp_path):
         "blueprint_compliance_log",
         "operations_snapshot_log",
         "signoff_packet_log",
+        "signoff_packet_decision_log",
         "live_approval_bundle_log",
         "live_operator_handoff_log",
         "live_dry_run_plan_log",

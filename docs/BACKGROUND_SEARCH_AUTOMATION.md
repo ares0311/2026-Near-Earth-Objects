@@ -171,6 +171,7 @@ The SQLite database contains append-only operational tables:
 | `needs_follow_up_log` | Outcome row when follow-up, tests, or review are required |
 | `human_signoff_log` | Manual reviewer signoff records |
 | `signoff_packet_log` | Internal human-review packet metadata |
+| `signoff_packet_decision_log` | Packet-linked reviewer decisions and resulting operations snapshots |
 | `automation_readiness_log` | Scheduler/live-readiness snapshots |
 | `blueprint_compliance_log` | Background blueprint compliance snapshots |
 | `operations_snapshot_log` | Aggregated operator-facing background status snapshots |
@@ -205,6 +206,8 @@ PYTHONPATH=src python Skills/background.py signoff-packet --run-id <run-id>
 PYTHONPATH=src python Skills/background.py write-signoff-packet --run-id <run-id>
 PYTHONPATH=src python Skills/background.py record-signoff-packet --run-id <run-id>
 PYTHONPATH=src python Skills/background.py signoff-packet-log-summary
+PYTHONPATH=src python Skills/background.py record-signoff-from-packet --packet-id <packet-id> --reviewer "Reviewer Name" --decision approved_for_internal_review --scope "Internal follow-up only"
+PYTHONPATH=src python Skills/background.py signoff-packet-decision-summary
 PYTHONPATH=src python Skills/background.py human-signoff-summary
 PYTHONPATH=src python Skills/background.py signoff-readiness
 PYTHONPATH=src python Skills/background.py record-automation-readiness
@@ -299,6 +302,8 @@ PYTHONPATH=src python Skills/background.py signoff-packet --run-id <run-id>
 PYTHONPATH=src python Skills/background.py write-signoff-packet --run-id <run-id>
 PYTHONPATH=src python Skills/background.py record-signoff-packet --run-id <run-id>
 PYTHONPATH=src python Skills/background.py signoff-packet-log-summary
+PYTHONPATH=src python Skills/background.py record-signoff-from-packet --packet-id <packet-id> --reviewer "Reviewer Name" --decision approved_for_internal_review --scope "Internal follow-up only"
+PYTHONPATH=src python Skills/background.py signoff-packet-decision-summary
 ```
 
 Signoff packets combine run detail, target history, required tests,
@@ -306,6 +311,28 @@ recommendations, operations snapshot status, and report readiness into a local
 review artifact. Writing or recording a packet does not approve anything,
 contact outside parties, enable live network access, or record a signoff
 decision. It only prepares evidence for a human reviewer.
+
+When a reviewer is ready to report a result from a persisted packet, record the
+decision from the packet rather than manually reconstructing the run metadata:
+
+```bash
+PYTHONPATH=src python Skills/background.py record-signoff-from-packet \
+  --packet-id <packet-id> \
+  --reviewer "Reviewer Name" \
+  --decision approved_for_internal_review \
+  --scope "Internal follow-up only" \
+  --notes "Reviewed SQLite log, packet, and report draft"
+
+PYTHONPATH=src python Skills/background.py signoff-packet-decision-summary
+```
+
+Packet-based decisions validate that the packet exists, the run is still an
+unsigned follow-up run, and the packet target still matches the logged
+follow-up target. The command writes a normal human signoff plus an auditable
+`signoff_packet_decision_log` row, then records a post-decision operations
+snapshot. It remains an internal review action only: it does not contact
+outside parties, enable live network access, or perform any external
+submission.
 
 ```bash
 PYTHONPATH=src python Skills/background.py record-signoff \

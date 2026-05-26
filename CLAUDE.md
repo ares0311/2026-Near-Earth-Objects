@@ -471,9 +471,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.54.0)
+## Current State (v0.55.0)
 
-All 10 pipeline modules are complete. 2098 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified CLI with automated offline scheduling readiness, live policy contract validation, provider-specific live readiness summaries, no-network live dry-run approval bundles, operator handoff exports, persisted operator handoff logs, persisted blueprint compliance summaries, persisted operations snapshots, internal signoff packets, top-level SQLite logs for runs, readiness checks, approval bundles, no-network live dry-run plans, mock-only provider execution attempts, and auditable signoff readiness. Public APIs now extend through v0.54.0 with expanded calibration, orbit dynamics, survey statistics, alert packaging, schema summaries, conservative candidate-priority helpers, background blueprint auditing, operations snapshots, and signoff packets.
+All 10 pipeline modules are complete. 2103 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified CLI with automated offline scheduling readiness, live policy contract validation, provider-specific live readiness summaries, no-network live dry-run approval bundles, operator handoff exports, persisted operator handoff logs, persisted blueprint compliance summaries, persisted operations snapshots, internal signoff packets, packet-linked signoff decisions, top-level SQLite logs for runs, readiness checks, approval bundles, no-network live dry-run plans, mock-only provider execution attempts, and auditable signoff readiness. Public APIs now extend through v0.55.0 with expanded calibration, orbit dynamics, survey statistics, alert packaging, schema summaries, conservative candidate-priority helpers, background blueprint auditing, operations snapshots, signoff packets, and packet-linked signoff decisions.
 
 ### Skills
 
@@ -600,7 +600,7 @@ All 10 pipeline modules are complete. 2098 tests passing (100% coverage). CI gre
 | `background/live_review_policy.schema.json` | JSON Schema for live dry-run review policy |
 | `background/targets.json` | Stable background automation fixture manifest |
 
-### Coverage by Module (v0.54.0)
+### Coverage by Module (v0.55.0)
 
 | Module | Coverage |
 |---|---|
@@ -631,9 +631,19 @@ All 10 pipeline modules are complete. 2098 tests passing (100% coverage). CI gre
 - Persist blueprint compliance snapshots with `Skills/background.py record-blueprint-compliance-summary` after scheduled background cycles.
 - Persist operator-facing operations snapshots with `Skills/background.py record-operations-snapshot` after scheduled background cycles.
 - Generate internal signoff packets with `Skills/background.py latest-unsigned-signoff-packet` before recording reviewer decisions.
+- Use `Skills/background.py record-signoff-from-packet` when a reviewer is ready to report a decision from a persisted packet.
 - Collect labeled training data via `Skills/generate_training_labels.py`.
 - Run credentialed live-data dry runs for ZTF/ATLAS/Pan-STARRS only when tokens and review policy are explicitly configured.
 - Train and evaluate Tier 2/Tier 3 model weights on real labeled data.
+
+### Key Changes in v0.55.0
+
+- `background.py`: added `record_signoff_from_packet(...)` and `signoff_packet_decision_summary(db_path)` to record reviewer decisions from persisted internal signoff packets.
+- `Skills/background.py`: added `record-signoff-from-packet` and `signoff-packet-decision-summary` subcommands.
+- `init_log_db`: added top-level SQLite table `signoff_packet_decision_log` for packet-linked reviewer decisions and resulting operations snapshots.
+- Packet-based decisions validate the packet, unsigned follow-up state, and target/run match before writing a normal human signoff plus decision audit row. Each packet decision also records a post-decision operations snapshot while keeping network access and external submission disabled.
+- 5 new tests (2103 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.55.0.
 
 ### Key Changes in v0.54.0
 

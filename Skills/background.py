@@ -46,10 +46,12 @@ from background import (
     record_live_dry_run_operator_handoff,
     record_live_dry_run_plan,
     record_live_execution_attempt,
+    record_signoff_from_packet,
     record_signoff_packet,
     reviewed_log_summary,
     run_detail,
     signoff_packet,
+    signoff_packet_decision_summary,
     signoff_packet_log_summary,
     signoff_readiness_summary,
     submission_recommendation_summary,
@@ -214,6 +216,21 @@ def main() -> None:
     record_packet.add_argument("--db", type=Path, default=DEFAULT_DB_PATH)
     record_packet.add_argument("--report-dir", type=Path, default=DEFAULT_REPORT_DIR)
 
+    packet_signoff = sub.add_parser(
+        "record-signoff-from-packet",
+        help="Record a human signoff decision from an internal packet",
+    )
+    packet_signoff.add_argument("--packet-id", required=True)
+    packet_signoff.add_argument("--reviewer", required=True)
+    packet_signoff.add_argument(
+        "--decision",
+        required=True,
+        choices=["approved_for_internal_review", "needs_more_work", "rejected"],
+    )
+    packet_signoff.add_argument("--scope", required=True)
+    packet_signoff.add_argument("--notes", default="")
+    packet_signoff.add_argument("--db", type=Path, default=DEFAULT_DB_PATH)
+
     for name in (
         "ledger-summary",
         "reviewed-summary",
@@ -224,6 +241,7 @@ def main() -> None:
         "blueprint-compliance-log-summary",
         "operations-snapshot-log-summary",
         "signoff-packet-log-summary",
+        "signoff-packet-decision-summary",
         "human-signoff-summary",
         "signoff-readiness",
         "automation-readiness-log-summary",
@@ -307,6 +325,17 @@ def main() -> None:
         _print_json(write_signoff_packet(args.run_id, args.db, args.report_dir))
     elif args.command == "record-signoff-packet":
         _print_json(record_signoff_packet(args.run_id, args.db, args.report_dir))
+    elif args.command == "record-signoff-from-packet":
+        _print_json(
+            record_signoff_from_packet(
+                packet_id=args.packet_id,
+                reviewer=args.reviewer,
+                decision=args.decision,
+                scope=args.scope,
+                notes=args.notes,
+                db_path=args.db,
+            )
+        )
     elif args.command == "ledger-summary":
         _print_json(ledger_summary(args.db))
     elif args.command == "reviewed-summary":
@@ -325,6 +354,8 @@ def main() -> None:
         _print_json(background_operations_snapshot_log_summary(args.db))
     elif args.command == "signoff-packet-log-summary":
         _print_json(signoff_packet_log_summary(args.db))
+    elif args.command == "signoff-packet-decision-summary":
+        _print_json(signoff_packet_decision_summary(args.db))
     elif args.command == "human-signoff-summary":
         _print_json(human_signoff_summary(args.db))
     elif args.command == "signoff-readiness":
