@@ -747,7 +747,7 @@ def test_background_operations_snapshot_empty_log(monkeypatch, tmp_path):
         fixture,
     )
 
-    assert snapshot["code_version"] == "0.56.0"
+    assert snapshot["code_version"] == "0.57.0"
     assert snapshot["next_action"] == "run_background_once"
     assert snapshot["ledger"]["total_runs"] == 0
     assert snapshot["automation_readiness"]["scheduler_ready"] is True
@@ -901,7 +901,7 @@ def test_signoff_packet_for_unsigned_followup(monkeypatch, tmp_path):
     packet = background.signoff_packet(result.ledger.run_id, db_path)
     latest = background.latest_unsigned_signoff_packet(db_path)
 
-    assert packet["code_version"] == "0.56.0"
+    assert packet["code_version"] == "0.57.0"
     assert packet["run_id"] == result.ledger.run_id
     assert packet["target_id"] == "T001"
     assert packet["recommended_decision"] == "review_and_optionally_sign"
@@ -2385,6 +2385,119 @@ def test_init_log_db_migrates_existing_ledger(tmp_path):
         "live_dry_run_plan_log",
         "live_execution_log",
     } <= tables
+
+
+def test_background_schema_status_summary_missing_db_is_read_only(tmp_path):
+    db_path = tmp_path / "missing" / "background.sqlite"
+
+    summary = background.background_schema_status_summary(db_path)
+
+    assert summary["db_exists"] is False
+    assert summary["is_current"] is False
+    assert "signoff_packet_decision_log" in summary["missing_tables"]
+    assert summary["present_tables"] == []
+    assert summary["network_access_performed"] is False
+    assert summary["external_submission_enabled"] is False
+    assert not db_path.exists()
+
+
+def test_background_schema_status_summary_reports_old_db_missing_tables(tmp_path):
+    db_path = tmp_path / "old.sqlite"
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("CREATE TABLE schema_metadata (key TEXT PRIMARY KEY, value TEXT)")
+        conn.execute(
+            "INSERT INTO schema_metadata (key, value) VALUES ('schema_version', 'old')"
+        )
+        conn.execute("CREATE TABLE signoff_packet_log (packet_id TEXT PRIMARY KEY)")
+
+    summary = background.background_schema_status_summary(db_path)
+
+    assert summary["db_exists"] is True
+    assert summary["schema_version"] == "old"
+    assert summary["is_current"] is False
+    assert summary["present_tables"] == ["schema_metadata", "signoff_packet_log"]
+    assert "signoff_packet_decision_log" in summary["missing_tables"]
+
+
+def test_migrate_background_log_db_adds_missing_tables(tmp_path):
+    db_path = tmp_path / "old.sqlite"
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            """
+            CREATE TABLE run_ledger (
+                run_id TEXT PRIMARY KEY,
+                started_at_utc TEXT NOT NULL,
+                completed_at_utc TEXT NOT NULL,
+                code_version TEXT NOT NULL,
+                schema_version TEXT NOT NULL,
+                input_path TEXT NOT NULL,
+                target_id TEXT NOT NULL,
+                outcome TEXT NOT NULL,
+                selected_score REAL NOT NULL,
+                reason_codes_json TEXT NOT NULL,
+                live_network_enabled INTEGER NOT NULL,
+                entry_json TEXT NOT NULL
+            )
+            """
+        )
+
+    migrated = background.migrate_background_log_db(db_path)
+    status = background.background_schema_status_summary(db_path)
+
+    assert migrated["db_existed_before"] is True
+    assert "signoff_packet_decision_log" in migrated["created_tables"]
+    assert migrated["missing_tables_after"] == []
+    assert migrated["is_current"] is True
+    assert migrated["signoff_recorded"] is False
+    assert migrated["packet_recorded"] is False
+    assert migrated["report_written"] is False
+    assert status["is_current"] is True
+
+
+def test_background_cli_schema_status_and_init_log_db(tmp_path):
+    repo = Path(__file__).resolve().parents[1]
+    db_path = tmp_path / "old.sqlite"
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("CREATE TABLE signoff_packet_log (packet_id TEXT PRIMARY KEY)")
+    env = {**os.environ, "PYTHONPATH": str(repo / "src")}
+
+    before = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "schema-status-summary",
+            "--db",
+            str(db_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    migrated = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "init-log-db",
+            "--db",
+            str(db_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+
+    before_payload = json.loads(before.stdout)
+    migrated_payload = json.loads(migrated.stdout)
+    assert before_payload["is_current"] is False
+    assert "signoff_packet_decision_log" in before_payload["missing_tables"]
+    assert migrated_payload["is_current"] is True
+    assert migrated_payload["missing_tables_after"] == []
+    assert migrated_payload["network_access_performed"] is False
+    assert migrated_payload["external_submission_enabled"] is False
 
 
 def test_report_text_rejects_forbidden_language():

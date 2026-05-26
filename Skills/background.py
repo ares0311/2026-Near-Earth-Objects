@@ -22,6 +22,7 @@ from background import (
     background_operations_snapshot,
     background_operations_snapshot_log_summary,
     background_run_once,
+    background_schema_status_summary,
     blueprint_compliance_log_summary,
     follow_up_test_summary,
     human_signoff_summary,
@@ -38,6 +39,7 @@ from background import (
     live_execution_log_summary,
     live_policy_contract_summary,
     live_provider_readiness,
+    migrate_background_log_db,
     needs_follow_up_summary,
     record_automation_readiness,
     record_background_operations_snapshot,
@@ -235,6 +237,8 @@ def main() -> None:
 
     for name in (
         "ledger-summary",
+        "schema-status-summary",
+        "init-log-db",
         "reviewed-summary",
         "needs-follow-up-summary",
         "follow-up-test-summary",
@@ -283,6 +287,10 @@ def main() -> None:
 
     if args.command == "run-once":
         _print_json(background_run_once(args.input, args.db, args.report_dir, args.config))
+    elif args.command == "schema-status-summary":
+        _print_json(background_schema_status_summary(args.db))
+    elif args.command == "init-log-db":
+        _print_json(migrate_background_log_db(args.db))
     elif args.command == "target-priority-summary":
         _print_json(target_priority_summary(args.input, args.db))
     elif args.command == "automation-readiness":

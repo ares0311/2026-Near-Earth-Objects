@@ -5,6 +5,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## v0.57.0
+
+- `background.py`: added `background_schema_status_summary(db_path)` for
+  read-only inspection of expected top-level SQLite log tables.
+- `background.py`: added `migrate_background_log_db(db_path)` to run the
+  additive `init_log_db` migration and report before/after schema state.
+- `Skills/background.py`: added `schema-status-summary` and `init-log-db`
+  subcommands.
+- Schema inspection and migration reports explicitly preserve the no-network,
+  no-external-submission, no-signoff, no-packet, and no-report-write
+  guardrails.
+- 4 new tests (2112 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.57.0.
+
 ## v0.56.0
 
 - `background.py`: added `signoff_packet_decision_readiness(db_path)` and

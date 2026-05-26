@@ -7,6 +7,8 @@ __all__ = [
     "DEFAULT_REPORT_DIR",
     "DEFAULT_CONFIG_PATH",
     "init_log_db",
+    "background_schema_status_summary",
+    "migrate_background_log_db",
     "load_config",
     "load_tracklets",
     "score_tracklet",
@@ -103,7 +105,24 @@ DEFAULT_INPUT_PATH = _ROOT / "background" / "targets.json"
 DEFAULT_DB_PATH = _ROOT / "Logs" / "background.sqlite"
 DEFAULT_REPORT_DIR = _ROOT / "Logs" / "reports"
 _SCHEMA_VERSION = "background-v1"
-_CODE_VERSION = "0.56.0"
+_CODE_VERSION = "0.57.0"
+_BACKGROUND_LOG_TABLES = (
+    "schema_metadata",
+    "run_ledger",
+    "reviewed_log",
+    "run_lock",
+    "human_signoff_log",
+    "needs_follow_up_log",
+    "automation_readiness_log",
+    "blueprint_compliance_log",
+    "operations_snapshot_log",
+    "signoff_packet_log",
+    "signoff_packet_decision_log",
+    "live_dry_run_plan_log",
+    "live_approval_bundle_log",
+    "live_operator_handoff_log",
+    "live_execution_log",
+)
 _LIVE_REVIEW_POLICY_SCHEMA_PATH = _ROOT / "background" / "live_review_policy.schema.json"
 _SUPPORTED_LIVE_SURVEYS = ("ZTF", "ATLAS", "PanSTARRS")
 _LIVE_PROVIDER_CAPABILITIES = {
@@ -199,6 +218,12 @@ def init_log_db(db_path: Path = DEFAULT_DB_PATH) -> None:
                 updated_at_utc TEXT NOT NULL
             )
             """
+        )
+        _add_column_if_missing(
+            conn,
+            "schema_metadata",
+            "updated_at_utc",
+            "TEXT NOT NULL DEFAULT ''",
         )
         conn.execute(
             """
@@ -418,6 +443,92 @@ def init_log_db(db_path: Path = DEFAULT_DB_PATH) -> None:
             )
             """
         )
+
+
+def _schema_status_from_connection(
+    conn: sqlite3.Connection,
+    db_path: Path,
+    db_exists: bool,
+) -> dict[str, Any]:
+    tables = {
+        row["name"]
+        for row in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table'"
+        ).fetchall()
+    }
+    metadata = (
+        conn.execute(
+            "SELECT value FROM schema_metadata WHERE key = 'schema_version'"
+        ).fetchone()
+        if "schema_metadata" in tables
+        else None
+    )
+    present = [name for name in _BACKGROUND_LOG_TABLES if name in tables]
+    missing = [name for name in _BACKGROUND_LOG_TABLES if name not in tables]
+    return {
+        "db_path": str(db_path),
+        "db_exists": db_exists,
+        "schema_version": metadata["value"] if metadata else None,
+        "expected_tables": list(_BACKGROUND_LOG_TABLES),
+        "present_tables": present,
+        "missing_tables": missing,
+        "extra_tables": sorted(tables.difference(_BACKGROUND_LOG_TABLES)),
+        "is_current": not missing,
+        "network_access_performed": False,
+        "external_submission_enabled": False,
+    }
+
+
+def background_schema_status_summary(
+    db_path: Path = DEFAULT_DB_PATH,
+) -> dict[str, Any]:
+    """Inspect background SQLite schema status without creating or migrating it."""
+    if not db_path.exists():
+        return {
+            "db_path": str(db_path),
+            "db_exists": False,
+            "schema_version": None,
+            "expected_tables": list(_BACKGROUND_LOG_TABLES),
+            "present_tables": [],
+            "missing_tables": list(_BACKGROUND_LOG_TABLES),
+            "extra_tables": [],
+            "is_current": False,
+            "network_access_performed": False,
+            "external_submission_enabled": False,
+        }
+    with sqlite3.connect(f"{db_path.resolve().as_uri()}?mode=ro", uri=True) as conn:
+        conn.row_factory = sqlite3.Row
+        return _schema_status_from_connection(conn, db_path, True)
+
+
+def migrate_background_log_db(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]:
+    """Run the additive background SQLite migration and report before/after state."""
+    before = background_schema_status_summary(db_path)
+    init_log_db(db_path)
+    after = background_schema_status_summary(db_path)
+    before_present = set(before["present_tables"])
+    after_present = set(after["present_tables"])
+    return {
+        "db_path": str(db_path),
+        "schema_version_before": before["schema_version"],
+        "schema_version_after": after["schema_version"],
+        "db_existed_before": before["db_exists"],
+        "created_tables": [
+            name
+            for name in _BACKGROUND_LOG_TABLES
+            if name in after_present and name not in before_present
+        ],
+        "missing_tables_before": before["missing_tables"],
+        "missing_tables_after": after["missing_tables"],
+        "is_current": after["is_current"],
+        "before": before,
+        "after": after,
+        "network_access_performed": False,
+        "external_submission_enabled": False,
+        "signoff_recorded": False,
+        "packet_recorded": False,
+        "report_written": False,
+    }
 
 
 def _model_json(model: Any) -> str:

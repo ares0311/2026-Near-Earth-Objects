@@ -189,6 +189,8 @@ either `reviewed_log` or `needs_follow_up_log`.
 
 ```bash
 PYTHONPATH=src python Skills/background.py ledger-summary
+PYTHONPATH=src python Skills/background.py schema-status-summary
+PYTHONPATH=src python Skills/background.py init-log-db
 PYTHONPATH=src python Skills/background.py reviewed-summary
 PYTHONPATH=src python Skills/background.py needs-follow-up-summary
 PYTHONPATH=src python Skills/background.py target-priority-summary
@@ -238,6 +240,32 @@ PYTHONPATH=src python Skills/background.py launchd-plist
 Each command prints structured JSON for scheduler notifications or manual review.
 The deprecated one-file wrapper scripts have been removed; use
 `Skills/background.py` with a subcommand for all background operations.
+
+## SQLite Schema Status
+
+Inspect the top-level SQLite log schema without mutating it:
+
+```bash
+PYTHONPATH=src python Skills/background.py schema-status-summary
+```
+
+The summary reports the expected table set, present tables, missing tables,
+extra tables, schema version, and guardrail flags. It does not create a
+database, write rows, generate reports, contact outside parties, enable live
+network access, record a packet, or record a signoff.
+
+Run the additive local migration only when an operator explicitly wants the
+SQLite log database brought up to the current schema:
+
+```bash
+PYTHONPATH=src python Skills/background.py init-log-db
+```
+
+This command delegates to `init_log_db`, which uses `CREATE TABLE IF NOT
+EXISTS` and additive column checks. It reports before/after table state and
+created tables. It does not create signoff decisions, write reports, generate
+packets, contact outside parties, enable live network access, or perform any
+external submission.
 
 ## Blueprint Compliance Matrix
 
