@@ -8,6 +8,7 @@ __all__ = [
     "DEFAULT_CONFIG_PATH",
     "init_log_db",
     "background_schema_status_summary",
+    "background_schema_migration_preview",
     "migrate_background_log_db",
     "load_config",
     "load_tracklets",
@@ -105,7 +106,7 @@ DEFAULT_INPUT_PATH = _ROOT / "background" / "targets.json"
 DEFAULT_DB_PATH = _ROOT / "Logs" / "background.sqlite"
 DEFAULT_REPORT_DIR = _ROOT / "Logs" / "reports"
 _SCHEMA_VERSION = "background-v1"
-_CODE_VERSION = "0.57.0"
+_CODE_VERSION = "0.58.0"
 _BACKGROUND_LOG_TABLES = (
     "schema_metadata",
     "run_ledger",
@@ -499,6 +500,33 @@ def background_schema_status_summary(
     with sqlite3.connect(f"{db_path.resolve().as_uri()}?mode=ro", uri=True) as conn:
         conn.row_factory = sqlite3.Row
         return _schema_status_from_connection(conn, db_path, True)
+
+
+def background_schema_migration_preview(
+    db_path: Path = DEFAULT_DB_PATH,
+) -> dict[str, Any]:
+    """Preview additive background SQLite migration effects without writing."""
+    status = background_schema_status_summary(db_path)
+    return {
+        "db_path": str(db_path),
+        "db_exists": status["db_exists"],
+        "schema_version": status["schema_version"],
+        "is_current": status["is_current"],
+        "migration_needed": not status["is_current"],
+        "db_would_be_created": not status["db_exists"],
+        "would_create_tables": status["missing_tables"],
+        "missing_tables": status["missing_tables"],
+        "present_tables": status["present_tables"],
+        "extra_tables": status["extra_tables"],
+        "init_command": "PYTHONPATH=src python Skills/background.py init-log-db",
+        "status": status,
+        "network_access_performed": False,
+        "external_submission_enabled": False,
+        "signoff_recorded": False,
+        "packet_recorded": False,
+        "report_written": False,
+        "db_created": False,
+    }
 
 
 def migrate_background_log_db(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]:

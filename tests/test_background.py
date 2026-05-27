@@ -747,7 +747,7 @@ def test_background_operations_snapshot_empty_log(monkeypatch, tmp_path):
         fixture,
     )
 
-    assert snapshot["code_version"] == "0.57.0"
+    assert snapshot["code_version"] == "0.58.0"
     assert snapshot["next_action"] == "run_background_once"
     assert snapshot["ledger"]["total_runs"] == 0
     assert snapshot["automation_readiness"]["scheduler_ready"] is True
@@ -901,7 +901,7 @@ def test_signoff_packet_for_unsigned_followup(monkeypatch, tmp_path):
     packet = background.signoff_packet(result.ledger.run_id, db_path)
     latest = background.latest_unsigned_signoff_packet(db_path)
 
-    assert packet["code_version"] == "0.57.0"
+    assert packet["code_version"] == "0.58.0"
     assert packet["run_id"] == result.ledger.run_id
     assert packet["target_id"] == "T001"
     assert packet["recommended_decision"] == "review_and_optionally_sign"
@@ -2401,6 +2401,25 @@ def test_background_schema_status_summary_missing_db_is_read_only(tmp_path):
     assert not db_path.exists()
 
 
+def test_background_schema_migration_preview_missing_db_is_read_only(tmp_path):
+    db_path = tmp_path / "missing" / "background.sqlite"
+
+    preview = background.background_schema_migration_preview(db_path)
+
+    assert preview["db_exists"] is False
+    assert preview["db_would_be_created"] is True
+    assert preview["migration_needed"] is True
+    assert preview["would_create_tables"] == preview["missing_tables"]
+    assert "signoff_packet_decision_log" in preview["would_create_tables"]
+    assert preview["db_created"] is False
+    assert preview["network_access_performed"] is False
+    assert preview["external_submission_enabled"] is False
+    assert preview["signoff_recorded"] is False
+    assert preview["packet_recorded"] is False
+    assert preview["report_written"] is False
+    assert not db_path.exists()
+
+
 def test_background_schema_status_summary_reports_old_db_missing_tables(tmp_path):
     db_path = tmp_path / "old.sqlite"
     with sqlite3.connect(db_path) as conn:
@@ -2417,6 +2436,36 @@ def test_background_schema_status_summary_reports_old_db_missing_tables(tmp_path
     assert summary["is_current"] is False
     assert summary["present_tables"] == ["schema_metadata", "signoff_packet_log"]
     assert "signoff_packet_decision_log" in summary["missing_tables"]
+
+
+def test_background_schema_migration_preview_reports_old_db_without_writing(tmp_path):
+    db_path = tmp_path / "old.sqlite"
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("CREATE TABLE signoff_packet_log (packet_id TEXT PRIMARY KEY)")
+
+    preview = background.background_schema_migration_preview(db_path)
+    after = background.background_schema_status_summary(db_path)
+
+    assert preview["db_exists"] is True
+    assert preview["db_would_be_created"] is False
+    assert preview["migration_needed"] is True
+    assert "signoff_packet_log" in preview["present_tables"]
+    assert "signoff_packet_decision_log" in preview["would_create_tables"]
+    assert after["present_tables"] == ["signoff_packet_log"]
+    assert "schema_metadata" in after["missing_tables"]
+
+
+def test_background_schema_migration_preview_current_db(tmp_path):
+    db_path = tmp_path / "current.sqlite"
+    background.init_log_db(db_path)
+
+    preview = background.background_schema_migration_preview(db_path)
+
+    assert preview["db_exists"] is True
+    assert preview["is_current"] is True
+    assert preview["migration_needed"] is False
+    assert preview["db_would_be_created"] is False
+    assert preview["would_create_tables"] == []
 
 
 def test_migrate_background_log_db_adds_missing_tables(tmp_path):
@@ -2498,6 +2547,35 @@ def test_background_cli_schema_status_and_init_log_db(tmp_path):
     assert migrated_payload["missing_tables_after"] == []
     assert migrated_payload["network_access_performed"] is False
     assert migrated_payload["external_submission_enabled"] is False
+
+
+def test_background_cli_init_log_db_preview(tmp_path):
+    repo = Path(__file__).resolve().parents[1]
+    db_path = tmp_path / "preview.sqlite"
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("CREATE TABLE signoff_packet_log (packet_id TEXT PRIMARY KEY)")
+    env = {**os.environ, "PYTHONPATH": str(repo / "src")}
+
+    preview = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "init-log-db-preview",
+            "--db",
+            str(db_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+
+    payload = json.loads(preview.stdout)
+    assert payload["migration_needed"] is True
+    assert payload["db_created"] is False
+    assert "signoff_packet_decision_log" in payload["would_create_tables"]
+    assert table_count(db_path, "signoff_packet_log") == 0
 
 
 def test_report_text_rejects_forbidden_language():

@@ -190,6 +190,7 @@ either `reviewed_log` or `needs_follow_up_log`.
 ```bash
 PYTHONPATH=src python Skills/background.py ledger-summary
 PYTHONPATH=src python Skills/background.py schema-status-summary
+PYTHONPATH=src python Skills/background.py init-log-db-preview
 PYTHONPATH=src python Skills/background.py init-log-db
 PYTHONPATH=src python Skills/background.py reviewed-summary
 PYTHONPATH=src python Skills/background.py needs-follow-up-summary
@@ -247,12 +248,18 @@ Inspect the top-level SQLite log schema without mutating it:
 
 ```bash
 PYTHONPATH=src python Skills/background.py schema-status-summary
+PYTHONPATH=src python Skills/background.py init-log-db-preview
 ```
 
 The summary reports the expected table set, present tables, missing tables,
 extra tables, schema version, and guardrail flags. It does not create a
 database, write rows, generate reports, contact outside parties, enable live
 network access, record a packet, or record a signoff.
+
+The preview command reports what `init-log-db` would create, including missing
+tables, would-create tables, whether the database file would be created, and
+the exact init command. It is also read-only and does not create a missing DB
+file.
 
 Run the additive local migration only when an operator explicitly wants the
 SQLite log database brought up to the current schema:

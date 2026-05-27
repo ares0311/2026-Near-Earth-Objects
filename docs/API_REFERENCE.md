@@ -359,6 +359,7 @@ def follow_up_test_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
 def submission_recommendation_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
 def validation_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
 def background_schema_status_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
+def background_schema_migration_preview(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
 def migrate_background_log_db(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
 def background_blueprint_compliance_summary(
     db_path: Path = DEFAULT_DB_PATH,
@@ -480,6 +481,8 @@ manual or scheduled review. The supported command-line entrypoint is
 `Skills/background.py` with subcommands; deprecated one-file wrappers have been
 removed. Use `background_schema_status_summary(db_path)` to inspect expected
 top-level SQLite tables without creating or migrating the database. Use
+`background_schema_migration_preview(db_path)` to preview what additive
+migration would create without writing anything. Use
 `migrate_background_log_db(db_path)` to run the additive `init_log_db`
 migration and report before/after table state without recording signoffs,
 packets, reports, network access, or external submission. Use
@@ -793,7 +796,7 @@ Lightweight summary of a `ScoredNEO` for display or export.
 
 ---
 
-## v0.16.0 through v0.57.0 Public API Additions
+## v0.16.0 through v0.58.0 Public API Additions
 
 These releases added conservative helper APIs around live-data retrieval,
 preprocessing quality, detection triage, linking, orbit review, classification
@@ -934,8 +937,9 @@ claim confirmation or impact probability.
 | v0.55.0 | `background.py` / `Skills/background.py` | `record_signoff_from_packet`, `signoff_packet_decision_summary`; packet decision CLI commands |
 | v0.56.0 | `background.py` / `Skills/background.py` | `signoff_packet_decision_readiness`, `latest_undecided_signoff_packet`; packet decision readiness CLI commands |
 | v0.57.0 | `background.py` / `Skills/background.py` | `background_schema_status_summary`, `migrate_background_log_db`; schema status and init-log-db CLI commands |
+| v0.58.0 | `background.py` / `Skills/background.py` | `background_schema_migration_preview`; init-log-db-preview CLI command |
 
-### Skills and CLI additions in v0.16.0 through v0.57.0
+### Skills and CLI additions in v0.16.0 through v0.58.0
 
 `export_candidate_report.py`, `tag_neo_class.py`, `check_tisserand.py`,
 `export_followup_requests.py`, `ephemeris_check.py`,
@@ -991,5 +995,6 @@ claim confirmation or impact probability.
 `Skills/background.py signoff-packet-decision-readiness`,
 `Skills/background.py latest-undecided-signoff-packet`,
 `Skills/background.py schema-status-summary`,
+`Skills/background.py init-log-db-preview`,
 `Skills/background.py init-log-db`, and
 `Skills/background.py launchd-plist`.

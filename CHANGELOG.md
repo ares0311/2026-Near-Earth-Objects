@@ -5,6 +5,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## v0.58.0
+
+- `background.py`: added `background_schema_migration_preview(db_path)` to
+  preview additive SQLite log migration effects without creating or changing a
+  database.
+- `Skills/background.py`: added `init-log-db-preview` for no-write operator
+  review before running `init-log-db`.
+- Migration preview reports missing tables, would-create tables, current schema
+  state, the init command, and guardrail flags while preserving no-network,
+  no-external-submission, no-signoff, no-packet, and no-report-write behavior.
+- 4 new tests (2116 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.58.0.
+
 ## v0.57.0
 
 - `background.py`: added `background_schema_status_summary(db_path)` for
