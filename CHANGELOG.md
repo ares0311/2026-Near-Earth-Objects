@@ -5,6 +5,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## v0.59.0
+
+- `background.py`: added `background_schema_operations_summary(db_path)` to
+  combine schema status, migration preview, packet-decision command readiness,
+  and the next safe operator action.
+- `Skills/background.py`: added `schema-operations-summary` for read-only
+  schema operations triage.
+- The operations summary reports whether packet-decision commands are ready and
+  recommends `init-log-db` only when the current SQLite schema is incomplete.
+- 4 new tests (2120 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.59.0.
+
 ## v0.58.0
 
 - `background.py`: added `background_schema_migration_preview(db_path)` to

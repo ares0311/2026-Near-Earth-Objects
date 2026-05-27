@@ -23,6 +23,7 @@ from background import (
     background_operations_snapshot_log_summary,
     background_run_once,
     background_schema_migration_preview,
+    background_schema_operations_summary,
     background_schema_status_summary,
     blueprint_compliance_log_summary,
     follow_up_test_summary,
@@ -240,6 +241,7 @@ def main() -> None:
         "ledger-summary",
         "schema-status-summary",
         "init-log-db-preview",
+        "schema-operations-summary",
         "init-log-db",
         "reviewed-summary",
         "needs-follow-up-summary",
@@ -293,6 +295,8 @@ def main() -> None:
         _print_json(background_schema_status_summary(args.db))
     elif args.command == "init-log-db-preview":
         _print_json(background_schema_migration_preview(args.db))
+    elif args.command == "schema-operations-summary":
+        _print_json(background_schema_operations_summary(args.db))
     elif args.command == "init-log-db":
         _print_json(migrate_background_log_db(args.db))
     elif args.command == "target-priority-summary":

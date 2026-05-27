@@ -747,7 +747,7 @@ def test_background_operations_snapshot_empty_log(monkeypatch, tmp_path):
         fixture,
     )
 
-    assert snapshot["code_version"] == "0.58.0"
+    assert snapshot["code_version"] == "0.59.0"
     assert snapshot["next_action"] == "run_background_once"
     assert snapshot["ledger"]["total_runs"] == 0
     assert snapshot["automation_readiness"]["scheduler_ready"] is True
@@ -901,7 +901,7 @@ def test_signoff_packet_for_unsigned_followup(monkeypatch, tmp_path):
     packet = background.signoff_packet(result.ledger.run_id, db_path)
     latest = background.latest_unsigned_signoff_packet(db_path)
 
-    assert packet["code_version"] == "0.58.0"
+    assert packet["code_version"] == "0.59.0"
     assert packet["run_id"] == result.ledger.run_id
     assert packet["target_id"] == "T001"
     assert packet["recommended_decision"] == "review_and_optionally_sign"
@@ -2468,6 +2468,51 @@ def test_background_schema_migration_preview_current_db(tmp_path):
     assert preview["would_create_tables"] == []
 
 
+def test_background_schema_operations_summary_missing_db_is_read_only(tmp_path):
+    db_path = tmp_path / "missing" / "background.sqlite"
+
+    summary = background.background_schema_operations_summary(db_path)
+
+    assert summary["db_exists"] is False
+    assert summary["migration_needed"] is True
+    assert summary["packet_decision_commands_ready"] is False
+    assert summary["next_schema_action"] == "create_log_db_when_ready"
+    assert "signoff_packet_decision_log" in summary["would_create_tables"]
+    assert summary["db_created"] is False
+    assert summary["network_access_performed"] is False
+    assert summary["external_submission_enabled"] is False
+    assert not db_path.exists()
+
+
+def test_background_schema_operations_summary_old_db_recommends_migration(tmp_path):
+    db_path = tmp_path / "old.sqlite"
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("CREATE TABLE signoff_packet_log (packet_id TEXT PRIMARY KEY)")
+
+    summary = background.background_schema_operations_summary(db_path)
+
+    assert summary["db_exists"] is True
+    assert summary["migration_needed"] is True
+    assert summary["packet_decision_commands_ready"] is False
+    assert summary["next_schema_action"] == "run_init_log_db"
+    assert summary["recommended_command"].endswith("init-log-db")
+    assert summary["status"]["present_tables"] == ["signoff_packet_log"]
+
+
+def test_background_schema_operations_summary_current_db_ready(tmp_path):
+    db_path = tmp_path / "current.sqlite"
+    background.init_log_db(db_path)
+
+    summary = background.background_schema_operations_summary(db_path)
+
+    assert summary["is_current"] is True
+    assert summary["migration_needed"] is False
+    assert summary["packet_decision_commands_ready"] is True
+    assert summary["next_schema_action"] == "none"
+    assert summary["recommended_command"] is None
+    assert summary["would_create_tables"] == []
+
+
 def test_migrate_background_log_db_adds_missing_tables(tmp_path):
     db_path = tmp_path / "old.sqlite"
     with sqlite3.connect(db_path) as conn:
@@ -2576,6 +2621,35 @@ def test_background_cli_init_log_db_preview(tmp_path):
     assert payload["db_created"] is False
     assert "signoff_packet_decision_log" in payload["would_create_tables"]
     assert table_count(db_path, "signoff_packet_log") == 0
+
+
+def test_background_cli_schema_operations_summary(tmp_path):
+    repo = Path(__file__).resolve().parents[1]
+    db_path = tmp_path / "operations.sqlite"
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("CREATE TABLE signoff_packet_log (packet_id TEXT PRIMARY KEY)")
+    env = {**os.environ, "PYTHONPATH": str(repo / "src")}
+
+    summary = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "schema-operations-summary",
+            "--db",
+            str(db_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+
+    payload = json.loads(summary.stdout)
+    assert payload["migration_needed"] is True
+    assert payload["packet_decision_commands_ready"] is False
+    assert payload["next_schema_action"] == "run_init_log_db"
+    assert "signoff_packet_decision_log" in payload["would_create_tables"]
 
 
 def test_report_text_rejects_forbidden_language():

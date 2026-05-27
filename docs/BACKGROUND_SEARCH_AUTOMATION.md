@@ -191,6 +191,7 @@ either `reviewed_log` or `needs_follow_up_log`.
 PYTHONPATH=src python Skills/background.py ledger-summary
 PYTHONPATH=src python Skills/background.py schema-status-summary
 PYTHONPATH=src python Skills/background.py init-log-db-preview
+PYTHONPATH=src python Skills/background.py schema-operations-summary
 PYTHONPATH=src python Skills/background.py init-log-db
 PYTHONPATH=src python Skills/background.py reviewed-summary
 PYTHONPATH=src python Skills/background.py needs-follow-up-summary
@@ -249,6 +250,7 @@ Inspect the top-level SQLite log schema without mutating it:
 ```bash
 PYTHONPATH=src python Skills/background.py schema-status-summary
 PYTHONPATH=src python Skills/background.py init-log-db-preview
+PYTHONPATH=src python Skills/background.py schema-operations-summary
 ```
 
 The summary reports the expected table set, present tables, missing tables,
@@ -260,6 +262,11 @@ The preview command reports what `init-log-db` would create, including missing
 tables, would-create tables, whether the database file would be created, and
 the exact init command. It is also read-only and does not create a missing DB
 file.
+
+The operations summary combines schema status and migration preview with a
+packet-decision readiness flag and the next safe schema action. Use it before
+packet-linked signoff decisions to confirm the SQLite log has the
+`signoff_packet_decision_log` table.
 
 Run the additive local migration only when an operator explicitly wants the
 SQLite log database brought up to the current schema:

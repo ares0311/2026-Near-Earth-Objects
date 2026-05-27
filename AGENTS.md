@@ -471,9 +471,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.58.0)
+## Current State (v0.59.0)
 
-All 10 pipeline modules are complete. 2116 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified CLI with automated offline scheduling readiness, live policy contract validation, provider-specific live readiness summaries, no-network live dry-run approval bundles, operator handoff exports, persisted operator handoff logs, persisted blueprint compliance summaries, persisted operations snapshots, internal signoff packets, packet-linked signoff decisions, packet-decision readiness summaries, background SQLite schema status and migration preview/reporting, top-level SQLite logs for runs, readiness checks, approval bundles, no-network live dry-run plans, mock-only provider execution attempts, and auditable signoff readiness. Public APIs now extend through v0.58.0 with expanded calibration, orbit dynamics, survey statistics, alert packaging, schema summaries, conservative candidate-priority helpers, background blueprint auditing, operations snapshots, signoff packets, packet-linked signoff decisions, packet-decision readiness, SQLite schema status, and migration preview.
+All 10 pipeline modules are complete. 2120 tests passing (100% coverage). CI green on Python 3.11 & 3.12. Coverage threshold 100%. Background automation uses one unified CLI with automated offline scheduling readiness, live policy contract validation, provider-specific live readiness summaries, no-network live dry-run approval bundles, operator handoff exports, persisted operator handoff logs, persisted blueprint compliance summaries, persisted operations snapshots, internal signoff packets, packet-linked signoff decisions, packet-decision readiness summaries, background SQLite schema status and migration preview/reporting, schema operations triage, top-level SQLite logs for runs, readiness checks, approval bundles, no-network live dry-run plans, mock-only provider execution attempts, and auditable signoff readiness. Public APIs now extend through v0.59.0 with expanded calibration, orbit dynamics, survey statistics, alert packaging, schema summaries, conservative candidate-priority helpers, background blueprint auditing, operations snapshots, signoff packets, packet-linked signoff decisions, packet-decision readiness, SQLite schema status, migration preview, and schema operations triage.
 
 ### Skills
 
@@ -600,7 +600,7 @@ All 10 pipeline modules are complete. 2116 tests passing (100% coverage). CI gre
 | `background/live_review_policy.schema.json` | JSON Schema for live dry-run review policy |
 | `background/targets.json` | Stable background automation fixture manifest |
 
-### Coverage by Module (v0.58.0)
+### Coverage by Module (v0.59.0)
 
 | Module | Coverage |
 |---|---|
@@ -629,6 +629,7 @@ All 10 pipeline modules are complete. 2116 tests passing (100% coverage). CI gre
 - Sync docs and changelog after each version bump so `AGENTS.md`, `CLAUDE.md`, `README.md`, and `CHANGELOG.md` stay aligned.
 - Inspect background SQLite schema status with `Skills/background.py schema-status-summary` before running operators against older logs.
 - Preview background SQLite migrations with `Skills/background.py init-log-db-preview` before running `init-log-db`.
+- Use `Skills/background.py schema-operations-summary` to confirm packet-decision command readiness before recording packet-linked decisions.
 - Run `Skills/background.py blueprint-compliance-summary` after background automation changes to confirm blueprint definition-of-done status.
 - Persist blueprint compliance snapshots with `Skills/background.py record-blueprint-compliance-summary` after scheduled background cycles.
 - Persist operator-facing operations snapshots with `Skills/background.py record-operations-snapshot` after scheduled background cycles.
@@ -638,6 +639,14 @@ All 10 pipeline modules are complete. 2116 tests passing (100% coverage). CI gre
 - Collect labeled training data via `Skills/generate_training_labels.py`.
 - Run credentialed live-data dry runs for ZTF/ATLAS/Pan-STARRS only when tokens and review policy are explicitly configured.
 - Train and evaluate Tier 2/Tier 3 model weights on real labeled data.
+
+### Key Changes in v0.59.0
+
+- `background.py`: added `background_schema_operations_summary(db_path)` to combine schema status, migration preview, packet-decision command readiness, and the next safe operator action.
+- `Skills/background.py`: added `schema-operations-summary` for read-only schema operations triage.
+- The operations summary reports whether packet-decision commands are ready and recommends `init-log-db` only when the current SQLite schema is incomplete.
+- 4 new tests (2120 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.59.0.
 
 ### Key Changes in v0.58.0
 

@@ -9,6 +9,7 @@ __all__ = [
     "init_log_db",
     "background_schema_status_summary",
     "background_schema_migration_preview",
+    "background_schema_operations_summary",
     "migrate_background_log_db",
     "load_config",
     "load_tracklets",
@@ -106,7 +107,7 @@ DEFAULT_INPUT_PATH = _ROOT / "background" / "targets.json"
 DEFAULT_DB_PATH = _ROOT / "Logs" / "background.sqlite"
 DEFAULT_REPORT_DIR = _ROOT / "Logs" / "reports"
 _SCHEMA_VERSION = "background-v1"
-_CODE_VERSION = "0.58.0"
+_CODE_VERSION = "0.59.0"
 _BACKGROUND_LOG_TABLES = (
     "schema_metadata",
     "run_ledger",
@@ -520,6 +521,43 @@ def background_schema_migration_preview(
         "extra_tables": status["extra_tables"],
         "init_command": "PYTHONPATH=src python Skills/background.py init-log-db",
         "status": status,
+        "network_access_performed": False,
+        "external_submission_enabled": False,
+        "signoff_recorded": False,
+        "packet_recorded": False,
+        "report_written": False,
+        "db_created": False,
+    }
+
+
+def background_schema_operations_summary(
+    db_path: Path = DEFAULT_DB_PATH,
+) -> dict[str, Any]:
+    """Summarize schema readiness and the next safe operator action."""
+    status = background_schema_status_summary(db_path)
+    preview = background_schema_migration_preview(db_path)
+    packet_decision_ready = "signoff_packet_decision_log" in status["present_tables"]
+    if status["is_current"]:
+        next_action = "none"
+        recommended_command = None
+    elif status["db_exists"]:
+        next_action = "run_init_log_db"
+        recommended_command = "PYTHONPATH=src python Skills/background.py init-log-db"
+    else:
+        next_action = "create_log_db_when_ready"
+        recommended_command = "PYTHONPATH=src python Skills/background.py init-log-db"
+    return {
+        "db_path": str(db_path),
+        "db_exists": status["db_exists"],
+        "is_current": status["is_current"],
+        "migration_needed": preview["migration_needed"],
+        "packet_decision_commands_ready": packet_decision_ready,
+        "missing_tables": status["missing_tables"],
+        "would_create_tables": preview["would_create_tables"],
+        "next_schema_action": next_action,
+        "recommended_command": recommended_command,
+        "status": status,
+        "preview": preview,
         "network_access_performed": False,
         "external_submission_enabled": False,
         "signoff_recorded": False,
