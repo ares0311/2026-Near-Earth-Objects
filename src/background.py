@@ -10,6 +10,7 @@ __all__ = [
     "background_schema_status_summary",
     "background_schema_migration_preview",
     "background_schema_operations_summary",
+    "background_operator_next_action_summary",
     "migrate_background_log_db",
     "load_config",
     "load_tracklets",
@@ -107,7 +108,7 @@ DEFAULT_INPUT_PATH = _ROOT / "background" / "targets.json"
 DEFAULT_DB_PATH = _ROOT / "Logs" / "background.sqlite"
 DEFAULT_REPORT_DIR = _ROOT / "Logs" / "reports"
 _SCHEMA_VERSION = "background-v1"
-_CODE_VERSION = "0.59.0"
+_CODE_VERSION = "0.60.0"
 _BACKGROUND_LOG_TABLES = (
     "schema_metadata",
     "run_ledger",
@@ -564,6 +565,105 @@ def background_schema_operations_summary(
         "packet_recorded": False,
         "report_written": False,
         "db_created": False,
+    }
+
+
+def _recommended_operator_command(next_action: str) -> str | None:
+    command_by_action = {
+        "run_background_once": "PYTHONPATH=src python Skills/background.py run-once",
+        "record_signoff": (
+            "PYTHONPATH=src python Skills/background.py latest-unsigned-signoff-packet"
+        ),
+        "review_follow_up": (
+            "PYTHONPATH=src python Skills/background.py latest-unsigned-signoff-packet"
+        ),
+        "resolve_scheduler_blockers": (
+            "PYTHONPATH=src python Skills/background.py automation-readiness"
+        ),
+        "continue_offline_scheduler": (
+            "PYTHONPATH=src python Skills/background.py run-once"
+        ),
+        "none": None,
+    }
+    return command_by_action.get(next_action)
+
+
+def _operator_action_message(next_action: str) -> str:
+    message_by_action = {
+        "run_init_log_db": "Bring the local SQLite log schema up to date.",
+        "create_log_db_when_ready": "Create the local SQLite log before operator review.",
+        "run_background_once": "Run one bounded offline background cycle.",
+        "record_signoff": "Prepare the next internal signoff packet for review.",
+        "review_follow_up": "Inspect the latest follow-up evidence before any decision.",
+        "resolve_scheduler_blockers": "Inspect scheduler blockers before more automation.",
+        "continue_offline_scheduler": "Continue fixture-only offline scheduling.",
+        "none": "No operator action is required.",
+    }
+    return message_by_action.get(next_action, "Inspect the reported action before proceeding.")
+
+
+def background_operator_next_action_summary(
+    config_path: Path = DEFAULT_CONFIG_PATH,
+    db_path: Path = DEFAULT_DB_PATH,
+    input_path: Path = DEFAULT_INPUT_PATH,
+) -> dict[str, Any]:
+    """Return the next conservative local command for an operator."""
+    schema = background_schema_operations_summary(db_path)
+    if not schema["is_current"]:
+        next_action = schema["next_schema_action"]
+        recommended_command = schema["recommended_command"]
+        return {
+            "captured_at_utc": _utc_now(),
+            "code_version": _CODE_VERSION,
+            "schema_version": _SCHEMA_VERSION,
+            "config_path": str(config_path),
+            "db_path": str(db_path),
+            "input_path": str(input_path),
+            "schema_ready": False,
+            "blocked": True,
+            "blocker": "BACKGROUND_LOG_SCHEMA_NOT_CURRENT",
+            "next_action": next_action,
+            "recommended_command": recommended_command,
+            "operator_message": _operator_action_message(next_action),
+            "safe_to_run_recommended_command": bool(recommended_command),
+            "requires_human_approval_before_external_action": True,
+            "schema_operations": schema,
+            "operations_snapshot": None,
+            "packet_decision_readiness": None,
+            "network_access_performed": False,
+            "external_submission_enabled": False,
+            "signoff_recorded": False,
+            "packet_recorded": False,
+            "report_written": False,
+        }
+
+    snapshot = background_operations_snapshot(config_path, db_path, input_path)
+    packet_readiness = signoff_packet_decision_readiness(db_path)
+    next_action = snapshot["next_action"]
+    recommended_command = _recommended_operator_command(next_action)
+    return {
+        "captured_at_utc": _utc_now(),
+        "code_version": _CODE_VERSION,
+        "schema_version": _SCHEMA_VERSION,
+        "config_path": str(config_path),
+        "db_path": str(db_path),
+        "input_path": str(input_path),
+        "schema_ready": True,
+        "blocked": False,
+        "blocker": None,
+        "next_action": next_action,
+        "recommended_command": recommended_command,
+        "operator_message": _operator_action_message(next_action),
+        "safe_to_run_recommended_command": bool(recommended_command),
+        "requires_human_approval_before_external_action": True,
+        "schema_operations": schema,
+        "operations_snapshot": snapshot,
+        "packet_decision_readiness": packet_readiness,
+        "network_access_performed": False,
+        "external_submission_enabled": False,
+        "signoff_recorded": False,
+        "packet_recorded": False,
+        "report_written": False,
     }
 
 

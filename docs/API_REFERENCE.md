@@ -361,6 +361,11 @@ def validation_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
 def background_schema_status_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
 def background_schema_migration_preview(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
 def background_schema_operations_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
+def background_operator_next_action_summary(
+    config_path: Path = DEFAULT_CONFIG_PATH,
+    db_path: Path = DEFAULT_DB_PATH,
+    input_path: Path = DEFAULT_INPUT_PATH,
+) -> dict[str, Any]
 def migrate_background_log_db(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
 def background_blueprint_compliance_summary(
     db_path: Path = DEFAULT_DB_PATH,
@@ -487,6 +492,9 @@ migration would create without writing anything. Use
 `background_schema_operations_summary(db_path)` to combine schema status,
 migration preview, packet-decision command readiness, and the next safe
 operator action. Use
+`background_operator_next_action_summary(config_path, db_path, input_path)` to
+schema-gate the operator workflow and recommend the next conservative local
+command while preserving no-network and no-external-submission guardrails. Use
 `migrate_background_log_db(db_path)` to run the additive `init_log_db`
 migration and report before/after table state without recording signoffs,
 packets, reports, network access, or external submission. Use
@@ -800,7 +808,7 @@ Lightweight summary of a `ScoredNEO` for display or export.
 
 ---
 
-## v0.16.0 through v0.59.0 Public API Additions
+## v0.16.0 through v0.60.0 Public API Additions
 
 These releases added conservative helper APIs around live-data retrieval,
 preprocessing quality, detection triage, linking, orbit review, classification
@@ -943,8 +951,9 @@ claim confirmation or impact probability.
 | v0.57.0 | `background.py` / `Skills/background.py` | `background_schema_status_summary`, `migrate_background_log_db`; schema status and init-log-db CLI commands |
 | v0.58.0 | `background.py` / `Skills/background.py` | `background_schema_migration_preview`; init-log-db-preview CLI command |
 | v0.59.0 | `background.py` / `Skills/background.py` | `background_schema_operations_summary`; schema-operations-summary CLI command |
+| v0.60.0 | `background.py` / `Skills/background.py` | `background_operator_next_action_summary`; operator-next-action CLI command |
 
-### Skills and CLI additions in v0.16.0 through v0.59.0
+### Skills and CLI additions in v0.16.0 through v0.60.0
 
 `export_candidate_report.py`, `tag_neo_class.py`, `check_tisserand.py`,
 `export_followup_requests.py`, `ephemeris_check.py`,
@@ -1002,5 +1011,6 @@ claim confirmation or impact probability.
 `Skills/background.py schema-status-summary`,
 `Skills/background.py init-log-db-preview`,
 `Skills/background.py schema-operations-summary`,
+`Skills/background.py operator-next-action`,
 `Skills/background.py init-log-db`, and
 `Skills/background.py launchd-plist`.

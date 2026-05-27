@@ -21,6 +21,7 @@ from background import (
     background_blueprint_compliance_summary,
     background_operations_snapshot,
     background_operations_snapshot_log_summary,
+    background_operator_next_action_summary,
     background_run_once,
     background_schema_migration_preview,
     background_schema_operations_summary,
@@ -188,6 +189,14 @@ def main() -> None:
     operations.add_argument("--input", type=Path, default=DEFAULT_INPUT_PATH)
     operations.add_argument("--db", type=Path, default=DEFAULT_DB_PATH)
 
+    next_action = sub.add_parser(
+        "operator-next-action",
+        help="Recommend the next conservative local operator command",
+    )
+    next_action.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
+    next_action.add_argument("--input", type=Path, default=DEFAULT_INPUT_PATH)
+    next_action.add_argument("--db", type=Path, default=DEFAULT_DB_PATH)
+
     record_operations = sub.add_parser(
         "record-operations-snapshot",
         help="Persist conservative background operations status to SQLite",
@@ -335,6 +344,8 @@ def main() -> None:
         _print_json(record_blueprint_compliance_summary(args.db, args.input))
     elif args.command == "operations-snapshot":
         _print_json(background_operations_snapshot(args.config, args.db, args.input))
+    elif args.command == "operator-next-action":
+        _print_json(background_operator_next_action_summary(args.config, args.db, args.input))
     elif args.command == "record-operations-snapshot":
         _print_json(record_background_operations_snapshot(args.config, args.db, args.input))
     elif args.command == "latest-unsigned-signoff-packet":

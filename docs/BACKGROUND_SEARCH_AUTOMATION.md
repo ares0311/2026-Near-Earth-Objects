@@ -192,6 +192,7 @@ PYTHONPATH=src python Skills/background.py ledger-summary
 PYTHONPATH=src python Skills/background.py schema-status-summary
 PYTHONPATH=src python Skills/background.py init-log-db-preview
 PYTHONPATH=src python Skills/background.py schema-operations-summary
+PYTHONPATH=src python Skills/background.py operator-next-action
 PYTHONPATH=src python Skills/background.py init-log-db
 PYTHONPATH=src python Skills/background.py reviewed-summary
 PYTHONPATH=src python Skills/background.py needs-follow-up-summary
@@ -251,6 +252,7 @@ Inspect the top-level SQLite log schema without mutating it:
 PYTHONPATH=src python Skills/background.py schema-status-summary
 PYTHONPATH=src python Skills/background.py init-log-db-preview
 PYTHONPATH=src python Skills/background.py schema-operations-summary
+PYTHONPATH=src python Skills/background.py operator-next-action
 ```
 
 The summary reports the expected table set, present tables, missing tables,
@@ -267,6 +269,11 @@ The operations summary combines schema status and migration preview with a
 packet-decision readiness flag and the next safe schema action. Use it before
 packet-linked signoff decisions to confirm the SQLite log has the
 `signoff_packet_decision_log` table.
+
+The operator next-action summary schema-gates the workflow first. If the
+SQLite log is incomplete, it recommends `init-log-db` and does not consult an
+operations snapshot. If the schema is current, it combines operations state and
+packet-decision readiness into one conservative local command recommendation.
 
 Run the additive local migration only when an operator explicitly wants the
 SQLite log database brought up to the current schema:
@@ -316,6 +323,7 @@ The operations snapshot is the compact operator view for a background cycle:
 
 ```bash
 PYTHONPATH=src python Skills/background.py operations-snapshot
+PYTHONPATH=src python Skills/background.py operator-next-action
 PYTHONPATH=src python Skills/background.py record-operations-snapshot
 PYTHONPATH=src python Skills/background.py operations-snapshot-log-summary
 ```
@@ -326,6 +334,8 @@ blueprint compliance, and live execution attempts into one structured JSON
 object. The snapshot also reports a conservative `next_action`, such as
 `run_background_once`, `record_signoff`, `review_follow_up`,
 `resolve_scheduler_blockers`, or `continue_offline_scheduler`.
+Use `operator-next-action` when an operator needs that action translated into
+one local command after schema readiness has been checked.
 
 Operations snapshots are no-network review artifacts. They persist to the
 top-level SQLite `operations_snapshot_log` table and explicitly keep

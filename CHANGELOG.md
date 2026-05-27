@@ -5,6 +5,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## v0.60.0
+
+- `background.py`: added
+  `background_operator_next_action_summary(config_path, db_path, input_path)`
+  to schema-gate the operator workflow and recommend the next conservative
+  local command.
+- `Skills/background.py`: added `operator-next-action` for machine-readable
+  next-command triage.
+- The operator summary blocks on incomplete SQLite schemas before consulting
+  operations snapshots, includes packet-decision readiness for current schemas,
+  and preserves no-network/no-external-submission guardrails.
+- 3 new tests (2123 total); 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.60.0.
+
 ## v0.59.0
 
 - `background.py`: added `background_schema_operations_summary(db_path)` to

@@ -747,7 +747,7 @@ def test_background_operations_snapshot_empty_log(monkeypatch, tmp_path):
         fixture,
     )
 
-    assert snapshot["code_version"] == "0.59.0"
+    assert snapshot["code_version"] == "0.60.0"
     assert snapshot["next_action"] == "run_background_once"
     assert snapshot["ledger"]["total_runs"] == 0
     assert snapshot["automation_readiness"]["scheduler_ready"] is True
@@ -886,6 +886,94 @@ def test_background_cli_operations_snapshot_commands(monkeypatch, tmp_path):
     assert summary_payload["latest"]["snapshot_id"] == recorded_payload["snapshot_id"]
 
 
+def test_background_operator_next_action_summary_blocks_old_schema(tmp_path):
+    db_path = tmp_path / "old.sqlite"
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("CREATE TABLE signoff_packet_log (packet_id TEXT PRIMARY KEY)")
+
+    summary = background.background_operator_next_action_summary(
+        Path("background/config.json"),
+        db_path,
+        Path("background/targets.json"),
+    )
+
+    assert summary["code_version"] == "0.60.0"
+    assert summary["schema_ready"] is False
+    assert summary["blocked"] is True
+    assert summary["blocker"] == "BACKGROUND_LOG_SCHEMA_NOT_CURRENT"
+    assert summary["next_action"] == "run_init_log_db"
+    assert summary["recommended_command"] == (
+        "PYTHONPATH=src python Skills/background.py init-log-db"
+    )
+    assert summary["operations_snapshot"] is None
+    assert summary["packet_decision_readiness"] is None
+    assert summary["network_access_performed"] is False
+    assert summary["external_submission_enabled"] is False
+
+
+def test_background_operator_next_action_summary_current_schema(monkeypatch, tmp_path):
+    fixture = tmp_path / "targets.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
+    write_fixture(fixture)
+    background.init_log_db(db_path)
+    monkeypatch.setattr(background, "score_tracklet", lambda tracklet, run_id: make_scored())
+
+    summary = background.background_operator_next_action_summary(
+        Path("background/config.json"),
+        db_path,
+        fixture,
+    )
+
+    assert summary["schema_ready"] is True
+    assert summary["blocked"] is False
+    assert summary["blocker"] is None
+    assert summary["next_action"] == "run_background_once"
+    assert summary["recommended_command"] == (
+        "PYTHONPATH=src python Skills/background.py run-once"
+    )
+    assert summary["safe_to_run_recommended_command"] is True
+    assert summary["requires_human_approval_before_external_action"] is True
+    assert summary["operations_snapshot"]["next_action"] == "run_background_once"
+    assert summary["packet_decision_readiness"]["total_packets"] == 0
+    assert summary["network_access_performed"] is False
+    assert summary["external_submission_enabled"] is False
+
+
+def test_background_cli_operator_next_action(tmp_path):
+    repo = Path(__file__).resolve().parents[1]
+    fixture = tmp_path / "targets.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
+    write_fixture(fixture)
+    env = {**os.environ, "PYTHONPATH": str(repo / "src")}
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "operator-next-action",
+            "--config",
+            str(repo / "background" / "config.json"),
+            "--input",
+            str(fixture),
+            "--db",
+            str(db_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+
+    payload = json.loads(result.stdout)
+    assert payload["schema_ready"] is False
+    assert payload["next_action"] == "create_log_db_when_ready"
+    assert payload["recommended_command"] == (
+        "PYTHONPATH=src python Skills/background.py init-log-db"
+    )
+    assert payload["external_submission_enabled"] is False
+
+
 def test_signoff_packet_for_unsigned_followup(monkeypatch, tmp_path):
     fixture = tmp_path / "targets.json"
     db_path = tmp_path / "Logs" / "background.sqlite"
@@ -901,7 +989,7 @@ def test_signoff_packet_for_unsigned_followup(monkeypatch, tmp_path):
     packet = background.signoff_packet(result.ledger.run_id, db_path)
     latest = background.latest_unsigned_signoff_packet(db_path)
 
-    assert packet["code_version"] == "0.59.0"
+    assert packet["code_version"] == "0.60.0"
     assert packet["run_id"] == result.ledger.run_id
     assert packet["target_id"] == "T001"
     assert packet["recommended_decision"] == "review_and_optionally_sign"
