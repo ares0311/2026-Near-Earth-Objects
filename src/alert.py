@@ -35,6 +35,7 @@ __all__ = [
     "format_neocp_submission",
     "count_observations_by_mission",
     "format_close_approach_bulletin",
+    "format_mpc_submission_header",
 ]
 
 import json
@@ -1506,3 +1507,23 @@ def format_close_approach_bulletin(neo: object) -> str:
         "GUARDRAIL: This pipeline does NOT assert any probability of Earth impact.\n"
         "All hazard assessments must be independently confirmed by MPC/CNEOS.\n"
     )
+
+
+def format_mpc_submission_header(obs_code: str, observer_name: str) -> str:
+    """Format a standard MPC submission COD/OBS header block.
+
+    Produces the two-line header that MPC requires at the top of every
+    observation batch submission:
+
+        COD <obs_code>
+        OBS <observer_name>
+
+    The observer name is truncated to 60 characters to stay within MPC
+    column limits.  obs_code must be a valid 3-character MPC observatory code;
+    it is upper-cased and stripped.
+
+    Returns a plain-text string ending with a newline.
+    """
+    code = str(obs_code).strip().upper()[:3]
+    name = str(observer_name).strip()[:60]
+    return f"COD {code}\nOBS {name}\n"

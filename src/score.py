@@ -18,7 +18,8 @@ __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "compute_survey_completeness",
            "compute_weighted_risk_score",
            "compute_hazard_summary",
-           "compute_priority_percentile"]
+           "compute_priority_percentile",
+           "compute_detection_confidence"]
 
 import math
 import uuid
@@ -1085,3 +1086,26 @@ def compute_priority_percentile(neo: object, neos: list) -> float:
     ref = _priority(neo)
     count = sum(1 for n in neos if _priority(n) <= ref)
     return round(count / len(neos), 6)
+
+
+def compute_detection_confidence(neo: object) -> float:
+    """Compute an overall detection confidence score in [0, 1].
+
+    Combines real_bogus_score (weight 0.4), orbit_quality_score (weight 0.3),
+    and arc_coverage_score (weight 0.3).  Missing feature scores contribute
+    0.0 (conservative).  Result is clamped to [0, 1] and rounded to 6 decimal
+    places.
+    """
+    features = getattr(neo, "features", None)
+
+    def _get(name: str) -> float:
+        if features is None:
+            return 0.0
+        val = getattr(features, name, None)
+        return float(val) if val is not None else 0.0
+
+    rb = _get("real_bogus_score")
+    oq = _get("orbit_quality_score")
+    ac = _get("arc_coverage_score")
+    confidence = 0.4 * rb + 0.3 * oq + 0.3 * ac
+    return round(min(1.0, max(0.0, confidence)), 6)

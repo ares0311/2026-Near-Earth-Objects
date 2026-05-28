@@ -17,7 +17,8 @@ __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fet
            "fetch_neocp_confirmed",
            "fetch_mpc_orbit_catalog",
            "compute_field_overlap",
-           "fetch_known_phas"]
+           "fetch_known_phas",
+           "fetch_mpc_close_approaches"]
 
 import json
 import os
@@ -1644,6 +1645,46 @@ def fetch_known_phas(force_refresh: bool = False) -> list[dict]:
                 "absolute_magnitude_h": h,
                 "moid_au": moid,
                 "neo_class": neo_class,
+            })
+        _save_cache(cache_key, rows)
+        return rows
+    except Exception:
+        return []
+
+
+def fetch_mpc_close_approaches(
+    days_ahead: int = 30,
+    force_refresh: bool = False,
+) -> list[dict]:
+    """Fetch upcoming close approaches from the MPC.
+
+    Queries the MPC close-approach table via ``astroquery.mpc`` and returns a
+    list of dicts with keys: ``designation``, ``approach_jd``, ``dist_au``,
+    ``v_rel_km_s``, ``h_mag``.  Results are disk-cached under the key
+    ``"mpc_close_approaches"``.  Returns an empty list on failure.
+    """
+    cache_key = "mpc_close_approaches"
+    if not force_refresh:
+        cached = _load_cache(cache_key)
+        if cached is not None and isinstance(cached, list):
+            return cached
+    try:
+        from astroquery.mpc import MPC  # type: ignore[import]
+
+        tbl = MPC.get_close_approaches(days=days_ahead)
+        rows: list[dict] = []
+        for row in tbl:
+            desig = str(row.get("designation") or row.get("name") or "unknown")
+            jd = float(row["epoch_jd"]) if "epoch_jd" in tbl.colnames else None
+            dist = float(row["dist"]) if "dist" in tbl.colnames else None
+            v_rel = float(row["v_rel"]) if "v_rel" in tbl.colnames else None
+            h = float(row["h"]) if "h" in tbl.colnames else None
+            rows.append({
+                "designation": desig,
+                "approach_jd": jd,
+                "dist_au": dist,
+                "v_rel_km_s": v_rel,
+                "h_mag": h,
             })
         _save_cache(cache_key, rows)
         return rows

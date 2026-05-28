@@ -34,6 +34,7 @@ __all__ = [
     "compute_posterior_stability",
     "compute_class_probability_range",
     "compute_ensemble_agreement",
+    "compute_posterior_kl_divergence",
 ]
 
 import base64
@@ -1637,3 +1638,33 @@ def compute_ensemble_agreement(posterior_list: list) -> float:
             total += 1.0 - l1 / 2.0
             count += 1
     return round(total / count, 6) if count > 0 else 0.0
+
+
+def compute_posterior_kl_divergence(p: object, q: object) -> float:
+    """Compute KL divergence KL(p || q) between two NEOPosterior-like objects.
+
+    Uses the five standard hypothesis keys.  Applies additive smoothing
+    (epsilon = 1e-10) before computing KL to avoid log(0).  Returns 0.0
+    if both distributions are degenerate (all-zero).  Result is rounded
+    to 8 decimal places.
+    """
+    _KEYS = [
+        "neo_candidate",
+        "known_object",
+        "main_belt_asteroid",
+        "stellar_artifact",
+        "other_solar_system",
+    ]
+    _EPS = 1e-10
+    p_vals = np.array([float(getattr(p, k, 0.0) or 0.0) for k in _KEYS])
+    q_vals = np.array([float(getattr(q, k, 0.0) or 0.0) for k in _KEYS])
+    p_sum = p_vals.sum()
+    q_sum = q_vals.sum()
+    if p_sum <= 0.0 or q_sum <= 0.0:
+        return 0.0
+    p_norm = (p_vals / p_sum) + _EPS
+    q_norm = (q_vals / q_sum) + _EPS
+    p_norm /= p_norm.sum()
+    q_norm /= q_norm.sum()
+    kl = float(np.sum(p_norm * np.log(p_norm / q_norm)))
+    return round(max(0.0, kl), 8)

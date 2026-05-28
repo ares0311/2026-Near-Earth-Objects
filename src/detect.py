@@ -15,7 +15,8 @@ __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus"
            "compute_brightness_trend",
            "compute_variability_index",
            "compute_angular_separation",
-           "compute_streak_orientation"]
+           "compute_streak_orientation",
+           "compute_detection_significance"]
 
 import math
 import uuid
@@ -1039,5 +1040,32 @@ def compute_streak_orientation(obs: object) -> float | None:
         angle_rad = 0.5 * math.atan2(2.0 * mu11, mu20 - mu02)
         angle_deg = math.degrees(angle_rad) % 180.0
         return float(angle_deg)
+    except Exception:
+        return None
+
+
+def compute_detection_significance(obs: object) -> float | None:
+    """Compute detection significance (sigma) from the 63×63 difference-image cutout.
+
+    Returns peak pixel value divided by the background RMS (estimated as the
+    standard deviation of pixels below the median).  Returns None if no cutout
+    is available, decoding fails, or the background RMS is zero.
+    """
+    try:
+        import base64
+
+        import numpy as np
+
+        cutout = getattr(obs, "cutout_difference", None)
+        if cutout is None:
+            return None
+        raw = base64.b64decode(cutout)
+        arr = np.frombuffer(raw, dtype=np.float32).reshape(63, 63)
+        med = float(np.median(arr))
+        below = arr[arr <= med]
+        rms = float(np.std(below))
+        if rms == 0.0:
+            return None
+        return float(arr.max()) / rms
     except Exception:
         return None

@@ -19,7 +19,8 @@ __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
            "compute_aphelion_distance",
            "compute_tisserand_wrt_earth",
            "compute_orbital_arc_quality",
-           "compute_mean_anomaly_at_epoch"]
+           "compute_mean_anomaly_at_epoch",
+           "compute_perihelion_velocity"]
 
 import math
 from typing import NamedTuple
@@ -1303,3 +1304,27 @@ def compute_mean_anomaly_at_epoch(elements: object, target_jd: float) -> float |
     n = 2.0 * math.pi / period_days
     m = m0_rad + n * (target_jd - float(epoch_jd))
     return float(m % (2.0 * math.pi))
+
+
+def compute_perihelion_velocity(elements: object) -> float | None:
+    """Compute orbital velocity at perihelion in km/s using the vis-viva equation.
+
+    v_p = sqrt(GM_sun * (2/q - 1/a))
+
+    where GM_sun = 4π² AU³/yr², converted so the result is in km/s.
+    Returns None if *a* ≤ 0, *e* ≥ 1, or q ≤ 0.
+
+    Conversion: 1 AU/yr = 1.496e8 km / (365.25 * 86400 s) ≈ 4.7406 km/s
+    """
+    a = float(getattr(elements, "a_au", 0.0) or 0.0)
+    e = float(getattr(elements, "e", 0.0) or 0.0)
+    if a <= 0.0 or e >= 1.0:
+        return None
+    q = a * (1.0 - e)
+    # vis-viva: v² = GM*(2/r - 1/a); at r=q:
+    # GM_sun in AU³/yr² = 4π²
+    gm_au3_yr2 = 4.0 * math.pi**2
+    v_au_yr = math.sqrt(gm_au3_yr2 * (2.0 / q - 1.0 / a))
+    # 1 AU/yr → km/s: 1 AU = 1.495978707e8 km, 1 yr = 365.25*86400 s
+    au_per_yr_to_km_per_s = 1.495978707e8 / (365.25 * 86400.0)
+    return round(v_au_yr * au_per_yr_to_km_per_s, 6)

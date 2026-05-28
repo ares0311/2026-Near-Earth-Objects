@@ -1991,3 +1991,54 @@ class TestFindLongestTracklet:
         sys.path.insert(0, "src")
         import link
         assert "find_longest_tracklet" in link.__all__
+
+
+class TestComputeTrackletCentroid:
+    def test_basic_centroid(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_tracklet_centroid
+        obs1 = SimpleNamespace(ra_deg=10.0, dec_deg=20.0)
+        obs2 = SimpleNamespace(ra_deg=12.0, dec_deg=22.0)
+        tracklet = SimpleNamespace(observations=(obs1, obs2))
+        ra, dec = compute_tracklet_centroid(tracklet)
+        assert abs(ra - 11.0) < 1e-5
+        assert abs(dec - 21.0) < 1e-5
+
+    def test_returns_none_empty(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_tracklet_centroid
+        tracklet = SimpleNamespace(observations=())
+        assert compute_tracklet_centroid(tracklet) is None
+
+    def test_single_obs(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_tracklet_centroid
+        obs = SimpleNamespace(ra_deg=45.0, dec_deg=-10.0)
+        tracklet = SimpleNamespace(observations=(obs,))
+        ra, dec = compute_tracklet_centroid(tracklet)
+        assert abs(ra - 45.0) < 1e-5
+        assert abs(dec - (-10.0)) < 1e-5
+
+    def test_no_observations_attr(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_tracklet_centroid
+        tracklet = SimpleNamespace()
+        assert compute_tracklet_centroid(tracklet) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+        assert "compute_tracklet_centroid" in link.__all__

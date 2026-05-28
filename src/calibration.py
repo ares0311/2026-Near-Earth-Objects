@@ -24,6 +24,7 @@ __all__ = [
     "compute_calibration_uniformity",
     "compute_mean_calibration_error",
     "compute_resolution",
+    "compute_uncertainty_component",
 ]
 
 import math
@@ -1024,3 +1025,27 @@ def compute_resolution(
         o_k = float(y[mask].mean())
         resolution += (n_k / n_total) * (o_k - o_bar) ** 2
     return round(float(resolution), 8)
+
+
+def compute_uncertainty_component(
+    probs: list[float] | np.ndarray,
+    labels: list[int] | np.ndarray,
+    n_bins: int = 10,
+) -> float:
+    """Compute the Brier uncertainty component: o_bar * (1 - o_bar).
+
+    This is the uncertainty term in the Brier score decomposition
+    (Murphy 1973): uncertainty = o_bar * (1 - o_bar), where o_bar is the
+    overall fraction of positive labels.
+
+    Returns 0.0 for empty inputs or single-class distributions.
+    Result is rounded to 8 decimal places.
+    """
+    p = np.asarray(probs, dtype=float)
+    y = np.asarray(labels, dtype=float)
+    if len(p) == 0 or len(y) == 0:
+        return 0.0
+    o_bar = float(y.mean())
+    if o_bar == 0.0 or o_bar == 1.0:
+        return 0.0
+    return round(o_bar * (1.0 - o_bar), 8)

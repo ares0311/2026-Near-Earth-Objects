@@ -29,6 +29,7 @@ __all__ = [
     "NightSummary",
     "TrackletCluster",
     "CampaignSummary",
+    "ObservationGroup",
 ]
 
 from dataclasses import dataclass
@@ -1009,3 +1010,17 @@ class CampaignSummary(BaseModel):
     n_pha_candidates: int
     surveys_used: tuple[str, ...] = ()
     sky_area_deg2: float | None = None
+
+
+class ObservationGroup(BaseModel):
+    """A group of observations sharing the same filter band and survey mission."""
+
+    model_config = ConfigDict(frozen=True)
+
+    group_id: str
+    filter_band: str
+    mission: Mission
+    observations: tuple[Observation, ...] = ()
+    n_obs: int = 0
+    mean_mag: float | None = None
+    jd_range_days: float = 0.0

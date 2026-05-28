@@ -1293,3 +1293,36 @@ class TestCampaignSummary:
         sys.path.insert(0, "src")
         import schemas
         assert "CampaignSummary" in schemas.__all__
+
+
+class TestObservationGroup:
+    def test_basic_construction(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import ObservationGroup
+        og = ObservationGroup(
+            group_id="g1",
+            filter_band="r",
+            mission="ZTF",
+            n_obs=3,
+        )
+        assert og.group_id == "g1"
+        assert og.filter_band == "r"
+        assert og.mission == "ZTF"
+        assert og.n_obs == 3
+        assert og.observations == ()
+        assert og.mean_mag is None
+
+    def test_frozen(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import ObservationGroup
+        og = ObservationGroup(group_id="g2", filter_band="g", mission="ATLAS")
+        with pytest.raises(Exception):
+            og.group_id = "changed"  # type: ignore[misc]
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        assert "ObservationGroup" in schemas.__all__

@@ -1826,3 +1826,64 @@ class TestComputeLocalBackground:
         sys.path.insert(0, "src")
         import preprocess
         assert "compute_local_background" in preprocess.__all__
+
+
+class TestComputeCutoutNoiseRatio:
+    def _make_obs(self, arr=None, cutout=None):
+        import sys
+        sys.path.insert(0, "src")
+        import base64
+        from types import SimpleNamespace
+
+        import numpy as np
+        if arr is not None:
+            raw = arr.astype(np.float32).tobytes()
+            cutout = base64.b64encode(raw).decode()
+        return SimpleNamespace(cutout_difference=cutout)
+
+    def test_returns_none_no_cutout(self):
+        import sys
+        sys.path.insert(0, "src")
+        from preprocess import compute_cutout_noise_ratio
+        obs = self._make_obs(cutout=None)
+        assert compute_cutout_noise_ratio(obs) is None
+
+    def test_returns_none_on_bad_decode(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_cutout_noise_ratio
+        obs = SimpleNamespace(cutout_difference="bad!!!")
+        assert compute_cutout_noise_ratio(obs) is None
+
+    def test_happy_path(self):
+        import sys
+        sys.path.insert(0, "src")
+        import numpy as np
+
+        from preprocess import compute_cutout_noise_ratio
+        rng = np.random.default_rng(0)
+        arr = rng.normal(1.0, 0.1, (63, 63)).astype(np.float32)
+        arr[31, 31] = 50.0  # bright source at center
+        obs = self._make_obs(arr=arr)
+        result = compute_cutout_noise_ratio(obs)
+        assert result is not None
+        assert result > 1.0
+
+    def test_returns_none_when_noise_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        import numpy as np
+
+        from preprocess import compute_cutout_noise_ratio
+        # Constant array -> std=0 -> None
+        arr = np.ones((63, 63), dtype=np.float32)
+        obs = self._make_obs(arr=arr)
+        assert compute_cutout_noise_ratio(obs) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import preprocess
+        assert "compute_cutout_noise_ratio" in preprocess.__all__

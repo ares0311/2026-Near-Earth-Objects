@@ -2044,3 +2044,53 @@ class TestComputeMeanAnomalyAtEpoch:
         sys.path.insert(0, "src")
         import orbit
         assert "compute_mean_anomaly_at_epoch" in orbit.__all__
+
+
+class TestComputePerihelionVelocity:
+    def test_earth_like_orbit(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_perihelion_velocity
+        # Near-circular orbit at 1 AU, e~0 -> v_p ~ 30 km/s
+        elem = SimpleNamespace(a_au=1.0, e=0.017)
+        result = compute_perihelion_velocity(elem)
+        assert result is not None
+        assert 28.0 < result < 32.0
+
+    def test_returns_none_for_hyperbolic(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_perihelion_velocity
+        elem = SimpleNamespace(a_au=1.5, e=1.0)
+        assert compute_perihelion_velocity(elem) is None
+
+    def test_returns_none_for_negative_a(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_perihelion_velocity
+        elem = SimpleNamespace(a_au=-1.0, e=0.5)
+        assert compute_perihelion_velocity(elem) is None
+
+    def test_high_eccentricity_fast(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_perihelion_velocity
+        # High-e Apollo: a=2, e=0.9 -> q=0.2 AU -> very fast perihelion
+        elem = SimpleNamespace(a_au=2.0, e=0.9)
+        result = compute_perihelion_velocity(elem)
+        assert result is not None
+        assert result > 50.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import orbit
+        assert "compute_perihelion_velocity" in orbit.__all__

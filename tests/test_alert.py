@@ -1828,3 +1828,41 @@ class TestFormatCloseApproachBulletin:
         sys.path.insert(0, "src")
         import alert
         assert "format_close_approach_bulletin" in alert.__all__
+
+
+class TestFormatMpcSubmissionHeader:
+    def test_basic_output(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_mpc_submission_header
+        result = format_mpc_submission_header("568", "Jane Smith")
+        assert result == "COD 568\nOBS Jane Smith\n"
+
+    def test_upcases_obs_code(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_mpc_submission_header
+        result = format_mpc_submission_header("g96", "Observer")
+        assert result.startswith("COD G96\n")
+
+    def test_truncates_obs_code_to_3(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_mpc_submission_header
+        result = format_mpc_submission_header("TOOLONG", "Obs")
+        assert result.startswith("COD TOO\n")
+
+    def test_truncates_observer_name(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_mpc_submission_header
+        long_name = "A" * 80
+        result = format_mpc_submission_header("568", long_name)
+        obs_line = result.split("\n")[1]
+        assert obs_line == "OBS " + "A" * 60
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+        assert "format_mpc_submission_header" in alert.__all__

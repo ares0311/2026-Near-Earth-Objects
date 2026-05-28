@@ -1228,3 +1228,47 @@ class TestComputeResolution:
         sys.path.insert(0, "src")
         import calibration
         assert "compute_resolution" in calibration.__all__
+
+
+class TestComputeUncertaintyComponent:
+    def test_balanced_binary(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_uncertainty_component
+        # o_bar = 0.5, uncertainty = 0.5*0.5 = 0.25
+        result = compute_uncertainty_component([0.6, 0.4, 0.7, 0.3], [1, 0, 1, 0])
+        assert abs(result - 0.25) < 1e-6
+
+    def test_empty_input(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_uncertainty_component
+        assert compute_uncertainty_component([], []) == 0.0
+
+    def test_all_positive_labels(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_uncertainty_component
+        # o_bar=1.0 -> 0.0
+        assert compute_uncertainty_component([0.9, 0.8], [1, 1]) == 0.0
+
+    def test_all_negative_labels(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_uncertainty_component
+        # o_bar=0.0 -> 0.0
+        assert compute_uncertainty_component([0.1, 0.2], [0, 0]) == 0.0
+
+    def test_skewed_distribution(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_uncertainty_component
+        # o_bar = 0.25, uncertainty = 0.25*0.75 = 0.1875
+        result = compute_uncertainty_component([0.3, 0.2, 0.1, 0.9], [0, 0, 0, 1])
+        assert abs(result - 0.1875) < 1e-6
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        assert "compute_uncertainty_component" in calibration.__all__

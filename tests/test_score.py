@@ -1767,3 +1767,56 @@ class TestComputePriorityPercentile:
         sys.path.insert(0, "src")
         import score
         assert "compute_priority_percentile" in score.__all__
+
+
+class TestComputeDetectionConfidence:
+    def test_full_features(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from score import compute_detection_confidence
+        features = SimpleNamespace(real_bogus_score=1.0, orbit_quality_score=1.0,
+                                   arc_coverage_score=1.0)
+        neo = SimpleNamespace(features=features)
+        result = compute_detection_confidence(neo)
+        assert abs(result - 1.0) < 1e-6
+
+    def test_no_features(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from score import compute_detection_confidence
+        neo = SimpleNamespace(features=None)
+        assert compute_detection_confidence(neo) == 0.0
+
+    def test_partial_features(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from score import compute_detection_confidence
+        features = SimpleNamespace(real_bogus_score=0.8, orbit_quality_score=None,
+                                   arc_coverage_score=0.6)
+        neo = SimpleNamespace(features=features)
+        # 0.4*0.8 + 0.3*0.0 + 0.3*0.6 = 0.32 + 0 + 0.18 = 0.50
+        result = compute_detection_confidence(neo)
+        assert abs(result - 0.50) < 1e-5
+
+    def test_clamped_to_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from score import compute_detection_confidence
+        features = SimpleNamespace(real_bogus_score=0.0, orbit_quality_score=0.0,
+                                   arc_coverage_score=0.0)
+        neo = SimpleNamespace(features=features)
+        assert compute_detection_confidence(neo) == 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        assert "compute_detection_confidence" in score.__all__

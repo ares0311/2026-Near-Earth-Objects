@@ -17,7 +17,8 @@ __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "compute_mean_consecutive_motion",
            "compute_tracklet_sky_density",
            "compute_tracklet_completeness",
-           "find_longest_tracklet"]
+           "find_longest_tracklet",
+           "compute_tracklet_centroid"]
 
 import math
 import uuid
@@ -1084,3 +1085,23 @@ def find_longest_tracklet(tracklets: list) -> object | None:
     if not tracklets:
         return None
     return max(tracklets, key=lambda t: float(getattr(t, "arc_days", 0.0) or 0.0))
+
+
+def compute_tracklet_centroid(tracklet: object) -> tuple[float, float] | None:
+    """Compute the mean (RA, Dec) centroid of a tracklet's observations.
+
+    Returns the arithmetic mean of all observation RA and Dec values as a
+    (ra_deg, dec_deg) tuple, or None if the tracklet has no observations.
+    """
+    observations = getattr(tracklet, "observations", ()) or ()
+    ras = []
+    decs = []
+    for obs in observations:
+        ra = getattr(obs, "ra_deg", None)
+        dec = getattr(obs, "dec_deg", None)
+        if ra is not None and dec is not None:
+            ras.append(float(ra))
+            decs.append(float(dec))
+    if not ras:
+        return None
+    return (round(sum(ras) / len(ras), 8), round(sum(decs) / len(decs), 8))

@@ -3414,3 +3414,71 @@ class TestFetchKnownPhas:
         sys.path.insert(0, "src")
         import fetch
         assert "fetch_known_phas" in fetch.__all__
+
+
+class TestFetchMpcCloseApproaches:
+    def test_returns_empty_on_failure(self, monkeypatch, tmp_path):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch as fe
+        monkeypatch.setattr(fe, "_load_cache", lambda key: None)
+        monkeypatch.setattr(fe, "_CACHE_DIR", tmp_path)
+        monkeypatch.setitem(sys.modules, "astroquery.mpc", None)
+        result = fe.fetch_mpc_close_approaches()
+        assert result == []
+
+    def test_returns_cached(self, monkeypatch, tmp_path):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch as fe
+        cached = [{"designation": "2025 XY1", "approach_jd": 2461000.0,
+                   "dist_au": 0.03, "v_rel_km_s": 12.5, "h_mag": 20.5}]
+        monkeypatch.setattr(fe, "_load_cache", lambda key: cached)
+        monkeypatch.setattr(fe, "_CACHE_DIR", tmp_path)
+        result = fe.fetch_mpc_close_approaches(force_refresh=False)
+        assert result == cached
+
+    def test_happy_path_with_mock_mpc(self, monkeypatch, tmp_path):
+        import sys
+        sys.path.insert(0, "src")
+        import types
+
+        import fetch as fe
+        monkeypatch.setattr(fe, "_load_cache", lambda key: None)
+        monkeypatch.setattr(fe, "_CACHE_DIR", tmp_path)
+        monkeypatch.setattr(fe, "_save_cache", lambda key, val: None)
+
+        class _FakeTbl(list):
+            colnames = ["epoch_jd", "dist", "v_rel", "h"]
+
+            def __iter__(self):
+                return iter(self._rows)
+
+        class _Row(dict):
+            def get(self, key, default=None):
+                return super().get(key, default)
+
+        fake_tbl = _FakeTbl()
+        fake_tbl._rows = [
+            {"designation": "2025 YZ9", "epoch_jd": 2461100.0,
+             "dist": 0.04, "v_rel": 15.0, "h": 21.0}
+        ]
+        fake_tbl.colnames = ["designation", "epoch_jd", "dist", "v_rel", "h"]
+
+        class _MockMPC:
+            @staticmethod
+            def get_close_approaches(days):
+                return fake_tbl
+
+        mock_mpc_mod = types.SimpleNamespace(MPC=_MockMPC)
+        monkeypatch.setitem(sys.modules, "astroquery.mpc", mock_mpc_mod)
+        result = fe.fetch_mpc_close_approaches(force_refresh=True)
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0]["designation"] == "2025 YZ9"
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+        assert "fetch_mpc_close_approaches" in fetch.__all__

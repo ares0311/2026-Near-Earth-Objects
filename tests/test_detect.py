@@ -1844,3 +1844,70 @@ class TestComputeStreakOrientation:
         sys.path.insert(0, "src")
         import detect
         assert "compute_streak_orientation" in detect.__all__
+
+
+class TestComputeDetectionSignificance:
+    def _make_obs(self, arr=None, cutout=None):
+        import sys
+        sys.path.insert(0, "src")
+        import base64
+        from types import SimpleNamespace
+
+        import numpy as np
+        if arr is not None:
+            raw = arr.astype(np.float32).tobytes()
+            cutout = base64.b64encode(raw).decode()
+        return SimpleNamespace(cutout_difference=cutout)
+
+    def test_returns_none_no_cutout(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_detection_significance
+        obs = self._make_obs(cutout=None)
+        assert compute_detection_significance(obs) is None
+
+    def test_returns_none_on_bad_decode(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import compute_detection_significance
+        obs = SimpleNamespace(cutout_difference="not_valid_base64!!!!")
+        assert compute_detection_significance(obs) is None
+
+    def test_happy_path(self):
+        import sys
+        sys.path.insert(0, "src")
+        import numpy as np
+
+        from detect import compute_detection_significance
+        arr = np.zeros((63, 63), dtype=np.float32)
+        arr[31, 31] = 100.0  # bright peak; rest is 0 -> all <= median=0
+        # below-median pixels: those == 0, std of zeros = 0 -> rms=0 -> None
+        # Use a more spread array instead:
+        rng = np.random.default_rng(42)
+        arr2 = rng.normal(0.5, 0.1, (63, 63)).astype(np.float32)
+        arr2[31, 31] = 10.0  # strong peak
+        obs = self._make_obs(arr=arr2)
+        result = compute_detection_significance(obs)
+        assert result is not None
+        assert result > 0
+
+    def test_returns_none_when_rms_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        import numpy as np
+
+        from detect import compute_detection_significance
+        # All same value -> std of below-median is 0
+        arr = np.ones((63, 63), dtype=np.float32)
+        arr[31, 31] = 2.0  # peak above median=1
+        # below-median: none (all >= median=1) -> below.size == 0 -> None
+        obs = self._make_obs(arr=arr)
+        assert compute_detection_significance(obs) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import detect
+        assert "compute_detection_significance" in detect.__all__

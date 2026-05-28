@@ -2299,3 +2299,74 @@ class TestComputeEnsembleAgreement:
         sys.path.insert(0, "src")
         import classify
         assert "compute_ensemble_agreement" in classify.__all__
+
+
+class TestComputePosteriorKlDivergence:
+    def test_identical_distributions(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from classify import compute_posterior_kl_divergence
+        p = SimpleNamespace(neo_candidate=0.5, known_object=0.2, main_belt_asteroid=0.2,
+                            stellar_artifact=0.05, other_solar_system=0.05)
+        q = SimpleNamespace(neo_candidate=0.5, known_object=0.2, main_belt_asteroid=0.2,
+                            stellar_artifact=0.05, other_solar_system=0.05)
+        result = compute_posterior_kl_divergence(p, q)
+        assert result == pytest.approx(0.0, abs=1e-6)
+
+    def test_different_distributions(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from classify import compute_posterior_kl_divergence
+        p = SimpleNamespace(neo_candidate=0.9, known_object=0.025, main_belt_asteroid=0.025,
+                            stellar_artifact=0.025, other_solar_system=0.025)
+        q = SimpleNamespace(neo_candidate=0.1, known_object=0.225, main_belt_asteroid=0.225,
+                            stellar_artifact=0.225, other_solar_system=0.225)
+        result = compute_posterior_kl_divergence(p, q)
+        assert result > 0.5
+
+    def test_degenerate_p_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from classify import compute_posterior_kl_divergence
+        p = SimpleNamespace(neo_candidate=0.0, known_object=0.0, main_belt_asteroid=0.0,
+                            stellar_artifact=0.0, other_solar_system=0.0)
+        q = SimpleNamespace(neo_candidate=0.5, known_object=0.2, main_belt_asteroid=0.2,
+                            stellar_artifact=0.05, other_solar_system=0.05)
+        assert compute_posterior_kl_divergence(p, q) == 0.0
+
+    def test_degenerate_q_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from classify import compute_posterior_kl_divergence
+        p = SimpleNamespace(neo_candidate=0.5, known_object=0.2, main_belt_asteroid=0.2,
+                            stellar_artifact=0.05, other_solar_system=0.05)
+        q = SimpleNamespace(neo_candidate=0.0, known_object=0.0, main_belt_asteroid=0.0,
+                            stellar_artifact=0.0, other_solar_system=0.0)
+        assert compute_posterior_kl_divergence(p, q) == 0.0
+
+    def test_result_nonnegative(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from classify import compute_posterior_kl_divergence
+        p = SimpleNamespace(neo_candidate=0.3, known_object=0.3, main_belt_asteroid=0.2,
+                            stellar_artifact=0.1, other_solar_system=0.1)
+        q = SimpleNamespace(neo_candidate=0.2, known_object=0.4, main_belt_asteroid=0.2,
+                            stellar_artifact=0.1, other_solar_system=0.1)
+        result = compute_posterior_kl_divergence(p, q)
+        assert result >= 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import classify
+        assert "compute_posterior_kl_divergence" in classify.__all__

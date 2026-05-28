@@ -17,7 +17,8 @@ __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_
            "compute_psf_asymmetry",
            "compute_source_compactness",
            "compute_cutout_peak_position",
-           "compute_local_background"]
+           "compute_local_background",
+           "compute_cutout_noise_ratio"]
 
 import base64
 import math
@@ -1004,5 +1005,36 @@ def compute_local_background(obs: object) -> float | None:
         mask = (dist >= 20.0) & (dist <= 31.0)
         pixels = arr[mask]
         return float(np.median(pixels))
+    except Exception:
+        return None
+
+
+def compute_cutout_noise_ratio(obs: object) -> float | None:
+    """Compute signal-to-noise ratio from the 63×63 difference-image cutout.
+
+    Signal is the peak pixel value.  Noise is the standard deviation of the
+    outer 8-pixel border pixels (rows/cols 0–7 and 55–62).  Returns None if
+    no cutout is available, decoding fails, or the noise is zero.
+    """
+    try:
+        import base64
+
+        import numpy as np
+
+        cutout = getattr(obs, "cutout_difference", None)
+        if cutout is None:
+            return None
+        raw = base64.b64decode(cutout)
+        arr = np.frombuffer(raw, dtype=np.float32).reshape(63, 63)
+        # Outer 8-pixel border mask
+        border_mask = np.zeros((63, 63), dtype=bool)
+        border_mask[:8, :] = True
+        border_mask[55:, :] = True
+        border_mask[:, :8] = True
+        border_mask[:, 55:] = True
+        noise = float(np.std(arr[border_mask]))
+        if noise == 0.0:
+            return None
+        return float(arr.max()) / noise
     except Exception:
         return None
