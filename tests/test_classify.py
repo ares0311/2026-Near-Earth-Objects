@@ -2356,3 +2356,48 @@ class TestComputeRealBogusHistogram:
         sys.path.insert(0, "src")
         import classify
         assert "compute_real_bogus_histogram" in classify.__all__
+
+
+class TestComputeNeoClassPrior:
+    def test_apollo_returns_point_five(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_neo_class_prior
+        assert compute_neo_class_prior("apollo") == pytest.approx(0.50)
+
+    def test_amor_returns_point_35(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_neo_class_prior
+        assert compute_neo_class_prior("amor") == pytest.approx(0.35)
+
+    def test_aten(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_neo_class_prior
+        assert compute_neo_class_prior("aten") == pytest.approx(0.12)
+
+    def test_ieo(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_neo_class_prior
+        assert compute_neo_class_prior("ieo") == pytest.approx(0.03)
+
+    def test_unknown_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_neo_class_prior
+        assert compute_neo_class_prior("mba") is None
+        assert compute_neo_class_prior("") is None
+
+    def test_case_insensitive(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_neo_class_prior
+        assert compute_neo_class_prior("APOLLO") == pytest.approx(0.50)
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import classify
+        assert "compute_neo_class_prior" in classify.__all__

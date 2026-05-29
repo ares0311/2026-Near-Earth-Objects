@@ -1009,18 +1009,20 @@ class TestEphemerisPoint:
         assert "EphemerisPoint" in __all__
 
 
-class TestObservationCluster:
-    """Tests for ObservationCluster schema."""
+class TestObservationClusterLegacy:
+    """Legacy tests for ObservationCluster schema (updated for v0.62.0 fields)."""
 
     def test_basic_construction(self):
         from schemas import ObservationCluster
         oc = ObservationCluster(
             cluster_id="CL001",
-            centroid_ra_deg=180.0,
-            centroid_dec_deg=10.0,
+            center_ra_deg=180.0,
+            center_dec_deg=10.0,
+            radius_arcsec=0.0,
+            epoch_jd=2460000.5,
         )
         assert oc.cluster_id == "CL001"
-        assert oc.centroid_ra_deg == 180.0
+        assert oc.center_ra_deg == 180.0
         assert oc.observations == ()
         assert oc.radius_arcsec == 0.0
 
@@ -1031,8 +1033,8 @@ class TestObservationCluster:
             mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF",
         ),)
         oc = ObservationCluster(
-            cluster_id="CL002", centroid_ra_deg=180.0, centroid_dec_deg=10.0,
-            observations=obs, radius_arcsec=5.0, jd=2460000.5,
+            cluster_id="CL002", center_ra_deg=180.0, center_dec_deg=10.0,
+            observations=obs, radius_arcsec=5.0, epoch_jd=2460000.5,
         )
         assert len(oc.observations) == 1
         assert oc.radius_arcsec == 5.0
@@ -1041,7 +1043,10 @@ class TestObservationCluster:
         import pytest
 
         from schemas import ObservationCluster
-        oc = ObservationCluster(cluster_id="X", centroid_ra_deg=0.0, centroid_dec_deg=0.0)
+        oc = ObservationCluster(
+            cluster_id="X", center_ra_deg=0.0, center_dec_deg=0.0,
+            radius_arcsec=0.0, epoch_jd=2460000.5,
+        )
         with pytest.raises(Exception):
             oc.cluster_id = "Y"  # type: ignore[misc]
 
@@ -1338,3 +1343,41 @@ class TestFieldObservationSummary:
         sys.path.insert(0, "src")
         import schemas
         assert "FieldObservationSummary" in schemas.__all__
+
+
+class TestObservationCluster:
+    def test_basic_construction(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import ObservationCluster
+        oc = ObservationCluster(
+            cluster_id="C001",
+            center_ra_deg=180.0,
+            center_dec_deg=5.0,
+            radius_arcsec=30.0,
+            epoch_jd=2460000.0,
+            n_observations=3,
+        )
+        assert oc.cluster_id == "C001"
+        assert oc.n_observations == 3
+        assert oc.observations == ()
+
+    def test_frozen(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import ObservationCluster
+        oc = ObservationCluster(
+            cluster_id="C002",
+            center_ra_deg=10.0,
+            center_dec_deg=0.0,
+            radius_arcsec=10.0,
+            epoch_jd=2460001.0,
+        )
+        with pytest.raises(Exception):
+            oc.cluster_id = "X"
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        assert "ObservationCluster" in schemas.__all__

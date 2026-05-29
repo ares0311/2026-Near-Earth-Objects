@@ -19,7 +19,8 @@ __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "compute_weighted_risk_score",
            "compute_hazard_summary",
            "compute_priority_percentile",
-           "compute_arc_completeness_score"]
+           "compute_arc_completeness_score",
+           "compute_followup_window_score"]
 
 import math
 import uuid
@@ -1108,4 +1109,41 @@ def compute_arc_completeness_score(neo: object) -> float:
     nobs = _get("nights_observed_score")
     oq = _get("orbit_quality_score")
     score = 0.4 * ac + 0.3 * nobs + 0.3 * oq
+    return round(min(1.0, max(0.0, score)), 6)
+
+
+def compute_followup_window_score(neo: object) -> float:
+    """Compute a follow-up window urgency score in [0, 1].
+
+    Combines:
+    - Gap since last observation (weight 0.5): 1.0 if gap >= 7 days.
+    - Orbit quality gap (weight 0.5): 1.0 if orbit_quality_score = 0.
+
+    Missing values default to 0.5 (neutral).
+    """
+    import time as _time
+
+    tracklet = getattr(neo, "tracklet", None)
+    features = getattr(neo, "features", None)
+
+    last_jd: float | None = None
+    if tracklet:
+        obs = getattr(tracklet, "observations", ())
+        if obs:
+            last_jd = max(float(getattr(o, "jd", 0.0)) for o in obs)
+    if last_jd is not None:
+        now_jd = 2440587.5 + _time.time() / 86400.0
+        gap_days = max(0.0, now_jd - last_jd)
+        gap_score = min(1.0, gap_days / 7.0)
+    else:
+        gap_score = 0.5
+
+    oq = (
+        float(features.orbit_quality_score)
+        if features is not None
+        and getattr(features, "orbit_quality_score", None) is not None
+        else None
+    )
+    orbit_gap_score = max(0.0, 1.0 - oq) if oq is not None else 0.5
+    score = 0.5 * gap_score + 0.5 * orbit_gap_score
     return round(min(1.0, max(0.0, score)), 6)

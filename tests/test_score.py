@@ -1841,3 +1841,62 @@ class TestComputeArcCompletenessScore:
         sys.path.insert(0, "src")
         import score
         assert "compute_arc_completeness_score" in score.__all__
+
+
+class TestComputeFollowupWindowScore:
+    def test_old_obs_high_score(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from score import compute_followup_window_score
+        # Very old observation — high gap score
+        obs = SimpleNamespace(jd=2400000.0)  # far in the past
+        tracklet = SimpleNamespace(observations=(obs,))
+        features = SimpleNamespace(orbit_quality_score=0.0)
+        neo = SimpleNamespace(tracklet=tracklet, features=features)
+        result = compute_followup_window_score(neo)
+        assert result == pytest.approx(1.0)
+
+    def test_no_tracklet_uses_neutral(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from score import compute_followup_window_score
+        features = SimpleNamespace(orbit_quality_score=1.0)
+        neo = SimpleNamespace(tracklet=None, features=features)
+        result = compute_followup_window_score(neo)
+        assert 0.0 <= result <= 1.0
+
+    def test_good_orbit_reduces_score(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from score import compute_followup_window_score
+        obs = SimpleNamespace(jd=2400000.0)
+        tracklet = SimpleNamespace(observations=(obs,))
+        features_good = SimpleNamespace(orbit_quality_score=1.0)
+        features_bad = SimpleNamespace(orbit_quality_score=0.0)
+        neo_good = SimpleNamespace(tracklet=tracklet, features=features_good)
+        neo_bad = SimpleNamespace(tracklet=tracklet, features=features_bad)
+        assert compute_followup_window_score(neo_good) < compute_followup_window_score(neo_bad)
+
+    def test_no_features_uses_neutral(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from score import compute_followup_window_score
+        obs = SimpleNamespace(jd=2400000.0)
+        tracklet = SimpleNamespace(observations=(obs,))
+        neo = SimpleNamespace(tracklet=tracklet, features=None)
+        result = compute_followup_window_score(neo)
+        assert 0.0 <= result <= 1.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        assert "compute_followup_window_score" in score.__all__

@@ -2054,3 +2054,59 @@ class TestComputeTrackletMotionScatter:
         sys.path.insert(0, "src")
         import link
         assert "compute_tracklet_motion_scatter" in link.__all__
+
+
+class TestComputeGreatCircleArc:
+    def test_two_obs_small_separation(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_great_circle_arc
+        obs = [
+            SimpleNamespace(jd=2460000.0, ra_deg=10.0, dec_deg=0.0),
+            SimpleNamespace(jd=2460001.0, ra_deg=10.1, dec_deg=0.0),
+        ]
+        tracklet = SimpleNamespace(observations=obs)
+        result = compute_great_circle_arc(tracklet)
+        assert result == pytest.approx(360.0, abs=1.0)
+
+    def test_single_obs_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_great_circle_arc
+        obs = [SimpleNamespace(jd=2460000.0, ra_deg=10.0, dec_deg=0.0)]
+        tracklet = SimpleNamespace(observations=obs)
+        assert compute_great_circle_arc(tracklet) == pytest.approx(0.0)
+
+    def test_no_obs_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_great_circle_arc
+        tracklet = SimpleNamespace(observations=())
+        assert compute_great_circle_arc(tracklet) == pytest.approx(0.0)
+
+    def test_three_obs_sums_pairs(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_great_circle_arc
+        obs = [
+            SimpleNamespace(jd=2460000.0, ra_deg=0.0, dec_deg=0.0),
+            SimpleNamespace(jd=2460001.0, ra_deg=0.1, dec_deg=0.0),
+            SimpleNamespace(jd=2460002.0, ra_deg=0.2, dec_deg=0.0),
+        ]
+        tracklet = SimpleNamespace(observations=obs)
+        result = compute_great_circle_arc(tracklet)
+        assert result > 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+        assert "compute_great_circle_arc" in link.__all__

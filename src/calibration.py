@@ -25,6 +25,7 @@ __all__ = [
     "compute_mean_calibration_error",
     "compute_resolution",
     "compute_calibration_slope",
+    "compute_overconfidence_score",
 ]
 
 import math
@@ -1067,3 +1068,19 @@ def compute_calibration_slope(
     num = float(((x_arr - x_mean) * (y_arr - y_mean)).sum())
     den = float(((x_arr - x_mean) ** 2).sum())
     return round(num / den, 8)
+
+
+def compute_overconfidence_score(
+    probs: list[float] | np.ndarray,
+    labels: list[int] | np.ndarray,
+) -> float:
+    """Compute the overconfidence score: mean predicted probability minus observed fraction.
+
+    Positive = overconfident (predicted higher than reality).
+    Negative = underconfident.  Returns 0.0 for empty inputs.
+    """
+    p = np.asarray(probs, dtype=float)
+    y = np.asarray(labels, dtype=float)
+    if len(p) == 0 or len(y) == 0:
+        return 0.0
+    return round(float(p.mean()) - float(y.mean()), 8)

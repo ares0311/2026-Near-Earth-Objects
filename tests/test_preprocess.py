@@ -1885,3 +1885,70 @@ class TestComputeCutoutSharpness:
         sys.path.insert(0, "src")
         import preprocess
         assert "compute_cutout_sharpness" in preprocess.__all__
+
+
+class TestComputeBackgroundGradient:
+    def test_flat_image_near_zero_gradient(self):
+        import base64
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        import numpy as np
+
+        from preprocess import compute_background_gradient
+        arr = np.ones((63, 63), dtype=np.float32)
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        obs = SimpleNamespace(cutout_difference=b64)
+        result = compute_background_gradient(obs)
+        assert result is not None
+        assert abs(result["dx"]) < 1e-4
+        assert abs(result["dy"]) < 1e-4
+
+    def test_gradient_image(self):
+        import base64
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        import numpy as np
+
+        from preprocess import compute_background_gradient
+        arr = np.zeros((63, 63), dtype=np.float32)
+        for i in range(63):
+            arr[:, i] = float(i)
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        obs = SimpleNamespace(cutout_difference=b64)
+        result = compute_background_gradient(obs)
+        assert result is not None
+        assert result["dx"] == pytest.approx(1.0, abs=0.01)
+
+    def test_no_cutout_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_background_gradient
+        obs = SimpleNamespace(cutout_difference=None)
+        assert compute_background_gradient(obs) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import preprocess
+        assert "compute_background_gradient" in preprocess.__all__
+
+    def test_invalid_data_returns_none(self):
+        import base64
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        import numpy as np
+
+        from preprocess import compute_background_gradient
+        # Valid base64 but wrong number of bytes → reshape will fail
+        arr = np.ones((10, 10), dtype=np.float32)
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        obs = SimpleNamespace(cutout_difference=b64)
+        assert compute_background_gradient(obs) is None

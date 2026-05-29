@@ -30,6 +30,7 @@ __all__ = [
     "TrackletCluster",
     "CampaignSummary",
     "FieldObservationSummary",
+    "ObservationCluster",
 ]
 
 from dataclasses import dataclass
@@ -906,29 +907,17 @@ class SurveyStatistics(BaseModel):
 
 
 class ObservationCluster(BaseModel):
-    """A group of spatially and temporally co-located observations from one field.
-
-    Clusters are produced by spatial grouping routines (e.g.
-    :func:`~detect.cluster_detections`) and capture the aggregate footprint of
-    a set of detections in a single pipeline epoch.
-
-    Attributes:
-        cluster_id: Unique identifier for this cluster.
-        centroid_ra_deg: Mean right ascension of the cluster centre in degrees.
-        centroid_dec_deg: Mean declination of the cluster centre in degrees.
-        jd: Reference Julian Date for this cluster (typically the median obs JD).
-        observations: Constituent :class:`Observation` objects.
-        radius_arcsec: Angular radius enclosing all members in arcsec.
-    """
+    """A spatial cluster of co-located observations from a single pipeline epoch."""
 
     model_config = ConfigDict(frozen=True)
 
     cluster_id: str
-    centroid_ra_deg: float
-    centroid_dec_deg: float
-    jd: float = 2460000.5
+    center_ra_deg: float
+    center_dec_deg: float
+    radius_arcsec: float
+    epoch_jd: float
     observations: tuple[Observation, ...] = ()
-    radius_arcsec: float = 0.0
+    n_observations: int = 0
 
 
 class AstrometricResidual(BaseModel):

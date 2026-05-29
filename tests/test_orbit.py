@@ -2092,3 +2092,59 @@ class TestComputeHillSphereRadius:
         sys.path.insert(0, "src")
         import orbit
         assert "compute_hill_sphere_radius" in orbit.__all__
+
+
+class TestComputeEncounterVelocity:
+    def test_earth_crossing_orbit(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_encounter_velocity
+        elements = SimpleNamespace(a_au=1.5, e=0.4)  # q=0.9, Q=2.1
+        result = compute_encounter_velocity(elements)
+        assert result is not None
+        assert result > 0.0
+        assert result < 100.0
+
+    def test_non_crossing_high_q(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_encounter_velocity
+        elements = SimpleNamespace(a_au=2.0, e=0.1)  # q=1.8 > 1.0
+        assert compute_encounter_velocity(elements) is None
+
+    def test_non_crossing_high_Q_low_a(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_encounter_velocity
+        elements = SimpleNamespace(a_au=0.6, e=0.1)  # Q=0.66 < 1.0
+        assert compute_encounter_velocity(elements) is None
+
+    def test_hyperbolic_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_encounter_velocity
+        elements = SimpleNamespace(a_au=1.5, e=1.1)
+        assert compute_encounter_velocity(elements) is None
+
+    def test_zero_a_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_encounter_velocity
+        elements = SimpleNamespace(a_au=0.0, e=0.3)
+        assert compute_encounter_velocity(elements) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import orbit
+        assert "compute_encounter_velocity" in orbit.__all__
