@@ -1938,3 +1938,63 @@ class TestComputeAstrometricPriority:
         sys.path.insert(0, "src")
         import score
         assert "compute_astrometric_priority" in score.__all__
+
+
+class TestComputeSizeScore:
+    def test_with_diameter_below_threshold(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_size_score
+
+        from .conftest import build_scored_neo
+        neo = build_scored_neo()
+        # build_scored_neo uses estimated_diameter_m=200.0
+        score = compute_size_score(neo)
+        assert score == 1.0  # 200/140 clamped to 1.0
+
+    def test_small_diameter_below_pha(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from score import compute_size_score
+        hazard = SimpleNamespace(estimated_diameter_m=70.0)
+        neo = SimpleNamespace(hazard=hazard)
+        score = compute_size_score(neo)
+        assert abs(score - 70.0 / 140.0) < 1e-9
+
+    def test_none_diameter_returns_sentinel(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from score import compute_size_score
+        hazard = SimpleNamespace(estimated_diameter_m=None)
+        neo = SimpleNamespace(hazard=hazard)
+        assert compute_size_score(neo) == 0.5
+
+    def test_zero_diameter_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from score import compute_size_score
+        hazard = SimpleNamespace(estimated_diameter_m=0.0)
+        neo = SimpleNamespace(hazard=hazard)
+        assert compute_size_score(neo) == 0.0
+
+    def test_result_clamped_to_one(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from score import compute_size_score
+        hazard = SimpleNamespace(estimated_diameter_m=1000.0)
+        neo = SimpleNamespace(hazard=hazard)
+        assert compute_size_score(neo) == 1.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        assert "compute_size_score" in score.__all__

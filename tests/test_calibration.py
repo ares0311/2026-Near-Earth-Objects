@@ -1370,3 +1370,85 @@ class TestComputeCalibrationSummary:
         assert "compute_calibration_summary" in calibration.__all__
 
 
+
+
+class TestComputeHosmerLemeshowStatistic:
+    def test_empty_input_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_hosmer_lemeshow_statistic
+        assert compute_hosmer_lemeshow_statistic([], []) == 0.0
+
+    def test_single_sample_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_hosmer_lemeshow_statistic
+        assert compute_hosmer_lemeshow_statistic([0.5], [1]) == 0.0
+
+    def test_perfect_calibration_low_statistic(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_hosmer_lemeshow_statistic
+        # All 0.5 predicted probability with 50% labels
+        probs = [0.5] * 100
+        labels = [1] * 50 + [0] * 50
+        stat = compute_hosmer_lemeshow_statistic(probs, labels)
+        assert isinstance(stat, float)
+        assert stat >= 0.0
+
+    def test_returns_float(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_hosmer_lemeshow_statistic
+        probs = [0.1, 0.4, 0.6, 0.9]
+        labels = [0, 0, 1, 1]
+        result = compute_hosmer_lemeshow_statistic(probs, labels)
+        assert isinstance(result, float)
+
+    def test_non_negative(self):
+        import sys
+        sys.path.insert(0, "src")
+        import numpy as np
+
+        from calibration import compute_hosmer_lemeshow_statistic
+        rng = np.random.default_rng(42)
+        probs = rng.random(50).tolist()
+        labels = (rng.random(50) > 0.5).astype(int).tolist()
+        result = compute_hosmer_lemeshow_statistic(probs, labels)
+        assert result >= 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        assert "compute_hosmer_lemeshow_statistic" in calibration.__all__
+
+
+class TestComputeHosmerLemeshowEdgeCases:
+    """Edge case tests for compute_hosmer_lemeshow_statistic."""
+
+    def test_all_zeros_labels_skips_degenerate_bins(self):
+        """All labels=0 forces exp == n_bin, hitting (n_bin - exp) == 0 branch."""
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_hosmer_lemeshow_statistic
+
+        # All predictions 0.5, all labels 0 → exp=0.5*n, n_bin-exp=0.5*n ≠ 0
+        # To hit n_bin-exp==0: all probs=1.0, all labels=0 → exp=n_bin
+        probs = [1.0] * 20
+        labels = [0] * 20
+        result = compute_hosmer_lemeshow_statistic(probs, labels)
+        assert isinstance(result, float)
+        assert result >= 0.0
+
+    def test_all_ones_labels_exp_equals_zero_branch(self):
+        """All probs=0.0, all labels=1 → exp=0 branch skipped in bins."""
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_hosmer_lemeshow_statistic
+
+        probs = [0.0] * 20
+        labels = [1] * 20
+        result = compute_hosmer_lemeshow_statistic(probs, labels)
+        assert isinstance(result, float)
+        assert result >= 0.0

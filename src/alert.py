@@ -38,6 +38,7 @@ __all__ = [
     "format_iau_circular_draft",
     "format_telescope_target_list",
     "compute_alert_priority_score",
+    "format_mpc_ades_header",
 ]
 
 import json
@@ -1640,3 +1641,33 @@ def compute_alert_priority_score(neo: ScoredNEO) -> float:
     oq = float(oq) if oq is not None else 0.5
     score = 0.4 * disc + 0.3 * (1.0 - ko) + 0.3 * oq
     return float(max(0.0, min(1.0, score)))
+
+
+def format_mpc_ades_header(neo: object, obs_code: str = "500") -> str:
+    """Return a plain-text ADES PSV header block for a NEO candidate.
+
+    Generates the standard ADES (Astrometry Data Exchange Standard) PSV
+    format header lines as a multi-line string.  Includes a mandatory
+    guardrail comment stating this is NOT a confirmed detection.
+
+    Args:
+        neo: Any object with a ``tracklet`` attribute that has an
+            ``object_id`` attribute.
+        obs_code: MPC observatory code (default ``"500"`` for geocentre).
+
+    Returns:
+        Plain-text ADES PSV header block as a string.
+    """
+    neo_id = getattr(getattr(neo, "tracklet", None), "object_id", "UNKNOWN")
+    lines = [
+        "# version=2017",
+        "# observatory",
+        f"# mpcCode {obs_code}",
+        "# submitter",
+        "# observers",
+        "# measurers",
+        "# telescope",
+        "# object",
+        f"# NEO candidate: {neo_id} (NOT a confirmed detection)",
+    ]
+    return "\n".join(lines)

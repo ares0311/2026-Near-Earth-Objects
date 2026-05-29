@@ -27,6 +27,7 @@ __all__ = [
     "compute_calibration_slope",
     "compute_overconfidence_score",
     "compute_calibration_summary",
+    "compute_hosmer_lemeshow_statistic",
 ]
 
 import math
@@ -1126,3 +1127,47 @@ def compute_calibration_summary(
         "overconfidence": compute_overconfidence_score(p, y),
         "n_samples": n,
     }
+
+
+def compute_hosmer_lemeshow_statistic(
+    probs: list | np.ndarray,
+    labels: list | np.ndarray,
+    n_bins: int = 10,
+) -> float:
+    """Compute the Hosmer-Lemeshow goodness-of-fit statistic.
+
+    Sorts samples by predicted probability, splits into ``n_bins`` equal-size
+    groups, then returns the sum of ``(O - E)^2 / E`` over non-degenerate
+    bins (where ``E > 0`` and ``n_bin - E > 0``).
+
+    Args:
+        probs: Predicted probabilities in [0, 1].
+        labels: Binary observed labels (0 or 1).
+        n_bins: Number of groups (default 10).
+
+    Returns:
+        Hosmer-Lemeshow statistic as a float.  Returns ``0.0`` for empty
+        input or fewer than 2 samples.
+    """
+    p = np.asarray(probs, dtype=float)
+    y = np.asarray(labels, dtype=float)
+    n = len(p)
+    if n < 2:
+        return 0.0
+
+    order = np.argsort(p)
+    p_sorted = p[order]
+    y_sorted = y[order]
+
+    indices = np.array_split(np.arange(n), n_bins)
+    hl_stat = 0.0
+    for idx in indices:
+        if len(idx) == 0:
+            continue
+        n_bin = float(len(idx))
+        obs = float(y_sorted[idx].sum())
+        exp = float(p_sorted[idx].sum())
+        if exp == 0.0 or (n_bin - exp) == 0.0:
+            continue
+        hl_stat += (obs - exp) ** 2 / exp
+    return float(hl_stat)

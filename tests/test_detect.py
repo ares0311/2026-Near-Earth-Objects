@@ -2040,3 +2040,72 @@ class TestComputeDetectionSignificance:
         sys.path.insert(0, "src")
         import detect
         assert "compute_detection_significance" in detect.__all__
+
+
+class TestComputeSkyPlaneVelocity:
+    def _make_obs(self, ra, dec, jd):
+        from types import SimpleNamespace
+        return SimpleNamespace(ra=ra, dec=dec, jd=jd)
+
+    def test_basic_motion(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_sky_plane_velocity
+        obs1 = self._make_obs(10.0, 0.0, 2460000.0)
+        obs2 = self._make_obs(10.01, 0.0, 2460000.5)
+        result = compute_sky_plane_velocity(obs1, obs2)
+        assert "dra_arcsec_hr" in result
+        assert "ddec_arcsec_hr" in result
+        assert "speed_arcsec_hr" in result
+        assert result["speed_arcsec_hr"] > 0.0
+
+    def test_zero_dt_returns_zeros(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_sky_plane_velocity
+        obs = self._make_obs(10.0, 10.0, 2460000.0)
+        result = compute_sky_plane_velocity(obs, obs)
+        assert result["dra_arcsec_hr"] == 0.0
+        assert result["ddec_arcsec_hr"] == 0.0
+        assert result["speed_arcsec_hr"] == 0.0
+
+    def test_cosine_dec_correction(self):
+        import sys
+        sys.path.insert(0, "src")
+        import math
+
+        from detect import compute_sky_plane_velocity
+        obs1 = self._make_obs(0.0, 60.0, 2460000.0)
+        obs2 = self._make_obs(1.0, 60.0, 2460001.0)
+        result = compute_sky_plane_velocity(obs1, obs2)
+        # dRA should be corrected by cos(60°) = 0.5
+        expected_dra = 1.0 * math.cos(math.radians(60.0)) * 3600.0 / 24.0
+        assert abs(result["dra_arcsec_hr"] - expected_dra) < 0.1
+
+    def test_dec_only_motion(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_sky_plane_velocity
+        obs1 = self._make_obs(10.0, 0.0, 2460000.0)
+        obs2 = self._make_obs(10.0, 0.1, 2460001.0)
+        result = compute_sky_plane_velocity(obs1, obs2)
+        assert abs(result["dra_arcsec_hr"]) < 0.001
+        assert result["ddec_arcsec_hr"] > 0.0
+
+    def test_speed_is_magnitude(self):
+        import sys
+        sys.path.insert(0, "src")
+        import math
+
+        from detect import compute_sky_plane_velocity
+        obs1 = self._make_obs(5.0, 5.0, 2460000.0)
+        obs2 = self._make_obs(5.01, 5.01, 2460001.0)
+        result = compute_sky_plane_velocity(obs1, obs2)
+        expected_speed = math.sqrt(result["dra_arcsec_hr"]**2 + result["ddec_arcsec_hr"]**2)
+        assert abs(result["speed_arcsec_hr"] - expected_speed) < 1e-3
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import detect
+        assert "compute_sky_plane_velocity" in detect.__all__

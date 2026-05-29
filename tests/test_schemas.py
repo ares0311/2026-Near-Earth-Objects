@@ -1417,3 +1417,75 @@ class TestSurveyRun:
         sys.path.insert(0, "src")
         import schemas
         assert "SurveyRun" in schemas.__all__
+
+
+class TestCandidateCluster:
+    def test_basic_construction(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import CandidateCluster
+        cc = CandidateCluster(
+            cluster_id="cluster-001",
+            run_id="run-42",
+            center_ra_deg=120.5,
+            center_dec_deg=-10.0,
+            n_candidates=3,
+            candidate_ids=("a", "b", "c"),
+        )
+        assert cc.cluster_id == "cluster-001"
+        assert cc.n_candidates == 3
+        assert cc.mean_priority == 0.0
+
+    def test_with_mean_priority(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import CandidateCluster
+        cc = CandidateCluster(
+            cluster_id="c2",
+            run_id="r2",
+            center_ra_deg=0.0,
+            center_dec_deg=0.0,
+            n_candidates=2,
+            candidate_ids=("x", "y"),
+            mean_priority=0.75,
+        )
+        assert cc.mean_priority == 0.75
+        assert cc.candidate_ids == ("x", "y")
+
+    def test_frozen(self):
+        import sys
+        sys.path.insert(0, "src")
+        import pytest
+
+        from schemas import CandidateCluster
+        cc = CandidateCluster(
+            cluster_id="c3",
+            run_id="r3",
+            center_ra_deg=5.0,
+            center_dec_deg=5.0,
+            n_candidates=1,
+            candidate_ids=("z",),
+        )
+        with pytest.raises(Exception):
+            cc.cluster_id = "changed"  # type: ignore
+
+    def test_empty_candidate_ids(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import CandidateCluster
+        cc = CandidateCluster(
+            cluster_id="c4",
+            run_id="r4",
+            center_ra_deg=180.0,
+            center_dec_deg=45.0,
+            n_candidates=0,
+            candidate_ids=(),
+        )
+        assert cc.candidate_ids == ()
+        assert cc.n_candidates == 0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        assert "CandidateCluster" in schemas.__all__

@@ -18,7 +18,8 @@ __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus"
            "compute_streak_orientation",
            "compute_magnitude_residual",
            "compute_elongation_ratio",
-           "compute_detection_significance"]
+           "compute_detection_significance",
+           "compute_sky_plane_velocity"]
 
 import math
 import uuid
@@ -1112,3 +1113,42 @@ def compute_detection_significance(obs: object) -> float | None:
     if mag >= 90.0 or limiting_mag >= 90.0:
         return None
     return float(max(0.0, min(1.0, (limiting_mag - mag) / 5.0)))
+
+
+def compute_sky_plane_velocity(obs1: object, obs2: object) -> dict:
+    """Compute sky-plane velocity between two observations.
+
+    Returns a dict with keys ``dra_arcsec_hr``, ``ddec_arcsec_hr``, and
+    ``speed_arcsec_hr``.  The RA component is cosine-Dec corrected.  Returns
+    a zero-velocity dict if both observations have the same JD.
+
+    Args:
+        obs1: First observation with ``ra``, ``dec``, and ``jd`` attributes.
+        obs2: Second observation with ``ra``, ``dec``, and ``jd`` attributes.
+
+    Returns:
+        Dict with velocity components in arcsec/hr.
+    """
+    ra1 = float(getattr(obs1, "ra", 0.0))
+    dec1 = float(getattr(obs1, "dec", 0.0))
+    jd1 = float(getattr(obs1, "jd", 0.0))
+    ra2 = float(getattr(obs2, "ra", 0.0))
+    dec2 = float(getattr(obs2, "dec", 0.0))
+    jd2 = float(getattr(obs2, "jd", 0.0))
+
+    dt_days = jd2 - jd1
+    if dt_days == 0.0:
+        return {"dra_arcsec_hr": 0.0, "ddec_arcsec_hr": 0.0, "speed_arcsec_hr": 0.0}
+
+    dt_hours = dt_days * 24.0
+    mean_dec_rad = math.radians((dec1 + dec2) / 2.0)
+    dra_deg = (ra2 - ra1) * math.cos(mean_dec_rad)
+    ddec_deg = dec2 - dec1
+    dra_arcsec_hr = dra_deg * 3600.0 / dt_hours
+    ddec_arcsec_hr = ddec_deg * 3600.0 / dt_hours
+    speed = math.sqrt(dra_arcsec_hr ** 2 + ddec_arcsec_hr ** 2)
+    return {
+        "dra_arcsec_hr": round(dra_arcsec_hr, 6),
+        "ddec_arcsec_hr": round(ddec_arcsec_hr, 6),
+        "speed_arcsec_hr": round(speed, 6),
+    }

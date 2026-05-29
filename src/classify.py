@@ -37,6 +37,7 @@ __all__ = [
     "compute_real_bogus_histogram",
     "compute_neo_class_prior",
     "compute_main_belt_probability",
+    "compute_comet_probability",
 ]
 
 import base64
@@ -1729,3 +1730,35 @@ def compute_main_belt_probability(features: object) -> float:
     exp_neo = math.exp(log_neo - max_log)
     denom = exp_mba + exp_neo
     return float(max(0.0, min(1.0, exp_mba / denom)))
+
+
+def compute_comet_probability(features: CandidateFeatures) -> float:
+    """Compute log-score comet probability from candidate features.
+
+    Uses a low prior (0.02) for comets and rewards erratic motion, poor orbit
+    quality, and uncertain detection scores.  Missing features contribute 0
+    (neutral).
+
+    Args:
+        features: :class:`~schemas.CandidateFeatures` object.
+
+    Returns:
+        Comet probability in [0, 1].
+    """
+
+    def _f(name: str) -> float:
+        v = getattr(features, name, None)
+        return float(v) if v is not None else 0.0
+
+    log_comet = (
+        math.log(0.02)
+        + 1.5 * (1.0 - _f("motion_consistency_score"))
+        + 1.0 * (1.0 - _f("orbit_quality_score"))
+        + 0.5 * (1.0 - _f("real_bogus_score"))
+    )
+    log_non_comet = math.log(0.98)
+    max_log = max(log_comet, log_non_comet)
+    exp_comet = math.exp(log_comet - max_log)
+    exp_non = math.exp(log_non_comet - max_log)
+    denom = exp_comet + exp_non
+    return float(max(0.0, min(1.0, exp_comet / denom)))

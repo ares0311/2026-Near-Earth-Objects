@@ -2182,3 +2182,124 @@ class TestComputeArcCurvature:
         sys.path.insert(0, "src")
         import link
         assert "compute_arc_curvature" in link.__all__
+
+
+class TestComputeTrackletDensity:
+    def _make_tracklet(self, ra_deg, dec_deg, object_id="T001"):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import Observation, Tracklet
+        obs = Observation(
+            obs_id=object_id + "_obs",
+            ra_deg=ra_deg,
+            dec_deg=dec_deg,
+            jd=2460000.5,
+            mag=19.5,
+            mag_err=0.05,
+            filter_band="r",
+            mission="ZTF",
+        )
+        return Tracklet(
+            object_id=object_id,
+            observations=(obs,),
+            arc_days=0.0,
+            motion_rate_arcsec_per_hour=1.0,
+            motion_pa_degrees=90.0,
+        )
+
+    def test_empty_input_returns_empty(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_tracklet_density
+        result = compute_tracklet_density([])
+        assert result == []
+
+    def test_single_tracklet_count_is_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_tracklet_density
+        t = self._make_tracklet(10.0, 0.0)
+        result = compute_tracklet_density([t])
+        assert result == [0]
+
+    def test_two_close_tracklets(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_tracklet_density
+        t1 = self._make_tracklet(10.0, 0.0, "T1")
+        t2 = self._make_tracklet(10.1, 0.0, "T2")  # ~0.1 deg apart
+        result = compute_tracklet_density([t1, t2], radius_deg=1.0)
+        assert result == [1, 1]
+
+    def test_two_far_tracklets(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_tracklet_density
+        t1 = self._make_tracklet(10.0, 0.0, "T1")
+        t2 = self._make_tracklet(50.0, 40.0, "T2")  # far apart
+        result = compute_tracklet_density([t1, t2], radius_deg=1.0)
+        assert result == [0, 0]
+
+    def test_length_matches_input(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_tracklet_density
+        tracklets = [self._make_tracklet(float(i), 0.0, f"T{i}") for i in range(5)]
+        result = compute_tracklet_density(tracklets, radius_deg=0.5)
+        assert len(result) == 5
+
+    def test_does_not_count_self(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_tracklet_density
+        t = self._make_tracklet(10.0, 0.0)
+        result = compute_tracklet_density([t], radius_deg=360.0)
+        assert result[0] == 0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+        assert "compute_tracklet_density" in link.__all__
+
+
+class TestComputeTrackletDensityEdgeCases:
+    """Tests for edge cases in compute_tracklet_density._first_radec."""
+
+    def test_obs_with_ra_not_ra_deg(self):
+        """Test fallback to 'ra'/'dec' when 'ra_deg'/'dec_deg' are absent."""
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_tracklet_density
+
+        obs = SimpleNamespace(ra=10.0, dec=5.0)
+        tracklet = SimpleNamespace(observations=[obs])
+        result = compute_tracklet_density([tracklet], radius_deg=1.0)
+        assert result == [0]
+
+    def test_obs_with_no_radec_attrs_returns_zero_count(self):
+        """Observation with no spatial attrs — _first_radec returns None, count=0."""
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_tracklet_density
+
+        obs = SimpleNamespace()  # no ra_deg, ra, dec_deg, dec
+        tracklet = SimpleNamespace(observations=[obs])
+        result = compute_tracklet_density([tracklet], radius_deg=360.0)
+        assert result == [0]
+
+    def test_empty_observations_list(self):
+        """Tracklet with empty observations — _first_radec returns None."""
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_tracklet_density
+
+        tracklet = SimpleNamespace(observations=[])
+        result = compute_tracklet_density([tracklet], radius_deg=1.0)
+        assert result == [0]

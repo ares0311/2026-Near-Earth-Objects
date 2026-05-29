@@ -2453,3 +2453,60 @@ class TestComputeMainBeltProbability:
         sys.path.insert(0, "src")
         import classify
         assert "compute_main_belt_probability" in classify.__all__
+
+
+class TestComputeCometProbability:
+    def test_high_erratic_motion_increases_probability(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_comet_probability
+        from schemas import CandidateFeatures
+        # Low motion_consistency_score → higher comet probability
+        f = CandidateFeatures(
+            motion_consistency_score=0.0,
+            orbit_quality_score=0.0,
+            real_bogus_score=0.0,
+        )
+        prob = compute_comet_probability(f)
+        assert 0.0 <= prob <= 1.0
+        assert prob > 0.0
+
+    def test_all_none_features(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_comet_probability
+        from schemas import CandidateFeatures
+        f = CandidateFeatures()
+        prob = compute_comet_probability(f)
+        assert 0.0 <= prob <= 1.0
+
+    def test_good_neo_features_low_comet_probability(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_comet_probability
+        from schemas import CandidateFeatures
+        f = CandidateFeatures(
+            motion_consistency_score=1.0,
+            orbit_quality_score=1.0,
+            real_bogus_score=1.0,
+        )
+        prob = compute_comet_probability(f)
+        # Consistent motion = less comet-like
+        assert prob < 0.5
+
+    def test_returns_float_in_range(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_comet_probability
+        from schemas import CandidateFeatures
+        for rb in [0.0, 0.5, 1.0]:
+            for mc in [0.0, 0.5, 1.0]:
+                f = CandidateFeatures(real_bogus_score=rb, motion_consistency_score=mc)
+                prob = compute_comet_probability(f)
+                assert 0.0 <= prob <= 1.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import classify
+        assert "compute_comet_probability" in classify.__all__
