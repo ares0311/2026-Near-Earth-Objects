@@ -39,6 +39,7 @@ __all__ = [
     "format_telescope_target_list",
     "compute_alert_priority_score",
     "format_mpc_ades_header",
+    "generate_followup_priority_list",
 ]
 
 import json
@@ -1671,3 +1672,64 @@ def format_mpc_ades_header(neo: object, obs_code: str = "500") -> str:
         f"# NEO candidate: {neo_id} (NOT a confirmed detection)",
     ]
     return "\n".join(lines)
+
+
+def generate_followup_priority_list(
+    neos: list[Any],
+    max_items: int = 10,
+) -> list[dict[str, Any]]:
+    """Return a ranked follow-up priority list for NEO candidates.
+
+    Sorts candidates by ``discovery_priority`` (descending) and returns the
+    top ``max_items`` as a list of dicts.  Each dict includes a mandatory
+    guardrail key stating this list does NOT constitute confirmed detections or
+    impact predictions.
+
+    Args:
+        neos: List of :class:`~schemas.ScoredNEO` objects.
+        max_items: Maximum number of items to return (default 10).
+
+    Returns:
+        List of dicts, each containing ``object_id``, ``urgency``,
+        ``alert_pathway``, ``moid_au``, ``discovery_priority``, and
+        ``guardrail``.
+    """
+    def _priority(neo: Any) -> float:
+        return float(getattr(getattr(neo, "metadata", None), "discovery_priority", 0.0) or 0.0)
+
+    sorted_neos = sorted(neos, key=_priority, reverse=True)[:max_items]
+    result = []
+    for neo in sorted_neos:
+        tracklet = getattr(neo, "tracklet", None)
+        object_id = getattr(tracklet, "object_id", "UNKNOWN")
+        hazard = getattr(neo, "hazard", None)
+        moid_au = getattr(hazard, "moid_au", None)
+        alert_pathway = getattr(hazard, "alert_pathway", "internal_candidate")
+        metadata = getattr(neo, "metadata", None)
+        discovery_priority = float(getattr(metadata, "discovery_priority", 0.0) or 0.0)
+        urgency = _compute_urgency(neo)
+        result.append({
+            "object_id": object_id,
+            "urgency": urgency,
+            "alert_pathway": alert_pathway,
+            "moid_au": moid_au,
+            "discovery_priority": discovery_priority,
+            "guardrail": "This list does NOT constitute confirmed detections or impact predictions",
+        })
+    return result
+
+
+def _compute_urgency(neo: Any) -> str:
+    """Derive urgency tier for a NEO candidate (internal helper)."""
+    hazard = getattr(neo, "hazard", None)
+    hazard_flag = getattr(hazard, "hazard_flag", "unknown")
+    moid_au = getattr(hazard, "moid_au", None)
+    metadata = getattr(neo, "metadata", None)
+    priority = float(getattr(metadata, "discovery_priority", 0.0) or 0.0)
+    if hazard_flag == "pha_candidate":
+        return "URGENT"
+    if moid_au is not None and float(moid_au) <= 0.1:
+        return "HIGH"
+    if priority >= 0.7:
+        return "MEDIUM"
+    return "ROUTINE"

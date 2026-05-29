@@ -21,7 +21,8 @@ __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "compute_tracklet_motion_scatter",
            "compute_great_circle_arc",
            "compute_arc_curvature",
-           "compute_tracklet_density"]
+           "compute_tracklet_density",
+           "compute_position_residuals"]
 
 import math
 import uuid
@@ -1252,3 +1253,41 @@ def compute_tracklet_density(tracklets: list, radius_deg: float = 1.0) -> list[i
                         count += 1
         counts.append(count)
     return counts
+
+
+def compute_position_residuals(tracklet: Tracklet) -> list[float]:
+    """Compute per-observation position residuals from a linear motion fit.
+
+    Fits linear models RA(t) and Dec(t) using :func:`numpy.polyfit` (degree 1)
+    and returns the per-observation residuals in arcseconds as
+    ``sqrt(dRA_cos_dec² + dDec²)``.  The RA residual is Dec-corrected by
+    multiplying the raw RA difference by ``cos(mean_dec_rad)``.
+
+    Returns an empty list for tracklets with fewer than 2 observations or on
+    any error.
+
+    Args:
+        tracklet: :class:`~schemas.Tracklet` object.
+
+    Returns:
+        List of residuals (arcsec) per observation, or ``[]`` on failure.
+    """
+    try:
+        obs_list = list(tracklet.observations)
+        if len(obs_list) < 2:
+            return []
+        jds = np.array([o.jd for o in obs_list], dtype=float)
+        ras = np.array([o.ra_deg for o in obs_list], dtype=float)
+        decs = np.array([o.dec_deg for o in obs_list], dtype=float)
+        mean_dec_rad = math.radians(float(np.mean(decs)))
+        cos_dec = math.cos(mean_dec_rad)
+        ra_fit = np.polyfit(jds, ras, 1)
+        dec_fit = np.polyfit(jds, decs, 1)
+        ra_pred = np.polyval(ra_fit, jds)
+        dec_pred = np.polyval(dec_fit, jds)
+        dra_arcsec = (ras - ra_pred) * cos_dec * 3600.0
+        ddec_arcsec = (decs - dec_pred) * 3600.0
+        residuals = np.sqrt(dra_arcsec ** 2 + ddec_arcsec ** 2)
+        return [float(r) for r in residuals]
+    except Exception:
+        return []

@@ -2510,3 +2510,61 @@ class TestComputeCometProbability:
         sys.path.insert(0, "src")
         import classify
         assert "compute_comet_probability" in classify.__all__
+
+
+class TestComputeKnownObjectProbability:
+    def test_high_known_object_score_raises_probability(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_known_object_probability
+        from schemas import CandidateFeatures
+        f_high = CandidateFeatures(known_object_score=1.0, real_bogus_score=1.0)
+        f_low = CandidateFeatures(known_object_score=0.0, real_bogus_score=0.0)
+        assert compute_known_object_probability(f_high) > compute_known_object_probability(f_low)
+
+    def test_all_none_features_returns_float(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_known_object_probability
+        from schemas import CandidateFeatures
+        f = CandidateFeatures()
+        prob = compute_known_object_probability(f)
+        assert isinstance(prob, float)
+        assert 0.0 <= prob <= 1.0
+
+    def test_known_object_score_one_high_prob(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_known_object_probability
+        from schemas import CandidateFeatures
+        f = CandidateFeatures(known_object_score=1.0, real_bogus_score=1.0,
+                              motion_consistency_score=1.0)
+        prob = compute_known_object_probability(f)
+        assert prob > 0.5
+
+    def test_zero_all_scores_low_prob(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_known_object_probability
+        from schemas import CandidateFeatures
+        f = CandidateFeatures(known_object_score=0.0, real_bogus_score=0.0,
+                              motion_consistency_score=0.0)
+        prob = compute_known_object_probability(f)
+        assert prob < 0.5
+
+    def test_result_in_range(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_known_object_probability
+        from schemas import CandidateFeatures
+        for ko in [0.0, 0.5, 1.0]:
+            for rb in [0.0, 0.5, 1.0]:
+                f = CandidateFeatures(known_object_score=ko, real_bogus_score=rb)
+                prob = compute_known_object_probability(f)
+                assert 0.0 <= prob <= 1.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import classify
+        assert "compute_known_object_probability" in classify.__all__

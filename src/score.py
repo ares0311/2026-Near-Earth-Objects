@@ -22,7 +22,8 @@ __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "compute_arc_completeness_score",
            "compute_followup_window_score",
            "compute_astrometric_priority",
-           "compute_size_score"]
+           "compute_size_score",
+           "compute_orbit_uncertainty_score"]
 
 import math
 import uuid
@@ -1194,3 +1195,24 @@ def compute_size_score(neo: ScoredNEO) -> float:
     if diameter is None:
         return 0.5
     return float(max(0.0, min(1.0, diameter / 140.0)))
+
+
+def compute_orbit_uncertainty_score(neo: ScoredNEO) -> float:
+    """Compute orbit uncertainty score as the complement of orbit quality.
+
+    Returns ``1.0 - orbit_quality_score`` where ``orbit_quality_score`` comes
+    from ``neo.features.orbit_quality_score``.  If the score is ``None``,
+    returns 0.5 (neutral sentinel).  Result is clamped to ``[0, 1]``.
+
+    A higher value indicates greater uncertainty in the orbital solution.
+
+    Args:
+        neo: :class:`~schemas.ScoredNEO` object.
+
+    Returns:
+        Orbit uncertainty score in [0, 1].
+    """
+    oq = getattr(neo.features, "orbit_quality_score", None)
+    if oq is None:
+        return 0.5
+    return float(max(0.0, min(1.0, 1.0 - float(oq))))

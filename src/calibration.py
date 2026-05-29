@@ -28,6 +28,7 @@ __all__ = [
     "compute_overconfidence_score",
     "compute_calibration_summary",
     "compute_hosmer_lemeshow_statistic",
+    "compute_spiegelhalter_z",
 ]
 
 import math
@@ -1171,3 +1172,40 @@ def compute_hosmer_lemeshow_statistic(
             continue
         hl_stat += (obs - exp) ** 2 / exp
     return float(hl_stat)
+
+
+def compute_spiegelhalter_z(
+    probs: list[float] | np.ndarray,
+    labels: list[float] | np.ndarray,
+    eps: float = 1e-7,
+) -> float:
+    """Compute Spiegelhalter's Z-score for probability calibration.
+
+    For each sample *i*, computes ``z_i = (y_i − p_i) * (1 − 2*p_i)``.
+    The overall Z-score is::
+
+        Z = sum(z_i) / sqrt(sum(p_i * (1 − p_i) * (1 − 2*p_i)²))
+
+    Returns ``0.0`` for empty input, fewer than 2 samples, or when the
+    denominator is ≤ ``eps``.
+
+    Args:
+        probs: Predicted probabilities in [0, 1].
+        labels: Binary observed labels (0 or 1).
+        eps: Minimum denominator threshold (default 1e-7).
+
+    Returns:
+        Spiegelhalter Z-score as a float.
+    """
+    p = np.asarray(probs, dtype=float)
+    y = np.asarray(labels, dtype=float)
+    n = len(p)
+    if n < 2:
+        return 0.0
+    p = np.clip(p, eps, 1.0 - eps)
+    z_i = (y - p) * (1.0 - 2.0 * p)
+    var_i = p * (1.0 - p) * (1.0 - 2.0 * p) ** 2
+    denom = float(np.sqrt(np.sum(var_i)))
+    if denom <= eps:
+        return 0.0
+    return float(np.sum(z_i) / denom)

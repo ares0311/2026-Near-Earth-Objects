@@ -2085,3 +2085,120 @@ class TestFormatMpcAdesHeader:
         sys.path.insert(0, "src")
         import alert
         assert "format_mpc_ades_header" in alert.__all__
+
+
+class TestGenerateFollowupPriorityList:
+    def test_returns_list(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import generate_followup_priority_list
+        neos = [make_scored_neo()]
+        result = generate_followup_priority_list(neos)
+        assert isinstance(result, list)
+        assert len(result) == 1
+
+    def test_guardrail_present(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import generate_followup_priority_list
+        neos = [make_scored_neo()]
+        result = generate_followup_priority_list(neos)
+        assert "NOT" in result[0]["guardrail"]
+
+    def test_empty_neos_returns_empty(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import generate_followup_priority_list
+        assert generate_followup_priority_list([]) == []
+
+    def test_max_items_limits_results(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import generate_followup_priority_list
+        neos = [make_scored_neo() for _ in range(5)]
+        result = generate_followup_priority_list(neos, max_items=3)
+        assert len(result) <= 3
+
+    def test_required_keys_present(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import generate_followup_priority_list
+        neos = [make_scored_neo()]
+        row = generate_followup_priority_list(neos)[0]
+        for key in ("object_id", "urgency", "alert_pathway", "moid_au",
+                    "discovery_priority", "guardrail"):
+            assert key in row
+
+    def test_sorted_by_priority_descending(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import generate_followup_priority_list
+        neo_hi = make_scored_neo()
+        neo_lo = make_scored_neo()
+        # Adjust discovery_priority via SimpleNamespace wrapper
+        from types import SimpleNamespace
+        lo_meta = SimpleNamespace(discovery_priority=0.1)
+        hi_meta = SimpleNamespace(discovery_priority=0.9)
+        neo_hi_ns = SimpleNamespace(
+            tracklet=neo_hi.tracklet,
+            hazard=neo_hi.hazard,
+            metadata=hi_meta,
+        )
+        neo_lo_ns = SimpleNamespace(
+            tracklet=neo_lo.tracklet,
+            hazard=neo_lo.hazard,
+            metadata=lo_meta,
+        )
+        result = generate_followup_priority_list([neo_lo_ns, neo_hi_ns])
+        assert result[0]["discovery_priority"] >= result[1]["discovery_priority"]
+
+    def test_urgency_high_for_low_moid(self):
+        """MOID <= 0.1 AU but not PHA → HIGH urgency."""
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from alert import generate_followup_priority_list
+        neo = make_scored_neo(moid_au=0.05, hazard_flag="close_approach")
+        hazard = SimpleNamespace(hazard_flag="close_approach", moid_au=0.05,
+                                 alert_pathway="mpc_submission")
+        meta = SimpleNamespace(discovery_priority=0.5)
+        neo_ns = SimpleNamespace(tracklet=neo.tracklet, hazard=hazard, metadata=meta)
+        result = generate_followup_priority_list([neo_ns])
+        assert result[0]["urgency"] == "HIGH"
+
+    def test_urgency_medium_for_high_priority(self):
+        """discovery_priority >= 0.7 → MEDIUM urgency."""
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from alert import generate_followup_priority_list
+        neo = make_scored_neo()
+        hazard = SimpleNamespace(hazard_flag="nominal", moid_au=None,
+                                 alert_pathway="internal_candidate")
+        meta = SimpleNamespace(discovery_priority=0.8)
+        neo_ns = SimpleNamespace(tracklet=neo.tracklet, hazard=hazard, metadata=meta)
+        result = generate_followup_priority_list([neo_ns])
+        assert result[0]["urgency"] == "MEDIUM"
+
+    def test_urgency_routine_for_low_priority_no_moid(self):
+        """Low priority, no MOID → ROUTINE."""
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from alert import generate_followup_priority_list
+        neo = make_scored_neo()
+        hazard = SimpleNamespace(hazard_flag="nominal", moid_au=None,
+                                 alert_pathway="internal_candidate")
+        meta = SimpleNamespace(discovery_priority=0.3)
+        neo_ns = SimpleNamespace(tracklet=neo.tracklet, hazard=hazard, metadata=meta)
+        result = generate_followup_priority_list([neo_ns])
+        assert result[0]["urgency"] == "ROUTINE"
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+        assert "generate_followup_priority_list" in alert.__all__

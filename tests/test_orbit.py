@@ -2292,3 +2292,54 @@ class TestComputeLongitudeOfPerihelionAdditional:
         )
         result = compute_longitude_of_perihelion(el)
         assert 0.0 <= result < 360.0
+
+
+class TestComputePerihelionDistanceAuAttrs:
+    """Tests for compute_perihelion_distance using a_au and e attributes."""
+
+    def _el(self, a, e):
+        from types import SimpleNamespace
+        return SimpleNamespace(a_au=a, e=e)
+
+    def test_basic_with_a_au_and_e(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_perihelion_distance
+        assert compute_perihelion_distance(self._el(1.5, 0.4)) == pytest.approx(0.9, abs=1e-5)
+
+    def test_circular_orbit_with_a_au(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_perihelion_distance
+        assert compute_perihelion_distance(self._el(1.0, 0.0)) == pytest.approx(1.0)
+
+    def test_e_ge_1_parabolic_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_perihelion_distance
+        assert compute_perihelion_distance(self._el(1.5, 1.0)) is None
+
+    def test_e_gt_1_hyperbolic_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_perihelion_distance
+        assert compute_perihelion_distance(self._el(1.5, 1.5)) is None
+
+    def test_both_attrs_none_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_perihelion_distance
+        # No a_au, no semi_major_axis_au
+        el = SimpleNamespace(e=0.5)
+        assert compute_perihelion_distance(el) is None
+
+    def test_e_none_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_perihelion_distance
+        el = SimpleNamespace(a_au=1.5, e=None)
+        assert compute_perihelion_distance(el) is None
