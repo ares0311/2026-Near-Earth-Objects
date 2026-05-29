@@ -15,7 +15,8 @@ __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus"
            "compute_brightness_trend",
            "compute_variability_index",
            "compute_angular_separation",
-           "compute_streak_orientation"]
+           "compute_streak_orientation",
+           "compute_magnitude_residual"]
 
 import math
 import uuid
@@ -1041,3 +1042,15 @@ def compute_streak_orientation(obs: object) -> float | None:
         return float(angle_deg)
     except Exception:
         return None
+
+
+def compute_magnitude_residual(obs: object, predicted_mag: float) -> float:
+    """Return the signed residual obs.mag − predicted_mag.
+
+    Returns 0.0 if either the observed magnitude or the predicted magnitude
+    is a sentinel value (≥ 90), which indicates an invalid or missing magnitude.
+    """
+    obs_mag = float(getattr(obs, "mag", 99.0) or 99.0)
+    if obs_mag >= 90.0 or predicted_mag >= 90.0:
+        return 0.0
+    return round(obs_mag - predicted_mag, 6)

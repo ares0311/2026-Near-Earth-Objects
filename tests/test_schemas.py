@@ -1293,3 +1293,48 @@ class TestCampaignSummary:
         sys.path.insert(0, "src")
         import schemas
         assert "CampaignSummary" in schemas.__all__
+
+
+class TestFieldObservationSummary:
+    def test_basic_construction(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import FieldObservationSummary
+        fos = FieldObservationSummary(
+            field_id="F001",
+            epoch_jd=2460000.0,
+            survey="ZTF",
+            n_sources=150,
+            n_moving=5,
+            n_known=3,
+            n_new=2,
+            limiting_mag=21.5,
+        )
+        assert fos.field_id == "F001"
+        assert fos.n_sources == 150
+        assert fos.limiting_mag == 21.5
+
+    def test_default_values(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import FieldObservationSummary
+        fos = FieldObservationSummary(field_id="F002", epoch_jd=2460001.0, survey="ATLAS")
+        assert fos.n_sources == 0
+        assert fos.n_moving == 0
+        assert fos.n_known == 0
+        assert fos.n_new == 0
+        assert fos.limiting_mag is None
+
+    def test_frozen(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import FieldObservationSummary
+        fos = FieldObservationSummary(field_id="F003", epoch_jd=2460002.0, survey="ZTF")
+        with pytest.raises(Exception):
+            fos.n_sources = 99
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        assert "FieldObservationSummary" in schemas.__all__

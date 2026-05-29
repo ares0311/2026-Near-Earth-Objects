@@ -3414,3 +3414,77 @@ class TestFetchKnownPhas:
         sys.path.insert(0, "src")
         import fetch
         assert "fetch_known_phas" in fetch.__all__
+
+
+class TestFetchMpcNeoCounts:
+    def test_returns_dict_on_success(self, tmp_path, monkeypatch):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, "src")
+        import unittest.mock as mock
+
+        import fetch
+        monkeypatch.setattr(fetch, "_CACHE_DIR", Path(tmp_path))
+        # Cover all branches: apollo(a>1,q<1.017), aten(a<1,Q>0.983),
+        # ieo(Q<0.983), amor(1.017<=q<=1.3)
+        rows = [
+            {"a": 1.5, "e": 0.4},   # apollo: q=0.9 < 1.017
+            {"a": 0.9, "e": 0.1},   # aten: a<1, Q=0.99 > 0.983
+            {"a": 0.4, "e": 0.3},   # ieo: Q=0.52 < 0.983
+            {"a": 1.2, "e": 0.1},   # amor: q=1.08, 1.017<=q<=1.3
+        ]
+
+        class FakeMPC:
+            @staticmethod
+            def get_observatory_list():
+                return []
+            @staticmethod
+            def query_objects_in_sky(**kwargs):
+                return rows
+
+        with mock.patch.dict("sys.modules", {"astroquery.mpc": mock.MagicMock(MPC=FakeMPC)}):
+            result = fetch.fetch_mpc_neo_counts(force_refresh=True)
+        assert isinstance(result, dict)
+        assert result.get("total") == 4
+        assert result.get("apollo") == 1
+        assert result.get("aten") == 1
+        assert result.get("ieo") == 1
+        assert result.get("amor") == 1
+
+    def test_returns_empty_on_failure(self, tmp_path, monkeypatch):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, "src")
+        import unittest.mock as mock
+
+        import fetch
+        monkeypatch.setattr(fetch, "_CACHE_DIR", Path(tmp_path))
+
+        class ErrorMPC:
+            @staticmethod
+            def get_observatory_list():
+                raise RuntimeError("network down")
+            @staticmethod
+            def query_objects_in_sky(**kwargs):
+                raise RuntimeError("network down")
+
+        with mock.patch.dict("sys.modules", {"astroquery.mpc": mock.MagicMock(MPC=ErrorMPC)}):
+            result = fetch.fetch_mpc_neo_counts(force_refresh=True)
+        assert result == {}
+
+    def test_cache_hit(self, tmp_path, monkeypatch):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, "src")
+        import fetch
+        monkeypatch.setattr(fetch, "_CACHE_DIR", Path(tmp_path))
+        cached = {"amor": 5, "apollo": 10, "aten": 2, "ieo": 1, "total": 18}
+        fetch._save_cache("mpc_neo_counts", cached)
+        result = fetch.fetch_mpc_neo_counts(force_refresh=False)
+        assert result == cached
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+        assert "fetch_mpc_neo_counts" in fetch.__all__

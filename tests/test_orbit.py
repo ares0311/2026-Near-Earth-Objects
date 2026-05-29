@@ -2044,3 +2044,51 @@ class TestComputeMeanAnomalyAtEpoch:
         sys.path.insert(0, "src")
         import orbit
         assert "compute_mean_anomaly_at_epoch" in orbit.__all__
+
+
+class TestComputeHillSphereRadius:
+    def test_typical_neo(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_hill_sphere_radius
+        elements = SimpleNamespace(a_au=1.5, e=0.3, absolute_magnitude_h=18.0)
+        result = compute_hill_sphere_radius(elements)
+        assert result is not None
+        assert result > 0.0
+
+    def test_hyperbolic_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_hill_sphere_radius
+        elements = SimpleNamespace(a_au=1.5, e=1.1, absolute_magnitude_h=18.0)
+        assert compute_hill_sphere_radius(elements) is None
+
+    def test_zero_a_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_hill_sphere_radius
+        elements = SimpleNamespace(a_au=0.0, e=0.1, absolute_magnitude_h=18.0)
+        assert compute_hill_sphere_radius(elements) is None
+
+    def test_no_h_uses_default(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_hill_sphere_radius
+        elements = SimpleNamespace(a_au=1.5, e=0.3, absolute_magnitude_h=None)
+        result = compute_hill_sphere_radius(elements)
+        assert result is not None
+        assert result > 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import orbit
+        assert "compute_hill_sphere_radius" in orbit.__all__

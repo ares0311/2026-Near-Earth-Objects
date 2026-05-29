@@ -24,6 +24,7 @@ __all__ = [
     "compute_calibration_uniformity",
     "compute_mean_calibration_error",
     "compute_resolution",
+    "compute_calibration_slope",
 ]
 
 import math
@@ -1024,3 +1025,45 @@ def compute_resolution(
         o_k = float(y[mask].mean())
         resolution += (n_k / n_total) * (o_k - o_bar) ** 2
     return round(float(resolution), 8)
+
+
+def compute_calibration_slope(
+    probs: list[float] | np.ndarray,
+    labels: list[int] | np.ndarray,
+    n_bins: int = 10,
+) -> float:
+    """Compute the linear regression slope of observed frequency vs mean predicted probability.
+
+    Bins predictions into *n_bins* equal-width bins, computes the mean predicted
+    probability and observed positive fraction per non-empty bin, then fits a
+    least-squares regression line.  Returns the slope; 1.0 = perfect calibration,
+    < 1.0 = overconfident, > 1.0 = underconfident.
+
+    Returns 1.0 if fewer than 2 non-empty bins exist.
+    """
+    p = np.asarray(probs, dtype=float)
+    y = np.asarray(labels, dtype=float)
+    if len(p) == 0 or len(y) == 0:
+        return 1.0
+    bin_edges = np.linspace(0.0, 1.0, n_bins + 1)
+    x_bins: list[float] = []
+    y_bins: list[float] = []
+    for i in range(n_bins):
+        if i < n_bins - 1:
+            mask = (p >= bin_edges[i]) & (p < bin_edges[i + 1])
+        else:
+            mask = (p >= bin_edges[i]) & (p <= bin_edges[i + 1])
+        n_k = int(mask.sum())
+        if n_k == 0:
+            continue
+        x_bins.append(float(p[mask].mean()))
+        y_bins.append(float(y[mask].mean()))
+    if len(x_bins) < 2:
+        return 1.0
+    x_arr = np.array(x_bins)
+    y_arr = np.array(y_bins)
+    x_mean = x_arr.mean()
+    y_mean = y_arr.mean()
+    num = float(((x_arr - x_mean) * (y_arr - y_mean)).sum())
+    den = float(((x_arr - x_mean) ** 2).sum())
+    return round(num / den, 8)

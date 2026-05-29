@@ -1828,3 +1828,62 @@ class TestFormatCloseApproachBulletin:
         sys.path.insert(0, "src")
         import alert
         assert "format_close_approach_bulletin" in alert.__all__
+
+
+class TestFormatIauCircularDraft:
+    def _make_neo(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+        obs1 = SimpleNamespace(jd=2460000.0, ra_deg=10.0, dec_deg=5.0, mag=18.5)
+        obs2 = SimpleNamespace(jd=2460001.0, ra_deg=10.1, dec_deg=5.1, mag=18.4)
+        tracklet = SimpleNamespace(object_id="2026AB1", observations=(obs1, obs2))
+        hazard = SimpleNamespace(
+            neo_class="apollo",
+            moid_au=0.03,
+            absolute_magnitude_h=21.5,
+            alert_pathway="mpc_submission",
+        )
+        metadata = SimpleNamespace(discovery_priority=0.85)
+        return SimpleNamespace(tracklet=tracklet, hazard=hazard, metadata=metadata)
+
+    def test_contains_not_guardrail(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_iau_circular_draft
+        neo = self._make_neo()
+        result = format_iau_circular_draft(neo)
+        assert "NOT" in result
+
+    def test_contains_object_id(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_iau_circular_draft
+        neo = self._make_neo()
+        result = format_iau_circular_draft(neo)
+        assert "2026AB1" in result
+
+    def test_contains_draft_header(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_iau_circular_draft
+        neo = self._make_neo()
+        result = format_iau_circular_draft(neo)
+        assert "DRAFT IAU CIRCULAR" in result
+
+    def test_no_tracklet(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from alert import format_iau_circular_draft
+        neo = SimpleNamespace(tracklet=None, hazard=None, metadata=None)
+        result = format_iau_circular_draft(neo)
+        assert "NOT" in result
+        assert "unknown" in result
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+        assert "format_iau_circular_draft" in alert.__all__

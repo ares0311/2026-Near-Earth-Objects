@@ -17,7 +17,8 @@ __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "compute_mean_consecutive_motion",
            "compute_tracklet_sky_density",
            "compute_tracklet_completeness",
-           "find_longest_tracklet"]
+           "find_longest_tracklet",
+           "compute_tracklet_motion_scatter"]
 
 import math
 import uuid
@@ -1084,3 +1085,41 @@ def find_longest_tracklet(tracklets: list) -> object | None:
     if not tracklets:
         return None
     return max(tracklets, key=lambda t: float(getattr(t, "arc_days", 0.0) or 0.0))
+
+
+def compute_tracklet_motion_scatter(tracklet: object) -> float | None:
+    """Compute the standard deviation of pairwise motion rates (arcsec/hr).
+
+    Computes the apparent motion rate between each consecutive pair of
+    observations (sorted by JD) and returns the standard deviation of those
+    rates.  Returns None if fewer than 3 observations are available (need at
+    least 2 consecutive pairs) or if all time differences are zero.
+    """
+    import math
+
+    observations = getattr(tracklet, "observations", ()) or ()
+    obs_sorted = sorted(observations, key=lambda o: getattr(o, "jd", 0.0))
+    if len(obs_sorted) < 3:
+        return None
+    rates: list[float] = []
+    for i in range(len(obs_sorted) - 1):
+        o1, o2 = obs_sorted[i], obs_sorted[i + 1]
+        dt_hr = (float(getattr(o2, "jd", 0.0)) - float(getattr(o1, "jd", 0.0))) * 24.0
+        if abs(dt_hr) < 1e-9:
+            continue
+        mid_dec = (
+            float(getattr(o1, "dec_deg", 0.0)) + float(getattr(o2, "dec_deg", 0.0))
+        ) / 2.0
+        cos_dec = math.cos(math.radians(mid_dec))
+        dra = (
+            (float(getattr(o2, "ra_deg", 0.0)) - float(getattr(o1, "ra_deg", 0.0)))
+            * 3600.0
+            * cos_dec
+        )
+        ddec = (float(getattr(o2, "dec_deg", 0.0)) - float(getattr(o1, "dec_deg", 0.0))) * 3600.0
+        rates.append(math.hypot(dra, ddec) / abs(dt_hr))
+    if len(rates) < 2:
+        return None
+    mean_rate = sum(rates) / len(rates)
+    variance = sum((r - mean_rate) ** 2 for r in rates) / len(rates)
+    return round(math.sqrt(variance), 6)

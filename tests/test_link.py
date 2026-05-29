@@ -1991,3 +1991,66 @@ class TestFindLongestTracklet:
         sys.path.insert(0, "src")
         import link
         assert "find_longest_tracklet" in link.__all__
+
+
+class TestComputeTrackletMotionScatter:
+    def test_consistent_motion_low_scatter(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_tracklet_motion_scatter
+        obs = [
+            SimpleNamespace(jd=2460000.0, ra_deg=10.0, dec_deg=5.0, mag=18.5),
+            SimpleNamespace(jd=2460000.5, ra_deg=10.1, dec_deg=5.1, mag=18.4),
+            SimpleNamespace(jd=2460001.0, ra_deg=10.2, dec_deg=5.2, mag=18.3),
+        ]
+        tracklet = SimpleNamespace(observations=obs)
+        result = compute_tracklet_motion_scatter(tracklet)
+        assert result is not None
+        assert result >= 0.0
+
+    def test_fewer_than_three_obs_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_tracklet_motion_scatter
+        obs = [
+            SimpleNamespace(jd=2460000.0, ra_deg=10.0, dec_deg=5.0, mag=18.5),
+            SimpleNamespace(jd=2460001.0, ra_deg=10.1, dec_deg=5.1, mag=18.4),
+        ]
+        tracklet = SimpleNamespace(observations=obs)
+        assert compute_tracklet_motion_scatter(tracklet) is None
+
+    def test_no_observations_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_tracklet_motion_scatter
+        tracklet = SimpleNamespace(observations=())
+        assert compute_tracklet_motion_scatter(tracklet) is None
+
+    def test_zero_time_delta_skipped(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_tracklet_motion_scatter
+        # Two obs at same JD plus one more — only 1 valid pair, return None
+        obs = [
+            SimpleNamespace(jd=2460000.0, ra_deg=10.0, dec_deg=5.0, mag=18.5),
+            SimpleNamespace(jd=2460000.0, ra_deg=10.05, dec_deg=5.05, mag=18.5),
+            SimpleNamespace(jd=2460001.0, ra_deg=10.1, dec_deg=5.1, mag=18.3),
+        ]
+        tracklet = SimpleNamespace(observations=obs)
+        result = compute_tracklet_motion_scatter(tracklet)
+        # Only 1 valid pair after skipping zero-dt → returns None
+        assert result is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+        assert "compute_tracklet_motion_scatter" in link.__all__

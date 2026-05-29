@@ -1826,3 +1826,62 @@ class TestComputeLocalBackground:
         sys.path.insert(0, "src")
         import preprocess
         assert "compute_local_background" in preprocess.__all__
+
+
+class TestComputeCutoutSharpness:
+    def test_valid_cutout_returns_float(self):
+        import base64
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        import numpy as np
+
+        from preprocess import compute_cutout_sharpness
+        arr = np.random.RandomState(42).random((63, 63)).astype(np.float32)
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        obs = SimpleNamespace(cutout_difference=b64)
+        result = compute_cutout_sharpness(obs)
+        assert result is not None
+        assert isinstance(result, float)
+        assert result >= 0.0
+
+    def test_no_cutout_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_cutout_sharpness
+        obs = SimpleNamespace(cutout_difference=None)
+        assert compute_cutout_sharpness(obs) is None
+
+    def test_invalid_b64_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_cutout_sharpness
+        obs = SimpleNamespace(cutout_difference="!!!invalid!!!")
+        assert compute_cutout_sharpness(obs) is None
+
+    def test_flat_image_low_sharpness(self):
+        import base64
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        import numpy as np
+
+        from preprocess import compute_cutout_sharpness
+        arr = np.ones((63, 63), dtype=np.float32)
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        obs = SimpleNamespace(cutout_difference=b64)
+        result = compute_cutout_sharpness(obs)
+        assert result is not None
+        assert result == pytest.approx(0.0)
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import preprocess
+        assert "compute_cutout_sharpness" in preprocess.__all__

@@ -17,7 +17,8 @@ __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fet
            "fetch_neocp_confirmed",
            "fetch_mpc_orbit_catalog",
            "compute_field_overlap",
-           "fetch_known_phas"]
+           "fetch_known_phas",
+           "fetch_mpc_neo_counts"]
 
 import json
 import os
@@ -1649,3 +1650,43 @@ def fetch_known_phas(force_refresh: bool = False) -> list[dict]:
         return rows
     except Exception:
         return []
+
+
+def fetch_mpc_neo_counts(force_refresh: bool = False) -> dict[str, int]:
+    """Fetch total known NEO counts by dynamical class from the MPC.
+
+    Returns a dict with keys ``"amor"``, ``"apollo"``, ``"aten"``, ``"ieo"``,
+    and ``"total"``.  Results are disk-cached under the key
+    ``"mpc_neo_counts"``.  Returns an empty dict on failure.
+    """
+    cache_key = "mpc_neo_counts"
+    if not force_refresh:
+        cached = _load_cache(cache_key)
+        if cached is not None and isinstance(cached, dict):
+            return cached
+    try:
+        from astroquery.mpc import MPC  # type: ignore[import]
+
+        MPC.get_observatory_list()  # dummy call to warm up session
+        neo_tbl = MPC.query_objects_in_sky(
+            ra_deg=180.0, dec_deg=0.0, radius=180.0, limiting_magnitude=30.0
+        )
+        counts: dict[str, int] = {"amor": 0, "apollo": 0, "aten": 0, "ieo": 0, "total": 0}
+        for row in neo_tbl:
+            a = float(row.get("a", 0.0) or 0.0)
+            e = float(row.get("e", 0.0) or 0.0)
+            q = a * (1.0 - e)
+            Q = a * (1.0 + e)
+            if a > 1.0 and q < 1.017:
+                counts["apollo"] += 1
+            elif a < 1.0 and Q > 0.983:
+                counts["aten"] += 1
+            elif Q < 0.983:
+                counts["ieo"] += 1
+            elif 1.017 <= q <= 1.3:
+                counts["amor"] += 1
+            counts["total"] += 1
+        _save_cache(cache_key, counts)
+        return counts
+    except Exception:
+        return {}

@@ -17,7 +17,8 @@ __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_
            "compute_psf_asymmetry",
            "compute_source_compactness",
            "compute_cutout_peak_position",
-           "compute_local_background"]
+           "compute_local_background",
+           "compute_cutout_sharpness"]
 
 import base64
 import math
@@ -1004,5 +1005,36 @@ def compute_local_background(obs: object) -> float | None:
         mask = (dist >= 20.0) & (dist <= 31.0)
         pixels = arr[mask]
         return float(np.median(pixels))
+    except Exception:
+        return None
+
+
+def compute_cutout_sharpness(obs: object) -> float | None:
+    """Compute sharpness of a 63×63 difference-image cutout via Laplacian variance.
+
+    The variance of the Laplacian is a focus/sharpness proxy: higher values
+    indicate a sharper (less blurred) source.  Returns None if no cutout is
+    available or decoding fails.
+    """
+    try:
+        import base64
+
+        import numpy as np
+
+        cutout = getattr(obs, "cutout_difference", None)
+        if cutout is None:
+            return None
+        raw = base64.b64decode(cutout)
+        arr = np.frombuffer(raw, dtype=np.float32).reshape(63, 63)
+        # 3×3 Laplacian kernel
+        kernel = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]], dtype=np.float32)
+        # Manual 2D convolution via stride tricks
+        padded = np.pad(arr, 1, mode="edge")
+        rows, cols = arr.shape
+        lap = np.zeros_like(arr)
+        for dr in range(3):
+            for dc in range(3):
+                lap += kernel[dr, dc] * padded[dr : dr + rows, dc : dc + cols]
+        return round(float(np.var(lap)), 6)
     except Exception:
         return None

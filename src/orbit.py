@@ -19,7 +19,8 @@ __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
            "compute_aphelion_distance",
            "compute_tisserand_wrt_earth",
            "compute_orbital_arc_quality",
-           "compute_mean_anomaly_at_epoch"]
+           "compute_mean_anomaly_at_epoch",
+           "compute_hill_sphere_radius"]
 
 import math
 from typing import NamedTuple
@@ -1303,3 +1304,36 @@ def compute_mean_anomaly_at_epoch(elements: object, target_jd: float) -> float |
     n = 2.0 * math.pi / period_days
     m = m0_rad + n * (target_jd - float(epoch_jd))
     return float(m % (2.0 * math.pi))
+
+
+def compute_hill_sphere_radius(elements: object) -> float | None:
+    """Compute the Hill sphere radius in AU.
+
+    Uses the approximation r_H = a*(1-e) * (m / (3*M_sun))^(1/3), where the
+    asteroid mass is estimated from its absolute magnitude H and a nominal
+    bulk density of 2000 kg/m³ and geometric albedo p_v = 0.14.
+
+    Returns None for hyperbolic or degenerate orbits (a ≤ 0, e ≥ 1).
+    M_sun ≈ 1.989e30 kg.
+    """
+    import math
+
+    a = float(getattr(elements, "a_au", 0.0) or 0.0)
+    e = float(getattr(elements, "e", 0.0) or 0.0)
+    if a <= 0.0 or e >= 1.0:
+        return None
+    q = a * (1.0 - e)
+    # Estimate asteroid mass from H magnitude
+    h = getattr(elements, "absolute_magnitude_h", None)
+    if h is None:
+        h = 20.0  # typical NEO
+    h = float(h)
+    albedo = 0.14
+    diameter_m = 1329e3 * 10 ** (-h / 5.0) / math.sqrt(albedo)
+    radius_m = diameter_m / 2.0
+    density_kg_m3 = 2000.0
+    mass_kg = (4.0 / 3.0) * math.pi * radius_m**3 * density_kg_m3
+    m_sun_kg = 1.989e30
+    mass_ratio = mass_kg / (3.0 * m_sun_kg)
+    r_h_au = q * mass_ratio ** (1.0 / 3.0)
+    return round(r_h_au, 10)
