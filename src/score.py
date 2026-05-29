@@ -20,7 +20,8 @@ __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "compute_hazard_summary",
            "compute_priority_percentile",
            "compute_arc_completeness_score",
-           "compute_followup_window_score"]
+           "compute_followup_window_score",
+           "compute_astrometric_priority"]
 
 import math
 import uuid
@@ -1147,3 +1148,28 @@ def compute_followup_window_score(neo: object) -> float:
     orbit_gap_score = max(0.0, 1.0 - oq) if oq is not None else 0.5
     score = 0.5 * gap_score + 0.5 * orbit_gap_score
     return round(min(1.0, max(0.0, score)), 6)
+
+
+def compute_astrometric_priority(neo: ScoredNEO) -> float:
+    """Compute the astrometric follow-up priority for a NEO candidate.
+
+    High priority indicates that additional astrometry would be most
+    valuable — when the arc is incomplete but the object is bright and
+    a reasonable orbit has been determined::
+
+        score = 0.4 × (1 − arc_coverage_score)
+              + 0.3 × brightness_score
+              + 0.3 × orbit_quality_score
+
+    Missing feature scores contribute 0.5 (neutral).  Result clamped to
+    ``[0, 1]``.
+    """
+    def _f(name: str) -> float:
+        v = getattr(neo.features, name, None)
+        return float(v) if v is not None else 0.5
+
+    arc = _f("arc_coverage_score")
+    brightness = _f("brightness_score")
+    orbit_q = _f("orbit_quality_score")
+    score = 0.4 * (1.0 - arc) + 0.3 * brightness + 0.3 * orbit_q
+    return float(max(0.0, min(1.0, score)))

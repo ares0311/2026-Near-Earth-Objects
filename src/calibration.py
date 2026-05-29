@@ -26,6 +26,7 @@ __all__ = [
     "compute_resolution",
     "compute_calibration_slope",
     "compute_overconfidence_score",
+    "compute_calibration_summary",
 ]
 
 import math
@@ -1084,3 +1085,44 @@ def compute_overconfidence_score(
     if len(p) == 0 or len(y) == 0:
         return 0.0
     return round(float(p.mean()) - float(y.mean()), 8)
+
+
+def compute_calibration_summary(
+    probs: list[float], labels: list[float | int]
+) -> dict:
+    """Compute a comprehensive calibration summary in a single call.
+
+    Returns a dict with keys::
+
+        {
+            "brier_score": float,
+            "ece": float,
+            "log_loss": float,
+            "roc_auc": float,
+            "overconfidence": float,
+            "n_samples": int,
+        }
+
+    Returns sentinel values (``0.0`` for error scores, ``0.5`` for
+    ``roc_auc``, ``0.0`` for ``overconfidence``) for empty inputs.
+    """
+    n = len(probs)
+    if n == 0:
+        return {
+            "brier_score": 0.0,
+            "ece": 0.0,
+            "log_loss": 0.0,
+            "roc_auc": 0.5,
+            "overconfidence": 0.0,
+            "n_samples": 0,
+        }
+    p = np.asarray(probs, dtype=float)
+    y = np.asarray(labels, dtype=float)
+    return {
+        "brier_score": brier_score(p, y),
+        "ece": expected_calibration_error(p, y),
+        "log_loss": compute_log_loss(p, y),
+        "roc_auc": compute_roc_auc(p, y),
+        "overconfidence": compute_overconfidence_score(p, y),
+        "n_samples": n,
+    }

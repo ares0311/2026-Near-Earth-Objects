@@ -19,7 +19,8 @@ __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_
            "compute_cutout_peak_position",
            "compute_local_background",
            "compute_cutout_sharpness",
-           "compute_background_gradient"]
+           "compute_background_gradient",
+           "compute_elongation_angle"]
 
 import base64
 import math
@@ -1066,5 +1067,43 @@ def compute_background_gradient(obs: object) -> dict[str, float] | None:
         result = np.linalg.lstsq(A, z, rcond=None)
         a, b = float(result[0][0]), float(result[0][1])
         return {"dx": round(a, 8), "dy": round(b, 8)}
+    except Exception:
+        return None
+
+
+def compute_elongation_angle(obs: object) -> float | None:
+    """Compute the orientation angle of an elongated source from image moments.
+
+    Returns the angle of the major axis in degrees ``[0, 180)`` using the
+    second-moment formula ``0.5 * arctan2(2*mxy, mxx - myy)``.  Returns
+    ``None`` if no cutout is available, decoding fails, or the source is
+    circular (degenerate moments).
+    """
+    try:
+        import base64
+        import math
+
+        import numpy as np
+
+        cutout = getattr(obs, "cutout_difference", None)
+        if cutout is None:
+            return None
+        raw = base64.b64decode(cutout)
+        arr = np.frombuffer(raw, dtype=np.float32).reshape(63, 63)
+        arr = np.clip(arr, 0.0, None)
+        total = float(arr.sum())
+        if total <= 0.0:
+            return None
+        rows_idx, cols_idx = np.mgrid[0:63, 0:63]
+        cx = float((cols_idx * arr).sum()) / total
+        cy = float((rows_idx * arr).sum()) / total
+        mxx = float(((cols_idx - cx) ** 2 * arr).sum()) / total
+        myy = float(((rows_idx - cy) ** 2 * arr).sum()) / total
+        mxy = float(((cols_idx - cx) * (rows_idx - cy) * arr).sum()) / total
+        if abs(mxx - myy) < 1e-12 and abs(mxy) < 1e-12:
+            return None
+        angle_rad = 0.5 * math.atan2(2.0 * mxy, mxx - myy)
+        angle_deg = math.degrees(angle_rad) % 180.0
+        return round(angle_deg, 4)
     except Exception:
         return None

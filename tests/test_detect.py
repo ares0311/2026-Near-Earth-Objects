@@ -1973,3 +1973,70 @@ class TestComputeElongationRatio:
         b64 = base64.b64encode(arr.tobytes()).decode()
         obs = SimpleNamespace(cutout_difference=b64)
         assert compute_elongation_ratio(obs) is None
+
+
+class TestComputeDetectionSignificance:
+    def test_bright_object(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import compute_detection_significance
+        obs = SimpleNamespace(mag=18.0, limiting_mag=21.0)
+        assert compute_detection_significance(obs) == pytest.approx(0.6)
+
+    def test_faint_object_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import compute_detection_significance
+        obs = SimpleNamespace(mag=22.0, limiting_mag=21.0)
+        assert compute_detection_significance(obs) == 0.0
+
+    def test_very_bright_clamped_to_one(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import compute_detection_significance
+        obs = SimpleNamespace(mag=10.0, limiting_mag=21.0)
+        assert compute_detection_significance(obs) == 1.0
+
+    def test_none_mag_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import compute_detection_significance
+        assert compute_detection_significance(SimpleNamespace(mag=None, limiting_mag=21.0)) is None
+
+    def test_none_limiting_mag_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import compute_detection_significance
+        assert compute_detection_significance(SimpleNamespace(mag=18.0, limiting_mag=None)) is None
+
+    def test_sentinel_mag_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import compute_detection_significance
+        assert compute_detection_significance(SimpleNamespace(mag=99.0, limiting_mag=21.0)) is None
+
+    def test_sentinel_limiting_mag_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import compute_detection_significance
+        assert compute_detection_significance(SimpleNamespace(mag=18.0, limiting_mag=99.0)) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import detect
+        assert "compute_detection_significance" in detect.__all__

@@ -19,7 +19,8 @@ __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fet
            "compute_field_overlap",
            "fetch_known_phas",
            "fetch_mpc_neo_counts",
-           "fetch_horizons_ephemeris"]
+           "fetch_horizons_ephemeris",
+           "summarize_survey_fields"]
 
 import json
 import os
@@ -1735,3 +1736,31 @@ def fetch_horizons_ephemeris(
         return results
     except Exception:
         return []
+
+
+def summarize_survey_fields(result: FetchResult) -> list[dict]:
+    """Summarise observations in a FetchResult grouped by field_id.
+
+    Returns a list of dicts, each with keys ``"field_id"``, ``"survey"``,
+    ``"epoch_jd"`` (median JD for the group), and ``"n_observations"``.
+    Observations whose ``field_id`` is ``None`` are grouped under ``"unknown"``.
+    Returns an empty list for an empty FetchResult.
+    """
+    from collections import defaultdict
+    groups: dict[str, list] = defaultdict(list)
+    for obs in result.alerts:
+        key = obs.field_id if obs.field_id is not None else "unknown"
+        groups[key].append(obs)
+    rows = []
+    for fid, obs_list in sorted(groups.items()):
+        jds = [o.jd for o in obs_list if o.jd is not None]
+        epoch = float(sorted(jds)[len(jds) // 2]) if jds else 0.0
+        surveys = [o.mission for o in obs_list if o.mission is not None]
+        survey = surveys[0] if surveys else "unknown"
+        rows.append({
+            "field_id": fid,
+            "survey": survey,
+            "epoch_jd": epoch,
+            "n_observations": len(obs_list),
+        })
+    return rows

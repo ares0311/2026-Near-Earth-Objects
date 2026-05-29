@@ -2401,3 +2401,55 @@ class TestComputeNeoClassPrior:
         sys.path.insert(0, "src")
         import classify
         assert "compute_neo_class_prior" in classify.__all__
+
+
+class TestComputeMainBeltProbability:
+    def test_none_features_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_main_belt_probability
+        assert compute_main_belt_probability(None) == 0.0
+
+    def test_mba_features_high_prob(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from classify import compute_main_belt_probability
+        features = SimpleNamespace(
+            main_belt_consistency_score=0.9, known_object_score=0.8,
+            real_bogus_score=0.7, motion_consistency_score=0.1,
+            orbit_quality_score=0.1, arc_coverage_score=0.1,
+            nights_observed_score=0.1,
+        )
+        assert compute_main_belt_probability(features) > 0.5
+
+    def test_neo_features_low_prob(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from classify import compute_main_belt_probability
+        features = SimpleNamespace(
+            main_belt_consistency_score=0.0, known_object_score=0.0,
+            real_bogus_score=0.95, motion_consistency_score=0.9,
+            orbit_quality_score=0.9, arc_coverage_score=0.9,
+            nights_observed_score=0.9,
+        )
+        assert compute_main_belt_probability(features) < 0.5
+
+    def test_all_none_returns_float(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from classify import compute_main_belt_probability
+        result = compute_main_belt_probability(SimpleNamespace())
+        assert isinstance(result, float)
+        assert 0.0 <= result <= 1.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import classify
+        assert "compute_main_belt_probability" in classify.__all__

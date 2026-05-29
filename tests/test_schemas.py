@@ -1381,3 +1381,39 @@ class TestObservationCluster:
         sys.path.insert(0, "src")
         import schemas
         assert "ObservationCluster" in schemas.__all__
+
+
+class TestSurveyRun:
+    def test_basic_construction(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import SurveyRun
+        r = SurveyRun(run_id="r1", survey="ZTF", epoch_jd=2460000.0, field_id="f1")
+        assert r.run_id == "r1"
+        assert r.n_candidates == 0
+        assert r.limiting_mag is None
+
+    def test_with_all_fields(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import SurveyRun
+        r = SurveyRun(run_id="r2", survey="ATLAS", epoch_jd=2460001.0, field_id="f2",
+                      n_candidates=5, sky_coverage_deg2=3.14, limiting_mag=21.5)
+        assert r.n_candidates == 5
+        assert r.limiting_mag == 21.5
+
+    def test_frozen(self):
+        import sys
+        sys.path.insert(0, "src")
+        import pytest
+
+        from schemas import SurveyRun
+        r = SurveyRun(run_id="r3", survey="ZTF", epoch_jd=2460000.0, field_id="f3")
+        with pytest.raises(Exception):
+            r.run_id = "x"  # type: ignore
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        assert "SurveyRun" in schemas.__all__

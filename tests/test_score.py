@@ -1900,3 +1900,41 @@ class TestComputeFollowupWindowScore:
         sys.path.insert(0, "src")
         import score
         assert "compute_followup_window_score" in score.__all__
+
+
+class TestComputeAstrometricPriority:
+    def test_incomplete_arc_high_priority(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from score import compute_astrometric_priority
+        features = SimpleNamespace(arc_coverage_score=0.1, brightness_score=0.8,
+                                   orbit_quality_score=0.7)
+        assert compute_astrometric_priority(SimpleNamespace(features=features)) > 0.5
+
+    def test_complete_arc_lower_priority(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from score import compute_astrometric_priority
+        features = SimpleNamespace(arc_coverage_score=1.0, brightness_score=0.3,
+                                   orbit_quality_score=0.3)
+        assert compute_astrometric_priority(SimpleNamespace(features=features)) < 0.5
+
+    def test_all_none_uses_neutral(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from score import compute_astrometric_priority
+        # 0.4*(1-0.5)+0.3*0.5+0.3*0.5 = 0.5
+        result = compute_astrometric_priority(SimpleNamespace(features=SimpleNamespace()))
+        assert abs(result - 0.5) < 0.01
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        assert "compute_astrometric_priority" in score.__all__

@@ -21,7 +21,8 @@ __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
            "compute_orbital_arc_quality",
            "compute_mean_anomaly_at_epoch",
            "compute_hill_sphere_radius",
-           "compute_encounter_velocity"]
+           "compute_encounter_velocity",
+           "compute_heliocentric_velocity"]
 
 import math
 from typing import NamedTuple
@@ -1369,3 +1370,33 @@ def compute_encounter_velocity(elements: object) -> float | None:
     v2_enc = max(0.0, v2_obj - v2_earth)
     au_per_yr_to_km_s = 4.74047
     return round(math.sqrt(v2_enc) * au_per_yr_to_km_s, 4)
+
+
+def compute_heliocentric_velocity(elements: object) -> float | None:
+    """Compute the heliocentric speed at perihelion in km/s.
+
+    Uses the vis-viva equation evaluated at ``r = q``::
+
+        v = sqrt(GM_sun * (2/q - 1/a))
+
+    where ``GM_sun = 4π² AU³/yr²`` and ``1 AU/yr ≈ 4.74047 km/s``.
+
+    Returns ``None`` for non-positive perihelion distance, zero semi-major
+    axis, or inputs that would produce a negative value under the radical.
+    """
+    import math
+
+    a = getattr(elements, "a_au", None)
+    e = getattr(elements, "e", None)
+    if a is None or e is None:
+        return None
+    if a == 0.0:
+        return None
+    q = a * (1.0 - e)
+    if q <= 0.0:
+        return None
+    gm = 4.0 * math.pi ** 2  # AU³/yr²
+    v2 = gm * (2.0 / q - 1.0 / a)
+    if v2 < 0.0:
+        return None
+    return round(math.sqrt(v2) * 4.74047, 4)

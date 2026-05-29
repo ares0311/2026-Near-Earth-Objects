@@ -1328,3 +1328,45 @@ class TestComputeOverconfidenceScore:
         sys.path.insert(0, "src")
         import calibration
         assert "compute_overconfidence_score" in calibration.__all__
+
+
+class TestComputeCalibrationSummary:
+    def test_empty_returns_sentinels(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_calibration_summary
+        result = compute_calibration_summary([], [])
+        assert result["brier_score"] == 0.0
+        assert result["roc_auc"] == 0.5
+        assert result["n_samples"] == 0
+
+    def test_valid_input_returns_all_keys(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_calibration_summary
+        probs = [0.9, 0.1, 0.8, 0.2]
+        labels = [1, 0, 1, 0]
+        result = compute_calibration_summary(probs, labels)
+        assert set(result.keys()) == {"brier_score", "ece", "log_loss", "roc_auc",
+                                      "overconfidence", "n_samples"}
+        assert result["n_samples"] == 4
+        assert 0.0 <= result["brier_score"] <= 1.0
+        assert result["roc_auc"] > 0.5
+
+    def test_perfect_calibration(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_calibration_summary
+        probs = [1.0, 0.0, 1.0, 0.0]
+        labels = [1, 0, 1, 0]
+        result = compute_calibration_summary(probs, labels)
+        assert result["brier_score"] == 0.0
+        assert abs(result["overconfidence"]) < 0.01
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        assert "compute_calibration_summary" in calibration.__all__
+
+

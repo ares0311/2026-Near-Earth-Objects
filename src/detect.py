@@ -17,7 +17,8 @@ __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus"
            "compute_angular_separation",
            "compute_streak_orientation",
            "compute_magnitude_residual",
-           "compute_elongation_ratio"]
+           "compute_elongation_ratio",
+           "compute_detection_significance"]
 
 import math
 import uuid
@@ -1095,3 +1096,19 @@ def compute_elongation_ratio(obs: object) -> float | None:
         return round(min(1.0, max(0.0, ratio)), 6)
     except Exception:
         return None
+
+
+def compute_detection_significance(obs: object) -> float | None:
+    """Compute detection significance as a [0, 1] score.
+
+    Uses ``(limiting_mag - mag) / 5.0``, clipped to ``[0, 1]``.  Returns
+    ``None`` if either magnitude is absent, ``None``, or a sentinel value
+    (≥ 90).
+    """
+    mag = getattr(obs, "mag", None)
+    limiting_mag = getattr(obs, "limiting_mag", None)
+    if mag is None or limiting_mag is None:
+        return None
+    if mag >= 90.0 or limiting_mag >= 90.0:
+        return None
+    return float(max(0.0, min(1.0, (limiting_mag - mag) / 5.0)))

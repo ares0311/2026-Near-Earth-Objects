@@ -1965,3 +1965,62 @@ class TestFormatTelescopeTargetList:
         neo = self._make_neo(priority=0.50)
         result = format_telescope_target_list([neo])
         assert "MEDIUM" in result
+
+
+class TestComputeAlertPriorityScore:
+    def test_high_priority_neo(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from alert import compute_alert_priority_score
+        features = SimpleNamespace(known_object_score=0.0, orbit_quality_score=0.9)
+        metadata = SimpleNamespace(discovery_priority=0.95)
+        neo = SimpleNamespace(features=features, metadata=metadata)
+        result = compute_alert_priority_score(neo)
+        assert result > 0.7
+
+    def test_known_object_low_priority(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from alert import compute_alert_priority_score
+        features = SimpleNamespace(known_object_score=1.0, orbit_quality_score=0.5)
+        metadata = SimpleNamespace(discovery_priority=0.2)
+        neo = SimpleNamespace(features=features, metadata=metadata)
+        result = compute_alert_priority_score(neo)
+        assert result < 0.5
+
+    def test_missing_values_use_neutral(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from alert import compute_alert_priority_score
+        features = SimpleNamespace()
+        metadata = SimpleNamespace(discovery_priority=None)
+        neo = SimpleNamespace(features=features, metadata=metadata)
+        result = compute_alert_priority_score(neo)
+        # 0.4*0.5 + 0.3*0.5 + 0.3*0.5 = 0.5
+        assert abs(result - 0.5) < 0.01
+
+    def test_result_clamped(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from alert import compute_alert_priority_score
+        features = SimpleNamespace(known_object_score=0.0, orbit_quality_score=1.0)
+        metadata = SimpleNamespace(discovery_priority=1.0)
+        neo = SimpleNamespace(features=features, metadata=metadata)
+        result = compute_alert_priority_score(neo)
+        assert 0.0 <= result <= 1.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+        assert "compute_alert_priority_score" in alert.__all__
+
+

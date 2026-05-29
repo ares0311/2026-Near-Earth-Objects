@@ -2148,3 +2148,76 @@ class TestComputeEncounterVelocity:
         sys.path.insert(0, "src")
         import orbit
         assert "compute_encounter_velocity" in orbit.__all__
+
+
+class TestComputeHeliocentricVelocity:
+    def test_typical_neo(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_heliocentric_velocity
+        elements = SimpleNamespace(a_au=1.5, e=0.4)  # q = 0.9 AU
+        v = compute_heliocentric_velocity(elements)
+        assert v is not None and v > 0.0
+
+    def test_circular_orbit_approx_earth_speed(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_heliocentric_velocity
+        elements = SimpleNamespace(a_au=1.0, e=0.0)
+        v = compute_heliocentric_velocity(elements)
+        assert v is not None
+        assert 28.0 < v < 32.0
+
+    def test_zero_a_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_heliocentric_velocity
+        assert compute_heliocentric_velocity(SimpleNamespace(a_au=0.0, e=0.5)) is None
+
+    def test_none_elements_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_heliocentric_velocity
+        assert compute_heliocentric_velocity(SimpleNamespace(a_au=None, e=0.5)) is None
+
+    def test_negative_q_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_heliocentric_velocity
+        # a=1, e=2 → q=1*(1-2)=-1 < 0
+        assert compute_heliocentric_velocity(SimpleNamespace(a_au=1.0, e=2.0)) is None
+
+    def test_hyperbolic_valid(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_heliocentric_velocity
+        # a=-10, e=1.5 → q=(-10)*(1-1.5)=(-10)*(-0.5)=5.0 AU > 0; v2>0
+        v = compute_heliocentric_velocity(SimpleNamespace(a_au=-10.0, e=1.5))
+        assert v is not None and v > 0.0
+
+    def test_negative_v2_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_heliocentric_velocity
+        # a=1, e=-5 → q=1*(1-(-5))=6; v2=GM*(2/6-1/1)=GM*(-2/3)<0
+        assert compute_heliocentric_velocity(SimpleNamespace(a_au=1.0, e=-5.0)) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import orbit
+        assert "compute_heliocentric_velocity" in orbit.__all__

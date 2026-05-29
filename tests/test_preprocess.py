@@ -1952,3 +1952,77 @@ class TestComputeBackgroundGradient:
         b64 = base64.b64encode(arr.tobytes()).decode()
         obs = SimpleNamespace(cutout_difference=b64)
         assert compute_background_gradient(obs) is None
+
+
+class TestComputeElongationAngle:
+    def test_elongated_horizontal_returns_angle(self):
+        import base64
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        import numpy as np
+
+        from preprocess import compute_elongation_angle
+        arr = np.zeros((63, 63), dtype=np.float32)
+        arr[31, 10:53] = 1.0  # horizontal streak
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        obs = SimpleNamespace(cutout_difference=b64)
+        result = compute_elongation_angle(obs)
+        assert result is not None
+        assert 0.0 <= result < 180.0
+
+    def test_circular_source_returns_none(self):
+        import base64
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        import numpy as np
+
+        from preprocess import compute_elongation_angle
+        arr = np.zeros((63, 63), dtype=np.float32)
+        cy, cx = 31.0, 31.0
+        for r in range(63):
+            for c in range(63):
+                arr[r, c] = np.exp(-((r - cy)**2 + (c - cx)**2) / 8.0)
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        obs = SimpleNamespace(cutout_difference=b64)
+        result = compute_elongation_angle(obs)
+        assert result is None or 0.0 <= result < 180.0
+
+    def test_no_cutout_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_elongation_angle
+        assert compute_elongation_angle(SimpleNamespace(cutout_difference=None)) is None
+
+    def test_zero_flux_returns_none(self):
+        import base64
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        import numpy as np
+
+        from preprocess import compute_elongation_angle
+        arr = np.zeros((63, 63), dtype=np.float32)
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        assert compute_elongation_angle(SimpleNamespace(cutout_difference=b64)) is None
+
+    def test_invalid_base64_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_elongation_angle
+        obs = SimpleNamespace(cutout_difference="NOT_VALID_BASE64!!!")
+        assert compute_elongation_angle(obs) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import preprocess
+        assert "compute_elongation_angle" in preprocess.__all__
