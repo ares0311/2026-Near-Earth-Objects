@@ -32,6 +32,7 @@ __all__ = [
     "FieldObservationSummary",
     "ObservationCluster",
     "SurveyRun",
+    "CandidateCluster",
 ]
 
 from dataclasses import dataclass
@@ -1030,3 +1031,17 @@ class SurveyRun(BaseModel):
     n_candidates: int = 0
     sky_coverage_deg2: float = 0.0
     limiting_mag: float | None = None
+
+
+class CandidateCluster(BaseModel):
+    """A spatial cluster of NEO candidates from a single pipeline run."""
+
+    model_config = ConfigDict(frozen=True)
+
+    cluster_id: str
+    run_id: str
+    center_ra_deg: float
+    center_dec_deg: float
+    n_candidates: int
+    candidate_ids: tuple[str, ...]
+    mean_priority: float = 0.0

@@ -20,7 +20,8 @@ __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "find_longest_tracklet",
            "compute_tracklet_motion_scatter",
            "compute_great_circle_arc",
-           "compute_arc_curvature"]
+           "compute_arc_curvature",
+           "compute_tracklet_density"]
 
 import math
 import uuid
@@ -1191,3 +1192,63 @@ def compute_arc_curvature(tracklet: object) -> float:
         return round(rms, 6)
     except Exception:
         return 0.0
+
+
+def compute_tracklet_density(tracklets: list, radius_deg: float = 1.0) -> list[int]:
+    """Count how many other tracklets have their first observation within radius_deg.
+
+    For each tracklet, counts how many *other* tracklets have their first
+    observation within ``radius_deg`` of this tracklet's first observation
+    (great-circle distance, haversine formula).
+
+    Args:
+        tracklets: List of Tracklet objects or objects with an ``observations``
+            attribute (sequence of observations with ``ra_deg``/``dec_deg`` or
+            ``ra``/``dec`` attributes).
+        radius_deg: Search radius in degrees (default 1.0).
+
+    Returns:
+        List of counts, one per tracklet.  Returns ``[]`` for empty input.
+    """
+    if not tracklets:
+        return []
+
+    def _first_radec(t: object) -> tuple[float, float] | None:
+        obs_list = list(getattr(t, "observations", []))
+        if not obs_list:
+            return None
+        obs0 = obs_list[0]
+        ra = getattr(obs0, "ra_deg", None)
+        if ra is None:
+            ra = getattr(obs0, "ra", None)
+        dec = getattr(obs0, "dec_deg", None)
+        if dec is None:
+            dec = getattr(obs0, "dec", None)
+        if ra is None or dec is None:
+            return None
+        return float(ra), float(dec)
+
+    def _haversine_deg(ra1: float, dec1: float, ra2: float, dec2: float) -> float:
+        lat1 = math.radians(dec1)
+        lat2 = math.radians(dec2)
+        dlat = lat2 - lat1
+        dlon = math.radians(ra2 - ra1)
+        a = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+        return math.degrees(2 * math.asin(math.sqrt(min(1.0, a))))
+
+    positions = [_first_radec(t) for t in tracklets]
+    counts: list[int] = []
+    n = len(tracklets)
+    for i in range(n):
+        count = 0
+        if positions[i] is not None:
+            ra_i, dec_i = positions[i]
+            for j in range(n):
+                if i == j:
+                    continue
+                if positions[j] is not None:
+                    ra_j, dec_j = positions[j]
+                    if _haversine_deg(ra_i, dec_i, ra_j, dec_j) <= radius_deg:
+                        count += 1
+        counts.append(count)
+    return counts

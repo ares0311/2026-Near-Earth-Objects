@@ -21,7 +21,8 @@ __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "compute_priority_percentile",
            "compute_arc_completeness_score",
            "compute_followup_window_score",
-           "compute_astrometric_priority"]
+           "compute_astrometric_priority",
+           "compute_size_score"]
 
 import math
 import uuid
@@ -1173,3 +1174,23 @@ def compute_astrometric_priority(neo: ScoredNEO) -> float:
     orbit_q = _f("orbit_quality_score")
     score = 0.4 * (1.0 - arc) + 0.3 * brightness + 0.3 * orbit_q
     return float(max(0.0, min(1.0, score)))
+
+
+def compute_size_score(neo: ScoredNEO) -> float:
+    """Compute a size score normalized to the PHA diameter threshold (140 m).
+
+    Returns ``min(1.0, estimated_diameter_m / 140.0)`` when the estimated
+    diameter is available.  Returns ``0.5`` (neutral sentinel) when the
+    diameter is unknown.  The result is clamped to ``[0, 1]``.
+
+    Args:
+        neo: :class:`~schemas.ScoredNEO` object.
+
+    Returns:
+        Size score in [0, 1].  Values ≥ 1.0 indicate the candidate is at or
+        above the PHA size threshold.
+    """
+    diameter = getattr(neo.hazard, "estimated_diameter_m", None)
+    if diameter is None:
+        return 0.5
+    return float(max(0.0, min(1.0, diameter / 140.0)))

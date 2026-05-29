@@ -2221,3 +2221,74 @@ class TestComputeHeliocentricVelocity:
         sys.path.insert(0, "src")
         import orbit
         assert "compute_heliocentric_velocity" in orbit.__all__
+
+
+class TestComputeLongitudeOfPerihelionAdditional:
+    """Additional tests for compute_longitude_of_perihelion covering edge cases."""
+
+    def test_with_omega_attributes(self):
+        """Test using the OrbitalElements-style attribute names."""
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_longitude_of_perihelion
+        # Using the canonical attribute names
+        el = SimpleNamespace(
+            longitude_of_ascending_node_deg=45.0,
+            argument_of_perihelion_deg=45.0,
+        )
+        result = compute_longitude_of_perihelion(el)
+        assert result == 90.0
+
+    def test_result_wraps_at_360(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_longitude_of_perihelion
+        el = SimpleNamespace(
+            longitude_of_ascending_node_deg=359.0,
+            argument_of_perihelion_deg=2.0,
+        )
+        result = compute_longitude_of_perihelion(el)
+        assert result == round(1.0, 6)
+
+    def test_full_circle(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_longitude_of_perihelion
+        el = SimpleNamespace(
+            longitude_of_ascending_node_deg=180.0,
+            argument_of_perihelion_deg=180.0,
+        )
+        result = compute_longitude_of_perihelion(el)
+        assert result == 0.0  # 360 mod 360
+
+    def test_negative_values_wrapped(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_longitude_of_perihelion
+        el = SimpleNamespace(
+            longitude_of_ascending_node_deg=-30.0,
+            argument_of_perihelion_deg=10.0,
+        )
+        result = compute_longitude_of_perihelion(el)
+        assert 0.0 <= result < 360.0
+
+    def test_large_values_wrapped(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_longitude_of_perihelion
+        el = SimpleNamespace(
+            longitude_of_ascending_node_deg=720.0,
+            argument_of_perihelion_deg=90.0,
+        )
+        result = compute_longitude_of_perihelion(el)
+        assert 0.0 <= result < 360.0

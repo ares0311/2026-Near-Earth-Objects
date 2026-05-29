@@ -2024,3 +2024,64 @@ class TestComputeAlertPriorityScore:
         assert "compute_alert_priority_score" in alert.__all__
 
 
+
+
+class TestFormatMpcAdesHeader:
+    def _make_neo(self, object_id="NEO-001"):
+        from types import SimpleNamespace
+        tracklet = SimpleNamespace(object_id=object_id)
+        return SimpleNamespace(tracklet=tracklet)
+
+    def test_contains_version(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_mpc_ades_header
+        neo = self._make_neo()
+        result = format_mpc_ades_header(neo)
+        assert "# version=2017" in result
+
+    def test_contains_obs_code(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_mpc_ades_header
+        neo = self._make_neo()
+        result = format_mpc_ades_header(neo, obs_code="703")
+        assert "703" in result
+
+    def test_contains_guardrail(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_mpc_ades_header
+        neo = self._make_neo()
+        result = format_mpc_ades_header(neo)
+        assert "NOT" in result
+
+    def test_contains_neo_id(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_mpc_ades_header
+        neo = self._make_neo("MY-SPECIAL-NEO")
+        result = format_mpc_ades_header(neo)
+        assert "MY-SPECIAL-NEO" in result
+
+    def test_default_obs_code(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_mpc_ades_header
+        neo = self._make_neo()
+        result = format_mpc_ades_header(neo)
+        assert "500" in result
+
+    def test_returns_string(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_mpc_ades_header
+        neo = self._make_neo()
+        result = format_mpc_ades_header(neo)
+        assert isinstance(result, str)
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+        assert "format_mpc_ades_header" in alert.__all__
