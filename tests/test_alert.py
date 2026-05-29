@@ -1887,3 +1887,80 @@ class TestFormatIauCircularDraft:
         sys.path.insert(0, "src")
         import alert
         assert "format_iau_circular_draft" in alert.__all__
+
+
+class TestFormatTelescopeTargetList:
+    def _make_neo(self, priority=0.9):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+        obs = SimpleNamespace(jd=2460000.0, ra_deg=180.0, dec_deg=5.0, mag=18.5)
+        tracklet = SimpleNamespace(object_id="2026AB1", observations=(obs,))
+        hazard = SimpleNamespace(alert_pathway="mpc_submission")
+        metadata = SimpleNamespace(discovery_priority=priority)
+        return SimpleNamespace(tracklet=tracklet, hazard=hazard, metadata=metadata)
+
+    def test_contains_not_guardrail(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_telescope_target_list
+        result = format_telescope_target_list([self._make_neo()])
+        assert "NOT" in result
+
+    def test_contains_object_id(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_telescope_target_list
+        result = format_telescope_target_list([self._make_neo()])
+        assert "2026AB1" in result
+
+    def test_urgent_sorted_first(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_telescope_target_list
+        urgent = self._make_neo(priority=0.9)
+        routine = self._make_neo(priority=0.1)
+        result = format_telescope_target_list([routine, urgent])
+        assert result.index("URGENT") < result.index("ROUTINE")
+
+    def test_empty_list(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_telescope_target_list
+        result = format_telescope_target_list([])
+        assert "NOT" in result
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+        assert "format_telescope_target_list" in alert.__all__
+
+    def test_no_observations_branch(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+        from alert import format_telescope_target_list
+        tracklet = SimpleNamespace(object_id="NOOBS", observations=())
+        hazard = SimpleNamespace(alert_pathway="internal_candidate")
+        metadata = SimpleNamespace(discovery_priority=0.0)
+        neo = SimpleNamespace(tracklet=tracklet, hazard=hazard, metadata=metadata)
+        result = format_telescope_target_list([neo])
+        assert "NOOBS" in result
+        assert "ROUTINE" in result
+
+    def test_high_urgency(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_telescope_target_list
+        neo = self._make_neo(priority=0.70)
+        result = format_telescope_target_list([neo])
+        assert "HIGH" in result
+
+    def test_medium_urgency(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_telescope_target_list
+        neo = self._make_neo(priority=0.50)
+        result = format_telescope_target_list([neo])
+        assert "MEDIUM" in result

@@ -36,6 +36,7 @@ __all__ = [
     "count_observations_by_mission",
     "format_close_approach_bulletin",
     "format_iau_circular_draft",
+    "format_telescope_target_list",
 ]
 
 import json
@@ -1560,3 +1561,56 @@ def format_iau_circular_draft(neo: object) -> str:
         "MPC/CNEOS before any public communication.  Do NOT release this draft\n"
         "without explicit authorisation from the discovery team and MPC.\n"
     )
+
+
+def format_telescope_target_list(neos: list[object], obs_code: str = "500") -> str:
+    """Format a plain-text telescope target list sorted by follow-up urgency.
+
+    Produces a tabular target list suitable for telescope scheduling review.
+    This pipeline does NOT autonomously schedule telescope time — the output
+    must be reviewed and submitted by an authorised observer.
+    """
+    header = (
+        "TELESCOPE TARGET LIST — NOT FOR AUTONOMOUS SUBMISSION\n"
+        "=======================================================\n"
+        f"Observer code : {obs_code}\n"
+        "Guardrail     : This list does NOT assert any impact probability.\n"
+        "=======================================================\n"
+        f"{'ID':<20} {'RA_deg':>10} {'Dec_deg':>10} {'Mag':>6} "
+        f"{'Urgency':<10} {'Pathway'}\n"
+        f"{'-'*20} {'-'*10} {'-'*10} {'-'*6} {'-'*10} {'-'*20}\n"
+    )
+    rows: list[tuple[str, str]] = []
+    for neo in neos:
+        tracklet = getattr(neo, "tracklet", None)
+        hazard = getattr(neo, "hazard", None)
+        metadata = getattr(neo, "metadata", None)
+        oid = getattr(tracklet, "object_id", "unknown") if tracklet else "unknown"
+        obs_list = getattr(tracklet, "observations", ()) if tracklet else ()
+        if obs_list:
+            last_obs = max(obs_list, key=lambda o: getattr(o, "jd", 0.0))
+            ra = float(getattr(last_obs, "ra_deg", 0.0))
+            dec = float(getattr(last_obs, "dec_deg", 0.0))
+            mag = float(getattr(last_obs, "mag", 99.0) or 99.0)
+        else:
+            ra, dec, mag = 0.0, 0.0, 99.0
+        pathway = getattr(hazard, "alert_pathway", "unknown") if hazard else "unknown"
+        priority = float(getattr(metadata, "discovery_priority", 0.0) or 0.0) if metadata else 0.0
+        if priority >= 0.85:
+            urgency = "URGENT"
+        elif priority >= 0.65:
+            urgency = "HIGH"
+        elif priority >= 0.40:
+            urgency = "MEDIUM"
+        else:
+            urgency = "ROUTINE"
+        mag_str = f"{mag:.1f}" if mag < 90.0 else "---"
+        row_str = (
+            f"{oid:<20} {ra:>10.5f} {dec:>10.5f} {mag_str:>6} {urgency:<10} {pathway}"
+        )
+        rows.append((urgency, row_str))
+
+    priority_order = {"URGENT": 0, "HIGH": 1, "MEDIUM": 2, "ROUTINE": 3}
+    rows.sort(key=lambda x: priority_order.get(x[0], 4))
+    body = "\n".join(r for _, r in rows)
+    return header + body + "\n"

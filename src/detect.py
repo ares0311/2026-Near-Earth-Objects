@@ -16,7 +16,8 @@ __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus"
            "compute_variability_index",
            "compute_angular_separation",
            "compute_streak_orientation",
-           "compute_magnitude_residual"]
+           "compute_magnitude_residual",
+           "compute_elongation_ratio"]
 
 import math
 import uuid
@@ -1054,3 +1055,43 @@ def compute_magnitude_residual(obs: object, predicted_mag: float) -> float:
     if obs_mag >= 90.0 or predicted_mag >= 90.0:
         return 0.0
     return round(obs_mag - predicted_mag, 6)
+
+
+def compute_elongation_ratio(obs: object) -> float | None:
+    """Compute the axis ratio b/a from 2D image second moments.
+
+    Returns a value in (0, 1] where 1.0 = circular and values closer to 0
+    indicate a highly elongated (streak) source.  Returns ``None`` if no
+    cutout is available or second moments are degenerate.
+    """
+    try:
+        import base64
+
+        import numpy as np
+
+        cutout = getattr(obs, "cutout_difference", None)
+        if cutout is None:
+            return None
+        raw = base64.b64decode(cutout)
+        arr = np.frombuffer(raw, dtype=np.float32).reshape(63, 63)
+        arr = np.clip(arr, 0.0, None)
+        total = float(arr.sum())
+        if total <= 0.0:
+            return None
+        rows_idx, cols_idx = np.mgrid[0:63, 0:63]
+        cx = float((cols_idx * arr).sum()) / total
+        cy = float((rows_idx * arr).sum()) / total
+        mxx = float(((cols_idx - cx) ** 2 * arr).sum()) / total
+        myy = float(((rows_idx - cy) ** 2 * arr).sum()) / total
+        mxy = float(((cols_idx - cx) * (rows_idx - cy) * arr).sum()) / total
+        trace = mxx + myy
+        det = mxx * myy - mxy ** 2
+        if trace <= 0.0 or det < 0.0:
+            return None
+        discriminant = max(0.0, (trace / 2.0) ** 2 - det)
+        lambda1 = trace / 2.0 + discriminant ** 0.5
+        lambda2 = trace / 2.0 - discriminant ** 0.5
+        ratio = float(max(0.0, lambda2)) / lambda1
+        return round(min(1.0, max(0.0, ratio)), 6)
+    except Exception:
+        return None

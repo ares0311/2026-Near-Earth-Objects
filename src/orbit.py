@@ -20,7 +20,8 @@ __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
            "compute_tisserand_wrt_earth",
            "compute_orbital_arc_quality",
            "compute_mean_anomaly_at_epoch",
-           "compute_hill_sphere_radius"]
+           "compute_hill_sphere_radius",
+           "compute_encounter_velocity"]
 
 import math
 from typing import NamedTuple
@@ -1337,3 +1338,34 @@ def compute_hill_sphere_radius(elements: object) -> float | None:
     mass_ratio = mass_kg / (3.0 * m_sun_kg)
     r_h_au = q * mass_ratio ** (1.0 / 3.0)
     return round(r_h_au, 10)
+
+
+def compute_encounter_velocity(elements: object) -> float | None:
+    """Compute approximate Earth-encounter velocity in km/s.
+
+    Uses the vis-viva equation evaluated at 1 AU (Earth's orbit):
+        v^2 = GM_sun * (2/r - 1/a)
+    The encounter velocity relative to Earth is:
+        v_enc = sqrt(max(0, v_obj^2 - v_earth^2))
+    where v_earth = sqrt(GM/1 AU).
+
+    Returns ``None`` for hyperbolic/parabolic orbits (e >= 1), non-positive
+    semi-major axis, or orbits that do not cross 1 AU.
+    """
+    import math
+
+    a = float(getattr(elements, "a_au", 0.0) or 0.0)
+    e = float(getattr(elements, "e", 0.0) or 0.0)
+    if a <= 0.0 or e >= 1.0:
+        return None
+    q = a * (1.0 - e)
+    Q = a * (1.0 + e)
+    if q > 1.0 or Q < 1.0:
+        return None
+    # Vis-viva: GM_sun = 4π² AU³/yr²; 1 AU/yr = 4.74047 km/s
+    gm = 4.0 * math.pi ** 2  # AU³/yr²
+    v2_obj = gm * (2.0 / 1.0 - 1.0 / a)  # AU²/yr²
+    v2_earth = gm * 1.0  # circular Earth orbit
+    v2_enc = max(0.0, v2_obj - v2_earth)
+    au_per_yr_to_km_s = 4.74047
+    return round(math.sqrt(v2_enc) * au_per_yr_to_km_s, 4)

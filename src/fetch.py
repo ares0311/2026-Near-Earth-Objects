@@ -18,7 +18,8 @@ __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fet
            "fetch_mpc_orbit_catalog",
            "compute_field_overlap",
            "fetch_known_phas",
-           "fetch_mpc_neo_counts"]
+           "fetch_mpc_neo_counts",
+           "fetch_horizons_ephemeris"]
 
 import json
 import os
@@ -1690,3 +1691,47 @@ def fetch_mpc_neo_counts(force_refresh: bool = False) -> dict[str, int]:
         return counts
     except Exception:
         return {}
+
+
+def fetch_horizons_ephemeris(
+    designation: str,
+    target_jds: list[float],
+    force_refresh: bool = False,
+) -> list[dict]:
+    """Fetch JPL Horizons ephemeris for a named object at specific JDs.
+
+    Returns a list of dicts with keys ``"jd"``, ``"ra_deg"``, ``"dec_deg"``,
+    ``"delta_au"`` (geocentric distance), and ``"mag"``.  Results are
+    disk-cached under ``"horizons_<designation>"``.  Returns an empty list on
+    failure.
+    """
+    cache_key = f"horizons_{designation.replace(' ', '_')}"
+    if not force_refresh:
+        cached = _load_cache(cache_key)
+        if cached is not None and isinstance(cached, list):
+            return cached
+    try:
+        from astroquery.jplhorizons import Horizons  # type: ignore[import]
+
+        results: list[dict] = []
+        for jd in target_jds:
+            obj = Horizons(
+                id=designation,
+                location="500@399",
+                epochs=jd,
+            )
+            eph = obj.ephemerides()
+            if len(eph) == 0:
+                continue
+            row = eph[0]
+            results.append({
+                "jd": float(jd),
+                "ra_deg": float(row["RA"]),
+                "dec_deg": float(row["DEC"]),
+                "delta_au": float(row.get("delta", 1.0) or 1.0),
+                "mag": float(row.get("V", 99.0) or 99.0),
+            })
+        _save_cache(cache_key, results)
+        return results
+    except Exception:
+        return []

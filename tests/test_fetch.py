@@ -3488,3 +3488,90 @@ class TestFetchMpcNeoCounts:
         sys.path.insert(0, "src")
         import fetch
         assert "fetch_mpc_neo_counts" in fetch.__all__
+
+
+class TestFetchHorizonsEphemeris:
+    def test_returns_list_on_success(self, tmp_path, monkeypatch):
+        import sys
+        import unittest.mock as mock
+        from pathlib import Path
+        sys.path.insert(0, "src")
+        import fetch
+        monkeypatch.setattr(fetch, "_CACHE_DIR", Path(tmp_path))
+
+        fake_row = {"RA": 180.0, "DEC": 5.0, "delta": 1.2, "V": 18.5}
+
+        class FakeEph:
+            def __len__(self): return 1
+            def __getitem__(self, i): return fake_row
+
+        class FakeHorizons:
+            def __init__(self, **kw): pass
+            def ephemerides(self): return FakeEph()
+
+        with mock.patch.dict(
+            "sys.modules",
+            {"astroquery.jplhorizons": mock.MagicMock(Horizons=FakeHorizons)},
+        ):
+            result = fetch.fetch_horizons_ephemeris("2026AB1", [2460000.0], force_refresh=True)
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0]["ra_deg"] == pytest.approx(180.0)
+
+    def test_returns_empty_on_failure(self, tmp_path, monkeypatch):
+        import sys
+        import unittest.mock as mock
+        from pathlib import Path
+        sys.path.insert(0, "src")
+        import fetch
+        monkeypatch.setattr(fetch, "_CACHE_DIR", Path(tmp_path))
+
+        class ErrorHorizons:
+            def __init__(self, **kw): pass
+            def ephemerides(self): raise RuntimeError("no network")
+
+        with mock.patch.dict(
+            "sys.modules",
+            {"astroquery.jplhorizons": mock.MagicMock(Horizons=ErrorHorizons)},
+        ):
+            result = fetch.fetch_horizons_ephemeris("bad", [2460000.0], force_refresh=True)
+        assert result == []
+
+    def test_cache_hit(self, tmp_path, monkeypatch):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, "src")
+        import fetch
+        monkeypatch.setattr(fetch, "_CACHE_DIR", Path(tmp_path))
+        cached = [{"jd": 2460000.0, "ra_deg": 10.0, "dec_deg": 5.0, "delta_au": 1.0, "mag": 18.0}]
+        fetch._save_cache("horizons_2026AB1", cached)
+        result = fetch.fetch_horizons_ephemeris("2026AB1", [2460000.0], force_refresh=False)
+        assert result == cached
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+        assert "fetch_horizons_ephemeris" in fetch.__all__
+
+    def test_empty_ephemeris_skips(self, tmp_path, monkeypatch):
+        import sys
+        import unittest.mock as mock
+        from pathlib import Path
+        sys.path.insert(0, "src")
+        import fetch
+        monkeypatch.setattr(fetch, "_CACHE_DIR", Path(tmp_path))
+
+        class EmptyEph:
+            def __len__(self): return 0
+
+        class EmptyHorizons:
+            def __init__(self, **kw): pass
+            def ephemerides(self): return EmptyEph()
+
+        with mock.patch.dict(
+            "sys.modules",
+            {"astroquery.jplhorizons": mock.MagicMock(Horizons=EmptyHorizons)},
+        ):
+            result = fetch.fetch_horizons_ephemeris("2026AB1", [2460000.0], force_refresh=True)
+        assert result == []

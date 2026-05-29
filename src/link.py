@@ -18,7 +18,8 @@ __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "compute_tracklet_sky_density",
            "compute_tracklet_completeness",
            "find_longest_tracklet",
-           "compute_tracklet_motion_scatter"]
+           "compute_tracklet_motion_scatter",
+           "compute_great_circle_arc"]
 
 import math
 import uuid
@@ -1123,3 +1124,32 @@ def compute_tracklet_motion_scatter(tracklet: object) -> float | None:
     mean_rate = sum(rates) / len(rates)
     variance = sum((r - mean_rate) ** 2 for r in rates) / len(rates)
     return round(math.sqrt(variance), 6)
+
+
+def compute_great_circle_arc(tracklet: object) -> float:
+    """Compute the total great-circle arc length of a tracklet in arcseconds.
+
+    Sums the angular separation between each consecutive pair of observations
+    (sorted by JD).  Returns 0.0 for fewer than 2 observations.
+    """
+    import math
+
+    observations = getattr(tracklet, "observations", ()) or ()
+    obs_sorted = sorted(observations, key=lambda o: getattr(o, "jd", 0.0))
+    if len(obs_sorted) < 2:
+        return 0.0
+    total_arcsec = 0.0
+    for i in range(len(obs_sorted) - 1):
+        o1, o2 = obs_sorted[i], obs_sorted[i + 1]
+        ra1 = math.radians(float(getattr(o1, "ra_deg", 0.0)))
+        dec1 = math.radians(float(getattr(o1, "dec_deg", 0.0)))
+        ra2 = math.radians(float(getattr(o2, "ra_deg", 0.0)))
+        dec2 = math.radians(float(getattr(o2, "dec_deg", 0.0)))
+        cos_angle = (
+            math.sin(dec1) * math.sin(dec2)
+            + math.cos(dec1) * math.cos(dec2) * math.cos(ra2 - ra1)
+        )
+        cos_angle = max(-1.0, min(1.0, cos_angle))
+        angle_rad = math.acos(cos_angle)
+        total_arcsec += math.degrees(angle_rad) * 3600.0
+    return round(total_arcsec, 6)

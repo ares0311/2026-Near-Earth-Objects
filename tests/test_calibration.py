@@ -1288,3 +1288,43 @@ class TestComputeCalibrationSlopeDegenerate:
         labels = [1] * 10 + [0] * 10
         result = compute_calibration_slope(probs, labels)
         assert isinstance(result, float)
+
+
+class TestComputeOverconfidenceScore:
+    def test_overconfident(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_overconfidence_score
+        probs = [0.8, 0.9, 0.7]
+        labels = [0, 0, 0]
+        result = compute_overconfidence_score(probs, labels)
+        assert result > 0.0
+
+    def test_underconfident(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_overconfidence_score
+        probs = [0.1, 0.2, 0.1]
+        labels = [1, 1, 1]
+        result = compute_overconfidence_score(probs, labels)
+        assert result < 0.0
+
+    def test_empty_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_overconfidence_score
+        assert compute_overconfidence_score([], []) == pytest.approx(0.0)
+
+    def test_perfectly_calibrated(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_overconfidence_score
+        probs = [0.5, 0.5]
+        labels = [0, 1]
+        assert compute_overconfidence_score(probs, labels) == pytest.approx(0.0)
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        assert "compute_overconfidence_score" in calibration.__all__

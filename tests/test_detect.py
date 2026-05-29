@@ -1897,3 +1897,79 @@ class TestComputeMagnitudeResidual:
         sys.path.insert(0, "src")
         import detect
         assert "compute_magnitude_residual" in detect.__all__
+
+
+class TestComputeElongationRatio:
+    def test_circular_source_near_one(self):
+        import base64
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        import numpy as np
+
+        from detect import compute_elongation_ratio
+        arr = np.zeros((63, 63), dtype=np.float32)
+        cy, cx = 31.0, 31.0
+        for r in range(63):
+            for c in range(63):
+                arr[r, c] = np.exp(-((r - cy)**2 + (c - cx)**2) / 8.0)
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        obs = SimpleNamespace(cutout_difference=b64)
+        result = compute_elongation_ratio(obs)
+        assert result is not None
+        assert 0.8 <= result <= 1.0
+
+    def test_no_cutout_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import compute_elongation_ratio
+        obs = SimpleNamespace(cutout_difference=None)
+        assert compute_elongation_ratio(obs) is None
+
+    def test_zero_flux_returns_none(self):
+        import base64
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        import numpy as np
+
+        from detect import compute_elongation_ratio
+        arr = np.zeros((63, 63), dtype=np.float32)
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        obs = SimpleNamespace(cutout_difference=b64)
+        assert compute_elongation_ratio(obs) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import detect
+        assert "compute_elongation_ratio" in detect.__all__
+
+    def test_bad_base64_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import compute_elongation_ratio
+        obs = SimpleNamespace(cutout_difference="!!not_valid_base64!!")
+        assert compute_elongation_ratio(obs) is None
+
+    def test_single_pixel_trace_zero_returns_none(self):
+        import base64
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        import numpy as np
+
+        from detect import compute_elongation_ratio
+        # Single pixel at center → all second moments are zero → trace=0
+        arr = np.zeros((63, 63), dtype=np.float32)
+        arr[31, 31] = 1.0
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        obs = SimpleNamespace(cutout_difference=b64)
+        assert compute_elongation_ratio(obs) is None

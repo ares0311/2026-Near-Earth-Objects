@@ -35,6 +35,7 @@ __all__ = [
     "compute_class_probability_range",
     "compute_ensemble_agreement",
     "compute_real_bogus_histogram",
+    "compute_neo_class_prior",
 ]
 
 import base64
@@ -1665,3 +1666,21 @@ def compute_real_bogus_histogram(tracklet: object, n_bins: int = 5) -> dict:
         "counts": [int(c) for c in counts_arr],
         "mean": round(float(np.mean(scores)), 6),
     }
+
+
+_NEO_CLASS_PRIORS: dict[str, float] = {
+    "amor": 0.35,
+    "apollo": 0.50,
+    "aten": 0.12,
+    "ieo": 0.03,
+}
+
+
+def compute_neo_class_prior(neo_class: str) -> float | None:
+    """Return the fractional prior for a NEO dynamical class.
+
+    Priors reflect approximate survey-completeness-corrected population fractions
+    (Apollo dominant, followed by Amor, Aten, and IEO/Atira).
+    Returns ``None`` for unknown class labels.
+    """
+    return _NEO_CLASS_PRIORS.get(neo_class.lower() if neo_class else "")
