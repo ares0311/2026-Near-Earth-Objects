@@ -1940,6 +1940,7 @@ class TestFormatTelescopeTargetList:
         import sys
         sys.path.insert(0, "src")
         from types import SimpleNamespace
+
         from alert import format_telescope_target_list
         tracklet = SimpleNamespace(object_id="NOOBS", observations=())
         hazard = SimpleNamespace(alert_pathway="internal_candidate")
