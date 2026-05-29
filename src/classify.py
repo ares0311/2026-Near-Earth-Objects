@@ -34,6 +34,7 @@ __all__ = [
     "compute_posterior_stability",
     "compute_class_probability_range",
     "compute_ensemble_agreement",
+    "compute_real_bogus_histogram",
 ]
 
 import base64
@@ -1637,3 +1638,30 @@ def compute_ensemble_agreement(posterior_list: list) -> float:
             total += 1.0 - l1 / 2.0
             count += 1
     return round(total / count, 6) if count > 0 else 0.0
+
+
+def compute_real_bogus_histogram(tracklet: object, n_bins: int = 5) -> dict:
+    """Compute a histogram of real/bogus scores across a tracklet's observations.
+
+    Returns a dict with keys ``"bins"`` (left edges, length n_bins),
+    ``"counts"`` (integer counts per bin), and ``"mean"`` (mean RB score).
+    Uses the deep_real_bogus score when available, falling back to real_bogus.
+    Returns an empty histogram dict if no valid scores are found.
+    """
+    observations = getattr(tracklet, "observations", ()) or ()
+    scores: list[float] = []
+    for obs in observations:
+        rb = getattr(obs, "deep_real_bogus", None)
+        if rb is None:
+            rb = getattr(obs, "real_bogus", None)
+        if rb is not None:
+            scores.append(float(rb))
+    if not scores:
+        return {"bins": [], "counts": [], "mean": None}
+    import numpy as np
+    counts_arr, edges = np.histogram(scores, bins=n_bins, range=(0.0, 1.0))
+    return {
+        "bins": [round(float(e), 4) for e in edges[:-1]],
+        "counts": [int(c) for c in counts_arr],
+        "mean": round(float(np.mean(scores)), 6),
+    }

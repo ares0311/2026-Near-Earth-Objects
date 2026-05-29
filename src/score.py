@@ -18,7 +18,8 @@ __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "compute_survey_completeness",
            "compute_weighted_risk_score",
            "compute_hazard_summary",
-           "compute_priority_percentile"]
+           "compute_priority_percentile",
+           "compute_arc_completeness_score"]
 
 import math
 import uuid
@@ -1085,3 +1086,26 @@ def compute_priority_percentile(neo: object, neos: list) -> float:
     ref = _priority(neo)
     count = sum(1 for n in neos if _priority(n) <= ref)
     return round(count / len(neos), 6)
+
+
+def compute_arc_completeness_score(neo: object) -> float:
+    """Compute an arc completeness score in [0, 1].
+
+    Combines arc_coverage_score (weight 0.4), nights_observed_score (weight
+    0.3), and orbit_quality_score (weight 0.3).  Missing feature scores
+    contribute 0.0 (conservative).  Result is clamped to [0, 1] and rounded to
+    6 decimal places.
+    """
+    features = getattr(neo, "features", None)
+
+    def _get(name: str) -> float:
+        if features is None:
+            return 0.0
+        val = getattr(features, name, None)
+        return float(val) if val is not None else 0.0
+
+    ac = _get("arc_coverage_score")
+    nobs = _get("nights_observed_score")
+    oq = _get("orbit_quality_score")
+    score = 0.4 * ac + 0.3 * nobs + 0.3 * oq
+    return round(min(1.0, max(0.0, score)), 6)

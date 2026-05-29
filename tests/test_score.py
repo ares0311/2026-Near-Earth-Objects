@@ -1767,3 +1767,77 @@ class TestComputePriorityPercentile:
         sys.path.insert(0, "src")
         import score
         assert "compute_priority_percentile" in score.__all__
+
+
+class TestComputeArcCompletenessScore:
+    def test_all_features_full(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from score import compute_arc_completeness_score
+        features = SimpleNamespace(
+            arc_coverage_score=1.0,
+            nights_observed_score=1.0,
+            orbit_quality_score=1.0,
+        )
+        neo = SimpleNamespace(features=features)
+        result = compute_arc_completeness_score(neo)
+        assert result == pytest.approx(1.0)
+
+    def test_all_features_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from score import compute_arc_completeness_score
+        features = SimpleNamespace(
+            arc_coverage_score=0.0,
+            nights_observed_score=0.0,
+            orbit_quality_score=0.0,
+        )
+        neo = SimpleNamespace(features=features)
+        assert compute_arc_completeness_score(neo) == pytest.approx(0.0)
+
+    def test_weighted_combination(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from score import compute_arc_completeness_score
+        features = SimpleNamespace(
+            arc_coverage_score=1.0,
+            nights_observed_score=0.0,
+            orbit_quality_score=0.0,
+        )
+        neo = SimpleNamespace(features=features)
+        assert compute_arc_completeness_score(neo) == pytest.approx(0.4)
+
+    def test_missing_features_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from score import compute_arc_completeness_score
+        features = SimpleNamespace(
+            arc_coverage_score=None,
+            nights_observed_score=None,
+            orbit_quality_score=None,
+        )
+        neo = SimpleNamespace(features=features)
+        assert compute_arc_completeness_score(neo) == pytest.approx(0.0)
+
+    def test_no_features_attr(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from score import compute_arc_completeness_score
+        neo = SimpleNamespace()
+        assert compute_arc_completeness_score(neo) == pytest.approx(0.0)
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        assert "compute_arc_completeness_score" in score.__all__

@@ -35,6 +35,7 @@ __all__ = [
     "format_neocp_submission",
     "count_observations_by_mission",
     "format_close_approach_bulletin",
+    "format_iau_circular_draft",
 ]
 
 import json
@@ -1505,4 +1506,57 @@ def format_close_approach_bulletin(neo: object) -> str:
         "\n"
         "GUARDRAIL: This pipeline does NOT assert any probability of Earth impact.\n"
         "All hazard assessments must be independently confirmed by MPC/CNEOS.\n"
+    )
+
+
+def format_iau_circular_draft(neo: object) -> str:
+    """Format a draft IAU CBET-style discovery circular for a NEO candidate.
+
+    Produces a plain-text draft suitable for review before formal IAU
+    submission.  The output includes object designation, discovery
+    circumstances, orbital summary, and a mandatory guardrail statement.
+
+    This pipeline does NOT autonomously submit to the IAU — the draft must
+    be reviewed and submitted by an authorised human observer.
+    """
+    tracklet = getattr(neo, "tracklet", None)
+    hazard = getattr(neo, "hazard", None)
+    metadata = getattr(neo, "metadata", None)
+
+    oid = getattr(tracklet, "object_id", "unknown") if tracklet else "unknown"
+    neo_class = getattr(hazard, "neo_class", "unknown") if hazard else "unknown"
+    moid_au = getattr(hazard, "moid_au", None) if hazard else None
+    h_mag = getattr(hazard, "absolute_magnitude_h", None) if hazard else None
+    pathway = getattr(hazard, "alert_pathway", "unknown") if hazard else "unknown"
+    priority = getattr(metadata, "discovery_priority", None) if metadata else None
+
+    n_obs = 0
+    first_jd: float | None = None
+    if tracklet:
+        obs = getattr(tracklet, "observations", ())
+        n_obs = len(obs)
+        if obs:
+            first_jd = min(getattr(o, "jd", 0.0) for o in obs)
+
+    moid_str = f"{moid_au:.6f} AU" if moid_au is not None else "undetermined"
+    h_str = f"{h_mag:.2f}" if h_mag is not None else "unknown"
+    jd_str = f"{first_jd:.5f}" if first_jd is not None else "unknown"
+    prio_str = f"{priority:.4f}" if priority is not None else "unknown"
+
+    return (
+        "DRAFT IAU CIRCULAR — NOT FOR PUBLIC RELEASE\n"
+        "============================================\n"
+        f"Provisional Designation : {oid}\n"
+        f"NEO Dynamical Class     : {neo_class.upper()}\n"
+        f"Discovery JD            : {jd_str}\n"
+        f"Number of Observations  : {n_obs}\n"
+        f"MOID (Earth)            : {moid_str}\n"
+        f"Absolute Magnitude H    : {h_str}\n"
+        f"Alert Pathway           : {pathway}\n"
+        f"Discovery Priority      : {prio_str}\n"
+        "\n"
+        "GUARDRAIL: This draft circular does NOT assert any probability of Earth\n"
+        "impact.  All hazard assessments must be independently confirmed by\n"
+        "MPC/CNEOS before any public communication.  Do NOT release this draft\n"
+        "without explicit authorisation from the discovery team and MPC.\n"
     )

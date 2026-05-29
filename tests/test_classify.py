@@ -2299,3 +2299,60 @@ class TestComputeEnsembleAgreement:
         sys.path.insert(0, "src")
         import classify
         assert "compute_ensemble_agreement" in classify.__all__
+
+
+class TestComputeRealBogusHistogram:
+    def test_basic_histogram(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from classify import compute_real_bogus_histogram
+        obs = [SimpleNamespace(real_bogus=0.2, deep_real_bogus=None),
+               SimpleNamespace(real_bogus=0.8, deep_real_bogus=None),
+               SimpleNamespace(real_bogus=0.5, deep_real_bogus=None)]
+        tracklet = SimpleNamespace(observations=obs)
+        result = compute_real_bogus_histogram(tracklet)
+        assert "bins" in result
+        assert "counts" in result
+        assert "mean" in result
+        assert len(result["bins"]) == 5
+        assert sum(result["counts"]) == 3
+
+    def test_prefers_deep_rb(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from classify import compute_real_bogus_histogram
+        obs = [SimpleNamespace(real_bogus=0.1, deep_real_bogus=0.9)]
+        tracklet = SimpleNamespace(observations=obs)
+        result = compute_real_bogus_histogram(tracklet)
+        assert result["mean"] == pytest.approx(0.9)
+
+    def test_empty_observations(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from classify import compute_real_bogus_histogram
+        tracklet = SimpleNamespace(observations=())
+        result = compute_real_bogus_histogram(tracklet)
+        assert result == {"bins": [], "counts": [], "mean": None}
+
+    def test_no_rb_scores(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from classify import compute_real_bogus_histogram
+        obs = [SimpleNamespace(real_bogus=None, deep_real_bogus=None)]
+        tracklet = SimpleNamespace(observations=obs)
+        result = compute_real_bogus_histogram(tracklet)
+        assert result["mean"] is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import classify
+        assert "compute_real_bogus_histogram" in classify.__all__

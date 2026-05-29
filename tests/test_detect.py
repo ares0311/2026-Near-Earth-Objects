@@ -1844,3 +1844,56 @@ class TestComputeStreakOrientation:
         sys.path.insert(0, "src")
         import detect
         assert "compute_streak_orientation" in detect.__all__
+
+
+class TestComputeMagnitudeResidual:
+    def test_positive_residual(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import compute_magnitude_residual
+        obs = SimpleNamespace(mag=18.5)
+        assert compute_magnitude_residual(obs, 18.0) == pytest.approx(0.5)
+
+    def test_negative_residual(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import compute_magnitude_residual
+        obs = SimpleNamespace(mag=17.5)
+        assert compute_magnitude_residual(obs, 18.0) == pytest.approx(-0.5)
+
+    def test_sentinel_obs_mag_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import compute_magnitude_residual
+        obs = SimpleNamespace(mag=99.0)
+        assert compute_magnitude_residual(obs, 18.0) == pytest.approx(0.0)
+
+    def test_sentinel_predicted_mag_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import compute_magnitude_residual
+        obs = SimpleNamespace(mag=18.5)
+        assert compute_magnitude_residual(obs, 99.0) == pytest.approx(0.0)
+
+    def test_missing_mag_attr_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import compute_magnitude_residual
+        obs = SimpleNamespace()
+        assert compute_magnitude_residual(obs, 18.0) == pytest.approx(0.0)
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import detect
+        assert "compute_magnitude_residual" in detect.__all__

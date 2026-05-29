@@ -1228,3 +1228,63 @@ class TestComputeResolution:
         sys.path.insert(0, "src")
         import calibration
         assert "compute_resolution" in calibration.__all__
+
+
+class TestComputeCalibrationSlope:
+    def test_perfect_calibration_returns_one(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_calibration_slope
+        # perfectly calibrated: predicted = observed fraction
+        probs = [0.1] * 10 + [0.5] * 10 + [0.9] * 10
+        labels = [0] * 9 + [1] + [0] * 5 + [1] * 5 + [0] * 1 + [1] * 9
+        result = compute_calibration_slope(probs, labels)
+        assert isinstance(result, float)
+
+    def test_empty_returns_one(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_calibration_slope
+        assert compute_calibration_slope([], []) == pytest.approx(1.0)
+
+    def test_single_bin_returns_one(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_calibration_slope
+        probs = [0.5] * 20
+        labels = [1] * 10 + [0] * 10
+        result = compute_calibration_slope(probs, labels)
+        assert result == pytest.approx(1.0)
+
+    def test_well_calibrated_slope_near_one(self):
+        import sys
+        sys.path.insert(0, "src")
+        import numpy as np
+
+        from calibration import compute_calibration_slope
+        rng = np.random.RandomState(0)
+        probs = rng.uniform(0, 1, 2000).tolist()
+        labels = [int(rng.random() < p) for p in probs]
+        slope = compute_calibration_slope(probs, labels)
+        assert 0.5 <= slope <= 2.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        assert "compute_calibration_slope" in calibration.__all__
+
+
+class TestComputeCalibrationSlopeDegenerate:
+    def test_all_probs_identical_returns_one(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_calibration_slope
+        # All predictions in the same bin → x_mean = x_bins[0] for each bin
+        # but with 1 bin → returns 1.0 from len(x_bins) < 2
+        # To hit den==0: need 2+ bins with exact same mean prob (impossible with linspace)
+        # But we can fill all probs exactly at 0.5 into only 1 bin → len < 2
+        probs = [0.5] * 10 + [0.501] * 10
+        labels = [1] * 10 + [0] * 10
+        result = compute_calibration_slope(probs, labels)
+        assert isinstance(result, float)

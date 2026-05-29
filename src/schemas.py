@@ -29,6 +29,7 @@ __all__ = [
     "NightSummary",
     "TrackletCluster",
     "CampaignSummary",
+    "FieldObservationSummary",
 ]
 
 from dataclasses import dataclass
@@ -1009,3 +1010,18 @@ class CampaignSummary(BaseModel):
     n_pha_candidates: int
     surveys_used: tuple[str, ...] = ()
     sky_area_deg2: float | None = None
+
+
+class FieldObservationSummary(BaseModel):
+    """Per-field observation summary from a single pipeline run epoch."""
+
+    model_config = ConfigDict(frozen=True)
+
+    field_id: str
+    epoch_jd: float
+    survey: Mission
+    n_sources: int = 0
+    n_moving: int = 0
+    n_known: int = 0
+    n_new: int = 0
+    limiting_mag: float | None = None
