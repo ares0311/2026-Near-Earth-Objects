@@ -31,6 +31,7 @@ __all__ = [
     "CampaignSummary",
     "FieldObservationSummary",
     "ObservationCluster",
+    "SurveyRun",
 ]
 
 from dataclasses import dataclass
@@ -102,6 +103,9 @@ class Observation(BaseModel):
     cutout_science: str | None = None
     cutout_reference: str | None = None
     cutout_difference: str | None = None
+    # Survey field metadata
+    field_id: str | None = None
+    limiting_mag: float | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -1013,4 +1017,16 @@ class FieldObservationSummary(BaseModel):
     n_moving: int = 0
     n_known: int = 0
     n_new: int = 0
+    limiting_mag: float | None = None
+
+
+class SurveyRun(BaseModel):
+    """A single survey field epoch produced by the pipeline."""
+    model_config = ConfigDict(frozen=True)
+    run_id: str
+    survey: Mission
+    epoch_jd: float
+    field_id: str
+    n_candidates: int = 0
+    sky_coverage_deg2: float = 0.0
     limiting_mag: float | None = None

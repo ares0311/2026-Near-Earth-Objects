@@ -2110,3 +2110,75 @@ class TestComputeGreatCircleArc:
         sys.path.insert(0, "src")
         import link
         assert "compute_great_circle_arc" in link.__all__
+
+
+class TestComputeArcCurvature:
+    def test_fewer_than_three_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_arc_curvature
+        obs1 = SimpleNamespace(jd=2460000.0, ra_deg=10.0, dec_deg=5.0)
+        obs2 = SimpleNamespace(jd=2460001.0, ra_deg=10.1, dec_deg=5.1)
+        tracklet = SimpleNamespace(observations=(obs1, obs2))
+        assert compute_arc_curvature(tracklet) == 0.0
+
+    def test_one_obs_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_arc_curvature
+        obs = SimpleNamespace(jd=2460000.0, ra_deg=10.0, dec_deg=5.0)
+        assert compute_arc_curvature(SimpleNamespace(observations=(obs,))) == 0.0
+
+    def test_linear_motion_near_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_arc_curvature
+        obs_list = [
+            SimpleNamespace(jd=2460000.0 + i, ra_deg=10.0 + i * 0.01, dec_deg=5.0 + i * 0.01)
+            for i in range(5)
+        ]
+        result = compute_arc_curvature(SimpleNamespace(observations=tuple(obs_list)))
+        assert result < 0.01
+
+    def test_curved_motion_nonzero(self):
+        import math
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_arc_curvature
+        obs_list = [
+            SimpleNamespace(
+                jd=2460000.0 + i,
+                ra_deg=10.0 + 0.5 * math.sin(i * 0.5),
+                dec_deg=5.0 + 0.5 * math.cos(i * 0.5),
+            )
+            for i in range(6)
+        ]
+        assert compute_arc_curvature(SimpleNamespace(observations=tuple(obs_list))) > 0.0
+
+    def test_exception_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_arc_curvature
+        # Observations with non-numeric jd trigger exception → returns 0.0
+        obs_list = [
+            SimpleNamespace(jd="bad", ra_deg=10.0, dec_deg=5.0),
+            SimpleNamespace(jd="bad", ra_deg=10.1, dec_deg=5.1),
+            SimpleNamespace(jd="bad", ra_deg=10.2, dec_deg=5.2),
+        ]
+        assert compute_arc_curvature(SimpleNamespace(observations=tuple(obs_list))) == 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+        assert "compute_arc_curvature" in link.__all__

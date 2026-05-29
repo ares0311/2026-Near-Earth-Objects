@@ -37,6 +37,7 @@ __all__ = [
     "format_close_approach_bulletin",
     "format_iau_circular_draft",
     "format_telescope_target_list",
+    "compute_alert_priority_score",
 ]
 
 import json
@@ -1614,3 +1615,28 @@ def format_telescope_target_list(neos: list[object], obs_code: str = "500") -> s
     rows.sort(key=lambda x: priority_order.get(x[0], 4))
     body = "\n".join(r for _, r in rows)
     return header + body + "\n"
+
+
+def compute_alert_priority_score(neo: ScoredNEO) -> float:
+    """Compute a composite alert priority score in ``[0, 1]``.
+
+    Combines discovery priority, novelty (inverse of known-object score),
+    and orbit quality::
+
+        score = 0.4 × discovery_priority
+              + 0.3 × (1 − known_object_score)
+              + 0.3 × orbit_quality_score
+
+    Missing values contribute 0.5 (neutral).  Result clamped to ``[0, 1]``.
+
+    This score does NOT assert any impact probability and must NOT be used
+    to trigger the NASA/MPC alert pathway autonomously.
+    """
+    disc = neo.metadata.discovery_priority
+    disc = float(disc) if disc is not None else 0.5
+    ko = getattr(neo.features, "known_object_score", None)
+    ko = float(ko) if ko is not None else 0.5
+    oq = getattr(neo.features, "orbit_quality_score", None)
+    oq = float(oq) if oq is not None else 0.5
+    score = 0.4 * disc + 0.3 * (1.0 - ko) + 0.3 * oq
+    return float(max(0.0, min(1.0, score)))

@@ -3575,3 +3575,60 @@ class TestFetchHorizonsEphemeris:
         ):
             result = fetch.fetch_horizons_ephemeris("2026AB1", [2460000.0], force_refresh=True)
         assert result == []
+
+
+class TestSummarizeSurveyFields:
+    def test_groups_by_field(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import summarize_survey_fields
+        from schemas import FetchProvenance, FetchResult, Observation
+        obs1 = Observation(obs_id="o1", ra_deg=10.0, dec_deg=5.0, jd=2460000.0,
+                           mag=18.0, mag_err=0.1, filter_band="r", mission="ZTF",
+                           field_id="F1", real_bogus=0.9)
+        obs2 = Observation(obs_id="o2", ra_deg=10.1, dec_deg=5.1, jd=2460001.0,
+                           mag=18.5, mag_err=0.1, filter_band="r", mission="ZTF",
+                           field_id="F1", real_bogus=0.8)
+        obs3 = Observation(obs_id="o3", ra_deg=20.0, dec_deg=10.0, jd=2460002.0,
+                           mag=19.0, mag_err=0.1, filter_band="g", mission="ZTF",
+                           field_id="F2", real_bogus=0.7)
+        prov = FetchProvenance(surveys=["ZTF"], start_jd=2460000.0, end_jd=2460002.0,
+                               n_alerts=3, cached=False)
+        result = FetchResult(alerts=[obs1, obs2, obs3], provenance=prov)
+        rows = summarize_survey_fields(result)
+        assert len(rows) == 2
+        field_ids = [r["field_id"] for r in rows]
+        assert "F1" in field_ids
+        assert "F2" in field_ids
+        f1 = next(r for r in rows if r["field_id"] == "F1")
+        assert f1["n_observations"] == 2
+
+    def test_none_field_id_grouped_as_unknown(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import summarize_survey_fields
+        from schemas import FetchProvenance, FetchResult, Observation
+        obs = Observation(obs_id="o1", ra_deg=10.0, dec_deg=5.0, jd=2460000.0,
+                          mag=18.0, mag_err=0.1, filter_band="r", mission="ZTF",
+                          field_id=None, real_bogus=0.9)
+        prov = FetchProvenance(surveys=["ZTF"], start_jd=2460000.0, end_jd=2460000.0,
+                               n_alerts=1, cached=False)
+        result = FetchResult(alerts=[obs], provenance=prov)
+        rows = summarize_survey_fields(result)
+        assert rows[0]["field_id"] == "unknown"
+
+    def test_empty_result(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import summarize_survey_fields
+        from schemas import FetchProvenance, FetchResult
+        prov = FetchProvenance(surveys=[], start_jd=2460000.0, end_jd=2460000.0,
+                               n_alerts=0, cached=False)
+        result = FetchResult(alerts=[], provenance=prov)
+        assert summarize_survey_fields(result) == []
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+        assert "summarize_survey_fields" in fetch.__all__

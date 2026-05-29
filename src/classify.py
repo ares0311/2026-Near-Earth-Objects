@@ -36,6 +36,7 @@ __all__ = [
     "compute_ensemble_agreement",
     "compute_real_bogus_histogram",
     "compute_neo_class_prior",
+    "compute_main_belt_probability",
 ]
 
 import base64
@@ -1684,3 +1685,47 @@ def compute_neo_class_prior(neo_class: str) -> float | None:
     Returns ``None`` for unknown class labels.
     """
     return _NEO_CLASS_PRIORS.get(neo_class.lower() if neo_class else "")
+
+
+def compute_main_belt_probability(features: object) -> float:
+    """Compute the log-score probability for the main-belt asteroid hypothesis.
+
+    Uses the prior of 0.35 (CLAUDE.md) with feature weights that reward
+    evidence consistent with a main-belt asteroid and penalise NEO-like
+    motion.  The result is normalised against the neo_candidate hypothesis
+    score so values are comparable.
+
+    Returns a value in ``[0, 1]``; ``0.0`` if ``features`` is ``None``.
+    """
+    import math
+
+    if features is None:
+        return 0.0
+
+    def _f(name: str) -> float:
+        v = getattr(features, name, None)
+        return float(v) if v is not None else 0.0
+
+    log_mba = (
+        math.log(0.35)
+        + 1.5 * _f("main_belt_consistency_score")
+        + 1.0 * _f("known_object_score")
+        + 0.5 * _f("real_bogus_score")
+        - 2.0 * _f("motion_consistency_score")
+        - 1.0 * _f("orbit_quality_score")
+        - 1.5 * _f("arc_coverage_score")
+    )
+    log_neo = (
+        math.log(0.05)
+        + 2.0 * _f("real_bogus_score")
+        + 1.5 * _f("arc_coverage_score")
+        + 1.5 * _f("nights_observed_score")
+        + 1.2 * _f("motion_consistency_score")
+        + 1.0 * _f("orbit_quality_score")
+        - 2.5 * _f("known_object_score")
+    )
+    max_log = max(log_mba, log_neo)
+    exp_mba = math.exp(log_mba - max_log)
+    exp_neo = math.exp(log_neo - max_log)
+    denom = exp_mba + exp_neo
+    return float(max(0.0, min(1.0, exp_mba / denom)))

@@ -19,7 +19,8 @@ __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "compute_tracklet_completeness",
            "find_longest_tracklet",
            "compute_tracklet_motion_scatter",
-           "compute_great_circle_arc"]
+           "compute_great_circle_arc",
+           "compute_arc_curvature"]
 
 import math
 import uuid
@@ -1153,3 +1154,40 @@ def compute_great_circle_arc(tracklet: object) -> float:
         angle_rad = math.acos(cos_angle)
         total_arcsec += math.degrees(angle_rad) * 3600.0
     return round(total_arcsec, 6)
+
+
+def compute_arc_curvature(tracklet: object) -> float:
+    """Compute the RMS quadratic residual of the arc in arcsec.
+
+    Fits a quadratic polynomial to RA (cos-Dec-corrected) and Dec vs time,
+    then returns the RMS of the residuals from the best-fit *linear* model.
+    A value close to 0 indicates straight-line motion; a larger value
+    indicates curvature (non-inertial apparent motion).
+
+    Returns ``0.0`` for fewer than 3 observations.
+    """
+    try:
+        import math
+
+        import numpy as np
+
+        obs_list = list(getattr(tracklet, "observations", []))
+        obs_list = sorted(obs_list, key=lambda o: o.jd)
+        if len(obs_list) < 3:
+            return 0.0
+        t = np.array([o.jd for o in obs_list], dtype=float)
+        ra = np.array([o.ra_deg for o in obs_list], dtype=float)
+        dec = np.array([o.dec_deg for o in obs_list], dtype=float)
+        mid_dec = float(np.mean(dec))
+        cos_dec = math.cos(math.radians(mid_dec))
+        ra_corr = ra * cos_dec
+        t0 = t[0]
+        dt = t - t0
+        # Linear fit residuals
+        A_lin = np.column_stack([dt, np.ones_like(dt)])
+        res_ra = ra_corr - A_lin @ np.linalg.lstsq(A_lin, ra_corr, rcond=None)[0]
+        res_dec = dec - A_lin @ np.linalg.lstsq(A_lin, dec, rcond=None)[0]
+        rms = float(np.sqrt(np.mean(res_ra**2 + res_dec**2))) * 3600.0
+        return round(rms, 6)
+    except Exception:
+        return 0.0
