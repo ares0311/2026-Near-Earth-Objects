@@ -2303,3 +2303,106 @@ class TestComputeTrackletDensityEdgeCases:
         tracklet = SimpleNamespace(observations=[])
         result = compute_tracklet_density([tracklet], radius_deg=1.0)
         assert result == [0]
+
+
+class TestComputePositionResiduals:
+    def _make_tracklet(self, ras, decs, jds):
+        import sys
+        sys.path.insert(0, "src")
+        obs_list = []
+        for i, (ra, dec, jd) in enumerate(zip(ras, decs, jds)):
+            obs_list.append(Observation(
+                obs_id=f"o{i}", ra_deg=ra, dec_deg=dec, jd=jd,
+                mag=18.0, mag_err=0.1, filter_band="r", mission="ZTF",
+            ))
+        return Tracklet(
+            object_id="TEST",
+            observations=tuple(obs_list),
+            arc_days=float(jds[-1] - jds[0]),
+            motion_rate_arcsec_per_hour=1.0,
+            motion_pa_degrees=0.0,
+        )
+
+    def test_linear_motion_small_residuals(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_position_residuals
+        # Perfect linear motion — residuals should be near zero
+        jds = [2460000.0, 2460001.0, 2460002.0]
+        ras = [10.0, 10.01, 10.02]
+        decs = [5.0, 5.0, 5.0]
+        t = self._make_tracklet(ras, decs, jds)
+        residuals = compute_position_residuals(t)
+        assert len(residuals) == 3
+        assert all(r < 0.01 for r in residuals)
+
+    def test_nonlinear_motion_nonzero_residuals(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_position_residuals
+        # Curved motion — middle point offset should give nonzero residual
+        jds = [2460000.0, 2460001.0, 2460002.0]
+        ras = [10.0, 10.005, 10.02]  # non-linear
+        decs = [5.0, 5.005, 5.0]   # non-linear
+        t = self._make_tracklet(ras, decs, jds)
+        residuals = compute_position_residuals(t)
+        assert len(residuals) == 3
+        assert max(residuals) > 0.0
+
+    def test_single_obs_returns_empty(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_position_residuals
+        obs = Observation(
+            obs_id="o0", ra_deg=10.0, dec_deg=5.0, jd=2460000.0,
+            mag=18.0, mag_err=0.1, filter_band="r", mission="ZTF",
+        )
+        t = Tracklet(
+            object_id="TEST",
+            observations=(obs,),
+            arc_days=0.0,
+            motion_rate_arcsec_per_hour=0.0,
+            motion_pa_degrees=0.0,
+        )
+        assert compute_position_residuals(t) == []
+
+    def test_residuals_are_nonnegative(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_position_residuals
+        jds = [2460000.0, 2460001.0, 2460002.0, 2460003.0]
+        ras = [10.0, 10.01, 10.02, 10.03]
+        decs = [5.0, 5.01, 5.02, 5.03]
+        t = self._make_tracklet(ras, decs, jds)
+        residuals = compute_position_residuals(t)
+        assert all(r >= 0.0 for r in residuals)
+
+    def test_returns_list(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_position_residuals
+        jds = [2460000.0, 2460001.0]
+        ras = [10.0, 10.01]
+        decs = [5.0, 5.0]
+        t = self._make_tracklet(ras, decs, jds)
+        result = compute_position_residuals(t)
+        assert isinstance(result, list)
+
+    def test_exception_returns_empty(self):
+        """Passing a non-Tracklet object triggers exception → returns []."""
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_position_residuals
+        # observations with non-numeric ra_deg will trigger exception
+        bad_obs = SimpleNamespace(ra_deg="bad", dec_deg="bad", jd=2460000.0)
+        tracklet = SimpleNamespace(observations=[bad_obs, bad_obs])
+        result = compute_position_residuals(tracklet)  # type: ignore[arg-type]
+        assert result == []
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+        assert "compute_position_residuals" in link.__all__

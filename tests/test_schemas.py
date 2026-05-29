@@ -1489,3 +1489,67 @@ class TestCandidateCluster:
         sys.path.insert(0, "src")
         import schemas
         assert "CandidateCluster" in schemas.__all__
+
+
+class TestObservationCoverageRunId:
+    """Tests for the new run_id / mean_limiting_mag / epoch_jd fields."""
+
+    def test_run_id_field(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import ObservationCoverage
+        oc = ObservationCoverage(
+            night_jd=2460000.5, mission="ZTF",
+            n_fields=3, total_area_deg2=50.0,
+            run_id="run-001",
+        )
+        assert oc.run_id == "run-001"
+
+    def test_mean_limiting_mag_field(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import ObservationCoverage
+        oc = ObservationCoverage(
+            night_jd=2460000.5, mission="ATLAS",
+            n_fields=2, total_area_deg2=30.0,
+            mean_limiting_mag=21.0,
+        )
+        assert oc.mean_limiting_mag == 21.0
+
+    def test_epoch_jd_field(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import ObservationCoverage
+        oc = ObservationCoverage(
+            night_jd=2460000.5, mission="ZTF",
+            n_fields=1, total_area_deg2=10.0,
+            epoch_jd=2460001.0,
+        )
+        assert oc.epoch_jd == 2460001.0
+
+    def test_all_new_fields_together(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import ObservationCoverage
+        oc = ObservationCoverage(
+            night_jd=2460000.5, mission="PanSTARRS",
+            n_fields=5, total_area_deg2=100.0,
+            run_id="run-xyz",
+            mean_limiting_mag=22.5,
+            epoch_jd=2460000.75,
+        )
+        assert oc.run_id == "run-xyz"
+        assert oc.mean_limiting_mag == 22.5
+        assert oc.epoch_jd == 2460000.75
+
+    def test_new_fields_default_to_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import ObservationCoverage
+        oc = ObservationCoverage(
+            night_jd=2460000.5, mission="ZTF",
+            n_fields=1, total_area_deg2=5.0,
+        )
+        assert oc.run_id is None
+        assert oc.mean_limiting_mag is None
+        assert oc.epoch_jd is None

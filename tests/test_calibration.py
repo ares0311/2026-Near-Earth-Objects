@@ -1452,3 +1452,62 @@ class TestComputeHosmerLemeshowEdgeCases:
         result = compute_hosmer_lemeshow_statistic(probs, labels)
         assert isinstance(result, float)
         assert result >= 0.0
+
+
+class TestComputeSpiegelhalterZ:
+    def test_perfect_calibration_near_zero(self):
+        """Z ≈ 0 when each p_i ≈ y_i (well-calibrated)."""
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_spiegelhalter_z
+        # All labels = 1, probs close to 1 — small z_i
+        probs = [0.9] * 20
+        labels = [1] * 20
+        result = compute_spiegelhalter_z(probs, labels)
+        assert isinstance(result, float)
+        assert abs(result) < 5.0  # not necessarily 0, but small
+
+    def test_empty_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_spiegelhalter_z
+        assert compute_spiegelhalter_z([], []) == 0.0
+
+    def test_single_sample_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_spiegelhalter_z
+        assert compute_spiegelhalter_z([0.5], [1]) == 0.0
+
+    def test_returns_float(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_spiegelhalter_z
+        result = compute_spiegelhalter_z([0.2, 0.8, 0.5], [0, 1, 1])
+        assert isinstance(result, float)
+
+    def test_all_half_prob_zero_denominator(self):
+        """p=0.5 → (1-2p)=0 → all var_i=0 → denom=0 → returns 0."""
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_spiegelhalter_z
+        probs = [0.5, 0.5, 0.5, 0.5]
+        labels = [0, 1, 0, 1]
+        result = compute_spiegelhalter_z(probs, labels)
+        assert result == 0.0
+
+    def test_overconfident_probs_nonzero_z(self):
+        """Large misfit → nonzero Z."""
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_spiegelhalter_z
+        probs = [0.99] * 10 + [0.01] * 10
+        labels = [0] * 10 + [1] * 10  # completely wrong
+        result = compute_spiegelhalter_z(probs, labels)
+        assert result != 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        assert "compute_spiegelhalter_z" in calibration.__all__

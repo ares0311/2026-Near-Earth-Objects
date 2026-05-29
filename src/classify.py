@@ -38,6 +38,7 @@ __all__ = [
     "compute_neo_class_prior",
     "compute_main_belt_probability",
     "compute_comet_probability",
+    "compute_known_object_probability",
 ]
 
 import base64
@@ -1762,3 +1763,43 @@ def compute_comet_probability(features: CandidateFeatures) -> float:
     exp_non = math.exp(log_non_comet - max_log)
     denom = exp_comet + exp_non
     return float(max(0.0, min(1.0, exp_comet / denom)))
+
+
+def compute_known_object_probability(features: CandidateFeatures) -> float:
+    """Compute log-score probability that a candidate is a known MPC object.
+
+    Log-score model::
+
+        log_ko  = log(0.30)
+                  + 2.0 × known_object_score
+                  + 1.0 × real_bogus_score
+                  + 0.5 × motion_consistency_score
+
+        log_neo = log(0.70)
+
+    Normalizes against ``log_neo`` (prior for not-known-object).  Missing
+    features contribute 0 (neutral).
+
+    Args:
+        features: :class:`~schemas.CandidateFeatures` object.
+
+    Returns:
+        Known-object probability in [0, 1].
+    """
+
+    def _f(name: str) -> float:
+        v = getattr(features, name, None)
+        return float(v) if v is not None else 0.0
+
+    log_ko = (
+        math.log(0.30)
+        + 2.0 * _f("known_object_score")
+        + 1.0 * _f("real_bogus_score")
+        + 0.5 * _f("motion_consistency_score")
+    )
+    log_neo = math.log(0.70)
+    max_log = max(log_ko, log_neo)
+    exp_ko = math.exp(log_ko - max_log)
+    exp_neo = math.exp(log_neo - max_log)
+    denom = exp_ko + exp_neo
+    return float(max(0.0, min(1.0, exp_ko / denom)))

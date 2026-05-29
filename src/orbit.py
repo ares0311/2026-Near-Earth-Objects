@@ -1214,18 +1214,28 @@ def compute_orbital_velocity(elements: object, r_au: float) -> float | None:
 def compute_perihelion_distance(elements: object) -> float | None:
     """Return the perihelion distance q = a·(1 − e) in AU.
 
-    Returns ``None`` if *a* or *e* is not available, if *a* ≤ 0, or if
-    the resulting *q* would be negative (physically impossible).
+    Checks the ``a_au`` attribute first, then falls back to
+    ``semi_major_axis_au``.  Similarly checks ``e`` then ``eccentricity``.
+    Returns ``None`` if *a* or *e* is not available, if ``e >= 1.0``
+    (parabolic or hyperbolic orbit), or if *a* ≤ 0.
     """
-    a = float(getattr(elements, "semi_major_axis_au", 0.0) or 0.0)
-    e = float(getattr(elements, "eccentricity", -1.0) if
-              getattr(elements, "eccentricity", None) is not None else -1.0)
-    if a <= 0.0 or e < 0.0:
+    a_raw = getattr(elements, "a_au", None)
+    if a_raw is None:
+        a_raw = getattr(elements, "semi_major_axis_au", None)
+    if a_raw is None:
         return None
-    q = a * (1.0 - e)
-    if q < 0.0:
+    a = float(a_raw)
+    if a <= 0.0:
         return None
-    return round(q, 8)
+    e_raw = getattr(elements, "e", None)
+    if e_raw is None:
+        e_raw = getattr(elements, "eccentricity", None)
+    if e_raw is None:
+        return None
+    e = float(e_raw)
+    if e >= 1.0:
+        return None
+    return round(a * (1.0 - e), 8)
 
 
 def compute_aphelion_distance(elements: object) -> float | None:

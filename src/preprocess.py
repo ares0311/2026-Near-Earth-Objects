@@ -20,7 +20,8 @@ __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_
            "compute_local_background",
            "compute_cutout_sharpness",
            "compute_background_gradient",
-           "compute_elongation_angle"]
+           "compute_elongation_angle",
+           "compute_cutout_noise"]
 
 import base64
 import math
@@ -1105,5 +1106,40 @@ def compute_elongation_angle(obs: object) -> float | None:
         angle_rad = 0.5 * math.atan2(2.0 * mxy, mxx - myy)
         angle_deg = math.degrees(angle_rad) % 180.0
         return round(angle_deg, 4)
+    except Exception:
+        return None
+
+
+def compute_cutout_noise(obs: object) -> float | None:
+    """Compute the noise level of a difference-image cutout from border pixels.
+
+    Decodes the base64 difference-image cutout, reshapes to a 63×63 float
+    array, and computes the standard deviation of the border pixels (top row,
+    bottom row, left column, right column concatenated).  Returns ``None`` if
+    no cutout is available or decoding fails.
+
+    Args:
+        obs: Any object with a ``cutout_difference`` attribute (base64 string).
+
+    Returns:
+        Standard deviation of border pixels as a float, or ``None``.
+    """
+    try:
+        import base64
+
+        import numpy as np
+
+        cutout = getattr(obs, "cutout_difference", None)
+        if cutout is None:
+            return None
+        raw = base64.b64decode(cutout)
+        arr = np.frombuffer(raw, dtype=np.float32).reshape(63, 63)
+        border = np.concatenate([
+            arr[0, :],
+            arr[-1, :],
+            arr[1:-1, 0],
+            arr[1:-1, -1],
+        ])
+        return float(np.std(border))
     except Exception:
         return None

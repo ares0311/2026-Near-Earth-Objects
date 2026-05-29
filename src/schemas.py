@@ -951,7 +951,7 @@ class ResidualSummary(BaseModel):
 
 
 class ObservationCoverage(BaseModel):
-    """Sky coverage summary for a single survey night."""
+    """Sky coverage metadata for a single pipeline run or survey night."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -961,6 +961,9 @@ class ObservationCoverage(BaseModel):
     total_area_deg2: float
     limiting_mag: float | None = None
     field_ids: tuple[str, ...] = ()
+    run_id: str | None = None
+    mean_limiting_mag: float | None = None
+    epoch_jd: float | None = None
 
 
 class NightSummary(BaseModel):

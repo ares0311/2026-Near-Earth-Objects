@@ -3632,3 +3632,69 @@ class TestSummarizeSurveyFields:
         sys.path.insert(0, "src")
         import fetch
         assert "summarize_survey_fields" in fetch.__all__
+
+
+class TestCountObservationsByMission:
+    def _make_result(self, missions):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import FetchProvenance, FetchResult, Observation
+        obs_list = []
+        for i, m in enumerate(missions):
+            obs_list.append(Observation(
+                obs_id=f"o{i}", ra_deg=10.0, dec_deg=5.0, jd=2460000.0 + i,
+                mag=18.0, mag_err=0.1, filter_band="r", mission=m,
+            ))
+        prov = FetchProvenance(surveys=list(set(missions)), start_jd=2460000.0,
+                               end_jd=2460001.0, n_alerts=len(missions), cached=False)
+        return FetchResult(alerts=obs_list, provenance=prov)
+
+    def test_single_mission(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import count_observations_by_mission
+        result = self._make_result(["ZTF", "ZTF", "ZTF"])
+        counts = count_observations_by_mission(result)
+        assert counts == {"ZTF": 3}
+
+    def test_multiple_missions(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import count_observations_by_mission
+        result = self._make_result(["ZTF", "ATLAS", "ZTF", "MPC"])
+        counts = count_observations_by_mission(result)
+        assert counts["ZTF"] == 2
+        assert counts["ATLAS"] == 1
+        assert counts["MPC"] == 1
+
+    def test_empty_result_returns_empty_dict(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import count_observations_by_mission
+        from schemas import FetchProvenance, FetchResult
+        prov = FetchProvenance(surveys=[], start_jd=2460000.0, end_jd=2460001.0,
+                               n_alerts=0, cached=False)
+        result = FetchResult(alerts=[], provenance=prov)
+        assert count_observations_by_mission(result) == {}
+
+    def test_returns_dict_type(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import count_observations_by_mission
+        result = self._make_result(["ZTF"])
+        assert isinstance(count_observations_by_mission(result), dict)
+
+    def test_all_missions_counted(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import count_observations_by_mission
+        missions = ["ZTF", "ATLAS", "PanSTARRS", "CSS", "MPC"]
+        result = self._make_result(missions)
+        counts = count_observations_by_mission(result)
+        assert sum(counts.values()) == len(missions)
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+        assert "count_observations_by_mission" in fetch.__all__

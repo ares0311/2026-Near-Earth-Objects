@@ -2026,3 +2026,78 @@ class TestComputeElongationAngle:
         sys.path.insert(0, "src")
         import preprocess
         assert "compute_elongation_angle" in preprocess.__all__
+
+
+class TestComputeCutoutNoise:
+    def _make_b64(self, arr):
+        import base64
+
+        import numpy as np
+        return base64.b64encode(arr.astype(np.float32).tobytes()).decode()
+
+    def test_uniform_array_zero_noise(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        import numpy as np
+
+        from preprocess import compute_cutout_noise
+        arr = np.ones((63, 63), dtype=np.float32)
+        obs = SimpleNamespace(cutout_difference=self._make_b64(arr))
+        result = compute_cutout_noise(obs)
+        assert result is not None
+        assert abs(result) < 1e-5
+
+    def test_noisy_border_returns_nonzero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        import numpy as np
+
+        from preprocess import compute_cutout_noise
+        rng = np.random.default_rng(42)
+        arr = rng.normal(0.0, 1.0, (63, 63)).astype(np.float32)
+        obs = SimpleNamespace(cutout_difference=self._make_b64(arr))
+        result = compute_cutout_noise(obs)
+        assert result is not None
+        assert result > 0.0
+
+    def test_no_cutout_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_cutout_noise
+        assert compute_cutout_noise(SimpleNamespace(cutout_difference=None)) is None
+
+    def test_invalid_base64_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_cutout_noise
+        obs = SimpleNamespace(cutout_difference="NOT_VALID_BASE64!!!")
+        assert compute_cutout_noise(obs) is None
+
+    def test_returns_float(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        import numpy as np
+
+        from preprocess import compute_cutout_noise
+        arr = np.zeros((63, 63), dtype=np.float32)
+        arr[0, :] = 1.0
+        obs = SimpleNamespace(cutout_difference=self._make_b64(arr))
+        result = compute_cutout_noise(obs)
+        assert result is not None
+        assert isinstance(result, float)
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import preprocess
+        assert "compute_cutout_noise" in preprocess.__all__

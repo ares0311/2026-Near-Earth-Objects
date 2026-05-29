@@ -20,7 +20,8 @@ __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fet
            "fetch_known_phas",
            "fetch_mpc_neo_counts",
            "fetch_horizons_ephemeris",
-           "summarize_survey_fields"]
+           "summarize_survey_fields",
+           "count_observations_by_mission"]
 
 import json
 import os
@@ -1764,3 +1765,23 @@ def summarize_survey_fields(result: FetchResult) -> list[dict]:
             "n_observations": len(obs_list),
         })
     return rows
+
+
+def count_observations_by_mission(fetch_result: FetchResult) -> dict[str, int]:
+    """Return a dict mapping mission name to observation count.
+
+    Iterates over ``fetch_result.alerts``, groups by ``obs.mission`` (string),
+    and returns the count per mission.  Returns an empty dict for an empty
+    ``FetchResult``.
+
+    Args:
+        fetch_result: :class:`~schemas.FetchResult` object.
+
+    Returns:
+        Dict mapping mission name (str) to count (int).
+    """
+    counts: dict[str, int] = {}
+    for obs in fetch_result.alerts:
+        mission = str(getattr(obs, "mission", "unknown"))
+        counts[mission] = counts.get(mission, 0) + 1
+    return counts

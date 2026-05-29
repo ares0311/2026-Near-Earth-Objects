@@ -1998,3 +1998,53 @@ class TestComputeSizeScore:
         sys.path.insert(0, "src")
         import score
         assert "compute_size_score" in score.__all__
+
+
+class TestComputeOrbitUncertaintyScore:
+    def _make_neo(self, orbit_quality_score):
+        from types import SimpleNamespace
+        features = SimpleNamespace(orbit_quality_score=orbit_quality_score)
+        return SimpleNamespace(features=features)
+
+    def test_quality_1_gives_uncertainty_0(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_orbit_uncertainty_score
+        neo = self._make_neo(1.0)
+        assert compute_orbit_uncertainty_score(neo) == pytest.approx(0.0)
+
+    def test_quality_0_gives_uncertainty_1(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_orbit_uncertainty_score
+        neo = self._make_neo(0.0)
+        assert compute_orbit_uncertainty_score(neo) == pytest.approx(1.0)
+
+    def test_quality_half_gives_half(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_orbit_uncertainty_score
+        neo = self._make_neo(0.5)
+        assert compute_orbit_uncertainty_score(neo) == pytest.approx(0.5)
+
+    def test_none_quality_gives_sentinel(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_orbit_uncertainty_score
+        neo = self._make_neo(None)
+        assert compute_orbit_uncertainty_score(neo) == pytest.approx(0.5)
+
+    def test_result_clamped_to_range(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_orbit_uncertainty_score
+        for oq in [0.0, 0.25, 0.5, 0.75, 1.0]:
+            neo = self._make_neo(oq)
+            result = compute_orbit_uncertainty_score(neo)
+            assert 0.0 <= result <= 1.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        assert "compute_orbit_uncertainty_score" in score.__all__
