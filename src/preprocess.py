@@ -22,7 +22,8 @@ __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_
            "compute_background_gradient",
            "compute_elongation_angle",
            "compute_cutout_noise",
-           "flag_cosmic_rays"]
+           "flag_cosmic_rays",
+           "compute_fwhm_from_cutout"]
 
 import base64
 import math
@@ -1190,3 +1191,52 @@ def flag_cosmic_rays(observations: list, sigma_threshold: float = 5.0) -> list[s
         except Exception:
             continue
     return flagged
+
+
+def compute_fwhm_from_cutout(obs: object) -> float | None:
+    """Estimate PSF FWHM in arcsec from the difference-image cutout.
+
+    Decodes the base64 float32 63×63 difference-image cutout, sums pixel
+    values along axis 0 (row-summed marginal profile), then fits a 1D
+    Gaussian model of the form ``A*exp(-0.5*((x-mu)/sigma)^2) + B`` using
+    ``scipy.optimize.curve_fit``.  FWHM is computed as
+    ``2.355 * abs(sigma) * pixel_scale_arcsec`` where the ZTF plate scale of
+    ``1.01`` arcsec/pixel is assumed.
+
+    Args:
+        obs: Any object with an optional ``cutout_difference`` base64-encoded
+            float32 array attribute.
+
+    Returns:
+        FWHM in arcsec (float), or ``None`` if the cutout is absent, decoding
+        fails, or the Gaussian fit does not converge.
+    """
+    try:
+        import base64 as _b64
+
+        import numpy as np
+        from scipy.optimize import curve_fit
+
+        _PIXEL_SCALE = 1.01  # arcsec/pixel (ZTF)
+
+        cutout = getattr(obs, "cutout_difference", None)
+        if cutout is None:
+            return None
+        raw = _b64.b64decode(cutout)
+        arr = np.frombuffer(raw, dtype=np.float32).reshape(63, 63).astype(float)
+        profile = arr.sum(axis=0)
+        x = np.arange(len(profile), dtype=float)
+
+        def _gaussian(x: np.ndarray, A: float, mu: float, sigma: float, B: float) -> np.ndarray:
+            return A * np.exp(-0.5 * ((x - mu) / sigma) ** 2) + B
+
+        x_center = float(x[np.argmax(profile)])
+        A0 = float(profile.max() - profile.min())
+        B0 = float(profile.min())
+        p0 = [A0, x_center, 3.0, B0]
+        popt, _ = curve_fit(_gaussian, x, profile, p0=p0, maxfev=2000)
+        sigma = float(popt[2])
+        fwhm = 2.355 * abs(sigma) * _PIXEL_SCALE
+        return round(fwhm, 4)
+    except Exception:
+        return None

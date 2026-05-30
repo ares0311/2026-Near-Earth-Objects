@@ -2481,3 +2481,66 @@ class TestComputeNodalPrecessionRate:
         sys.path.insert(0, "src")
         import orbit
         assert "compute_nodal_precession_rate" in orbit.__all__
+
+
+class TestComputeVisVivaVelocity:
+    def _make_elements(self, a_au: float = 1.5, e: float = 0.3):
+        from types import SimpleNamespace
+        return SimpleNamespace(a_au=a_au, e=e)
+
+    def test_circular_orbit_at_1au(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_vis_viva_velocity
+        # Earth-like circular orbit: a=1, r=1 → v²=GM → v=2π AU/yr
+        el = self._make_elements(a_au=1.0, e=0.0)
+        result = compute_vis_viva_velocity(el, r_au=1.0)
+        assert result is not None
+        # 2π AU/yr * 4.74047 km/s per AU/yr ≈ 29.78 km/s
+        assert abs(result - 29.7847) < 0.5
+
+    def test_none_on_missing_a(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_vis_viva_velocity
+        el = SimpleNamespace(e=0.3)
+        assert compute_vis_viva_velocity(el, r_au=1.0) is None
+
+    def test_none_on_missing_e(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_vis_viva_velocity
+        el = SimpleNamespace(a_au=1.5)
+        assert compute_vis_viva_velocity(el, r_au=1.0) is None
+
+    def test_none_on_nonpositive_a(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_vis_viva_velocity
+        el = self._make_elements(a_au=0.0)
+        assert compute_vis_viva_velocity(el, r_au=1.0) is None
+
+    def test_none_on_nonpositive_r(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_vis_viva_velocity
+        el = self._make_elements(a_au=1.5)
+        assert compute_vis_viva_velocity(el, r_au=0.0) is None
+
+    def test_none_on_negative_v2(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_vis_viva_velocity
+        # r >> 2a → 2/r - 1/a < 0
+        el = self._make_elements(a_au=1.0, e=0.0)
+        assert compute_vis_viva_velocity(el, r_au=100.0) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import orbit
+        assert "compute_vis_viva_velocity" in orbit.__all__

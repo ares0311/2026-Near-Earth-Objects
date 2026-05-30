@@ -2187,3 +2187,84 @@ class TestFlagCosmicRays:
         sys.path.insert(0, "src")
         import preprocess
         assert "flag_cosmic_rays" in preprocess.__all__
+
+
+class TestComputeFwhmFromCutout:
+    def _make_gaussian_cutout(self, sigma: float = 3.0) -> str:
+        import base64
+
+        import numpy as np
+        arr = np.zeros((63, 63), dtype=np.float32)
+        cx, cy = 31, 31
+        for i in range(63):
+            for j in range(63):
+                r2 = ((i - cy) / sigma) ** 2 + ((j - cx) / sigma) ** 2
+                arr[i, j] = float(np.exp(-0.5 * r2))
+        return base64.b64encode(arr.tobytes()).decode()
+
+    def test_no_cutout_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_fwhm_from_cutout
+        obs = SimpleNamespace(cutout_difference=None)
+        assert compute_fwhm_from_cutout(obs) is None
+
+    def test_bad_base64_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_fwhm_from_cutout
+        obs = SimpleNamespace(cutout_difference="not!!valid!!base64")
+        result = compute_fwhm_from_cutout(obs)
+        assert result is None
+
+    def test_gaussian_cutout_returns_float(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_fwhm_from_cutout
+        obs = SimpleNamespace(cutout_difference=self._make_gaussian_cutout(sigma=4.0))
+        result = compute_fwhm_from_cutout(obs)
+        assert result is not None
+        assert isinstance(result, float)
+        assert result > 0.0
+
+    def test_fwhm_scales_with_sigma(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_fwhm_from_cutout
+        narrow = SimpleNamespace(cutout_difference=self._make_gaussian_cutout(sigma=2.0))
+        wide = SimpleNamespace(cutout_difference=self._make_gaussian_cutout(sigma=6.0))
+        fwhm_narrow = compute_fwhm_from_cutout(narrow)
+        fwhm_wide = compute_fwhm_from_cutout(wide)
+        assert fwhm_narrow is not None
+        assert fwhm_wide is not None
+        assert fwhm_narrow < fwhm_wide
+
+    def test_wrong_size_cutout_returns_none(self):
+        import base64
+        import sys
+
+        import numpy as np
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_fwhm_from_cutout
+        # Wrong number of elements — reshape fails → None
+        arr = np.zeros(10, dtype=np.float32)
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        obs = SimpleNamespace(cutout_difference=b64)
+        result = compute_fwhm_from_cutout(obs)
+        assert result is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import preprocess
+        assert "compute_fwhm_from_cutout" in preprocess.__all__

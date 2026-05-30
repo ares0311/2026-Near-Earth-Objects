@@ -41,6 +41,7 @@ __all__ = [
     "compute_known_object_probability",
     "compute_stellar_artifact_score_from_features",
     "compute_posterior_from_scores",
+    "compute_classification_confidence",
 ]
 
 import base64
@@ -1894,3 +1895,33 @@ def compute_posterior_from_scores(
         stellar_artifact=round(w_art / total, 8),
         other_solar_system=round(w_other / total, 8),
     )
+
+
+def compute_classification_confidence(posterior: object) -> float:
+    """Return the margin between the top-1 and top-2 posterior probabilities.
+
+    Extracts the five class probabilities from a :class:`~schemas.NEOPosterior`
+    (``neo_candidate``, ``known_object``, ``main_belt_asteroid``,
+    ``stellar_artifact``, ``other_solar_system``), sorts them in descending
+    order, and returns the difference between the highest and second-highest
+    probability.  Returns ``0.0`` when all probabilities are equal or when
+    fewer than two distinct values exist.
+
+    Args:
+        posterior: :class:`~schemas.NEOPosterior` or any object with the five
+            class-probability attributes.
+
+    Returns:
+        Confidence margin in [0, 1].
+    """
+    fields = [
+        "neo_candidate",
+        "known_object",
+        "main_belt_asteroid",
+        "stellar_artifact",
+        "other_solar_system",
+    ]
+    probs = sorted(
+        [float(getattr(posterior, f, 0.0) or 0.0) for f in fields], reverse=True
+    )
+    return round(float(max(0.0, probs[0] - probs[1])), 6)

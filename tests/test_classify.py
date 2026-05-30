@@ -2674,3 +2674,90 @@ class TestComputePosteriorFromScores:
         sys.path.insert(0, "src")
         import classify
         assert "compute_posterior_from_scores" in classify.__all__
+
+
+class TestComputeClassificationConfidence:
+    def _make_posterior(self, probs: dict):
+        from types import SimpleNamespace
+        return SimpleNamespace(**probs)
+
+    def test_clear_winner_returns_margin(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_classification_confidence
+        # neo_candidate=0.8, others=0.05 → margin = 0.8 - 0.05 = 0.75
+        post = self._make_posterior({
+            "neo_candidate": 0.8,
+            "known_object": 0.05,
+            "main_belt_asteroid": 0.05,
+            "stellar_artifact": 0.05,
+            "other_solar_system": 0.05,
+        })
+        result = compute_classification_confidence(post)
+        assert abs(result - 0.75) < 1e-5
+
+    def test_uniform_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_classification_confidence
+        post = self._make_posterior({
+            "neo_candidate": 0.2,
+            "known_object": 0.2,
+            "main_belt_asteroid": 0.2,
+            "stellar_artifact": 0.2,
+            "other_solar_system": 0.2,
+        })
+        result = compute_classification_confidence(post)
+        assert result == 0.0
+
+    def test_result_in_zero_one(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_classification_confidence
+        post = self._make_posterior({
+            "neo_candidate": 0.9,
+            "known_object": 0.1,
+            "main_belt_asteroid": 0.0,
+            "stellar_artifact": 0.0,
+            "other_solar_system": 0.0,
+        })
+        result = compute_classification_confidence(post)
+        assert 0.0 <= result <= 1.0
+
+    def test_uses_neo_posterior_fields(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_classification_confidence
+        from schemas import NEOPosterior
+        post = NEOPosterior(
+            neo_candidate=0.6,
+            known_object=0.2,
+            main_belt_asteroid=0.1,
+            stellar_artifact=0.05,
+            other_solar_system=0.05,
+        )
+        result = compute_classification_confidence(post)
+        assert abs(result - 0.4) < 1e-5
+
+    def test_missing_fields_default_to_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from classify import compute_classification_confidence
+        # Only neo_candidate is non-zero
+        post = SimpleNamespace(
+            neo_candidate=0.5,
+            known_object=0.0,
+            main_belt_asteroid=0.0,
+            stellar_artifact=0.0,
+            other_solar_system=0.0,
+        )
+        result = compute_classification_confidence(post)
+        assert result == 0.5
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import classify
+        assert "compute_classification_confidence" in classify.__all__

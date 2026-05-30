@@ -2263,3 +2263,62 @@ class TestCountAlertsByHazardFlag:
         sys.path.insert(0, "src")
         import alert
         assert "count_alerts_by_hazard_flag" in alert.__all__
+
+
+class TestGenerateMpcBatchHeader:
+    def _make_neo(self, object_id="T001", jds=None):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+        obs_list = []
+        for jd in (jds or [2460000.5, 2460001.5]):
+            obs_list.append(SimpleNamespace(jd=jd))
+        tracklet = SimpleNamespace(observations=obs_list)
+        return SimpleNamespace(tracklet=tracklet)
+
+    def test_basic_header_contains_n_candidates(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import generate_mpc_batch_header
+        neos = [self._make_neo()]
+        header = generate_mpc_batch_header(neos)
+        assert "N candidates: 1" in header
+
+    def test_contains_guardrail(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import generate_mpc_batch_header
+        neos = [self._make_neo()]
+        header = generate_mpc_batch_header(neos)
+        assert "NOT" in header
+
+    def test_epoch_range_from_observations(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import generate_mpc_batch_header
+        neos = [self._make_neo(jds=[2460000.5, 2460002.5])]
+        header = generate_mpc_batch_header(neos)
+        assert "2460000.5000" in header
+        assert "2460002.5000" in header
+
+    def test_empty_neos_gives_na_epoch(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import generate_mpc_batch_header
+        header = generate_mpc_batch_header([])
+        assert "N/A" in header
+        assert "N candidates: 0" in header
+
+    def test_custom_obs_code(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import generate_mpc_batch_header
+        neos = [self._make_neo()]
+        header = generate_mpc_batch_header(neos, obs_code="G96")
+        assert "G96" in header
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+        assert "generate_mpc_batch_header" in alert.__all__

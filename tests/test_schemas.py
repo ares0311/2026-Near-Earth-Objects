@@ -1670,3 +1670,66 @@ class TestTrackletBatch:
         sys.path.insert(0, "src")
         import schemas
         assert "TrackletBatch" in schemas.__all__
+
+
+class TestFieldObservation:
+    def test_basic_construction(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import FieldObservation
+        fo = FieldObservation(
+            field_id="f1", ra_deg=45.0, dec_deg=-10.0, epoch_jd=2460000.0, survey="ZTF"
+        )
+        assert fo.field_id == "f1"
+        assert fo.ra_deg == 45.0
+        assert fo.survey == "ZTF"
+
+    def test_defaults(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import FieldObservation
+        fo = FieldObservation(
+            field_id="f2", ra_deg=0.0, dec_deg=0.0, epoch_jd=2460001.0, survey="ATLAS"
+        )
+        assert fo.limiting_mag is None
+        assert fo.n_sources == 0
+        assert fo.filter_band is None
+
+    def test_with_optional_fields(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import FieldObservation
+        fo = FieldObservation(
+            field_id="f3", ra_deg=120.0, dec_deg=30.0, epoch_jd=2460002.0,
+            survey="PanSTARRS", limiting_mag=22.5, n_sources=150, filter_band="g"
+        )
+        assert fo.limiting_mag == 22.5
+        assert fo.n_sources == 150
+        assert fo.filter_band == "g"
+
+    def test_frozen(self):
+        import sys
+        sys.path.insert(0, "src")
+        import pytest
+
+        from schemas import FieldObservation
+        fo = FieldObservation(
+            field_id="f4", ra_deg=0.0, dec_deg=0.0, epoch_jd=2460000.0, survey="ZTF"
+        )
+        with pytest.raises(Exception):
+            fo.field_id = "changed"  # type: ignore[misc]
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        assert "FieldObservation" in schemas.__all__
+
+    def test_epoch_jd_stored(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import FieldObservation
+        fo = FieldObservation(
+            field_id="f5", ra_deg=200.0, dec_deg=-30.0, epoch_jd=2460999.5, survey="CSS"
+        )
+        assert fo.epoch_jd == 2460999.5

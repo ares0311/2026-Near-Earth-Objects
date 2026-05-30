@@ -41,6 +41,7 @@ __all__ = [
     "format_mpc_ades_header",
     "generate_followup_priority_list",
     "count_alerts_by_hazard_flag",
+    "generate_mpc_batch_header",
 ]
 
 import json
@@ -1754,3 +1755,49 @@ def count_alerts_by_hazard_flag(neos: list) -> dict[str, int]:
         flag = getattr(getattr(neo, "hazard", None), "hazard_flag", "unknown")
         counts[flag] = counts.get(flag, 0) + 1
     return counts
+
+
+def generate_mpc_batch_header(neos: list, obs_code: str = "500") -> str:
+    """Return a plain-text MPC batch submission header string.
+
+    Collects the Julian Dates of all observations across all tracklets in
+    *neos* to compute the epoch range.  If no observations are found, the
+    epoch range is reported as ``N/A``.
+
+    The header format is::
+
+        # MPC Batch Submission
+        # Observatory: {obs_code}
+        # N candidates: {len(neos)}
+        # Epoch range: {min_jd:.4f} -- {max_jd:.4f}
+        # NOTE: These are NOT confirmed detections. Independent confirmation required.
+
+    Args:
+        neos: List of :class:`~schemas.ScoredNEO` objects.
+        obs_code: MPC observatory code string (default ``"500"`` for geocentre).
+
+    Returns:
+        Formatted multi-line header string.
+    """
+    all_jds: list[float] = []
+    for neo in neos:
+        tracklet = getattr(neo, "tracklet", None)
+        observations = getattr(tracklet, "observations", None) or []
+        for obs in observations:
+            jd = getattr(obs, "jd", None)
+            if jd is not None:
+                all_jds.append(float(jd))
+
+    if all_jds:
+        epoch_range = f"{min(all_jds):.4f} -- {max(all_jds):.4f}"
+    else:
+        epoch_range = "N/A"
+
+    lines = [
+        "# MPC Batch Submission",
+        f"# Observatory: {obs_code}",
+        f"# N candidates: {len(neos)}",
+        f"# Epoch range: {epoch_range}",
+        "# NOTE: These are NOT confirmed detections. Independent confirmation required.",
+    ]
+    return "\n".join(lines)

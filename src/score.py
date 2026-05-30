@@ -25,7 +25,8 @@ __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "compute_size_score",
            "compute_orbit_uncertainty_score",
            "compute_detection_completeness_score",
-           "compute_combined_hazard_score"]
+           "compute_combined_hazard_score",
+           "compute_priority_weighted_moid"]
 
 import math
 import uuid
@@ -1276,3 +1277,42 @@ def compute_combined_hazard_score(neo: ScoredNEO) -> float:
     orb = float(_orb) if _orb is not None else 0.0
     score = 0.4 * moid + 0.3 * pha + 0.3 * orb
     return round(float(min(1.0, max(0.0, score))), 4)
+
+
+def compute_priority_weighted_moid(neos: list) -> float | None:
+    """Return the discovery-priority-weighted mean MOID in AU.
+
+    Iterates over *neos*, skipping any candidate whose MOID is ``None`` or
+    whose ``discovery_priority`` is zero or ``None``.  Computes the weighted
+    mean as:
+
+    .. math::
+
+        \\bar{d} = \\frac{\\sum_i p_i \\cdot d_i}{\\sum_i p_i}
+
+    where :math:`p_i` is the ``discovery_priority`` and :math:`d_i` is
+    ``moid_au`` for candidate *i*.
+
+    Returns ``None`` when no valid candidates remain after filtering.
+
+    Args:
+        neos: List of :class:`~schemas.ScoredNEO` objects.
+
+    Returns:
+        Weighted mean MOID in AU (float), or ``None`` if no valid candidates.
+    """
+    weighted_sum = 0.0
+    total_weight = 0.0
+    for neo in neos:
+        moid_au = getattr(getattr(neo, "hazard", None), "moid_au", None)
+        metadata = getattr(neo, "metadata", None)
+        priority = getattr(metadata, "discovery_priority", None)
+        if moid_au is None:
+            continue
+        if priority is None or float(priority) == 0.0:
+            continue
+        weighted_sum += float(priority) * float(moid_au)
+        total_weight += float(priority)
+    if total_weight == 0.0:
+        return None
+    return float(weighted_sum / total_weight)

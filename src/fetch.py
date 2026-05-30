@@ -23,7 +23,8 @@ __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fet
            "summarize_survey_fields",
            "count_observations_by_mission",
            "build_fetch_provenance",
-           "get_fetch_result_age"]
+           "get_fetch_result_age",
+           "deduplicate_observations"]
 
 import json
 import os
@@ -1863,3 +1864,29 @@ def get_fetch_result_age(fetch_result: FetchResult) -> float | None:
     earliest_jd = min(obs.jd for obs in fetch_result.alerts)
     current_jd = Time.now().jd
     return float(current_jd - earliest_jd)
+
+
+def deduplicate_observations(observations: object) -> list:
+    """Remove duplicate observations by ``obs_id``, keeping first occurrence.
+
+    Iterates over *observations* (any iterable of objects with an ``obs_id``
+    attribute) and returns a new list containing only the first occurrence of
+    each unique ``obs_id``.  Objects whose ``obs_id`` attribute is missing or
+    ``None`` are treated as having a unique sentinel id and are always kept.
+
+    Args:
+        observations: Any iterable of observation-like objects with an
+            ``obs_id`` attribute.
+
+    Returns:
+        List of deduplicated observations in their original order.
+    """
+    seen: set[object] = set()
+    result: list = []
+    for obs in observations:  # type: ignore[attr-defined]
+        obs_id = getattr(obs, "obs_id", None)
+        if obs_id is None or obs_id not in seen:
+            if obs_id is not None:
+                seen.add(obs_id)
+            result.append(obs)
+    return result

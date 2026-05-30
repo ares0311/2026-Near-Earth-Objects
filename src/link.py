@@ -24,7 +24,8 @@ __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "compute_tracklet_density",
            "compute_position_residuals",
            "compute_inter_observation_gaps",
-           "compute_tracklet_overlap_fraction"]
+           "compute_tracklet_overlap_fraction",
+           "compute_velocity_dispersion"]
 
 import math
 import uuid
@@ -1340,3 +1341,26 @@ def compute_tracklet_overlap_fraction(t1: Tracklet, t2: Tracklet) -> float:
     shared = ids1 & ids2
     smaller = min(len(ids1), len(ids2))
     return float(len(shared)) / float(smaller)
+
+
+def compute_velocity_dispersion(tracklets: list) -> float:
+    """Return the standard deviation of motion rates across tracklets.
+
+    Computes the population standard deviation of
+    ``motion_rate_arcsec_per_hour`` over all supplied tracklets.  Returns
+    ``0.0`` when fewer than 2 tracklets are provided or when all tracklets
+    share the same motion rate.
+
+    Args:
+        tracklets: List of :class:`~schemas.Tracklet` objects (or any objects
+            with a ``motion_rate_arcsec_per_hour`` attribute).
+
+    Returns:
+        Standard deviation of motion rates in arcsec/hour (float ≥ 0).
+    """
+    rates = [float(getattr(t, "motion_rate_arcsec_per_hour", 0.0)) for t in tracklets]
+    if len(rates) < 2:
+        return 0.0
+    mean = sum(rates) / len(rates)
+    variance = sum((r - mean) ** 2 for r in rates) / len(rates)
+    return float(math.sqrt(variance))

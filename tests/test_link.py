@@ -2562,3 +2562,51 @@ class TestComputeTrackletOverlapFraction:
         sys.path.insert(0, "src")
         import link
         assert "compute_tracklet_overlap_fraction" in link.__all__
+
+
+class TestComputeVelocityDispersion:
+    def _make_tracklet(self, rate: float) -> "Tracklet":
+        from types import SimpleNamespace
+        return SimpleNamespace(motion_rate_arcsec_per_hour=rate)
+
+    def test_empty_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_velocity_dispersion
+        assert compute_velocity_dispersion([]) == 0.0
+
+    def test_single_tracklet_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_velocity_dispersion
+        assert compute_velocity_dispersion([self._make_tracklet(5.0)]) == 0.0
+
+    def test_identical_rates_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_velocity_dispersion
+        tracklets = [self._make_tracklet(3.0) for _ in range(5)]
+        assert compute_velocity_dispersion(tracklets) == 0.0
+
+    def test_different_rates_returns_positive(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_velocity_dispersion
+        tracklets = [self._make_tracklet(r) for r in [1.0, 3.0, 5.0, 7.0]]
+        result = compute_velocity_dispersion(tracklets)
+        assert result > 0.0
+
+    def test_known_dispersion(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_velocity_dispersion
+        # rates: 0, 2 → mean=1, var=1, std=1
+        tracklets = [self._make_tracklet(0.0), self._make_tracklet(2.0)]
+        result = compute_velocity_dispersion(tracklets)
+        assert abs(result - 1.0) < 1e-9
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+        assert "compute_velocity_dispersion" in link.__all__

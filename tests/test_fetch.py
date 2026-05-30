@@ -3831,3 +3831,65 @@ class TestGetFetchResultAge:
         sys.path.insert(0, "src")
         import fetch
         assert "get_fetch_result_age" in fetch.__all__
+
+
+class TestDeduplicateObservations:
+    def _make_obs(self, obs_id: str):
+        from types import SimpleNamespace
+        return SimpleNamespace(obs_id=obs_id, jd=2460000.0)
+
+    def test_empty_input(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import deduplicate_observations
+        result = deduplicate_observations([])
+        assert result == []
+
+    def test_no_duplicates(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import deduplicate_observations
+        obs = [self._make_obs("a"), self._make_obs("b"), self._make_obs("c")]
+        result = deduplicate_observations(obs)
+        assert len(result) == 3
+
+    def test_duplicates_removed(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import deduplicate_observations
+        obs = [self._make_obs("a"), self._make_obs("b"), self._make_obs("a")]
+        result = deduplicate_observations(obs)
+        assert len(result) == 2
+        assert result[0].obs_id == "a"
+        assert result[1].obs_id == "b"
+
+    def test_keeps_first_occurrence(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from fetch import deduplicate_observations
+        obs1 = SimpleNamespace(obs_id="x", value=1)
+        obs2 = SimpleNamespace(obs_id="x", value=2)
+        result = deduplicate_observations([obs1, obs2])
+        assert len(result) == 1
+        assert result[0].value == 1
+
+    def test_none_obs_id_always_kept(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from fetch import deduplicate_observations
+        obs = [
+            SimpleNamespace(obs_id=None),
+            SimpleNamespace(obs_id=None),
+        ]
+        result = deduplicate_observations(obs)
+        assert len(result) == 2
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+        assert "deduplicate_observations" in fetch.__all__

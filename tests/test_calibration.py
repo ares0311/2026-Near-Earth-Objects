@@ -1571,3 +1571,52 @@ class TestComputeBrierSkillScoreWeighted:
         sys.path.insert(0, "src")
         import calibration
         assert "compute_brier_skill_score_weighted" in calibration.__all__
+
+
+class TestComputeIsotonicCalibrationError:
+    def test_perfect_calibration_gives_low_error(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_isotonic_calibration_error
+        probs = [0.1, 0.3, 0.5, 0.7, 0.9]
+        labels = [0, 0, 1, 1, 1]
+        result = compute_isotonic_calibration_error(probs, labels)
+        assert isinstance(result, float)
+        assert result >= 0.0
+
+    def test_empty_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_isotonic_calibration_error
+        assert compute_isotonic_calibration_error([], []) == 0.0
+
+    def test_single_sample_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_isotonic_calibration_error
+        assert compute_isotonic_calibration_error([0.5], [1]) == 0.0
+
+    def test_all_positive_labels(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_isotonic_calibration_error
+        probs = [0.2, 0.4, 0.6, 0.8]
+        labels = [1, 1, 1, 1]
+        result = compute_isotonic_calibration_error(probs, labels)
+        assert isinstance(result, float)
+        assert result >= 0.0
+
+    def test_returns_float(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_isotonic_calibration_error
+        probs = [0.1, 0.5, 0.9]
+        labels = [0, 1, 1]
+        result = compute_isotonic_calibration_error(probs, labels)
+        assert isinstance(result, float)
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        assert "compute_isotonic_calibration_error" in calibration.__all__
