@@ -22,7 +22,8 @@ __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fet
            "fetch_horizons_ephemeris",
            "summarize_survey_fields",
            "count_observations_by_mission",
-           "build_fetch_provenance"]
+           "build_fetch_provenance",
+           "get_fetch_result_age"]
 
 import json
 import os
