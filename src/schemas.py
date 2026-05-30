@@ -33,6 +33,7 @@ __all__ = [
     "ObservationCluster",
     "SurveyRun",
     "CandidateCluster",
+    "PipelineRunSummary",
 ]
 
 from dataclasses import dataclass
@@ -1048,3 +1049,31 @@ class CandidateCluster(BaseModel):
     n_candidates: int
     candidate_ids: tuple[str, ...]
     mean_priority: float = 0.0
+
+
+class PipelineRunSummary(BaseModel):
+    """High-level summary of a single pipeline run for reporting and auditing.
+
+    Aggregates the key headline numbers from a complete pipeline execution
+    into a single frozen model suitable for dashboards, logs, and operator
+    review.
+
+    Attributes:
+        run_id: Unique identifier for this pipeline run.
+        epoch_jd: Julian Date of the observation epoch.
+        n_tracklets: Total number of linked tracklets produced.
+        n_pha_candidates: Number of PHA-candidate tracklets.
+        n_new_candidates: Number of candidates not matched to known objects.
+        top_priority: Highest discovery_priority score among all candidates.
+        alert_pathways: Tuple of distinct alert pathway values seen this run.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    run_id: str
+    epoch_jd: float
+    n_tracklets: int = 0
+    n_pha_candidates: int = 0
+    n_new_candidates: int = 0
+    top_priority: float = 0.0
+    alert_pathways: tuple[str, ...] = ()

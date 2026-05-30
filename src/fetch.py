@@ -21,7 +21,8 @@ __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fet
            "fetch_mpc_neo_counts",
            "fetch_horizons_ephemeris",
            "summarize_survey_fields",
-           "count_observations_by_mission"]
+           "count_observations_by_mission",
+           "build_fetch_provenance"]
 
 import json
 import os
@@ -1765,6 +1766,60 @@ def summarize_survey_fields(result: FetchResult) -> list[dict]:
             "n_observations": len(obs_list),
         })
     return rows
+
+
+def build_fetch_provenance(
+    alerts: list | tuple,
+    survey: str,
+    start_jd: float,
+    end_jd: float,
+    *,
+    search_ra_deg: float | None = None,
+    search_dec_deg: float | None = None,
+    search_radius_deg: float | None = None,
+    limiting_magnitude: float | None = None,
+    fetched_at_jd: float = 0.0,
+    cached: bool = False,
+) -> FetchProvenance:
+    """Construct a :class:`~schemas.FetchProvenance` from the given parameters.
+
+    This is a convenience factory that collects fetch-stage metadata into a
+    single immutable provenance object.  The ``survey`` string is normalised
+    to the canonical ``Mission`` literals where possible.
+
+    Args:
+        alerts: List or tuple of :class:`~schemas.Observation` objects returned
+            by the fetch stage (used only for consistency; not stored directly).
+        survey: Survey name string (e.g. ``"ZTF"``, ``"ATLAS"``).
+        start_jd: Start of the search window as a Julian Date.
+        end_jd: End of the search window as a Julian Date.
+        search_ra_deg: Right ascension of the search centre in degrees; None if
+            not applicable.
+        search_dec_deg: Declination of the search centre in degrees; None if not
+            applicable.
+        search_radius_deg: Search cone radius in degrees; None if not applicable.
+        limiting_magnitude: Estimated 5-sigma limiting magnitude; None if
+            unknown.
+        fetched_at_jd: Julian Date at which the fetch was performed (default 0).
+        cached: Whether the result was loaded from a local disk cache.
+
+    Returns:
+        :class:`~schemas.FetchProvenance` capturing all provided metadata.
+    """
+    _KNOWN_MISSIONS = {"ZTF", "ATLAS", "PanSTARRS", "CSS", "MPC"}
+    normalised = survey if survey in _KNOWN_MISSIONS else "ZTF"
+    mission: Mission = normalised  # type: ignore[assignment]
+    return FetchProvenance(
+        surveys=(mission,),
+        start_jd=start_jd,
+        end_jd=end_jd,
+        search_ra_deg=search_ra_deg,
+        search_dec_deg=search_dec_deg,
+        search_radius_deg=search_radius_deg,
+        limiting_magnitude=limiting_magnitude,
+        fetched_at_jd=fetched_at_jd,
+        cached=cached,
+    )
 
 
 def count_observations_by_mission(fetch_result: FetchResult) -> dict[str, int]:
