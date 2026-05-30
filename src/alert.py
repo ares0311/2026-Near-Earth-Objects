@@ -40,6 +40,7 @@ __all__ = [
     "compute_alert_priority_score",
     "format_mpc_ades_header",
     "generate_followup_priority_list",
+    "count_alerts_by_hazard_flag",
 ]
 
 import json
@@ -1733,3 +1734,23 @@ def _compute_urgency(neo: Any) -> str:
     if priority >= 0.7:
         return "MEDIUM"
     return "ROUTINE"
+
+
+def count_alerts_by_hazard_flag(neos: list) -> dict[str, int]:
+    """Count scored NEO candidates grouped by their hazard flag.
+
+    Provides a quick tally of how many candidates fall into each hazard
+    category, useful for operations dashboards and run summaries.
+
+    Args:
+        neos: List of :class:`~schemas.ScoredNEO` objects.
+
+    Returns:
+        Dict mapping each ``hazard_flag`` string to its count.  Only flags
+        with at least one candidate are included (zero counts are excluded).
+    """
+    counts: dict[str, int] = {}
+    for neo in neos:
+        flag = getattr(getattr(neo, "hazard", None), "hazard_flag", "unknown")
+        counts[flag] = counts.get(flag, 0) + 1
+    return counts

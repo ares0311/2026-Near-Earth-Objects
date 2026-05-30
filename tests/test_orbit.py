@@ -2343,3 +2343,58 @@ class TestComputePerihelionDistanceAuAttrs:
         from orbit import compute_perihelion_distance
         el = SimpleNamespace(a_au=1.5, e=None)
         assert compute_perihelion_distance(el) is None
+
+
+class TestComputeSemiLatusRectum:
+    def _el(self, a, e):
+        from types import SimpleNamespace
+        return SimpleNamespace(a_au=a, e=e)
+
+    def test_circular_orbit(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_semi_latus_rectum
+        result = compute_semi_latus_rectum(self._el(1.0, 0.0))
+        assert result == pytest.approx(1.0)
+
+    def test_non_circular_orbit(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_semi_latus_rectum
+        # a=2.0, e=0.5 → p = 2.0 * (1 - 0.25) = 1.5
+        result = compute_semi_latus_rectum(self._el(2.0, 0.5))
+        assert result == pytest.approx(1.5, rel=1e-5)
+
+    def test_a_none_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_semi_latus_rectum
+        result = compute_semi_latus_rectum(self._el(None, 0.3))
+        assert result is None
+
+    def test_e_none_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_semi_latus_rectum
+        result = compute_semi_latus_rectum(self._el(1.5, None))
+        assert result is None
+
+    def test_a_zero_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_semi_latus_rectum
+        result = compute_semi_latus_rectum(self._el(0.0, 0.3))
+        assert result is None
+
+    def test_a_negative_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_semi_latus_rectum
+        result = compute_semi_latus_rectum(self._el(-1.0, 0.3))
+        assert result is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import orbit
+        assert "compute_semi_latus_rectum" in orbit.__all__

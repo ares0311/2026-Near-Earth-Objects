@@ -22,7 +22,8 @@ __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "compute_great_circle_arc",
            "compute_arc_curvature",
            "compute_tracklet_density",
-           "compute_position_residuals"]
+           "compute_position_residuals",
+           "compute_inter_observation_gaps"]
 
 import math
 import uuid
@@ -1291,3 +1292,27 @@ def compute_position_residuals(tracklet: Tracklet) -> list[float]:
         return [float(r) for r in residuals]
     except Exception:
         return []
+
+
+def compute_inter_observation_gaps(tracklet: Tracklet) -> list[float]:
+    """Return the time gaps in hours between consecutive observations.
+
+    Sorts observations by Julian Date (ascending) and computes the difference
+    in hours between each successive pair.
+
+    Args:
+        tracklet: :class:`~schemas.Tracklet` object.
+
+    Returns:
+        List of time gaps in hours between consecutive observations, sorted by
+        observation JD.  Returns an empty list for tracklets with fewer than
+        2 observations.
+    """
+    obs_list = sorted(tracklet.observations, key=lambda o: o.jd)
+    if len(obs_list) < 2:
+        return []
+    gaps: list[float] = []
+    for i in range(len(obs_list) - 1):
+        gap_hours = (obs_list[i + 1].jd - obs_list[i].jd) * 24.0
+        gaps.append(float(gap_hours))
+    return gaps

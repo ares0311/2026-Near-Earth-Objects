@@ -2406,3 +2406,84 @@ class TestComputePositionResiduals:
         sys.path.insert(0, "src")
         import link
         assert "compute_position_residuals" in link.__all__
+
+
+class TestComputeInterObservationGaps:
+    def _make_tracklet(self, jds):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import Observation, Tracklet
+        obs = tuple(
+            Observation(
+                obs_id=f"g_{i}", ra_deg=10.0 + i * 0.001, dec_deg=5.0,
+                jd=jd, mag=18.0, mag_err=0.1, filter_band="r", mission="ZTF",
+            )
+            for i, jd in enumerate(jds)
+        )
+        return Tracklet(
+            object_id="T_GAP",
+            observations=obs,
+            arc_days=max(jds) - min(jds) if len(jds) > 1 else 0.0,
+            motion_rate_arcsec_per_hour=1.0,
+            motion_pa_degrees=90.0,
+        )
+
+    def test_two_observations_one_gap(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_inter_observation_gaps
+        t = self._make_tracklet([2460000.0, 2460001.0])
+        gaps = compute_inter_observation_gaps(t)
+        assert len(gaps) == 1
+        assert abs(gaps[0] - 24.0) < 1e-9
+
+    def test_three_observations_two_gaps(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_inter_observation_gaps
+        t = self._make_tracklet([2460000.0, 2460001.0, 2460002.0])
+        gaps = compute_inter_observation_gaps(t)
+        assert len(gaps) == 2
+        assert all(abs(g - 24.0) < 1e-9 for g in gaps)
+
+    def test_single_observation_returns_empty(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_inter_observation_gaps
+        from schemas import Observation, Tracklet
+        obs = (Observation(
+            obs_id="o1", ra_deg=10.0, dec_deg=5.0, jd=2460000.0,
+            mag=18.0, mag_err=0.1, filter_band="r", mission="ZTF",
+        ),)
+        t = Tracklet(
+            object_id="T_SINGLE",
+            observations=obs,
+            arc_days=0.0,
+            motion_rate_arcsec_per_hour=1.0,
+            motion_pa_degrees=0.0,
+        )
+        assert compute_inter_observation_gaps(t) == []
+
+    def test_unordered_observations_sorted(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_inter_observation_gaps
+        # Provide in reverse order; should still compute positive gaps
+        t = self._make_tracklet([2460002.0, 2460000.0])
+        gaps = compute_inter_observation_gaps(t)
+        assert len(gaps) == 1
+        assert gaps[0] > 0.0
+
+    def test_half_day_gap(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_inter_observation_gaps
+        t = self._make_tracklet([2460000.0, 2460000.5])
+        gaps = compute_inter_observation_gaps(t)
+        assert abs(gaps[0] - 12.0) < 1e-9
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+        assert "compute_inter_observation_gaps" in link.__all__

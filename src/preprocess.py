@@ -21,7 +21,8 @@ __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_
            "compute_cutout_sharpness",
            "compute_background_gradient",
            "compute_elongation_angle",
-           "compute_cutout_noise"]
+           "compute_cutout_noise",
+           "flag_cosmic_rays"]
 
 import base64
 import math
@@ -1143,3 +1144,49 @@ def compute_cutout_noise(obs: object) -> float | None:
         return float(np.std(border))
     except Exception:
         return None
+
+
+def flag_cosmic_rays(observations: list, sigma_threshold: float = 5.0) -> list[str]:
+    """Return obs_ids of observations likely contaminated by cosmic rays.
+
+    For each observation, decodes the base64 ``cutout_difference`` array
+    (63×63 float32), computes the median and Median Absolute Deviation (MAD)
+    of all pixels, and flags the observation if its peak pixel value exceeds
+    ``median + sigma_threshold * MAD``.
+
+    Observations without a ``cutout_difference`` attribute, or where decoding
+    fails, are silently skipped.
+
+    Args:
+        observations: List of observation objects with optional
+            ``cutout_difference`` base64 attributes.
+        sigma_threshold: Number of MAD units above median to flag (default 5.0).
+
+    Returns:
+        List of ``obs_id`` strings for flagged observations (possibly empty).
+    """
+    import base64
+
+    import numpy as np
+
+    flagged: list[str] = []
+    for obs in observations:
+        cutout = getattr(obs, "cutout_difference", None)
+        if cutout is None:
+            continue
+        try:
+            raw = base64.b64decode(cutout)
+            arr = np.frombuffer(raw, dtype=np.float32).reshape(63, 63).astype(float)
+            med = float(np.median(arr))
+            mad = float(np.median(np.abs(arr - med)))
+            spread = mad if mad > 0.0 else float(np.std(arr))
+            if spread == 0.0:
+                continue
+            threshold = med + sigma_threshold * spread
+            if float(arr.max()) > threshold:
+                obs_id = getattr(obs, "obs_id", None)
+                if obs_id is not None:
+                    flagged.append(str(obs_id))
+        except Exception:
+            continue
+    return flagged

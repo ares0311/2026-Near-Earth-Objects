@@ -39,6 +39,7 @@ __all__ = [
     "compute_main_belt_probability",
     "compute_comet_probability",
     "compute_known_object_probability",
+    "compute_stellar_artifact_score_from_features",
 ]
 
 import base64
@@ -1803,3 +1804,23 @@ def compute_known_object_probability(features: CandidateFeatures) -> float:
     exp_neo = math.exp(log_neo - max_log)
     denom = exp_ko + exp_neo
     return float(max(0.0, min(1.0, exp_ko / denom)))
+
+
+def compute_stellar_artifact_score_from_features(features: CandidateFeatures) -> float:
+    """Extract the stellar artifact score from a :class:`~schemas.CandidateFeatures` object.
+
+    Returns ``features.stellar_artifact_score`` as a float.  If the value is
+    ``None`` or the attribute is missing (e.g. due to a duck-typed input),
+    returns ``0.0``.
+
+    Args:
+        features: :class:`~schemas.CandidateFeatures` object (or any object
+            with an optional ``stellar_artifact_score`` attribute).
+
+    Returns:
+        Stellar artifact score in [0, 1], or ``0.0`` if unavailable.
+    """
+    v = getattr(features, "stellar_artifact_score", None)
+    if v is None:
+        return 0.0
+    return float(v)

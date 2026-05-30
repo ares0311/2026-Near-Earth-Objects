@@ -2202,3 +2202,64 @@ class TestGenerateFollowupPriorityList:
         sys.path.insert(0, "src")
         import alert
         assert "generate_followup_priority_list" in alert.__all__
+
+
+class TestCountAlertsByHazardFlag:
+    def _make_neo(self, hazard_flag):
+        import sys
+        sys.path.insert(0, "src")
+        from .conftest import build_scored_neo
+        return build_scored_neo(hazard_flag=hazard_flag)
+
+    def test_empty_list_returns_empty_dict(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import count_alerts_by_hazard_flag
+        assert count_alerts_by_hazard_flag([]) == {}
+
+    def test_single_candidate(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import count_alerts_by_hazard_flag
+        neos = [self._make_neo("pha_candidate")]
+        counts = count_alerts_by_hazard_flag(neos)
+        assert counts == {"pha_candidate": 1}
+
+    def test_multiple_same_flag(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import count_alerts_by_hazard_flag
+        neos = [self._make_neo("nominal")] * 3
+        counts = count_alerts_by_hazard_flag(neos)
+        assert counts["nominal"] == 3
+
+    def test_mixed_flags(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import count_alerts_by_hazard_flag
+        neos = [
+            self._make_neo("pha_candidate"),
+            self._make_neo("nominal"),
+            self._make_neo("nominal"),
+            self._make_neo("close_approach"),
+        ]
+        counts = count_alerts_by_hazard_flag(neos)
+        assert counts["pha_candidate"] == 1
+        assert counts["nominal"] == 2
+        assert counts["close_approach"] == 1
+
+    def test_zero_counts_excluded(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import count_alerts_by_hazard_flag
+        neos = [self._make_neo("pha_candidate")]
+        counts = count_alerts_by_hazard_flag(neos)
+        # Only pha_candidate should appear; no zero-count entries
+        for v in counts.values():
+            assert v > 0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+        assert "count_alerts_by_hazard_flag" in alert.__all__

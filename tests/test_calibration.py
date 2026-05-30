@@ -1511,3 +1511,63 @@ class TestComputeSpiegelhalterZ:
         sys.path.insert(0, "src")
         import calibration
         assert "compute_spiegelhalter_z" in calibration.__all__
+
+
+class TestComputeBrierSkillScoreWeighted:
+    def test_empty_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_brier_skill_score_weighted
+        assert compute_brier_skill_score_weighted([], [], []) == 0.0
+
+    def test_uniform_weights_matches_bss(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_brier_skill_score, compute_brier_skill_score_weighted
+        probs = [0.9, 0.1, 0.8, 0.2]
+        labels = [1, 0, 1, 0]
+        weights = [1.0, 1.0, 1.0, 1.0]
+        weighted = compute_brier_skill_score_weighted(probs, labels, weights)
+        unweighted = compute_brier_skill_score(probs, labels)
+        assert abs(weighted - unweighted) < 1e-5
+
+    def test_zero_weights_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_brier_skill_score_weighted
+        probs = [0.8, 0.2]
+        labels = [1, 0]
+        weights = [0.0, 0.0]
+        assert compute_brier_skill_score_weighted(probs, labels, weights) == 0.0
+
+    def test_single_class_labels_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_brier_skill_score_weighted
+        # All labels identical → bs_clim == 0 → return 0.0
+        probs = [0.5, 0.5, 0.5]
+        labels = [1, 1, 1]
+        assert compute_brier_skill_score_weighted(probs, labels) == 0.0
+
+    def test_none_weights_uses_uniform(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_brier_skill_score, compute_brier_skill_score_weighted
+        probs = [0.7, 0.3, 0.6]
+        labels = [1, 0, 1]
+        w_none = compute_brier_skill_score_weighted(probs, labels, None)
+        w_unif = compute_brier_skill_score(probs, labels)
+        assert abs(w_none - w_unif) < 1e-5
+
+    def test_returns_float(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_brier_skill_score_weighted
+        result = compute_brier_skill_score_weighted([0.9, 0.1], [1, 0], [2.0, 1.0])
+        assert isinstance(result, float)
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        assert "compute_brier_skill_score_weighted" in calibration.__all__

@@ -3698,3 +3698,65 @@ class TestCountObservationsByMission:
         sys.path.insert(0, "src")
         import fetch
         assert "count_observations_by_mission" in fetch.__all__
+
+
+class TestBuildFetchProvenance:
+    def _make_obs(self, obs_id="o1"):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import Observation
+        return Observation(
+            obs_id=obs_id, ra_deg=10.0, dec_deg=5.0, jd=2460000.0,
+            mag=18.0, mag_err=0.1, filter_band="r", mission="ZTF",
+        )
+
+    def test_basic_construction(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import build_fetch_provenance
+        alerts = [self._make_obs()]
+        prov = build_fetch_provenance(alerts, "ZTF", 2460000.0, 2460001.0)
+        assert prov.start_jd == 2460000.0
+        assert prov.end_jd == 2460001.0
+        assert "ZTF" in prov.surveys
+
+    def test_optional_fields(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import build_fetch_provenance
+        prov = build_fetch_provenance(
+            [], "ATLAS", 2460000.0, 2460001.0,
+            search_ra_deg=10.0, search_dec_deg=5.0,
+            search_radius_deg=1.0, limiting_magnitude=21.5,
+        )
+        assert prov.search_ra_deg == 10.0
+        assert prov.search_dec_deg == 5.0
+        assert prov.search_radius_deg == 1.0
+        assert prov.limiting_magnitude == 21.5
+
+    def test_unknown_survey_defaults_to_ztf(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import build_fetch_provenance
+        prov = build_fetch_provenance([], "UNKNOWN_SURVEY", 2460000.0, 2460001.0)
+        assert "ZTF" in prov.surveys
+
+    def test_cached_flag(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import build_fetch_provenance
+        prov = build_fetch_provenance([], "ZTF", 2460000.0, 2460001.0, cached=True)
+        assert prov.cached is True
+
+    def test_fetched_at_jd(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import build_fetch_provenance
+        prov = build_fetch_provenance([], "ZTF", 2460000.0, 2460001.0, fetched_at_jd=2460000.5)
+        assert prov.fetched_at_jd == 2460000.5
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+        assert "build_fetch_provenance" in fetch.__all__
