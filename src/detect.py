@@ -20,7 +20,8 @@ __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus"
            "compute_elongation_ratio",
            "compute_detection_significance",
            "compute_sky_plane_velocity",
-           "compute_detection_rate"]
+           "compute_detection_rate",
+           "compute_source_compactness"]
 
 import math
 import uuid
@@ -1185,3 +1186,38 @@ def compute_detection_rate(
         # clamp last edge to last bin
         occupied.add(min(bin_idx, n_bins - 1))
     return float(len(occupied)) / float(n_bins)
+
+
+def compute_source_compactness(obs: object) -> float | None:
+    """Return the peak-to-total flux ratio from the difference-image cutout.
+
+    Compactness is defined as the ratio of the peak pixel value to the sum of
+    all pixel values in the 63×63 float32 difference-image cutout.  A value
+    near 1 indicates a point-like source; lower values indicate extended
+    emission.  Returns ``None`` when no cutout is available, base64 decoding
+    fails, or the total flux is ≤ 0.
+
+    Args:
+        obs: Any object with an optional ``cutout_difference`` base64-encoded
+            float32 array attribute.
+
+    Returns:
+        Compactness index in [0, 1], or ``None``.
+    """
+    try:
+        import base64
+
+        import numpy as np
+
+        cutout = getattr(obs, "cutout_difference", None)
+        if cutout is None:
+            return None
+        raw = base64.b64decode(cutout)
+        arr = np.frombuffer(raw, dtype=np.float32).reshape(63, 63).astype(float)
+        total = float(arr.sum())
+        if total <= 0.0:
+            return None
+        peak = float(arr.max())
+        return round(float(min(1.0, max(0.0, peak / total))), 6)
+    except Exception:
+        return None
