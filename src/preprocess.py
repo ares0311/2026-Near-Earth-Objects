@@ -1240,4 +1240,3 @@ def compute_fwhm_from_cutout(obs: object) -> float | None:
         return round(fwhm, 4)
     except Exception:
         return None
-    return flagged

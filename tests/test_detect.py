@@ -2184,3 +2184,91 @@ class TestComputeDetectionRate:
         # All observations at the same JD → zero span → 0.0
         obs = [self._make_obs(2460000.0) for _ in range(5)]
         assert compute_detection_rate(obs) == 0.0
+
+
+class TestComputeSourceCompactness:
+    def _make_point_cutout(self) -> str:
+        import base64
+
+        import numpy as np
+        arr = np.zeros((63, 63), dtype=np.float32)
+        arr[31, 31] = 1.0
+        return base64.b64encode(arr.tobytes()).decode()
+
+    def _make_uniform_cutout(self) -> str:
+        import base64
+
+        import numpy as np
+        arr = np.ones((63, 63), dtype=np.float32)
+        return base64.b64encode(arr.tobytes()).decode()
+
+    def test_no_cutout_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import compute_source_compactness
+        obs = SimpleNamespace(cutout_difference=None)
+        assert compute_source_compactness(obs) is None
+
+    def test_bad_base64_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import compute_source_compactness
+        obs = SimpleNamespace(cutout_difference="not!!valid")
+        assert compute_source_compactness(obs) is None
+
+    def test_point_source_high_compactness(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import compute_source_compactness
+        obs = SimpleNamespace(cutout_difference=self._make_point_cutout())
+        result = compute_source_compactness(obs)
+        assert result is not None
+        assert result == 1.0
+
+    def test_uniform_source_low_compactness(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import compute_source_compactness
+        obs = SimpleNamespace(cutout_difference=self._make_uniform_cutout())
+        result = compute_source_compactness(obs)
+        assert result is not None
+        assert result < 0.01
+
+    def test_zero_flux_returns_none(self):
+        import base64
+        import sys
+
+        import numpy as np
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import compute_source_compactness
+        arr = np.zeros((63, 63), dtype=np.float32)
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        obs = SimpleNamespace(cutout_difference=b64)
+        assert compute_source_compactness(obs) is None
+
+    def test_result_in_range(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import compute_source_compactness
+        obs = SimpleNamespace(cutout_difference=self._make_uniform_cutout())
+        result = compute_source_compactness(obs)
+        assert result is not None
+        assert 0.0 <= result <= 1.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import detect
+        assert "compute_source_compactness" in detect.__all__

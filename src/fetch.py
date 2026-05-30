@@ -1883,7 +1883,7 @@ def deduplicate_observations(observations: object) -> list:
     """
     seen: set[object] = set()
     result: list = []
-    for obs in observations:  # type: ignore[union-attr]
+    for obs in observations:  # type: ignore[attr-defined]
         obs_id = getattr(obs, "obs_id", None)
         if obs_id is None or obs_id not in seen:
             if obs_id is not None:

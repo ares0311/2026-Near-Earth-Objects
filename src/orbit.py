@@ -24,7 +24,8 @@ __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
            "compute_encounter_velocity",
            "compute_heliocentric_velocity",
            "compute_semi_latus_rectum",
-           "compute_nodal_precession_rate"]
+           "compute_nodal_precession_rate",
+           "compute_vis_viva_velocity"]
 
 import math
 from typing import NamedTuple
@@ -1484,3 +1485,46 @@ def compute_nodal_precession_rate(elements: object) -> float | None:
     denom = (a ** 3.5) * ((1.0 - e ** 2) ** 2)
     rate = -2.06e-2 * cos_i / denom
     return round(float(rate), 8)
+
+
+def compute_vis_viva_velocity(elements: object, r_au: float) -> float | None:
+    """Return the orbital speed in km/s at heliocentric distance *r_au*.
+
+    Uses the vis-viva equation:
+
+    .. math::
+
+        v = \\sqrt{GM\\left(\\frac{2}{r} - \\frac{1}{a}\\right)}
+
+    where :math:`GM = 4\\pi^2` AU³/yr² and the result is converted to km/s
+    by multiplying by 4.74047 km/s per AU/yr.
+
+    Returns ``None`` if ``a_au`` or ``e`` are missing, if *a_au* ≤ 0, if
+    *r_au* ≤ 0, or if the expression under the square root is negative.
+
+    Args:
+        elements: Any object with ``a_au`` and ``e`` attributes
+            (e.g. :class:`~schemas.OrbitalElements`).
+        r_au: Heliocentric distance in AU at which to evaluate the speed.
+
+    Returns:
+        Orbital speed in km/s rounded to 4 decimal places, or ``None``.
+    """
+    _GM = 4.0 * math.pi ** 2  # AU³/yr²
+    _AU_YR_TO_KM_S = 4.74047  # km/s per AU/yr
+
+    a = getattr(elements, "a_au", None)
+    e = getattr(elements, "e", None)
+    if a is None or e is None:
+        return None
+    a = float(a)
+    if a <= 0.0:
+        return None
+    if r_au <= 0.0:
+        return None
+    v2 = _GM * (2.0 / r_au - 1.0 / a)
+    if v2 < 0.0:
+        return None
+    v_au_yr = math.sqrt(v2)
+    v_km_s = v_au_yr * _AU_YR_TO_KM_S
+    return round(float(v_km_s), 4)

@@ -30,6 +30,7 @@ __all__ = [
     "compute_hosmer_lemeshow_statistic",
     "compute_spiegelhalter_z",
     "compute_brier_skill_score_weighted",
+    "compute_isotonic_calibration_error",
 ]
 
 import math
@@ -1263,3 +1264,36 @@ def compute_brier_skill_score_weighted(
 
     bss = 1.0 - bs / bs_clim
     return round(float(bss), 6)
+
+
+def compute_isotonic_calibration_error(
+    probs: list | np.ndarray,
+    labels: list | np.ndarray,
+    n_bins: int = 10,
+) -> float:
+    """Compute the mean absolute calibration error after isotonic regression.
+
+    Fits an isotonic regression calibrator to *probs* and *labels*, obtains
+    calibrated probabilities, then computes the mean absolute error between
+    the calibrated probabilities and the true labels.  Returns ``0.0`` for
+    empty input or fewer than 2 samples.
+
+    Args:
+        probs: Predicted probabilities in [0, 1].
+        labels: True binary labels (0 or 1).
+        n_bins: Unused parameter retained for API consistency (default 10).
+
+    Returns:
+        Mean absolute calibration error (float ≥ 0).
+    """
+    from sklearn.isotonic import IsotonicRegression
+
+    p = np.asarray(probs, dtype=float)
+    y = np.asarray(labels, dtype=float)
+    n = len(p)
+    if n < 2:
+        return 0.0
+    iso = IsotonicRegression(out_of_bounds="clip")
+    calibrated = iso.fit_transform(p, y)
+    mae = float(np.mean(np.abs(calibrated - y)))
+    return round(mae, 6)

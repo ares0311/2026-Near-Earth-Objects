@@ -2224,3 +2224,66 @@ class TestComputeCombinedHazardScore:
         sys.path.insert(0, "src")
         import score
         assert "compute_combined_hazard_score" in score.__all__
+
+
+class TestComputePriorityWeightedMoid:
+    def _make_neo(self, moid_au, priority):
+        from types import SimpleNamespace
+        hazard = SimpleNamespace(moid_au=moid_au)
+        metadata = SimpleNamespace(discovery_priority=priority)
+        return SimpleNamespace(hazard=hazard, metadata=metadata)
+
+    def test_single_candidate(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_priority_weighted_moid
+        neos = [self._make_neo(0.04, 0.8)]
+        result = compute_priority_weighted_moid(neos)
+        assert result is not None
+        assert abs(result - 0.04) < 1e-9
+
+    def test_weighted_mean(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_priority_weighted_moid
+        neos = [self._make_neo(0.02, 1.0), self._make_neo(0.10, 1.0)]
+        result = compute_priority_weighted_moid(neos)
+        assert result is not None
+        assert abs(result - 0.06) < 1e-9
+
+    def test_none_moid_skipped(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_priority_weighted_moid
+        neos = [self._make_neo(None, 0.9), self._make_neo(0.05, 0.5)]
+        result = compute_priority_weighted_moid(neos)
+        assert result is not None
+        assert abs(result - 0.05) < 1e-9
+
+    def test_zero_priority_skipped(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_priority_weighted_moid
+        neos = [self._make_neo(0.03, 0.0), self._make_neo(0.07, 0.5)]
+        result = compute_priority_weighted_moid(neos)
+        assert result is not None
+        assert abs(result - 0.07) < 1e-9
+
+    def test_empty_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_priority_weighted_moid
+        assert compute_priority_weighted_moid([]) is None
+
+    def test_all_none_moids_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_priority_weighted_moid
+        neos = [self._make_neo(None, 0.8)]
+        assert compute_priority_weighted_moid(neos) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        assert "compute_priority_weighted_moid" in score.__all__
