@@ -35,6 +35,7 @@ __all__ = [
     "CandidateCluster",
     "PipelineRunSummary",
     "TrackletBatch",
+    "FieldObservation",
 ]
 
 from dataclasses import dataclass
@@ -1090,3 +1091,18 @@ class TrackletBatch(BaseModel):
     tracklets: tuple[str, ...]  # object_ids
     n_tracklets: int = 0
     epoch_jd: float | None = None
+
+
+class FieldObservation(BaseModel):
+    """A single survey field pointing with metadata."""
+
+    model_config = ConfigDict(frozen=True)
+
+    field_id: str
+    ra_deg: float
+    dec_deg: float
+    epoch_jd: float
+    survey: str
+    limiting_mag: float | None = None
+    n_sources: int = 0
+    filter_band: str | None = None
