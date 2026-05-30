@@ -3760,3 +3760,74 @@ class TestBuildFetchProvenance:
         sys.path.insert(0, "src")
         import fetch
         assert "build_fetch_provenance" in fetch.__all__
+
+
+class TestGetFetchResultAge:
+    """Tests for get_fetch_result_age."""
+
+    def _make_fetch_result(self, jds):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import FetchProvenance, FetchResult, Observation
+        obs = [
+            Observation(
+                obs_id=f"o{i}", jd=jd, ra_deg=10.0, dec_deg=5.0,
+                mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF",
+            )
+            for i, jd in enumerate(jds)
+        ]
+        prov = FetchProvenance(surveys=("ZTF",), start_jd=min(jds), end_jd=max(jds) + 1)
+        return FetchResult(alerts=tuple(obs), provenance=prov)
+
+    def test_returns_none_for_empty(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import FetchProvenance, FetchResult
+        prov = FetchProvenance(surveys=("ZTF",), start_jd=2460000.0, end_jd=2460001.0)
+        fr = FetchResult(alerts=(), provenance=prov)
+        from fetch import get_fetch_result_age
+        assert get_fetch_result_age(fr) is None
+
+    def test_returns_float_for_single_obs(self):
+        import sys
+        sys.path.insert(0, "src")
+        from unittest.mock import patch
+
+        from fetch import get_fetch_result_age
+        fr = self._make_fetch_result([2460000.0])
+        with patch("astropy.time.Time.now") as mock_now:
+            mock_now.return_value.jd = 2460010.0
+            age = get_fetch_result_age(fr)
+        assert age is not None
+        assert abs(age - 10.0) < 0.001
+
+    def test_uses_earliest_jd(self):
+        import sys
+        sys.path.insert(0, "src")
+        from unittest.mock import patch
+
+        from fetch import get_fetch_result_age
+        fr = self._make_fetch_result([2460005.0, 2460000.0, 2460003.0])
+        with patch("astropy.time.Time.now") as mock_now:
+            mock_now.return_value.jd = 2460010.0
+            age = get_fetch_result_age(fr)
+        assert age is not None
+        assert abs(age - 10.0) < 0.001
+
+    def test_age_non_negative(self):
+        import sys
+        sys.path.insert(0, "src")
+        from unittest.mock import patch
+
+        from fetch import get_fetch_result_age
+        fr = self._make_fetch_result([2460000.0])
+        with patch("astropy.time.Time.now") as mock_now:
+            mock_now.return_value.jd = 2460001.5
+            age = get_fetch_result_age(fr)
+        assert age >= 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+        assert "get_fetch_result_age" in fetch.__all__

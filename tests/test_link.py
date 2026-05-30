@@ -2487,3 +2487,78 @@ class TestComputeInterObservationGaps:
         sys.path.insert(0, "src")
         import link
         assert "compute_inter_observation_gaps" in link.__all__
+
+
+class TestComputeTrackletOverlapFraction:
+    """Tests for compute_tracklet_overlap_fraction."""
+
+    def _make_tracklet(self, obs_ids):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import Observation, Tracklet
+        obs = tuple(
+            Observation(
+                obs_id=oid, jd=2460000.0 + i, ra_deg=10.0, dec_deg=5.0,
+                mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF",
+            )
+            for i, oid in enumerate(obs_ids)
+        )
+        return Tracklet(
+            object_id="T_" + obs_ids[0],
+            observations=obs,
+            arc_days=float(len(obs_ids) - 1),
+            motion_rate_arcsec_per_hour=1.0,
+            motion_pa_degrees=90.0,
+        )
+
+    def test_no_overlap(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_tracklet_overlap_fraction
+        t1 = self._make_tracklet(["a", "b"])
+        t2 = self._make_tracklet(["c", "d"])
+        assert compute_tracklet_overlap_fraction(t1, t2) == 0.0
+
+    def test_full_overlap_same_tracklet(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_tracklet_overlap_fraction
+        t1 = self._make_tracklet(["a", "b", "c"])
+        assert compute_tracklet_overlap_fraction(t1, t1) == 1.0
+
+    def test_partial_overlap(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_tracklet_overlap_fraction
+        t1 = self._make_tracklet(["a", "b", "c"])
+        t2 = self._make_tracklet(["b", "c", "d"])
+        frac = compute_tracklet_overlap_fraction(t1, t2)
+        assert abs(frac - 2.0 / 3.0) < 1e-9
+
+    def test_empty_tracklet_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_tracklet_overlap_fraction
+        from schemas import Tracklet
+        empty = Tracklet(
+            object_id="empty", observations=(), arc_days=0.0,
+            motion_rate_arcsec_per_hour=0.0, motion_pa_degrees=0.0,
+        )
+        t2 = self._make_tracklet(["a", "b"])
+        assert compute_tracklet_overlap_fraction(empty, t2) == 0.0
+        assert compute_tracklet_overlap_fraction(t2, empty) == 0.0
+
+    def test_result_in_0_1(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_tracklet_overlap_fraction
+        t1 = self._make_tracklet(["a", "b", "c", "d"])
+        t2 = self._make_tracklet(["c", "d", "e"])
+        frac = compute_tracklet_overlap_fraction(t1, t2)
+        assert 0.0 <= frac <= 1.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+        assert "compute_tracklet_overlap_fraction" in link.__all__

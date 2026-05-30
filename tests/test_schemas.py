@@ -1617,3 +1617,56 @@ class TestPipelineRunSummary:
             alert_pathways=("mpc_submission",),
         )
         assert isinstance(prs.alert_pathways, tuple)
+
+
+class TestTrackletBatch:
+    """Tests for TrackletBatch schema model."""
+
+    def test_basic_construction(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import TrackletBatch
+        tb = TrackletBatch(batch_id="b1", run_id="r1", tracklets=("obj1", "obj2"))
+        assert tb.batch_id == "b1"
+        assert tb.run_id == "r1"
+        assert tb.tracklets == ("obj1", "obj2")
+
+    def test_default_n_tracklets(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import TrackletBatch
+        tb = TrackletBatch(batch_id="b1", run_id="r1", tracklets=())
+        assert tb.n_tracklets == 0
+
+    def test_epoch_jd_none_by_default(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import TrackletBatch
+        tb = TrackletBatch(batch_id="b1", run_id="r1", tracklets=())
+        assert tb.epoch_jd is None
+
+    def test_with_epoch_jd(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import TrackletBatch
+        tb = TrackletBatch(
+            batch_id="b1", run_id="r1", tracklets=("x",), n_tracklets=1, epoch_jd=2460000.0
+        )
+        assert tb.epoch_jd == 2460000.0
+        assert tb.n_tracklets == 1
+
+    def test_frozen(self):
+        import sys
+        sys.path.insert(0, "src")
+        import pytest
+
+        from schemas import TrackletBatch
+        tb = TrackletBatch(batch_id="b1", run_id="r1", tracklets=())
+        with pytest.raises(Exception):
+            tb.batch_id = "changed"  # type: ignore[misc]
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        assert "TrackletBatch" in schemas.__all__

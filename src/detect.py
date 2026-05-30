@@ -19,7 +19,8 @@ __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus"
            "compute_magnitude_residual",
            "compute_elongation_ratio",
            "compute_detection_significance",
-           "compute_sky_plane_velocity"]
+           "compute_sky_plane_velocity",
+           "compute_detection_rate"]
 
 import math
 import uuid
@@ -1152,3 +1153,35 @@ def compute_sky_plane_velocity(obs1: object, obs2: object) -> dict:
         "ddec_arcsec_hr": round(ddec_arcsec_hr, 6),
         "speed_arcsec_hr": round(speed, 6),
     }
+
+
+def compute_detection_rate(
+    observations: list[object], window_days: float = 1.0
+) -> float:
+    """Return the fraction of time bins that contain at least one observation.
+
+    Divides the full observation span into bins of ``window_days`` width and
+    counts the fraction that contain at least one observation.  Returns
+    ``0.0`` for empty input or a single observation (no span defined).
+
+    Args:
+        observations: List of observation objects with a ``jd`` attribute.
+        window_days: Width of each time bin in days (default 1.0).
+
+    Returns:
+        Detection rate in [0, 1].
+    """
+    if len(observations) < 2:
+        return 0.0
+    jds = sorted(float(getattr(o, "jd", 0.0)) for o in observations)
+    span = jds[-1] - jds[0]
+    if span <= 0.0:
+        return 0.0
+    n_bins = int(math.ceil(span / window_days))
+    occupied: set[int] = set()
+    t0 = jds[0]
+    for jd in jds:
+        bin_idx = int((jd - t0) / window_days)
+        # clamp last edge to last bin
+        occupied.add(min(bin_idx, n_bins - 1))
+    return float(len(occupied)) / float(n_bins)

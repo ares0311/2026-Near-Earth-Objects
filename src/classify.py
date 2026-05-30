@@ -40,6 +40,7 @@ __all__ = [
     "compute_comet_probability",
     "compute_known_object_probability",
     "compute_stellar_artifact_score_from_features",
+    "compute_posterior_from_scores",
 ]
 
 import base64
@@ -1824,3 +1825,72 @@ def compute_stellar_artifact_score_from_features(features: CandidateFeatures) ->
     if v is None:
         return 0.0
     return float(v)
+
+
+def compute_posterior_from_scores(
+    real_bogus: float | None,
+    neo_prob: float | None,
+    known_obj_prob: float | None,
+) -> NEOPosterior:
+    """Construct a :class:`~schemas.NEOPosterior` from three scalar scores.
+
+    Uses hypothesis priors when inputs are ``None``:
+
+    - ``neo_candidate``:      0.05
+    - ``known_object``:       0.30
+    - ``main_belt_asteroid``: 0.35
+    - ``stellar_artifact``:   0.25
+    - ``other_solar_system``: 0.05
+
+    When ``real_bogus`` is provided, the artifact weight is scaled by
+    ``(1 - real_bogus)`` and the neo / known-object / main-belt weights are
+    scaled up proportionally to preserve normalisation.  When ``neo_prob``
+    is provided it replaces the neo prior weight (before normalisation).
+    When ``known_obj_prob`` is provided it replaces the known-object prior
+    weight (before normalisation).  The resulting weights are always
+    normalised to sum to 1.0.
+
+    Args:
+        real_bogus: Real/bogus score in [0, 1], or ``None``.
+        neo_prob:  NEO candidate probability in [0, 1], or ``None``.
+        known_obj_prob: Known-object probability in [0, 1], or ``None``.
+
+    Returns:
+        :class:`~schemas.NEOPosterior` with all five fields summing to 1.0.
+    """
+    # Start from priors
+    w_neo = 0.05
+    w_ko = 0.30
+    w_mba = 0.35
+    w_art = 0.25
+    w_other = 0.05
+
+    # Apply provided scores
+    if neo_prob is not None:
+        w_neo = float(neo_prob)
+    if known_obj_prob is not None:
+        w_ko = float(known_obj_prob)
+
+    if real_bogus is not None:
+        rb = float(real_bogus)
+        # Scale artifact down by (1 - rb)
+        w_art = w_art * (1.0 - rb)
+        # Scale the real-source hypotheses up by (1 + rb) proportionally
+        real_total = w_neo + w_ko + w_mba
+        if real_total > 0.0:
+            scale = real_total + real_total * rb
+            if real_total > 0.0:
+                factor = scale / real_total
+                w_neo *= factor
+                w_ko *= factor
+                w_mba *= factor
+
+    # Normalise — total is always > 0 since w_other = 0.05 (fixed prior)
+    total = w_neo + w_ko + w_mba + w_art + w_other
+    return NEOPosterior(
+        neo_candidate=round(w_neo / total, 8),
+        known_object=round(w_ko / total, 8),
+        main_belt_asteroid=round(w_mba / total, 8),
+        stellar_artifact=round(w_art / total, 8),
+        other_solar_system=round(w_other / total, 8),
+    )

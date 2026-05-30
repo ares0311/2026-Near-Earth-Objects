@@ -2398,3 +2398,86 @@ class TestComputeSemiLatusRectum:
         sys.path.insert(0, "src")
         import orbit
         assert "compute_semi_latus_rectum" in orbit.__all__
+
+
+class TestComputeNodalPrecessionRate:
+    """Tests for compute_nodal_precession_rate."""
+
+    def _make_elements(self, a=1.5, e=0.3, i=10.0):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import OrbitalElements
+        return OrbitalElements(
+            semi_major_axis_au=a,
+            eccentricity=e,
+            inclination_deg=i,
+            longitude_ascending_node_deg=45.0,
+            argument_perihelion_deg=90.0,
+            mean_anomaly_deg=180.0,
+            epoch_jd=2460000.5,
+            perihelion_au=a * (1 - e),
+            aphelion_au=a * (1 + e),
+            quality_code=2,
+        )
+
+    def test_returns_float_for_valid_elements(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_nodal_precession_rate
+        el = self._make_elements()
+        rate = compute_nodal_precession_rate(el)
+        assert rate is not None
+        assert isinstance(rate, float)
+
+    def test_returns_none_for_missing_a(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_nodal_precession_rate
+
+        class FakeEl:
+            a_au = None
+            e = 0.3
+            i_deg = 10.0
+
+        assert compute_nodal_precession_rate(FakeEl()) is None
+
+    def test_returns_none_for_zero_a(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_nodal_precession_rate
+
+        class FakeEl:
+            a_au = 0.0
+            e = 0.3
+            i_deg = 10.0
+
+        assert compute_nodal_precession_rate(FakeEl()) is None
+
+    def test_returns_none_for_e_ge_1(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_nodal_precession_rate
+
+        class FakeEl:
+            a_au = 1.5
+            e = 1.0
+            i_deg = 10.0
+
+        assert compute_nodal_precession_rate(FakeEl()) is None
+
+    def test_equatorial_orbit_has_maximum_magnitude(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_nodal_precession_rate
+        el_eq = self._make_elements(i=0.0)
+        el_incl = self._make_elements(i=45.0)
+        rate_eq = compute_nodal_precession_rate(el_eq)
+        rate_incl = compute_nodal_precession_rate(el_incl)
+        assert rate_eq is not None and rate_incl is not None
+        assert abs(rate_eq) >= abs(rate_incl)
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import orbit
+        assert "compute_nodal_precession_rate" in orbit.__all__
