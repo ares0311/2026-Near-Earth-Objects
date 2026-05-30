@@ -2619,3 +2619,58 @@ class TestComputeStellarArtifactScoreFromFeatures:
         sys.path.insert(0, "src")
         import classify
         assert "compute_stellar_artifact_score_from_features" in classify.__all__
+
+
+class TestComputePosteriorFromScores:
+    """Tests for compute_posterior_from_scores."""
+
+    def test_all_none_uses_priors(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_posterior_from_scores
+        post = compute_posterior_from_scores(None, None, None)
+        total = (post.neo_candidate + post.known_object + post.main_belt_asteroid
+                 + post.stellar_artifact + post.other_solar_system)
+        assert abs(total - 1.0) < 1e-6
+
+    def test_sums_to_one_with_real_bogus(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_posterior_from_scores
+        post = compute_posterior_from_scores(0.9, None, None)
+        total = (post.neo_candidate + post.known_object + post.main_belt_asteroid
+                 + post.stellar_artifact + post.other_solar_system)
+        assert abs(total - 1.0) < 1e-6
+
+    def test_high_real_bogus_lowers_artifact(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_posterior_from_scores
+        post_hi = compute_posterior_from_scores(0.99, None, None)
+        post_lo = compute_posterior_from_scores(0.01, None, None)
+        assert post_hi.stellar_artifact < post_lo.stellar_artifact
+
+    def test_neo_prob_respected(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_posterior_from_scores
+        post_hi = compute_posterior_from_scores(None, 0.9, None)
+        post_lo = compute_posterior_from_scores(None, 0.01, None)
+        assert post_hi.neo_candidate > post_lo.neo_candidate
+
+    def test_all_probabilities_non_negative(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_posterior_from_scores
+        post = compute_posterior_from_scores(0.5, 0.3, 0.2)
+        assert post.neo_candidate >= 0.0
+        assert post.known_object >= 0.0
+        assert post.main_belt_asteroid >= 0.0
+        assert post.stellar_artifact >= 0.0
+        assert post.other_solar_system >= 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import classify
+        assert "compute_posterior_from_scores" in classify.__all__

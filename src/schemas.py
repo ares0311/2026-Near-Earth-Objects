@@ -34,6 +34,7 @@ __all__ = [
     "SurveyRun",
     "CandidateCluster",
     "PipelineRunSummary",
+    "TrackletBatch",
 ]
 
 from dataclasses import dataclass
@@ -1077,3 +1078,15 @@ class PipelineRunSummary(BaseModel):
     n_new_candidates: int = 0
     top_priority: float = 0.0
     alert_pathways: tuple[str, ...] = ()
+
+
+class TrackletBatch(BaseModel):
+    """A batch of tracklets from a single pipeline run for bulk processing."""
+
+    model_config = ConfigDict(frozen=True)
+
+    batch_id: str
+    run_id: str
+    tracklets: tuple[str, ...]  # object_ids
+    n_tracklets: int = 0
+    epoch_jd: float | None = None

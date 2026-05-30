@@ -23,7 +23,8 @@ __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "compute_arc_curvature",
            "compute_tracklet_density",
            "compute_position_residuals",
-           "compute_inter_observation_gaps"]
+           "compute_inter_observation_gaps",
+           "compute_tracklet_overlap_fraction"]
 
 import math
 import uuid
@@ -1316,3 +1317,26 @@ def compute_inter_observation_gaps(tracklet: Tracklet) -> list[float]:
         gap_hours = (obs_list[i + 1].jd - obs_list[i].jd) * 24.0
         gaps.append(float(gap_hours))
     return gaps
+
+
+def compute_tracklet_overlap_fraction(t1: Tracklet, t2: Tracklet) -> float:
+    """Return the fraction of shared obs_ids between two tracklets.
+
+    The overlap fraction is computed as the number of ``obs_id`` values shared
+    by both tracklets divided by the size of the *smaller* tracklet.  Returns
+    ``0.0`` if either tracklet has no observations.
+
+    Args:
+        t1: First :class:`~schemas.Tracklet`.
+        t2: Second :class:`~schemas.Tracklet`.
+
+    Returns:
+        Overlap fraction in [0, 1].
+    """
+    ids1 = {o.obs_id for o in t1.observations}
+    ids2 = {o.obs_id for o in t2.observations}
+    if not ids1 or not ids2:
+        return 0.0
+    shared = ids1 & ids2
+    smaller = min(len(ids1), len(ids2))
+    return float(len(shared)) / float(smaller)

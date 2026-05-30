@@ -2109,3 +2109,78 @@ class TestComputeSkyPlaneVelocity:
         sys.path.insert(0, "src")
         import detect
         assert "compute_sky_plane_velocity" in detect.__all__
+
+
+class TestComputeDetectionRate:
+    """Tests for compute_detection_rate."""
+
+    def _make_obs(self, jd):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import Observation
+        return Observation(
+            obs_id=f"o{jd}", jd=jd, ra_deg=10.0, dec_deg=5.0,
+            mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF",
+        )
+
+    def test_empty_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_detection_rate
+        assert compute_detection_rate([]) == 0.0
+
+    def test_single_obs_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_detection_rate
+        obs = self._make_obs(2460000.0)
+        assert compute_detection_rate([obs]) == 0.0
+
+    def test_two_obs_one_day_apart_full_rate(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_detection_rate
+        obs1 = self._make_obs(2460000.0)
+        obs2 = self._make_obs(2460001.0)
+        rate = compute_detection_rate([obs1, obs2], window_days=1.0)
+        assert rate > 0.0
+        assert rate <= 1.0
+
+    def test_dense_observations_high_rate(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_detection_rate
+        obs = [self._make_obs(2460000.0 + i) for i in range(5)]
+        rate = compute_detection_rate(obs, window_days=1.0)
+        assert rate == 1.0
+
+    def test_sparse_observations_lower_rate(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_detection_rate
+        # 2 obs over a 10-day span in 1-day bins → some bins empty
+        obs = [self._make_obs(2460000.0), self._make_obs(2460009.0)]
+        rate = compute_detection_rate(obs, window_days=1.0)
+        assert 0.0 < rate < 1.0
+
+    def test_rate_bounded_zero_to_one(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_detection_rate
+        obs = [self._make_obs(2460000.0 + i * 0.1) for i in range(20)]
+        rate = compute_detection_rate(obs, window_days=1.0)
+        assert 0.0 <= rate <= 1.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import detect
+        assert "compute_detection_rate" in detect.__all__
+
+    def test_same_jd_observations_return_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_detection_rate
+        # All observations at the same JD → zero span → 0.0
+        obs = [self._make_obs(2460000.0) for _ in range(5)]
+        assert compute_detection_rate(obs) == 0.0

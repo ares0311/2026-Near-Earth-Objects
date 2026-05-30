@@ -24,7 +24,8 @@ __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "compute_astrometric_priority",
            "compute_size_score",
            "compute_orbit_uncertainty_score",
-           "compute_detection_completeness_score"]
+           "compute_detection_completeness_score",
+           "compute_combined_hazard_score"]
 
 import math
 import uuid
@@ -1245,4 +1246,33 @@ def compute_detection_completeness_score(neo: ScoredNEO) -> float:
     nights = float(_nights) if _nights is not None else 0.0
     rb = float(_rb) if _rb is not None else 0.0
     score = 0.5 * arc + 0.3 * nights + 0.2 * rb
+    return round(float(min(1.0, max(0.0, score))), 4)
+
+
+def compute_combined_hazard_score(neo: ScoredNEO) -> float:
+    """Compute a combined hazard score from candidate feature scores.
+
+    Weighted combination:
+
+    - ``moid_score``          weight 0.4
+    - ``pha_flag_confidence`` weight 0.3
+    - ``orbit_quality_score`` weight 0.3
+
+    Missing feature scores (``None``) contribute ``0.0`` to the weighted
+    sum.  The result is clamped to ``[0, 1]`` and rounded to 4 decimal
+    places.
+
+    Args:
+        neo: :class:`~schemas.ScoredNEO` object.
+
+    Returns:
+        Combined hazard score in [0, 1].
+    """
+    _moid = neo.features.moid_score
+    _pha = neo.features.pha_flag_confidence
+    _orb = neo.features.orbit_quality_score
+    moid = float(_moid) if _moid is not None else 0.0
+    pha = float(_pha) if _pha is not None else 0.0
+    orb = float(_orb) if _orb is not None else 0.0
+    score = 0.4 * moid + 0.3 * pha + 0.3 * orb
     return round(float(min(1.0, max(0.0, score))), 4)

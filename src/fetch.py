@@ -22,7 +22,8 @@ __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fet
            "fetch_horizons_ephemeris",
            "summarize_survey_fields",
            "count_observations_by_mission",
-           "build_fetch_provenance"]
+           "build_fetch_provenance",
+           "get_fetch_result_age"]
 
 import json
 import os
@@ -1840,3 +1841,25 @@ def count_observations_by_mission(fetch_result: FetchResult) -> dict[str, int]:
         mission = str(getattr(obs, "mission", "unknown"))
         counts[mission] = counts.get(mission, 0) + 1
     return counts
+
+
+def get_fetch_result_age(fetch_result: FetchResult) -> float | None:
+    """Return the age in days of a fetch result.
+
+    Age is defined as the current Julian Date minus the earliest observation
+    JD in the result.  Uses ``astropy.time.Time.now().jd`` for the current
+    JD.  Returns ``None`` if the fetch result contains no observations.
+
+    Args:
+        fetch_result: :class:`~schemas.FetchResult` object.
+
+    Returns:
+        Age in days (float ≥ 0), or ``None`` if no observations are present.
+    """
+    from astropy.time import Time  # noqa: PLC0415
+
+    if not fetch_result.alerts:
+        return None
+    earliest_jd = min(obs.jd for obs in fetch_result.alerts)
+    current_jd = Time.now().jd
+    return float(current_jd - earliest_jd)

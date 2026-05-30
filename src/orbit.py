@@ -23,7 +23,8 @@ __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
            "compute_hill_sphere_radius",
            "compute_encounter_velocity",
            "compute_heliocentric_velocity",
-           "compute_semi_latus_rectum"]
+           "compute_semi_latus_rectum",
+           "compute_nodal_precession_rate"]
 
 import math
 from typing import NamedTuple
@@ -1436,3 +1437,50 @@ def compute_semi_latus_rectum(elements: object) -> float | None:
     if a <= 0.0:
         return None
     return round(float(a) * (1.0 - float(e) ** 2), 6)
+
+
+def compute_nodal_precession_rate(elements: object) -> float | None:
+    """Return the approximate secular nodal precession rate in degrees/year.
+
+    Uses the J2-based secular approximation:
+
+    .. math::
+
+        \\frac{d\\Omega}{dt} \\approx
+        -\\frac{2.06 \\times 10^{-2} \\cos i}{a^{7/2} (1 - e^2)^2}
+
+    where *a* is in AU, *e* is eccentricity, and *i* is orbital inclination.
+    The formula is a simplified solar J2 perturbation expression and gives
+    results in degrees/year.
+
+    Returns ``None`` if ``a_au``, ``e``, or ``i_deg`` are missing, if
+    ``a_au ≤ 0``, or if ``e ≥ 1`` (open orbit).
+
+    Args:
+        elements: Any object with ``a_au``, ``e``, and ``i_deg`` attributes
+            (e.g. :class:`~schemas.OrbitalElements`).
+
+    Returns:
+        Nodal precession rate in degrees/year, or ``None``.
+    """
+    a = getattr(elements, "a_au", None)
+    if a is None:
+        a = getattr(elements, "semi_major_axis_au", None)
+    e = getattr(elements, "e", None)
+    if e is None:
+        e = getattr(elements, "eccentricity", None)
+    i_deg = getattr(elements, "i_deg", None)
+    if i_deg is None:
+        i_deg = getattr(elements, "inclination_deg", None)
+    if a is None or e is None or i_deg is None:
+        return None
+    a = float(a)
+    e = float(e)
+    i_deg = float(i_deg)
+    if a <= 0.0 or e >= 1.0:
+        return None
+    cos_i = math.cos(math.radians(i_deg))
+    # denom > 0 guaranteed: a > 0 (checked above) and e < 1 (checked above)
+    denom = (a ** 3.5) * ((1.0 - e ** 2) ** 2)
+    rate = -2.06e-2 * cos_i / denom
+    return round(float(rate), 8)

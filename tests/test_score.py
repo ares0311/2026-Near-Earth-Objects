@@ -2114,3 +2114,113 @@ class TestComputeDetectionCompletenessScore:
         sys.path.insert(0, "src")
         import score
         assert "compute_detection_completeness_score" in score.__all__
+
+
+class TestComputeCombinedHazardScore:
+    """Tests for compute_combined_hazard_score."""
+
+    def _build_neo(self, moid_score=None, pha_conf=None, orbit_qual=None):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import (
+            CandidateExplanation,
+            CandidateFeatures,
+            HazardAssessment,
+            NEOPosterior,
+            Observation,
+            OrbitalElements,
+            ScoredNEO,
+            ScoringMetadata,
+            Tracklet,
+        )
+        obs = tuple(
+            Observation(
+                obs_id=f"ch_{i}", jd=2460000.0 + i, ra_deg=10.0, dec_deg=5.0,
+                mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF",
+            )
+            for i in range(3)
+        )
+        tracklet = Tracklet(
+            object_id="T_CH",
+            observations=obs,
+            arc_days=2.0,
+            motion_rate_arcsec_per_hour=1.2,
+            motion_pa_degrees=90.0,
+        )
+        feats = CandidateFeatures(
+            real_bogus_score=0.9,
+            moid_score=moid_score,
+            pha_flag_confidence=pha_conf,
+            orbit_quality_score=orbit_qual,
+        )
+        posterior = NEOPosterior(
+            neo_candidate=0.75, known_object=0.05, main_belt_asteroid=0.10,
+            stellar_artifact=0.05, other_solar_system=0.05,
+        )
+        orbital = OrbitalElements(
+            semi_major_axis_au=1.5, eccentricity=0.3, inclination_deg=10.0,
+            longitude_ascending_node_deg=45.0, argument_perihelion_deg=90.0,
+            mean_anomaly_deg=180.0, epoch_jd=2460000.5,
+            perihelion_au=1.05, aphelion_au=1.95, quality_code=2,
+        )
+        explanation = CandidateExplanation(
+            summary="test", supporting_evidence=(), contra_evidence=(), model_version="0.1.0"
+        )
+        hazard = HazardAssessment(
+            hazard_flag="pha_candidate", moid_au=0.03,
+            estimated_diameter_m=200.0, absolute_magnitude_h=21.5,
+            neo_class="apollo", alert_pathway="mpc_submission",
+            explanation=explanation, orbital_elements=orbital,
+        )
+        metadata = ScoringMetadata(
+            scorer_version="0.1.0", scored_at_jd=2460000.5,
+            pipeline_run_id="test_run", discovery_priority=0.8,
+            followup_value=0.6, scientific_interest=0.5,
+        )
+        return ScoredNEO(
+            tracklet=tracklet, features=feats, posterior=posterior,
+            hazard=hazard, metadata=metadata,
+        )
+
+    def test_all_none_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_combined_hazard_score
+        neo = self._build_neo()
+        assert compute_combined_hazard_score(neo) == 0.0
+
+    def test_all_one_returns_one(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_combined_hazard_score
+        neo = self._build_neo(moid_score=1.0, pha_conf=1.0, orbit_qual=1.0)
+        assert compute_combined_hazard_score(neo) == 1.0
+
+    def test_partial_scores_weighted(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_combined_hazard_score
+        neo = self._build_neo(moid_score=1.0, pha_conf=0.0, orbit_qual=0.0)
+        assert abs(compute_combined_hazard_score(neo) - 0.4) < 1e-4
+
+    def test_result_bounded(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_combined_hazard_score
+        neo = self._build_neo(moid_score=0.5, pha_conf=0.5, orbit_qual=0.5)
+        score = compute_combined_hazard_score(neo)
+        assert 0.0 <= score <= 1.0
+
+    def test_missing_moid_contributes_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_combined_hazard_score
+        neo1 = self._build_neo(moid_score=None, pha_conf=1.0, orbit_qual=1.0)
+        neo2 = self._build_neo(moid_score=0.0, pha_conf=1.0, orbit_qual=1.0)
+        assert compute_combined_hazard_score(neo1) == compute_combined_hazard_score(neo2)
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        assert "compute_combined_hazard_score" in score.__all__
