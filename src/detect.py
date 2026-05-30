@@ -21,7 +21,8 @@ __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus"
            "compute_detection_significance",
            "compute_sky_plane_velocity",
            "compute_detection_rate",
-           "compute_source_compactness"]
+           "compute_source_compactness",
+           "compute_photon_noise_limit"]
 
 import math
 import uuid
@@ -1219,5 +1220,39 @@ def compute_source_compactness(obs: object) -> float | None:
             return None
         peak = float(arr.max())
         return round(float(min(1.0, max(0.0, peak / total))), 6)
+    except Exception:
+        return None
+
+
+def compute_photon_noise_limit(obs: object, gain: float = 1.0) -> float | None:
+    """Compute the Poisson photon noise floor from the difference-image cutout.
+
+    The noise floor is estimated as ``sqrt(peak * gain) / peak`` where ``peak``
+    is the maximum pixel value in the 63×63 float32 difference-image cutout.
+    This represents the fractional photon noise limit at the peak pixel.
+
+    Args:
+        obs: Any object with an optional ``cutout_difference`` base64-encoded
+            float32 array attribute.
+        gain: Detector gain in electrons per ADU (default 1.0).
+
+    Returns:
+        Photon noise limit (float ≥ 0), or ``None`` if no cutout, decode
+        error, or peak ≤ 0.
+    """
+    try:
+        import base64
+
+        import numpy as np
+
+        cutout = getattr(obs, "cutout_difference", None)
+        if cutout is None:
+            return None
+        raw = base64.b64decode(cutout)
+        arr = np.frombuffer(raw, dtype=np.float32).reshape(63, 63).astype(float)
+        peak = float(arr.max())
+        if peak <= 0.0:
+            return None
+        return float(math.sqrt(peak * gain) / peak)
     except Exception:
         return None

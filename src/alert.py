@@ -42,6 +42,7 @@ __all__ = [
     "generate_followup_priority_list",
     "count_alerts_by_hazard_flag",
     "generate_mpc_batch_header",
+    "format_candidate_summary_table",
 ]
 
 import json
@@ -1801,3 +1802,41 @@ def generate_mpc_batch_header(neos: list, obs_code: str = "500") -> str:
         "# NOTE: These are NOT confirmed detections. Independent confirmation required.",
     ]
     return "\n".join(lines)
+
+
+def format_candidate_summary_table(neos: list[object], max_rows: int = 20) -> str:
+    """Format a plain-text ASCII summary table of NEO candidates.
+
+    Produces a ranked table with columns: rank, object_id, hazard_flag,
+    moid_au, and priority.  The header clearly states these are NOT confirmed
+    detections.
+
+    Args:
+        neos: Iterable of :class:`~schemas.ScoredNEO`-like objects.  Objects
+            are listed in the order provided (already ranked by caller).
+        max_rows: Maximum number of candidate rows to include (default 20).
+
+    Returns:
+        Plain-text ASCII table string.
+    """
+    header = "# NEO Candidate Summary (NOT confirmed detections)"
+    col_header = (
+        f"{'rank':>4}  {'object_id':<20}  {'hazard_flag':<18}"
+        f"  {'moid_au':>8}  {'priority':>8}"
+    )
+    separator = "-" * len(col_header)
+    rows = [header, col_header, separator]
+    for rank, neo in enumerate(neos[:max_rows], start=1):
+        tracklet = getattr(neo, "tracklet", None)
+        object_id = str(getattr(tracklet, "object_id", "unknown") if tracklet else "unknown")
+        hazard = getattr(neo, "hazard", None)
+        hazard_flag = str(getattr(hazard, "hazard_flag", "unknown") if hazard else "unknown")
+        moid_au = getattr(hazard, "moid_au", None) if hazard else None
+        moid_str = f"{moid_au:.4f}" if moid_au is not None else "   N/A"
+        metadata = getattr(neo, "metadata", None)
+        priority = getattr(metadata, "discovery_priority", None) if metadata else None
+        priority_str = f"{priority:.4f}" if priority is not None else "   N/A"
+        rows.append(
+            f"{rank:>4}  {object_id:<20}  {hazard_flag:<18}  {moid_str:>8}  {priority_str:>8}"
+        )
+    return "\n".join(rows)

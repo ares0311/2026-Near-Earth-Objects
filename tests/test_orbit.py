@@ -1941,38 +1941,56 @@ class TestComputeOrbitalArcQuality:
     def test_code1_short_arc(self):
         import sys
         sys.path.insert(0, "src")
-        from types import SimpleNamespace
-
         from orbit import compute_orbital_arc_quality
-        tracklet = SimpleNamespace(arc_days=0.5)
-        assert compute_orbital_arc_quality(tracklet) == 1
+        assert compute_orbital_arc_quality(0.5) == 1
 
     def test_code2_one_day(self):
         import sys
         sys.path.insert(0, "src")
-        from types import SimpleNamespace
-
         from orbit import compute_orbital_arc_quality
-        tracklet = SimpleNamespace(arc_days=3.0)
-        assert compute_orbital_arc_quality(tracklet) == 2
+        assert compute_orbital_arc_quality(3.0) == 2
 
     def test_code3_week(self):
         import sys
         sys.path.insert(0, "src")
-        from types import SimpleNamespace
-
         from orbit import compute_orbital_arc_quality
-        tracklet = SimpleNamespace(arc_days=10.0)
-        assert compute_orbital_arc_quality(tracklet) == 3
+        assert compute_orbital_arc_quality(10.0) == 3
 
     def test_code4_month(self):
         import sys
         sys.path.insert(0, "src")
-        from types import SimpleNamespace
-
         from orbit import compute_orbital_arc_quality
-        tracklet = SimpleNamespace(arc_days=60.0)
-        assert compute_orbital_arc_quality(tracklet) == 4
+        assert compute_orbital_arc_quality(60.0) == 4
+
+    def test_none_input(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_orbital_arc_quality
+        assert compute_orbital_arc_quality(None) is None
+
+    def test_negative_input(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_orbital_arc_quality
+        assert compute_orbital_arc_quality(-1.0) is None
+
+    def test_boundary_one_day(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_orbital_arc_quality
+        assert compute_orbital_arc_quality(1.0) == 2
+
+    def test_boundary_seven_days(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_orbital_arc_quality
+        assert compute_orbital_arc_quality(7.0) == 3
+
+    def test_boundary_thirty_days(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_orbital_arc_quality
+        assert compute_orbital_arc_quality(30.0) == 4
 
     def test_in_all(self):
         import sys

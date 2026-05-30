@@ -42,6 +42,7 @@ __all__ = [
     "compute_stellar_artifact_score_from_features",
     "compute_posterior_from_scores",
     "compute_classification_confidence",
+    "compute_entropy_weighted_score",
 ]
 
 import base64
@@ -1925,3 +1926,29 @@ def compute_classification_confidence(posterior: object) -> float:
         [float(getattr(posterior, f, 0.0) or 0.0) for f in fields], reverse=True
     )
     return round(float(max(0.0, probs[0] - probs[1])), 6)
+
+
+def compute_entropy_weighted_score(posterior: object, features: object) -> float:
+    """Compute entropy-weighted NEO candidate score.
+
+    Combines the NEO posterior probability with a confidence weight derived
+    from posterior entropy: ``neo_prob * (1 - H / H_max)`` where ``H`` is the
+    Shannon entropy of the posterior in bits and ``H_max = log2(5)``
+    (maximum entropy for 5 hypotheses).  The result is clamped to [0, 1].
+
+    Args:
+        posterior: A :class:`~schemas.NEOPosterior`-like object.
+        features: A :class:`~schemas.CandidateFeatures`-like object (unused
+            directly but kept for API consistency).
+
+    Returns:
+        Entropy-weighted score in [0, 1].
+    """
+    from classify import posterior_entropy
+
+    H = posterior_entropy(posterior)
+    H_max = math.log2(5)
+    neo_prob = float(getattr(posterior, "neo_candidate", 0.0) or 0.0)
+    confidence = 1.0 - (H / H_max) if H_max > 0.0 else 0.0
+    result = neo_prob * confidence
+    return float(min(1.0, max(0.0, result)))

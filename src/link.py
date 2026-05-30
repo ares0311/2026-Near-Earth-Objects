@@ -25,7 +25,8 @@ __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "compute_position_residuals",
            "compute_inter_observation_gaps",
            "compute_tracklet_overlap_fraction",
-           "compute_velocity_dispersion"]
+           "compute_velocity_dispersion",
+           "compute_tracklet_centroid"]
 
 import math
 import uuid
@@ -1364,3 +1365,25 @@ def compute_velocity_dispersion(tracklets: list) -> float:
     mean = sum(rates) / len(rates)
     variance = sum((r - mean) ** 2 for r in rates) / len(rates)
     return float(math.sqrt(variance))
+
+
+def compute_tracklet_centroid(tracklet: object) -> dict[str, float] | None:
+    """Compute the mean sky position (centroid) of a tracklet.
+
+    Averages the RA and Dec of all observations in the tracklet in
+    degree-space and returns a dict with keys ``"ra_deg"`` and ``"dec_deg"``.
+
+    Args:
+        tracklet: Object with an ``observations`` attribute (tuple/list of
+            observation-like objects each having ``ra`` and ``dec`` in degrees).
+
+    Returns:
+        Dict with ``"ra_deg"`` and ``"dec_deg"`` (floats), or ``None`` if the
+        tracklet has no observations (empty tuple/list).
+    """
+    observations = getattr(tracklet, "observations", None) or ()
+    if not observations:
+        return None
+    ras = [float(getattr(obs, "ra", 0.0)) for obs in observations]
+    decs = [float(getattr(obs, "dec", 0.0)) for obs in observations]
+    return {"ra_deg": float(sum(ras) / len(ras)), "dec_deg": float(sum(decs) / len(decs))}

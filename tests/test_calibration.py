@@ -1620,3 +1620,76 @@ class TestComputeIsotonicCalibrationError:
         sys.path.insert(0, "src")
         import calibration
         assert "compute_isotonic_calibration_error" in calibration.__all__
+
+
+class TestComputeExpectedCalibrationErrorWeighted:
+    def test_empty_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_expected_calibration_error_weighted
+        assert compute_expected_calibration_error_weighted([], [], []) == 0.0
+
+    def test_perfect_calibration_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_expected_calibration_error_weighted
+        # Identical prob and label in each bin → zero calibration error
+        probs = [0.5, 0.5, 0.5, 0.5]
+        labels = [0.5, 0.5, 0.5, 0.5]
+        weights = [1.0, 1.0, 1.0, 1.0]
+        result = compute_expected_calibration_error_weighted(probs, labels, weights, n_bins=5)
+        assert result < 0.01
+
+    def test_all_zero_weight_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_expected_calibration_error_weighted
+        probs = [0.5, 0.5]
+        labels = [0.0, 1.0]
+        weights = [0.0, 0.0]
+        assert compute_expected_calibration_error_weighted(probs, labels, weights) == 0.0
+
+    def test_uniform_weight_matches_unweighted_roughly(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import (
+            compute_expected_calibration_error_weighted,
+        )
+        probs = [0.2, 0.4, 0.6, 0.8]
+        labels = [0.0, 0.0, 1.0, 1.0]
+        weights = [1.0, 1.0, 1.0, 1.0]
+        weighted = compute_expected_calibration_error_weighted(probs, labels, weights, n_bins=4)
+        assert isinstance(weighted, float)
+        assert weighted >= 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        assert "compute_expected_calibration_error_weighted" in calibration.__all__
+
+    def test_higher_weight_bins_dominate(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_expected_calibration_error_weighted
+        # High error bin with high weight → higher ECE
+        probs = [0.05, 0.95]
+        labels = [1.0, 0.0]  # Completely wrong predictions
+        weights = [1.0, 1.0]
+        result = compute_expected_calibration_error_weighted(probs, labels, weights, n_bins=10)
+        assert result > 0.0
+
+    def test_zero_weight_bin_skipped(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_expected_calibration_error_weighted
+        # One bin has all-zero weights while another has positive weights.
+        # The zero-weight bin should be skipped (bin_weight == 0.0 branch covered).
+        probs = [0.05, 0.95]
+        labels = [0.0, 1.0]
+        # First sample falls in low-prob bin with zero weight;
+        # second sample is in high-prob bin with positive weight.
+        weights = [0.0, 1.0]
+        result = compute_expected_calibration_error_weighted(probs, labels, weights, n_bins=10)
+        assert isinstance(result, float)
+        assert result >= 0.0

@@ -2287,3 +2287,60 @@ class TestComputePriorityWeightedMoid:
         sys.path.insert(0, "src")
         import score
         assert "compute_priority_weighted_moid" in score.__all__
+
+
+class TestComputeImpactProbabilityProxy:
+    @staticmethod
+    def _make_neo(moid_score=None, pha_flag=None, orbit_q=None):
+        from types import SimpleNamespace
+        features = SimpleNamespace(
+            moid_score=moid_score,
+            pha_flag_confidence=pha_flag,
+            orbit_quality_score=orbit_q,
+        )
+        return SimpleNamespace(features=features)
+
+    def test_all_ones_returns_one(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_impact_probability_proxy
+        neo = self._make_neo(1.0, 1.0, 1.0)
+        assert compute_impact_probability_proxy(neo) == 1.0
+
+    def test_any_none_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_impact_probability_proxy
+        neo = self._make_neo(None, None, None)
+        assert compute_impact_probability_proxy(neo) == 0.0
+
+    def test_partial_scores(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_impact_probability_proxy
+        neo = self._make_neo(0.5, 0.8, 1.0)
+        result = compute_impact_probability_proxy(neo)
+        assert abs(result - 0.5 * 0.8 * 1.0) < 1e-9
+
+    def test_no_features_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from score import compute_impact_probability_proxy
+        neo = SimpleNamespace(features=None)
+        assert compute_impact_probability_proxy(neo) == 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        assert "compute_impact_probability_proxy" in score.__all__
+
+    def test_result_in_range(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_impact_probability_proxy
+        neo = self._make_neo(0.3, 0.7, 0.9)
+        result = compute_impact_probability_proxy(neo)
+        assert 0.0 <= result <= 1.0

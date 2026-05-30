@@ -2761,3 +2761,83 @@ class TestComputeClassificationConfidence:
         sys.path.insert(0, "src")
         import classify
         assert "compute_classification_confidence" in classify.__all__
+
+
+class TestComputeEntropyWeightedScore:
+    def test_certain_neo_high_score(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from classify import compute_entropy_weighted_score
+        # All probability on neo_candidate → low entropy → high score
+        post = SimpleNamespace(
+            neo_candidate=1.0, known_object=0.0, main_belt_asteroid=0.0,
+            stellar_artifact=0.0, other_solar_system=0.0
+        )
+        features = SimpleNamespace()
+        result = compute_entropy_weighted_score(post, features)
+        assert result > 0.9
+
+    def test_uniform_posterior_low_score(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from classify import compute_entropy_weighted_score
+        # Uniform → max entropy → confidence = 0 → score = 0
+        p = 0.2
+        post = SimpleNamespace(
+            neo_candidate=p, known_object=p, main_belt_asteroid=p,
+            stellar_artifact=p, other_solar_system=p
+        )
+        features = SimpleNamespace()
+        result = compute_entropy_weighted_score(post, features)
+        assert result == 0.0
+
+    def test_zero_neo_prob_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from classify import compute_entropy_weighted_score
+        post = SimpleNamespace(
+            neo_candidate=0.0, known_object=1.0, main_belt_asteroid=0.0,
+            stellar_artifact=0.0, other_solar_system=0.0
+        )
+        features = SimpleNamespace()
+        assert compute_entropy_weighted_score(post, features) == 0.0
+
+    def test_result_in_range(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from classify import compute_entropy_weighted_score
+        post = SimpleNamespace(
+            neo_candidate=0.6, known_object=0.2, main_belt_asteroid=0.1,
+            stellar_artifact=0.05, other_solar_system=0.05
+        )
+        features = SimpleNamespace()
+        result = compute_entropy_weighted_score(post, features)
+        assert 0.0 <= result <= 1.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import classify
+        assert "compute_entropy_weighted_score" in classify.__all__
+
+    def test_returns_float(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from classify import compute_entropy_weighted_score
+        post = SimpleNamespace(
+            neo_candidate=0.5, known_object=0.5, main_belt_asteroid=0.0,
+            stellar_artifact=0.0, other_solar_system=0.0
+        )
+        features = SimpleNamespace()
+        result = compute_entropy_weighted_score(post, features)
+        assert isinstance(result, float)
