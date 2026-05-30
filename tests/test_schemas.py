@@ -1553,3 +1553,67 @@ class TestObservationCoverageRunId:
         assert oc.run_id is None
         assert oc.mean_limiting_mag is None
         assert oc.epoch_jd is None
+
+
+class TestPipelineRunSummary:
+    def test_basic_construction(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import PipelineRunSummary
+        prs = PipelineRunSummary(run_id="run-001", epoch_jd=2460000.5)
+        assert prs.run_id == "run-001"
+        assert prs.epoch_jd == 2460000.5
+
+    def test_default_values(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import PipelineRunSummary
+        prs = PipelineRunSummary(run_id="r", epoch_jd=2460000.0)
+        assert prs.n_tracklets == 0
+        assert prs.n_pha_candidates == 0
+        assert prs.n_new_candidates == 0
+        assert prs.top_priority == 0.0
+        assert prs.alert_pathways == ()
+
+    def test_full_construction(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import PipelineRunSummary
+        prs = PipelineRunSummary(
+            run_id="run-full",
+            epoch_jd=2460100.0,
+            n_tracklets=42,
+            n_pha_candidates=3,
+            n_new_candidates=10,
+            top_priority=0.97,
+            alert_pathways=("mpc_submission", "nasa_pdco_notify"),
+        )
+        assert prs.n_tracklets == 42
+        assert prs.n_pha_candidates == 3
+        assert prs.n_new_candidates == 10
+        assert prs.top_priority == 0.97
+        assert "mpc_submission" in prs.alert_pathways
+
+    def test_frozen(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import PipelineRunSummary
+        prs = PipelineRunSummary(run_id="r", epoch_jd=2460000.0)
+        with pytest.raises(Exception):
+            prs.run_id = "changed"  # type: ignore[misc]
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        assert "PipelineRunSummary" in schemas.__all__
+
+    def test_alert_pathways_tuple(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import PipelineRunSummary
+        prs = PipelineRunSummary(
+            run_id="r", epoch_jd=2460000.0,
+            alert_pathways=("mpc_submission",),
+        )
+        assert isinstance(prs.alert_pathways, tuple)

@@ -2048,3 +2048,69 @@ class TestComputeOrbitUncertaintyScore:
         sys.path.insert(0, "src")
         import score
         assert "compute_orbit_uncertainty_score" in score.__all__
+
+
+class TestComputeDetectionCompletenessScore:
+    def _make_neo(self, arc=None, nights=None, rb=None):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import CandidateFeatures, ScoredNEO
+
+        from .conftest import build_scored_neo
+        neo = build_scored_neo()
+        # Replace features with custom values
+        feat = CandidateFeatures(
+            arc_coverage_score=arc,
+            nights_observed_score=nights,
+            real_bogus_score=rb,
+        )
+        return ScoredNEO(
+            tracklet=neo.tracklet,
+            features=feat,
+            posterior=neo.posterior,
+            hazard=neo.hazard,
+            metadata=neo.metadata,
+        )
+
+    def test_all_none_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_detection_completeness_score
+        neo = self._make_neo(None, None, None)
+        assert compute_detection_completeness_score(neo) == 0.0
+
+    def test_all_ones_returns_one(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_detection_completeness_score
+        neo = self._make_neo(1.0, 1.0, 1.0)
+        assert compute_detection_completeness_score(neo) == pytest.approx(1.0)
+
+    def test_partial_scores(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_detection_completeness_score
+        neo = self._make_neo(0.8, 0.6, 0.9)
+        score_val = compute_detection_completeness_score(neo)
+        expected = round(0.5 * 0.8 + 0.3 * 0.6 + 0.2 * 0.9, 4)
+        assert score_val == pytest.approx(expected, abs=1e-4)
+
+    def test_returns_float(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_detection_completeness_score
+        neo = self._make_neo(0.5, 0.5, 0.5)
+        assert isinstance(compute_detection_completeness_score(neo), float)
+
+    def test_clamped_to_zero_one(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_detection_completeness_score
+        neo = self._make_neo(0.0, 0.0, 0.0)
+        assert 0.0 <= compute_detection_completeness_score(neo) <= 1.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        assert "compute_detection_completeness_score" in score.__all__

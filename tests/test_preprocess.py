@@ -2101,3 +2101,89 @@ class TestComputeCutoutNoise:
         sys.path.insert(0, "src")
         import preprocess
         assert "compute_cutout_noise" in preprocess.__all__
+
+
+class TestFlagCosmicRays:
+    def _make_b64(self, arr):
+        import base64
+
+        import numpy as np
+        return base64.b64encode(arr.astype(np.float32).tobytes()).decode()
+
+    def _make_obs(self, obs_id, arr):
+        from types import SimpleNamespace
+        return SimpleNamespace(obs_id=obs_id, cutout_difference=self._make_b64(arr))
+
+    def test_no_cosmic_rays_uniform(self):
+        import sys
+        sys.path.insert(0, "src")
+        import numpy as np
+
+        from preprocess import flag_cosmic_rays
+        arr = np.ones((63, 63), dtype=np.float32)
+        obs = self._make_obs("o1", arr)
+        flagged = flag_cosmic_rays([obs])
+        assert flagged == []
+
+    def test_flags_high_peak_pixel(self):
+        import sys
+        sys.path.insert(0, "src")
+        import numpy as np
+
+        from preprocess import flag_cosmic_rays
+        arr = np.zeros((63, 63), dtype=np.float32)
+        arr[31, 31] = 1000.0  # extreme outlier
+        obs = self._make_obs("cr_001", arr)
+        flagged = flag_cosmic_rays([obs])
+        assert "cr_001" in flagged
+
+    def test_no_cutout_skipped(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import flag_cosmic_rays
+        obs = SimpleNamespace(obs_id="o_no_cutout", cutout_difference=None)
+        flagged = flag_cosmic_rays([obs])
+        assert flagged == []
+
+    def test_invalid_base64_skipped(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import flag_cosmic_rays
+        obs = SimpleNamespace(obs_id="bad", cutout_difference="INVALID!!!")
+        flagged = flag_cosmic_rays([obs])
+        assert flagged == []
+
+    def test_empty_list_returns_empty(self):
+        import sys
+        sys.path.insert(0, "src")
+        from preprocess import flag_cosmic_rays
+        assert flag_cosmic_rays([]) == []
+
+    def test_custom_sigma_threshold(self):
+        import sys
+        sys.path.insert(0, "src")
+        import numpy as np
+
+        from preprocess import flag_cosmic_rays
+        # Use a noisy background so MAD > 0
+        rng = np.random.default_rng(0)
+        arr = rng.normal(100.0, 5.0, (63, 63)).astype(np.float32)
+        # Add a moderate outlier — just above background
+        arr[31, 31] = 130.0  # ~6 sigma above background
+        obs = self._make_obs("o1", arr)
+        # with very high threshold, should not flag (outlier is not extreme enough)
+        flagged_high = flag_cosmic_rays([obs], sigma_threshold=1e9)
+        assert "o1" not in flagged_high
+        # with low threshold (0.1 sigma), should flag
+        flagged_low = flag_cosmic_rays([obs], sigma_threshold=0.1)
+        assert "o1" in flagged_low
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import preprocess
+        assert "flag_cosmic_rays" in preprocess.__all__

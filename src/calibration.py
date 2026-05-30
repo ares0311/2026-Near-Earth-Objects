@@ -29,6 +29,7 @@ __all__ = [
     "compute_calibration_summary",
     "compute_hosmer_lemeshow_statistic",
     "compute_spiegelhalter_z",
+    "compute_brier_skill_score_weighted",
 ]
 
 import math
@@ -1209,3 +1210,56 @@ def compute_spiegelhalter_z(
     if denom <= eps:
         return 0.0
     return float(np.sum(z_i) / denom)
+
+
+def compute_brier_skill_score_weighted(
+    probs: list | np.ndarray,
+    labels: list | np.ndarray,
+    weights: list | np.ndarray | None = None,
+) -> float:
+    """Compute a weighted Brier Skill Score (BSS).
+
+    Computes a sample-weighted version of the BSS where the climatological
+    baseline uses the same weights:
+
+    - Weighted BS = sum(w * (p − y)²) / sum(w)
+    - Weighted climatology p̄ = sum(w * y) / sum(w)
+    - Weighted BS_clim = p̄ * (1 − p̄)
+    - BSS = 1 − BS / BS_clim
+
+    Returns ``0.0`` for empty input, all-zero weights, or when the
+    climatological BS is zero (all labels identical → no skill to measure).
+
+    Args:
+        probs: Predicted probabilities in [0, 1].
+        labels: True binary labels (0 or 1).
+        weights: Non-negative sample weights.  If ``None``, uniform weights
+            are used (equivalent to :func:`compute_brier_skill_score`).
+
+    Returns:
+        Weighted Brier Skill Score, rounded to 6 decimal places.
+    """
+    p = np.asarray(probs, dtype=float)
+    y = np.asarray(labels, dtype=float)
+    n = len(p)
+    if n == 0:
+        return 0.0
+
+    if weights is None:
+        w = np.ones(n, dtype=float)
+    else:
+        w = np.asarray(weights, dtype=float)
+
+    total_weight = float(w.sum())
+    if total_weight <= 0.0:
+        return 0.0
+
+    bs = float(np.sum(w * (p - y) ** 2)) / total_weight
+    p_bar = float(np.sum(w * y)) / total_weight
+    bs_clim = p_bar * (1.0 - p_bar)
+
+    if bs_clim == 0.0:
+        return 0.0
+
+    bss = 1.0 - bs / bs_clim
+    return round(float(bss), 6)

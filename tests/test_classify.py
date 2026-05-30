@@ -2568,3 +2568,54 @@ class TestComputeKnownObjectProbability:
         sys.path.insert(0, "src")
         import classify
         assert "compute_known_object_probability" in classify.__all__
+
+
+class TestComputeStellarArtifactScoreFromFeatures:
+    def _make_features(self, stellar_artifact_score=None):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import CandidateFeatures
+        return CandidateFeatures(stellar_artifact_score=stellar_artifact_score)
+
+    def test_none_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_stellar_artifact_score_from_features
+        f = self._make_features(None)
+        assert compute_stellar_artifact_score_from_features(f) == 0.0
+
+    def test_float_value_returned(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_stellar_artifact_score_from_features
+        f = self._make_features(0.75)
+        assert compute_stellar_artifact_score_from_features(f) == pytest.approx(0.75)
+
+    def test_zero_value(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_stellar_artifact_score_from_features
+        f = self._make_features(0.0)
+        assert compute_stellar_artifact_score_from_features(f) == 0.0
+
+    def test_one_value(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_stellar_artifact_score_from_features
+        f = self._make_features(1.0)
+        assert compute_stellar_artifact_score_from_features(f) == pytest.approx(1.0)
+
+    def test_missing_attribute_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from classify import compute_stellar_artifact_score_from_features
+        obj = SimpleNamespace()  # no stellar_artifact_score attribute
+        assert compute_stellar_artifact_score_from_features(obj) == 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import classify
+        assert "compute_stellar_artifact_score_from_features" in classify.__all__

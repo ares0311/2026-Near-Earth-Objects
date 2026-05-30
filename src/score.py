@@ -23,7 +23,8 @@ __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "compute_followup_window_score",
            "compute_astrometric_priority",
            "compute_size_score",
-           "compute_orbit_uncertainty_score"]
+           "compute_orbit_uncertainty_score",
+           "compute_detection_completeness_score"]
 
 import math
 import uuid
@@ -1216,3 +1217,32 @@ def compute_orbit_uncertainty_score(neo: ScoredNEO) -> float:
     if oq is None:
         return 0.5
     return float(max(0.0, min(1.0, 1.0 - float(oq))))
+
+
+def compute_detection_completeness_score(neo: ScoredNEO) -> float:
+    """Compute a composite detection completeness score for a scored NEO.
+
+    Combines three feature scores that together reflect how completely the
+    candidate has been observed:
+
+    - ``arc_coverage_score``  (weight 0.5)
+    - ``nights_observed_score`` (weight 0.3)
+    - ``real_bogus_score``      (weight 0.2)
+
+    Missing feature scores (``None``) contribute ``0.0`` to the weighted sum.
+    The result is clamped to ``[0, 1]`` and rounded to 4 decimal places.
+
+    Args:
+        neo: :class:`~schemas.ScoredNEO` object.
+
+    Returns:
+        Detection completeness score in [0, 1].
+    """
+    _arc = neo.features.arc_coverage_score
+    _nights = neo.features.nights_observed_score
+    _rb = neo.features.real_bogus_score
+    arc = float(_arc) if _arc is not None else 0.0
+    nights = float(_nights) if _nights is not None else 0.0
+    rb = float(_rb) if _rb is not None else 0.0
+    score = 0.5 * arc + 0.3 * nights + 0.2 * rb
+    return round(float(min(1.0, max(0.0, score))), 4)

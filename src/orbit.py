@@ -22,7 +22,8 @@ __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
            "compute_mean_anomaly_at_epoch",
            "compute_hill_sphere_radius",
            "compute_encounter_velocity",
-           "compute_heliocentric_velocity"]
+           "compute_heliocentric_velocity",
+           "compute_semi_latus_rectum"]
 
 import math
 from typing import NamedTuple
@@ -1410,3 +1411,28 @@ def compute_heliocentric_velocity(elements: object) -> float | None:
     if v2 < 0.0:
         return None
     return round(math.sqrt(v2) * 4.74047, 4)
+
+
+def compute_semi_latus_rectum(elements: object) -> float | None:
+    """Compute the semi-latus rectum p = a * (1 − e²) in AU.
+
+    The semi-latus rectum is the perpendicular distance from a focus to the
+    orbit at the point where the true anomaly is 90°.  It is a useful
+    intermediate quantity in orbital mechanics.
+
+    Returns ``None`` if ``a`` or ``e`` are missing, or if ``a ≤ 0``.
+
+    Args:
+        elements: Any object with ``a_au`` and ``e`` attributes (e.g.
+            :class:`~schemas.OrbitalElements`).
+
+    Returns:
+        Semi-latus rectum in AU, rounded to 6 decimal places, or ``None``.
+    """
+    a = getattr(elements, "a_au", None)
+    e = getattr(elements, "e", None)
+    if a is None or e is None:
+        return None
+    if a <= 0.0:
+        return None
+    return round(float(a) * (1.0 - float(e) ** 2), 6)
