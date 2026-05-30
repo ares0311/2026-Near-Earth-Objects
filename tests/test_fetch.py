@@ -3893,3 +3893,52 @@ class TestDeduplicateObservations:
         sys.path.insert(0, "src")
         import fetch
         assert "deduplicate_observations" in fetch.__all__
+
+
+class TestGetSurveyCoverageFraction:
+    @staticmethod
+    def _make_fetch_result(field_ids):
+        from types import SimpleNamespace
+        alerts = [SimpleNamespace(field_id=fid) for fid in field_ids]
+        return SimpleNamespace(alerts=alerts)
+
+    def test_full_coverage(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import get_survey_coverage_fraction
+        result = self._make_fetch_result(["f1", "f2", "f3"])
+        assert get_survey_coverage_fraction(result, 3) == 1.0
+
+    def test_partial_coverage(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import get_survey_coverage_fraction
+        result = self._make_fetch_result(["f1", "f2"])
+        assert abs(get_survey_coverage_fraction(result, 4) - 0.5) < 1e-9
+
+    def test_zero_expected_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import get_survey_coverage_fraction
+        result = self._make_fetch_result(["f1"])
+        assert get_survey_coverage_fraction(result, 0) == 0.0
+
+    def test_no_alerts_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import get_survey_coverage_fraction
+        result = self._make_fetch_result([])
+        assert get_survey_coverage_fraction(result, 5) == 0.0
+
+    def test_duplicate_field_ids_counted_once(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import get_survey_coverage_fraction
+        result = self._make_fetch_result(["f1", "f1", "f1"])
+        assert abs(get_survey_coverage_fraction(result, 3) - 1.0 / 3.0) < 1e-9
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+        assert "get_survey_coverage_fraction" in fetch.__all__

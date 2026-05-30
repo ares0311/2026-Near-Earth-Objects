@@ -2268,3 +2268,79 @@ class TestComputeFwhmFromCutout:
         sys.path.insert(0, "src")
         import preprocess
         assert "compute_fwhm_from_cutout" in preprocess.__all__
+
+
+class TestComputeLocalBackgroundRms:
+    @staticmethod
+    def _make_cutout(border_val: float = 1.0, center_val: float = 100.0) -> str:
+        import base64
+
+        import numpy as np
+        arr = np.full((63, 63), center_val, dtype=np.float32)
+        arr[:10, :] = border_val
+        arr[53:, :] = border_val
+        arr[:, :10] = border_val
+        arr[:, 53:] = border_val
+        return base64.b64encode(arr.tobytes()).decode()
+
+    def test_uniform_border_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_local_background_rms
+        obs = SimpleNamespace(cutout_difference=self._make_cutout(1.0, 1.0))
+        result = compute_local_background_rms(obs)
+        assert result is not None
+        assert result == 0.0
+
+    def test_nonzero_border_rms(self):
+        import sys
+        sys.path.insert(0, "src")
+        import base64
+        from types import SimpleNamespace
+
+        import numpy as np
+
+        from preprocess import compute_local_background_rms
+        rng = np.random.default_rng(42)
+        arr = rng.normal(0.0, 2.0, (63, 63)).astype(np.float32)
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        obs = SimpleNamespace(cutout_difference=b64)
+        result = compute_local_background_rms(obs)
+        assert result is not None
+        assert result > 0.0
+
+    def test_no_cutout_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_local_background_rms
+        obs = SimpleNamespace(cutout_difference=None)
+        assert compute_local_background_rms(obs) is None
+
+    def test_bad_base64_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_local_background_rms
+        obs = SimpleNamespace(cutout_difference="not-valid-base64!!!")
+        assert compute_local_background_rms(obs) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import preprocess
+        assert "compute_local_background_rms" in preprocess.__all__
+
+    def test_returns_float(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_local_background_rms
+        obs = SimpleNamespace(cutout_difference=self._make_cutout(2.0, 50.0))
+        result = compute_local_background_rms(obs)
+        assert isinstance(result, float)

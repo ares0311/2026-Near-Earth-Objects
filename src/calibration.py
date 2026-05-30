@@ -31,6 +31,7 @@ __all__ = [
     "compute_spiegelhalter_z",
     "compute_brier_skill_score_weighted",
     "compute_isotonic_calibration_error",
+    "compute_expected_calibration_error_weighted",
 ]
 
 import math
@@ -1297,3 +1298,53 @@ def compute_isotonic_calibration_error(
     calibrated = iso.fit_transform(p, y)
     mae = float(np.mean(np.abs(calibrated - y)))
     return round(mae, 6)
+
+
+def compute_expected_calibration_error_weighted(
+    probs: list[float],
+    labels: list[float],
+    weights: list[float],
+    n_bins: int = 10,
+) -> float:
+    """Compute weighted Expected Calibration Error (ECE).
+
+    Predictions are binned by their predicted probability value.  Each bin's
+    contribution to the ECE is weighted by the fraction of total weight that
+    falls in that bin:
+    ``abs(mean_prob_in_bin - mean_label_in_bin) * (sum_weights_in_bin / total_weight)``
+
+    Args:
+        probs: Predicted probabilities in [0, 1].
+        labels: Binary ground-truth labels (0 or 1).
+        weights: Non-negative sample weights (one per prediction).
+        n_bins: Number of equal-width probability bins (default 10).
+
+    Returns:
+        Weighted ECE (float ≥ 0).  Returns 0.0 for empty input or zero
+        total weight.
+    """
+    p = np.asarray(probs, dtype=float)
+    y = np.asarray(labels, dtype=float)
+    w = np.asarray(weights, dtype=float)
+    if len(p) == 0:
+        return 0.0
+    total_weight = float(w.sum())
+    if total_weight == 0.0:
+        return 0.0
+    ece = 0.0
+    bin_edges = np.linspace(0.0, 1.0, n_bins + 1)
+    for i in range(n_bins):
+        lo, hi = bin_edges[i], bin_edges[i + 1]
+        if i == n_bins - 1:
+            mask = (p >= lo) & (p <= hi)
+        else:
+            mask = (p >= lo) & (p < hi)
+        if not mask.any():
+            continue
+        bin_weight = float(w[mask].sum())
+        if bin_weight == 0.0:
+            continue
+        mean_prob = float(np.average(p[mask], weights=w[mask]))
+        mean_label = float(np.average(y[mask], weights=w[mask]))
+        ece += abs(mean_prob - mean_label) * (bin_weight / total_weight)
+    return float(ece)

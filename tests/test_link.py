@@ -2610,3 +2610,69 @@ class TestComputeVelocityDispersion:
         sys.path.insert(0, "src")
         import link
         assert "compute_velocity_dispersion" in link.__all__
+
+
+class TestComputeTrackletCentroid:
+    def test_basic_centroid(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_tracklet_centroid
+        obs1 = SimpleNamespace(ra=10.0, dec=20.0)
+        obs2 = SimpleNamespace(ra=20.0, dec=30.0)
+        tracklet = SimpleNamespace(observations=(obs1, obs2))
+        result = compute_tracklet_centroid(tracklet)
+        assert result is not None
+        assert abs(result["ra_deg"] - 15.0) < 1e-9
+        assert abs(result["dec_deg"] - 25.0) < 1e-9
+
+    def test_single_observation(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_tracklet_centroid
+        obs = SimpleNamespace(ra=100.0, dec=-45.0)
+        tracklet = SimpleNamespace(observations=(obs,))
+        result = compute_tracklet_centroid(tracklet)
+        assert result is not None
+        assert abs(result["ra_deg"] - 100.0) < 1e-9
+        assert abs(result["dec_deg"] - -45.0) < 1e-9
+
+    def test_empty_observations_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_tracklet_centroid
+        tracklet = SimpleNamespace(observations=())
+        assert compute_tracklet_centroid(tracklet) is None
+
+    def test_no_observations_attr_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_tracklet_centroid
+        tracklet = SimpleNamespace()
+        assert compute_tracklet_centroid(tracklet) is None
+
+    def test_returns_dict_keys(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_tracklet_centroid
+        obs = SimpleNamespace(ra=50.0, dec=10.0)
+        tracklet = SimpleNamespace(observations=(obs,))
+        result = compute_tracklet_centroid(tracklet)
+        assert result is not None
+        assert "ra_deg" in result
+        assert "dec_deg" in result
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+        assert "compute_tracklet_centroid" in link.__all__

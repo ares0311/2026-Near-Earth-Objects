@@ -2322,3 +2322,62 @@ class TestGenerateMpcBatchHeader:
         sys.path.insert(0, "src")
         import alert
         assert "generate_mpc_batch_header" in alert.__all__
+
+
+class TestFormatCandidateSummaryTable:
+    @staticmethod
+    def _make_neo(object_id="NEO-001", hazard_flag="pha_candidate", moid_au=0.03, priority=0.85):
+        from types import SimpleNamespace
+        tracklet = SimpleNamespace(object_id=object_id)
+        hazard = SimpleNamespace(hazard_flag=hazard_flag, moid_au=moid_au)
+        metadata = SimpleNamespace(discovery_priority=priority)
+        return SimpleNamespace(tracklet=tracklet, hazard=hazard, metadata=metadata)
+
+    def test_header_present(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_candidate_summary_table
+        neos = [self._make_neo()]
+        table = format_candidate_summary_table(neos)
+        assert "NOT" in table
+        assert "NEO Candidate Summary" in table
+
+    def test_contains_object_id(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_candidate_summary_table
+        neos = [self._make_neo("MYOBJ-42")]
+        table = format_candidate_summary_table(neos)
+        assert "MYOBJ-42" in table
+
+    def test_max_rows_truncation(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_candidate_summary_table
+        neos = [self._make_neo(f"NEO-{i:03d}") for i in range(30)]
+        table = format_candidate_summary_table(neos, max_rows=5)
+        # 5 rows + header + col header + separator = 8 lines
+        lines = table.strip().split("\n")
+        assert len(lines) == 8
+
+    def test_empty_neos(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_candidate_summary_table
+        table = format_candidate_summary_table([])
+        assert "NOT" in table
+        assert isinstance(table, str)
+
+    def test_none_moid(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_candidate_summary_table
+        neos = [self._make_neo(moid_au=None)]
+        table = format_candidate_summary_table(neos)
+        assert "N/A" in table
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+        assert "format_candidate_summary_table" in alert.__all__

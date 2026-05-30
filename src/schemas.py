@@ -36,6 +36,7 @@ __all__ = [
     "PipelineRunSummary",
     "TrackletBatch",
     "FieldObservation",
+    "ScoringRun",
 ]
 
 from dataclasses import dataclass
@@ -1106,3 +1107,16 @@ class FieldObservation(BaseModel):
     limiting_mag: float | None = None
     n_sources: int = 0
     filter_band: str | None = None
+
+
+class ScoringRun(BaseModel):
+    """Summary of a single scoring batch run."""
+
+    model_config = ConfigDict(frozen=True)
+
+    run_id: str
+    n_scored: int = 0
+    n_pha: int = 0
+    mean_priority: float = 0.0
+    top_object_id: str | None = None
+    epoch_jd: float | None = None

@@ -23,7 +23,8 @@ __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_
            "compute_elongation_angle",
            "compute_cutout_noise",
            "flag_cosmic_rays",
-           "compute_fwhm_from_cutout"]
+           "compute_fwhm_from_cutout",
+           "compute_local_background_rms"]
 
 import base64
 import math
@@ -1238,5 +1239,42 @@ def compute_fwhm_from_cutout(obs: object) -> float | None:
         sigma = float(popt[2])
         fwhm = 2.355 * abs(sigma) * _PIXEL_SCALE
         return round(fwhm, 4)
+    except Exception:
+        return None
+
+
+def compute_local_background_rms(obs: object) -> float | None:
+    """Compute background RMS from the border pixels of the difference-image cutout.
+
+    Extracts pixels from the 10-pixel border region of the 63×63 float32
+    difference-image cutout (top 10 rows, bottom 10 rows, left 10 columns,
+    right 10 columns) and returns their standard deviation as the local
+    background RMS estimate.
+
+    Args:
+        obs: Any object with an optional ``cutout_difference`` base64-encoded
+            float32 array attribute.
+
+    Returns:
+        Background RMS in pixel units (float), or ``None`` if no cutout,
+        decode error, or fewer than 4 border pixels.
+    """
+    try:
+        import base64
+
+        import numpy as np
+
+        cutout = getattr(obs, "cutout_difference", None)
+        if cutout is None:
+            return None
+        raw = base64.b64decode(cutout)
+        arr = np.frombuffer(raw, dtype=np.float32).reshape(63, 63).astype(float)
+        # Collect border pixels: top 10 rows, bottom 10 rows, left 10 cols, right 10 cols
+        top = arr[:10, :].ravel()
+        bottom = arr[53:, :].ravel()
+        left = arr[:, :10].ravel()
+        right = arr[:, 53:].ravel()
+        border = np.concatenate([top, bottom, left, right])
+        return float(np.std(border))
     except Exception:
         return None

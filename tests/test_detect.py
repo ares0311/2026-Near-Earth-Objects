@@ -2272,3 +2272,72 @@ class TestComputeSourceCompactness:
         sys.path.insert(0, "src")
         import detect
         assert "compute_source_compactness" in detect.__all__
+
+
+class TestComputePhotonNoiseLimit:
+    @staticmethod
+    def _make_cutout(peak: float = 100.0) -> str:
+        import base64
+
+        import numpy as np
+        arr = np.zeros((63, 63), dtype=np.float32)
+        arr[31, 31] = peak
+        return base64.b64encode(arr.tobytes()).decode()
+
+    def test_basic_noise_floor(self):
+        import sys
+        sys.path.insert(0, "src")
+        import math
+        from types import SimpleNamespace
+
+        from detect import compute_photon_noise_limit
+        obs = SimpleNamespace(cutout_difference=self._make_cutout(100.0))
+        result = compute_photon_noise_limit(obs)
+        assert result is not None
+        assert abs(result - math.sqrt(100.0) / 100.0) < 1e-6
+
+    def test_no_cutout_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import compute_photon_noise_limit
+        obs = SimpleNamespace(cutout_difference=None)
+        assert compute_photon_noise_limit(obs) is None
+
+    def test_zero_peak_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import compute_photon_noise_limit
+        obs = SimpleNamespace(cutout_difference=self._make_cutout(0.0))
+        assert compute_photon_noise_limit(obs) is None
+
+    def test_custom_gain(self):
+        import sys
+        sys.path.insert(0, "src")
+        import math
+        from types import SimpleNamespace
+
+        from detect import compute_photon_noise_limit
+        obs = SimpleNamespace(cutout_difference=self._make_cutout(64.0))
+        result = compute_photon_noise_limit(obs, gain=4.0)
+        expected = math.sqrt(64.0 * 4.0) / 64.0
+        assert result is not None
+        assert abs(result - expected) < 1e-6
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import detect
+        assert "compute_photon_noise_limit" in detect.__all__
+
+    def test_bad_base64_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import compute_photon_noise_limit
+        obs = SimpleNamespace(cutout_difference="bad!!!")
+        assert compute_photon_noise_limit(obs) is None

@@ -24,7 +24,8 @@ __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fet
            "count_observations_by_mission",
            "build_fetch_provenance",
            "get_fetch_result_age",
-           "deduplicate_observations"]
+           "deduplicate_observations",
+           "get_survey_coverage_fraction"]
 
 import json
 import os
@@ -1890,3 +1891,33 @@ def deduplicate_observations(observations: object) -> list:
                 seen.add(obs_id)
             result.append(obs)
     return result
+
+
+def get_survey_coverage_fraction(fetch_result: object, expected_fields: int) -> float:
+    """Return the fraction of expected survey fields represented in a FetchResult.
+
+    Counts the number of unique ``field_id`` values among all observations in
+    *fetch_result.alerts* and divides by *expected_fields*.  Returns a float
+    in [0, 1].  Returns 0.0 if *expected_fields* ≤ 0 or if there are no
+    observations.
+
+    Args:
+        fetch_result: A :class:`~schemas.FetchResult`-like object with an
+            ``alerts`` attribute (iterable of observation-like objects, each
+            with an optional ``field_id`` attribute).
+        expected_fields: Total number of fields expected for full coverage.
+
+    Returns:
+        Coverage fraction in [0, 1].
+    """
+    if expected_fields <= 0:
+        return 0.0
+    alerts = getattr(fetch_result, "alerts", None) or []
+    field_ids: set[object] = set()
+    for obs in alerts:
+        fid = getattr(obs, "field_id", None)
+        if fid is not None:
+            field_ids.add(fid)
+    if not field_ids:
+        return 0.0
+    return float(min(1.0, len(field_ids) / expected_fields))

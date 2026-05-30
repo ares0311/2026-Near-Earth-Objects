@@ -26,7 +26,8 @@ __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "compute_orbit_uncertainty_score",
            "compute_detection_completeness_score",
            "compute_combined_hazard_score",
-           "compute_priority_weighted_moid"]
+           "compute_priority_weighted_moid",
+           "compute_impact_probability_proxy"]
 
 import math
 import uuid
@@ -1316,3 +1317,33 @@ def compute_priority_weighted_moid(neos: list) -> float | None:
     if total_weight == 0.0:
         return None
     return float(weighted_sum / total_weight)
+
+
+def compute_impact_probability_proxy(neo: object) -> float:
+    """Compute a conservative proxy score for hazard assessment.
+
+    This value is NOT a real impact probability.  It does NOT represent the
+    actual probability of an Earth impact and must NOT be communicated as
+    such.  It is a dimensionless product of three pipeline feature scores
+    for internal prioritisation only.  All hazard assessments must defer
+    to MPC/CNEOS for authoritative impact probability estimates.
+
+    The proxy is computed as:
+        ``moid_score * pha_flag_confidence * orbit_quality_score``
+
+    Any missing (``None``) feature contributes 0.0 to the product.  The
+    result is clamped to [0, 1].
+
+    Args:
+        neo: A :class:`~schemas.ScoredNEO`-like object with a ``features``
+            attribute.
+
+    Returns:
+        Proxy score in [0, 1] (float).
+    """
+    features = getattr(neo, "features", None)
+    moid_score = float(getattr(features, "moid_score", None) or 0.0) if features else 0.0
+    pha_flag = float(getattr(features, "pha_flag_confidence", None) or 0.0) if features else 0.0
+    orbit_q = float(getattr(features, "orbit_quality_score", None) or 0.0) if features else 0.0
+    result = moid_score * pha_flag * orbit_q
+    return float(min(1.0, max(0.0, result)))

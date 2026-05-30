@@ -1733,3 +1733,64 @@ class TestFieldObservation:
             field_id="f5", ra_deg=200.0, dec_deg=-30.0, epoch_jd=2460999.5, survey="CSS"
         )
         assert fo.epoch_jd == 2460999.5
+
+
+class TestScoringRun:
+    def test_default_values(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import ScoringRun
+        run = ScoringRun(run_id="run-001")
+        assert run.n_scored == 0
+        assert run.n_pha == 0
+        assert run.mean_priority == 0.0
+        assert run.top_object_id is None
+        assert run.epoch_jd is None
+
+    def test_custom_values(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import ScoringRun
+        run = ScoringRun(
+            run_id="run-002",
+            n_scored=10,
+            n_pha=2,
+            mean_priority=0.75,
+            top_object_id="NEO-001",
+            epoch_jd=2460000.5,
+        )
+        assert run.n_scored == 10
+        assert run.n_pha == 2
+        assert run.mean_priority == 0.75
+        assert run.top_object_id == "NEO-001"
+        assert run.epoch_jd == 2460000.5
+
+    def test_is_frozen(self):
+        import sys
+        sys.path.insert(0, "src")
+        import pytest
+
+        from schemas import ScoringRun
+        run = ScoringRun(run_id="run-003")
+        with pytest.raises(Exception):
+            run.n_scored = 5  # type: ignore[misc]
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        assert "ScoringRun" in schemas.__all__
+
+    def test_run_id_stored(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import ScoringRun
+        run = ScoringRun(run_id="my-run-id")
+        assert run.run_id == "my-run-id"
+
+    def test_mean_priority_float(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import ScoringRun
+        run = ScoringRun(run_id="r", mean_priority=0.5)
+        assert isinstance(run.mean_priority, float)

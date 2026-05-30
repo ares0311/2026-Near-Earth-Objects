@@ -1277,8 +1277,8 @@ def compute_tisserand_wrt_earth(elements: object) -> float | None:
     return round(t_e, 8)
 
 
-def compute_orbital_arc_quality(tracklet: object) -> int:
-    """Return an orbit quality code (1–4) based on the tracklet's arc length in days.
+def compute_orbital_arc_quality(arc_days: float | None) -> int | None:
+    """Return an orbit quality code (1–4) based on arc length in days.
 
     Quality codes follow the MPC convention:
     - 1: arc_days < 1 (single night)
@@ -1287,17 +1287,22 @@ def compute_orbital_arc_quality(tracklet: object) -> int:
     - 4: arc_days ≥ 30 (opposition / long arc)
 
     Args:
-        tracklet: Object with an ``arc_days`` attribute (default 0.0 if missing).
+        arc_days: Arc length in days, or ``None``.
 
     Returns:
-        Integer quality code in {1, 2, 3, 4}.
+        Integer quality code in {1, 2, 3, 4}, or ``None`` if *arc_days* is
+        ``None`` or negative.
     """
-    arc_days = float(getattr(tracklet, "arc_days", 0.0) or 0.0)
-    if arc_days >= 30.0:
+    if arc_days is None:
+        return None
+    arc = float(arc_days)
+    if arc < 0.0:
+        return None
+    if arc >= 30.0:
         return 4
-    if arc_days >= 7.0:
+    if arc >= 7.0:
         return 3
-    if arc_days >= 1.0:
+    if arc >= 1.0:
         return 2
     return 1
 
