@@ -24,7 +24,8 @@ __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_
            "compute_cutout_noise",
            "flag_cosmic_rays",
            "compute_fwhm_from_cutout",
-           "compute_local_background_rms"]
+           "compute_local_background_rms",
+           "compute_cutout_peak_snr"]
 
 import base64
 import math
@@ -1239,6 +1240,47 @@ def compute_fwhm_from_cutout(obs: object) -> float | None:
         sigma = float(popt[2])
         fwhm = 2.355 * abs(sigma) * _PIXEL_SCALE
         return round(fwhm, 4)
+    except Exception:
+        return None
+
+
+def compute_cutout_peak_snr(obs: object) -> float | None:
+    """Compute peak pixel SNR from the difference-image cutout.
+
+    Divides the maximum pixel value in the 63×63 float32 difference-image
+    cutout by the standard deviation of the 10-pixel border region (rows 0–9,
+    rows 53–62, columns 0–9, columns 53–62).  The border pixels serve as the
+    background noise estimate.
+
+    Args:
+        obs: Any object with an optional ``cutout_difference`` base64-encoded
+            float32 array attribute.
+
+    Returns:
+        Peak SNR (float), or ``None`` if no cutout, decode error, or border
+        standard deviation is zero or negative.
+    """
+    try:
+        import base64
+
+        import numpy as np
+
+        cutout = getattr(obs, "cutout_difference", None)
+        if cutout is None:
+            return None
+        raw = base64.b64decode(cutout)
+        arr = np.frombuffer(raw, dtype=np.float32).reshape(63, 63).astype(float)
+        # Border pixels: rows 0-9, rows 53-62, cols 0-9, cols 53-62
+        top = arr[:10, :].ravel()
+        bottom = arr[53:, :].ravel()
+        left = arr[:, :10].ravel()
+        right = arr[:, 53:].ravel()
+        border = np.concatenate([top, bottom, left, right])
+        border_std = float(np.std(border))
+        if border_std <= 0.0:
+            return None
+        peak = float(arr.max())
+        return float(peak / border_std)
     except Exception:
         return None
 

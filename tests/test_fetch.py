@@ -3942,3 +3942,76 @@ class TestGetSurveyCoverageFraction:
         sys.path.insert(0, "src")
         import fetch
         assert "get_survey_coverage_fraction" in fetch.__all__
+
+
+class TestPartitionByField:
+    """Tests for partition_by_field."""
+
+    def test_empty_fetch_result_returns_empty_dict(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from fetch import partition_by_field
+
+        fr = SimpleNamespace(alerts=[])
+        result = partition_by_field(fr)
+        assert result == {}
+
+    def test_none_field_id_groups_under_unknown(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from fetch import partition_by_field
+
+        obs = SimpleNamespace(field_id=None)
+        fr = SimpleNamespace(alerts=[obs])
+        result = partition_by_field(fr)
+        assert "unknown" in result
+        assert len(result["unknown"]) == 1
+
+    def test_missing_field_id_attr_groups_under_unknown(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from fetch import partition_by_field
+
+        obs = SimpleNamespace()  # no field_id attr
+        fr = SimpleNamespace(alerts=[obs])
+        result = partition_by_field(fr)
+        assert "unknown" in result
+
+    def test_groups_by_field_id(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from fetch import partition_by_field
+
+        obs1 = SimpleNamespace(field_id="f1")
+        obs2 = SimpleNamespace(field_id="f2")
+        obs3 = SimpleNamespace(field_id="f1")
+        fr = SimpleNamespace(alerts=[obs1, obs2, obs3])
+        result = partition_by_field(fr)
+        assert len(result["f1"]) == 2
+        assert len(result["f2"]) == 1
+
+    def test_no_alerts_attr_returns_empty_dict(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from fetch import partition_by_field
+
+        fr = SimpleNamespace()  # no alerts attr
+        result = partition_by_field(fr)
+        assert result == {}
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+
+        assert "partition_by_field" in fetch.__all__

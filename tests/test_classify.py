@@ -2841,3 +2841,95 @@ class TestComputeEntropyWeightedScore:
         features = SimpleNamespace()
         result = compute_entropy_weighted_score(post, features)
         assert isinstance(result, float)
+
+
+class TestComputeTier1NeoScore:
+    """Tests for compute_tier1_neo_score."""
+
+    @staticmethod
+    def _make_features(**kwargs):
+        from types import SimpleNamespace
+
+        defaults = dict(
+            real_bogus_score=0.9,
+            arc_coverage_score=0.8,
+            nights_observed_score=0.7,
+            motion_consistency_score=0.8,
+            orbit_quality_score=0.6,
+            known_object_score=0.0,
+            stellar_artifact_score=0.05,
+            main_belt_consistency_score=0.1,
+        )
+        defaults.update(kwargs)
+        return SimpleNamespace(**defaults)
+
+    def test_returns_float(self):
+        import sys
+        sys.path.insert(0, "src")
+
+        from classify import compute_tier1_neo_score
+
+        f = self._make_features()
+        result = compute_tier1_neo_score(f)
+        assert isinstance(result, float)
+
+    def test_result_in_range(self):
+        import sys
+        sys.path.insert(0, "src")
+
+        from classify import compute_tier1_neo_score
+
+        f = self._make_features()
+        result = compute_tier1_neo_score(f)
+        assert 0.0 <= result <= 1.0
+
+    def test_artifact_features_gives_low_score(self):
+        import sys
+        sys.path.insert(0, "src")
+
+        from classify import compute_tier1_neo_score
+
+        f = self._make_features(real_bogus_score=0.1, arc_coverage_score=0.1,
+                                 nights_observed_score=0.1, stellar_artifact_score=0.9)
+        result = compute_tier1_neo_score(f)
+        assert result < 0.5
+
+    def test_zero_neo_prob_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from classify import compute_neo_probability, compute_tier1_neo_score
+
+        # Use features that make neo prob as low as possible
+        f = SimpleNamespace(
+            real_bogus_score=0.0, arc_coverage_score=0.0, nights_observed_score=0.0,
+            motion_consistency_score=0.0, orbit_quality_score=0.0, known_object_score=1.0,
+            stellar_artifact_score=1.0, main_belt_consistency_score=1.0,
+        )
+        p = compute_neo_probability(f)
+        result = compute_tier1_neo_score(f)
+        assert result >= 0.0
+        if p <= 0.0:
+            assert result == 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import classify
+
+        assert "compute_tier1_neo_score" in classify.__all__
+
+    def test_high_quality_features_high_score(self):
+        import sys
+        sys.path.insert(0, "src")
+
+        from classify import compute_tier1_neo_score
+
+        f = self._make_features(
+            real_bogus_score=1.0, arc_coverage_score=1.0, nights_observed_score=1.0,
+            motion_consistency_score=1.0, orbit_quality_score=1.0,
+            known_object_score=0.0, stellar_artifact_score=0.0, main_belt_consistency_score=0.0,
+        )
+        result = compute_tier1_neo_score(f)
+        assert result > 0.5

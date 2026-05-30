@@ -2676,3 +2676,103 @@ class TestComputeTrackletCentroid:
         sys.path.insert(0, "src")
         import link
         assert "compute_tracklet_centroid" in link.__all__
+
+
+class TestComputeAlongTrackError:
+    """Tests for compute_along_track_error."""
+
+    @staticmethod
+    def _make_tracklet(n_obs=4, pa_deg=0.0):
+        from types import SimpleNamespace
+
+        obs = []
+        for i in range(n_obs):
+            obs.append(SimpleNamespace(
+                ra=180.0 + i * 0.001,
+                dec=10.0 + i * 0.0001,
+                jd=2460000.5 + i * 1.0,
+            ))
+        return SimpleNamespace(
+            observations=tuple(obs),
+            motion_pa_degrees=pa_deg,
+            motion_rate_arcsec_per_hour=1.0,
+        )
+
+    def test_returns_float(self):
+        import sys
+        sys.path.insert(0, "src")
+
+        from link import compute_along_track_error
+
+        tracklet = self._make_tracklet(4)
+        result = compute_along_track_error(tracklet)
+        assert isinstance(result, float)
+
+    def test_few_obs_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+
+        from link import compute_along_track_error
+
+        tracklet = self._make_tracklet(2)
+        assert compute_along_track_error(tracklet) == 0.0
+
+    def test_one_obs_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+
+        from link import compute_along_track_error
+
+        tracklet = self._make_tracklet(1)
+        assert compute_along_track_error(tracklet) == 0.0
+
+    def test_perfectly_linear_near_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+
+        from link import compute_along_track_error
+
+        # Perfectly linear motion → residuals should be very small
+        tracklet = self._make_tracklet(5)
+        result = compute_along_track_error(tracklet)
+        assert result >= 0.0
+        assert result < 1.0  # should be near 0 for linear motion
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+
+        assert "compute_along_track_error" in link.__all__
+
+    def test_no_observations_attr_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_along_track_error
+
+        tracklet = SimpleNamespace()
+        assert compute_along_track_error(tracklet) == 0.0
+
+    def test_observations_with_invalid_jd_triggers_exception_path(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_along_track_error
+
+        # Observations with all the same JD will cause polyfit to produce
+        # degenerate coefficients that survive, but if we pass non-numeric
+        # ra values numpy will raise an exception caught by the except block.
+        class _BadObs:
+            ra = "not-a-number"
+            dec = 10.0
+            jd = 2460000.5
+
+        tracklet = SimpleNamespace(
+            observations=(_BadObs(), _BadObs(), _BadObs()),
+            motion_pa_degrees=0.0,
+        )
+        result = compute_along_track_error(tracklet)
+        assert result == 0.0

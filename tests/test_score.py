@@ -2344,3 +2344,73 @@ class TestComputeImpactProbabilityProxy:
         neo = self._make_neo(0.3, 0.7, 0.9)
         result = compute_impact_probability_proxy(neo)
         assert 0.0 <= result <= 1.0
+
+
+class TestComputeSurveyEfficiencyScore:
+    """Tests for compute_survey_efficiency_score."""
+
+    @staticmethod
+    def _make_neo(arc=None, nights=None):
+        from types import SimpleNamespace
+
+        features = SimpleNamespace(
+            arc_coverage_score=arc,
+            nights_observed_score=nights,
+        )
+        return SimpleNamespace(features=features)
+
+    def test_both_none_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+
+        from score import compute_survey_efficiency_score
+
+        neo = self._make_neo(None, None)
+        assert compute_survey_efficiency_score(neo) == 0.0
+
+    def test_perfect_scores_returns_one(self):
+        import sys
+        sys.path.insert(0, "src")
+
+        from score import compute_survey_efficiency_score
+
+        neo = self._make_neo(1.0, 1.0)
+        assert abs(compute_survey_efficiency_score(neo) - 1.0) < 1e-9
+
+    def test_geometric_mean(self):
+        import sys
+        sys.path.insert(0, "src")
+        import math
+
+        from score import compute_survey_efficiency_score
+
+        neo = self._make_neo(0.64, 0.36)
+        result = compute_survey_efficiency_score(neo)
+        assert abs(result - math.sqrt(0.64 * 0.36)) < 1e-9
+
+    def test_no_features_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from score import compute_survey_efficiency_score
+
+        neo = SimpleNamespace(features=None)
+        assert compute_survey_efficiency_score(neo) == 0.0
+
+    def test_result_in_range(self):
+        import sys
+        sys.path.insert(0, "src")
+
+        from score import compute_survey_efficiency_score
+
+        neo = self._make_neo(0.7, 0.5)
+        result = compute_survey_efficiency_score(neo)
+        assert 0.0 <= result <= 1.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+
+        assert "compute_survey_efficiency_score" in score.__all__

@@ -37,6 +37,7 @@ __all__ = [
     "TrackletBatch",
     "FieldObservation",
     "ScoringRun",
+    "AlertBatch",
 ]
 
 from dataclasses import dataclass
@@ -1120,3 +1121,16 @@ class ScoringRun(BaseModel):
     mean_priority: float = 0.0
     top_object_id: str | None = None
     epoch_jd: float | None = None
+
+
+class AlertBatch(BaseModel):
+    """A batch of alert packages from a single pipeline run."""
+
+    model_config = ConfigDict(frozen=True)
+
+    batch_id: str
+    run_id: str
+    n_alerts: int = 0
+    pathways: tuple[str, ...] = ()
+    epoch_jd: float | None = None
+    guardrail_statement: str = "These alerts do NOT constitute confirmed detections."

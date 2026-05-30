@@ -25,7 +25,8 @@ __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
            "compute_heliocentric_velocity",
            "compute_semi_latus_rectum",
            "compute_nodal_precession_rate",
-           "compute_vis_viva_velocity"]
+           "compute_vis_viva_velocity",
+           "compute_jacobi_constant"]
 
 import math
 from typing import NamedTuple
@@ -1533,3 +1534,22 @@ def compute_vis_viva_velocity(elements: object, r_au: float) -> float | None:
     v_au_yr = math.sqrt(v2)
     v_km_s = v_au_yr * _AU_YR_TO_KM_S
     return round(float(v_km_s), 4)
+
+
+def compute_jacobi_constant(elements: object) -> float:
+    """Compute the Jacobi constant (Tisserand parameter w.r.t. Jupiter).
+
+    Delegates to :func:`tisserand_parameter` and returns the result.  The
+    Jacobi constant is used to distinguish cometary from asteroidal orbits
+    (T_J < 3 ↔ comet-like behaviour).  Returns 0.0 for non-positive
+    semi-major axis (delegated to :func:`tisserand_parameter`).
+
+    Args:
+        elements: An :class:`~schemas.OrbitalElements`-like object with
+            ``semi_major_axis_au``, ``eccentricity``, and ``inclination_deg``
+            attributes.
+
+    Returns:
+        Tisserand parameter (float).
+    """
+    return tisserand_parameter(elements)

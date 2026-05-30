@@ -43,6 +43,7 @@ __all__ = [
     "count_alerts_by_hazard_flag",
     "generate_mpc_batch_header",
     "format_candidate_summary_table",
+    "estimate_confirmation_time",
 ]
 
 import json
@@ -1840,3 +1841,34 @@ def format_candidate_summary_table(neos: list[object], max_rows: int = 20) -> st
             f"{rank:>4}  {object_id:<20}  {hazard_flag:<18}  {moid_str:>8}  {priority_str:>8}"
         )
     return "\n".join(rows)
+
+
+def estimate_confirmation_time(neo: object) -> float:
+    """Estimate the time in hours required to obtain independent confirmation.
+
+    Uses :func:`~score.compute_followup_urgency` to determine the urgency tier
+    for the candidate, then maps that tier to a characteristic confirmation
+    time based on typical survey cadences.
+
+    Urgency mapping:
+        - ``"URGENT"``  → 6 hours
+        - ``"HIGH"``    → 24 hours
+        - ``"MEDIUM"``  → 72 hours
+        - ``"ROUTINE"`` → 168 hours (default for unknown urgency)
+
+    Args:
+        neo: A :class:`~schemas.ScoredNEO`-like object.
+
+    Returns:
+        Estimated confirmation time in hours (float).
+    """
+    from score import compute_followup_urgency
+
+    _urgency_hours: dict[str, float] = {
+        "URGENT": 6.0,
+        "HIGH": 24.0,
+        "MEDIUM": 72.0,
+        "ROUTINE": 168.0,
+    }
+    urgency = compute_followup_urgency(neo)
+    return _urgency_hours.get(urgency, 168.0)

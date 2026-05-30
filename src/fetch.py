@@ -25,7 +25,8 @@ __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fet
            "build_fetch_provenance",
            "get_fetch_result_age",
            "deduplicate_observations",
-           "get_survey_coverage_fraction"]
+           "get_survey_coverage_fraction",
+           "partition_by_field"]
 
 import json
 import os
@@ -1921,3 +1922,27 @@ def get_survey_coverage_fraction(fetch_result: object, expected_fields: int) -> 
     if not field_ids:
         return 0.0
     return float(min(1.0, len(field_ids) / expected_fields))
+
+
+def partition_by_field(fetch_result: object) -> dict[str, list]:
+    """Group observations from a FetchResult by field_id.
+
+    Iterates over ``fetch_result.alerts`` and buckets each observation by its
+    ``field_id`` attribute.  Observations with no ``field_id`` or where the
+    attribute is ``None`` are grouped under the key ``"unknown"``.
+
+    Args:
+        fetch_result: A :class:`~schemas.FetchResult`-like object with an
+            ``alerts`` attribute (iterable of observation-like objects).
+
+    Returns:
+        A ``dict[str, list]`` mapping field_id → list of observations.  Returns
+        an empty dict if the fetch result has no alerts.
+    """
+    alerts = getattr(fetch_result, "alerts", None) or []
+    result: dict[str, list] = {}
+    for obs in alerts:
+        fid = getattr(obs, "field_id", None)
+        key = str(fid) if fid is not None else "unknown"
+        result.setdefault(key, []).append(obs)
+    return result
