@@ -24,7 +24,8 @@ __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_
            "compute_cutout_noise",
            "flag_cosmic_rays",
            "compute_fwhm_from_cutout",
-           "compute_local_background_rms"]
+           "compute_local_background_rms",
+           "compute_cutout_peak_snr"]
 
 import base64
 import math
