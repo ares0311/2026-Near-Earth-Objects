@@ -26,7 +26,8 @@ __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "compute_inter_observation_gaps",
            "compute_tracklet_overlap_fraction",
            "compute_velocity_dispersion",
-           "compute_tracklet_centroid"]
+           "compute_tracklet_centroid",
+           "compute_along_track_error"]
 
 import math
 import uuid
@@ -1387,3 +1388,56 @@ def compute_tracklet_centroid(tracklet: object) -> dict[str, float] | None:
     ras = [float(getattr(obs, "ra", 0.0)) for obs in observations]
     decs = [float(getattr(obs, "dec", 0.0)) for obs in observations]
     return {"ra_deg": float(sum(ras) / len(ras)), "dec_deg": float(sum(decs) / len(decs))}
+
+
+def compute_along_track_error(tracklet: object) -> float:
+    """Compute the RMS of observation residuals projected along the motion PA.
+
+    Fits linear models to RA(t) and Dec(t), computes the residuals for each
+    observation, then projects each residual onto the along-track direction
+    defined by the tracklet's motion position angle.  Returns the RMS of those
+    along-track residuals in arcseconds.
+
+    Args:
+        tracklet: Object with ``observations``, ``motion_pa_degrees``, and
+            ``motion_rate_arcsec_per_hour`` attributes.  Observations must have
+            ``ra``, ``dec``, and ``jd`` attributes (all in degrees / Julian dates).
+
+    Returns:
+        Along-track RMS residual in arcseconds (float ≥ 0).  Returns ``0.0``
+        for tracklets with fewer than 3 observations or on any exception.
+    """
+    try:
+        import math
+
+        import numpy as np
+
+        observations = getattr(tracklet, "observations", None) or ()
+        if len(observations) < 3:
+            return 0.0
+
+        pa_deg = getattr(tracklet, "motion_pa_degrees", 0.0) or 0.0
+        pa_rad = math.radians(float(pa_deg))
+
+        jds = np.array([float(getattr(obs, "jd", 0.0)) for obs in observations])
+        ras = np.array([float(getattr(obs, "ra", 0.0)) for obs in observations])
+        decs = np.array([float(getattr(obs, "dec", 0.0)) for obs in observations])
+
+        # Fit linear RA(t) and Dec(t)
+        ra_coeffs = np.polyfit(jds, ras, 1)
+        dec_coeffs = np.polyfit(jds, decs, 1)
+
+        ra_pred = np.polyval(ra_coeffs, jds)
+        dec_pred = np.polyval(dec_coeffs, jds)
+
+        # Residuals in arcsec
+        dra_arcsec = (ras - ra_pred) * 3600.0
+        ddec_arcsec = (decs - dec_pred) * 3600.0
+
+        # Project onto along-track direction
+        along = dra_arcsec * math.cos(pa_rad) + ddec_arcsec * math.sin(pa_rad)
+
+        rms = float(np.sqrt(np.mean(along ** 2)))
+        return rms
+    except Exception:
+        return 0.0

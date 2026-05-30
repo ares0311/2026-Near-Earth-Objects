@@ -2344,3 +2344,95 @@ class TestComputeLocalBackgroundRms:
         obs = SimpleNamespace(cutout_difference=self._make_cutout(2.0, 50.0))
         result = compute_local_background_rms(obs)
         assert isinstance(result, float)
+
+
+class TestComputeCutoutPeakSnr:
+    """Tests for compute_cutout_peak_snr."""
+
+    @staticmethod
+    def _make_cutout(
+        border_val: float = 1.0, center_val: float = 100.0, noise: bool = False
+    ) -> str:
+        import base64
+
+        import numpy as np
+
+        rng = np.random.default_rng(0)
+        arr = np.full((63, 63), border_val, dtype=np.float32)
+        if noise:
+            arr[:10, :] += rng.normal(0, 0.5, (10, 63)).astype(np.float32)
+            arr[53:, :] += rng.normal(0, 0.5, (10, 63)).astype(np.float32)
+            arr[:, :10] += rng.normal(0, 0.5, (63, 10)).astype(np.float32)
+            arr[:, 53:] += rng.normal(0, 0.5, (63, 10)).astype(np.float32)
+        arr[31, 31] = center_val
+        return base64.b64encode(arr.tobytes()).decode()
+
+    def test_returns_float_for_valid_cutout(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_cutout_peak_snr
+
+        obs = SimpleNamespace(cutout_difference=self._make_cutout(1.0, 100.0, noise=True))
+        result = compute_cutout_peak_snr(obs)
+        assert isinstance(result, float)
+        assert result > 0.0
+
+    def test_no_cutout_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_cutout_peak_snr
+
+        obs = SimpleNamespace(cutout_difference=None)
+        assert compute_cutout_peak_snr(obs) is None
+
+    def test_uniform_border_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        # Uniform array → std = 0 → None
+        import base64
+        from types import SimpleNamespace
+
+        import numpy as np
+
+        from preprocess import compute_cutout_peak_snr
+
+        arr = np.ones((63, 63), dtype=np.float32) * 5.0
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        obs = SimpleNamespace(cutout_difference=b64)
+        assert compute_cutout_peak_snr(obs) is None
+
+    def test_bad_base64_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_cutout_peak_snr
+
+        obs = SimpleNamespace(cutout_difference="!!!notvalidbase64!!!")
+        assert compute_cutout_peak_snr(obs) is None
+
+    def test_high_peak_gives_higher_snr(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_cutout_peak_snr
+
+        obs_low = SimpleNamespace(cutout_difference=self._make_cutout(1.0, 10.0, noise=True))
+        obs_high = SimpleNamespace(cutout_difference=self._make_cutout(1.0, 1000.0, noise=True))
+        snr_low = compute_cutout_peak_snr(obs_low)
+        snr_high = compute_cutout_peak_snr(obs_high)
+        assert snr_low is not None
+        assert snr_high is not None
+        assert snr_high > snr_low
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import preprocess
+
+        assert "compute_cutout_peak_snr" in preprocess.__all__

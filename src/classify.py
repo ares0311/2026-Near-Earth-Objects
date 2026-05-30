@@ -43,6 +43,7 @@ __all__ = [
     "compute_posterior_from_scores",
     "compute_classification_confidence",
     "compute_entropy_weighted_score",
+    "compute_tier1_neo_score",
 ]
 
 import base64
@@ -1952,3 +1953,23 @@ def compute_entropy_weighted_score(posterior: object, features: object) -> float
     confidence = 1.0 - (H / H_max) if H_max > 0.0 else 0.0
     result = neo_prob * confidence
     return float(min(1.0, max(0.0, result)))
+
+
+def compute_tier1_neo_score(features: object) -> float:
+    """Compute a Tier 1 NEO score as a log-likelihood ratio rescaled to [0, 1].
+
+    Calls :func:`compute_neo_probability` to obtain the NEO hypothesis
+    probability ``p_neo``, computes the log-odds (log-likelihood ratio), clamps
+    the LLR to [−10, 10], and applies the logistic function to map the result
+    back to [0, 1].
+
+    Args:
+        features: A :class:`~schemas.CandidateFeatures`-like object.
+
+    Returns:
+        Tier 1 NEO score in [0, 1] (float).
+    """
+    p_neo = compute_neo_probability(features)
+    llr = math.log(p_neo / (1.0 - p_neo))
+    llr = max(-10.0, min(10.0, llr))
+    return float(1.0 / (1.0 + math.exp(-llr)))

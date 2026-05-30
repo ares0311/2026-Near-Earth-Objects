@@ -2562,3 +2562,96 @@ class TestComputeVisVivaVelocity:
         sys.path.insert(0, "src")
         import orbit
         assert "compute_vis_viva_velocity" in orbit.__all__
+
+
+class TestComputeJacobiConstant:
+    """Tests for compute_jacobi_constant."""
+
+    @staticmethod
+    def _make_elements(**kwargs):
+        from schemas import OrbitalElements
+
+        defaults = dict(
+            semi_major_axis_au=2.5,
+            eccentricity=0.1,
+            inclination_deg=5.0,
+            longitude_ascending_node_deg=45.0,
+            argument_perihelion_deg=90.0,
+            mean_anomaly_deg=180.0,
+            epoch_jd=2460000.5,
+            perihelion_au=2.25,
+            aphelion_au=2.75,
+        )
+        defaults.update(kwargs)
+        return OrbitalElements(**defaults)
+
+    def test_returns_float_for_valid_elements(self):
+        import sys
+        sys.path.insert(0, "src")
+
+        from orbit import compute_jacobi_constant
+
+        el = self._make_elements()
+        result = compute_jacobi_constant(el)
+        assert result is not None
+        assert isinstance(result, float)
+
+    def test_returns_positive_value(self):
+        import sys
+        sys.path.insert(0, "src")
+
+        from orbit import compute_jacobi_constant
+
+        el = self._make_elements()
+        result = compute_jacobi_constant(el)
+        assert result is not None
+        assert result > 0.0
+
+    def test_matches_tisserand(self):
+        import sys
+        sys.path.insert(0, "src")
+
+        from orbit import compute_jacobi_constant, tisserand_parameter
+
+        el = self._make_elements()
+        assert compute_jacobi_constant(el) == tisserand_parameter(el)
+
+    def test_comet_like_below_three(self):
+        import sys
+        sys.path.insert(0, "src")
+
+        from orbit import compute_jacobi_constant
+
+        # High eccentricity + high inclination → T_J < 3
+        el = self._make_elements(
+            semi_major_axis_au=5.0,
+            eccentricity=0.8,
+            inclination_deg=60.0,
+            perihelion_au=1.0,
+            aphelion_au=9.0,
+        )
+        result = compute_jacobi_constant(el)
+        assert result is not None
+        assert result < 3.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import orbit
+
+        assert "compute_jacobi_constant" in orbit.__all__
+
+    def test_zero_a_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+
+        from orbit import compute_jacobi_constant
+
+        # tisserand_parameter returns 0.0 for a <= 0
+        el = self._make_elements(
+            semi_major_axis_au=0.0,
+            perihelion_au=0.0,
+            aphelion_au=0.0,
+        )
+        result = compute_jacobi_constant(el)
+        assert result == 0.0

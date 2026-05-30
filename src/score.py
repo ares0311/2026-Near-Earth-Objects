@@ -27,7 +27,8 @@ __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "compute_detection_completeness_score",
            "compute_combined_hazard_score",
            "compute_priority_weighted_moid",
-           "compute_impact_probability_proxy"]
+           "compute_impact_probability_proxy",
+           "compute_survey_efficiency_score"]
 
 import math
 import uuid
@@ -1346,4 +1347,26 @@ def compute_impact_probability_proxy(neo: object) -> float:
     pha_flag = float(getattr(features, "pha_flag_confidence", None) or 0.0) if features else 0.0
     orbit_q = float(getattr(features, "orbit_quality_score", None) or 0.0) if features else 0.0
     result = moid_score * pha_flag * orbit_q
+    return float(min(1.0, max(0.0, result)))
+
+
+def compute_survey_efficiency_score(neo: object) -> float:
+    """Compute a survey efficiency score as the geometric mean of arc and night scores.
+
+    Combines ``arc_coverage_score`` and ``nights_observed_score`` from the
+    candidate features using the geometric mean: ``sqrt(arc * nights)``.
+    Missing scores (``None``) are treated as 0.0.  The result is clamped to
+    [0, 1].
+
+    Args:
+        neo: A :class:`~schemas.ScoredNEO`-like object with a ``features``
+            attribute.
+
+    Returns:
+        Survey efficiency score in [0, 1] (float).
+    """
+    features = getattr(neo, "features", None)
+    arc = float(getattr(features, "arc_coverage_score", None) or 0.0) if features else 0.0
+    nights = float(getattr(features, "nights_observed_score", None) or 0.0) if features else 0.0
+    result = math.sqrt(arc * nights)
     return float(min(1.0, max(0.0, result)))

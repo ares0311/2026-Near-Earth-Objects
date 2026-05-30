@@ -2381,3 +2381,92 @@ class TestFormatCandidateSummaryTable:
         sys.path.insert(0, "src")
         import alert
         assert "format_candidate_summary_table" in alert.__all__
+
+
+class TestEstimateConfirmationTime:
+    """Tests for estimate_confirmation_time."""
+
+    @staticmethod
+    def _make_neo(hazard_flag="pha_candidate", moid_au=0.01, priority=0.95):
+        from types import SimpleNamespace
+
+        hazard = SimpleNamespace(
+            hazard_flag=hazard_flag,
+            moid_au=moid_au,
+        )
+        metadata = SimpleNamespace(discovery_priority=priority)
+        tracklet = SimpleNamespace(object_id="NEO-TEST")
+        return SimpleNamespace(hazard=hazard, metadata=metadata, tracklet=tracklet,
+                               features=SimpleNamespace(
+                                   arc_coverage_score=0.8,
+                                   nights_observed_score=0.7,
+                                   moid_score=1.0,
+                                   orbit_quality_score=0.9,
+                               ))
+
+    def test_urgent_returns_6(self):
+        import sys
+        sys.path.insert(0, "src")
+
+        from alert import estimate_confirmation_time
+
+        # PHA with very high priority → URGENT
+        neo = self._make_neo("pha_candidate", 0.001, 0.99)
+        result = estimate_confirmation_time(neo)
+        assert result == 6.0
+
+    def test_returns_float(self):
+        import sys
+        sys.path.insert(0, "src")
+
+        from alert import estimate_confirmation_time
+
+        neo = self._make_neo()
+        result = estimate_confirmation_time(neo)
+        assert isinstance(result, float)
+
+    def test_routine_returns_168(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from alert import estimate_confirmation_time
+
+        # Low priority nominal → ROUTINE
+        neo = SimpleNamespace(
+            hazard=SimpleNamespace(hazard_flag="nominal", moid_au=1.0),
+            metadata=SimpleNamespace(discovery_priority=0.1),
+            tracklet=SimpleNamespace(object_id="N001"),
+            features=SimpleNamespace(
+                arc_coverage_score=0.1, nights_observed_score=0.1,
+                moid_score=0.0, orbit_quality_score=0.1,
+            ),
+        )
+        result = estimate_confirmation_time(neo)
+        assert result == 168.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+
+        assert "estimate_confirmation_time" in alert.__all__
+
+    def test_positive_result(self):
+        import sys
+        sys.path.insert(0, "src")
+
+        from alert import estimate_confirmation_time
+
+        neo = self._make_neo()
+        assert estimate_confirmation_time(neo) > 0.0
+
+    def test_result_is_one_of_known_values(self):
+        import sys
+        sys.path.insert(0, "src")
+
+        from alert import estimate_confirmation_time
+
+        neo = self._make_neo()
+        result = estimate_confirmation_time(neo)
+        assert result in (6.0, 24.0, 72.0, 168.0)

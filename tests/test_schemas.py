@@ -1794,3 +1794,67 @@ class TestScoringRun:
         from schemas import ScoringRun
         run = ScoringRun(run_id="r", mean_priority=0.5)
         assert isinstance(run.mean_priority, float)
+
+
+class TestAlertBatch:
+    def test_default_values(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import AlertBatch
+
+        batch = AlertBatch(batch_id="b1", run_id="r1")
+        assert batch.n_alerts == 0
+        assert batch.pathways == ()
+        assert batch.epoch_jd is None
+        assert "NOT" in batch.guardrail_statement
+
+    def test_custom_values(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import AlertBatch
+
+        batch = AlertBatch(
+            batch_id="b2",
+            run_id="r2",
+            n_alerts=5,
+            pathways=("mpc_submission", "neocp_followup"),
+            epoch_jd=2460000.5,
+        )
+        assert batch.n_alerts == 5
+        assert batch.pathways == ("mpc_submission", "neocp_followup")
+        assert batch.epoch_jd == 2460000.5
+
+    def test_is_frozen(self):
+        import sys
+        sys.path.insert(0, "src")
+        import pytest
+
+        from schemas import AlertBatch
+
+        batch = AlertBatch(batch_id="b3", run_id="r3")
+        with pytest.raises(Exception):
+            batch.n_alerts = 10  # type: ignore[misc]
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+
+        assert "AlertBatch" in schemas.__all__
+
+    def test_guardrail_contains_not(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import AlertBatch
+
+        batch = AlertBatch(batch_id="b4", run_id="r4")
+        assert "NOT" in batch.guardrail_statement
+
+    def test_batch_id_stored(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import AlertBatch
+
+        batch = AlertBatch(batch_id="my-batch-id", run_id="my-run")
+        assert batch.batch_id == "my-batch-id"
+        assert batch.run_id == "my-run"
