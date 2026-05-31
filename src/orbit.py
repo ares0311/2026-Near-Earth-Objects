@@ -28,7 +28,8 @@ __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
            "compute_vis_viva_velocity",
            "compute_jacobi_constant",
            "compute_earth_moid_estimate",
-           "compute_orbital_eccentricity_class"]
+           "compute_orbital_eccentricity_class",
+           "compute_orbital_speed_at_perihelion"]
 
 import math
 from typing import NamedTuple
@@ -1595,3 +1596,25 @@ def compute_orbital_eccentricity_class(elements: object) -> str:
     if e <= 1.001:
         return "parabolic"
     return "hyperbolic"
+
+
+def compute_orbital_speed_at_perihelion(elements: object) -> float | None:
+    """Return the orbital speed at perihelion in km/s using the vis-viva equation.
+
+    v = sqrt(GM_sun * (2/r - 1/a)), evaluated at r = q = a·(1-e).
+    Uses GM_sun = 1.327124e20 m³/s² and 1 AU = 1.495978707e11 m.
+    Returns None if perihelion distance or semi-major axis is unavailable or
+    the orbit is hyperbolic (a ≤ 0) or parabolic (e = 1).
+    """
+    GM_SUN_M3_S2 = 1.327124e20
+    AU_TO_M = 1.495978707e11
+
+    q = compute_perihelion_distance(elements)
+    if q is None or q <= 0.0:
+        return None
+    a_raw = getattr(elements, "a_au", None) or getattr(elements, "semi_major_axis_au", None)
+    a = float(a_raw)
+    r_m = q * AU_TO_M
+    a_m = a * AU_TO_M
+    v2 = GM_SUN_M3_S2 * (2.0 / r_m - 1.0 / a_m)
+    return float(v2 ** 0.5 / 1000.0)

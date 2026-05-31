@@ -2551,3 +2551,82 @@ class TestComputeCutoutRms:
         sys.path.insert(0, "src")
         import preprocess
         assert "compute_cutout_rms" in preprocess.__all__
+
+
+class TestComputeCutoutEntropyNormalized:
+    def _make_obs(self, pixels=None):
+        import base64
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        import numpy as np
+        if pixels is not None:
+            arr = np.array(pixels, dtype=np.float32)
+            cutout = base64.b64encode(arr.tobytes()).decode()
+        else:
+            cutout = None
+        return SimpleNamespace(
+            obs_id="O1", ra=10.0, dec=20.0, jd=2460000.0,
+            mag=18.0, mag_err=0.05, filter_band="r", mission="ZTF",
+            cutout_difference=cutout,
+        )
+
+    def test_uniform_image_high_entropy(self):
+        import sys
+        sys.path.insert(0, "src")
+        import numpy as np
+
+        from preprocess import compute_cutout_entropy_normalized
+        pixels = np.linspace(0, 1, 63 * 63, dtype=np.float32).reshape(63, 63)
+        obs = self._make_obs(pixels)
+        result = compute_cutout_entropy_normalized(obs)
+        assert result is not None
+        assert 0.0 <= result <= 1.0
+        assert result > 0.5
+
+    def test_constant_image_zero_entropy(self):
+        import sys
+        sys.path.insert(0, "src")
+        import numpy as np
+
+        from preprocess import compute_cutout_entropy_normalized
+        pixels = np.ones((63, 63), dtype=np.float32)
+        obs = self._make_obs(pixels)
+        result = compute_cutout_entropy_normalized(obs)
+        assert result == 0.0
+
+    def test_no_cutout_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from preprocess import compute_cutout_entropy_normalized
+        obs = self._make_obs(pixels=None)
+        assert compute_cutout_entropy_normalized(obs) is None
+
+    def test_result_in_unit_interval(self):
+        import sys
+        sys.path.insert(0, "src")
+        import numpy as np
+
+        from preprocess import compute_cutout_entropy_normalized
+        rng = np.random.default_rng(0)
+        pixels = rng.random((63, 63)).astype(np.float32)
+        obs = self._make_obs(pixels)
+        result = compute_cutout_entropy_normalized(obs)
+        assert result is not None
+        assert 0.0 <= result <= 1.0
+
+    def test_bad_base64_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_cutout_entropy_normalized
+        obs = SimpleNamespace(cutout_difference="!!!not_valid_base64!!!")
+        assert compute_cutout_entropy_normalized(obs) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import preprocess
+        assert "compute_cutout_entropy_normalized" in preprocess.__all__

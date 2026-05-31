@@ -29,7 +29,8 @@ __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "compute_tracklet_centroid",
            "compute_along_track_error",
            "compute_observation_rate",
-           "compute_tracklet_brightness_trend"]
+           "compute_tracklet_brightness_trend",
+           "compute_arc_endpoint_separation"]
 
 import math
 import uuid
@@ -1479,3 +1480,25 @@ def compute_tracklet_brightness_trend(tracklet: object) -> float | None:
         return None
     coeffs = np.polyfit(jds, mags, 1)
     return float(coeffs[0])
+
+
+def compute_arc_endpoint_separation(tracklet: object) -> float | None:
+    """Return the great-circle separation in arcsec between the first and last observations.
+
+    Returns None if the tracklet has fewer than 2 observations.
+    """
+    observations = getattr(tracklet, "observations", None) or ()
+    if len(observations) < 2:
+        return None
+    obs_sorted = sorted(observations, key=lambda o: float(getattr(o, "jd", 0.0)))
+    o1, o2 = obs_sorted[0], obs_sorted[-1]
+    ra1 = math.radians(float(getattr(o1, "ra_deg", 0.0)))
+    dec1 = math.radians(float(getattr(o1, "dec_deg", 0.0)))
+    ra2 = math.radians(float(getattr(o2, "ra_deg", 0.0)))
+    dec2 = math.radians(float(getattr(o2, "dec_deg", 0.0)))
+    cos_sep = (
+        math.sin(dec1) * math.sin(dec2)
+        + math.cos(dec1) * math.cos(dec2) * math.cos(ra1 - ra2)
+    )
+    cos_sep = max(-1.0, min(1.0, cos_sep))
+    return math.degrees(math.acos(cos_sep)) * 3600.0

@@ -3054,3 +3054,68 @@ class TestComputeClassBalance:
         sys.path.insert(0, "src")
         import classify
         assert "compute_class_balance" in classify.__all__
+
+
+class TestComputeRealBogusSummary:
+    def _make_neo(self, rb_score):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+        features = SimpleNamespace(real_bogus_score=rb_score)
+        return SimpleNamespace(features=features)
+
+    def test_basic_stats(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_real_bogus_summary
+        neos = [self._make_neo(0.8), self._make_neo(0.6), self._make_neo(1.0)]
+        result = compute_real_bogus_summary(neos)
+        assert abs(result["mean"] - (0.8 + 0.6 + 1.0) / 3) < 1e-9
+        assert abs(result["min"] - 0.6) < 1e-9
+        assert abs(result["max"] - 1.0) < 1e-9
+        assert result["n"] == 3
+
+    def test_empty_list(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_real_bogus_summary
+        result = compute_real_bogus_summary([])
+        assert result["n"] == 0
+        assert result["mean"] is None
+        assert result["min"] is None
+        assert result["max"] is None
+
+    def test_none_scores_excluded(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_real_bogus_summary
+        neos = [self._make_neo(None), self._make_neo(0.9)]
+        result = compute_real_bogus_summary(neos)
+        assert result["n"] == 1
+        assert abs(result["mean"] - 0.9) < 1e-9
+
+    def test_all_none_scores(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_real_bogus_summary
+        neos = [self._make_neo(None), self._make_neo(None)]
+        result = compute_real_bogus_summary(neos)
+        assert result["n"] == 0
+        assert result["mean"] is None
+
+    def test_single_neo(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_real_bogus_summary
+        neos = [self._make_neo(0.75)]
+        result = compute_real_bogus_summary(neos)
+        assert result["n"] == 1
+        assert abs(result["mean"] - 0.75) < 1e-9
+        assert abs(result["min"] - 0.75) < 1e-9
+        assert abs(result["max"] - 0.75) < 1e-9
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import classify
+        assert "compute_real_bogus_summary" in classify.__all__

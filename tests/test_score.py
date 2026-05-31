@@ -2550,3 +2550,57 @@ class TestComputeFollowupScore:
         sys.path.insert(0, "src")
         import score
         assert "compute_followup_score" in score.__all__
+
+
+class TestComputeMoidHazardScore:
+    def _make_neo(self, moid):
+        from types import SimpleNamespace
+        hazard = SimpleNamespace(moid_au=moid)
+        return SimpleNamespace(hazard=hazard)
+
+    def test_zero_moid_is_one(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_moid_hazard_score
+        assert compute_moid_hazard_score(self._make_neo(0.0)) == 1.0
+
+    def test_half_au_is_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_moid_hazard_score
+        assert compute_moid_hazard_score(self._make_neo(0.5)) == 0.0
+
+    def test_large_moid_clipped_to_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_moid_hazard_score
+        assert compute_moid_hazard_score(self._make_neo(2.0)) == 0.0
+
+    def test_none_moid_returns_half(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_moid_hazard_score
+        assert compute_moid_hazard_score(self._make_neo(None)) == 0.5
+
+    def test_no_hazard_attr_returns_half(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from score import compute_moid_hazard_score
+        neo = SimpleNamespace(hazard=None)
+        assert compute_moid_hazard_score(neo) == 0.5
+
+    def test_intermediate_value(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_moid_hazard_score
+        # moid=0.25 → 1 - 0.25/0.5 = 0.5
+        result = compute_moid_hazard_score(self._make_neo(0.25))
+        assert abs(result - 0.5) < 1e-9
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        assert "compute_moid_hazard_score" in score.__all__

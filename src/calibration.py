@@ -34,6 +34,7 @@ __all__ = [
     "compute_expected_calibration_error_weighted",
     "compute_positive_rate",
     "compute_weighted_brier_score",
+    "compute_calibration_gap",
 ]
 
 import math
@@ -1380,3 +1381,29 @@ def compute_weighted_brier_score(
     return float(
         sum(w * (p - y) ** 2 for p, y, w in zip(probs, labels, weights)) / total_w
     )
+
+
+def compute_calibration_gap(probs: list[float], labels: list[float], n_bins: int = 10) -> float:
+    """Return the mean absolute gap between predicted probability and observed frequency.
+
+    Bins predictions into ``n_bins`` equal-width bins, computes |bin_mean_pred − fraction_positive|
+    for non-empty bins, and returns their mean.  Returns 0.0 for empty inputs or no non-empty bins.
+    """
+    if not probs or not labels:
+        return 0.0
+    import math
+
+    bin_sums: dict[int, float] = {}
+    bin_pos: dict[int, float] = {}
+    bin_counts: dict[int, int] = {}
+    for p, y in zip(probs, labels):
+        idx = min(int(math.floor(float(p) * n_bins)), n_bins - 1)
+        bin_sums[idx] = bin_sums.get(idx, 0.0) + float(p)
+        bin_pos[idx] = bin_pos.get(idx, 0.0) + float(y)
+        bin_counts[idx] = bin_counts.get(idx, 0) + 1
+    gaps = []
+    for idx, cnt in bin_counts.items():
+        mean_pred = bin_sums[idx] / cnt
+        frac_pos = bin_pos[idx] / cnt
+        gaps.append(abs(mean_pred - frac_pos))
+    return float(sum(gaps) / len(gaps)) if gaps else 0.0

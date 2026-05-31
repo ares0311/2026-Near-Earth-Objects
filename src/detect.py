@@ -24,7 +24,8 @@ __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus"
            "compute_source_compactness",
            "compute_photon_noise_limit",
            "compute_source_flux",
-           "compute_apparent_motion_rate"]
+           "compute_apparent_motion_rate",
+           "compute_magnitude_range"]
 
 import math
 import uuid
@@ -1313,3 +1314,22 @@ def compute_apparent_motion_rate(observations: list) -> float | None:
     if not rates:
         return None
     return float(sum(rates) / len(rates))
+
+
+def compute_magnitude_range(observations: list) -> float | None:
+    """Return the range (max − min) of valid magnitudes across a list of observations.
+
+    Excludes sentinel magnitudes (≥ 90) and None values. Returns None if fewer
+    than 2 valid magnitudes are found.
+    """
+    mags = []
+    for obs in observations:
+        mag = getattr(obs, "mag", None)
+        if mag is None:
+            continue
+        m = float(mag)
+        if m < 90.0:
+            mags.append(m)
+    if len(mags) < 2:
+        return None
+    return float(max(mags) - min(mags))
