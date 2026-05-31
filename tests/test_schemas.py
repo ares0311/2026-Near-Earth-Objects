@@ -1909,3 +1909,50 @@ class TestObservationFilter:
         sys.path.insert(0, "src")
         import schemas
         assert "ObservationFilter" in schemas.__all__
+
+
+class TestFieldStatistics:
+    def test_basic_construction(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import FieldStatistics
+        fs = FieldStatistics(field_id="F001", n_sources=150, limiting_mag=21.5)
+        assert fs.field_id == "F001"
+        assert fs.n_sources == 150
+        assert fs.limiting_mag == 21.5
+
+    def test_defaults(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import FieldStatistics
+        fs = FieldStatistics(field_id="F002", n_sources=0)
+        assert fs.sky_area_sq_deg is None
+        assert fs.epoch_jd is None
+        assert fs.mission is None
+
+    def test_all_fields(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import FieldStatistics
+        fs = FieldStatistics(
+            field_id="F003", n_sources=200, limiting_mag=22.0,
+            sky_area_sq_deg=1.0, epoch_jd=2460000.5, mission="ZTF",
+        )
+        assert fs.mission == "ZTF"
+        assert fs.sky_area_sq_deg == 1.0
+
+    def test_frozen(self):
+        import sys
+        sys.path.insert(0, "src")
+        import pytest
+
+        from schemas import FieldStatistics
+        fs = FieldStatistics(field_id="F004", n_sources=10)
+        with pytest.raises(Exception):
+            fs.n_sources = 20  # type: ignore[misc]
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        assert "FieldStatistics" in schemas.__all__

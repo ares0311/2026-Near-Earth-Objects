@@ -2995,3 +2995,62 @@ class TestComputeArtifactFeaturesSummary:
         sys.path.insert(0, "src")
         import classify
         assert "compute_artifact_features_summary" in classify.__all__
+
+
+class TestComputeClassBalance:
+    def _make_neo(
+        self, neo_p: float, ko_p: float, mba_p: float, art_p: float, other_p: float
+    ) -> object:
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from schemas import NEOPosterior
+        posterior = NEOPosterior(
+            neo_candidate=neo_p, known_object=ko_p,
+            main_belt_asteroid=mba_p, stellar_artifact=art_p,
+            other_solar_system=other_p,
+        )
+        return SimpleNamespace(posterior=posterior)
+
+    def test_all_same_class(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_class_balance
+        neos = [self._make_neo(0.9, 0.05, 0.02, 0.02, 0.01)] * 3
+        result = compute_class_balance(neos)
+        assert result.get("neo_candidate", 0) == 3
+
+    def test_mixed_classes(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_class_balance
+        neos = [
+            self._make_neo(0.9, 0.05, 0.02, 0.02, 0.01),
+            self._make_neo(0.05, 0.9, 0.02, 0.02, 0.01),
+        ]
+        result = compute_class_balance(neos)
+        assert result["neo_candidate"] == 1
+        assert result["known_object"] == 1
+
+    def test_empty_list(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_class_balance
+        assert compute_class_balance([]) == {}
+
+    def test_none_posterior_counts_unknown(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from classify import compute_class_balance
+        neo = SimpleNamespace(posterior=None)
+        result = compute_class_balance([neo])
+        assert result.get("unknown", 0) == 1
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import classify
+        assert "compute_class_balance" in classify.__all__

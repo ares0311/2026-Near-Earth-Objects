@@ -2833,3 +2833,74 @@ class TestComputeObservationRate:
         sys.path.insert(0, "src")
         import link
         assert "compute_observation_rate" in link.__all__
+
+
+class TestComputeTrackletBrightnessTrend:
+    def _make_tracklet(self, jds: list[float], mags: list[float]) -> object:
+        from types import SimpleNamespace
+        obs = [SimpleNamespace(jd=j, mag=m) for j, m in zip(jds, mags)]
+        return SimpleNamespace(observations=tuple(obs))
+
+    def test_fading_trend_positive(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_tracklet_brightness_trend
+        # brightness increasing with JD → fading
+        trk = self._make_tracklet([2460000.0, 2460001.0, 2460002.0], [19.0, 20.0, 21.0])
+        result = compute_tracklet_brightness_trend(trk)
+        assert result is not None
+        assert result > 0.0
+
+    def test_brightening_trend_negative(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_tracklet_brightness_trend
+        trk = self._make_tracklet([2460000.0, 2460001.0, 2460002.0], [21.0, 20.0, 19.0])
+        result = compute_tracklet_brightness_trend(trk)
+        assert result is not None
+        assert result < 0.0
+
+    def test_single_obs_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_tracklet_brightness_trend
+        trk = self._make_tracklet([2460000.0], [20.0])
+        assert compute_tracklet_brightness_trend(trk) is None
+
+    def test_sentinel_mags_excluded(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_tracklet_brightness_trend
+        # Only 1 valid mag after sentinel exclusion → None
+        trk = self._make_tracklet([2460000.0, 2460001.0], [99.0, 20.0])
+        assert compute_tracklet_brightness_trend(trk) is None
+
+    def test_no_observations_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_tracklet_brightness_trend
+        assert compute_tracklet_brightness_trend(SimpleNamespace(observations=())) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+        assert "compute_tracklet_brightness_trend" in link.__all__
+
+
+class TestComputeTrackletBrightnessTrendNoneMag:
+    def test_none_mag_skipped(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_tracklet_brightness_trend
+        obs = [
+            SimpleNamespace(jd=2460000.0, mag=None),
+            SimpleNamespace(jd=2460001.0, mag=19.0),
+        ]
+        trk = SimpleNamespace(observations=tuple(obs))
+        # Only 1 valid mag after None exclusion → None
+        assert compute_tracklet_brightness_trend(trk) is None

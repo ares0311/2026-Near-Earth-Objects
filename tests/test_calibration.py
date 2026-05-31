@@ -1741,3 +1741,59 @@ class TestComputePositiveRate:
         sys.path.insert(0, "src")
         import calibration
         assert "compute_positive_rate" in calibration.__all__
+
+
+class TestComputeWeightedBrierScore:
+    def test_perfect_predictions(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_weighted_brier_score
+        result = compute_weighted_brier_score([0.0, 1.0], [0.0, 1.0], [1.0, 1.0])
+        assert result == 0.0
+
+    def test_worst_predictions(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_weighted_brier_score
+        result = compute_weighted_brier_score([1.0, 0.0], [0.0, 1.0], [1.0, 1.0])
+        assert abs(result - 1.0) < 1e-9
+
+    def test_uniform_weights_equals_brier(self):
+        import sys
+        sys.path.insert(0, "src")
+        import numpy as np
+
+        from calibration import brier_score, compute_weighted_brier_score
+        probs = [0.3, 0.6, 0.9]
+        labels = [0.0, 1.0, 1.0]
+        weights = [1.0, 1.0, 1.0]
+        weighted = compute_weighted_brier_score(probs, labels, weights)
+        unweighted = brier_score(np.array(probs), np.array(labels))
+        assert abs(weighted - unweighted) < 1e-9
+
+    def test_empty_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_weighted_brier_score
+        assert compute_weighted_brier_score([], [], []) == 0.0
+
+    def test_zero_weights_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_weighted_brier_score
+        result = compute_weighted_brier_score([0.5, 0.5], [0.0, 1.0], [0.0, 0.0])
+        assert result == 0.0
+
+    def test_high_weight_sample_dominates(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_weighted_brier_score
+        # Perfect on high-weight sample, wrong on low-weight sample
+        result = compute_weighted_brier_score([1.0, 0.0], [1.0, 1.0], [100.0, 1.0])
+        assert result < 0.05
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        assert "compute_weighted_brier_score" in calibration.__all__

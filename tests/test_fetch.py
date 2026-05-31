@@ -4066,3 +4066,43 @@ class TestFilterByMagnitude:
         sys.path.insert(0, "src")
         import fetch
         assert "filter_by_magnitude" in fetch.__all__
+
+
+class TestComputeFieldSkyArea:
+    def test_small_radius(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_field_sky_area
+        area = compute_field_sky_area(1.0)
+        assert area > 0.0
+        assert abs(area - 3.14159) < 0.01  # ≈ π sq deg for small radius
+
+    def test_zero_radius(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_field_sky_area
+        assert compute_field_sky_area(0.0) == 0.0
+
+    def test_negative_radius_same_as_positive(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_field_sky_area
+        assert abs(compute_field_sky_area(-1.0) - compute_field_sky_area(1.0)) < 1e-9
+
+    def test_larger_radius_larger_area(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_field_sky_area
+        assert compute_field_sky_area(2.0) > compute_field_sky_area(1.0)
+
+    def test_returns_float(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_field_sky_area
+        assert isinstance(compute_field_sky_area(0.5), float)
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+        assert "compute_field_sky_area" in fetch.__all__

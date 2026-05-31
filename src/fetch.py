@@ -27,7 +27,8 @@ __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fet
            "deduplicate_observations",
            "get_survey_coverage_fraction",
            "partition_by_field",
-           "filter_by_magnitude"]
+           "filter_by_magnitude",
+           "compute_field_sky_area"]
 
 import json
 import os
@@ -1972,3 +1973,15 @@ def filter_by_magnitude(observations: list, min_mag: float, max_mag: float) -> l
         if min_mag <= float(mag) <= max_mag:
             result.append(obs)
     return result
+
+
+def compute_field_sky_area(radius_deg: float) -> float:
+    """Return the sky area in square degrees for a circular field of given radius.
+
+    Uses the exact spherical-cap formula: 2π·(1 − cos(r)) steradians,
+    converted to square degrees.
+    """
+    import math
+    r_rad = math.radians(abs(radius_deg))
+    steradians = 2.0 * math.pi * (1.0 - math.cos(r_rad))
+    return steradians * (180.0 / math.pi) ** 2

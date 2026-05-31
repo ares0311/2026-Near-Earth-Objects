@@ -29,7 +29,8 @@ __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "compute_priority_weighted_moid",
            "compute_impact_probability_proxy",
            "compute_survey_efficiency_score",
-           "compute_novelty_rank"]
+           "compute_novelty_rank",
+           "compute_followup_score"]
 
 import math
 import uuid
@@ -1400,3 +1401,19 @@ def compute_novelty_rank(neos: list) -> list[tuple[int, str]]:
         oid = str(getattr(getattr(neo, "tracklet", neo), "object_id", "unknown"))
         result.append((rank, oid))
     return result
+
+
+def compute_followup_score(neo: object) -> float:
+    """Return a composite [0, 1] followup priority score.
+
+    Combines discovery priority (weight 0.4), orbit quality (weight 0.4),
+    and brightness score (weight 0.2). Missing components contribute 0.
+    """
+    meta = getattr(neo, "metadata", None)
+    features = getattr(neo, "features", None)
+
+    disc = float(getattr(meta, "discovery_priority", 0.0) or 0.0) if meta else 0.0
+    oq = float(getattr(features, "orbit_quality_score", 0.0) or 0.0) if features else 0.0
+    br = float(getattr(features, "brightness_score", 0.0) or 0.0) if features else 0.0
+
+    return float(min(1.0, max(0.0, 0.4 * disc + 0.4 * oq + 0.2 * br)))

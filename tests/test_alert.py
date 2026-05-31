@@ -2533,3 +2533,69 @@ class TestFormatAlertAgeSummary:
         sys.path.insert(0, "src")
         import alert
         assert "format_alert_age_summary" in alert.__all__
+
+
+class TestFormatCandidateCountSummary:
+    def _make_neo(self, flag: str, pathway: str) -> object:
+        from types import SimpleNamespace
+        hazard = SimpleNamespace(hazard_flag=flag, alert_pathway=pathway)
+        return SimpleNamespace(hazard=hazard)
+
+    def test_basic_counts(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_candidate_count_summary
+        neos = [
+            self._make_neo("nominal", "internal_candidate"),
+            self._make_neo("nominal", "internal_candidate"),
+            self._make_neo("pha_candidate", "mpc_submission"),
+        ]
+        result = format_candidate_count_summary(neos)
+        assert result["total"] == 3
+        assert result["by_hazard_flag"]["nominal"] == 2
+        assert result["by_hazard_flag"]["pha_candidate"] == 1
+
+    def test_empty_list(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_candidate_count_summary
+        result = format_candidate_count_summary([])
+        assert result["total"] == 0
+        assert result["by_hazard_flag"] == {}
+
+    def test_guardrail_contains_not(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_candidate_count_summary
+        result = format_candidate_count_summary([self._make_neo("unknown", "internal_candidate")])
+        assert "NOT" in result["guardrail"]
+
+    def test_no_hazard_attr(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from alert import format_candidate_count_summary
+        neo = SimpleNamespace(hazard=None)
+        result = format_candidate_count_summary([neo])
+        assert result["total"] == 1
+        assert result["by_hazard_flag"]["unknown"] == 1
+
+    def test_pathway_counts(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_candidate_count_summary
+        neos = [
+            self._make_neo("nominal", "mpc_submission"),
+            self._make_neo("nominal", "mpc_submission"),
+            self._make_neo("nominal", "internal_candidate"),
+        ]
+        result = format_candidate_count_summary(neos)
+        assert result["by_alert_pathway"]["mpc_submission"] == 2
+        assert result["by_alert_pathway"]["internal_candidate"] == 1
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+        assert "format_candidate_count_summary" in alert.__all__

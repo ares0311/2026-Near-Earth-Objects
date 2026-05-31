@@ -1,8 +1,8 @@
-"""Batch sky-plane velocity computation for consecutive observation pairs within tracklets.
+"""Batch brightness-trend slope computation from tracklet JSON.
 
 Usage:
-    python Skills/compute_sky_velocities.py data/sample_tracklets.json
-    python Skills/compute_sky_velocities.py data/sample_tracklets.json --json
+    python Skills/compute_brightness_trends.py data/sample_tracklets.json
+    python Skills/compute_brightness_trends.py data/sample_tracklets.json --json
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ import sys
 
 sys.path.insert(0, "src")
 
-from detect import compute_apparent_motion_rate
+from link import compute_tracklet_brightness_trend
 
 
 def _load_tracklets(path: str) -> list[dict]:
@@ -30,8 +30,13 @@ class _Obs:
             setattr(self, k, v)
 
 
+class _Tracklet:
+    def __init__(self, observations: list) -> None:
+        self.observations = tuple(observations)
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Batch sky-plane velocity computation")
+    parser = argparse.ArgumentParser(description="Batch brightness trend slopes")
     parser.add_argument("input", help="Path to tracklet JSON file")
     parser.add_argument("--json", action="store_true", help="Output JSON")
     args = parser.parse_args()
@@ -41,22 +46,23 @@ def main() -> None:
     for trk in tracklets:
         oid = trk.get("object_id", "unknown")
         obs_list = [_Obs(o) for o in trk.get("observations", [])]
-        rate = compute_apparent_motion_rate(obs_list)
+        t = _Tracklet(obs_list)
+        slope = compute_tracklet_brightness_trend(t)
         rows.append({
             "object_id": oid,
             "n_obs": len(obs_list),
-            "mean_motion_rate_arcsec_hr": round(rate, 4) if rate is not None else None,
+            "brightness_slope_mag_per_day": round(slope, 6) if slope is not None else None,
         })
 
     if args.json:
         print(json.dumps(rows, indent=2))
     else:
-        print(f"{'Object ID':<40} {'N obs':>6} {'Rate (arcsec/hr)':>18}")
-        print("-" * 68)
+        print(f"{'Object ID':<40} {'N obs':>6} {'Slope (mag/day)':>16}")
+        print("-" * 66)
         for row in rows:
-            r = row["mean_motion_rate_arcsec_hr"]
-            rate_str = f"{r:.4f}" if r is not None else "N/A"
-            print(f"{row['object_id']:<40} {row['n_obs']:>6} {rate_str:>18}")
+            s = row["brightness_slope_mag_per_day"]
+            slope_str = f"{s:+.6f}" if s is not None else "N/A"
+            print(f"{row['object_id']:<40} {row['n_obs']:>6} {slope_str:>16}")
 
 
 if __name__ == "__main__":

@@ -2719,3 +2719,68 @@ class TestComputeEarthMoidEstimate:
         sys.path.insert(0, "src")
         import orbit
         assert "compute_earth_moid_estimate" in orbit.__all__
+
+
+class TestComputeOrbitalEccentricityClass:
+    def test_circular(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_orbital_eccentricity_class
+        assert compute_orbital_eccentricity_class(SimpleNamespace(e=0.01)) == "circular"
+
+    def test_elliptical(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_orbital_eccentricity_class
+        assert compute_orbital_eccentricity_class(SimpleNamespace(e=0.5)) == "elliptical"
+
+    def test_parabolic(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_orbital_eccentricity_class
+        assert compute_orbital_eccentricity_class(SimpleNamespace(e=1.0)) == "parabolic"
+
+    def test_hyperbolic(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_orbital_eccentricity_class
+        assert compute_orbital_eccentricity_class(SimpleNamespace(e=1.5)) == "hyperbolic"
+
+    def test_no_e_attr_returns_unknown(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_orbital_eccentricity_class
+        assert compute_orbital_eccentricity_class(SimpleNamespace()) == "unknown"
+
+    def test_negative_e_returns_unknown(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_orbital_eccentricity_class
+        assert compute_orbital_eccentricity_class(SimpleNamespace(e=-0.1)) == "unknown"
+
+    def test_eccentricity_attr_fallback(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_orbital_eccentricity_class
+        obj = SimpleNamespace(eccentricity=0.3)
+        assert compute_orbital_eccentricity_class(obj) == "elliptical"
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import orbit
+        assert "compute_orbital_eccentricity_class" in orbit.__all__

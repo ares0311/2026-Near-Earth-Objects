@@ -45,6 +45,7 @@ __all__ = [
     "format_candidate_summary_table",
     "estimate_confirmation_time",
     "format_alert_age_summary",
+    "format_candidate_count_summary",
 ]
 
 import json
@@ -1904,5 +1905,30 @@ def format_alert_age_summary(neos: list) -> dict:
         "guardrail": (
             "GUARDRAIL: These are pipeline candidates, NOT confirmed detections. "
             "Do NOT submit to MPC or notify NASA PDCO without independent confirmation."
+        ),
+    }
+
+
+def format_candidate_count_summary(neos: list) -> dict:
+    """Return counts of candidates grouped by hazard_flag and alert_pathway.
+
+    NOTE: All counts reflect pipeline candidates, NOT confirmed detections.
+    No external report should be filed without MPC independent confirmation.
+    """
+    by_flag: dict[str, int] = {}
+    by_pathway: dict[str, int] = {}
+    for neo in neos:
+        hazard = getattr(neo, "hazard", None)
+        flag = str(getattr(hazard, "hazard_flag", "unknown")) if hazard else "unknown"
+        pathway = str(getattr(hazard, "alert_pathway", "unknown")) if hazard else "unknown"
+        by_flag[flag] = by_flag.get(flag, 0) + 1
+        by_pathway[pathway] = by_pathway.get(pathway, 0) + 1
+    return {
+        "total": len(neos),
+        "by_hazard_flag": by_flag,
+        "by_alert_pathway": by_pathway,
+        "guardrail": (
+            "GUARDRAIL: These are pipeline candidates, NOT confirmed detections. "
+            "Do NOT file any external report without independent MPC confirmation."
         ),
     }
