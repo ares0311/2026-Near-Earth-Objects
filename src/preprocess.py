@@ -25,7 +25,8 @@ __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_
            "flag_cosmic_rays",
            "compute_fwhm_from_cutout",
            "compute_local_background_rms",
-           "compute_cutout_peak_snr"]
+           "compute_cutout_peak_snr",
+           "compute_gradient_magnitude"]
 
 import base64
 import math
@@ -1318,5 +1319,34 @@ def compute_local_background_rms(obs: object) -> float | None:
         right = arr[:, 53:].ravel()
         border = np.concatenate([top, bottom, left, right])
         return float(np.std(border))
+    except Exception:
+        return None
+
+
+def compute_gradient_magnitude(obs: object) -> float | None:
+    """Return the mean gradient magnitude over the difference-image cutout.
+
+    Computes ``sqrt(dx² + dy²)`` at every pixel via :func:`numpy.gradient`
+    and returns the mean over all pixels.
+
+    Args:
+        obs: Observation-like object with an optional ``cutout_difference``
+            base64 attribute.
+
+    Returns:
+        Mean gradient magnitude as ``float``, or ``None`` if no cutout or
+        decode error.
+    """
+    cutout = getattr(obs, "cutout_difference", None)
+    if cutout is None:
+        return None
+    try:
+        import base64 as _b64
+
+        raw = _b64.b64decode(cutout)
+        arr = np.frombuffer(raw, dtype=np.float32).reshape(_CUTOUT_SIZE, _CUTOUT_SIZE).astype(float)
+        dy, dx = np.gradient(arr)
+        mag = np.sqrt(dx ** 2 + dy ** 2)
+        return float(np.mean(mag))
     except Exception:
         return None

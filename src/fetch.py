@@ -26,7 +26,8 @@ __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fet
            "get_fetch_result_age",
            "deduplicate_observations",
            "get_survey_coverage_fraction",
-           "partition_by_field"]
+           "partition_by_field",
+           "filter_by_magnitude"]
 
 import json
 import os
@@ -1945,4 +1946,29 @@ def partition_by_field(fetch_result: object) -> dict[str, list]:
         fid = getattr(obs, "field_id", None)
         key = str(fid) if fid is not None else "unknown"
         result.setdefault(key, []).append(obs)
+    return result
+
+
+def filter_by_magnitude(observations: list, min_mag: float, max_mag: float) -> list:
+    """Filter observations to those with magnitude in [min_mag, max_mag].
+
+    Sentinel magnitudes (≥ 90) are always excluded.
+
+    Args:
+        observations: List of observation-like objects with a ``mag`` attribute.
+        min_mag: Minimum magnitude (inclusive).
+        max_mag: Maximum magnitude (inclusive).
+
+    Returns:
+        Filtered list of observations.
+    """
+    result = []
+    for obs in observations:
+        mag = getattr(obs, "mag", None)
+        if mag is None:
+            continue
+        if float(mag) >= 90.0:
+            continue
+        if min_mag <= float(mag) <= max_mag:
+            result.append(obs)
     return result

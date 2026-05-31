@@ -2341,3 +2341,61 @@ class TestComputePhotonNoiseLimit:
         from detect import compute_photon_noise_limit
         obs = SimpleNamespace(cutout_difference="bad!!!")
         assert compute_photon_noise_limit(obs) is None
+
+
+class TestComputeSourceFlux:
+    def _make_obs_with_cutout(self, peak_val: float = 100.0) -> object:
+        import base64
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        import numpy as np
+        arr = np.zeros((63, 63), dtype=np.float32)
+        arr[31, 31] = peak_val
+        encoded = base64.b64encode(arr.tobytes()).decode()
+        return SimpleNamespace(cutout_difference=encoded)
+
+    def test_nonzero_flux_for_bright_source(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_source_flux
+        obs = self._make_obs_with_cutout(100.0)
+        result = compute_source_flux(obs)
+        assert result is not None
+        assert result > 0.0
+
+    def test_larger_aperture_captures_more(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_source_flux
+        obs = self._make_obs_with_cutout(50.0)
+        flux_small = compute_source_flux(obs, aperture_radius_px=3.0)
+        flux_large = compute_source_flux(obs, aperture_radius_px=8.0)
+        assert flux_small is not None
+        assert flux_large is not None
+        assert flux_large >= flux_small
+
+    def test_no_cutout_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import compute_source_flux
+        obs = SimpleNamespace(cutout_difference=None)
+        assert compute_source_flux(obs) is None
+
+    def test_invalid_cutout_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import compute_source_flux
+        obs = SimpleNamespace(cutout_difference="!!!not_base64!!!")
+        assert compute_source_flux(obs) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import detect
+        assert "compute_source_flux" in detect.__all__

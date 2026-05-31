@@ -4015,3 +4015,54 @@ class TestPartitionByField:
         import fetch
 
         assert "partition_by_field" in fetch.__all__
+
+
+class TestFilterByMagnitude:
+    def _make_obs(self, mag: float | None) -> object:
+        from types import SimpleNamespace
+        return SimpleNamespace(mag=mag)
+
+    def test_filters_within_range(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import filter_by_magnitude
+        obs = [self._make_obs(18.0), self._make_obs(22.0), self._make_obs(16.0)]
+        result = filter_by_magnitude(obs, 17.0, 21.0)
+        assert len(result) == 1
+        assert result[0].mag == 18.0
+
+    def test_excludes_sentinels(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import filter_by_magnitude
+        obs = [self._make_obs(99.0), self._make_obs(19.0)]
+        result = filter_by_magnitude(obs, 15.0, 25.0)
+        assert len(result) == 1
+
+    def test_excludes_none_mag(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import filter_by_magnitude
+        obs = [self._make_obs(None), self._make_obs(20.0)]
+        result = filter_by_magnitude(obs, 15.0, 25.0)
+        assert len(result) == 1
+
+    def test_empty_list(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import filter_by_magnitude
+        assert filter_by_magnitude([], 15.0, 25.0) == []
+
+    def test_boundary_included(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import filter_by_magnitude
+        obs = [self._make_obs(15.0), self._make_obs(25.0)]
+        result = filter_by_magnitude(obs, 15.0, 25.0)
+        assert len(result) == 2
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+        assert "filter_by_magnitude" in fetch.__all__

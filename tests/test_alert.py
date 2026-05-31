@@ -2470,3 +2470,66 @@ class TestEstimateConfirmationTime:
         neo = self._make_neo()
         result = estimate_confirmation_time(neo)
         assert result in (6.0, 24.0, 72.0, 168.0)
+
+
+class TestFormatAlertAgeSummary:
+    def _make_neo(self, jds: list[float]) -> object:
+        from types import SimpleNamespace
+        obs = [SimpleNamespace(jd=j) for j in jds]
+        tracklet = SimpleNamespace(observations=tuple(obs))
+        return SimpleNamespace(tracklet=tracklet)
+
+    def test_basic_summary(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_alert_age_summary
+        neos = [
+            self._make_neo([2460000.0, 2460001.0]),
+            self._make_neo([2460002.0, 2460003.0]),
+        ]
+        result = format_alert_age_summary(neos)
+        assert result["count"] == 2
+        assert result["oldest_jd"] == 2460001.0
+        assert result["newest_jd"] == 2460003.0
+
+    def test_empty_list(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_alert_age_summary
+        result = format_alert_age_summary([])
+        assert result["count"] == 0
+        assert result["oldest_jd"] is None
+        assert result["newest_jd"] is None
+
+    def test_guardrail_contains_not(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_alert_age_summary
+        result = format_alert_age_summary([self._make_neo([2460000.0])])
+        assert "NOT" in result["guardrail"]
+
+    def test_no_observations_skipped(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from alert import format_alert_age_summary
+        neo_empty = SimpleNamespace(tracklet=SimpleNamespace(observations=()))
+        neo_good = self._make_neo([2460010.0])
+        result = format_alert_age_summary([neo_empty, neo_good])
+        assert result["count"] == 2
+        assert result["newest_jd"] == 2460010.0
+
+    def test_single_neo(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_alert_age_summary
+        neos = [self._make_neo([2460005.0, 2460006.0])]
+        result = format_alert_age_summary(neos)
+        assert result["oldest_jd"] == result["newest_jd"] == 2460006.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+        assert "format_alert_age_summary" in alert.__all__

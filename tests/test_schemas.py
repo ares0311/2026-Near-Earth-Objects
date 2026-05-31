@@ -1858,3 +1858,54 @@ class TestAlertBatch:
         batch = AlertBatch(batch_id="my-batch-id", run_id="my-run")
         assert batch.batch_id == "my-batch-id"
         assert batch.run_id == "my-run"
+
+
+class TestObservationFilter:
+    def test_default_construction(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import ObservationFilter
+        f = ObservationFilter()
+        assert f.min_rb_score is None
+        assert f.max_mag is None
+        assert f.surveys == ()
+
+    def test_with_values(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import ObservationFilter
+        f = ObservationFilter(min_rb_score=0.65, max_mag=21.0, surveys=("ZTF",))
+        assert f.min_rb_score == 0.65
+        assert f.max_mag == 21.0
+        assert "ZTF" in f.surveys
+
+    def test_frozen(self):
+        import sys
+        sys.path.insert(0, "src")
+        import pytest
+
+        from schemas import ObservationFilter
+        f = ObservationFilter(min_rb_score=0.5)
+        with pytest.raises(Exception):
+            f.min_rb_score = 0.9  # type: ignore[misc]
+
+    def test_filter_bands(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import ObservationFilter
+        f = ObservationFilter(filter_bands=("g", "r"))
+        assert "g" in f.filter_bands
+
+    def test_jd_bounds(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import ObservationFilter
+        f = ObservationFilter(min_jd=2460000.0, max_jd=2460010.0)
+        assert f.min_jd == 2460000.0
+        assert f.max_jd == 2460010.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        assert "ObservationFilter" in schemas.__all__

@@ -2933,3 +2933,65 @@ class TestComputeTier1NeoScore:
         )
         result = compute_tier1_neo_score(f)
         assert result > 0.5
+
+
+class TestComputeArtifactFeaturesSummary:
+    def _make_features(self, **kwargs: float | None) -> object:
+        from types import SimpleNamespace
+        return SimpleNamespace(**kwargs)
+
+    def test_all_present(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_artifact_features_summary
+        features = self._make_features(
+            stellar_artifact_score=0.1,
+            psf_quality_score=0.9,
+            real_bogus_score=0.8,
+            streak_score=0.05,
+        )
+        result = compute_artifact_features_summary(features)
+        assert result["stellar_artifact_score"] == 0.1
+        assert result["psf_quality_score"] == 0.9
+        assert result["real_bogus_score"] == 0.8
+        assert result["streak_score"] == 0.05
+
+    def test_missing_attrs_return_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from classify import compute_artifact_features_summary
+        features = SimpleNamespace()
+        result = compute_artifact_features_summary(features)
+        assert result["stellar_artifact_score"] is None
+        assert result["real_bogus_score"] is None
+
+    def test_returns_all_four_keys(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from classify import compute_artifact_features_summary
+        result = compute_artifact_features_summary(SimpleNamespace())
+        assert set(result.keys()) == {
+            "stellar_artifact_score",
+            "psf_quality_score",
+            "real_bogus_score",
+            "streak_score",
+        }
+
+    def test_partial_features(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_artifact_features_summary
+        features = self._make_features(real_bogus_score=0.75)
+        result = compute_artifact_features_summary(features)
+        assert result["real_bogus_score"] == 0.75
+        assert result["psf_quality_score"] is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import classify
+        assert "compute_artifact_features_summary" in classify.__all__
