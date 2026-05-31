@@ -22,6 +22,7 @@ __all__ = [
     "get_posterior_vector",
     "compute_neo_probability",
     "compute_artifact_probability",
+    "compute_artifact_features_summary",
     "compute_confusion_matrix",
     "compute_calibration_gain",
     "batch_classify_morphology",
@@ -1973,3 +1974,17 @@ def compute_tier1_neo_score(features: object) -> float:
     llr = math.log(p_neo / (1.0 - p_neo))
     llr = max(-10.0, min(10.0, llr))
     return float(1.0 / (1.0 + math.exp(-llr)))
+
+
+def compute_artifact_features_summary(features: object) -> dict:
+    """Return a dict of artifact-relevant feature scores from a CandidateFeatures object.
+
+    Each value is a float in [0, 1] or None if the feature is absent.
+    """
+    names = [
+        "stellar_artifact_score",
+        "psf_quality_score",
+        "real_bogus_score",
+        "streak_score",
+    ]
+    return {name: getattr(features, name, None) for name in names}

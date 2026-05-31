@@ -32,6 +32,7 @@ __all__ = [
     "compute_brier_skill_score_weighted",
     "compute_isotonic_calibration_error",
     "compute_expected_calibration_error_weighted",
+    "compute_positive_rate",
 ]
 
 import math
@@ -1348,3 +1349,13 @@ def compute_expected_calibration_error_weighted(
         mean_label = float(np.average(y[mask], weights=w[mask]))
         ece += abs(mean_prob - mean_label) * (bin_weight / total_weight)
     return float(ece)
+
+
+def compute_positive_rate(probs: list[float], threshold: float = 0.5) -> float:
+    """Return the fraction of probabilities that exceed *threshold*.
+
+    Returns 0.0 for an empty list.
+    """
+    if not probs:
+        return 0.0
+    return float(sum(1 for p in probs if p > threshold)) / float(len(probs))

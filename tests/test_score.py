@@ -2414,3 +2414,87 @@ class TestComputeSurveyEfficiencyScore:
         import score
 
         assert "compute_survey_efficiency_score" in score.__all__
+
+
+class TestComputeNoveltyRank:
+    def _make_neo(self, object_id: str, novelty_score: float | None) -> object:
+        from types import SimpleNamespace
+        tracklet = SimpleNamespace(object_id=object_id)
+        metadata = SimpleNamespace(novelty_score=novelty_score)
+        return SimpleNamespace(tracklet=tracklet, metadata=metadata)
+
+    def test_ranks_most_novel_first(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_novelty_rank
+        neos = [
+            self._make_neo("a", 0.9),
+            self._make_neo("b", 0.5),
+            self._make_neo("c", 0.1),
+        ]
+        result = compute_novelty_rank(neos)
+        assert result[0][0] == 1
+        assert result[0][1] == "a"
+        assert result[1][0] == 2
+        assert result[2][0] == 3
+
+    def test_ties_get_same_rank(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_novelty_rank
+        neos = [
+            self._make_neo("x", 0.8),
+            self._make_neo("y", 0.8),
+            self._make_neo("z", 0.2),
+        ]
+        result = compute_novelty_rank(neos)
+        ranks = {oid: r for r, oid in result}
+        assert ranks["x"] == ranks["y"]
+        assert ranks["z"] > ranks["x"]
+
+    def test_none_novelty_at_bottom(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_novelty_rank
+        neos = [
+            self._make_neo("good", 0.7),
+            self._make_neo("unknown", None),
+        ]
+        result = compute_novelty_rank(neos)
+        oids = [oid for _, oid in result]
+        assert oids[0] == "good"
+        assert oids[1] == "unknown"
+
+    def test_empty_list(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_novelty_rank
+        assert compute_novelty_rank([]) == []
+
+    def test_single_neo(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_novelty_rank
+        neos = [self._make_neo("solo", 0.5)]
+        result = compute_novelty_rank(neos)
+        assert len(result) == 1
+        assert result[0][0] == 1
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        assert "compute_novelty_rank" in score.__all__
+
+
+class TestComputeNoveltyRankMetaNone:
+    def test_no_metadata_attr(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from score import compute_novelty_rank
+        neo = SimpleNamespace(tracklet=SimpleNamespace(object_id="x"))
+        result = compute_novelty_rank([neo])
+        assert len(result) == 1
+        assert result[0][1] == "x"

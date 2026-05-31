@@ -38,6 +38,7 @@ __all__ = [
     "FieldObservation",
     "ScoringRun",
     "AlertBatch",
+    "ObservationFilter",
 ]
 
 from dataclasses import dataclass
@@ -1134,3 +1135,17 @@ class AlertBatch(BaseModel):
     pathways: tuple[str, ...] = ()
     epoch_jd: float | None = None
     guardrail_statement: str = "These alerts do NOT constitute confirmed detections."
+
+
+class ObservationFilter(BaseModel):
+    """Configurable criteria for filtering pipeline observations."""
+
+    model_config = ConfigDict(frozen=True)
+
+    min_rb_score: float | None = None
+    max_mag: float | None = None
+    min_mag: float | None = None
+    surveys: tuple[str, ...] = ()
+    filter_bands: tuple[str, ...] = ()
+    min_jd: float | None = None
+    max_jd: float | None = None

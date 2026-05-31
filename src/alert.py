@@ -44,6 +44,7 @@ __all__ = [
     "generate_mpc_batch_header",
     "format_candidate_summary_table",
     "estimate_confirmation_time",
+    "format_alert_age_summary",
 ]
 
 import json
@@ -1872,3 +1873,36 @@ def estimate_confirmation_time(neo: object) -> float:
     }
     urgency = compute_followup_urgency(neo)
     return _urgency_hours.get(urgency, 168.0)
+
+
+def format_alert_age_summary(neos: list) -> dict:
+    """Return a summary of detection ages across a list of ScoredNEO candidates.
+
+    Collects the most recent observation JD from each candidate and reports:
+    - count: total number of candidates
+    - oldest_jd: earliest last-observation JD (or None)
+    - newest_jd: most recent last-observation JD (or None)
+    - guardrail: mandatory disclaimer
+
+    NOTE: These are candidate objects. This pipeline does NOT produce
+    confirmed detections — all alerts are subject to independent review
+    and must NOT trigger any external notification without MPC confirmation.
+    """
+    last_jds: list[float] = []
+    for neo in neos:
+        tracklet = getattr(neo, "tracklet", None)
+        observations = getattr(tracklet, "observations", None) or []
+        if not observations:
+            continue
+        jd = max(float(getattr(obs, "jd", 0.0)) for obs in observations)
+        last_jds.append(jd)
+
+    return {
+        "count": len(neos),
+        "oldest_jd": min(last_jds) if last_jds else None,
+        "newest_jd": max(last_jds) if last_jds else None,
+        "guardrail": (
+            "GUARDRAIL: These are pipeline candidates, NOT confirmed detections. "
+            "Do NOT submit to MPC or notify NASA PDCO without independent confirmation."
+        ),
+    }

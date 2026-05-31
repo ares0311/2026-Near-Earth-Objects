@@ -26,7 +26,8 @@ __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
            "compute_semi_latus_rectum",
            "compute_nodal_precession_rate",
            "compute_vis_viva_velocity",
-           "compute_jacobi_constant"]
+           "compute_jacobi_constant",
+           "compute_earth_moid_estimate"]
 
 import math
 from typing import NamedTuple
@@ -1553,3 +1554,16 @@ def compute_jacobi_constant(elements: object) -> float:
         Tisserand parameter (float).
     """
     return tisserand_parameter(elements)
+
+
+def compute_earth_moid_estimate(elements: object) -> float | None:
+    """Return a rough Earth-MOID estimate as |q - 1.0| AU.
+
+    This is NOT a true MOID computation — it is a fast lower-bound proxy
+    using only the perihelion distance. Use compute_moid() for the full
+    geometric calculation. Returns None if perihelion distance is unavailable.
+    """
+    q = compute_perihelion_distance(elements)
+    if q is None:
+        return None
+    return abs(q - 1.0)

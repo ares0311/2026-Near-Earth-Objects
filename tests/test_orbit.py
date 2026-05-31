@@ -2655,3 +2655,67 @@ class TestComputeJacobiConstant:
         )
         result = compute_jacobi_constant(el)
         assert result == 0.0
+
+
+class TestComputeEarthMoidEstimate:
+    def _make_elements(self, a: float, e: float) -> object:
+        from types import SimpleNamespace
+        return SimpleNamespace(
+            a_au=a, e=e, i=10.0, om=0.0, w=0.0, m0=0.0,
+            epoch_jd=2460000.5, quality_code=2,
+        )
+
+    def test_apollo_close_to_earth(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_earth_moid_estimate
+        elements = self._make_elements(1.5, 0.32)  # q ≈ 1.02 AU
+        result = compute_earth_moid_estimate(elements)
+        assert result is not None
+        assert result >= 0.0
+
+    def test_result_is_abs_q_minus_one(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_earth_moid_estimate, compute_perihelion_distance
+        elements = self._make_elements(2.0, 0.5)  # q = 1.0 AU exactly
+        q = compute_perihelion_distance(elements)
+        result = compute_earth_moid_estimate(elements)
+        assert result is not None
+        assert abs(result - abs(q - 1.0)) < 1e-12
+
+    def test_none_for_missing_a(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_earth_moid_estimate
+        elements = SimpleNamespace()
+        result = compute_earth_moid_estimate(elements)
+        assert result is None
+
+    def test_zero_moid_at_q_one(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_earth_moid_estimate
+        # a=2, e=0.5 → q = 2*(1-0.5)=1.0
+        elements = self._make_elements(2.0, 0.5)
+        result = compute_earth_moid_estimate(elements)
+        assert result is not None
+        assert result < 0.001
+
+    def test_large_moid_for_outer_object(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_earth_moid_estimate
+        # q = 3*(1-0.1) = 2.7 AU → |q-1| = 1.7
+        elements = self._make_elements(3.0, 0.1)
+        result = compute_earth_moid_estimate(elements)
+        assert result is not None
+        assert result > 1.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import orbit
+        assert "compute_earth_moid_estimate" in orbit.__all__

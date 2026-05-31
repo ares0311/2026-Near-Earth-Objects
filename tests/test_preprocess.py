@@ -2436,3 +2436,65 @@ class TestComputeCutoutPeakSnr:
         import preprocess
 
         assert "compute_cutout_peak_snr" in preprocess.__all__
+
+
+class TestComputeGradientMagnitude:
+    def _make_obs_with_cutout(self, arr_value: float = 1.0) -> object:
+        import base64
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        import numpy as np
+        arr = np.full((63, 63), arr_value, dtype=np.float32)
+        encoded = base64.b64encode(arr.tobytes()).decode()
+        return SimpleNamespace(cutout_difference=encoded)
+
+    def test_flat_image_has_zero_gradient(self):
+        import sys
+        sys.path.insert(0, "src")
+        from preprocess import compute_gradient_magnitude
+        obs = self._make_obs_with_cutout(5.0)
+        result = compute_gradient_magnitude(obs)
+        assert result is not None
+        assert result < 1e-6
+
+    def test_varying_image_has_nonzero_gradient(self):
+        import base64
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        import numpy as np
+
+        from preprocess import compute_gradient_magnitude
+        arr = np.arange(63 * 63, dtype=np.float32).reshape(63, 63)
+        encoded = base64.b64encode(arr.tobytes()).decode()
+        obs = SimpleNamespace(cutout_difference=encoded)
+        result = compute_gradient_magnitude(obs)
+        assert result is not None
+        assert result > 0.0
+
+    def test_no_cutout_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_gradient_magnitude
+        obs = SimpleNamespace(cutout_difference=None)
+        assert compute_gradient_magnitude(obs) is None
+
+    def test_invalid_cutout_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_gradient_magnitude
+        obs = SimpleNamespace(cutout_difference="!!!invalid_base64!!!")
+        assert compute_gradient_magnitude(obs) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import preprocess
+        assert "compute_gradient_magnitude" in preprocess.__all__

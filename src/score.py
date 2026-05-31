@@ -28,7 +28,8 @@ __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "compute_combined_hazard_score",
            "compute_priority_weighted_moid",
            "compute_impact_probability_proxy",
-           "compute_survey_efficiency_score"]
+           "compute_survey_efficiency_score",
+           "compute_novelty_rank"]
 
 import math
 import uuid
@@ -1370,3 +1371,32 @@ def compute_survey_efficiency_score(neo: object) -> float:
     nights = float(getattr(features, "nights_observed_score", None) or 0.0) if features else 0.0
     result = math.sqrt(arc * nights)
     return float(min(1.0, max(0.0, result)))
+
+
+def compute_novelty_rank(neos: list) -> list[tuple[int, str]]:
+    """Return dense novelty rankings for scored NEOs.
+
+    Each element is (rank, object_id) sorted from most novel (rank 1) to
+    least novel. Ties share the same rank (dense ranking). NEOs without a
+    novelty_score are placed at the bottom with rank len(neos).
+    """
+    def _novelty(neo: object) -> float:
+        meta = getattr(neo, "metadata", None)
+        if meta is None:
+            return -1.0
+        v = getattr(meta, "novelty_score", None)
+        return float(v) if v is not None else -1.0
+
+    scored = [(neo, _novelty(neo)) for neo in neos]
+    scored.sort(key=lambda x: x[1], reverse=True)
+
+    result: list[tuple[int, str]] = []
+    rank = 0
+    prev_score: float | None = None
+    for neo, score in scored:
+        if score != prev_score:
+            rank += 1
+            prev_score = score
+        oid = str(getattr(getattr(neo, "tracklet", neo), "object_id", "unknown"))
+        result.append((rank, oid))
+    return result

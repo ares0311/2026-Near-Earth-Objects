@@ -1693,3 +1693,51 @@ class TestComputeExpectedCalibrationErrorWeighted:
         result = compute_expected_calibration_error_weighted(probs, labels, weights, n_bins=10)
         assert isinstance(result, float)
         assert result >= 0.0
+
+
+class TestComputePositiveRate:
+    def test_all_above_threshold(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_positive_rate
+        assert compute_positive_rate([0.6, 0.7, 0.8]) == 1.0
+
+    def test_none_above_threshold(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_positive_rate
+        assert compute_positive_rate([0.1, 0.2, 0.3]) == 0.0
+
+    def test_half_above(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_positive_rate
+        result = compute_positive_rate([0.3, 0.7])
+        assert abs(result - 0.5) < 1e-9
+
+    def test_empty_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_positive_rate
+        assert compute_positive_rate([]) == 0.0
+
+    def test_custom_threshold(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_positive_rate
+        result = compute_positive_rate([0.3, 0.5, 0.7], threshold=0.4)
+        assert abs(result - 2.0 / 3.0) < 1e-9
+
+    def test_exactly_at_threshold_not_counted(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_positive_rate
+        # threshold uses strict >, so exactly 0.5 is NOT counted
+        result = compute_positive_rate([0.5], threshold=0.5)
+        assert result == 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        assert "compute_positive_rate" in calibration.__all__

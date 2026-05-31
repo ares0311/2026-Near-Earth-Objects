@@ -22,7 +22,8 @@ __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus"
            "compute_sky_plane_velocity",
            "compute_detection_rate",
            "compute_source_compactness",
-           "compute_photon_noise_limit"]
+           "compute_photon_noise_limit",
+           "compute_source_flux"]
 
 import math
 import uuid
@@ -1254,5 +1255,33 @@ def compute_photon_noise_limit(obs: object, gain: float = 1.0) -> float | None:
         if peak <= 0.0:
             return None
         return float(math.sqrt(peak * gain) / peak)
+    except Exception:
+        return None
+
+
+def compute_source_flux(obs: object, aperture_radius_px: float = 5.0) -> float | None:
+    """Sum of pixel values within a circular aperture centred on the brightest pixel.
+
+    Args:
+        obs: Observation-like object with an optional ``cutout_difference`` base64 attr.
+        aperture_radius_px: Aperture radius in pixels (default 5).
+
+    Returns:
+        Total flux as ``float``, or ``None`` if no cutout or decode error.
+    """
+    import base64 as _b64
+
+    import numpy as np
+
+    cutout = getattr(obs, "cutout_difference", None)
+    if cutout is None:
+        return None
+    try:
+        raw = _b64.b64decode(cutout)
+        arr = np.frombuffer(raw, dtype=np.float32).reshape(63, 63).astype(float)
+        cy, cx = np.unravel_index(int(arr.argmax()), arr.shape)
+        ys, xs = np.indices(arr.shape)
+        mask = (ys - cy) ** 2 + (xs - cx) ** 2 <= aperture_radius_px ** 2
+        return float(arr[mask].sum())
     except Exception:
         return None

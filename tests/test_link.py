@@ -2776,3 +2776,60 @@ class TestComputeAlongTrackError:
         )
         result = compute_along_track_error(tracklet)
         assert result == 0.0
+
+
+class TestComputeObservationRate:
+    def _make_tracklet(self, jds: list[float]) -> object:
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+        obs = [SimpleNamespace(jd=j) for j in jds]
+        return SimpleNamespace(observations=tuple(obs))
+
+    def test_single_night(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_observation_rate
+        trk = self._make_tracklet([2460000.5, 2460000.6, 2460000.7])
+        result = compute_observation_rate(trk)
+        assert result == 3.0
+
+    def test_multi_night(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_observation_rate
+        trk = self._make_tracklet([2460000.5, 2460001.5, 2460002.5])
+        result = compute_observation_rate(trk)
+        assert abs(result - 1.0) < 1e-9
+
+    def test_two_nights_four_obs(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_observation_rate
+        trk = self._make_tracklet([2460000.1, 2460000.9, 2460001.1, 2460001.9])
+        result = compute_observation_rate(trk)
+        assert abs(result - 2.0) < 1e-9
+
+    def test_empty_observations_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_observation_rate
+        trk = SimpleNamespace(observations=())
+        assert compute_observation_rate(trk) is None
+
+    def test_no_observations_attr_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_observation_rate
+        trk = SimpleNamespace()
+        assert compute_observation_rate(trk) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+        assert "compute_observation_rate" in link.__all__

@@ -27,7 +27,8 @@ __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "compute_tracklet_overlap_fraction",
            "compute_velocity_dispersion",
            "compute_tracklet_centroid",
-           "compute_along_track_error"]
+           "compute_along_track_error",
+           "compute_observation_rate"]
 
 import math
 import uuid
@@ -1441,3 +1442,15 @@ def compute_along_track_error(tracklet: object) -> float:
         return rms
     except Exception:
         return 0.0
+
+
+def compute_observation_rate(tracklet: object) -> float | None:
+    """Return observations per distinct night for the tracklet.
+
+    Returns None if the tracklet has no observations.
+    """
+    observations = getattr(tracklet, "observations", None) or ()
+    if not observations:
+        return None
+    nights = {int(getattr(obs, "jd", 0.0)) for obs in observations}
+    return float(len(observations)) / float(len(nights))
