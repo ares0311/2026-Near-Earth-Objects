@@ -26,7 +26,8 @@ __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_
            "compute_fwhm_from_cutout",
            "compute_local_background_rms",
            "compute_cutout_peak_snr",
-           "compute_gradient_magnitude"]
+           "compute_gradient_magnitude",
+           "compute_cutout_rms"]
 
 import base64
 import math
@@ -1348,5 +1349,22 @@ def compute_gradient_magnitude(obs: object) -> float | None:
         dy, dx = np.gradient(arr)
         mag = np.sqrt(dx ** 2 + dy ** 2)
         return float(np.mean(mag))
+    except Exception:
+        return None
+
+
+def compute_cutout_rms(obs: object) -> float | None:
+    """Return the RMS of pixel values across the difference-image cutout.
+
+    Returns None if no cutout is present or the cutout cannot be decoded.
+    """
+    cutout = getattr(obs, "cutout_difference", None)
+    if cutout is None:
+        return None
+    try:
+        import base64 as _b64
+        raw = _b64.b64decode(cutout)
+        arr = np.frombuffer(raw, dtype=np.float32).reshape(_CUTOUT_SIZE, _CUTOUT_SIZE).astype(float)
+        return float(np.sqrt(np.mean(arr ** 2)))
     except Exception:
         return None

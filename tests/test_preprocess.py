@@ -2498,3 +2498,56 @@ class TestComputeGradientMagnitude:
         sys.path.insert(0, "src")
         import preprocess
         assert "compute_gradient_magnitude" in preprocess.__all__
+
+
+class TestComputeCutoutRms:
+    def _make_obs(self, value: float = 2.0) -> object:
+        import base64
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        import numpy as np
+        arr = np.full((63, 63), value, dtype=np.float32)
+        encoded = base64.b64encode(arr.tobytes()).decode()
+        return SimpleNamespace(cutout_difference=encoded)
+
+    def test_constant_array_rms_equals_value(self):
+        import sys
+        sys.path.insert(0, "src")
+        from preprocess import compute_cutout_rms
+        obs = self._make_obs(3.0)
+        result = compute_cutout_rms(obs)
+        assert result is not None
+        assert abs(result - 3.0) < 1e-5
+
+    def test_zero_array_rms_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from preprocess import compute_cutout_rms
+        obs = self._make_obs(0.0)
+        result = compute_cutout_rms(obs)
+        assert result is not None
+        assert result == 0.0
+
+    def test_no_cutout_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_cutout_rms
+        assert compute_cutout_rms(SimpleNamespace(cutout_difference=None)) is None
+
+    def test_invalid_cutout_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_cutout_rms
+        assert compute_cutout_rms(SimpleNamespace(cutout_difference="!!!bad!!!")) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import preprocess
+        assert "compute_cutout_rms" in preprocess.__all__

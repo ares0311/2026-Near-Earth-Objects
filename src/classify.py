@@ -45,6 +45,7 @@ __all__ = [
     "compute_classification_confidence",
     "compute_entropy_weighted_score",
     "compute_tier1_neo_score",
+    "compute_class_balance",
 ]
 
 import base64
@@ -1988,3 +1989,20 @@ def compute_artifact_features_summary(features: object) -> dict:
         "streak_score",
     ]
     return {name: getattr(features, name, None) for name in names}
+
+
+def compute_class_balance(neos: list) -> dict[str, int]:
+    """Return a count of each dominant hypothesis across a list of ScoredNEO objects.
+
+    The dominant hypothesis is the highest-probability class in each object's
+    NEOPosterior. Returns a dict mapping hypothesis name to count.
+    """
+    counts: dict[str, int] = {}
+    for neo in neos:
+        posterior = getattr(neo, "posterior", None)
+        if posterior is None:
+            counts["unknown"] = counts.get("unknown", 0) + 1
+            continue
+        name, _ = dominant_hypothesis(posterior)
+        counts[name] = counts.get(name, 0) + 1
+    return counts

@@ -28,7 +28,8 @@ __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "compute_velocity_dispersion",
            "compute_tracklet_centroid",
            "compute_along_track_error",
-           "compute_observation_rate"]
+           "compute_observation_rate",
+           "compute_tracklet_brightness_trend"]
 
 import math
 import uuid
@@ -1454,3 +1455,27 @@ def compute_observation_rate(tracklet: object) -> float | None:
         return None
     nights = {int(getattr(obs, "jd", 0.0)) for obs in observations}
     return float(len(observations)) / float(len(nights))
+
+
+def compute_tracklet_brightness_trend(tracklet: object) -> float | None:
+    """Return the linear slope of magnitude vs JD in mag/day.
+
+    A positive slope means the object is fading; negative means brightening.
+    Returns None if fewer than 2 observations have valid (non-sentinel) magnitudes.
+    """
+    observations = getattr(tracklet, "observations", None) or ()
+    jds = []
+    mags = []
+    for obs in observations:
+        mag = getattr(obs, "mag", None)
+        if mag is None:
+            continue
+        m = float(mag)
+        if m >= 90.0:
+            continue
+        jds.append(float(getattr(obs, "jd", 0.0)))
+        mags.append(m)
+    if len(jds) < 2:
+        return None
+    coeffs = np.polyfit(jds, mags, 1)
+    return float(coeffs[0])

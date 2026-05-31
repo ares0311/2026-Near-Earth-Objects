@@ -39,6 +39,7 @@ __all__ = [
     "ScoringRun",
     "AlertBatch",
     "ObservationFilter",
+    "FieldStatistics",
 ]
 
 from dataclasses import dataclass
@@ -1149,3 +1150,16 @@ class ObservationFilter(BaseModel):
     filter_bands: tuple[str, ...] = ()
     min_jd: float | None = None
     max_jd: float | None = None
+
+
+class FieldStatistics(BaseModel):
+    """Summary statistics for a single survey field observation."""
+
+    model_config = ConfigDict(frozen=True)
+
+    field_id: str
+    n_sources: int
+    limiting_mag: float | None = None
+    sky_area_sq_deg: float | None = None
+    epoch_jd: float | None = None
+    mission: str | None = None

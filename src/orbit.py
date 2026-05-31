@@ -27,7 +27,8 @@ __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
            "compute_nodal_precession_rate",
            "compute_vis_viva_velocity",
            "compute_jacobi_constant",
-           "compute_earth_moid_estimate"]
+           "compute_earth_moid_estimate",
+           "compute_orbital_eccentricity_class"]
 
 import math
 from typing import NamedTuple
@@ -1567,3 +1568,30 @@ def compute_earth_moid_estimate(elements: object) -> float | None:
     if q is None:
         return None
     return abs(q - 1.0)
+
+
+def compute_orbital_eccentricity_class(elements: object) -> str:
+    """Classify an orbit by eccentricity.
+
+    Returns one of:
+    - ``"circular"``   — e < 0.05
+    - ``"elliptical"`` — 0.05 ≤ e < 0.999
+    - ``"parabolic"``  — 0.999 ≤ e ≤ 1.001
+    - ``"hyperbolic"`` — e > 1.001
+    - ``"unknown"``    — eccentricity not available or negative
+    """
+    e_raw = getattr(elements, "e", None)
+    if e_raw is None:
+        e_raw = getattr(elements, "eccentricity", None)
+    if e_raw is None:
+        return "unknown"
+    e = float(e_raw)
+    if e < 0.0:
+        return "unknown"
+    if e < 0.05:
+        return "circular"
+    if e < 0.999:
+        return "elliptical"
+    if e <= 1.001:
+        return "parabolic"
+    return "hyperbolic"

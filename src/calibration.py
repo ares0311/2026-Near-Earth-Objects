@@ -33,6 +33,7 @@ __all__ = [
     "compute_isotonic_calibration_error",
     "compute_expected_calibration_error_weighted",
     "compute_positive_rate",
+    "compute_weighted_brier_score",
 ]
 
 import math
@@ -1359,3 +1360,23 @@ def compute_positive_rate(probs: list[float], threshold: float = 0.5) -> float:
     if not probs:
         return 0.0
     return float(sum(1 for p in probs if p > threshold)) / float(len(probs))
+
+
+def compute_weighted_brier_score(
+    probs: list[float],
+    labels: list[float],
+    weights: list[float],
+) -> float:
+    """Return the sample-weighted Brier score.
+
+    Brier score = Σ wᵢ·(pᵢ − yᵢ)² / Σ wᵢ.
+    Returns 0.0 if the input is empty or all weights are zero.
+    """
+    if not probs or not labels or not weights:
+        return 0.0
+    total_w = sum(weights)
+    if total_w <= 0.0:
+        return 0.0
+    return float(
+        sum(w * (p - y) ** 2 for p, y, w in zip(probs, labels, weights)) / total_w
+    )

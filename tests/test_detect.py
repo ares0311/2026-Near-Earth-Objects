@@ -2399,3 +2399,57 @@ class TestComputeSourceFlux:
         sys.path.insert(0, "src")
         import detect
         assert "compute_source_flux" in detect.__all__
+
+
+class TestComputeApparentMotionRate:
+    def _make_obs(self, jd: float, ra: float, dec: float) -> object:
+        from types import SimpleNamespace
+        return SimpleNamespace(jd=jd, ra_deg=ra, dec_deg=dec)
+
+    def test_single_obs_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_apparent_motion_rate
+        assert compute_apparent_motion_rate([self._make_obs(0.0, 10.0, 0.0)]) is None
+
+    def test_empty_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_apparent_motion_rate
+        assert compute_apparent_motion_rate([]) is None
+
+    def test_stationary_source_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_apparent_motion_rate
+        obs = [self._make_obs(0.0, 10.0, 5.0), self._make_obs(0.042, 10.0, 5.0)]
+        result = compute_apparent_motion_rate(obs)
+        assert result is not None
+        assert result == 0.0
+
+    def test_moving_source_nonzero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_apparent_motion_rate
+        # 1 arcsec motion over 1 hour = 1 arcsec/hr
+        obs = [
+            self._make_obs(2460000.0, 10.0, 5.0),
+            self._make_obs(2460000.0 + 1.0 / 24.0, 10.0 + 1.0 / 3600.0, 5.0),
+        ]
+        result = compute_apparent_motion_rate(obs)
+        assert result is not None
+        assert result > 0.0
+
+    def test_identical_jds_skipped(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_apparent_motion_rate
+        obs = [self._make_obs(0.0, 10.0, 5.0), self._make_obs(0.0, 10.1, 5.0)]
+        result = compute_apparent_motion_rate(obs)
+        assert result is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import detect
+        assert "compute_apparent_motion_rate" in detect.__all__

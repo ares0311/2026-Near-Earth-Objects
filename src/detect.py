@@ -23,7 +23,8 @@ __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus"
            "compute_detection_rate",
            "compute_source_compactness",
            "compute_photon_noise_limit",
-           "compute_source_flux"]
+           "compute_source_flux",
+           "compute_apparent_motion_rate"]
 
 import math
 import uuid
@@ -1285,3 +1286,30 @@ def compute_source_flux(obs: object, aperture_radius_px: float = 5.0) -> float |
         return float(arr[mask].sum())
     except Exception:
         return None
+
+
+def compute_apparent_motion_rate(observations: list) -> float | None:
+    """Return the mean apparent motion rate in arcsec/hr across consecutive observation pairs.
+
+    Uses cosine-Dec-corrected RA differences for each consecutive pair and
+    returns the mean rate. Returns None for fewer than 2 observations or
+    identical JDs across all pairs.
+    """
+    if len(observations) < 2:
+        return None
+    obs_sorted = sorted(observations, key=lambda o: float(getattr(o, "jd", 0.0)))
+    rates = []
+    for i in range(len(obs_sorted) - 1):
+        o1, o2 = obs_sorted[i], obs_sorted[i + 1]
+        dt_hr = (float(getattr(o2, "jd", 0.0)) - float(getattr(o1, "jd", 0.0))) * 24.0
+        if abs(dt_hr) < 1e-9:
+            continue
+        mean_dec = (float(getattr(o1, "dec_deg", 0.0)) + float(getattr(o2, "dec_deg", 0.0))) / 2.0
+        cos_dec = math.cos(math.radians(mean_dec))
+        dra_deg = float(getattr(o2, "ra_deg", 0.0)) - float(getattr(o1, "ra_deg", 0.0))
+        dra = dra_deg * 3600.0 * cos_dec
+        ddec = (float(getattr(o2, "dec_deg", 0.0)) - float(getattr(o1, "dec_deg", 0.0))) * 3600.0
+        rates.append(math.hypot(dra, ddec) / abs(dt_hr))
+    if not rates:
+        return None
+    return float(sum(rates) / len(rates))
