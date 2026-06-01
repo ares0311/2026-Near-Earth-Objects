@@ -108,7 +108,7 @@ DEFAULT_INPUT_PATH = _ROOT / "background" / "targets.json"
 DEFAULT_DB_PATH = _ROOT / "Logs" / "background.sqlite"
 DEFAULT_REPORT_DIR = _ROOT / "Logs" / "reports"
 _SCHEMA_VERSION = "background-v1"
-_CODE_VERSION = "0.60.0"
+_CODE_VERSION = "0.72.0"
 _BACKGROUND_LOG_TABLES = (
     "schema_metadata",
     "run_ledger",
@@ -575,7 +575,7 @@ def _recommended_operator_command(next_action: str) -> str | None:
             "PYTHONPATH=src python Skills/background.py latest-unsigned-signoff-packet"
         ),
         "review_follow_up": (
-            "PYTHONPATH=src python Skills/background.py latest-unsigned-signoff-packet"
+            "PYTHONPATH=src python Skills/background.py needs-follow-up-summary"
         ),
         "resolve_scheduler_blockers": (
             "PYTHONPATH=src python Skills/background.py automation-readiness"

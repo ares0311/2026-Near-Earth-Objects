@@ -747,7 +747,7 @@ def test_background_operations_snapshot_empty_log(monkeypatch, tmp_path):
         fixture,
     )
 
-    assert snapshot["code_version"] == "0.60.0"
+    assert snapshot["code_version"] == "0.72.0"
     assert snapshot["next_action"] == "run_background_once"
     assert snapshot["ledger"]["total_runs"] == 0
     assert snapshot["automation_readiness"]["scheduler_ready"] is True
@@ -897,7 +897,7 @@ def test_background_operator_next_action_summary_blocks_old_schema(tmp_path):
         Path("background/targets.json"),
     )
 
-    assert summary["code_version"] == "0.60.0"
+    assert summary["code_version"] == "0.72.0"
     assert summary["schema_ready"] is False
     assert summary["blocked"] is True
     assert summary["blocker"] == "BACKGROUND_LOG_SCHEMA_NOT_CURRENT"
@@ -935,6 +935,44 @@ def test_background_operator_next_action_summary_current_schema(monkeypatch, tmp
     assert summary["requires_human_approval_before_external_action"] is True
     assert summary["operations_snapshot"]["next_action"] == "run_background_once"
     assert summary["packet_decision_readiness"]["total_packets"] == 0
+    assert summary["network_access_performed"] is False
+    assert summary["external_submission_enabled"] is False
+
+
+def test_background_operator_next_action_summary_after_signoff(monkeypatch, tmp_path):
+    fixture = tmp_path / "targets.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
+    write_fixture(fixture)
+    monkeypatch.setattr(background, "score_tracklet", lambda tracklet, run_id: make_scored())
+    result = background.background_run_once(
+        fixture,
+        db_path,
+        tmp_path / "reports",
+        config_path=tmp_path / "missing_config.json",
+    )
+    background.record_human_signoff(
+        run_id=result.ledger.run_id,
+        target_id=result.ledger.target_id,
+        reviewer="Reviewer",
+        decision="approved_for_internal_review",
+        scope="Internal Project Tracking",
+        notes="Internal fixture review only.",
+        db_path=db_path,
+    )
+
+    summary = background.background_operator_next_action_summary(
+        Path("background/config.json"),
+        db_path,
+        fixture,
+    )
+
+    assert summary["next_action"] == "review_follow_up"
+    assert summary["recommended_command"] == (
+        "PYTHONPATH=src python Skills/background.py needs-follow-up-summary"
+    )
+    assert summary["operations_snapshot"]["signoff_readiness"][
+        "unsigned_follow_up_runs"
+    ] == []
     assert summary["network_access_performed"] is False
     assert summary["external_submission_enabled"] is False
 
@@ -989,7 +1027,7 @@ def test_signoff_packet_for_unsigned_followup(monkeypatch, tmp_path):
     packet = background.signoff_packet(result.ledger.run_id, db_path)
     latest = background.latest_unsigned_signoff_packet(db_path)
 
-    assert packet["code_version"] == "0.60.0"
+    assert packet["code_version"] == "0.72.0"
     assert packet["run_id"] == result.ledger.run_id
     assert packet["target_id"] == "T001"
     assert packet["recommended_decision"] == "review_and_optionally_sign"
