@@ -1167,10 +1167,10 @@ The older n=50 baseline remains in `data/injection_recovery_baseline.json` for h
 
 | Step | Purpose | Done When |
 |---|---|---|
-| **S1** | Persist current blueprint compliance and operations snapshots after the internal-tracking signoff | `record-blueprint-compliance-summary` and `record-operations-snapshot` have current rows in `Logs/background.sqlite`. |
-| **S2** | Review `needs-follow-up-summary` for `BACKGROUND_001` after internal signoff | The local follow-up record is reviewed and any additional local-only tests are listed. |
-| **S3** | Clarify CLI wording around internal-only signoff vs. live-search approval | Help text and docs make clear that internal project tracking is not live search, discovery, hazard, or submission approval. |
-| **S4** | Decide whether the next offline scheduled cycle should run now | Either `run-once` is executed and logged, or the operator records why the scheduler remains paused. |
+| **S1** | Persist current blueprint compliance and operations snapshots after the internal-tracking signoff | Complete in local runtime DB: compliance `276cf093-709a-47ac-b560-36969473d6a0`; operations snapshot `795858ad-bde1-4f11-bf11-2786294d13d2`. |
+| **S2** | Review `needs-follow-up-summary` for `BACKGROUND_001` after internal signoff | Complete: evidence remains local-only; known-object evidence is blocked, cross-source support is uncertain, and external submission remains inappropriate. |
+| **S3** | Clarify CLI wording around internal-only signoff vs. live-search approval | Complete: CLI help and background automation docs now state that packet signoff is internal-only and not live-search or external-submission approval. |
+| **S4** | Decide whether the next offline scheduled cycle should run now | Complete: paused for now; no new offline run will be started until the internal-only wording/docs patch is committed and the operator chooses the next offline cycle. |
 | **S5** | Keep docs/version/test counts aligned with package metadata | README, AGENTS, CHANGELOG, API docs, and `pyproject.toml` agree before the next release commit. |
 
 ### 15.4 Upcoming Milestones
@@ -1198,11 +1198,11 @@ Use this table as the working roadmap ledger. Each row should move from
 | **P1** | Complete | Promote local background SQLite schema | `Logs/background.sqlite` contains `signoff_packet_decision_log`; backup retained as `Logs/background.pre-v0.60.0-20260601.sqlite` | None |
 | **P2** | Complete | Record `BACKGROUND_001` approval for internal project tracking | `human_signoff_log` and `signoff_packet_decision_log` each contain one row; no undecided packets remain | None |
 | **P3** | Complete | Correct signed follow-up operator recommendation | Commit `fc9ef8f`; `operator-next-action` recommends `needs-follow-up-summary` after signoff | None |
-| **P4** | Pending | Persist post-signoff blueprint compliance snapshot | New row in `blueprint_compliance_log` after internal-tracking signoff | `PYTHONPATH=src python Skills/background.py record-blueprint-compliance-summary` |
-| **P5** | Pending | Persist post-signoff operations snapshot | New row in `operations_snapshot_log` showing signed follow-up state | `PYTHONPATH=src python Skills/background.py record-operations-snapshot` |
-| **P6** | Pending | Review signed follow-up evidence | Operator notes from `needs-follow-up-summary`; local-only follow-up tests listed | `PYTHONPATH=src python Skills/background.py needs-follow-up-summary` |
-| **P7** | Pending | Clarify internal-only signoff language in CLI/docs | Help text and docs distinguish internal tracking from live-search approval | Patch `Skills/background.py` help text and docs |
-| **P8** | Pending | Decide next offline scheduled cycle | Either a new `run_ledger` row exists or a documented pause reason exists | Operator decision |
+| **P4** | Complete | Persist post-signoff blueprint compliance snapshot | `blueprint_compliance_log` row `276cf093-709a-47ac-b560-36969473d6a0`; overall status `pass` | None |
+| **P5** | Complete | Persist post-signoff operations snapshot | `operations_snapshot_log` row `795858ad-bde1-4f11-bf11-2786294d13d2`; signed follow-up state recorded | None |
+| **P6** | Complete | Review signed follow-up evidence | `needs-follow-up-summary` reviewed; evidence remains local-only with single-source and known-object blockers | None |
+| **P7** | Complete | Clarify internal-only signoff language in CLI/docs | CLI help and background docs distinguish internal tracking from live-search approval | None |
+| **P8** | Complete | Decide next offline scheduled cycle | Paused until this wording/docs patch is committed and the operator chooses the next offline cycle | None |
 | **P9** | Pending | Align release docs after the next code change | README, AGENTS, CHANGELOG, API docs, and package metadata agree | Version/docs sweep before commit |
 | **P10** | Pending | Prepare live dry-run credential inventory | Credential names and storage plan documented; no secrets committed | Operator credential review |
 | **P11** | Pending | Approve live dry-run policy | Non-example policy file reviewed with named reviewer and bounded scope | Operator policy approval |

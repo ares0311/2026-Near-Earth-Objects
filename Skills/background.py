@@ -233,7 +233,15 @@ def main() -> None:
 
     packet_signoff = sub.add_parser(
         "record-signoff-from-packet",
-        help="Record a human signoff decision from an internal packet",
+        help=(
+            "Record an internal-only human review decision from a packet; "
+            "does not approve live search or external submission"
+        ),
+        description=(
+            "Record an internal-only human review decision from a packet. "
+            "This does not approve live search, discovery claims, hazard claims, "
+            "external submission, or public communication."
+        ),
     )
     packet_signoff.add_argument("--packet-id", required=True)
     packet_signoff.add_argument("--reviewer", required=True)

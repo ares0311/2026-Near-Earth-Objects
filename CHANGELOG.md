@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+- `Skills/background.py`: clarified that `record-signoff-from-packet` records
+  an internal-only review decision and does not approve live search or external
+  submission.
+- `docs/BACKGROUND_SEARCH_AUTOMATION.md` and `README.md`: updated the roadmap
+  and signoff language after the local `BACKGROUND_001` internal-tracking
+  signoff, including persisted blueprint and operations snapshot evidence.
+
 ## v0.60.0
 
 - `background.py`: added

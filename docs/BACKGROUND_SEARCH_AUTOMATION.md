@@ -346,7 +346,10 @@ top-level SQLite `operations_snapshot_log` table and explicitly keep
 Signoff records are explicit and auditable. They do not submit or contact
 external parties. Multiple reviewers may record signoffs for the same run; one
 `approved_for_internal_review` record is enough for the signoff-readiness audit
-view to report the run as signed.
+view to report the run as signed. This approval is internal-only: it records
+project tracking or follow-up review state, not live-search approval, discovery
+confirmation, hazard assessment, external submission permission, or public
+communication approval.
 
 Before recording a signoff, generate an internal signoff packet:
 
@@ -398,7 +401,8 @@ follow-up target. The command writes a normal human signoff plus an auditable
 `signoff_packet_decision_log` row, then records a post-decision operations
 snapshot. It remains an internal review action only: it does not contact
 outside parties, enable live network access, or perform any external
-submission.
+submission, and it does not convert an offline fixture result into a live
+survey detection.
 
 ```bash
 PYTHONPATH=src python Skills/background.py record-signoff \
