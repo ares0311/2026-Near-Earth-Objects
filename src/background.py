@@ -23,6 +23,7 @@ __all__ = [
     "run_detail",
     "target_history",
     "signoff_readiness_summary",
+    "internal_follow_up_disposition_summary",
     "signoff_packet",
     "latest_unsigned_signoff_packet",
     "write_signoff_packet",
@@ -1613,6 +1614,78 @@ def signoff_readiness_summary(
                 run["run_id"] for run in runs if not run["is_ready"]
             ],
         }
+
+
+def _follow_up_limitations(entry: Mapping[str, Any]) -> list[str]:
+    limitations: list[str] = []
+    for test in entry.get("required_tests", []):
+        status = test.get("status")
+        if status in {"blocked", "uncertain", "fail"}:
+            limitations.append(
+                f"{test.get('name')}: {status} ({test.get('reason_code')})"
+            )
+    return limitations
+
+
+def internal_follow_up_disposition_summary(
+    db_path: Path = DEFAULT_DB_PATH,
+    required_approval_count: int = 1,
+) -> dict[str, Any]:
+    """Summarize signed fixture follow-ups for internal tracking only."""
+    init_log_db(db_path)
+    readiness = signoff_readiness_summary(db_path, required_approval_count)
+    readiness_by_run = {run["run_id"]: run for run in readiness["runs"]}
+    with _connect(db_path) as conn:
+        rows = conn.execute(
+            """
+            SELECT entry_json
+            FROM needs_follow_up_log
+            ORDER BY recorded_at_utc ASC
+            """
+        ).fetchall()
+    dispositions = []
+    for row in rows:
+        entry = json.loads(row["entry_json"])
+        run_ready = readiness_by_run.get(entry["run_id"], {})
+        signed = bool(run_ready.get("is_ready"))
+        limitations = _follow_up_limitations(entry)
+        if signed:
+            disposition = "internal_tracking_complete"
+            next_action = "await_operator_decision_for_next_offline_cycle"
+        else:
+            disposition = "awaiting_internal_review"
+            next_action = "record_internal_review_decision"
+        dispositions.append({
+            "run_id": entry["run_id"],
+            "target_id": entry["target_id"],
+            "disposition": disposition,
+            "signed_for_internal_tracking": signed,
+            "scope": (
+                run_ready.get("signoffs", [{}])[-1].get("scope")
+                if run_ready.get("signoffs")
+                else None
+            ),
+            "remaining_local_limitations": limitations,
+            "next_action": next_action,
+            "external_submission_enabled": False,
+            "live_search_approved": False,
+            "discovery_claim_approved": False,
+            "hazard_claim_approved": False,
+            "network_access_performed": False,
+        })
+    return {
+        "db_path": str(db_path),
+        "required_approval_count": required_approval_count,
+        "total_follow_up": len(dispositions),
+        "total_internal_tracking_complete": sum(
+            1
+            for item in dispositions
+            if item["disposition"] == "internal_tracking_complete"
+        ),
+        "dispositions": dispositions,
+        "network_access_performed": False,
+        "external_submission_enabled": False,
+    }
 
 
 def _signoff_packet_decision(readiness: Mapping[str, Any]) -> str:

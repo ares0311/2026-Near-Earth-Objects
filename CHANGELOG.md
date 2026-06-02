@@ -11,6 +11,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `docs/BACKGROUND_SEARCH_AUTOMATION.md` and `README.md`: updated the roadmap
   and signoff language after the local `BACKGROUND_001` internal-tracking
   signoff, including persisted blueprint and operations snapshot evidence.
+- `background.py` / `Skills/background.py`: added
+  `internal_follow_up_disposition_summary` and
+  `internal-follow-up-disposition` for review-only internal disposition of signed
+  fixture follow-ups.
 
 ## v0.60.0
 

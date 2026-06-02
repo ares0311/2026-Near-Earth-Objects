@@ -1218,6 +1218,45 @@ def test_record_signoff_from_packet_approves_and_snapshots(monkeypatch, tmp_path
     assert readiness["unsigned_follow_up_runs"] == []
 
 
+def test_internal_follow_up_disposition_summary_signed(monkeypatch, tmp_path):
+    fixture = tmp_path / "targets.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
+    write_fixture(fixture)
+    monkeypatch.setattr(
+        background,
+        "score_tracklet",
+        lambda tracklet, run_id: make_scored(known_object_score=None),
+    )
+    result = background.background_run_once(
+        fixture,
+        db_path,
+        tmp_path / "reports",
+        config_path=tmp_path / "missing_config.json",
+    )
+    background.record_human_signoff(
+        run_id=result.ledger.run_id,
+        target_id=result.ledger.target_id,
+        reviewer="Reviewer",
+        decision="approved_for_internal_review",
+        scope="Internal Project Tracking",
+        notes="Internal fixture review only.",
+        db_path=db_path,
+    )
+
+    summary = background.internal_follow_up_disposition_summary(db_path)
+
+    assert summary["total_follow_up"] == 1
+    assert summary["total_internal_tracking_complete"] == 1
+    assert summary["dispositions"][0]["disposition"] == "internal_tracking_complete"
+    assert summary["dispositions"][0]["signed_for_internal_tracking"] is True
+    assert summary["dispositions"][0]["scope"] == "Internal Project Tracking"
+    assert summary["dispositions"][0]["live_search_approved"] is False
+    assert summary["dispositions"][0]["external_submission_enabled"] is False
+    assert "known_object_evidence_check: blocked" in " ".join(
+        summary["dispositions"][0]["remaining_local_limitations"]
+    )
+
+
 @pytest.mark.parametrize("decision", ["needs_more_work", "rejected"])
 def test_record_signoff_from_packet_nonapproval_keeps_run_unsigned(
     monkeypatch,
@@ -1376,6 +1415,50 @@ def test_background_cli_record_signoff_from_packet(monkeypatch, tmp_path):
     assert recorded_payload["external_submission_enabled"] is False
     assert summary_payload["total_packet_decisions"] == 1
     assert summary_payload["by_decision"] == {"approved_for_internal_review": 1}
+
+
+def test_background_cli_internal_follow_up_disposition(monkeypatch, tmp_path):
+    repo = Path(__file__).resolve().parents[1]
+    fixture = tmp_path / "targets.json"
+    db_path = tmp_path / "Logs" / "background.sqlite"
+    write_fixture(fixture)
+    monkeypatch.setattr(background, "score_tracklet", lambda tracklet, run_id: make_scored())
+    result = background.background_run_once(
+        fixture,
+        db_path,
+        tmp_path / "reports",
+        config_path=tmp_path / "missing_config.json",
+    )
+    background.record_human_signoff(
+        result.ledger.run_id,
+        result.ledger.target_id,
+        "Reviewer",
+        "approved_for_internal_review",
+        "Internal Project Tracking",
+        "Internal fixture review only.",
+        db_path,
+    )
+    env = {**os.environ, "PYTHONPATH": str(repo / "src")}
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "internal-follow-up-disposition",
+            "--db",
+            str(db_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+
+    payload = json.loads(completed.stdout)
+    assert payload["total_internal_tracking_complete"] == 1
+    assert payload["dispositions"][0]["discovery_claim_approved"] is False
+    assert payload["network_access_performed"] is False
 
 
 def test_signoff_packet_decision_readiness_empty_db(tmp_path):

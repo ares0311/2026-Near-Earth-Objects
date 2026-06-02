@@ -354,6 +354,10 @@ outcome row, and return the structured result.
 def ledger_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
 def reviewed_log_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
 def needs_follow_up_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
+def internal_follow_up_disposition_summary(
+    db_path: Path = DEFAULT_DB_PATH,
+    required_approval_count: int = 1,
+) -> dict[str, Any]
 def target_priority_summary(...) -> dict[str, Any]
 def follow_up_test_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
 def submission_recommendation_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]
@@ -808,7 +812,7 @@ Lightweight summary of a `ScoredNEO` for display or export.
 
 ---
 
-## v0.16.0 through v0.60.0 Public API Additions
+## v0.16.0 through v0.72.0 Public API Additions
 
 These releases added conservative helper APIs around live-data retrieval,
 preprocessing quality, detection triage, linking, orbit review, classification
@@ -952,8 +956,9 @@ claim confirmation or impact probability.
 | v0.58.0 | `background.py` / `Skills/background.py` | `background_schema_migration_preview`; init-log-db-preview CLI command |
 | v0.59.0 | `background.py` / `Skills/background.py` | `background_schema_operations_summary`; schema-operations-summary CLI command |
 | v0.60.0 | `background.py` / `Skills/background.py` | `background_operator_next_action_summary`; operator-next-action CLI command |
+| v0.72.0 | `background.py` / `Skills/background.py` | `internal_follow_up_disposition_summary`; internal-follow-up-disposition CLI command |
 
-### Skills and CLI additions in v0.16.0 through v0.60.0
+### Skills and CLI additions in v0.16.0 through v0.72.0
 
 `export_candidate_report.py`, `tag_neo_class.py`, `check_tisserand.py`,
 `export_followup_requests.py`, `ephemeris_check.py`,
@@ -1008,6 +1013,7 @@ claim confirmation or impact probability.
 `Skills/background.py signoff-packet-decision-summary`,
 `Skills/background.py signoff-packet-decision-readiness`,
 `Skills/background.py latest-undecided-signoff-packet`,
+`Skills/background.py internal-follow-up-disposition`,
 `Skills/background.py schema-status-summary`,
 `Skills/background.py init-log-db-preview`,
 `Skills/background.py schema-operations-summary`,

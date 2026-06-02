@@ -196,6 +196,7 @@ PYTHONPATH=src python Skills/background.py operator-next-action
 PYTHONPATH=src python Skills/background.py init-log-db
 PYTHONPATH=src python Skills/background.py reviewed-summary
 PYTHONPATH=src python Skills/background.py needs-follow-up-summary
+PYTHONPATH=src python Skills/background.py internal-follow-up-disposition
 PYTHONPATH=src python Skills/background.py target-priority-summary
 PYTHONPATH=src python Skills/background.py follow-up-test-summary
 PYTHONPATH=src python Skills/background.py submission-recommendation-summary
@@ -363,6 +364,7 @@ PYTHONPATH=src python Skills/background.py record-signoff-from-packet --packet-i
 PYTHONPATH=src python Skills/background.py signoff-packet-decision-summary
 PYTHONPATH=src python Skills/background.py signoff-packet-decision-readiness
 PYTHONPATH=src python Skills/background.py latest-undecided-signoff-packet
+PYTHONPATH=src python Skills/background.py internal-follow-up-disposition
 ```
 
 Signoff packets combine run detail, target history, required tests,
@@ -403,6 +405,11 @@ snapshot. It remains an internal review action only: it does not contact
 outside parties, enable live network access, or perform any external
 submission, and it does not convert an offline fixture result into a live
 survey detection.
+
+After internal review, use `internal-follow-up-disposition` to summarize signed
+fixture follow-ups as internal-tracking records. The command is a review-only
+operator aid: it does not close a live search, approve discovery or hazard
+claims, contact outside parties, or enable external submission.
 
 ```bash
 PYTHONPATH=src python Skills/background.py record-signoff \

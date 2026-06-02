@@ -29,6 +29,7 @@ from background import (
     blueprint_compliance_log_summary,
     follow_up_test_summary,
     human_signoff_summary,
+    internal_follow_up_disposition_summary,
     latest_undecided_signoff_packet,
     latest_unsigned_signoff_packet,
     launchd_plist,
@@ -271,6 +272,7 @@ def main() -> None:
         "signoff-packet-decision-summary",
         "signoff-packet-decision-readiness",
         "latest-undecided-signoff-packet",
+        "internal-follow-up-disposition",
         "human-signoff-summary",
         "signoff-readiness",
         "automation-readiness-log-summary",
@@ -399,6 +401,8 @@ def main() -> None:
         _print_json(signoff_packet_decision_readiness(args.db))
     elif args.command == "latest-undecided-signoff-packet":
         _print_json(latest_undecided_signoff_packet(args.db))
+    elif args.command == "internal-follow-up-disposition":
+        _print_json(internal_follow_up_disposition_summary(args.db))
     elif args.command == "human-signoff-summary":
         _print_json(human_signoff_summary(args.db))
     elif args.command == "signoff-readiness":
