@@ -34,6 +34,7 @@ from background import (
     latest_unsigned_signoff_packet,
     launchd_plist,
     ledger_summary,
+    live_credential_inventory,
     live_dry_run_approval_bundle,
     live_dry_run_approval_bundle_log_summary,
     live_dry_run_operator_handoff,
@@ -116,6 +117,12 @@ def main() -> None:
         help="Inspect live provider readiness without network access",
     )
     provider_readiness.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
+
+    credential_inventory = sub.add_parser(
+        "live-credential-inventory",
+        help="Print no-secret live dry-run credential inventory",
+    )
+    credential_inventory.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
 
     approval_bundle = sub.add_parser(
         "live-dry-run-approval-bundle",
@@ -330,6 +337,8 @@ def main() -> None:
         _print_json(live_policy_contract_summary(args.config))
     elif args.command == "live-provider-readiness-summary":
         _print_json(live_provider_readiness(args.config))
+    elif args.command == "live-credential-inventory":
+        _print_json(live_credential_inventory(args.config))
     elif args.command == "live-dry-run-approval-bundle":
         _print_json(live_dry_run_approval_bundle(args.config))
     elif args.command == "record-live-dry-run-approval-bundle":

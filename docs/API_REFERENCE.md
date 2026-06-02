@@ -437,6 +437,7 @@ def automation_readiness_log_summary(db_path: Path = DEFAULT_DB_PATH) -> dict[st
 def live_policy_contract_summary(config_path: Path = DEFAULT_CONFIG_PATH) -> dict[str, Any]
 def live_provider_capabilities() -> tuple[dict[str, Any], ...]
 def live_provider_readiness(config_path: Path = DEFAULT_CONFIG_PATH) -> tuple[dict[str, Any], ...]
+def live_credential_inventory(config_path: Path = DEFAULT_CONFIG_PATH) -> dict[str, Any]
 def live_dry_run_approval_bundle(config_path: Path = DEFAULT_CONFIG_PATH) -> dict[str, Any]
 def record_live_dry_run_approval_bundle(
     config_path: Path = DEFAULT_CONFIG_PATH,
@@ -515,6 +516,9 @@ result that claims network access or external submission is rejected. Use
 file and schema contract without network access, and
 `live_provider_readiness(config_path)` to inspect provider-specific credential,
 policy, rate-limit, and submission-safety blockers. Use
+`live_credential_inventory(config_path)` to list required credential environment
+variables, provider mappings, presence booleans, and storage guidance without
+recording secret values. Use
 `live_dry_run_approval_bundle(config_path)` to inspect the combined scheduler,
 policy, provider, and dry-run plan gates before any mock live dry-run execution
 attempt, and `record_live_dry_run_approval_bundle(config_path, db_path)` to
@@ -812,7 +816,7 @@ Lightweight summary of a `ScoredNEO` for display or export.
 
 ---
 
-## v0.16.0 through v0.72.0 Public API Additions
+## v0.16.0 through v0.73.0 Public API Additions
 
 These releases added conservative helper APIs around live-data retrieval,
 preprocessing quality, detection triage, linking, orbit review, classification
@@ -957,8 +961,9 @@ claim confirmation or impact probability.
 | v0.59.0 | `background.py` / `Skills/background.py` | `background_schema_operations_summary`; schema-operations-summary CLI command |
 | v0.60.0 | `background.py` / `Skills/background.py` | `background_operator_next_action_summary`; operator-next-action CLI command |
 | v0.72.0 | `background.py` / `Skills/background.py` | `internal_follow_up_disposition_summary`; internal-follow-up-disposition CLI command |
+| v0.73.0 | `background.py` / `Skills/background.py` | `live_credential_inventory`; live-credential-inventory CLI command |
 
-### Skills and CLI additions in v0.16.0 through v0.72.0
+### Skills and CLI additions in v0.16.0 through v0.73.0
 
 `export_candidate_report.py`, `tag_neo_class.py`, `check_tisserand.py`,
 `export_followup_requests.py`, `ephemeris_check.py`,
@@ -986,6 +991,7 @@ claim confirmation or impact probability.
 `Skills/background.py automation-readiness-log-summary`, and
 `Skills/background.py live-policy-contract-summary`,
 `Skills/background.py live-provider-readiness-summary`,
+`Skills/background.py live-credential-inventory`,
 `Skills/background.py live-dry-run-approval-bundle`,
 `Skills/background.py record-live-dry-run-approval-bundle`,
 `Skills/background.py live-dry-run-approval-bundle-log-summary`,

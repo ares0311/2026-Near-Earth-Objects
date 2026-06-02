@@ -75,6 +75,16 @@ Inspect just the provider readiness details:
 PYTHONPATH=src python Skills/background.py live-provider-readiness-summary
 ```
 
+Prepare a no-secret credential inventory before live dry-run approval:
+
+```bash
+PYTHONPATH=src python Skills/background.py live-credential-inventory
+```
+
+The inventory reports required environment variable names, provider mappings,
+presence booleans, and storage guidance. It never prints token values, performs
+no network access, and enables no external submission.
+
 Inspect the combined no-network live dry-run approval bundle:
 
 ```bash
@@ -227,6 +237,7 @@ PYTHONPATH=src python Skills/background.py live-dry-run-execute
 PYTHONPATH=src python Skills/background.py live-execution-log-summary
 PYTHONPATH=src python Skills/background.py live-policy-contract-summary
 PYTHONPATH=src python Skills/background.py live-provider-readiness-summary
+PYTHONPATH=src python Skills/background.py live-credential-inventory
 PYTHONPATH=src python Skills/background.py live-dry-run-approval-bundle
 PYTHONPATH=src python Skills/background.py record-live-dry-run-approval-bundle
 PYTHONPATH=src python Skills/background.py live-dry-run-approval-bundle-log-summary

@@ -134,6 +134,12 @@ is allowed, `Skills/background.py automation-readiness` checks:
 | ATLAS forced photometry | `ATLAS_TOKEN` |
 | Pan-STARRS / MAST | `MAST_API_TOKEN` |
 
+Use `Skills/background.py live-credential-inventory` to review required
+credential names, provider mappings, local presence booleans, and storage
+guidance without printing token values. Tokens must stay outside git and should
+be supplied only through local environment variables or an operator-managed
+secret store before an approved dry run.
+
 The review contract lives in:
 
 ```text

@@ -15,6 +15,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   `internal_follow_up_disposition_summary` and
   `internal-follow-up-disposition` for review-only internal disposition of signed
   fixture follow-ups.
+- `background.py` / `Skills/background.py`: added
+  `live_credential_inventory` and `live-credential-inventory` to report
+  live dry-run credential names, provider mappings, presence booleans, and
+  storage guidance without recording secret values.
+- Bumped package/background version metadata to v0.73.0 and updated the roadmap
+  test count to 2810 default tests plus 2 deselected live/integration checks.
 
 ## v0.60.0
 

@@ -53,6 +53,7 @@ __all__ = [
     "live_policy_contract_summary",
     "live_provider_capabilities",
     "live_provider_readiness",
+    "live_credential_inventory",
     "live_dry_run_approval_bundle",
     "record_live_dry_run_approval_bundle",
     "live_dry_run_approval_bundle_log_summary",
@@ -109,7 +110,7 @@ DEFAULT_INPUT_PATH = _ROOT / "background" / "targets.json"
 DEFAULT_DB_PATH = _ROOT / "Logs" / "background.sqlite"
 DEFAULT_REPORT_DIR = _ROOT / "Logs" / "reports"
 _SCHEMA_VERSION = "background-v1"
-_CODE_VERSION = "0.72.0"
+_CODE_VERSION = "0.73.0"
 _BACKGROUND_LOG_TABLES = (
     "schema_metadata",
     "run_ledger",
@@ -3094,6 +3095,48 @@ def live_provider_readiness(
             "external_submission_enabled": False,
         })
     return tuple(readiness)
+
+
+def live_credential_inventory(config_path: Path = DEFAULT_CONFIG_PATH) -> dict[str, Any]:
+    """Return a no-secret credential inventory for live dry-run preparation."""
+    config = load_config(config_path)
+    readiness = live_provider_readiness(config_path)
+    entries = []
+    for provider in readiness:
+        entries.append({
+            "survey": provider["survey"],
+            "credential_env": provider["credential_env"],
+            "fetch_api": provider["fetch_api"],
+            "credential_present": provider["credential_present"],
+            "required_by_config": provider["credential_env"]
+            in config.required_credential_env,
+            "storage_recommendation": (
+                "Set as a local environment variable or shell profile secret; "
+                "do not commit."
+            ),
+            "secret_value_recorded": False,
+            "network_access_performed": False,
+            "external_submission_enabled": False,
+        })
+    missing = tuple(
+        entry["credential_env"]
+        for entry in entries
+        if entry["required_by_config"] and not entry["credential_present"]
+    )
+    return {
+        "config_path": str(config_path),
+        "required_credential_env": config.required_credential_env,
+        "missing_credential_env": missing,
+        "all_required_credentials_present": not missing,
+        "credential_storage_plan": (
+            "Keep tokens outside git; expose only via local environment variables "
+            "or an operator-managed secret store before an approved dry run."
+        ),
+        "inventory": entries,
+        "secret_values_recorded": False,
+        "network_access_performed": False,
+        "external_submission_enabled": False,
+    }
 
 
 def _dedupe_codes(*groups: Any) -> tuple[str, ...]:

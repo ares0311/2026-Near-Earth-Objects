@@ -292,6 +292,32 @@ def test_live_provider_readiness_approved_config_is_ready(monkeypatch, tmp_path)
     }
 
 
+def test_live_credential_inventory_omits_secret_values(monkeypatch, tmp_path):
+    policy_path = tmp_path / "policy.json"
+    config_path = tmp_path / "config.json"
+    write_live_policy(policy_path, approved=True)
+    write_live_config(config_path, policy_path, live_network_enabled=True)
+    monkeypatch.setenv("ZTF_IRSA_TOKEN", "ztf-token")
+    monkeypatch.delenv("ATLAS_TOKEN", raising=False)
+    monkeypatch.delenv("MAST_API_TOKEN", raising=False)
+
+    inventory = background.live_credential_inventory(config_path)
+    payload = json.dumps(inventory)
+
+    assert inventory["all_required_credentials_present"] is False
+    assert inventory["missing_credential_env"] == ("ATLAS_TOKEN", "MAST_API_TOKEN")
+    assert inventory["secret_values_recorded"] is False
+    assert inventory["network_access_performed"] is False
+    assert inventory["external_submission_enabled"] is False
+    assert "ztf-token" not in payload
+    assert {entry["credential_env"] for entry in inventory["inventory"]} == {
+        "ZTF_IRSA_TOKEN",
+        "ATLAS_TOKEN",
+        "MAST_API_TOKEN",
+    }
+    assert all(entry["secret_value_recorded"] is False for entry in inventory["inventory"])
+
+
 def test_live_provider_readiness_flags_rate_limit_gap(monkeypatch, tmp_path):
     policy_path = tmp_path / "policy.json"
     config_path = tmp_path / "config.json"
@@ -747,7 +773,7 @@ def test_background_operations_snapshot_empty_log(monkeypatch, tmp_path):
         fixture,
     )
 
-    assert snapshot["code_version"] == "0.72.0"
+    assert snapshot["code_version"] == "0.73.0"
     assert snapshot["next_action"] == "run_background_once"
     assert snapshot["ledger"]["total_runs"] == 0
     assert snapshot["automation_readiness"]["scheduler_ready"] is True
@@ -897,7 +923,7 @@ def test_background_operator_next_action_summary_blocks_old_schema(tmp_path):
         Path("background/targets.json"),
     )
 
-    assert summary["code_version"] == "0.72.0"
+    assert summary["code_version"] == "0.73.0"
     assert summary["schema_ready"] is False
     assert summary["blocked"] is True
     assert summary["blocker"] == "BACKGROUND_LOG_SCHEMA_NOT_CURRENT"
@@ -1027,7 +1053,7 @@ def test_signoff_packet_for_unsigned_followup(monkeypatch, tmp_path):
     packet = background.signoff_packet(result.ledger.run_id, db_path)
     latest = background.latest_unsigned_signoff_packet(db_path)
 
-    assert packet["code_version"] == "0.72.0"
+    assert packet["code_version"] == "0.73.0"
     assert packet["run_id"] == result.ledger.run_id
     assert packet["target_id"] == "T001"
     assert packet["recommended_decision"] == "review_and_optionally_sign"
@@ -2158,6 +2184,41 @@ def test_background_cli_live_provider_readiness_approved_config(monkeypatch, tmp
     assert all(provider["policy_approved"] is True for provider in payload)
     assert all(provider["network_access_performed"] is False for provider in payload)
     assert all(provider["external_submission_enabled"] is False for provider in payload)
+
+
+def test_background_cli_live_credential_inventory(monkeypatch, tmp_path):
+    repo = Path(__file__).resolve().parents[1]
+    policy_path = tmp_path / "policy.json"
+    config_path = tmp_path / "config.json"
+    write_live_policy(policy_path, approved=True)
+    write_live_config(config_path, policy_path, live_network_enabled=True)
+    monkeypatch.setenv("ZTF_IRSA_TOKEN", "ztf-token")
+    monkeypatch.setenv("ATLAS_TOKEN", "atlas-token")
+    monkeypatch.setenv("MAST_API_TOKEN", "mast-token")
+    env = {**os.environ, "PYTHONPATH": str(repo / "src")}
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "live-credential-inventory",
+            "--config",
+            str(config_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    payload = json.loads(completed.stdout)
+
+    assert payload["all_required_credentials_present"] is True
+    assert payload["missing_credential_env"] == []
+    assert payload["secret_values_recorded"] is False
+    assert "ztf-token" not in completed.stdout
+    assert "atlas-token" not in completed.stdout
+    assert "mast-token" not in completed.stdout
 
 
 def test_live_dry_run_approval_bundle_default_config_is_blocked():
