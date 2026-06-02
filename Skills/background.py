@@ -67,6 +67,7 @@ from background import (
     target_history,
     target_priority_summary,
     validation_summary,
+    write_live_credential_inventory_report,
     write_live_dry_run_operator_handoff,
     write_signoff_packet,
 )
@@ -123,6 +124,7 @@ def main() -> None:
         help="Print no-secret live dry-run credential inventory",
     )
     credential_inventory.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
+    credential_inventory.add_argument("--write-report", type=Path, default=None)
 
     approval_bundle = sub.add_parser(
         "live-dry-run-approval-bundle",
@@ -338,7 +340,10 @@ def main() -> None:
     elif args.command == "live-provider-readiness-summary":
         _print_json(live_provider_readiness(args.config))
     elif args.command == "live-credential-inventory":
-        _print_json(live_credential_inventory(args.config))
+        if args.write_report:
+            _print_json(write_live_credential_inventory_report(args.config, args.write_report))
+        else:
+            _print_json(live_credential_inventory(args.config))
     elif args.command == "live-dry-run-approval-bundle":
         _print_json(live_dry_run_approval_bundle(args.config))
     elif args.command == "record-live-dry-run-approval-bundle":

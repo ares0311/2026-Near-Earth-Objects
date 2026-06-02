@@ -18,6 +18,7 @@ Logs/*.db
 Logs/*.db-*
 Logs/*.log
 Logs/reports/*.md
+Logs/reports/*.json
 !Logs/.gitkeep
 !Logs/reports/
 !Logs/reports/.gitkeep

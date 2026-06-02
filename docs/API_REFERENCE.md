@@ -438,6 +438,10 @@ def live_policy_contract_summary(config_path: Path = DEFAULT_CONFIG_PATH) -> dic
 def live_provider_capabilities() -> tuple[dict[str, Any], ...]
 def live_provider_readiness(config_path: Path = DEFAULT_CONFIG_PATH) -> tuple[dict[str, Any], ...]
 def live_credential_inventory(config_path: Path = DEFAULT_CONFIG_PATH) -> dict[str, Any]
+def write_live_credential_inventory_report(
+    config_path: Path = DEFAULT_CONFIG_PATH,
+    report_path: Path = DEFAULT_REPORT_DIR / "credential_inventory_latest.json",
+) -> dict[str, Any]
 def live_dry_run_approval_bundle(config_path: Path = DEFAULT_CONFIG_PATH) -> dict[str, Any]
 def record_live_dry_run_approval_bundle(
     config_path: Path = DEFAULT_CONFIG_PATH,
@@ -516,9 +520,11 @@ result that claims network access or external submission is rejected. Use
 file and schema contract without network access, and
 `live_provider_readiness(config_path)` to inspect provider-specific credential,
 policy, rate-limit, and submission-safety blockers. Use
-`live_credential_inventory(config_path)` to list required credential environment
-variables, provider mappings, presence booleans, and storage guidance without
-recording secret values. Use
+`live_credential_inventory(config_path)` to list credential environment
+variables, provider mappings, environment/Keychain presence sources, and
+storage guidance without recording secret values. Use
+`write_live_credential_inventory_report(config_path, report_path)` to write the
+same sanitized inventory to a JSON report for local operator review. Use
 `live_dry_run_approval_bundle(config_path)` to inspect the combined scheduler,
 policy, provider, and dry-run plan gates before any mock live dry-run execution
 attempt, and `record_live_dry_run_approval_bundle(config_path, db_path)` to
@@ -816,7 +822,7 @@ Lightweight summary of a `ScoredNEO` for display or export.
 
 ---
 
-## v0.16.0 through v0.73.0 Public API Additions
+## v0.16.0 through v0.74.0 Public API Additions
 
 These releases added conservative helper APIs around live-data retrieval,
 preprocessing quality, detection triage, linking, orbit review, classification
@@ -962,8 +968,9 @@ claim confirmation or impact probability.
 | v0.60.0 | `background.py` / `Skills/background.py` | `background_operator_next_action_summary`; operator-next-action CLI command |
 | v0.72.0 | `background.py` / `Skills/background.py` | `internal_follow_up_disposition_summary`; internal-follow-up-disposition CLI command |
 | v0.73.0 | `background.py` / `Skills/background.py` | `live_credential_inventory`; live-credential-inventory CLI command |
+| v0.74.0 | `background.py` / `Skills/background.py` | env/Keychain credential-source reporting; `write_live_credential_inventory_report`; live-credential-inventory --write-report CLI option |
 
-### Skills and CLI additions in v0.16.0 through v0.73.0
+### Skills and CLI additions in v0.16.0 through v0.74.0
 
 `export_candidate_report.py`, `tag_neo_class.py`, `check_tisserand.py`,
 `export_followup_requests.py`, `ephemeris_check.py`,

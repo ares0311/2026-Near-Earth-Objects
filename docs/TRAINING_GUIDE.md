@@ -19,7 +19,7 @@ Required environment variables (set in `.env` or export):
 | Variable | Purpose |
 |---|---|
 | `ATLAS_TOKEN` | ATLAS forced-photometry API token |
-| `ZTF_IRSA_TOKEN` | IRSA account token for ztfquery (optional for cached data) |
+| `ZTF_IRSA_USERNAME` / `ZTF_IRSA_PASSWORD` | Optional IRSA login for proprietary ZTF access; public ZTF access needs no credential |
 
 ---
 

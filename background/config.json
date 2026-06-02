@@ -11,8 +11,6 @@
   "scheduler_interval_minutes": 60,
   "live_review_policy": "background/live_review_policy.example.json",
   "required_credential_env": [
-    "ZTF_IRSA_TOKEN",
-    "ATLAS_TOKEN",
-    "MAST_API_TOKEN"
+    "ATLAS_TOKEN"
   ]
 }

@@ -471,9 +471,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.73.0)
+## Current State (v0.74.0)
 
-All 10 pipeline modules are complete. Default collection finds 2810 non-live tests plus 2 deselected live/integration checks. CI is expected to remain green on Python 3.11 & 3.12 with the 100% coverage target. Background automation uses one unified CLI with automated offline scheduling readiness, live policy contract validation, provider-specific live readiness summaries, no-secret credential inventories, no-network live dry-run approval bundles, operator handoff exports, persisted operator handoff logs, persisted blueprint compliance summaries, persisted operations snapshots, internal signoff packets, packet-linked signoff decisions, packet-decision readiness summaries, background SQLite schema status and migration preview/reporting, schema operations triage, operator next-action summaries, internal follow-up disposition summaries, top-level SQLite logs for runs, readiness checks, approval bundles, no-network live dry-run plans, mock-only provider execution attempts, and auditable signoff readiness. Public APIs now extend through v0.73.0 with expanded calibration, orbit dynamics, survey statistics, alert packaging, schema summaries, conservative candidate-priority helpers, background blueprint auditing, operations snapshots, signoff packets, packet-linked signoff decisions, packet-decision readiness, SQLite schema status, migration preview, schema operations triage, operator next-action guidance, internal disposition reporting for signed fixture follow-ups, and no-secret credential inventory reporting for live dry-run preparation.
+All 10 pipeline modules are complete. Default collection finds 2812 non-live tests plus 2 deselected live/integration checks. CI is expected to remain green on Python 3.11 & 3.12 with the 100% coverage target. Background automation uses one unified CLI with automated offline scheduling readiness, live policy contract validation, provider-specific live readiness summaries, no-secret credential inventories with env/Keychain source reporting, no-network live dry-run approval bundles, operator handoff exports, persisted operator handoff logs, persisted blueprint compliance summaries, persisted operations snapshots, internal signoff packets, packet-linked signoff decisions, packet-decision readiness summaries, background SQLite schema status and migration preview/reporting, schema operations triage, operator next-action summaries, internal follow-up disposition summaries, top-level SQLite logs for runs, readiness checks, approval bundles, no-network live dry-run plans, mock-only provider execution attempts, and auditable signoff readiness. Public APIs now extend through v0.74.0 with expanded calibration, orbit dynamics, survey statistics, alert packaging, schema summaries, conservative candidate-priority helpers, background blueprint auditing, operations snapshots, signoff packets, packet-linked signoff decisions, packet-decision readiness, SQLite schema status, migration preview, schema operations triage, operator next-action guidance, internal disposition reporting for signed fixture follow-ups, and sanitized credential inventory report writing for live dry-run preparation.
 
 ### Skills
 
@@ -600,7 +600,7 @@ All 10 pipeline modules are complete. Default collection finds 2810 non-live tes
 | `background/live_review_policy.schema.json` | JSON Schema for live dry-run review policy |
 | `background/targets.json` | Stable background automation fixture manifest |
 
-### Coverage by Module (v0.73.0)
+### Coverage by Module (v0.74.0)
 
 | Module | Coverage |
 |---|---|
@@ -638,7 +638,7 @@ All 10 pipeline modules are complete. Default collection finds 2810 non-live tes
 - Inspect persisted packet-decision readiness with `Skills/background.py signoff-packet-decision-readiness` before asking for a packet-linked decision.
 - Use `Skills/background.py record-signoff-from-packet` when a reviewer is ready to report a decision from a persisted packet.
 - Use `Skills/background.py internal-follow-up-disposition` after internal review to summarize signed fixture follow-ups without approving live search or external submission.
-- Use `Skills/background.py live-credential-inventory` to review live dry-run credential names and local presence without printing or committing secret values.
+- Use `Skills/background.py live-credential-inventory --write-report Logs/reports/credential_inventory_latest.json` to review env/Keychain credential presence without printing or committing secret values.
 - Collect labeled training data via `Skills/generate_training_labels.py`.
 - Run credentialed live-data dry runs for ZTF/ATLAS/Pan-STARRS only when tokens and review policy are explicitly configured.
 - Train and evaluate Tier 2/Tier 3 model weights on real labeled data.
@@ -876,7 +876,7 @@ All 10 pipeline modules are complete. Default collection finds 2810 non-live tes
 
 - `background.py`: added `live_dry_run_plan(config_path)`, `record_live_dry_run_plan(config_path, db_path)`, and `live_dry_run_plan_log_summary(db_path)`.
 - `background/live_review_policy.example.json` and `background/live_review_policy.schema.json`: added a formal live review policy contract for M4 dry-run approval.
-- `background/config.json`: declares `MAST_API_TOKEN` along with ZTF/ATLAS credentials and points to the example review policy.
+- `background/config.json`: requires `ATLAS_TOKEN` for ATLAS dry-run readiness, treats public ZTF/Pan-STARRS as no-credential by default, and points to the example review policy.
 - `Skills/background.py`: added `live-dry-run-plan`, `record-live-dry-run-plan`, and `live-dry-run-plan-log-summary` subcommands.
 - `automation_readiness_summary`: now validates live review policy fields and reports policy-specific blockers before any network access.
 - 1 new test (1336 total); 100% coverage maintained; ruff + mypy clean.

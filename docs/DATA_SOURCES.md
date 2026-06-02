@@ -128,17 +128,19 @@ Used in `preprocess.py` for astrometric correction of ZTF source positions relat
 Automated live dry-run planning is offline by default. Before any network query
 is allowed, `Skills/background.py automation-readiness` checks:
 
-| Source | Environment variable |
+| Source | Default dry-run auth |
 |---|---|
-| ZTF / IRSA | `ZTF_IRSA_TOKEN` |
-| ATLAS forced photometry | `ATLAS_TOKEN` |
-| Pan-STARRS / MAST | `MAST_API_TOKEN` |
+| ZTF / IRSA public | no credential |
+| ZTF / IRSA proprietary | optional `ZTF_IRSA_USERNAME` + `ZTF_IRSA_PASSWORD` |
+| ATLAS forced photometry | required `ATLAS_TOKEN` when ATLAS is included |
+| Pan-STARRS public | no credential |
+| MAST authenticated access | optional `MAST_API_TOKEN` |
 
 Use `Skills/background.py live-credential-inventory` to review required
 credential names, provider mappings, local presence booleans, and storage
-guidance without printing token values. Tokens must stay outside git and should
-be supplied only through local environment variables or an operator-managed
-secret store before an approved dry run.
+guidance without printing token values. The inventory checks environment
+variables first and macOS Keychain service names such as
+`neo-detection:ATLAS_TOKEN` second. Tokens and passwords must stay outside git.
 
 The review contract lives in:
 
@@ -164,11 +166,12 @@ mock-only execution attempt. Injected dry-run providers must report
 provider result that violates those fields is rejected. None of these commands
 submit observations, notify external parties, or assert impact probabilities.
 
-Provider readiness is reported per survey before any live attempt. ZTF uses
-`ZTF_IRSA_TOKEN` and `fetch_ztf_alerts`, ATLAS uses `ATLAS_TOKEN` and
-`fetch_atlas_forced`, and Pan-STARRS uses `MAST_API_TOKEN` and
-`fetch_panstarrs_catalog`. These mappings are readiness metadata only; they do
-not trigger live data retrieval.
+Provider readiness is reported per survey before any live attempt. Public ZTF
+uses `fetch_ztf_alerts` without a default credential; proprietary ZTF can use
+`ZTF_IRSA_USERNAME` and `ZTF_IRSA_PASSWORD`; ATLAS uses `ATLAS_TOKEN` and
+`fetch_atlas_forced`; public Pan-STARRS uses `fetch_panstarrs_catalog` without a
+default credential, with `MAST_API_TOKEN` treated as optional. These mappings
+are readiness metadata only; they do not trigger live data retrieval.
 
 ---
 

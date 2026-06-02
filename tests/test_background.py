@@ -24,6 +24,12 @@ from score import score
 from .conftest import build_orbital_elements, build_tracklet
 
 
+@pytest.fixture(autouse=True)
+def no_keychain_credentials(monkeypatch):
+    monkeypatch.setenv("NEO_DETECTION_DISABLE_KEYCHAIN_LOOKUP", "1")
+    monkeypatch.setattr(background, "_keychain_secret_present", lambda service: False)
+
+
 def write_fixture(path: Path, object_ids: tuple[str, ...] = ("T001",)) -> None:
     rows = []
     for object_id in object_ids:
@@ -86,7 +92,7 @@ def write_live_config(path: Path, policy_path: Path, live_network_enabled: bool 
         "scheduler_enabled": True,
         "scheduler_interval_minutes": 60,
         "live_review_policy": str(policy_path),
-        "required_credential_env": ["ZTF_IRSA_TOKEN", "ATLAS_TOKEN", "MAST_API_TOKEN"],
+        "required_credential_env": ["ATLAS_TOKEN"],
     }))
 
 
@@ -184,14 +190,12 @@ def test_project_config_is_automated_offline():
     assert cfg.run_mode == "automated"
     assert cfg.scheduler_enabled is True
     assert cfg.live_network_enabled is False
-    assert cfg.required_credential_env == ("ZTF_IRSA_TOKEN", "ATLAS_TOKEN", "MAST_API_TOKEN")
+    assert cfg.required_credential_env == ("ATLAS_TOKEN",)
     assert cfg.live_review_policy == "background/live_review_policy.example.json"
 
 
 def test_automation_readiness_is_scheduler_ready_but_live_blocked(monkeypatch):
-    monkeypatch.delenv("ZTF_IRSA_TOKEN", raising=False)
     monkeypatch.delenv("ATLAS_TOKEN", raising=False)
-    monkeypatch.delenv("MAST_API_TOKEN", raising=False)
 
     readiness = background.automation_readiness_summary(Path("background/config.json"))
 
@@ -202,11 +206,7 @@ def test_automation_readiness_is_scheduler_ready_but_live_blocked(monkeypatch):
     assert "MISSING_REQUIRED_CREDENTIALS" in readiness["live_mode_blockers"]
     assert "LIVE_PROVIDER_NOT_READY" in readiness["live_mode_blockers"]
     assert "LIVE_REVIEW_POLICY_NOT_APPROVED" in readiness["live_mode_blockers"]
-    assert readiness["missing_credential_env"] == (
-        "ZTF_IRSA_TOKEN",
-        "ATLAS_TOKEN",
-        "MAST_API_TOKEN",
-    )
+    assert readiness["missing_credential_env"] == ("ATLAS_TOKEN",)
     assert readiness["live_review_policy_summary"]["allowed_surveys"] == (
         "ZTF",
         "ATLAS",
@@ -258,17 +258,18 @@ def test_live_policy_contract_summary_rejects_missing_policy(tmp_path):
 
 
 def test_live_provider_readiness_default_config_is_blocked(monkeypatch):
-    monkeypatch.delenv("ZTF_IRSA_TOKEN", raising=False)
     monkeypatch.delenv("ATLAS_TOKEN", raising=False)
-    monkeypatch.delenv("MAST_API_TOKEN", raising=False)
 
     providers = background.live_provider_readiness(Path("background/config.json"))
+    by_survey = {provider["survey"]: provider for provider in providers}
 
     assert [provider["survey"] for provider in providers] == ["ZTF", "ATLAS", "PanSTARRS"]
     assert all(provider["network_access_performed"] is False for provider in providers)
     assert all(provider["external_submission_enabled"] is False for provider in providers)
-    assert all(provider["ready"] is False for provider in providers)
-    assert all("PROVIDER_CREDENTIAL_MISSING" in provider["blockers"] for provider in providers)
+    assert by_survey["ZTF"]["ready"] is True
+    assert by_survey["PanSTARRS"]["ready"] is True
+    assert by_survey["ATLAS"]["ready"] is False
+    assert "PROVIDER_CREDENTIAL_MISSING" in by_survey["ATLAS"]["blockers"]
 
 
 def test_live_provider_readiness_approved_config_is_ready(monkeypatch, tmp_path):
@@ -276,9 +277,7 @@ def test_live_provider_readiness_approved_config_is_ready(monkeypatch, tmp_path)
     config_path = tmp_path / "config.json"
     write_live_policy(policy_path, approved=True)
     write_live_config(config_path, policy_path, live_network_enabled=True)
-    monkeypatch.setenv("ZTF_IRSA_TOKEN", "ztf-token")
     monkeypatch.setenv("ATLAS_TOKEN", "atlas-token")
-    monkeypatch.setenv("MAST_API_TOKEN", "mast-token")
 
     providers = background.live_provider_readiness(config_path)
 
@@ -297,25 +296,52 @@ def test_live_credential_inventory_omits_secret_values(monkeypatch, tmp_path):
     config_path = tmp_path / "config.json"
     write_live_policy(policy_path, approved=True)
     write_live_config(config_path, policy_path, live_network_enabled=True)
-    monkeypatch.setenv("ZTF_IRSA_TOKEN", "ztf-token")
     monkeypatch.delenv("ATLAS_TOKEN", raising=False)
-    monkeypatch.delenv("MAST_API_TOKEN", raising=False)
+    monkeypatch.setenv("MAST_API_TOKEN", "mast-token")
 
     inventory = background.live_credential_inventory(config_path)
     payload = json.dumps(inventory)
 
     assert inventory["all_required_credentials_present"] is False
-    assert inventory["missing_credential_env"] == ("ATLAS_TOKEN", "MAST_API_TOKEN")
+    assert inventory["missing_credential_env"] == ("ATLAS_TOKEN",)
     assert inventory["secret_values_recorded"] is False
     assert inventory["network_access_performed"] is False
     assert inventory["external_submission_enabled"] is False
-    assert "ztf-token" not in payload
+    assert "mast-token" not in payload
     assert {entry["credential_env"] for entry in inventory["inventory"]} == {
-        "ZTF_IRSA_TOKEN",
+        "ZTF_IRSA_USERNAME",
+        "ZTF_IRSA_PASSWORD",
         "ATLAS_TOKEN",
         "MAST_API_TOKEN",
     }
     assert all(entry["secret_value_recorded"] is False for entry in inventory["inventory"])
+
+
+def test_live_credential_inventory_detects_keychain_source(monkeypatch, tmp_path):
+    policy_path = tmp_path / "policy.json"
+    config_path = tmp_path / "config.json"
+    write_live_policy(policy_path, approved=True)
+    write_live_config(config_path, policy_path, live_network_enabled=True)
+    monkeypatch.delenv("ATLAS_TOKEN", raising=False)
+    monkeypatch.delenv("NEO_DETECTION_DISABLE_KEYCHAIN_LOOKUP", raising=False)
+    monkeypatch.setattr(
+        background,
+        "_keychain_secret_present",
+        lambda service: service == "neo-detection:ATLAS_TOKEN",
+    )
+
+    inventory = background.live_credential_inventory(config_path)
+    atlas = next(
+        item for item in inventory["inventory"]
+        if item["credential_env"] == "ATLAS_TOKEN"
+    )
+
+    assert inventory["all_required_credentials_present"] is True
+    assert inventory["missing_credential_env"] == ()
+    assert atlas["credential_present"] is True
+    assert atlas["credential_source"] == "keychain"
+    assert atlas["keychain_service"] == "neo-detection:ATLAS_TOKEN"
+    assert atlas["secret_value_recorded"] is False
 
 
 def test_live_provider_readiness_flags_rate_limit_gap(monkeypatch, tmp_path):
@@ -323,9 +349,7 @@ def test_live_provider_readiness_flags_rate_limit_gap(monkeypatch, tmp_path):
     config_path = tmp_path / "config.json"
     write_live_policy(policy_path, approved=True, min_seconds=0)
     write_live_config(config_path, policy_path, live_network_enabled=True)
-    monkeypatch.setenv("ZTF_IRSA_TOKEN", "ztf-token")
     monkeypatch.setenv("ATLAS_TOKEN", "atlas-token")
-    monkeypatch.setenv("MAST_API_TOKEN", "mast-token")
 
     readiness = background.automation_readiness_summary(config_path)
 
@@ -348,9 +372,7 @@ def test_launchd_plist_wraps_one_run_command():
 
 
 def test_record_automation_readiness_writes_sqlite_log(monkeypatch, tmp_path):
-    monkeypatch.delenv("ZTF_IRSA_TOKEN", raising=False)
     monkeypatch.delenv("ATLAS_TOKEN", raising=False)
-    monkeypatch.delenv("MAST_API_TOKEN", raising=False)
     db_path = tmp_path / "Logs" / "background.sqlite"
 
     entry = background.record_automation_readiness(Path("background/config.json"), db_path)
@@ -394,7 +416,7 @@ def test_live_dry_run_execute_blocked_by_default(monkeypatch, tmp_path):
         def execute(self, query):
             raise AssertionError("provider should not run for blocked config")
 
-    monkeypatch.setenv("ZTF_IRSA_TOKEN", "ztf-token")
+    monkeypatch.setenv("ATLAS_TOKEN", "atlas-token")
     entry = background.record_live_execution_attempt(
         Path("background/config.json"),
         db_path,
@@ -417,9 +439,7 @@ def test_live_dry_run_execute_approved_config_uses_mock_hook(monkeypatch, tmp_pa
     db_path = tmp_path / "Logs" / "background.sqlite"
     write_live_policy(policy_path, approved=True)
     write_live_config(config_path, policy_path, live_network_enabled=True)
-    monkeypatch.setenv("ZTF_IRSA_TOKEN", "ztf-token")
     monkeypatch.setenv("ATLAS_TOKEN", "atlas-token")
-    monkeypatch.setenv("MAST_API_TOKEN", "mast-token")
     calls = []
 
     class CountingProvider:
@@ -460,9 +480,7 @@ def test_live_dry_run_execute_records_missing_injected_providers(monkeypatch, tm
     config_path = tmp_path / "config.json"
     write_live_policy(policy_path, approved=True)
     write_live_config(config_path, policy_path, live_network_enabled=True)
-    monkeypatch.setenv("ZTF_IRSA_TOKEN", "ztf-token")
     monkeypatch.setenv("ATLAS_TOKEN", "atlas-token")
-    monkeypatch.setenv("MAST_API_TOKEN", "mast-token")
 
     class ZtfOnlyProvider:
         survey = "ZTF"
@@ -492,9 +510,7 @@ def test_live_dry_run_execute_rejects_network_provider(monkeypatch, tmp_path):
     config_path = tmp_path / "config.json"
     write_live_policy(policy_path, approved=True)
     write_live_config(config_path, policy_path, live_network_enabled=True)
-    monkeypatch.setenv("ZTF_IRSA_TOKEN", "ztf-token")
     monkeypatch.setenv("ATLAS_TOKEN", "atlas-token")
-    monkeypatch.setenv("MAST_API_TOKEN", "mast-token")
 
     class BadProvider:
         survey = "ZTF"
@@ -773,7 +789,7 @@ def test_background_operations_snapshot_empty_log(monkeypatch, tmp_path):
         fixture,
     )
 
-    assert snapshot["code_version"] == "0.73.0"
+    assert snapshot["code_version"] == "0.74.0"
     assert snapshot["next_action"] == "run_background_once"
     assert snapshot["ledger"]["total_runs"] == 0
     assert snapshot["automation_readiness"]["scheduler_ready"] is True
@@ -923,7 +939,7 @@ def test_background_operator_next_action_summary_blocks_old_schema(tmp_path):
         Path("background/targets.json"),
     )
 
-    assert summary["code_version"] == "0.73.0"
+    assert summary["code_version"] == "0.74.0"
     assert summary["schema_ready"] is False
     assert summary["blocked"] is True
     assert summary["blocker"] == "BACKGROUND_LOG_SCHEMA_NOT_CURRENT"
@@ -1053,7 +1069,7 @@ def test_signoff_packet_for_unsigned_followup(monkeypatch, tmp_path):
     packet = background.signoff_packet(result.ledger.run_id, db_path)
     latest = background.latest_unsigned_signoff_packet(db_path)
 
-    assert packet["code_version"] == "0.73.0"
+    assert packet["code_version"] == "0.74.0"
     assert packet["run_id"] == result.ledger.run_id
     assert packet["target_id"] == "T001"
     assert packet["recommended_decision"] == "review_and_optionally_sign"
@@ -2158,9 +2174,7 @@ def test_background_cli_live_provider_readiness_approved_config(monkeypatch, tmp
     config_path = tmp_path / "config.json"
     write_live_policy(policy_path, approved=True)
     write_live_config(config_path, policy_path, live_network_enabled=True)
-    monkeypatch.setenv("ZTF_IRSA_TOKEN", "ztf-token")
     monkeypatch.setenv("ATLAS_TOKEN", "atlas-token")
-    monkeypatch.setenv("MAST_API_TOKEN", "mast-token")
     env = {**os.environ, "PYTHONPATH": str(repo / "src")}
 
     readiness = subprocess.run(
@@ -2192,9 +2206,7 @@ def test_background_cli_live_credential_inventory(monkeypatch, tmp_path):
     config_path = tmp_path / "config.json"
     write_live_policy(policy_path, approved=True)
     write_live_config(config_path, policy_path, live_network_enabled=True)
-    monkeypatch.setenv("ZTF_IRSA_TOKEN", "ztf-token")
     monkeypatch.setenv("ATLAS_TOKEN", "atlas-token")
-    monkeypatch.setenv("MAST_API_TOKEN", "mast-token")
     env = {**os.environ, "PYTHONPATH": str(repo / "src")}
 
     completed = subprocess.run(
@@ -2221,6 +2233,42 @@ def test_background_cli_live_credential_inventory(monkeypatch, tmp_path):
     assert "mast-token" not in completed.stdout
 
 
+def test_background_cli_live_credential_inventory_write_report(monkeypatch, tmp_path):
+    repo = Path(__file__).resolve().parents[1]
+    policy_path = tmp_path / "policy.json"
+    config_path = tmp_path / "config.json"
+    report_path = tmp_path / "reports" / "credential_inventory.json"
+    write_live_policy(policy_path, approved=True)
+    write_live_config(config_path, policy_path, live_network_enabled=True)
+    monkeypatch.setenv("ATLAS_TOKEN", "atlas-token")
+    env = {**os.environ, "PYTHONPATH": str(repo / "src")}
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "live-credential-inventory",
+            "--config",
+            str(config_path),
+            "--write-report",
+            str(report_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    payload = json.loads(completed.stdout)
+    report = json.loads(report_path.read_text())
+
+    assert payload["report_path"] == str(report_path)
+    assert payload["secret_values_recorded"] is False
+    assert report["all_required_credentials_present"] is True
+    assert "atlas-token" not in completed.stdout
+    assert "atlas-token" not in report_path.read_text()
+
+
 def test_live_dry_run_approval_bundle_default_config_is_blocked():
     bundle = background.live_dry_run_approval_bundle(Path("background/config.json"))
 
@@ -2245,9 +2293,7 @@ def test_background_cli_live_dry_run_approval_bundle_approved_config(
     config_path = tmp_path / "config.json"
     write_live_policy(policy_path, approved=True)
     write_live_config(config_path, policy_path, live_network_enabled=True)
-    monkeypatch.setenv("ZTF_IRSA_TOKEN", "ztf-token")
     monkeypatch.setenv("ATLAS_TOKEN", "atlas-token")
-    monkeypatch.setenv("MAST_API_TOKEN", "mast-token")
     env = {**os.environ, "PYTHONPATH": str(repo / "src")}
 
     approval = subprocess.run(
@@ -2283,9 +2329,7 @@ def test_live_dry_run_approval_bundle_blocks_unsafe_policy(monkeypatch, tmp_path
     policy["no_external_submission_confirmed"] = False
     policy_path.write_text(json.dumps(policy))
     write_live_config(config_path, policy_path, live_network_enabled=True)
-    monkeypatch.setenv("ZTF_IRSA_TOKEN", "ztf-token")
     monkeypatch.setenv("ATLAS_TOKEN", "atlas-token")
-    monkeypatch.setenv("MAST_API_TOKEN", "mast-token")
 
     bundle = background.live_dry_run_approval_bundle(config_path)
 
@@ -2321,9 +2365,7 @@ def test_record_live_dry_run_approval_bundle_approved_config(monkeypatch, tmp_pa
     config_path = tmp_path / "config.json"
     write_live_policy(policy_path, approved=True)
     write_live_config(config_path, policy_path, live_network_enabled=True)
-    monkeypatch.setenv("ZTF_IRSA_TOKEN", "ztf-token")
     monkeypatch.setenv("ATLAS_TOKEN", "atlas-token")
-    monkeypatch.setenv("MAST_API_TOKEN", "mast-token")
 
     entry = background.record_live_dry_run_approval_bundle(config_path, db_path)
     summary = background.live_dry_run_approval_bundle_log_summary(db_path)
@@ -2400,7 +2442,7 @@ def test_live_dry_run_operator_handoff_default_config_is_blocked():
     assert handoff["network_access_performed"] is False
     assert handoff["external_submission_enabled"] is False
     assert "LIVE_NETWORK_DISABLED" in text
-    assert "ZTF_IRSA_TOKEN" in text
+    assert "ATLAS_TOKEN" in text
     assert "Internal review only" in text
     _assert_no_forbidden_handoff_language(text)
 
@@ -2411,9 +2453,7 @@ def test_write_live_dry_run_operator_handoff_approved_config(monkeypatch, tmp_pa
     config_path = tmp_path / "config.json"
     write_live_policy(policy_path, approved=True)
     write_live_config(config_path, policy_path, live_network_enabled=True)
-    monkeypatch.setenv("ZTF_IRSA_TOKEN", "ztf-token")
     monkeypatch.setenv("ATLAS_TOKEN", "atlas-token")
-    monkeypatch.setenv("MAST_API_TOKEN", "mast-token")
 
     handoff = background.write_live_dry_run_operator_handoff(config_path, report_dir)
     path = Path(handoff["report_path"])
@@ -2518,9 +2558,7 @@ def test_record_live_dry_run_operator_handoff_approved_config(monkeypatch, tmp_p
     config_path = tmp_path / "config.json"
     write_live_policy(policy_path, approved=True)
     write_live_config(config_path, policy_path, live_network_enabled=True)
-    monkeypatch.setenv("ZTF_IRSA_TOKEN", "ztf-token")
     monkeypatch.setenv("ATLAS_TOKEN", "atlas-token")
-    monkeypatch.setenv("MAST_API_TOKEN", "mast-token")
 
     entry = background.record_live_dry_run_operator_handoff(
         config_path,

@@ -19,8 +19,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   `live_credential_inventory` and `live-credential-inventory` to report
   live dry-run credential names, provider mappings, presence booleans, and
   storage guidance without recording secret values.
-- Bumped package/background version metadata to v0.73.0 and updated the roadmap
-  test count to 2810 default tests plus 2 deselected live/integration checks.
+- `background.py` / `Skills/background.py`: updated live dry-run credential
+  readiness to use environment-variable checks first and macOS Keychain service
+  presence second, corrected ZTF public/Pan-STARRS public auth as no-credential
+  by default, and added `live-credential-inventory --write-report` for
+  sanitized local operator review.
+- Bumped package/background version metadata to v0.74.0 and updated the roadmap
+  test count to 2812 default tests plus 2 deselected live/integration checks.
 
 ## v0.60.0
 

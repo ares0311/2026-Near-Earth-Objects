@@ -54,6 +54,7 @@ __all__ = [
     "live_provider_capabilities",
     "live_provider_readiness",
     "live_credential_inventory",
+    "write_live_credential_inventory_report",
     "live_dry_run_approval_bundle",
     "record_live_dry_run_approval_bundle",
     "live_dry_run_approval_bundle_log_summary",
@@ -75,6 +76,7 @@ __all__ = [
 import json
 import os
 import sqlite3
+import subprocess
 import uuid
 from collections.abc import Mapping
 from contextlib import contextmanager
@@ -110,7 +112,7 @@ DEFAULT_INPUT_PATH = _ROOT / "background" / "targets.json"
 DEFAULT_DB_PATH = _ROOT / "Logs" / "background.sqlite"
 DEFAULT_REPORT_DIR = _ROOT / "Logs" / "reports"
 _SCHEMA_VERSION = "background-v1"
-_CODE_VERSION = "0.73.0"
+_CODE_VERSION = "0.74.0"
 _BACKGROUND_LOG_TABLES = (
     "schema_metadata",
     "run_ledger",
@@ -133,16 +135,22 @@ _SUPPORTED_LIVE_SURVEYS = ("ZTF", "ATLAS", "PanSTARRS")
 _LIVE_PROVIDER_CAPABILITIES = {
     "ZTF": {
         "survey": "ZTF",
-        "credential_env": "ZTF_IRSA_TOKEN",
+        "auth_mode": "public",
+        "credential_env": None,
+        "credential_envs": (),
+        "optional_credential_envs": ("ZTF_IRSA_USERNAME", "ZTF_IRSA_PASSWORD"),
         "fetch_api": "fetch_ztf_alerts",
-        "network_mode": "credentialed",
+        "network_mode": "public",
         "supports_live_query": True,
         "supports_external_submission": False,
         "min_seconds_between_queries": 1,
     },
     "ATLAS": {
         "survey": "ATLAS",
+        "auth_mode": "token",
         "credential_env": "ATLAS_TOKEN",
+        "credential_envs": ("ATLAS_TOKEN",),
+        "optional_credential_envs": (),
         "fetch_api": "fetch_atlas_forced",
         "network_mode": "credentialed",
         "supports_live_query": True,
@@ -151,9 +159,12 @@ _LIVE_PROVIDER_CAPABILITIES = {
     },
     "PanSTARRS": {
         "survey": "PanSTARRS",
-        "credential_env": "MAST_API_TOKEN",
+        "auth_mode": "public",
+        "credential_env": None,
+        "credential_envs": (),
+        "optional_credential_envs": ("MAST_API_TOKEN",),
         "fetch_api": "fetch_panstarrs_catalog",
-        "network_mode": "credentialed",
+        "network_mode": "public",
         "supports_live_query": True,
         "supports_external_submission": False,
         "min_seconds_between_queries": 1,
@@ -3053,6 +3064,45 @@ def live_provider_capabilities() -> tuple[dict[str, Any], ...]:
     return tuple(dict(_LIVE_PROVIDER_CAPABILITIES[survey]) for survey in _SUPPORTED_LIVE_SURVEYS)
 
 
+def _keychain_service_for_env(env_name: str) -> str:
+    return f"neo-detection:{env_name}"
+
+
+def _keychain_secret_present(service_name: str) -> bool:
+    if os.environ.get("NEO_DETECTION_DISABLE_KEYCHAIN_LOOKUP") == "1":
+        return False
+    try:
+        completed = subprocess.run(
+            ["security", "find-generic-password", "-s", service_name, "-w"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+    except (OSError, ValueError):
+        return False
+    return completed.returncode == 0
+
+
+def _credential_presence(env_name: str) -> dict[str, Any]:
+    keychain_service = _keychain_service_for_env(env_name)
+    if os.environ.get(env_name):
+        source = "env"
+        present = True
+    elif _keychain_secret_present(keychain_service):
+        source = "keychain"
+        present = True
+    else:
+        source = "missing"
+        present = False
+    return {
+        "credential_env": env_name,
+        "keychain_service": keychain_service,
+        "credential_present": present,
+        "credential_source": source,
+        "secret_value_recorded": False,
+    }
+
+
 def _policy_allowed_surveys(policy: dict[str, Any] | None) -> tuple[str, ...]:
     if not policy or not isinstance(policy.get("allowed_surveys"), list):
         return ()
@@ -3070,11 +3120,16 @@ def live_provider_readiness(
     readiness = []
     for capability in live_provider_capabilities():
         survey = capability["survey"]
-        credential_env = capability["credential_env"]
+        credential_envs = tuple(capability.get("credential_envs", ()))
+        optional_credential_envs = tuple(capability.get("optional_credential_envs", ()))
+        required_credentials = tuple(_credential_presence(env) for env in credential_envs)
+        optional_credentials = tuple(
+            _credential_presence(env) for env in optional_credential_envs
+        )
         blockers: list[str] = []
         if survey not in allowed_surveys:
             blockers.append("PROVIDER_NOT_POLICY_APPROVED")
-        if not os.environ.get(credential_env):
+        if any(not credential["credential_present"] for credential in required_credentials):
             blockers.append("PROVIDER_CREDENTIAL_MISSING")
         if capability["supports_external_submission"]:
             blockers.append("PROVIDER_EXTERNAL_SUBMISSION_CAPABLE")
@@ -3088,7 +3143,12 @@ def live_provider_readiness(
         readiness.append({
             **capability,
             "policy_approved": survey in allowed_surveys,
-            "credential_present": bool(os.environ.get(credential_env)),
+            "credential_required": bool(required_credentials),
+            "credential_present": all(
+                credential["credential_present"] for credential in required_credentials
+            ),
+            "credential_status": required_credentials,
+            "optional_credential_status": optional_credentials,
             "ready": not blockers,
             "blockers": tuple(blockers),
             "network_access_performed": False,
@@ -3103,21 +3163,49 @@ def live_credential_inventory(config_path: Path = DEFAULT_CONFIG_PATH) -> dict[s
     readiness = live_provider_readiness(config_path)
     entries = []
     for provider in readiness:
-        entries.append({
-            "survey": provider["survey"],
-            "credential_env": provider["credential_env"],
-            "fetch_api": provider["fetch_api"],
-            "credential_present": provider["credential_present"],
-            "required_by_config": provider["credential_env"]
-            in config.required_credential_env,
-            "storage_recommendation": (
-                "Set as a local environment variable or shell profile secret; "
-                "do not commit."
-            ),
-            "secret_value_recorded": False,
-            "network_access_performed": False,
-            "external_submission_enabled": False,
-        })
+        credential_rows = [
+            (credential, True) for credential in provider["credential_status"]
+        ] + [
+            (credential, False)
+            for credential in provider["optional_credential_status"]
+        ]
+        if not credential_rows:
+            entries.append({
+                "survey": provider["survey"],
+                "credential_env": None,
+                "keychain_service": None,
+                "auth_mode": provider["auth_mode"],
+                "fetch_api": provider["fetch_api"],
+                "credential_present": True,
+                "credential_source": "not_required",
+                "credential_required": False,
+                "required_by_config": False,
+                "storage_recommendation": "No credential required for public dry-run access.",
+                "secret_value_recorded": False,
+                "network_access_performed": False,
+                "external_submission_enabled": False,
+            })
+            continue
+        for credential, required_for_provider in credential_rows:
+            entries.append({
+                "survey": provider["survey"],
+                "credential_env": credential["credential_env"],
+                "keychain_service": credential["keychain_service"],
+                "auth_mode": provider["auth_mode"],
+                "fetch_api": provider["fetch_api"],
+                "credential_present": credential["credential_present"],
+                "credential_source": credential["credential_source"],
+                "credential_required": required_for_provider,
+                "required_by_config": credential["credential_env"]
+                in config.required_credential_env,
+                "storage_recommendation": (
+                    "Set as a local environment variable or store in macOS Keychain "
+                    "as the listed service name; do not commit."
+                ),
+                "secret_value_recorded": False,
+                "network_access_performed": False,
+                "external_submission_enabled": False,
+            })
     missing = tuple(
         entry["credential_env"]
         for entry in entries
@@ -3133,6 +3221,23 @@ def live_credential_inventory(config_path: Path = DEFAULT_CONFIG_PATH) -> dict[s
             "or an operator-managed secret store before an approved dry run."
         ),
         "inventory": entries,
+        "secret_values_recorded": False,
+        "network_access_performed": False,
+        "external_submission_enabled": False,
+    }
+
+
+def write_live_credential_inventory_report(
+    config_path: Path = DEFAULT_CONFIG_PATH,
+    report_path: Path = DEFAULT_REPORT_DIR / "credential_inventory_latest.json",
+) -> dict[str, Any]:
+    """Write a sanitized credential inventory report without secret values."""
+    inventory = live_credential_inventory(config_path)
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(json.dumps(inventory, indent=2) + "\n")
+    return {
+        "report_path": str(report_path),
+        "inventory": inventory,
         "secret_values_recorded": False,
         "network_access_performed": False,
         "external_submission_enabled": False,
@@ -3156,8 +3261,13 @@ def automation_readiness_summary(config_path: Path = DEFAULT_CONFIG_PATH) -> dic
     policy, policy_blockers = _load_live_review_policy(config)
     policy_contract = live_policy_contract_summary(config_path)
     provider_readiness = live_provider_readiness(config_path)
+    required_credential_status = tuple(
+        _credential_presence(name) for name in config.required_credential_env
+    )
     missing_credentials = tuple(
-        name for name in config.required_credential_env if not os.environ.get(name)
+        status["credential_env"]
+        for status in required_credential_status
+        if not status["credential_present"]
     )
 
     scheduler_blockers: list[str] = []
@@ -3191,6 +3301,7 @@ def automation_readiness_summary(config_path: Path = DEFAULT_CONFIG_PATH) -> dic
         "live_mode_ready": config.live_network_enabled and not live_blockers,
         "live_mode_blockers": live_blockers,
         "required_credential_env": config.required_credential_env,
+        "required_credential_status": required_credential_status,
         "missing_credential_env": missing_credentials,
         "live_provider_readiness": provider_readiness,
         "live_review_policy": str(_policy_path(config)) if _policy_path(config) else None,
@@ -3466,15 +3577,17 @@ def _live_dry_run_handoff_text(bundle: Mapping[str, Any]) -> str:
     readiness = bundle["automation_readiness"]
     policy = readiness.get("live_review_policy_summary") or {}
     missing_credentials = readiness.get("missing_credential_env", ())
-    provider_lines = [
-        (
+    provider_lines = []
+    for provider in bundle["live_provider_readiness"]:
+        required_credentials = tuple(
+            item["credential_env"] for item in provider.get("credential_status", ())
+        )
+        provider_lines.append(
             f"- {provider['survey']}: "
             f"{'ready' if provider['ready'] else 'blocked'}"
-            f"; credential {provider['credential_env']}"
+            f"; required credentials: {_csv_or_none(required_credentials)}"
             f"; blockers: {_csv_or_none(provider['blockers'])}"
         )
-        for provider in bundle["live_provider_readiness"]
-    ]
     scope = bundle["live_dry_run_plan"].get("dry_run_scope") or {}
     scope_text = (
         "Unavailable"

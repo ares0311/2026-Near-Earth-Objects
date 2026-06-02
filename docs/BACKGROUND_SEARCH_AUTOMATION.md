@@ -79,11 +79,13 @@ Prepare a no-secret credential inventory before live dry-run approval:
 
 ```bash
 PYTHONPATH=src python Skills/background.py live-credential-inventory
+PYTHONPATH=src python Skills/background.py live-credential-inventory --write-report Logs/reports/credential_inventory_latest.json
 ```
 
 The inventory reports required environment variable names, provider mappings,
-presence booleans, and storage guidance. It never prints token values, performs
-no network access, and enables no external submission.
+presence booleans, Keychain service names, and storage guidance. It checks
+environment variables first and macOS Keychain second, never prints token
+values, performs no network access, and enables no external submission.
 
 Inspect the combined no-network live dry-run approval bundle:
 
