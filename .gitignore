@@ -24,3 +24,4 @@ Logs/reports/*.json
 !Logs/reports/.gitkeep
 background/config.local.json
 background/live_review_policy.local.json
+coverage.json
