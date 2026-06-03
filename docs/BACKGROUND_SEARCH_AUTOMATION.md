@@ -87,6 +87,19 @@ presence booleans, Keychain service names, and storage guidance. It checks
 environment variables first and macOS Keychain second, never prints token
 values, performs no network access, and enables no external submission.
 
+Prepare a no-secret local policy approval checklist:
+
+```bash
+PYTHONPATH=src python Skills/background.py live-policy-approval-checklist
+PYTHONPATH=src python Skills/background.py live-policy-approval-checklist --write-report Logs/reports/live_policy_approval_checklist_latest.json
+```
+
+The checklist emits a ZTF-first one-query policy skeleton and operator review
+steps. It recommends copying the committed config and skeleton into
+gitignored local files, leaves `approved_for_live_network=false` in the
+skeleton, and does not replace the example policy, enable network access, record
+credentials, or allow external submission.
+
 Inspect the combined no-network live dry-run approval bundle:
 
 ```bash
@@ -240,6 +253,7 @@ PYTHONPATH=src python Skills/background.py live-execution-log-summary
 PYTHONPATH=src python Skills/background.py live-policy-contract-summary
 PYTHONPATH=src python Skills/background.py live-provider-readiness-summary
 PYTHONPATH=src python Skills/background.py live-credential-inventory
+PYTHONPATH=src python Skills/background.py live-policy-approval-checklist
 PYTHONPATH=src python Skills/background.py live-dry-run-approval-bundle
 PYTHONPATH=src python Skills/background.py record-live-dry-run-approval-bundle
 PYTHONPATH=src python Skills/background.py live-dry-run-approval-bundle-log-summary

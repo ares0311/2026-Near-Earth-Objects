@@ -42,6 +42,7 @@ from background import (
     live_dry_run_plan,
     live_dry_run_plan_log_summary,
     live_execution_log_summary,
+    live_policy_approval_checklist,
     live_policy_contract_summary,
     live_provider_readiness,
     migrate_background_log_db,
@@ -69,6 +70,7 @@ from background import (
     validation_summary,
     write_live_credential_inventory_report,
     write_live_dry_run_operator_handoff,
+    write_live_policy_approval_checklist_report,
     write_signoff_packet,
 )
 
@@ -125,6 +127,13 @@ def main() -> None:
     )
     credential_inventory.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
     credential_inventory.add_argument("--write-report", type=Path, default=None)
+
+    policy_checklist = sub.add_parser(
+        "live-policy-approval-checklist",
+        help="Print no-secret local live-policy approval checklist",
+    )
+    policy_checklist.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
+    policy_checklist.add_argument("--write-report", type=Path, default=None)
 
     approval_bundle = sub.add_parser(
         "live-dry-run-approval-bundle",
@@ -344,6 +353,13 @@ def main() -> None:
             _print_json(write_live_credential_inventory_report(args.config, args.write_report))
         else:
             _print_json(live_credential_inventory(args.config))
+    elif args.command == "live-policy-approval-checklist":
+        if args.write_report:
+            _print_json(
+                write_live_policy_approval_checklist_report(args.config, args.write_report)
+            )
+        else:
+            _print_json(live_policy_approval_checklist(args.config))
     elif args.command == "live-dry-run-approval-bundle":
         _print_json(live_dry_run_approval_bundle(args.config))
     elif args.command == "record-live-dry-run-approval-bundle":

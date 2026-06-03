@@ -22,3 +22,5 @@ Logs/reports/*.json
 !Logs/.gitkeep
 !Logs/reports/
 !Logs/reports/.gitkeep
+background/config.local.json
+background/live_review_policy.local.json

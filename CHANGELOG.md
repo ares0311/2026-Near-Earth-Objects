@@ -24,8 +24,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   presence second, corrected ZTF public/Pan-STARRS public auth as no-credential
   by default, and added `live-credential-inventory --write-report` for
   sanitized local operator review.
-- Bumped package/background version metadata to v0.74.0 and updated the roadmap
-  test count to 2812 default tests plus 2 deselected live/integration checks.
+- `background.py` / `Skills/background.py`: added
+  `live_policy_approval_checklist`,
+  `write_live_policy_approval_checklist_report`, and the
+  `live-policy-approval-checklist --write-report` CLI path for no-secret local
+  policy approval preparation.
+- `.gitignore`: added local live dry-run config/policy filenames so an operator
+  can prepare bounded approvals without committing local operational files.
+- Bumped package/background version metadata to v0.75.0 and updated the roadmap
+  test count to 2814 default tests plus 2 deselected live/integration checks.
 
 ## v0.60.0
 

@@ -822,7 +822,7 @@ Lightweight summary of a `ScoredNEO` for display or export.
 
 ---
 
-## v0.16.0 through v0.74.0 Public API Additions
+## v0.16.0 through v0.75.0 Public API Additions
 
 These releases added conservative helper APIs around live-data retrieval,
 preprocessing quality, detection triage, linking, orbit review, classification
@@ -969,8 +969,9 @@ claim confirmation or impact probability.
 | v0.72.0 | `background.py` / `Skills/background.py` | `internal_follow_up_disposition_summary`; internal-follow-up-disposition CLI command |
 | v0.73.0 | `background.py` / `Skills/background.py` | `live_credential_inventory`; live-credential-inventory CLI command |
 | v0.74.0 | `background.py` / `Skills/background.py` | env/Keychain credential-source reporting; `write_live_credential_inventory_report`; live-credential-inventory --write-report CLI option |
+| v0.75.0 | `background.py` / `Skills/background.py` | `live_policy_approval_checklist`, `write_live_policy_approval_checklist_report`; live-policy-approval-checklist CLI command with --write-report option |
 
-### Skills and CLI additions in v0.16.0 through v0.74.0
+### Skills and CLI additions in v0.16.0 through v0.75.0
 
 `export_candidate_report.py`, `tag_neo_class.py`, `check_tisserand.py`,
 `export_followup_requests.py`, `ephemeris_check.py`,

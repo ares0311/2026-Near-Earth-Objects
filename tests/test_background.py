@@ -789,7 +789,7 @@ def test_background_operations_snapshot_empty_log(monkeypatch, tmp_path):
         fixture,
     )
 
-    assert snapshot["code_version"] == "0.74.0"
+    assert snapshot["code_version"] == "0.75.0"
     assert snapshot["next_action"] == "run_background_once"
     assert snapshot["ledger"]["total_runs"] == 0
     assert snapshot["automation_readiness"]["scheduler_ready"] is True
@@ -939,7 +939,7 @@ def test_background_operator_next_action_summary_blocks_old_schema(tmp_path):
         Path("background/targets.json"),
     )
 
-    assert summary["code_version"] == "0.74.0"
+    assert summary["code_version"] == "0.75.0"
     assert summary["schema_ready"] is False
     assert summary["blocked"] is True
     assert summary["blocker"] == "BACKGROUND_LOG_SCHEMA_NOT_CURRENT"
@@ -1069,7 +1069,7 @@ def test_signoff_packet_for_unsigned_followup(monkeypatch, tmp_path):
     packet = background.signoff_packet(result.ledger.run_id, db_path)
     latest = background.latest_unsigned_signoff_packet(db_path)
 
-    assert packet["code_version"] == "0.74.0"
+    assert packet["code_version"] == "0.75.0"
     assert packet["run_id"] == result.ledger.run_id
     assert packet["target_id"] == "T001"
     assert packet["recommended_decision"] == "review_and_optionally_sign"
@@ -2265,6 +2265,69 @@ def test_background_cli_live_credential_inventory_write_report(monkeypatch, tmp_
     assert payload["report_path"] == str(report_path)
     assert payload["secret_values_recorded"] is False
     assert report["all_required_credentials_present"] is True
+    assert "atlas-token" not in completed.stdout
+    assert "atlas-token" not in report_path.read_text()
+
+
+def test_live_policy_approval_checklist_is_sanitized(monkeypatch, tmp_path):
+    policy_path = tmp_path / "policy.json"
+    config_path = tmp_path / "config.json"
+    write_live_policy(policy_path, approved=False)
+    write_live_config(config_path, policy_path, live_network_enabled=False)
+    monkeypatch.setenv("ATLAS_TOKEN", "atlas-token")
+
+    checklist = background.live_policy_approval_checklist(config_path)
+
+    skeleton = checklist["recommended_policy_skeleton"]
+    assert checklist["network_access_performed"] is False
+    assert checklist["external_submission_enabled"] is False
+    assert checklist["secret_values_recorded"] is False
+    assert checklist["recommended_first_dry_run_mode"] == (
+        "ZTF public-only, one bounded query"
+    )
+    assert skeleton["allowed_surveys"] == ["ZTF"]
+    assert skeleton["approved_for_live_network"] is False
+    assert skeleton["no_external_submission_confirmed"] is True
+    assert skeleton["no_impact_probability_claims"] is True
+    assert "SET_LOCAL_CONFIG_TO_LOCAL_POLICY_PATH" in checklist["approval_blockers"]
+    assert "atlas-token" not in json.dumps(checklist)
+
+
+def test_background_cli_live_policy_approval_checklist_write_report(
+    monkeypatch, tmp_path
+):
+    repo = Path(__file__).resolve().parents[1]
+    policy_path = tmp_path / "policy.json"
+    config_path = tmp_path / "config.json"
+    report_path = tmp_path / "reports" / "policy_checklist.json"
+    write_live_policy(policy_path, approved=False)
+    write_live_config(config_path, policy_path, live_network_enabled=False)
+    monkeypatch.setenv("ATLAS_TOKEN", "atlas-token")
+    env = {**os.environ, "PYTHONPATH": str(repo / "src")}
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "live-policy-approval-checklist",
+            "--config",
+            str(config_path),
+            "--write-report",
+            str(report_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    payload = json.loads(completed.stdout)
+    report = json.loads(report_path.read_text())
+
+    assert payload["report_path"] == str(report_path)
+    assert payload["secret_values_recorded"] is False
+    assert report["recommended_policy_skeleton"]["allowed_surveys"] == ["ZTF"]
+    assert report["recommended_policy_skeleton"]["approved_for_live_network"] is False
     assert "atlas-token" not in completed.stdout
     assert "atlas-token" not in report_path.read_text()
 

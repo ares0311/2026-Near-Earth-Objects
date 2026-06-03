@@ -1,9 +1,9 @@
 # 2026 Near-Earth Object Detection & Ranking Pipeline
 
 ![Status](https://img.shields.io/badge/status-active%20development-blue)
-![Version](https://img.shields.io/badge/version-0.74.0-informational)
+![Version](https://img.shields.io/badge/version-0.75.0-informational)
 ![License](https://img.shields.io/badge/license-Apache%202.0-green)
-![Tests](https://img.shields.io/badge/tests-2812%20default-brightgreen)
+![Tests](https://img.shields.io/badge/tests-2814%20default-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
 ![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)
 ![CI](https://img.shields.io/badge/CI-passing-brightgreen)
@@ -12,7 +12,7 @@
 
 ## Abstract
 
-Near-Earth Objects (NEOs) — small solar system bodies with perihelion distances $q < 1.3$ AU — represent both a premier target for planetary science and the only known category of natural disaster that is, in principle, preventable. Despite three decades of systematic survey effort, population completeness models estimate that the majority of NEOs larger than 140 meters remain undetected, sustaining the need for automated, high-throughput discovery pipelines capable of operating at the cadence and scale of modern wide-field photometric surveys. This work presents a complete, research-grade automated pipeline for the detection, multi-night linking, orbital characterization, and hazard ranking of NEO candidates derived from the Zwicky Transient Facility (ZTF) alert stream, ATLAS forced photometry, and the Minor Planet Center (MPC) catalog. The system implements a seven-stage directed acyclic processing graph — fetch, preprocess, detect, link, classify, orbit, score — followed by a mandatory three-step alert protocol governing all external communications. Classification employs a three-tier ensemble architecture: a gradient-boosted tree classifier on tabular features (Tier 1), a convolutional neural network operating on 63×63-pixel ZTF image triplets following the architecture of Duev et al. (2019) (Tier 2), and a BERT-style Transformer trained on multi-night observation sequences following Lin et al. (2022) (Tier 3), with outputs combined by a logistic regression meta-learner and calibrated via Platt scaling or isotonic regression. Hazard assessment follows a Bayesian log-score model over five competing hypotheses with deliberately pessimistic priors for new NEO candidates. Preliminary orbit determination uses Gauss's method with differential correction, and Potentially Hazardous Asteroid (PHA) flags are gated on orbit quality code ≥ 2 and independently confirmed MOID ≤ 0.05 AU. As of version 0.74.0, all ten pipeline modules are complete, default collection finds 2812 non-live tests plus 2 deselected live/integration checks, and background automation includes offline scheduling readiness, provider-specific live readiness summaries, no-secret credential inventories with environment-variable and macOS Keychain presence checks, no-network live dry-run approval bundles, operator handoff exports, persisted blueprint and operations snapshots, internal signoff packets, packet-linked signoff decisions, packet-decision readiness, SQLite schema migration/reporting, schema-gated operator next-action summaries, internal follow-up disposition summaries, and conservative post-signoff follow-up recommendations. Injection-recovery validation on $n = 200$ synthetic NEO tracklets reports 100% detection, link, and score rates. The pipeline produces MPC-compatible 80-column, ADES PSV, and JSON observation reports and implements a non-negotiable three-step pathway — MPC submission, independent observatory confirmation, and conditional NASA PDCO notification — ensuring that no autonomous impact claim is ever issued.
+Near-Earth Objects (NEOs) — small solar system bodies with perihelion distances $q < 1.3$ AU — represent both a premier target for planetary science and the only known category of natural disaster that is, in principle, preventable. Despite three decades of systematic survey effort, population completeness models estimate that the majority of NEOs larger than 140 meters remain undetected, sustaining the need for automated, high-throughput discovery pipelines capable of operating at the cadence and scale of modern wide-field photometric surveys. This work presents a complete, research-grade automated pipeline for the detection, multi-night linking, orbital characterization, and hazard ranking of NEO candidates derived from the Zwicky Transient Facility (ZTF) alert stream, ATLAS forced photometry, and the Minor Planet Center (MPC) catalog. The system implements a seven-stage directed acyclic processing graph — fetch, preprocess, detect, link, classify, orbit, score — followed by a mandatory three-step alert protocol governing all external communications. Classification employs a three-tier ensemble architecture: a gradient-boosted tree classifier on tabular features (Tier 1), a convolutional neural network operating on 63×63-pixel ZTF image triplets following the architecture of Duev et al. (2019) (Tier 2), and a BERT-style Transformer trained on multi-night observation sequences following Lin et al. (2022) (Tier 3), with outputs combined by a logistic regression meta-learner and calibrated via Platt scaling or isotonic regression. Hazard assessment follows a Bayesian log-score model over five competing hypotheses with deliberately pessimistic priors for new NEO candidates. Preliminary orbit determination uses Gauss's method with differential correction, and Potentially Hazardous Asteroid (PHA) flags are gated on orbit quality code ≥ 2 and independently confirmed MOID ≤ 0.05 AU. As of version 0.75.0, all ten pipeline modules are complete, default collection finds 2814 non-live tests plus 2 deselected live/integration checks, and background automation includes offline scheduling readiness, provider-specific live readiness summaries, no-secret credential inventories with environment-variable and macOS Keychain presence checks, no-secret live-policy approval checklists, no-network live dry-run approval bundles, operator handoff exports, persisted blueprint and operations snapshots, internal signoff packets, packet-linked signoff decisions, packet-decision readiness, SQLite schema migration/reporting, schema-gated operator next-action summaries, internal follow-up disposition summaries, and conservative post-signoff follow-up recommendations. Injection-recovery validation on $n = 200$ synthetic NEO tracklets reports 100% detection, link, and score rates. The pipeline produces MPC-compatible 80-column, ADES PSV, and JSON observation reports and implements a non-negotiable three-step pathway — MPC submission, independent observatory confirmation, and conditional NASA PDCO notification — ensuring that no autonomous impact claim is ever issued.
 
 **Keywords:** near-Earth objects, planetary defense, asteroid detection, automated pipeline, machine learning, real/bogus classification, orbit determination, Bayesian scoring, ZTF, Minor Planet Center
 
@@ -57,7 +57,7 @@ This repository implements a complete, research-grade automated detection and ra
 4. **Independent confirmation before alert** — the NASA PDCO notification pathway is gated on MPC submission *and* independent observatory confirmation, not on pipeline confidence alone.
 5. **No autonomous impact claims** — the system produces ranked candidates and hazard flags; it defers all authoritative impact probability statements to CNEOS Scout and Sentry.
 
-The pipeline follows the build order: `schemas` → `fetch` → `preprocess` → `detect` → `link` → `classify` → `orbit` → `score` → `alert` → `calibration`. Each stage consumes the immutable, typed output of all prior stages. As of v0.74.0, all ten pipeline modules plus background automation are complete, default collection finds 2812 non-live tests plus 2 deselected live/integration checks, and the offline operator workflow can schema-gate, migrate, inspect, packetize, record internal-only decisions, summarize internal follow-up disposition, inventory live dry-run credential names without secrets, and recommend the next local review command without live network access or external submission. The local runtime DB in this workspace has been promoted to the current schema and `BACKGROUND_001` has been approved only for internal project tracking; this is not a live survey result, discovery claim, hazard claim, or external-submission approval.
+The pipeline follows the build order: `schemas` → `fetch` → `preprocess` → `detect` → `link` → `classify` → `orbit` → `score` → `alert` → `calibration`. Each stage consumes the immutable, typed output of all prior stages. As of v0.75.0, all ten pipeline modules plus background automation are complete, default collection finds 2814 non-live tests plus 2 deselected live/integration checks, and the offline operator workflow can schema-gate, migrate, inspect, packetize, record internal-only decisions, summarize internal follow-up disposition, inventory live dry-run credential names without secrets, prepare a no-secret live-policy approval checklist, and recommend the next local review command without live network access or external submission. The local runtime DB in this workspace has been promoted to the current schema and `BACKGROUND_001` has been approved only for internal project tracking; this is not a live survey result, discovery claim, hazard claim, or external-submission approval.
 
 ---
 
@@ -109,7 +109,7 @@ The pipeline implements a strict directed acyclic graph (DAG) of processing stag
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    NEO DETECTION PIPELINE  v0.74.0                  │
+│                    NEO DETECTION PIPELINE  v0.75.0                  │
 └─────────────────────────────────────────────────────────────────────┘
 
   External Data Sources
@@ -521,7 +521,7 @@ The diagram below shows how data and artifacts move between the repository's top
 2026-Near-Earth-Objects/
 │
 ├── src/                          # Core pipeline modules (Python 3.11+)
-│   ├── __init__.py               # Package version (0.74.0)
+│   ├── __init__.py               # Package version (0.75.0)
 │   ├── schemas.py                # All Pydantic data models (frozen=True)
 │   ├── fetch.py                  # ZTF/ATLAS/MPC/Horizons data retrieval
 │   ├── preprocess.py             # Difference image handling; Gaia astrometry
@@ -534,7 +534,7 @@ The diagram below shows how data and artifacts move between the repository's top
 │   ├── calibration.py            # Platt / isotonic PAVA calibration
 │   └── py.typed                  # PEP 561 type information marker
 │
-├── tests/                        # pytest suite (2812 default tests collected; 2 live/integration deselected)
+├── tests/                        # pytest suite (2814 default tests collected; 2 live/integration deselected)
 │   ├── conftest.py               # Shared fixtures and synthetic tracklet factories
 │   ├── test_schemas.py
 │   ├── test_fetch.py
@@ -878,7 +878,7 @@ Compare the output against the baseline in `data/injection_recovery_baseline.jso
 | 5. Calibrator refit | `evaluate_calibration.py` | ECE ≤ 0.05; Brier ≤ 0.10 |
 | 6. Linker tuned (if needed) | `tune_linker.py` | Link rate ≥ baseline − 5% |
 | 7. Injection-recovery passed | `injection_recovery.py` | Link + score rate ≥ baseline − 5% |
-| 8. Full default test collection is stable | `pytest --collect-only` | 2812 default tests collected; 2 live/integration tests deselected |
+| 8. Full default test collection is stable | `pytest --collect-only` | 2814 default tests collected; 2 live/integration tests deselected |
 | 9. Models committed | `git add models/` | New weights in version control |
 
 ---
@@ -952,7 +952,7 @@ PYTHONPATH=src python Skills/smoke_test.py
 
 ```bash
 OMP_NUM_THREADS=1 PYTHONPATH=src python -m pytest --collect-only -q
-# Expected collection: 2812 default tests collected; 2 deselected
+# Expected collection: 2814 default tests collected; 2 deselected
 ```
 
 For a full local run, use:
@@ -1006,6 +1006,8 @@ PYTHONPATH=src python Skills/background.py live-policy-contract-summary
 PYTHONPATH=src python Skills/background.py live-provider-readiness-summary
 PYTHONPATH=src python Skills/background.py live-credential-inventory
 PYTHONPATH=src python Skills/background.py live-credential-inventory --write-report Logs/reports/credential_inventory_latest.json
+PYTHONPATH=src python Skills/background.py live-policy-approval-checklist
+PYTHONPATH=src python Skills/background.py live-policy-approval-checklist --write-report Logs/reports/live_policy_approval_checklist_latest.json
 PYTHONPATH=src python Skills/background.py live-dry-run-approval-bundle
 PYTHONPATH=src python Skills/background.py record-live-dry-run-approval-bundle
 PYTHONPATH=src python Skills/background.py live-dry-run-approval-bundle-log-summary
@@ -1031,8 +1033,12 @@ recorded from the review policy. Operator handoffs can be written and persisted
 to SQLite for local review. Mock-only live dry-run provider execution attempts
 can also be logged without contacting survey services. Injected
 dry-run providers must report no network access and no external submission.
-The approval-bundle command aggregates scheduler, policy, provider, and dry-run
-plan gates before any mock live dry-run execution attempt.
+The live-policy approval checklist command writes a no-secret skeleton for a
+bounded local dry-run policy and leaves live approval pending until the operator
+copies it and the config into ignored local files, reviews the scope, and
+explicitly approves it. The approval-bundle command aggregates scheduler,
+policy, provider, and dry-run plan gates before any mock live dry-run execution
+attempt.
 The command is offline by default and does not make external submissions. Manual reviewer signoff can be recorded with
 `Skills/background.py record-signoff`; multiple signoffs per run are supported.
 Persisted signoff packets can be inspected with
@@ -1129,7 +1135,7 @@ The older n=50 baseline remains in `data/injection_recovery_baseline.json` for h
 | `score.py` | — | 100% |
 | `alert.py` | — | 100% |
 | `calibration.py` | — | 100% |
-| **Total** | **2812 default tests collected** | **100% target; verify with coverage run before release** |
+| **Total** | **2814 default tests collected** | **100% target; verify with coverage run before release** |
 
 ---
 
@@ -1143,7 +1149,7 @@ The older n=50 baseline remains in `data/injection_recovery_baseline.json` for h
 | Offline validation | Complete for synthetic baselines | `data/injection_recovery_n200.json` and `data/stress_test_high_motion.json` report 100% detection/link/score or link rates on synthetic fixtures. These are not substitutes for real survey validation. |
 | Background automation | Complete for offline scheduler readiness | Unified `Skills/background.py` supports one-run execution, readiness, schema status, migration preview, blueprint compliance, operations snapshots, signoff packets, packet-linked decisions, and operator next-action summaries. |
 | Runtime SQLite log | Current in this workspace | `Logs/background.sqlite` has been migrated to the current schema. `BACKGROUND_001` is internally signed for **Internal Project Tracking** only. Runtime DB files are local artifacts and are not committed. |
-| Live survey operations | Not production-certified | Live ZTF/ATLAS/Pan-STARRS modes remain blocked by disabled live network mode, missing credentials, and unapproved live policy. |
+| Live survey operations | Not production-certified | Live ZTF/ATLAS/Pan-STARRS modes remain blocked by disabled live network mode and unapproved live policy. A no-secret approval checklist is available for preparing the local policy review. |
 | External reporting | Not enabled | No MPC, NEOCP, NASA, CNEOS, or public submission path is active. The alert protocol still requires MPC submission and independent confirmation before any NASA pathway. |
 | ML production training | Pending real data | Tier 2/Tier 3 architectures and dataset builders exist, but production weights require labeled cutouts and multi-night sequence data. |
 
@@ -1171,14 +1177,14 @@ The older n=50 baseline remains in `data/injection_recovery_baseline.json` for h
 | **S2** | Review `needs-follow-up-summary` for `BACKGROUND_001` after internal signoff | Complete: evidence remains local-only; known-object evidence is blocked, cross-source support is uncertain, and external submission remains inappropriate. |
 | **S3** | Clarify CLI wording around internal-only signoff vs. live-search approval | Complete: CLI help and background automation docs now state that packet signoff is internal-only and not live-search or external-submission approval. |
 | **S4** | Decide whether the next offline scheduled cycle should run now | Complete: paused for now; no new offline run will be started until the internal-only wording/docs patch is committed and the operator chooses the next offline cycle. |
-| **S5** | Keep docs/version/test counts aligned with package metadata | Complete for this increment: README, AGENTS, CLAUDE, CHANGELOG, API docs, and package metadata agree on the v0.74.0 credential inventory workflow. |
+| **S5** | Keep docs/version/test counts aligned with package metadata | Complete for this increment: README, AGENTS, CLAUDE, CHANGELOG, API docs, and package metadata agree on the v0.75.0 live-policy approval checklist workflow. |
 
 ### 15.4 Upcoming Milestones
 
 | Milestone | Description | Required Preconditions | Status |
 |---|---|---|---|
 | **M4a** | Credential inventory for live dry-run readiness | Public ZTF and Pan-STARRS require no default credential; `ATLAS_TOKEN` is required for ATLAS and optional IRSA/MAST credentials are inventoried without values | Complete |
-| **M4b** | Replace example live review policy with an operator-approved local policy | Named reviewer, approved dry-run scope, query caps, rate limits, no-submission confirmation | Pending |
+| **M4b** | Replace example live review policy with an operator-approved local policy | Named reviewer, approved dry-run scope, query caps, rate limits, no-submission confirmation; checklist command now prepares the local policy skeleton without secrets | Pending |
 | **M4c** | No-network live dry-run approval bundle is green | Scheduler ready, policy contract valid, provider readiness green, no external submission enabled | Pending |
 | **M4d** | First credentialed live dry run | Explicit operator approval, network access permitted for dry-run only, logs persisted, no external submission | Pending |
 | **M4e** | Live dry-run review and rollback criteria | Results audited against provenance, rate limits, false-positive evidence, and guardrail language | Pending |
@@ -1203,10 +1209,11 @@ Use this table as the working roadmap ledger. Each row should move from
 | **P6** | Complete | Review signed follow-up evidence | `needs-follow-up-summary` reviewed; evidence remains local-only with single-source and known-object blockers | None |
 | **P7** | Complete | Clarify internal-only signoff language in CLI/docs | CLI help and background docs distinguish internal tracking from live-search approval | None |
 | **P8** | Complete | Decide next offline scheduled cycle | Paused until this internal disposition patch is committed and the operator chooses the next offline cycle | None |
-| **P9** | Complete | Align release docs after the next code change | README, AGENTS, CLAUDE, CHANGELOG, API docs, and package metadata agree for the v0.74.0 credential inventory workflow | None |
+| **P9** | Complete | Align release docs after the next code change | README, AGENTS, CLAUDE, CHANGELOG, API docs, and package metadata agree for the v0.75.0 live-policy approval checklist workflow | None |
 | **P13** | Complete | Add review-only internal disposition summary for signed fixture follow-ups | `internal-follow-up-disposition` reports signed fixture follow-ups as internal-tracking records without live-search or submission approval | None |
 | **P10** | Complete | Prepare live dry-run credential inventory | `live-credential-inventory --write-report` reports provider/env/Keychain mappings and missing credentials without recording secret values | None |
-| **P11** | Pending | Approve live dry-run policy | Non-example policy file reviewed with named reviewer and bounded scope | Operator policy approval |
+| **P14** | Complete | Prepare live dry-run policy approval checklist | `live-policy-approval-checklist --write-report` emits a no-secret ZTF-first policy skeleton and operator checklist; local config/policy filenames are gitignored | None |
+| **P11** | Pending | Approve live dry-run policy | Non-example policy file reviewed with named reviewer and bounded scope | Run the checklist, copy the config and skeleton to ignored local files, and explicitly approve the bounded dry-run scope |
 | **P12** | Pending | Attempt first credentialed live dry run | Live dry-run log row exists; no external submission enabled | Explicit operator approval required |
 
 ### 15.6 Known Limitations

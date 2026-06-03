@@ -55,6 +55,8 @@ __all__ = [
     "live_provider_readiness",
     "live_credential_inventory",
     "write_live_credential_inventory_report",
+    "live_policy_approval_checklist",
+    "write_live_policy_approval_checklist_report",
     "live_dry_run_approval_bundle",
     "record_live_dry_run_approval_bundle",
     "live_dry_run_approval_bundle_log_summary",
@@ -112,7 +114,7 @@ DEFAULT_INPUT_PATH = _ROOT / "background" / "targets.json"
 DEFAULT_DB_PATH = _ROOT / "Logs" / "background.sqlite"
 DEFAULT_REPORT_DIR = _ROOT / "Logs" / "reports"
 _SCHEMA_VERSION = "background-v1"
-_CODE_VERSION = "0.74.0"
+_CODE_VERSION = "0.75.0"
 _BACKGROUND_LOG_TABLES = (
     "schema_metadata",
     "run_ledger",
@@ -3238,6 +3240,102 @@ def write_live_credential_inventory_report(
     return {
         "report_path": str(report_path),
         "inventory": inventory,
+        "secret_values_recorded": False,
+        "network_access_performed": False,
+        "external_submission_enabled": False,
+    }
+
+
+def _recommended_live_policy_skeleton() -> dict[str, Any]:
+    return {
+        "schema_version": "live-review-policy-v1",
+        "policy_name": "local-ztf-public-dry-run-policy",
+        "reviewer": "REPLACE_WITH_REVIEWER_NAME",
+        "approved_for_live_network": False,
+        "allowed_surveys": ["ZTF"],
+        "max_queries_per_run": 1,
+        "min_seconds_between_queries": 10,
+        "dry_run_scope": {
+            "ra_deg": 180.0,
+            "dec_deg": 0.0,
+            "radius_deg": 0.1,
+            "start_jd": 2460000.5,
+            "end_jd": 2460001.5,
+        },
+        "no_external_submission_confirmed": True,
+        "no_impact_probability_claims": True,
+        "notes": (
+            "Template only. Copy to an ignored local policy file, review scope "
+            "and rate limits, then set approved_for_live_network=true only after "
+            "explicit operator approval for a bounded dry run."
+        ),
+    }
+
+
+def live_policy_approval_checklist(
+    config_path: Path = DEFAULT_CONFIG_PATH,
+) -> dict[str, Any]:
+    """Build a no-secret checklist for replacing the example live policy."""
+    config = load_config(config_path)
+    contract = live_policy_contract_summary(config_path)
+    inventory = live_credential_inventory(config_path)
+    policy_path = _policy_path(config)
+    skeleton = _recommended_live_policy_skeleton()
+    approval_blockers = [
+        "COPY_CONFIG_TO_GITIGNORED_LOCAL_CONFIG",
+        "COPY_TEMPLATE_TO_GITIGNORED_LOCAL_POLICY",
+        "REPLACE_REVIEWER_NAME",
+        "REVIEW_AND_BOUND_DRY_RUN_SCOPE",
+        "KEEP_EXTERNAL_SUBMISSION_DISABLED",
+        "KEEP_IMPACT_PROBABILITY_CLAIMS_DISABLED",
+        "SET_LOCAL_CONFIG_TO_LOCAL_POLICY_PATH",
+        "ENABLE_LIVE_NETWORK_ONLY_FOR_APPROVED_DRY_RUN",
+    ]
+    if "ATLAS_TOKEN" in inventory["missing_credential_env"]:
+        approval_blockers.append("ATLAS_TOKEN_MISSING_FOR_ATLAS_SURVEY")
+
+    return {
+        "config_path": str(config_path),
+        "current_policy_path": str(policy_path) if policy_path else None,
+        "current_policy_contract_valid": contract["contract_valid"],
+        "current_policy_blockers": contract["policy_blockers"],
+        "recommended_config_filename": "background/config.local.json",
+        "recommended_policy_filename": "background/live_review_policy.local.json",
+        "recommended_local_file_status": "gitignored_operator_local_files",
+        "recommended_first_dry_run_mode": "ZTF public-only, one bounded query",
+        "recommended_policy_skeleton": skeleton,
+        "operator_checklist": (
+            "copy background/config.json to background/config.local.json",
+            "copy the skeleton to background/live_review_policy.local.json",
+            "replace reviewer with the approving human name",
+            "verify allowed_surveys, query cap, cadence, and sky/time scope",
+            "confirm no external submission and no impact-probability claims",
+            "point background/config.local.json at the local policy file",
+            "set approved_for_live_network=true only after explicit approval",
+            (
+                "run live-dry-run-approval-bundle with --config "
+                "background/config.local.json before any live dry-run execute"
+            ),
+        ),
+        "approval_blockers": tuple(dict.fromkeys(approval_blockers)),
+        "credential_inventory": inventory,
+        "secret_values_recorded": False,
+        "network_access_performed": False,
+        "external_submission_enabled": False,
+    }
+
+
+def write_live_policy_approval_checklist_report(
+    config_path: Path = DEFAULT_CONFIG_PATH,
+    report_path: Path = DEFAULT_REPORT_DIR / "live_policy_approval_checklist_latest.json",
+) -> dict[str, Any]:
+    """Write a no-secret live policy approval checklist report."""
+    checklist = live_policy_approval_checklist(config_path)
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(json.dumps(checklist, indent=2) + "\n")
+    return {
+        "report_path": str(report_path),
+        "checklist": checklist,
         "secret_values_recorded": False,
         "network_access_performed": False,
         "external_submission_enabled": False,
