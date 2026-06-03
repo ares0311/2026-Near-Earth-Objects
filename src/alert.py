@@ -46,6 +46,7 @@ __all__ = [
     "estimate_confirmation_time",
     "format_alert_age_summary",
     "format_candidate_count_summary",
+    "format_observation_count_summary",
 ]
 
 import json
@@ -1930,5 +1931,31 @@ def format_candidate_count_summary(neos: list) -> dict:
         "guardrail": (
             "GUARDRAIL: These are pipeline candidates, NOT confirmed detections. "
             "Do NOT file any external report without independent MPC confirmation."
+        ),
+    }
+
+
+def format_observation_count_summary(neos: list) -> dict:
+    """Return observation count totals per mission across all scored NEO candidates.
+
+    Counts total observations and breaks them down by mission (survey).
+    Includes a guardrail statement confirming these are NOT confirmed detections.
+    """
+    total_obs = 0
+    by_mission: dict[str, int] = {}
+    for neo in neos:
+        tracklet = getattr(neo, "tracklet", None)
+        observations = getattr(tracklet, "observations", None) or []
+        for obs in observations:
+            total_obs += 1
+            mission = str(getattr(obs, "mission", "unknown") or "unknown")
+            by_mission[mission] = by_mission.get(mission, 0) + 1
+    return {
+        "total_observations": total_obs,
+        "by_mission": by_mission,
+        "n_candidates": len(neos),
+        "guardrail": (
+            "GUARDRAIL: These are pipeline candidate observations, NOT confirmed detections. "
+            "Do NOT report any impact probability without MPC/CNEOS independent confirmation."
         ),
     }

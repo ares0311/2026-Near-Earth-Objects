@@ -2453,3 +2453,58 @@ class TestComputeApparentMotionRate:
         sys.path.insert(0, "src")
         import detect
         assert "compute_apparent_motion_rate" in detect.__all__
+
+
+class TestComputeMagnitudeRange:
+    def _make_obs(self, mag):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+        return SimpleNamespace(
+            obs_id="O1", ra=10.0, dec=20.0, jd=2460000.0,
+            mag=mag, mag_err=0.1, filter_band="r", mission="ZTF",
+        )
+
+    def test_basic_range(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_magnitude_range
+        obs = [self._make_obs(18.0), self._make_obs(20.0), self._make_obs(19.0)]
+        result = compute_magnitude_range(obs)
+        assert result is not None
+        assert abs(result - 2.0) < 1e-9
+
+    def test_single_obs_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_magnitude_range
+        assert compute_magnitude_range([self._make_obs(18.0)]) is None
+
+    def test_empty_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_magnitude_range
+        assert compute_magnitude_range([]) is None
+
+    def test_sentinel_excluded(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_magnitude_range
+        # sentinel mag=99 should be excluded
+        obs = [self._make_obs(18.0), self._make_obs(99.0)]
+        assert compute_magnitude_range(obs) is None  # only 1 valid
+
+    def test_none_mag_excluded(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_magnitude_range
+        obs = [self._make_obs(None), self._make_obs(18.0), self._make_obs(20.0)]
+        result = compute_magnitude_range(obs)
+        assert result is not None
+        assert abs(result - 2.0) < 1e-9
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import detect
+        assert "compute_magnitude_range" in detect.__all__

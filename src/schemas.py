@@ -40,6 +40,7 @@ __all__ = [
     "AlertBatch",
     "ObservationFilter",
     "FieldStatistics",
+    "CandidateGrouping",
 ]
 
 from dataclasses import dataclass
@@ -1163,3 +1164,16 @@ class FieldStatistics(BaseModel):
     sky_area_sq_deg: float | None = None
     epoch_jd: float | None = None
     mission: str | None = None
+
+
+class CandidateGrouping(BaseModel):
+    """A named grouping of scored NEO candidate IDs from the same field and night."""
+
+    model_config = ConfigDict(frozen=True)
+
+    group_id: str
+    field_id: str | None = None
+    night_jd: float | None = None
+    candidate_ids: tuple[str, ...] = ()
+    n_candidates: int = 0
+    dominant_hazard_flag: str = "unknown"

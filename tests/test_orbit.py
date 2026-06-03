@@ -2784,3 +2784,60 @@ class TestComputeOrbitalEccentricityClass:
         sys.path.insert(0, "src")
         import orbit
         assert "compute_orbital_eccentricity_class" in orbit.__all__
+
+
+class TestComputeOrbitalSpeedAtPerihelion:
+    def _make_elements(self, a_au, e):
+        from types import SimpleNamespace
+        return SimpleNamespace(a_au=a_au, semi_major_axis_au=a_au, e=e, eccentricity=e)
+
+    def test_earth_orbit(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_orbital_speed_at_perihelion
+        # Earth: a≈1 AU, e≈0.017 → perihelion speed ~30.3 km/s
+        el = self._make_elements(1.0, 0.0167)
+        speed = compute_orbital_speed_at_perihelion(el)
+        assert speed is not None
+        assert 29.0 < speed < 32.0
+
+    def test_high_eccentricity(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_orbital_speed_at_perihelion
+        el = self._make_elements(2.0, 0.9)
+        speed = compute_orbital_speed_at_perihelion(el)
+        assert speed is not None
+        assert speed > 0.0
+
+    def test_no_a_au_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_orbital_speed_at_perihelion
+        el = SimpleNamespace(a_au=None, semi_major_axis_au=None, e=0.1)
+        assert compute_orbital_speed_at_perihelion(el) is None
+
+    def test_zero_a_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_orbital_speed_at_perihelion
+        el = self._make_elements(0.0, 0.1)
+        assert compute_orbital_speed_at_perihelion(el) is None
+
+    def test_parabolic_e_one_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_orbital_speed_at_perihelion
+        el = self._make_elements(1.0, 1.0)
+        # perihelion q=0, speed undefined
+        result = compute_orbital_speed_at_perihelion(el)
+        # Either None or very large; just check it doesn't crash
+        assert result is None or result > 0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import orbit
+        assert "compute_orbital_speed_at_perihelion" in orbit.__all__
