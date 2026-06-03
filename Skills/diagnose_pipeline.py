@@ -86,18 +86,9 @@ def run_diagnostics() -> list[dict]:
     # ---- detect ----
     def _diag_detect() -> Any:
         from detect import detect
-        from schemas import PreprocessProvenance, PreprocessResult
 
         obs = tuple(_make_obs(f"det_{i}", 2460000.5 + i * 0.04) for i in range(3))
-        prep = PreprocessResult(
-            observations=obs,
-            provenance=PreprocessProvenance(
-                n_sources_in=3,
-                n_sources_out=3,
-                astrometric_reference="none",
-            ),
-        )
-        return detect(prep)
+        return detect(obs, mpc_cross_match=False)
 
     results.append(_run_stage("detect", _diag_detect))
 
@@ -120,10 +111,8 @@ def run_diagnostics() -> list[dict]:
         )
         cands = tuple(
             RawCandidate(
-                object_id=f"c{n}",
+                candidate_id=f"c{n}",
                 observations=obs,
-                detection_jd=obs[0].jd,
-                survey="ZTF",
             )
             for n, obs in enumerate([obs_night1, obs_night2, obs_night3])
         )
@@ -206,11 +195,12 @@ def run_diagnostics() -> list[dict]:
     def _diag_validate() -> Any:
         import tempfile
 
+        from validate_mpc_report import validate_report
+
         from alert import format_mpc_report
         from classify import classify
         from orbit import fit_orbit
         from score import score
-        from Skills.validate_mpc_report import validate_report  # type: ignore[import]
 
         t = _make_tracklet()
         f, p = classify(t)

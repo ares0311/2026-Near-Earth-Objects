@@ -57,6 +57,8 @@ __all__ = [
     "write_live_credential_inventory_report",
     "live_policy_approval_checklist",
     "write_live_policy_approval_checklist_report",
+    "scoring_metrics_kpi_report",
+    "write_scoring_metrics_kpi_report",
     "live_dry_run_approval_bundle",
     "record_live_dry_run_approval_bundle",
     "live_dry_run_approval_bundle_log_summary",
@@ -76,6 +78,7 @@ __all__ = [
 ]
 
 import json
+import math
 import os
 import sqlite3
 import subprocess
@@ -95,10 +98,13 @@ from schemas import (
     BackgroundRunMode,
     BackgroundRunResult,
     BackgroundTarget,
+    CandidateFeatures,
     FollowUpTestResult,
     HumanSignoffEntry,
     NeedsFollowUpLogEntry,
+    NEOPosterior,
     Observation,
+    OrbitalElements,
     PriorityFactors,
     ReviewedLogEntry,
     ScoredNEO,
@@ -114,7 +120,7 @@ DEFAULT_INPUT_PATH = _ROOT / "background" / "targets.json"
 DEFAULT_DB_PATH = _ROOT / "Logs" / "background.sqlite"
 DEFAULT_REPORT_DIR = _ROOT / "Logs" / "reports"
 _SCHEMA_VERSION = "background-v1"
-_CODE_VERSION = "0.75.0"
+_CODE_VERSION = "0.76.0"
 _BACKGROUND_LOG_TABLES = (
     "schema_metadata",
     "run_ledger",
@@ -3336,6 +3342,381 @@ def write_live_policy_approval_checklist_report(
     return {
         "report_path": str(report_path),
         "checklist": checklist,
+        "secret_values_recorded": False,
+        "network_access_performed": False,
+        "external_submission_enabled": False,
+    }
+
+
+_SCORING_KPI_THRESHOLDS = {
+    "posterior_sum_tolerance": 1e-6,
+    "brier_score_max": 0.20,
+    "expected_calibration_error_max": 0.10,
+    "false_external_alert_rate_max": 0.0,
+}
+
+
+def _scoring_kpi_tracklet(object_id: str = "KPI") -> Tracklet:
+    observations = tuple(
+        Observation(
+            obs_id=f"{object_id}_{idx}",
+            ra_deg=180.0 + idx * 0.005,
+            dec_deg=10.0,
+            jd=2460000.5 + idx,
+            mag=19.5,
+            mag_err=0.05,
+            filter_band="r",
+            mission="ZTF",
+            real_bogus=0.95,
+        )
+        for idx in range(3)
+    )
+    return Tracklet(
+        object_id=object_id,
+        observations=observations,
+        arc_days=2.0,
+        motion_rate_arcsec_per_hour=1.2,
+        motion_pa_degrees=90.0,
+    )
+
+
+def _scoring_kpi_orbit(quality_code: int = 2) -> OrbitalElements:
+    return OrbitalElements(
+        semi_major_axis_au=1.0,
+        eccentricity=0.0,
+        inclination_deg=0.0,
+        longitude_ascending_node_deg=0.0,
+        argument_perihelion_deg=0.0,
+        mean_anomaly_deg=180.0,
+        epoch_jd=2460000.5,
+        perihelion_au=1.0,
+        aphelion_au=1.0,
+        quality_code=quality_code,
+    )
+
+
+def _scoring_kpi_features(**updates: Any) -> CandidateFeatures:
+    values = {
+        "real_bogus_score": 0.95,
+        "motion_consistency_score": 0.90,
+        "arc_coverage_score": 0.60,
+        "nights_observed_score": 0.70,
+        "brightness_score": 0.80,
+        "known_object_score": 0.0,
+        "stellar_artifact_score": 0.05,
+        "main_belt_consistency_score": 0.10,
+    }
+    values.update(updates)
+    return CandidateFeatures(**values)
+
+
+def _scoring_kpi_posterior(**updates: Any) -> NEOPosterior:
+    values = {
+        "neo_candidate": 0.75,
+        "known_object": 0.05,
+        "main_belt_asteroid": 0.10,
+        "stellar_artifact": 0.05,
+        "other_solar_system": 0.05,
+    }
+    values.update(updates)
+    return NEOPosterior(**values)
+
+
+def _scoring_kpi_case(
+    case_id: str,
+    features: CandidateFeatures,
+    posterior: NEOPosterior,
+    orbital: OrbitalElements | None,
+) -> ScoredNEO:
+    return score(
+        _scoring_kpi_tracklet(case_id),
+        features,
+        posterior,
+        orbital,
+        pipeline_run_id="scoring-kpi",
+    )
+
+
+def _scoring_kpi_cases() -> dict[str, ScoredNEO]:
+    return {
+        "positive_pha_candidate": _scoring_kpi_case(
+            "positive_pha_candidate",
+            _scoring_kpi_features(),
+            _scoring_kpi_posterior(),
+            _scoring_kpi_orbit(quality_code=2),
+        ),
+        "low_real_bogus": _scoring_kpi_case(
+            "low_real_bogus",
+            _scoring_kpi_features(real_bogus_score=0.50),
+            _scoring_kpi_posterior(),
+            _scoring_kpi_orbit(quality_code=2),
+        ),
+        "low_orbit_quality": _scoring_kpi_case(
+            "low_orbit_quality",
+            _scoring_kpi_features(),
+            _scoring_kpi_posterior(),
+            _scoring_kpi_orbit(quality_code=1),
+        ),
+        "known_object": _scoring_kpi_case(
+            "known_object",
+            _scoring_kpi_features(known_object_score=0.95),
+            _scoring_kpi_posterior(
+                neo_candidate=0.05,
+                known_object=0.80,
+                main_belt_asteroid=0.08,
+                stellar_artifact=0.04,
+                other_solar_system=0.03,
+            ),
+            _scoring_kpi_orbit(quality_code=2),
+        ),
+        "artifact_heavy": _scoring_kpi_case(
+            "artifact_heavy",
+            _scoring_kpi_features(stellar_artifact_score=0.95),
+            _scoring_kpi_posterior(
+                neo_candidate=0.25,
+                known_object=0.05,
+                main_belt_asteroid=0.08,
+                stellar_artifact=0.60,
+                other_solar_system=0.02,
+            ),
+            _scoring_kpi_orbit(quality_code=2),
+        ),
+        "missing_features": _scoring_kpi_case(
+            "missing_features",
+            CandidateFeatures(),
+            _scoring_kpi_posterior(),
+            _scoring_kpi_orbit(quality_code=2),
+        ),
+    }
+
+
+def _numeric_values(value: Any) -> list[float]:
+    if isinstance(value, bool) or value is None:
+        return []
+    if isinstance(value, int | float):
+        return [float(value)]
+    if isinstance(value, Mapping):
+        values: list[float] = []
+        for item in value.values():
+            values.extend(_numeric_values(item))
+        return values
+    if isinstance(value, (list, tuple)):
+        values = []
+        for item in value:
+            values.extend(_numeric_values(item))
+        return values
+    return []
+
+
+def _score_values_in_range(payload: Mapping[str, Any]) -> bool:
+    for value in _numeric_values(payload):
+        if not math.isfinite(value):
+            return False
+        if value < 0.0 or value > 1.0:
+            return False
+    return True
+
+
+def _kpi_entry(
+    kpi_id: str,
+    observed: Any,
+    threshold: Any,
+    passed: bool,
+    rationale: str,
+    status: str | None = None,
+) -> dict[str, Any]:
+    return {
+        "id": kpi_id,
+        "status": status or ("pass" if passed else "fail"),
+        "observed": observed,
+        "threshold": threshold,
+        "rationale": rationale,
+    }
+
+
+def scoring_metrics_kpi_report() -> dict[str, Any]:
+    """Evaluate offline scoring KPI gates without network access."""
+    cases = _scoring_kpi_cases()
+    case_summaries = {
+        name: {
+            "object_id": scored.tracklet.object_id,
+            "hazard_flag": scored.hazard.hazard_flag,
+            "alert_pathway": scored.hazard.alert_pathway,
+            "moid_au": scored.hazard.moid_au,
+            "discovery_priority": scored.metadata.discovery_priority,
+            "followup_value": scored.metadata.followup_value,
+            "scientific_interest": scored.metadata.scientific_interest,
+            "posterior_sum": sum(scored.posterior.model_dump().values()),
+        }
+        for name, scored in cases.items()
+    }
+    posterior_errors = {
+        name: abs(summary["posterior_sum"] - 1.0)
+        for name, summary in case_summaries.items()
+    }
+    negative_cases = {
+        key: value
+        for key, value in case_summaries.items()
+        if key != "positive_pha_candidate"
+    }
+    external_pathways = {"mpc_submission", "neocp_followup", "nasa_pdco_notify"}
+    negative_external_pathways = [
+        name
+        for name, summary in negative_cases.items()
+        if summary["alert_pathway"] in external_pathways
+    ]
+    forbidden_phrases = ("confirmed neo", "impact probability")
+    report_text = json.dumps(case_summaries).lower()
+    forbidden_hits = [
+        phrase for phrase in forbidden_phrases if phrase in report_text
+    ]
+
+    numeric_values_finite = all(
+        math.isfinite(value)
+        for summary in case_summaries.values()
+        for value in _numeric_values(summary)
+    )
+    scores_bounded = all(_score_values_in_range(summary) for summary in case_summaries.values())
+
+    kpis = [
+        _kpi_entry(
+            "numeric_values_finite",
+            numeric_values_finite,
+            True,
+            numeric_values_finite,
+            "All numeric KPI summary values must be finite.",
+        ),
+        _kpi_entry(
+            "scores_bounded_unit_interval",
+            scores_bounded,
+            True,
+            scores_bounded,
+            "Score-like KPI summary values must remain inside [0, 1].",
+        ),
+        _kpi_entry(
+            "posterior_normalization",
+            max(posterior_errors.values()),
+            f"<= {_SCORING_KPI_THRESHOLDS['posterior_sum_tolerance']}",
+            max(posterior_errors.values())
+            <= _SCORING_KPI_THRESHOLDS["posterior_sum_tolerance"],
+            "Posterior probabilities should sum to 1.0 within tolerance.",
+        ),
+        _kpi_entry(
+            "low_real_bogus_blocks_external_pathway",
+            case_summaries["low_real_bogus"]["alert_pathway"],
+            "internal_candidate",
+            case_summaries["low_real_bogus"]["alert_pathway"] == "internal_candidate",
+            "Low RB fixtures must remain internal.",
+        ),
+        _kpi_entry(
+            "low_orbit_quality_blocks_external_pathway",
+            case_summaries["low_orbit_quality"]["alert_pathway"],
+            "internal_candidate",
+            case_summaries["low_orbit_quality"]["alert_pathway"] == "internal_candidate",
+            "Orbit quality below 2 must block external pathways.",
+        ),
+        _kpi_entry(
+            "known_object_routes_to_known_object",
+            case_summaries["known_object"]["alert_pathway"],
+            "known_object",
+            case_summaries["known_object"]["alert_pathway"] == "known_object",
+            "Known-object evidence must route away from new-candidate pathways.",
+        ),
+        _kpi_entry(
+            "artifact_heavy_blocks_external_pathway",
+            case_summaries["artifact_heavy"]["alert_pathway"],
+            "internal_candidate",
+            case_summaries["artifact_heavy"]["alert_pathway"] == "internal_candidate",
+            "Artifact-heavy fixtures must remain internal.",
+        ),
+        _kpi_entry(
+            "missing_features_conservative",
+            case_summaries["missing_features"]["alert_pathway"],
+            "internal_candidate",
+            case_summaries["missing_features"]["alert_pathway"] == "internal_candidate",
+            "Missing feature scores must not create external pathways.",
+        ),
+        _kpi_entry(
+            "pha_gate_positive_fixture",
+            {
+                "hazard_flag": case_summaries["positive_pha_candidate"]["hazard_flag"],
+                "alert_pathway": case_summaries["positive_pha_candidate"]["alert_pathway"],
+            },
+            {"hazard_flag": "pha_candidate", "alert_pathway": "mpc_submission"},
+            case_summaries["positive_pha_candidate"]["hazard_flag"] == "pha_candidate"
+            and case_summaries["positive_pha_candidate"]["alert_pathway"] == "mpc_submission",
+            "Only the positive fixture should reach MPC-submission pathway status.",
+        ),
+        _kpi_entry(
+            "negative_false_external_pathway_rate",
+            len(negative_external_pathways) / max(len(negative_cases), 1),
+            f"<= {_SCORING_KPI_THRESHOLDS['false_external_alert_rate_max']}",
+            not negative_external_pathways,
+            "Negative fixtures must produce zero external-report pathways.",
+        ),
+        _kpi_entry(
+            "guardrail_forbidden_phrases_absent",
+            forbidden_hits,
+            [],
+            not forbidden_hits,
+            "KPI summaries must not contain forbidden hazard/discovery claim phrases.",
+        ),
+        _kpi_entry(
+            "brier_score",
+            None,
+            f"<= {_SCORING_KPI_THRESHOLDS['brier_score_max']}",
+            False,
+            "Pending representative labeled validation data.",
+            status="pending_labeled_data",
+        ),
+        _kpi_entry(
+            "expected_calibration_error",
+            None,
+            f"<= {_SCORING_KPI_THRESHOLDS['expected_calibration_error_max']}",
+            False,
+            "Pending representative labeled validation data.",
+            status="pending_labeled_data",
+        ),
+        _kpi_entry(
+            "log_loss",
+            None,
+            "tracked after labeled baseline exists",
+            False,
+            "Pending representative labeled validation data.",
+            status="pending_labeled_data",
+        ),
+    ]
+    failed = [kpi["id"] for kpi in kpis if kpi["status"] == "fail"]
+    pending = [kpi["id"] for kpi in kpis if kpi["status"] == "pending_labeled_data"]
+    return {
+        "checked_at_utc": _utc_now(),
+        "code_version": _CODE_VERSION,
+        "schema_version": _SCHEMA_VERSION,
+        "approval_scope": "Offline Scoring Metrics KPI Review",
+        "overall_status": "pass" if not failed else "fail",
+        "ready_for_live_smoke_metrics_approval": not failed,
+        "failed_kpis": failed,
+        "pending_labeled_data_kpis": pending,
+        "thresholds": _SCORING_KPI_THRESHOLDS,
+        "case_summaries": case_summaries,
+        "kpis": kpis,
+        "secret_values_recorded": False,
+        "network_access_performed": False,
+        "external_submission_enabled": False,
+        "authoritative_hazard_assessment_deferred": True,
+    }
+
+
+def write_scoring_metrics_kpi_report(
+    report_path: Path = DEFAULT_REPORT_DIR / "scoring_metrics_kpi_latest.json",
+) -> dict[str, Any]:
+    """Write the offline scoring metrics KPI report."""
+    report = scoring_metrics_kpi_report()
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(json.dumps(report, indent=2) + "\n")
+    return {
+        "report_path": str(report_path),
+        "report": report,
         "secret_values_recorded": False,
         "network_access_performed": False,
         "external_submission_enabled": False,

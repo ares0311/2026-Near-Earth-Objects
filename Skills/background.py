@@ -59,6 +59,7 @@ from background import (
     record_signoff_packet,
     reviewed_log_summary,
     run_detail,
+    scoring_metrics_kpi_report,
     signoff_packet,
     signoff_packet_decision_readiness,
     signoff_packet_decision_summary,
@@ -71,6 +72,7 @@ from background import (
     write_live_credential_inventory_report,
     write_live_dry_run_operator_handoff,
     write_live_policy_approval_checklist_report,
+    write_scoring_metrics_kpi_report,
     write_signoff_packet,
 )
 
@@ -134,6 +136,12 @@ def main() -> None:
     )
     policy_checklist.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
     policy_checklist.add_argument("--write-report", type=Path, default=None)
+
+    scoring_kpis = sub.add_parser(
+        "scoring-metrics-kpi-report",
+        help="Print offline scoring metrics KPI report",
+    )
+    scoring_kpis.add_argument("--write-report", type=Path, default=None)
 
     approval_bundle = sub.add_parser(
         "live-dry-run-approval-bundle",
@@ -360,6 +368,11 @@ def main() -> None:
             )
         else:
             _print_json(live_policy_approval_checklist(args.config))
+    elif args.command == "scoring-metrics-kpi-report":
+        if args.write_report:
+            _print_json(write_scoring_metrics_kpi_report(args.write_report))
+        else:
+            _print_json(scoring_metrics_kpi_report())
     elif args.command == "live-dry-run-approval-bundle":
         _print_json(live_dry_run_approval_bundle(args.config))
     elif args.command == "record-live-dry-run-approval-bundle":

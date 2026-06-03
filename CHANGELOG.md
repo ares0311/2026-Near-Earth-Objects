@@ -5,6 +5,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+- `.mcp.json`, `.codex/config.toml`, and `Skills/neo_mcp_server.py`: added
+  project-scoped MCP bootstrap config for read-only project file access,
+  limited git inspection, and fixed offline validation/readiness commands.
 - `Skills/background.py`: clarified that `record-signoff-from-packet` records
   an internal-only review decision and does not approve live search or external
   submission.
@@ -31,8 +34,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   policy approval preparation.
 - `.gitignore`: added local live dry-run config/policy filenames so an operator
   can prepare bounded approvals without committing local operational files.
-- Bumped package/background version metadata to v0.75.0 and updated the roadmap
-  test count to 2814 default tests plus 2 deselected live/integration checks.
+- `background.py` / `Skills/background.py`: added
+  `scoring_metrics_kpi_report`, `write_scoring_metrics_kpi_report`, and the
+  `scoring-metrics-kpi-report --write-report` CLI path for split metrics-test
+  approval evidence before systems smoke testing.
+- Bumped package/background version metadata to v0.76.0 and updated the roadmap
+  test count to 2816 default tests plus 2 deselected live/integration checks.
 
 ## v0.60.0
 

@@ -1,0 +1,37 @@
+{
+  "mcpServers": {
+    "neo_project_files": {
+      "command": ".venv/bin/python",
+      "args": [
+        "Skills/neo_mcp_server.py",
+        "--server",
+        "project_files"
+      ],
+      "env": {
+        "NEO_MCP_OFFLINE_DEFAULT": "1"
+      }
+    },
+    "neo_git_read": {
+      "command": ".venv/bin/python",
+      "args": [
+        "Skills/neo_mcp_server.py",
+        "--server",
+        "git_read"
+      ],
+      "env": {
+        "NEO_MCP_OFFLINE_DEFAULT": "1"
+      }
+    },
+    "neo_guard": {
+      "command": ".venv/bin/python",
+      "args": [
+        "Skills/neo_mcp_server.py",
+        "--server",
+        "neo_guard"
+      ],
+      "env": {
+        "NEO_MCP_OFFLINE_DEFAULT": "1"
+      }
+    }
+  }
+}

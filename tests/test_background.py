@@ -789,7 +789,7 @@ def test_background_operations_snapshot_empty_log(monkeypatch, tmp_path):
         fixture,
     )
 
-    assert snapshot["code_version"] == "0.75.0"
+    assert snapshot["code_version"] == "0.76.0"
     assert snapshot["next_action"] == "run_background_once"
     assert snapshot["ledger"]["total_runs"] == 0
     assert snapshot["automation_readiness"]["scheduler_ready"] is True
@@ -939,7 +939,7 @@ def test_background_operator_next_action_summary_blocks_old_schema(tmp_path):
         Path("background/targets.json"),
     )
 
-    assert summary["code_version"] == "0.75.0"
+    assert summary["code_version"] == "0.76.0"
     assert summary["schema_ready"] is False
     assert summary["blocked"] is True
     assert summary["blocker"] == "BACKGROUND_LOG_SCHEMA_NOT_CURRENT"
@@ -1069,7 +1069,7 @@ def test_signoff_packet_for_unsigned_followup(monkeypatch, tmp_path):
     packet = background.signoff_packet(result.ledger.run_id, db_path)
     latest = background.latest_unsigned_signoff_packet(db_path)
 
-    assert packet["code_version"] == "0.75.0"
+    assert packet["code_version"] == "0.76.0"
     assert packet["run_id"] == result.ledger.run_id
     assert packet["target_id"] == "T001"
     assert packet["recommended_decision"] == "review_and_optionally_sign"
@@ -2330,6 +2330,64 @@ def test_background_cli_live_policy_approval_checklist_write_report(
     assert report["recommended_policy_skeleton"]["approved_for_live_network"] is False
     assert "atlas-token" not in completed.stdout
     assert "atlas-token" not in report_path.read_text()
+
+
+def test_scoring_metrics_kpi_report_passes_hard_gates():
+    report = background.scoring_metrics_kpi_report()
+    by_id = {kpi["id"]: kpi for kpi in report["kpis"]}
+
+    assert report["overall_status"] == "pass"
+    assert report["ready_for_live_smoke_metrics_approval"] is True
+    assert report["network_access_performed"] is False
+    assert report["external_submission_enabled"] is False
+    assert report["secret_values_recorded"] is False
+    assert report["thresholds"]["posterior_sum_tolerance"] == 1e-6
+    assert by_id["posterior_normalization"]["status"] == "pass"
+    assert by_id["low_real_bogus_blocks_external_pathway"]["observed"] == (
+        "internal_candidate"
+    )
+    assert by_id["low_orbit_quality_blocks_external_pathway"]["observed"] == (
+        "internal_candidate"
+    )
+    assert by_id["known_object_routes_to_known_object"]["observed"] == "known_object"
+    assert by_id["artifact_heavy_blocks_external_pathway"]["observed"] == (
+        "internal_candidate"
+    )
+    assert by_id["missing_features_conservative"]["observed"] == "internal_candidate"
+    assert by_id["negative_false_external_pathway_rate"]["observed"] == 0.0
+    assert by_id["brier_score"]["status"] == "pending_labeled_data"
+    assert by_id["expected_calibration_error"]["status"] == "pending_labeled_data"
+    assert "confirmed neo" not in json.dumps(report).lower()
+    assert "impact probability" not in json.dumps(report).lower()
+
+
+def test_background_cli_scoring_metrics_kpi_report_write_report(tmp_path):
+    repo = Path(__file__).resolve().parents[1]
+    report_path = tmp_path / "reports" / "scoring_kpis.json"
+    env = {**os.environ, "PYTHONPATH": str(repo / "src")}
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "Skills" / "background.py"),
+            "scoring-metrics-kpi-report",
+            "--write-report",
+            str(report_path),
+        ],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    payload = json.loads(completed.stdout)
+    report = json.loads(report_path.read_text())
+
+    assert payload["report_path"] == str(report_path)
+    assert payload["secret_values_recorded"] is False
+    assert report["overall_status"] == "pass"
+    assert report["ready_for_live_smoke_metrics_approval"] is True
+    assert "pending_labeled_data" in report_path.read_text()
 
 
 def test_live_dry_run_approval_bundle_default_config_is_blocked():

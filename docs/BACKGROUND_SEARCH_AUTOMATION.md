@@ -100,6 +100,20 @@ gitignored local files, leaves `approved_for_live_network=false` in the
 skeleton, and does not replace the example policy, enable network access, record
 credentials, or allow external submission.
 
+Prepare the separate offline scoring metrics KPI report:
+
+```bash
+PYTHONPATH=src python Skills/background.py scoring-metrics-kpi-report
+PYTHONPATH=src python Skills/background.py scoring-metrics-kpi-report --write-report Logs/reports/scoring_metrics_kpi_latest.json
+```
+
+This report is separate from systems connection smoke testing. It evaluates
+deterministic scoring fixtures for finite and bounded scores, posterior
+normalization, conservative pathway gates, negative-fixture external-pathway
+rate, and forbidden guardrail language. Labeled-data calibration metrics such as
+Brier score, expected calibration error, and log loss are reported as pending
+until a representative validation set exists.
+
 Inspect the combined no-network live dry-run approval bundle:
 
 ```bash
@@ -254,6 +268,7 @@ PYTHONPATH=src python Skills/background.py live-policy-contract-summary
 PYTHONPATH=src python Skills/background.py live-provider-readiness-summary
 PYTHONPATH=src python Skills/background.py live-credential-inventory
 PYTHONPATH=src python Skills/background.py live-policy-approval-checklist
+PYTHONPATH=src python Skills/background.py scoring-metrics-kpi-report
 PYTHONPATH=src python Skills/background.py live-dry-run-approval-bundle
 PYTHONPATH=src python Skills/background.py record-live-dry-run-approval-bundle
 PYTHONPATH=src python Skills/background.py live-dry-run-approval-bundle-log-summary
