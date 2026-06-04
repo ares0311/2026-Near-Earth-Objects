@@ -3077,9 +3077,9 @@ class TestComputeImageRms:
 
     def test_valid_rms(self):
         import base64
+        import math
         import struct
         from types import SimpleNamespace
-        import math
         vals = [1.0, 2.0, 3.0, 4.0]
         raw = struct.pack(f"{len(vals)}f", *vals)
         b64 = base64.b64encode(raw).decode()

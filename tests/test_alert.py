@@ -3012,7 +3012,9 @@ class TestFormatCandidateSummaryLine:
     def test_none_priority_shows_na(self):
         from types import SimpleNamespace
         tracklet = SimpleNamespace(object_id="X")
-        hazard = SimpleNamespace(alert_pathway="internal_candidate", hazard_flag="nominal", moid_au=None)
+        hazard = SimpleNamespace(
+            alert_pathway="internal_candidate", hazard_flag="nominal", moid_au=None
+        )
         metadata = SimpleNamespace(discovery_priority=None)
         neo = SimpleNamespace(tracklet=tracklet, hazard=hazard, metadata=metadata)
         result = self._fn()(neo)
