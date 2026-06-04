@@ -4163,3 +4163,44 @@ class TestComputeSurveyOverlap:
         sys.path.insert(0, "src")
         import fetch
         assert "compute_survey_overlap" in fetch.__all__
+
+
+class TestCountObservationsByNight:
+    def _make_result(self, jds):
+        from types import SimpleNamespace
+        alerts = [SimpleNamespace(obs_id=str(i), jd=j) for i, j in enumerate(jds)]
+        return SimpleNamespace(alerts=alerts)
+
+    def test_basic_grouping(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import count_observations_by_night
+        result = self._make_result([2460000.1, 2460000.9, 2460001.5])
+        counts = count_observations_by_night(result)
+        assert counts[2460000] == 2
+        assert counts[2460001] == 1
+
+    def test_empty(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from fetch import count_observations_by_night
+        result = SimpleNamespace(alerts=[])
+        assert count_observations_by_night(result) == {}
+
+    def test_none_jd_skipped(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from fetch import count_observations_by_night
+        obs_no_jd = SimpleNamespace(obs_id="x", jd=None)
+        result = SimpleNamespace(alerts=[obs_no_jd])
+        assert count_observations_by_night(result) == {}
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+        assert "count_observations_by_night" in fetch.__all__

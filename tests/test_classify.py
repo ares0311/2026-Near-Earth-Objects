@@ -3119,3 +3119,66 @@ class TestComputeRealBogusSummary:
         sys.path.insert(0, "src")
         import classify
         assert "compute_real_bogus_summary" in classify.__all__
+
+
+class TestComputeClassAgreement:
+    def _make_neo(self, dominant: str):
+        from types import SimpleNamespace
+        vals = {"neo_candidate": 0.1, "known_object": 0.1, "main_belt_asteroid": 0.1,
+                "stellar_artifact": 0.1, "other_solar_system": 0.1}
+        vals[dominant] = 0.9
+        posterior = SimpleNamespace(**vals)
+        return SimpleNamespace(posterior=posterior)
+
+    def test_full_agreement(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_class_agreement
+        neos = [self._make_neo("neo_candidate") for _ in range(5)]
+        assert compute_class_agreement(neos) == 1.0
+
+    def test_split(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_class_agreement
+        neos = [self._make_neo("neo_candidate"), self._make_neo("neo_candidate"),
+                self._make_neo("stellar_artifact")]
+        result = compute_class_agreement(neos)
+        assert abs(result - 2 / 3) < 0.01
+
+    def test_empty_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_class_agreement
+        assert compute_class_agreement([]) == 0.0
+
+    def test_no_posterior_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from classify import compute_class_agreement
+        neos = [SimpleNamespace(posterior=None)]
+        assert compute_class_agreement(neos) == 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import classify
+        assert "compute_class_agreement" in classify.__all__
+
+
+class TestComputeClassAgreementUnknownHypothesis:
+    def test_all_zero_posterior_skipped(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from classify import compute_class_agreement
+        # All-zero posterior → dominant_hypothesis returns ("unknown", 0.0) → skipped
+        zero_posterior = SimpleNamespace(
+            neo_candidate=0.0, known_object=0.0, main_belt_asteroid=0.0,
+            stellar_artifact=0.0, other_solar_system=0.0
+        )
+        neo = SimpleNamespace(posterior=zero_posterior)
+        assert compute_class_agreement([neo, neo]) == 0.0

@@ -31,7 +31,8 @@ __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "compute_survey_efficiency_score",
            "compute_novelty_rank",
            "compute_followup_score",
-           "compute_moid_hazard_score"]
+           "compute_moid_hazard_score",
+           "compute_size_estimate_range"]
 
 import math
 import uuid
@@ -1432,3 +1433,22 @@ def compute_moid_hazard_score(neo: object) -> float:
     if moid is None:
         return 0.5
     return float(max(0.0, 1.0 - float(moid) / 0.5))
+
+
+def compute_size_estimate_range(neo: object, albedo_range: tuple = (0.05, 0.25)) -> dict:
+    """Return a dict with min/max estimated diameter in metres using the given albedo range.
+
+    Uses D = (1329 / sqrt(albedo)) * 10^(-H/5) km, where H is the absolute magnitude.
+    Returns {'min_m': None, 'max_m': None} if H is unavailable.
+    Larger albedo → smaller object; min diameter uses max_albedo, max uses min_albedo.
+    """
+    hazard = getattr(neo, "hazard", None)
+    h_mag = getattr(hazard, "absolute_magnitude_h", None) if hazard else None
+    if h_mag is None:
+        return {"min_m": None, "max_m": None}
+    albedo_lo, albedo_hi = float(albedo_range[0]), float(albedo_range[1])
+    h = float(h_mag)
+    factor = 10.0 ** (-h / 5.0)
+    d_at_hi = (1329.0 / math.sqrt(albedo_hi)) * factor * 1000.0
+    d_at_lo = (1329.0 / math.sqrt(albedo_lo)) * factor * 1000.0
+    return {"min_m": float(d_at_hi), "max_m": float(d_at_lo)}

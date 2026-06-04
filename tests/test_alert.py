@@ -2668,3 +2668,59 @@ class TestFormatObservationCountSummary:
         sys.path.insert(0, "src")
         import alert
         assert "format_observation_count_summary" in alert.__all__
+
+
+class TestCountSubmissionReady:
+    def _make_neo(self, rb=0.95, quality=2, moid=0.03, known_score=0.0, neo_prob=0.6):
+        from types import SimpleNamespace
+        features = SimpleNamespace(
+            real_bogus_score=rb,
+            orbit_quality_score=quality / 4.0,
+            known_object_score=known_score,
+        )
+        orbital_elements = SimpleNamespace(quality_code=quality)
+        hazard = SimpleNamespace(
+            moid_au=moid,
+            neo_class="apollo",
+            alert_pathway="mpc_submission",
+            orbital_elements=orbital_elements,
+        )
+        posterior = SimpleNamespace(
+            neo_candidate=neo_prob,
+            known_object=0.1,
+            main_belt_asteroid=0.1,
+            stellar_artifact=0.1,
+            other_solar_system=0.1,
+        )
+        meta = SimpleNamespace(
+            quality_code=quality,
+            discovery_priority=0.5,
+            close_approach_au=moid,
+        )
+        return SimpleNamespace(features=features, hazard=hazard, posterior=posterior, metadata=meta)
+
+    def test_all_ready(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import count_submission_ready
+        neos = [self._make_neo() for _ in range(3)]
+        assert count_submission_ready(neos) == 3
+
+    def test_none_ready_low_rb(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import count_submission_ready
+        neos = [self._make_neo(rb=0.5) for _ in range(3)]
+        assert count_submission_ready(neos) == 0
+
+    def test_empty_list(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import count_submission_ready
+        assert count_submission_ready([]) == 0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+        assert "count_submission_ready" in alert.__all__

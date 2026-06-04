@@ -47,6 +47,7 @@ __all__ = [
     "compute_tier1_neo_score",
     "compute_class_balance",
     "compute_real_bogus_summary",
+    "compute_class_agreement",
 ]
 
 import base64
@@ -2029,3 +2030,25 @@ def compute_real_bogus_summary(neos: list) -> dict:
         "max": float(max(scores)),
         "n": len(scores),
     }
+
+
+def compute_class_agreement(neos: list) -> float:
+    """Return the fraction of candidates that share the single most common dominant hypothesis.
+
+    Agreement = count(most_common_hypothesis) / total_valid_candidates.
+    Returns 0.0 if the list is empty or no posteriors are valid.
+    """
+    counts: dict[str, int] = {}
+    total = 0
+    for neo in neos:
+        posterior = getattr(neo, "posterior", None)
+        if posterior is None:
+            continue
+        name, _ = dominant_hypothesis(posterior)
+        if name == "unknown":
+            continue
+        counts[name] = counts.get(name, 0) + 1
+        total += 1
+    if total == 0:
+        return 0.0
+    return float(max(counts.values()) / total)

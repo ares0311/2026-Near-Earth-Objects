@@ -29,7 +29,8 @@ __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fet
            "partition_by_field",
            "filter_by_magnitude",
            "compute_field_sky_area",
-           "compute_survey_overlap"]
+           "compute_survey_overlap",
+           "count_observations_by_night"]
 
 import json
 import os
@@ -2001,3 +2002,20 @@ def compute_survey_overlap(result1: object, result2: object) -> float:
     if not union:
         return 0.0
     return float(len(ids1 & ids2)) / float(len(union))
+
+
+def count_observations_by_night(fetch_result: object) -> dict:
+    """Return a dict mapping integer JD (floor) to observation count.
+
+    Each observation's JD is floored to an integer night key.
+    Returns an empty dict if the FetchResult has no alerts.
+    """
+    alerts = getattr(fetch_result, "alerts", None) or []
+    counts: dict[int, int] = {}
+    for obs in alerts:
+        jd = getattr(obs, "jd", None)
+        if jd is None:
+            continue
+        night = int(float(jd))
+        counts[night] = counts.get(night, 0) + 1
+    return counts

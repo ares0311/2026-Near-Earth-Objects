@@ -30,7 +30,8 @@ __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "compute_along_track_error",
            "compute_observation_rate",
            "compute_tracklet_brightness_trend",
-           "compute_arc_endpoint_separation"]
+           "compute_arc_endpoint_separation",
+           "compute_pa_circular_std"]
 
 import math
 import uuid
@@ -1502,3 +1503,24 @@ def compute_arc_endpoint_separation(tracklet: object) -> float | None:
     )
     cos_sep = max(-1.0, min(1.0, cos_sep))
     return math.degrees(math.acos(cos_sep)) * 3600.0
+
+
+def compute_pa_circular_std(tracklets: list) -> float | None:
+    """Return the circular standard deviation of motion position angles across tracklets.
+
+    Uses the mean-resultant-vector formula: σ = sqrt(-2 * ln(R̄)) where
+    R̄ = |Σ exp(i·θ)| / N.  Angles are taken from tracklet.motion_pa_degrees.
+    Returns None if fewer than 2 tracklets have a valid PA.
+    """
+    pas = []
+    for t in tracklets:
+        pa = getattr(t, "motion_pa_degrees", None)
+        if pa is not None:
+            pas.append(math.radians(float(pa)))
+    if len(pas) < 2:
+        return None
+    sin_sum = sum(math.sin(a) for a in pas)
+    cos_sum = sum(math.cos(a) for a in pas)
+    r_bar = math.hypot(sin_sum, cos_sum) / len(pas)
+    r_bar = min(r_bar, 1.0 - 1e-12)
+    return float(math.degrees(math.sqrt(-2.0 * math.log(r_bar))))

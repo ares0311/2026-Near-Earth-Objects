@@ -47,6 +47,7 @@ __all__ = [
     "format_alert_age_summary",
     "format_candidate_count_summary",
     "format_observation_count_summary",
+    "count_submission_ready",
 ]
 
 import json
@@ -1959,3 +1960,21 @@ def format_observation_count_summary(neos: list) -> dict:
             "Do NOT report any impact probability without MPC/CNEOS independent confirmation."
         ),
     }
+
+
+def count_submission_ready(neos: list) -> int:
+    """Return the count of ScoredNEO candidates that pass all alert-protocol gates.
+
+    Gates (from ready_for_submission):
+      - Tier 1 real_bogus_score ≥ 0.90
+      - orbit quality_code ≥ 2
+      - MOID ≤ 0.05 AU
+      - Not matched to a known MPC object (known_object_score < 0.5)
+    Returns an integer count; never raises.
+    """
+    count = 0
+    for neo in neos:
+        ok, _ = ready_for_submission(neo)
+        if ok:
+            count += 1
+    return count

@@ -1851,3 +1851,44 @@ class TestComputeCalibrationGap:
         sys.path.insert(0, "src")
         import calibration
         assert "compute_calibration_gap" in calibration.__all__
+
+
+class TestComputeCalibrationGain:
+    def test_positive_gain(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_calibration_gain
+        # raw probs far from labels, cal probs near labels → positive gain
+        raw = [0.9, 0.9, 0.1, 0.1]
+        cal = [0.1, 0.1, 0.9, 0.9]
+        labels = [0.0, 0.0, 1.0, 1.0]
+        gain = compute_calibration_gain(raw, cal, labels)
+        assert gain > 0.0
+
+    def test_negative_gain_if_cal_worse(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_calibration_gain
+        raw = [0.1, 0.1, 0.9, 0.9]
+        cal = [0.9, 0.9, 0.1, 0.1]
+        labels = [0.0, 0.0, 1.0, 1.0]
+        gain = compute_calibration_gain(raw, cal, labels)
+        assert gain < 0.0
+
+    def test_empty_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_calibration_gain
+        assert compute_calibration_gain([], [], []) == 0.0
+
+    def test_length_mismatch_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_calibration_gain
+        assert compute_calibration_gain([0.5, 0.5], [0.5], [1.0, 0.0]) == 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        assert "compute_calibration_gain" in calibration.__all__

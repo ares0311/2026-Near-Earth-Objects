@@ -2604,3 +2604,44 @@ class TestComputeMoidHazardScore:
         sys.path.insert(0, "src")
         import score
         assert "compute_moid_hazard_score" in score.__all__
+
+
+class TestComputeSizeEstimateRange:
+    def _make_neo(self, h_mag):
+        from types import SimpleNamespace
+        hazard = SimpleNamespace(absolute_magnitude_h=h_mag)
+        return SimpleNamespace(hazard=hazard)
+
+    def test_known_h(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_size_estimate_range
+        neo = self._make_neo(22.0)
+        rng = compute_size_estimate_range(neo)
+        assert rng["min_m"] is not None
+        assert rng["max_m"] is not None
+        assert rng["min_m"] < rng["max_m"]
+
+    def test_no_h_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_size_estimate_range
+        neo = self._make_neo(None)
+        rng = compute_size_estimate_range(neo)
+        assert rng["min_m"] is None
+        assert rng["max_m"] is None
+
+    def test_brighter_larger(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_size_estimate_range
+        # Lower H = brighter = larger object
+        small = compute_size_estimate_range(self._make_neo(25.0))
+        large = compute_size_estimate_range(self._make_neo(18.0))
+        assert large["max_m"] > small["max_m"]
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        assert "compute_size_estimate_range" in score.__all__

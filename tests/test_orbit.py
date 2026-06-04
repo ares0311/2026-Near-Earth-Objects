@@ -2841,3 +2841,50 @@ class TestComputeOrbitalSpeedAtPerihelion:
         sys.path.insert(0, "src")
         import orbit
         assert "compute_orbital_speed_at_perihelion" in orbit.__all__
+
+
+class TestComputeImpactParameter:
+    def _make_elements(self, a_au, e):
+        from types import SimpleNamespace
+        return SimpleNamespace(a_au=a_au, eccentricity=e, semi_major_axis_au=None)
+
+    def test_earth_crossing(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_impact_parameter
+        # Apollo-type: a=1.5, e=0.5 → q=0.75 AU (Earth-crossing)
+        els = self._make_elements(1.5, 0.5)
+        b = compute_impact_parameter(els, v_inf_km_s=20.0)
+        assert b is not None
+        assert b > 0.0
+
+    def test_non_earth_crossing_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_impact_parameter
+        # Amor: q > 1.017 AU
+        els = self._make_elements(1.5, 0.1)  # q = 1.35 AU
+        assert compute_impact_parameter(els) is None
+
+    def test_zero_vinf_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_impact_parameter
+        els = self._make_elements(1.5, 0.5)
+        assert compute_impact_parameter(els, v_inf_km_s=0.0) is None
+
+    def test_gravitational_focusing_larger_than_geometric(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_impact_parameter
+        els = self._make_elements(1.5, 0.5)
+        b = compute_impact_parameter(els, v_inf_km_s=20.0)
+        AU_TO_KM = 1.495978707e8
+        q_km = 0.75 * AU_TO_KM
+        assert b > q_km
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import orbit
+        assert "compute_impact_parameter" in orbit.__all__

@@ -35,6 +35,7 @@ __all__ = [
     "compute_positive_rate",
     "compute_weighted_brier_score",
     "compute_calibration_gap",
+    "compute_calibration_gain",
 ]
 
 import math
@@ -1407,3 +1408,26 @@ def compute_calibration_gap(probs: list[float], labels: list[float], n_bins: int
         frac_pos = bin_pos[idx] / cnt
         gaps.append(abs(mean_pred - frac_pos))
     return float(sum(gaps) / len(gaps)) if gaps else 0.0
+
+
+def compute_calibration_gain(
+    raw_probs: list[float],
+    cal_probs: list[float],
+    labels: list[float],
+) -> float:
+    """Return the Brier score reduction achieved by calibration.
+
+    Gain = Brier(raw_probs, labels) - Brier(cal_probs, labels).
+    Positive gain means calibration improved the predictions.
+    Returns 0.0 if either list is empty or lengths differ.
+    """
+    if not raw_probs or not cal_probs or not labels:
+        return 0.0
+    if len(raw_probs) != len(cal_probs) or len(raw_probs) != len(labels):
+        return 0.0
+    p_raw = np.array(raw_probs, dtype=float)
+    p_cal = np.array(cal_probs, dtype=float)
+    y = np.array(labels, dtype=float)
+    raw_brier = brier_score(p_raw, y)
+    cal_brier = brier_score(p_cal, y)
+    return float(raw_brier - cal_brier)

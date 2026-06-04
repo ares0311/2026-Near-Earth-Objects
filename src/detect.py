@@ -25,7 +25,8 @@ __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus"
            "compute_photon_noise_limit",
            "compute_source_flux",
            "compute_apparent_motion_rate",
-           "compute_magnitude_range"]
+           "compute_magnitude_range",
+           "compute_detection_density"]
 
 import math
 import uuid
@@ -1333,3 +1334,17 @@ def compute_magnitude_range(observations: list) -> float | None:
     if len(mags) < 2:
         return None
     return float(max(mags) - min(mags))
+
+
+def compute_detection_density(candidates: list, field_radius_deg: float) -> float | None:
+    """Return the number of candidates per square degree.
+
+    Uses the solid-angle formula for a circular field: Ω = 2π(1−cos(r)) steradians,
+    converted to square degrees.  Returns None if field_radius_deg ≤ 0.
+    """
+    if field_radius_deg <= 0.0:
+        return None
+    r_rad = math.radians(abs(field_radius_deg))
+    steradians = 2.0 * math.pi * (1.0 - math.cos(r_rad))
+    sq_deg = steradians * (180.0 / math.pi) ** 2
+    return float(len(candidates) / sq_deg) if sq_deg > 0.0 else None

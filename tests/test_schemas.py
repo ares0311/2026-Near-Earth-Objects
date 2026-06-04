@@ -2012,3 +2012,38 @@ class TestCandidateGrouping:
         cg = CandidateGrouping(group_id="G004", candidate_ids=("X", "Y", "Z"))
         assert len(cg.candidate_ids) == 3
         assert "Z" in cg.candidate_ids
+
+
+class TestMCPServerStatus:
+    def test_defaults(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import MCPServerStatus
+        s = MCPServerStatus(server_name="neo-project_files")
+        assert s.is_healthy is False
+        assert s.tool_count == 0
+        assert s.offline_mode is True
+
+    def test_healthy(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import MCPServerStatus
+        s = MCPServerStatus(server_name="neo-git_read", is_healthy=True, tool_count=5)
+        assert s.is_healthy is True
+        assert s.tool_count == 5
+
+    def test_frozen(self):
+        import sys
+        sys.path.insert(0, "src")
+        import pytest
+
+        from schemas import MCPServerStatus
+        s = MCPServerStatus(server_name="test")
+        with pytest.raises(Exception):
+            s.is_healthy = True  # type: ignore[misc]
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        assert "MCPServerStatus" in schemas.__all__

@@ -2630,3 +2630,61 @@ class TestComputeCutoutEntropyNormalized:
         sys.path.insert(0, "src")
         import preprocess
         assert "compute_cutout_entropy_normalized" in preprocess.__all__
+
+
+class TestComputeImageContrast:
+    def _make_cutout_obs(self, fill_value: float = 1.0, pix_max: float = 2.0):
+        import base64
+        from types import SimpleNamespace
+
+        import numpy as np
+        arr = np.full((63, 63), fill_value, dtype=np.float32)
+        arr[31, 31] = pix_max
+        raw = base64.b64encode(arr.tobytes()).decode()
+        return SimpleNamespace(cutout_difference=raw)
+
+    def test_basic_contrast(self):
+        import sys
+        sys.path.insert(0, "src")
+        from preprocess import compute_image_contrast
+        obs = self._make_cutout_obs(fill_value=1.0, pix_max=3.0)
+        c = compute_image_contrast(obs)
+        assert c is not None
+        assert c > 0.0
+
+    def test_no_cutout_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_image_contrast
+        obs = SimpleNamespace(cutout_difference=None)
+        assert compute_image_contrast(obs) is None
+
+    def test_uniform_cutout_returns_none(self):
+        import base64
+        import sys
+        from types import SimpleNamespace
+
+        import numpy as np
+        sys.path.insert(0, "src")
+        from preprocess import compute_image_contrast
+        arr = np.zeros((63, 63), dtype=np.float32)
+        raw = base64.b64encode(arr.tobytes()).decode()
+        obs = SimpleNamespace(cutout_difference=raw)
+        assert compute_image_contrast(obs) is None
+
+    def test_bad_data_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_image_contrast
+        obs = SimpleNamespace(cutout_difference="!!!not_valid_base64!!!")
+        assert compute_image_contrast(obs) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import preprocess
+        assert "compute_image_contrast" in preprocess.__all__

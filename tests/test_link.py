@@ -2979,3 +2979,49 @@ class TestComputeArcEndpointSeparation:
         sys.path.insert(0, "src")
         import link
         assert "compute_arc_endpoint_separation" in link.__all__
+
+
+class TestComputePaCircularStd:
+    def _make_tracklet(self, pa: float):
+        from types import SimpleNamespace
+        return SimpleNamespace(motion_pa_degrees=pa)
+
+    def test_spread_angles(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_pa_circular_std
+        tracklets = [self._make_tracklet(pa) for pa in [0.0, 90.0, 180.0, 270.0]]
+        result = compute_pa_circular_std(tracklets)
+        assert result is not None
+        assert result > 0.0
+
+    def test_consistent_angles(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_pa_circular_std
+        tracklets = [self._make_tracklet(45.0) for _ in range(5)]
+        result = compute_pa_circular_std(tracklets)
+        assert result is not None
+        assert result < 1.0
+
+    def test_too_few_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_pa_circular_std
+        result = compute_pa_circular_std([self._make_tracklet(45.0)])
+        assert result is None
+
+    def test_no_pa_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_pa_circular_std
+        t = SimpleNamespace(motion_pa_degrees=None)
+        assert compute_pa_circular_std([t, t]) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+        assert "compute_pa_circular_std" in link.__all__

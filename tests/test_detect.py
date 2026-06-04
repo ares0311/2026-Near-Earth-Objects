@@ -2508,3 +2508,39 @@ class TestComputeMagnitudeRange:
         sys.path.insert(0, "src")
         import detect
         assert "compute_magnitude_range" in detect.__all__
+
+
+class TestComputeDetectionDensity:
+    def test_basic(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_detection_density
+        candidates = list(range(100))
+        density = compute_detection_density(candidates, field_radius_deg=1.0)
+        assert density is not None
+        assert density > 0.0
+
+    def test_zero_radius_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_detection_density
+        assert compute_detection_density([], field_radius_deg=0.0) is None
+
+    def test_negative_radius_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_detection_density
+        assert compute_detection_density([], field_radius_deg=-1.0) is None
+
+    def test_empty_candidates(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_detection_density
+        density = compute_detection_density([], field_radius_deg=2.0)
+        assert density == 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import detect
+        assert "compute_detection_density" in detect.__all__

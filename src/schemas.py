@@ -41,6 +41,7 @@ __all__ = [
     "ObservationFilter",
     "FieldStatistics",
     "CandidateGrouping",
+    "MCPServerStatus",
 ]
 
 from dataclasses import dataclass
@@ -1177,3 +1178,14 @@ class CandidateGrouping(BaseModel):
     candidate_ids: tuple[str, ...] = ()
     n_candidates: int = 0
     dominant_hazard_flag: str = "unknown"
+
+
+class MCPServerStatus(BaseModel):
+    """Status snapshot for a single MCP server used by the NEO pipeline."""
+
+    model_config = ConfigDict(frozen=True)
+
+    server_name: str
+    is_healthy: bool = False
+    tool_count: int = 0
+    offline_mode: bool = True

@@ -29,7 +29,8 @@ __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
            "compute_jacobi_constant",
            "compute_earth_moid_estimate",
            "compute_orbital_eccentricity_class",
-           "compute_orbital_speed_at_perihelion"]
+           "compute_orbital_speed_at_perihelion",
+           "compute_impact_parameter"]
 
 import math
 from typing import NamedTuple
@@ -1618,3 +1619,26 @@ def compute_orbital_speed_at_perihelion(elements: object) -> float | None:
     a_m = a * AU_TO_M
     v2 = GM_SUN_M3_S2 * (2.0 / r_m - 1.0 / a_m)
     return float(v2 ** 0.5 / 1000.0)
+
+
+def compute_impact_parameter(elements: object, v_inf_km_s: float = 20.0) -> float | None:
+    """Return the gravitational-focusing-corrected b-plane impact parameter in km.
+
+    b = q * sqrt(1 + v_esc² / v_inf²) where v_esc is the Earth escape speed at
+    perihelion distance (approximated using Earth's surface escape speed scaled to
+    the perihelion distance from Earth's centre) and v_inf is the hyperbolic excess
+    velocity.  Returns None if perihelion distance is unavailable, v_inf ≤ 0, or
+    the orbit is not Earth-crossing (q > 1.017 AU).
+    """
+    if v_inf_km_s <= 0.0:
+        return None
+    q = compute_perihelion_distance(elements)
+    if q is None or q > 1.017:
+        return None
+    R_EARTH_KM = 6371.0
+    V_ESC_SURFACE_KM_S = 11.186
+    AU_TO_KM = 1.495978707e8
+    q_km = q * AU_TO_KM
+    v_esc_sq = V_ESC_SURFACE_KM_S**2 * (R_EARTH_KM / max(q_km, R_EARTH_KM))
+    b = q_km * math.sqrt(1.0 + v_esc_sq / (v_inf_km_s**2))
+    return float(b)

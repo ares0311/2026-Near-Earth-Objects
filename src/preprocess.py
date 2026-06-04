@@ -28,7 +28,8 @@ __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_
            "compute_cutout_peak_snr",
            "compute_gradient_magnitude",
            "compute_cutout_rms",
-           "compute_cutout_entropy_normalized"]
+           "compute_cutout_entropy_normalized",
+           "compute_image_contrast"]
 
 import base64
 import math
@@ -1394,5 +1395,28 @@ def compute_cutout_entropy_normalized(obs: object) -> float | None:
         probs = probs[probs > 0.0]
         entropy_bits = float(-np.sum(probs * np.log2(probs)))
         return float(min(1.0, entropy_bits / 8.0))
+    except Exception:
+        return None
+
+
+def compute_image_contrast(obs: object) -> float | None:
+    """Return the pixel contrast ratio of a difference-image cutout.
+
+    Contrast = (max_pixel - min_pixel) / mean_pixel, where mean_pixel is the
+    absolute mean of all pixel values.  Returns None if no cutout is present,
+    if the cutout cannot be decoded, or if mean_pixel is zero.
+    """
+    cutout = getattr(obs, "cutout_difference", None)
+    if cutout is None:
+        return None
+    try:
+        raw = base64.b64decode(cutout)
+        arr = np.frombuffer(raw, dtype=np.float32).reshape(_CUTOUT_SIZE, _CUTOUT_SIZE).astype(float)
+        pix_min = arr.min()
+        pix_max = arr.max()
+        mean_abs = float(np.mean(np.abs(arr)))
+        if mean_abs == 0.0:
+            return None
+        return float((pix_max - pix_min) / mean_abs)
     except Exception:
         return None
