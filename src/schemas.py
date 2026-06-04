@@ -42,6 +42,7 @@ __all__ = [
     "FieldStatistics",
     "CandidateGrouping",
     "MCPServerStatus",
+    "BatchProcessingResult",
 ]
 
 from dataclasses import dataclass
@@ -1189,3 +1190,23 @@ class MCPServerStatus(BaseModel):
     is_healthy: bool = False
     tool_count: int = 0
     offline_mode: bool = True
+
+
+class BatchProcessingResult(BaseModel):
+    """Summary result from a batch pipeline processing run.
+
+    Aggregates high-level counts and timing for a single batch of candidates
+    processed through the full pipeline (detect → link → classify → score).
+    Immutable after construction.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    batch_id: str
+    n_input: int = 0
+    n_detected: int = 0
+    n_linked: int = 0
+    n_scored: int = 0
+    n_pha_candidates: int = 0
+    elapsed_seconds: float = 0.0
+    pipeline_version: str = "unknown"

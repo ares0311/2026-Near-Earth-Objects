@@ -2688,3 +2688,91 @@ class TestComputeImageContrast:
         sys.path.insert(0, "src")
         import preprocess
         assert "compute_image_contrast" in preprocess.__all__
+
+
+class TestComputePixelSaturationFraction:
+    def _make_cutout_b64(self, values):
+        import base64
+        import sys
+        sys.path.insert(0, "src")
+        import numpy as np
+
+        arr = np.array(values, dtype=np.float32).reshape(63, 63)
+        return base64.b64encode(arr.tobytes()).decode()
+
+    def test_no_cutout_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_pixel_saturation_fraction
+
+        assert compute_pixel_saturation_fraction(SimpleNamespace()) is None
+
+    def test_none_cutout(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_pixel_saturation_fraction
+
+        assert compute_pixel_saturation_fraction(SimpleNamespace(cutout_science=None)) is None
+
+    def test_all_uniform_returns_one(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_pixel_saturation_fraction
+
+        flat = [1.0] * (63 * 63)
+        b64 = self._make_cutout_b64(flat)
+        obs = SimpleNamespace(cutout_science=b64)
+        frac = compute_pixel_saturation_fraction(obs)
+        assert frac == 1.0
+
+    def test_all_zero_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_pixel_saturation_fraction
+
+        flat = [0.0] * (63 * 63)
+        b64 = self._make_cutout_b64(flat)
+        obs = SimpleNamespace(cutout_science=b64)
+        assert compute_pixel_saturation_fraction(obs) == 0.0
+
+    def test_partial_saturation(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        import numpy as np
+
+        from preprocess import compute_pixel_saturation_fraction
+
+        arr = np.zeros(63 * 63, dtype=np.float32)
+        # Set first half to max value (saturated after normalisation)
+        half = 63 * 63 // 2
+        arr[:half] = 1.0
+        b64 = __import__("base64").b64encode(arr.tobytes()).decode()
+        obs = SimpleNamespace(cutout_science=b64)
+        frac = compute_pixel_saturation_fraction(obs)
+        assert 0.0 < frac < 1.0
+
+    def test_invalid_data_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_pixel_saturation_fraction
+
+        obs = SimpleNamespace(cutout_science="not_valid_base64!!!")
+        assert compute_pixel_saturation_fraction(obs) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import preprocess
+        assert "compute_pixel_saturation_fraction" in preprocess.__all__

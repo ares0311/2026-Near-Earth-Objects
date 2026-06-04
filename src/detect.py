@@ -26,7 +26,8 @@ __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus"
            "compute_source_flux",
            "compute_apparent_motion_rate",
            "compute_magnitude_range",
-           "compute_detection_density"]
+           "compute_detection_density",
+           "count_streak_detections"]
 
 import math
 import uuid
@@ -1348,3 +1349,14 @@ def compute_detection_density(candidates: list, field_radius_deg: float) -> floa
     steradians = 2.0 * math.pi * (1.0 - math.cos(r_rad))
     sq_deg = steradians * (180.0 / math.pi) ** 2
     return float(len(candidates) / sq_deg) if sq_deg > 0.0 else None
+
+
+def count_streak_detections(detect_result: object) -> int:
+    """Return the number of streak/trail candidates in a DetectResult.
+
+    Counts candidates whose ``is_streak`` attribute is True.  If the
+    *detect_result* has no ``candidates`` attribute or no candidates have
+    streak metadata, returns 0.
+    """
+    candidates = getattr(detect_result, "candidates", None) or []
+    return sum(1 for c in candidates if getattr(c, "is_streak", False))

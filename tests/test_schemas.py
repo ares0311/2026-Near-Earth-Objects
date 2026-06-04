@@ -2047,3 +2047,52 @@ class TestMCPServerStatus:
         sys.path.insert(0, "src")
         import schemas
         assert "MCPServerStatus" in schemas.__all__
+
+
+class TestBatchProcessingResult:
+    def test_defaults(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import BatchProcessingResult
+
+        r = BatchProcessingResult(batch_id="run-001")
+        assert r.batch_id == "run-001"
+        assert r.n_input == 0
+        assert r.n_pha_candidates == 0
+        assert r.pipeline_version == "unknown"
+
+    def test_custom_fields(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import BatchProcessingResult
+
+        r = BatchProcessingResult(
+            batch_id="test",
+            n_input=100,
+            n_detected=90,
+            n_linked=70,
+            n_scored=65,
+            n_pha_candidates=2,
+            elapsed_seconds=12.5,
+            pipeline_version="0.79.0",
+        )
+        assert r.n_detected == 90
+        assert r.elapsed_seconds == 12.5
+        assert r.pipeline_version == "0.79.0"
+
+    def test_frozen(self):
+        import sys
+        sys.path.insert(0, "src")
+        import pytest
+
+        from schemas import BatchProcessingResult
+
+        r = BatchProcessingResult(batch_id="x")
+        with pytest.raises(Exception):
+            r.n_input = 5  # type: ignore[misc]
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        assert "BatchProcessingResult" in schemas.__all__

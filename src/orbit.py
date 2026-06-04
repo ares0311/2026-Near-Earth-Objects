@@ -30,7 +30,8 @@ __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
            "compute_earth_moid_estimate",
            "compute_orbital_eccentricity_class",
            "compute_orbital_speed_at_perihelion",
-           "compute_impact_parameter"]
+           "compute_impact_parameter",
+           "compute_geocentric_velocity"]
 
 import math
 from typing import NamedTuple
@@ -1642,3 +1643,37 @@ def compute_impact_parameter(elements: object, v_inf_km_s: float = 20.0) -> floa
     v_esc_sq = V_ESC_SURFACE_KM_S**2 * (R_EARTH_KM / max(q_km, R_EARTH_KM))
     b = q_km * math.sqrt(1.0 + v_esc_sq / (v_inf_km_s**2))
     return float(b)
+
+
+def compute_geocentric_velocity(elements: object) -> float | None:
+    """Return the geocentric encounter velocity in km/s at perihelion.
+
+    Uses the inclination-based encounter velocity formula:
+
+    .. math::
+
+        v_{\\rm enc} = \\sqrt{v_{\\rm obj}^2 + v_{\\oplus}^2
+                        - 2\\,v_{\\rm obj}\\,v_{\\oplus}\\cos(i)}
+
+    where *v_obj* is the object's orbital speed at perihelion (via vis-viva),
+    *v_Earth* = 29.78 km/s (mean Earth orbital speed), and *i* is the orbital
+    inclination.  This is the rigorous vector-subtraction formula for the
+    relative velocity of a coplanar or inclined orbit at the Earth's distance.
+
+    Returns ``None`` if perihelion distance, semi-major axis, or inclination
+    are unavailable.
+    """
+    V_EARTH_KM_S = 29.78
+
+    q = compute_perihelion_distance(elements)
+    if q is None:
+        return None
+    v_obj = compute_vis_viva_velocity(elements, q)
+    if v_obj is None:
+        return None
+    incl = getattr(elements, "inclination_deg", None)
+    if incl is None:
+        return None
+    i_rad = math.radians(float(incl))
+    v_enc_sq = v_obj**2 + V_EARTH_KM_S**2 - 2.0 * v_obj * V_EARTH_KM_S * math.cos(i_rad)
+    return float(math.sqrt(max(0.0, v_enc_sq)))

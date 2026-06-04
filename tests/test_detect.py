@@ -2544,3 +2544,78 @@ class TestComputeDetectionDensity:
         sys.path.insert(0, "src")
         import detect
         assert "compute_detection_density" in detect.__all__
+
+
+class TestCountStreakDetections:
+    def test_no_streaks(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import count_streak_detections
+
+        cands = [SimpleNamespace(is_streak=False), SimpleNamespace(is_streak=False)]
+        result = SimpleNamespace(candidates=cands)
+        assert count_streak_detections(result) == 0
+
+    def test_all_streaks(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import count_streak_detections
+
+        cands = [SimpleNamespace(is_streak=True), SimpleNamespace(is_streak=True)]
+        result = SimpleNamespace(candidates=cands)
+        assert count_streak_detections(result) == 2
+
+    def test_mixed(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import count_streak_detections
+
+        cands = [
+            SimpleNamespace(is_streak=True),
+            SimpleNamespace(is_streak=False),
+            SimpleNamespace(is_streak=True),
+        ]
+        result = SimpleNamespace(candidates=cands)
+        assert count_streak_detections(result) == 2
+
+    def test_no_is_streak_attr(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import count_streak_detections
+
+        cands = [SimpleNamespace(), SimpleNamespace()]
+        result = SimpleNamespace(candidates=cands)
+        assert count_streak_detections(result) == 0
+
+    def test_empty_candidates(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import count_streak_detections
+
+        result = SimpleNamespace(candidates=[])
+        assert count_streak_detections(result) == 0
+
+    def test_no_candidates_attr(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import count_streak_detections
+
+        assert count_streak_detections(SimpleNamespace()) == 0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import detect
+        assert "count_streak_detections" in detect.__all__

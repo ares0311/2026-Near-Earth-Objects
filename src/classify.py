@@ -48,6 +48,7 @@ __all__ = [
     "compute_class_balance",
     "compute_real_bogus_summary",
     "compute_class_agreement",
+    "compute_neo_class_distribution",
 ]
 
 import base64

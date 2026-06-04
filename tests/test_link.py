@@ -3025,3 +3025,65 @@ class TestComputePaCircularStd:
         sys.path.insert(0, "src")
         import link
         assert "compute_pa_circular_std" in link.__all__
+
+
+class TestComputeSkyCoverageArea:
+    def _make_tracklet(self, ra, dec):
+        from types import SimpleNamespace
+
+        obs = SimpleNamespace(ra=ra, dec=dec)
+        return SimpleNamespace(observations=(obs,))
+
+    def test_empty_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_sky_coverage_area
+
+        assert compute_sky_coverage_area([]) == 0.0
+
+    def test_single_tracklet_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_sky_coverage_area
+
+        assert compute_sky_coverage_area([self._make_tracklet(10.0, 5.0)]) == 0.0
+
+    def test_two_tracklets(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_sky_coverage_area
+
+        tracklets = [self._make_tracklet(10.0, 0.0), self._make_tracklet(11.0, 1.0)]
+        area = compute_sky_coverage_area(tracklets)
+        assert area > 0.0
+
+    def test_equatorial_field(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_sky_coverage_area
+
+        # At dec=0, cos(dec)=1 so area ~ dra * ddec
+        tracklets = [
+            self._make_tracklet(0.0, 0.0),
+            self._make_tracklet(2.0, 2.0),
+        ]
+        area = compute_sky_coverage_area(tracklets)
+        assert abs(area - 4.0) < 0.01
+
+    def test_no_observations_skipped(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_sky_coverage_area
+
+        empty = SimpleNamespace(observations=())
+        valid = self._make_tracklet(10.0, 5.0)
+        # only one with valid obs; returns 0
+        assert compute_sky_coverage_area([empty, valid]) == 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+        assert "compute_sky_coverage_area" in link.__all__

@@ -2724,3 +2724,69 @@ class TestCountSubmissionReady:
         sys.path.insert(0, "src")
         import alert
         assert "count_submission_ready" in alert.__all__
+
+
+class TestFormatMpcObservationBlock:
+    def test_returns_string(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_mpc_observation_block
+
+        neo = make_scored_neo()
+        block = format_mpc_observation_block(neo)
+        assert isinstance(block, str)
+
+    def test_line_count_equals_observations(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_mpc_observation_block
+
+        neo = make_scored_neo()
+        block = format_mpc_observation_block(neo)
+        lines = block.split("\n")
+        assert len(lines) == len(neo.tracklet.observations)
+
+    def test_each_line_is_80_chars(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_mpc_observation_block
+
+        neo = make_scored_neo()
+        for line in format_mpc_observation_block(neo).split("\n"):
+            assert len(line) == 80, f"Line length {len(line)}: {line!r}"
+
+    def test_first_line_is_discovery(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_mpc_observation_block
+
+        neo = make_scored_neo()
+        first_line = format_mpc_observation_block(neo).split("\n")[0]
+        # Column 6 (index 5) is the discovery asterisk
+        assert first_line[5] == "*"
+
+    def test_subsequent_lines_not_discovery(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_mpc_observation_block
+
+        neo = make_scored_neo()
+        lines = format_mpc_observation_block(neo).split("\n")
+        for line in lines[1:]:
+            assert line[5] == " "
+
+    def test_custom_obs_code(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_mpc_observation_block
+
+        neo = make_scored_neo()
+        block = format_mpc_observation_block(neo, obs_code="703")
+        for line in block.split("\n"):
+            assert line[76:79] == "703"
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+        assert "format_mpc_observation_block" in alert.__all__

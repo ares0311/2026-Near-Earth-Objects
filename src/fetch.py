@@ -30,7 +30,8 @@ __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fet
            "filter_by_magnitude",
            "compute_field_sky_area",
            "compute_survey_overlap",
-           "count_observations_by_night"]
+           "count_observations_by_night",
+           "compute_temporal_coverage"]
 
 import json
 import os
@@ -2019,3 +2020,42 @@ def count_observations_by_night(fetch_result: object) -> dict:
         night = int(float(jd))
         counts[night] = counts.get(night, 0) + 1
     return counts
+
+
+def compute_temporal_coverage(fetch_result: object) -> dict:
+    """Return a summary of the temporal span covered by a FetchResult.
+
+    Returns a dict with keys:
+      - ``n_observations``: total observation count
+      - ``min_jd``: earliest JD (float) or None
+      - ``max_jd``: latest JD (float) or None
+      - ``span_days``: max_jd - min_jd (float) or None if fewer than 2 obs
+      - ``n_nights``: number of distinct integer-JD nights
+
+    Returns all-None / zero values if the FetchResult has no alerts.
+    """
+    alerts = getattr(fetch_result, "alerts", None) or []
+    jds: list[float] = []
+    for obs in alerts:
+        jd = getattr(obs, "jd", None)
+        if jd is not None:
+            jds.append(float(jd))
+    if not jds:
+        return {
+            "n_observations": 0,
+            "min_jd": None,
+            "max_jd": None,
+            "span_days": None,
+            "n_nights": 0,
+        }
+    min_jd = min(jds)
+    max_jd = max(jds)
+    span = (max_jd - min_jd) if len(jds) >= 2 else None
+    n_nights = len({int(j) for j in jds})
+    return {
+        "n_observations": len(jds),
+        "min_jd": min_jd,
+        "max_jd": max_jd,
+        "span_days": span,
+        "n_nights": n_nights,
+    }

@@ -2888,3 +2888,87 @@ class TestComputeImpactParameter:
         sys.path.insert(0, "src")
         import orbit
         assert "compute_impact_parameter" in orbit.__all__
+
+
+class TestComputeGeocentricVelocity:
+    def _make_elements(self, a, e, incl_deg):
+        from types import SimpleNamespace
+
+        return SimpleNamespace(
+            a_au=a,
+            e=e,
+            inclination_deg=incl_deg,
+        )
+
+    def test_apollo_low_inclination(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_geocentric_velocity
+
+        # Apollo-like: a=1.5, e=0.6, i=10 deg => q = 0.6 AU
+        els = self._make_elements(1.5, 0.6, 10.0)
+        v = compute_geocentric_velocity(els)
+        assert v is not None
+        assert v > 0.0
+
+    def test_coplanar_gives_speed_difference(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_geocentric_velocity, compute_vis_viva_velocity
+
+        # i=0: v_enc = |v_obj - v_Earth|
+        els = self._make_elements(1.5, 0.6, 0.0)
+        v = compute_geocentric_velocity(els)
+        v_obj = compute_vis_viva_velocity(els, 1.5 * (1 - 0.6))
+        V_EARTH = 29.78
+        expected = abs(v_obj - V_EARTH)
+        assert abs(v - expected) < 0.01
+
+    def test_high_inclination_increases_velocity(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_geocentric_velocity
+
+        els_low_i = self._make_elements(1.5, 0.6, 5.0)
+        els_high_i = self._make_elements(1.5, 0.6, 60.0)
+        v_low = compute_geocentric_velocity(els_low_i)
+        v_high = compute_geocentric_velocity(els_high_i)
+        assert v_high > v_low
+
+    def test_missing_inclination_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_geocentric_velocity
+
+        els = SimpleNamespace(a_au=1.5, e=0.6)
+        assert compute_geocentric_velocity(els) is None
+
+    def test_missing_a_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_geocentric_velocity
+
+        els = SimpleNamespace(e=0.6, inclination_deg=10.0)
+        assert compute_geocentric_velocity(els) is None
+
+    def test_v_obj_none_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_geocentric_velocity
+
+        # semi_major_axis_au lets compute_perihelion_distance succeed,
+        # but compute_vis_viva_velocity needs a_au (not found → returns None)
+        els = SimpleNamespace(semi_major_axis_au=1.5, e=0.6, inclination_deg=10.0)
+        assert compute_geocentric_velocity(els) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import orbit
+        assert "compute_geocentric_velocity" in orbit.__all__

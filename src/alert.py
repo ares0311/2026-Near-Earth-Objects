@@ -48,6 +48,7 @@ __all__ = [
     "format_candidate_count_summary",
     "format_observation_count_summary",
     "count_submission_ready",
+    "format_mpc_observation_block",
 ]
 
 import json
@@ -1978,3 +1979,35 @@ def count_submission_ready(neos: list) -> int:
         if ok:
             count += 1
     return count
+
+
+def format_mpc_observation_block(
+    neo: ScoredNEO,
+    obs_code: str = _MPC_OBS_CODE,
+) -> str:
+    """Return a paste-ready MPC 80-column observation block for a ScoredNEO.
+
+    Produces one 80-character line per observation in the tracklet, formatted
+    using :func:`format_mpc_observation`, joined by newlines with no trailing
+    newline.  The first observation is flagged as the discovery observation
+    (asterisk in column 6).
+
+    This string can be pasted directly into an MPC submission form or included
+    in an e-mail to the Minor Planet Center.
+
+    **Guardrail**: This function formats observations only.  It does NOT
+    submit any data and does NOT assert that the candidate is a confirmed NEO.
+    Actual submission requires independent confirmation — see the alert protocol.
+    """
+    tracklet = neo.tracklet
+    designation = tracklet.object_id
+    lines = [
+        format_mpc_observation(
+            obs,
+            designation=designation,
+            is_discovery=(i == 0),
+            obs_code=obs_code,
+        )
+        for i, obs in enumerate(tracklet.observations)
+    ]
+    return "\n".join(lines)

@@ -1892,3 +1892,56 @@ class TestComputeCalibrationGain:
         sys.path.insert(0, "src")
         import calibration
         assert "compute_calibration_gain" in calibration.__all__
+
+
+class TestComputeCalibrationBias:
+    def test_empty_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_calibration_bias
+
+        assert compute_calibration_bias([], []) == 0.0
+
+    def test_length_mismatch_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_calibration_bias
+
+        assert compute_calibration_bias([0.5], [0.0, 1.0]) == 0.0
+
+    def test_over_confident(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_calibration_bias
+
+        # Predicts 0.8 but only 50% are positive => bias = +0.3
+        probs = [0.8, 0.8]
+        labels = [1.0, 0.0]
+        bias = compute_calibration_bias(probs, labels)
+        assert abs(bias - 0.3) < 1e-9
+
+    def test_under_confident(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_calibration_bias
+
+        # Predicts 0.2 but 100% are positive => bias = -0.8
+        probs = [0.2, 0.2]
+        labels = [1.0, 1.0]
+        bias = compute_calibration_bias(probs, labels)
+        assert abs(bias - (-0.8)) < 1e-9
+
+    def test_perfect_calibration_near_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_calibration_bias
+
+        probs = [0.5, 0.5]
+        labels = [1.0, 0.0]
+        assert abs(compute_calibration_bias(probs, labels)) < 1e-9
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        assert "compute_calibration_bias" in calibration.__all__

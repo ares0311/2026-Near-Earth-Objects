@@ -4204,3 +4204,77 @@ class TestCountObservationsByNight:
         sys.path.insert(0, "src")
         import fetch
         assert "count_observations_by_night" in fetch.__all__
+
+
+class TestComputeTemporalCoverage:
+    def _make_result(self, jds):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        obs = [SimpleNamespace(jd=j) for j in jds]
+        return SimpleNamespace(alerts=obs)
+
+    def test_empty(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_temporal_coverage
+
+        result = self._make_result([])
+        s = compute_temporal_coverage(result)
+        assert s["n_observations"] == 0
+        assert s["min_jd"] is None
+        assert s["span_days"] is None
+        assert s["n_nights"] == 0
+
+    def test_single_observation(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_temporal_coverage
+
+        result = self._make_result([2460000.5])
+        s = compute_temporal_coverage(result)
+        assert s["n_observations"] == 1
+        assert s["min_jd"] == 2460000.5
+        assert s["max_jd"] == 2460000.5
+        assert s["span_days"] is None
+        assert s["n_nights"] == 1
+
+    def test_multi_night(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_temporal_coverage
+
+        result = self._make_result([2460000.5, 2460001.5, 2460002.5])
+        s = compute_temporal_coverage(result)
+        assert s["n_observations"] == 3
+        assert abs(s["span_days"] - 2.0) < 1e-9
+        assert s["n_nights"] == 3
+
+    def test_none_jd_skipped(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from fetch import compute_temporal_coverage
+
+        obs = [SimpleNamespace(jd=None), SimpleNamespace(jd=2460000.5)]
+        result = SimpleNamespace(alerts=obs)
+        s = compute_temporal_coverage(result)
+        assert s["n_observations"] == 1
+
+    def test_no_alerts_attr(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from fetch import compute_temporal_coverage
+
+        s = compute_temporal_coverage(SimpleNamespace())
+        assert s["n_observations"] == 0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+        assert "compute_temporal_coverage" in fetch.__all__

@@ -32,7 +32,8 @@ __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "compute_novelty_rank",
            "compute_followup_score",
            "compute_moid_hazard_score",
-           "compute_size_estimate_range"]
+           "compute_size_estimate_range",
+           "compute_priority_histogram"]
 
 import math
 import uuid
@@ -1452,3 +1453,37 @@ def compute_size_estimate_range(neo: object, albedo_range: tuple = (0.05, 0.25))
     d_at_hi = (1329.0 / math.sqrt(albedo_hi)) * factor * 1000.0
     d_at_lo = (1329.0 / math.sqrt(albedo_lo)) * factor * 1000.0
     return {"min_m": float(d_at_hi), "max_m": float(d_at_lo)}
+
+
+def compute_priority_histogram(neos: list, n_bins: int = 5) -> dict:
+    """Return a histogram of discovery_priority values across a list of ScoredNEOs.
+
+    Divides the [0, 1] range into *n_bins* equal-width bins and counts how many
+    candidates fall into each bin.  Returns a dict with keys:
+
+      - ``"bin_edges"``: list of n_bins + 1 edge values (0.0 to 1.0)
+      - ``"counts"``: list of n_bins integer counts
+      - ``"n_total"``: total number of candidates with a valid discovery_priority
+
+    Candidates with None or missing discovery_priority are excluded.
+    *n_bins* is clamped to at least 1.
+    """
+    n_bins = max(1, int(n_bins))
+    priorities: list[float] = []
+    for neo in neos:
+        metadata = getattr(neo, "metadata", None)
+        p = getattr(metadata, "discovery_priority", None) if metadata else None
+        if p is not None:
+            priorities.append(float(p))
+    edges = [float(i) / n_bins for i in range(n_bins + 1)]
+    counts = [0] * n_bins
+    for p in priorities:
+        idx = int(p * n_bins)
+        if idx >= n_bins:
+            idx = n_bins - 1
+        counts[idx] += 1
+    return {
+        "bin_edges": edges,
+        "counts": counts,
+        "n_total": len(priorities),
+    }

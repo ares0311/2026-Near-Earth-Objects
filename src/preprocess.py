@@ -29,7 +29,8 @@ __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_
            "compute_gradient_magnitude",
            "compute_cutout_rms",
            "compute_cutout_entropy_normalized",
-           "compute_image_contrast"]
+           "compute_image_contrast",
+           "compute_pixel_saturation_fraction"]
 
 import base64
 import math
@@ -1418,5 +1419,31 @@ def compute_image_contrast(obs: object) -> float | None:
         if mean_abs == 0.0:
             return None
         return float((pix_max - pix_min) / mean_abs)
+    except Exception:
+        return None
+
+
+def compute_pixel_saturation_fraction(
+    obs: object,
+    saturation_threshold: float = 0.98,
+) -> float | None:
+    """Return the fraction of pixels in the science cutout that are near saturation.
+
+    Pixels with normalised value ≥ *saturation_threshold* (default 0.98) are
+    considered saturated.  The cutout is normalised to [0, 1] before comparison.
+    Returns None if no science cutout is available or if the cutout cannot be decoded.
+    Returns 0.0 if the max pixel value is zero (blank cutout).
+    """
+    cutout = getattr(obs, "cutout_science", None)
+    if cutout is None:
+        return None
+    try:
+        raw = base64.b64decode(cutout)
+        arr = np.frombuffer(raw, dtype=np.float32).reshape(_CUTOUT_SIZE, _CUTOUT_SIZE).astype(float)
+        pix_max = arr.max()
+        if pix_max == 0.0:
+            return 0.0
+        normalized = arr / pix_max
+        return float(np.mean(normalized >= saturation_threshold))
     except Exception:
         return None

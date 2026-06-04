@@ -36,6 +36,7 @@ __all__ = [
     "compute_weighted_brier_score",
     "compute_calibration_gap",
     "compute_calibration_gain",
+    "compute_calibration_bias",
 ]
 
 import math
@@ -1431,3 +1432,19 @@ def compute_calibration_gain(
     raw_brier = brier_score(p_raw, y)
     cal_brier = brier_score(p_cal, y)
     return float(raw_brier - cal_brier)
+
+
+def compute_calibration_bias(probs: list, labels: list) -> float:
+    """Return the mean calibration bias: mean(predicted_prob) - fraction_positive.
+
+    A positive bias means the model is over-confident (predicts higher probabilities
+    than the observed positive rate).  A negative bias means under-confidence.
+    Returns 0.0 if the input lists are empty or have different lengths.
+    """
+    if not probs or not labels:
+        return 0.0
+    if len(probs) != len(labels):
+        return 0.0
+    p_arr = np.array(probs, dtype=float)
+    y_arr = np.array(labels, dtype=float)
+    return float(np.mean(p_arr) - np.mean(y_arr))

@@ -2645,3 +2645,84 @@ class TestComputeSizeEstimateRange:
         sys.path.insert(0, "src")
         import score
         assert "compute_size_estimate_range" in score.__all__
+
+
+class TestComputePriorityHistogram:
+    def _make_neo(self, priority):
+        from types import SimpleNamespace
+
+        meta = SimpleNamespace(discovery_priority=priority)
+        return SimpleNamespace(metadata=meta)
+
+    def test_empty_list(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_priority_histogram
+
+        h = compute_priority_histogram([])
+        assert h["n_total"] == 0
+        assert all(c == 0 for c in h["counts"])
+
+    def test_counts_sum_to_n_total(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_priority_histogram
+
+        neos = [self._make_neo(p) for p in [0.1, 0.3, 0.5, 0.7, 0.9]]
+        h = compute_priority_histogram(neos, n_bins=5)
+        assert sum(h["counts"]) == 5
+        assert h["n_total"] == 5
+
+    def test_bin_edges_correct_length(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_priority_histogram
+
+        h = compute_priority_histogram([], n_bins=10)
+        assert len(h["bin_edges"]) == 11
+        assert len(h["counts"]) == 10
+
+    def test_value_1_goes_to_last_bin(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_priority_histogram
+
+        neos = [self._make_neo(1.0)]
+        h = compute_priority_histogram(neos, n_bins=5)
+        assert h["counts"][-1] == 1
+
+    def test_none_priority_excluded(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from score import compute_priority_histogram
+
+        neos = [SimpleNamespace(metadata=SimpleNamespace(discovery_priority=None))]
+        h = compute_priority_histogram(neos)
+        assert h["n_total"] == 0
+
+    def test_no_metadata_excluded(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from score import compute_priority_histogram
+
+        neos = [SimpleNamespace(metadata=None)]
+        h = compute_priority_histogram(neos)
+        assert h["n_total"] == 0
+
+    def test_n_bins_clamped_to_one(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_priority_histogram
+
+        h = compute_priority_histogram([], n_bins=0)
+        assert len(h["counts"]) == 1
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        assert "compute_priority_histogram" in score.__all__

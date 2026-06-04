@@ -31,7 +31,8 @@ __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "compute_observation_rate",
            "compute_tracklet_brightness_trend",
            "compute_arc_endpoint_separation",
-           "compute_pa_circular_std"]
+           "compute_pa_circular_std",
+           "compute_sky_coverage_area"]
 
 import math
 import uuid
@@ -1524,3 +1525,32 @@ def compute_pa_circular_std(tracklets: list) -> float | None:
     r_bar = math.hypot(sin_sum, cos_sum) / len(pas)
     r_bar = min(r_bar, 1.0 - 1e-12)
     return float(math.degrees(math.sqrt(-2.0 * math.log(r_bar))))
+
+
+def compute_sky_coverage_area(tracklets: list) -> float:
+    """Return the approximate sky area covered by a list of tracklets in square degrees.
+
+    Computes the bounding box (ΔRA × ΔDec) in degrees multiplied by cos(mean Dec)
+    to account for the spherical projection.  Returns 0.0 if fewer than 2 tracklets
+    have valid position data or if all positions are identical.
+
+    Positions are taken from each tracklet's first observation (``observations[0]``).
+    """
+    ras: list[float] = []
+    decs: list[float] = []
+    for t in tracklets:
+        obs_seq = getattr(t, "observations", None) or ()
+        if not obs_seq:
+            continue
+        first = obs_seq[0]
+        ra = getattr(first, "ra", None)
+        dec = getattr(first, "dec", None)
+        if ra is not None and dec is not None:
+            ras.append(float(ra))
+            decs.append(float(dec))
+    if len(ras) < 2:
+        return 0.0
+    dra = max(ras) - min(ras)
+    ddec = max(decs) - min(decs)
+    mean_dec_rad = math.radians(sum(decs) / len(decs))
+    return float(dra * math.cos(mean_dec_rad) * ddec)
