@@ -30,7 +30,8 @@ __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus"
            "count_streak_detections",
            "count_detections_by_mission",
            "filter_by_streak_score",
-           "compute_rb_score_distribution"]
+           "compute_rb_score_distribution",
+           "count_candidates_above_rb"]
 
 import math
 import uuid
@@ -1449,3 +1450,22 @@ def compute_rb_score_distribution(result: DetectResult, n_bins: int = 10) -> dic
             idx = n_bins - 1
         counts[idx] += 1
     return {"bin_edges": edges, "counts": counts, "n_total": len(scores)}
+
+
+def count_candidates_above_rb(result: DetectResult, threshold: float = 0.65) -> int:
+    """Return the count of candidates with at least one real_bogus score ≥ threshold.
+
+    For each candidate, considers all ``real_bogus`` scores across its
+    observations.  Candidates with no valid (non-None) scores are excluded.
+    Returns 0 for an empty result or if no candidates meet the threshold.
+    """
+    count = 0
+    for cand in result.candidates:
+        valid = [
+            obs.real_bogus
+            for obs in cand.observations
+            if obs.real_bogus is not None
+        ]
+        if valid and max(valid) >= threshold:
+            count += 1
+    return count

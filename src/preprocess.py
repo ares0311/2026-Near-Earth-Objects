@@ -33,7 +33,8 @@ __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_
            "compute_pixel_saturation_fraction",
            "compute_reference_cutout_snr",
            "compute_cutout_noise_level",
-           "compute_cutout_peak_value"]
+           "compute_cutout_peak_value",
+           "compute_cutout_contrast_ratio"]
 
 import base64
 import math
@@ -1512,5 +1513,37 @@ def compute_cutout_peak_value(obs: object) -> float | None:
         if arr.size == 0:
             return None
         return float(np.max(arr))
+    except Exception:
+        return None
+
+
+def compute_cutout_contrast_ratio(obs: object) -> float | None:
+    """Return the peak-to-median pixel ratio in the difference-image cutout.
+
+    Decodes the base64 float32 difference-image cutout, clips negative
+    values to zero, and returns ``max(arr) / median(arr)`` for the
+    non-zero pixels.  Returns ``None`` if the cutout is absent, cannot
+    be decoded, the array is empty, or the median is zero.
+    """
+    import base64
+    import math
+
+    import numpy as np
+
+    raw_b64 = getattr(obs, "cutout_difference", None)
+    if raw_b64 is None:
+        return None
+    try:
+        raw = base64.b64decode(raw_b64)
+        arr = np.frombuffer(raw, dtype=np.float32).astype(np.float64)
+        if arr.size == 0:
+            return None
+        arr = np.clip(arr, 0.0, None)
+        median_val = float(np.median(arr))
+        if median_val == 0.0:
+            return None
+        peak = float(np.max(arr))
+        result = peak / median_val
+        return result if math.isfinite(result) else None
     except Exception:
         return None

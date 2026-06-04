@@ -2930,3 +2930,48 @@ class TestCountSubmissionsByPathway:
         with patch("alert.ready_for_submission", return_value=(False, ["missing rb"])):
             result = self.fn([neo])
         assert result == {}
+
+
+class TestValidateObsCode:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import validate_obs_code
+        self.fn = validate_obs_code
+
+    def test_valid_numeric(self):
+        ok, msg = self.fn("568")
+        assert ok is True
+        assert msg == ""
+
+    def test_valid_alphanumeric(self):
+        ok, _ = self.fn("T05")
+        assert ok is True
+
+    def test_valid_all_letters(self):
+        ok, _ = self.fn("ZTF")
+        assert ok is True
+
+    def test_too_short(self):
+        ok, msg = self.fn("56")
+        assert ok is False
+        assert "3" in msg
+
+    def test_too_long(self):
+        ok, msg = self.fn("5689")
+        assert ok is False
+
+    def test_lowercase_invalid(self):
+        ok, msg = self.fn("56a")
+        assert ok is False
+        assert "a" in msg
+
+    def test_not_string(self):
+        ok, msg = self.fn(568)
+        assert ok is False
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+        assert "validate_obs_code" in alert.__all__

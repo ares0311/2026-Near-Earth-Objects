@@ -52,6 +52,7 @@ __all__ = [
     "format_neocp_submission_header",
     "format_complete_mpc_submission",
     "count_submissions_by_pathway",
+    "validate_obs_code",
 ]
 
 import json
@@ -2088,3 +2089,23 @@ def count_submissions_by_pathway(neos: list) -> dict:
         pathway = getattr(getattr(neo, "hazard", None), "alert_pathway", "unknown")
         counts[pathway] = counts.get(pathway, 0) + 1
     return counts
+
+
+def validate_obs_code(obs_code: str) -> tuple:
+    """Validate an MPC observatory code.
+
+    MPC observatory codes are exactly 3 characters: the first may be a digit
+    or uppercase letter; the remaining two must be alphanumeric (digit or
+    uppercase letter).
+
+    Returns ``(True, "")`` for valid codes and ``(False, reason)`` for
+    invalid ones.
+    """
+    if not isinstance(obs_code, str):
+        return (False, "obs_code must be a string")
+    if len(obs_code) != 3:
+        return (False, f"obs_code must be 3 characters, got {len(obs_code)}")
+    for ch in obs_code:
+        if not (ch.isdigit() or ch.isupper()):
+            return (False, f"invalid character '{ch}': must be digit or uppercase letter")
+    return (True, "")

@@ -33,6 +33,7 @@ __all__ = [
     "compute_tier1_feature_vector",
     "batch_dominant_hypothesis",
     "filter_by_neo_probability",
+    "count_by_dominant_hypothesis",
     "compute_posterior_update",
     "compute_tier1_confidence",
     "compute_posterior_stability",
@@ -2153,3 +2154,22 @@ def filter_by_neo_probability(neos: list, min_prob: float = 0.5) -> list:
         if prob is not None and float(prob) >= min_prob:
             result.append(neo)
     return result
+
+
+def count_by_dominant_hypothesis(neos: list) -> dict:
+    """Return a count of scored NEOs by their dominant posterior hypothesis.
+
+    For each NEO in *neos*, calls :func:`dominant_hypothesis` on its
+    posterior and tallies the result.  NEOs with missing posteriors
+    contribute to the ``"unknown"`` key.  Returns an empty dict for
+    empty input.
+    """
+    counts: dict = {}
+    for neo in neos:
+        posterior = getattr(neo, "posterior", None)
+        if posterior is None:
+            hyp = "unknown"
+        else:
+            hyp, _ = dominant_hypothesis(posterior)
+        counts[hyp] = counts.get(hyp, 0) + 1
+    return counts

@@ -4477,3 +4477,57 @@ class TestGroupObservationsByNight:
         result = FetchResult(alerts=[obs_inf], provenance=prov)
         groups = self.fn(result)
         assert len(groups) == 0
+
+
+class TestCountObservationsByFilter:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import count_observations_by_filter
+        self.fn = count_observations_by_filter
+
+    def _make_result(self, bands):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import FetchProvenance, FetchResult, Observation
+        obs = [
+            Observation(
+                obs_id=f"o{i}", ra_deg=10.0, dec_deg=5.0, jd=2460000.5 + i,
+                mag=20.0, mag_err=0.1, filter_band=b, mission="ZTF",
+            )
+            for i, b in enumerate(bands)
+        ]
+        prov = FetchProvenance(
+            surveys=["ZTF"], query_ra_deg=0.0, query_dec_deg=0.0,
+            query_radius_deg=1.0, start_jd=2460000.0, end_jd=2460001.0,
+        )
+        return FetchResult(alerts=obs, provenance=prov)
+
+    def test_single_band(self):
+        result = self._make_result(["r", "r", "r"])
+        counts = self.fn(result)
+        assert counts == {"r": 3}
+
+    def test_multiple_bands(self):
+        result = self._make_result(["r", "g", "r", "i"])
+        counts = self.fn(result)
+        assert counts["r"] == 2
+        assert counts["g"] == 1
+        assert counts["i"] == 1
+
+    def test_empty(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import FetchProvenance, FetchResult
+        prov = FetchProvenance(
+            surveys=["ZTF"], query_ra_deg=0.0, query_dec_deg=0.0,
+            query_radius_deg=1.0, start_jd=0.0, end_jd=0.0,
+        )
+        result = FetchResult(alerts=[], provenance=prov)
+        assert self.fn(result) == {}
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+        assert "count_observations_by_filter" in fetch.__all__

@@ -34,7 +34,8 @@ __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fet
            "compute_temporal_coverage",
            "compute_observation_rate",
            "compute_magnitude_distribution",
-           "group_observations_by_night"]
+           "group_observations_by_night",
+           "count_observations_by_filter"]
 
 import json
 import os
@@ -2138,3 +2139,16 @@ def group_observations_by_night(fetch_result: FetchResult) -> dict:
         night = int(math.floor(obs.jd))
         groups.setdefault(night, []).append(obs)
     return groups
+
+
+def count_observations_by_filter(fetch_result: FetchResult) -> dict:
+    """Return the count of observations per filter band in a FetchResult.
+
+    Returns a dict mapping each ``filter_band`` string to the number of
+    observations in that band.  Returns an empty dict for empty inputs.
+    """
+    counts: dict = {}
+    for obs in fetch_result.alerts:
+        band = obs.filter_band
+        counts[band] = counts.get(band, 0) + 1
+    return counts

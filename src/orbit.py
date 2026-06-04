@@ -34,7 +34,8 @@ __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
            "compute_geocentric_velocity",
            "compute_orbital_period_years",
            "compute_longitude_ascending_node_rate",
-           "compute_argument_of_perihelion_rate"]
+           "compute_argument_of_perihelion_rate",
+           "compute_perihelion_velocity"]
 
 import math
 from typing import NamedTuple
@@ -1795,3 +1796,40 @@ def compute_argument_of_perihelion_rate(elements: object) -> float | None:
         * (5.0 * math.cos(i_rad) ** 2 - 1.0) / (2.0 * denom)
     )
     return float(math.degrees(rate_rad_yr))
+
+
+def compute_perihelion_velocity(elements: object) -> float | None:
+    """Return the orbital speed at perihelion in km/s via the vis-viva equation.
+
+    At perihelion (r = q = a(1-e)):
+
+    .. math::
+
+        v_q = \\sqrt{\\mu \\left(\\frac{2}{q} - \\frac{1}{a}\\right)}
+
+    where μ = GM_Sun = 4π² AU³/yr² converted to km²/s².  Returns ``None``
+    if any required element is missing, ``a ≤ 0``, ``e ≥ 1``, or
+    ``q ≤ 0`` (degenerate orbit).
+    """
+    import math
+
+    AU_KM = 1.495978707e8
+    YR_S = 365.25 * 86400.0
+    GM_AU3_YR2 = 4.0 * math.pi ** 2
+    GM_KM3_S2 = GM_AU3_YR2 * (AU_KM ** 3) / (YR_S ** 2)
+
+    a = getattr(elements, "a_au", None) or getattr(elements, "semi_major_axis_au", None)
+    if a is None:
+        return None
+    a_val = float(a)
+    if a_val <= 0.0:
+        return None
+    e = getattr(elements, "e", None) or getattr(elements, "eccentricity", None)
+    if e is None:
+        return None
+    e_val = float(e)
+    if e_val >= 1.0:
+        return None
+    q_val = a_val * (1.0 - e_val)
+    v2 = GM_KM3_S2 * (2.0 / (q_val * AU_KM) - 1.0 / (a_val * AU_KM))
+    return float(math.sqrt(v2))

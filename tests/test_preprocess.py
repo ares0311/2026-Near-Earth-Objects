@@ -2987,3 +2987,63 @@ class TestComputeCutoutPeakValue:
         b = base64.b64encode(b"\x01").decode()
         obs = SimpleNamespace(cutout_difference=b)
         assert self.fn(obs) is None
+
+
+class TestComputeCutoutContrastRatio:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from preprocess import compute_cutout_contrast_ratio
+        self.fn = compute_cutout_contrast_ratio
+
+    def _make_obs(self, values):
+        import base64
+        from types import SimpleNamespace
+
+        import numpy as np
+        arr = np.array(values, dtype=np.float32)
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        return SimpleNamespace(cutout_difference=b64)
+
+    def test_basic(self):
+        obs = self._make_obs([1.0, 2.0, 4.0, 2.0])
+        result = self.fn(obs)
+        assert result is not None
+        assert result > 1.0
+
+    def test_no_cutout_none(self):
+        from types import SimpleNamespace
+        assert self.fn(SimpleNamespace()) is None
+
+    def test_none_cutout_none(self):
+        from types import SimpleNamespace
+        assert self.fn(SimpleNamespace(cutout_difference=None)) is None
+
+    def test_all_zeros_none(self):
+        obs = self._make_obs([0.0, 0.0, 0.0, 0.0])
+        assert self.fn(obs) is None
+
+    def test_uniform_nonzero(self):
+        obs = self._make_obs([2.0, 2.0, 2.0, 2.0])
+        result = self.fn(obs)
+        assert result is not None
+        assert abs(result - 1.0) < 1e-5
+
+    def test_invalid_b64_none(self):
+        # 1-byte payload causes np.frombuffer error
+        import base64
+        from types import SimpleNamespace
+        b = base64.b64encode(b"\x01").decode()
+        assert self.fn(SimpleNamespace(cutout_difference=b)) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import preprocess
+        assert "compute_cutout_contrast_ratio" in preprocess.__all__
+
+    def test_empty_array_none(self):
+        from types import SimpleNamespace
+        # empty base64 → 0-byte array → arr.size == 0
+        obs = SimpleNamespace(cutout_difference="")
+        assert self.fn(obs) is None

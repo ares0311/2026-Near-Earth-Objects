@@ -2232,3 +2232,40 @@ class TestObservationQualityReport:
         sys.path.insert(0, "src")
         import schemas
         assert "ObservationQualityReport" in schemas.__all__
+
+
+class TestFieldCoverageReport:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import FieldCoverageReport
+        self.cls = FieldCoverageReport
+
+    def test_defaults(self):
+        r = self.cls()
+        assert r.n_obs == 0
+        assert r.n_tracklets == 0
+        assert r.limiting_mag is None
+        assert r.area_sq_deg == 0.0
+
+    def test_populated(self):
+        r = self.cls(
+            field_id="F001", ra_deg=10.0, dec_deg=5.0,
+            area_sq_deg=9.6, n_obs=150, n_tracklets=3,
+            limiting_mag=21.5, pipeline_version="0.83.0",
+        )
+        assert r.field_id == "F001"
+        assert r.n_obs == 150
+        assert r.limiting_mag == 21.5
+
+    def test_immutable(self):
+        import pytest
+        r = self.cls()
+        with pytest.raises(Exception):
+            r.n_obs = 5
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        assert "FieldCoverageReport" in schemas.__all__

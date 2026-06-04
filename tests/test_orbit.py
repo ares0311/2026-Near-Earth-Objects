@@ -3150,3 +3150,51 @@ class TestComputeArgumentOfPerihelionRate:
         sys.path.insert(0, "src")
         import orbit
         assert "compute_argument_of_perihelion_rate" in orbit.__all__
+
+
+class TestComputePerihelionVelocity:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_perihelion_velocity
+        self.fn = compute_perihelion_velocity
+
+    def test_earth_like(self):
+        from types import SimpleNamespace
+        el = SimpleNamespace(a_au=1.0, e=0.0167)
+        result = self.fn(el)
+        assert result is not None
+        assert 25.0 < result < 35.0
+
+    def test_missing_a_none(self):
+        from types import SimpleNamespace
+        assert self.fn(SimpleNamespace(e=0.1)) is None
+
+    def test_zero_a_none(self):
+        from types import SimpleNamespace
+        assert self.fn(SimpleNamespace(a_au=0.0, e=0.1)) is None
+
+    def test_missing_e_none(self):
+        from types import SimpleNamespace
+        assert self.fn(SimpleNamespace(a_au=1.0)) is None
+
+    def test_parabolic_none(self):
+        from types import SimpleNamespace
+        assert self.fn(SimpleNamespace(a_au=1.0, e=1.0)) is None
+
+    def test_high_eccentricity(self):
+        from types import SimpleNamespace
+        el = SimpleNamespace(a_au=2.0, e=0.9)
+        result = self.fn(el)
+        assert result is not None
+        assert result > 0.0
+
+    def test_negative_a_none(self):
+        from types import SimpleNamespace
+        assert self.fn(SimpleNamespace(a_au=-1.0, e=0.1)) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import orbit
+        assert "compute_perihelion_velocity" in orbit.__all__

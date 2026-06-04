@@ -46,6 +46,7 @@ __all__ = [
     "SurveyRunSummary",
     "PipelineHealthReport",
     "ObservationQualityReport",
+    "FieldCoverageReport",
 ]
 
 from dataclasses import dataclass
@@ -1269,3 +1270,22 @@ class ObservationQualityReport(BaseModel):
     mean_fwhm_arcsec: float | None = None
     n_saturated: int = 0
     limiting_mag: float | None = None
+
+
+class FieldCoverageReport(BaseModel):
+    """Frozen coverage summary for a single survey field.
+
+    Aggregates spatial and observational metadata for a field, suitable
+    for survey efficiency assessment and scheduling decisions.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    field_id: str = "unknown"
+    ra_deg: float = 0.0
+    dec_deg: float = 0.0
+    area_sq_deg: float = 0.0
+    n_obs: int = 0
+    n_tracklets: int = 0
+    limiting_mag: float | None = None
+    pipeline_version: str = "unknown"

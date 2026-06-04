@@ -40,6 +40,7 @@ __all__ = [
     "compute_overconfidence_fraction",
     "compute_max_calibration_error",
     "compute_calibration_resolution",
+    "compute_fraction_calibrated",
 ]
 
 import math
@@ -1554,3 +1555,41 @@ def compute_calibration_resolution(
     if normalizer <= 0.0:
         return 0.0
     return float(min(1.0, resolution / normalizer))
+
+
+def compute_fraction_calibrated(
+    probs: list,
+    labels: list,
+    threshold: float = 0.1,
+    n_bins: int = 10,
+) -> float:
+    """Return the fraction of non-empty bins within *threshold* of perfect calibration.
+
+    For each non-empty equal-width bin, computes |mean_predicted_prob −
+    fraction_positive|.  Returns the fraction of non-empty bins where this
+    error is ≤ *threshold*.
+
+    Returns 0.0 for empty input, mismatched lengths, or no non-empty bins.
+    """
+    if not probs or not labels or len(probs) != len(labels):
+        return 0.0
+    n_bins = max(1, int(n_bins))
+    bin_probs: list[list[float]] = [[] for _ in range(n_bins)]
+    bin_labels: list[list[float]] = [[] for _ in range(n_bins)]
+    for p, y in zip(probs, labels):
+        idx = int(float(p) * n_bins)
+        if idx >= n_bins:
+            idx = n_bins - 1
+        bin_probs[idx].append(float(p))
+        bin_labels[idx].append(float(y))
+    n_calibrated = 0
+    n_nonempty = 0
+    for bp, bl in zip(bin_probs, bin_labels):
+        if not bp:
+            continue
+        n_nonempty += 1
+        mean_p = sum(bp) / len(bp)
+        frac_pos = sum(bl) / len(bl)
+        if abs(mean_p - frac_pos) <= threshold:
+            n_calibrated += 1
+    return float(n_calibrated) / n_nonempty if n_nonempty > 0 else 0.0

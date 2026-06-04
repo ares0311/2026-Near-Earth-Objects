@@ -2871,3 +2871,42 @@ class TestGetTopCandidates:
         sys.path.insert(0, "src")
         import score
         assert "get_top_candidates" in score.__all__
+
+
+class TestComputePhaFraction:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_pha_fraction
+        self.fn = compute_pha_fraction
+
+    def test_empty(self):
+        assert self.fn([]) == 0.0
+
+    def test_all_pha(self):
+        from types import SimpleNamespace
+        neo = SimpleNamespace(hazard=SimpleNamespace(hazard_flag="pha_candidate"))
+        assert self.fn([neo, neo]) == 1.0
+
+    def test_none_pha(self):
+        from types import SimpleNamespace
+        neo = SimpleNamespace(hazard=SimpleNamespace(hazard_flag="nominal"))
+        assert self.fn([neo]) == 0.0
+
+    def test_mixed(self):
+        from types import SimpleNamespace
+        pha = SimpleNamespace(hazard=SimpleNamespace(hazard_flag="pha_candidate"))
+        nom = SimpleNamespace(hazard=SimpleNamespace(hazard_flag="nominal"))
+        result = self.fn([pha, nom])
+        assert abs(result - 0.5) < 1e-9
+
+    def test_no_hazard_attr(self):
+        from types import SimpleNamespace
+        neo = SimpleNamespace()
+        assert self.fn([neo]) == 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        assert "compute_pha_fraction" in score.__all__

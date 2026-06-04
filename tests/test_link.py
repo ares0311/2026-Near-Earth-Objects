@@ -3236,3 +3236,47 @@ class TestEstimateObservationCadence:
         ]
         t = SimpleNamespace(observations=obs)
         assert self.fn(t) is None
+
+
+class TestComputeTrackletSpanNights:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_tracklet_span_nights
+        self.fn = compute_tracklet_span_nights
+
+    def test_two_nights(self, tracklet):
+        result = self.fn(tracklet)
+        assert result >= 1
+
+    def test_single_night(self):
+        from types import SimpleNamespace
+        obs = [SimpleNamespace(jd=2460000.1), SimpleNamespace(jd=2460000.9)]
+        t = SimpleNamespace(observations=obs)
+        assert self.fn(t) == 1
+
+    def test_two_distinct_nights(self):
+        from types import SimpleNamespace
+        obs = [SimpleNamespace(jd=2460000.5), SimpleNamespace(jd=2460001.5)]
+        t = SimpleNamespace(observations=obs)
+        assert self.fn(t) == 2
+
+    def test_empty_obs(self):
+        from types import SimpleNamespace
+        assert self.fn(SimpleNamespace(observations=[])) == 0
+
+    def test_no_obs_attr(self):
+        from types import SimpleNamespace
+        assert self.fn(SimpleNamespace()) == 0
+
+    def test_bad_jd_returns_zero(self):
+        from types import SimpleNamespace
+        obs = [SimpleNamespace(jd="bad")]
+        t = SimpleNamespace(observations=obs)
+        assert self.fn(t) == 0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+        assert "compute_tracklet_span_nights" in link.__all__

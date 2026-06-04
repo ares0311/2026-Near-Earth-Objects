@@ -2923,3 +2923,56 @@ class TestComputeRbScoreDistribution:
         sys.path.insert(0, "src")
         import detect
         assert "compute_rb_score_distribution" in detect.__all__
+
+
+class TestCountCandidatesAboveRb:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import count_candidates_above_rb
+        self.fn = count_candidates_above_rb
+
+    def _make_result(self, rb_scores):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import DetectProvenance, DetectResult, Observation, RawCandidate
+        candidates = []
+        for i, rb in enumerate(rb_scores):
+            obs = Observation(
+                obs_id=f"o{i}", ra_deg=10.0, dec_deg=5.0, jd=2460000.5,
+                mag=20.0, mag_err=0.1, filter_band="r", mission="ZTF",
+                real_bogus=rb,
+            )
+            cand = RawCandidate(candidate_id=f"c{i}", observations=(obs,))
+            candidates.append(cand)
+        prov = DetectProvenance(
+            real_bogus_threshold=0.65, n_candidates=len(candidates),
+            n_known_matches=0, detected_at_jd=2460000.5,
+        )
+        return DetectResult(candidates=tuple(candidates), known_matches=(), provenance=prov)
+
+    def test_all_above(self):
+        result = self._make_result([0.7, 0.8, 0.9])
+        assert self.fn(result, threshold=0.65) == 3
+
+    def test_none_above(self):
+        result = self._make_result([0.2, 0.3])
+        assert self.fn(result, threshold=0.65) == 0
+
+    def test_empty(self):
+        result = self._make_result([])
+        assert self.fn(result) == 0
+
+    def test_none_rb_excluded(self):
+        result = self._make_result([None])
+        assert self.fn(result) == 0
+
+    def test_mixed(self):
+        result = self._make_result([0.8, 0.3, 0.9])
+        assert self.fn(result, threshold=0.65) == 2
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import detect
+        assert "count_candidates_above_rb" in detect.__all__

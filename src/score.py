@@ -36,7 +36,8 @@ __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "compute_priority_histogram",
            "compute_alert_urgency_score",
            "filter_by_discovery_priority",
-           "get_top_candidates"]
+           "get_top_candidates",
+           "compute_pha_fraction"]
 
 import math
 import uuid
@@ -1555,3 +1556,18 @@ def get_top_candidates(neos: list, n: int = 10) -> list:
 
     sorted_neos = sorted(neos, key=_priority, reverse=True)
     return sorted_neos[: max(0, int(n))]
+
+
+def compute_pha_fraction(neos: list) -> float:
+    """Return the fraction of scored NEOs flagged as PHA candidates.
+
+    Reads ``neo.hazard.hazard_flag`` and counts those equal to
+    ``"pha_candidate"``.  Returns 0.0 for empty input.
+    """
+    if not neos:
+        return 0.0
+    pha_count = sum(
+        1 for neo in neos
+        if getattr(getattr(neo, "hazard", None), "hazard_flag", None) == "pha_candidate"
+    )
+    return float(pha_count) / len(neos)

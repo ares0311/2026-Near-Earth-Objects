@@ -2099,3 +2099,43 @@ class TestComputeCalibrationResolution:
         sys.path.insert(0, "src")
         import calibration
         assert "compute_calibration_resolution" in calibration.__all__
+
+
+class TestComputeFractionCalibrated:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_fraction_calibrated
+        self.fn = compute_fraction_calibrated
+
+    def test_perfect_calibration(self):
+        probs = [0.0, 0.0, 1.0, 1.0]
+        labels = [0, 0, 1, 1]
+        result = self.fn(probs, labels, threshold=0.1)
+        assert result == 1.0
+
+    def test_empty_returns_zero(self):
+        assert self.fn([], []) == 0.0
+
+    def test_mismatched_lengths(self):
+        assert self.fn([0.5], [0, 1]) == 0.0
+
+    def test_range(self):
+        import random
+        random.seed(99)
+        probs = [random.random() for _ in range(200)]
+        labels = [random.randint(0, 1) for _ in range(200)]
+        result = self.fn(probs, labels)
+        assert 0.0 <= result <= 1.0
+
+    def test_tight_threshold(self):
+        probs = [0.1, 0.9]
+        labels = [0, 1]
+        result = self.fn(probs, labels, threshold=0.0)
+        assert 0.0 <= result <= 1.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        assert "compute_fraction_calibrated" in calibration.__all__

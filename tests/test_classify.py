@@ -3364,3 +3364,35 @@ class TestFilterByNeoProbability:
         sys.path.insert(0, "src")
         import classify
         assert "filter_by_neo_probability" in classify.__all__
+
+
+class TestCountByDominantHypothesis:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import count_by_dominant_hypothesis
+        self.fn = count_by_dominant_hypothesis
+
+    def test_basic(self, scored_neo):
+        result = self.fn([scored_neo])
+        assert isinstance(result, dict)
+        assert sum(result.values()) == 1
+
+    def test_empty(self):
+        assert self.fn([]) == {}
+
+    def test_none_posterior(self):
+        from types import SimpleNamespace
+        neo = SimpleNamespace(posterior=None)
+        result = self.fn([neo])
+        assert result.get("unknown") == 1
+
+    def test_multiple(self, scored_neo):
+        result = self.fn([scored_neo, scored_neo])
+        assert sum(result.values()) == 2
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import classify
+        assert "count_by_dominant_hypothesis" in classify.__all__

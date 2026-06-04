@@ -35,7 +35,8 @@ __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "compute_sky_coverage_area",
            "compute_night_gap_statistics",
            "compute_field_tracklet_density",
-           "estimate_observation_cadence"]
+           "estimate_observation_cadence",
+           "compute_tracklet_span_nights"]
 
 import math
 import uuid
@@ -1625,3 +1626,22 @@ def estimate_observation_cadence(tracklet: object) -> float | None:
         return None
     deltas = [(jds[i + 1] - jds[i]) * 24.0 for i in range(len(jds) - 1)]
     return float(sum(deltas) / len(deltas))
+
+
+def compute_tracklet_span_nights(tracklet: object) -> int:
+    """Return the number of distinct integer nights spanned by a tracklet.
+
+    Counts the number of unique ``int(floor(jd))`` values across all
+    observations.  Returns 0 if the tracklet has no observations or if
+    observations cannot be accessed.
+    """
+    import math
+
+    obs = getattr(tracklet, "observations", None)
+    if not obs:
+        return 0
+    try:
+        nights = {int(math.floor(float(o.jd))) for o in obs}
+    except Exception:
+        return 0
+    return len(nights)
