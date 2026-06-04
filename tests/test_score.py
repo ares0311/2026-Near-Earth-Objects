@@ -2910,3 +2910,50 @@ class TestComputePhaFraction:
         sys.path.insert(0, "src")
         import score
         assert "compute_pha_fraction" in score.__all__
+
+
+class TestCountByAlertPathway:
+    fn_name = "count_by_alert_pathway"
+
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        return getattr(score, self.fn_name)
+
+    def _neo(self, pathway):
+        from types import SimpleNamespace
+        hazard = SimpleNamespace(alert_pathway=pathway)
+        return SimpleNamespace(hazard=hazard)
+
+    def test_empty_list(self):
+        assert self._fn()([]) == {}
+
+    def test_single_pathway(self):
+        neos = [self._neo("mpc_submission"), self._neo("mpc_submission")]
+        result = self._fn()(neos)
+        assert result == {"mpc_submission": 2}
+
+    def test_multiple_pathways(self):
+        neos = [
+            self._neo("mpc_submission"),
+            self._neo("internal_candidate"),
+            self._neo("internal_candidate"),
+            self._neo("known_object"),
+        ]
+        result = self._fn()(neos)
+        assert result["mpc_submission"] == 1
+        assert result["internal_candidate"] == 2
+        assert result["known_object"] == 1
+
+    def test_no_hazard_attr(self):
+        from types import SimpleNamespace
+        neo = SimpleNamespace()
+        result = self._fn()([neo])
+        assert result == {"unknown": 1}
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        assert "count_by_alert_pathway" in score.__all__

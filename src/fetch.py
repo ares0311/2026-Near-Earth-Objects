@@ -35,7 +35,8 @@ __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fet
            "compute_observation_rate",
            "compute_magnitude_distribution",
            "group_observations_by_night",
-           "count_observations_by_filter"]
+           "count_observations_by_filter",
+           "get_brightest_observation"]
 
 import json
 import os
@@ -2152,3 +2153,15 @@ def count_observations_by_filter(fetch_result: FetchResult) -> dict:
         band = obs.filter_band
         counts[band] = counts.get(band, 0) + 1
     return counts
+
+
+def get_brightest_observation(fetch_result: FetchResult) -> object | None:
+    """Return the single brightest (lowest-magnitude) Observation in a FetchResult.
+
+    Excludes observations with sentinel magnitudes ≥ 90.  Returns ``None``
+    if the result is empty or all magnitudes are sentinels.
+    """
+    valid = [obs for obs in fetch_result.alerts if obs.mag < 90.0]
+    if not valid:
+        return None
+    return min(valid, key=lambda o: o.mag)

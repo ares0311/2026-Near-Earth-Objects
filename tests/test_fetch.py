@@ -4531,3 +4531,52 @@ class TestCountObservationsByFilter:
         sys.path.insert(0, "src")
         import fetch
         assert "count_observations_by_filter" in fetch.__all__
+
+
+class TestGetBrightestObservation:
+    fn_name = "get_brightest_observation"
+
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+        return getattr(fetch, self.fn_name)
+
+    def _obs(self, mag):
+        from types import SimpleNamespace
+        return SimpleNamespace(
+            obs_id=f"obs-{mag}", ra_deg=10.0, dec_deg=5.0,
+            jd=2460000.0, mag=mag, mag_err=0.1, filter_band="r",
+            real_bogus_score=None, mission="ZTF", cutout_science=None,
+            cutout_reference=None, cutout_difference=None,
+        )
+
+    def _result(self, alerts):
+        from types import SimpleNamespace
+        return SimpleNamespace(alerts=alerts, provenance=None)
+
+    def test_empty_returns_none(self):
+        result = self._result([])
+        assert self._fn()(result) is None
+
+    def test_all_sentinel_returns_none(self):
+        result = self._result([self._obs(99.0), self._obs(90.0)])
+        assert self._fn()(result) is None
+
+    def test_returns_brightest(self):
+        obs_bright = self._obs(17.5)
+        obs_faint = self._obs(20.0)
+        result = self._result([obs_faint, obs_bright])
+        best = self._fn()(result)
+        assert best is obs_bright
+
+    def test_single_valid(self):
+        obs = self._obs(18.0)
+        result = self._result([obs])
+        assert self._fn()(result) is obs
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+        assert "get_brightest_observation" in fetch.__all__

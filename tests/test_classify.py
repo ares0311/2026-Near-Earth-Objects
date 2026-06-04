@@ -3396,3 +3396,49 @@ class TestCountByDominantHypothesis:
         sys.path.insert(0, "src")
         import classify
         assert "count_by_dominant_hypothesis" in classify.__all__
+
+
+class TestComputeMeanNeoProbability:
+    fn_name = "compute_mean_neo_probability"
+
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import classify
+        return getattr(classify, self.fn_name)
+
+    def _make_neo(self, neo_prob):
+        from types import SimpleNamespace
+        posterior = SimpleNamespace(neo_candidate=neo_prob) if neo_prob is not None else None
+        return SimpleNamespace(posterior=posterior)
+
+    def test_empty_list_returns_none(self):
+        assert self._fn()([]) is None
+
+    def test_all_none_posterior_returns_none(self):
+        neos = [self._make_neo(None)]
+        assert self._fn()(neos) is None
+
+    def test_single_neo(self):
+        neos = [self._make_neo(0.7)]
+        result = self._fn()(neos)
+        assert result is not None
+        assert abs(result - 0.7) < 1e-9
+
+    def test_multiple_neos(self):
+        neos = [self._make_neo(0.4), self._make_neo(0.6)]
+        result = self._fn()(neos)
+        assert result is not None
+        assert abs(result - 0.5) < 1e-9
+
+    def test_mixed_none_and_valid(self):
+        neos = [self._make_neo(None), self._make_neo(0.8)]
+        result = self._fn()(neos)
+        assert result is not None
+        assert abs(result - 0.8) < 1e-9
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import classify
+        assert "compute_mean_neo_probability" in classify.__all__

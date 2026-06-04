@@ -34,7 +34,8 @@ __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_
            "compute_reference_cutout_snr",
            "compute_cutout_noise_level",
            "compute_cutout_peak_value",
-           "compute_cutout_contrast_ratio"]
+           "compute_cutout_contrast_ratio",
+           "compute_image_rms"]
 
 import base64
 import math
@@ -1545,5 +1546,30 @@ def compute_cutout_contrast_ratio(obs: object) -> float | None:
         peak = float(np.max(arr))
         result = peak / median_val
         return result if math.isfinite(result) else None
+    except Exception:
+        return None
+
+
+def compute_image_rms(obs: object) -> float | None:
+    """Return the RMS of all pixels in the difference-image cutout.
+
+    Decodes the base64 float32 difference-image cutout and returns the
+    root-mean-square of all pixel values.  Returns ``None`` if the
+    observation has no ``cutout_difference`` attribute, it is ``None``,
+    or the bytes cannot be decoded as a valid float32 array.
+    """
+    import base64
+
+    import numpy as np
+
+    raw_b64 = getattr(obs, "cutout_difference", None)
+    if raw_b64 is None:
+        return None
+    try:
+        raw = base64.b64decode(raw_b64)
+        arr = np.frombuffer(raw, dtype=np.float32).astype(np.float64)
+        if arr.size == 0:
+            return None
+        return float(np.sqrt(np.mean(arr ** 2)))
     except Exception:
         return None

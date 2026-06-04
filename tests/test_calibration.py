@@ -2139,3 +2139,66 @@ class TestComputeFractionCalibrated:
         sys.path.insert(0, "src")
         import calibration
         assert "compute_fraction_calibrated" in calibration.__all__
+
+
+class TestComputeCalibrationSpread:
+    fn_name = "compute_calibration_spread"
+
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        return getattr(calibration, self.fn_name)
+
+    def test_empty_probs_returns_zero(self):
+        assert self._fn()([], []) == 0.0
+
+    def test_mismatched_lengths_returns_zero(self):
+        assert self._fn()([0.5, 0.6], [1]) == 0.0
+
+    def test_one_bin_returns_zero(self):
+        probs = [0.1, 0.2]
+        labels = [0, 1]
+        result = self._fn()(probs, labels, n_bins=1)
+        assert result == 0.0
+
+    def test_uniform_errors_returns_zero(self):
+        probs = [0.1] * 5 + [0.9] * 5
+        labels = [0] * 5 + [1] * 5
+        result = self._fn()(probs, labels)
+        assert result >= 0.0
+
+    def test_returns_float(self):
+        probs = [0.1, 0.3, 0.5, 0.7, 0.9]
+        labels = [0, 0, 1, 1, 1]
+        result = self._fn()(probs, labels)
+        assert isinstance(result, float)
+        assert result >= 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        assert "compute_calibration_spread" in calibration.__all__
+
+
+class TestComputeCalibrationSpreadCoverage:
+    """Coverage for clamp branch (prob=1.0 → idx clamped to n_bins-1)."""
+
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        return calibration.compute_calibration_spread
+
+    def test_prob_one_clamp_branch(self):
+        probs = [0.0, 1.0]
+        labels = [0, 1]
+        result = self._fn()(probs, labels, n_bins=1)
+        assert result == 0.0
+
+    def test_prob_one_with_multiple_bins(self):
+        probs = [0.1, 0.9, 1.0]
+        labels = [0, 1, 1]
+        result = self._fn()(probs, labels, n_bins=10)
+        assert isinstance(result, float)

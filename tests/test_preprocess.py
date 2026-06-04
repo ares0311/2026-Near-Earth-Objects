@@ -3047,3 +3047,50 @@ class TestComputeCutoutContrastRatio:
         # empty base64 → 0-byte array → arr.size == 0
         obs = SimpleNamespace(cutout_difference="")
         assert self.fn(obs) is None
+
+
+class TestComputeImageRms:
+    fn_name = "compute_image_rms"
+
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import preprocess
+        return getattr(preprocess, self.fn_name)
+
+    def test_none_cutout_returns_none(self):
+        from types import SimpleNamespace
+        obs = SimpleNamespace(cutout_difference=None)
+        assert self._fn()(obs) is None
+
+    def test_empty_b64_returns_none(self):
+        from types import SimpleNamespace
+        obs = SimpleNamespace(cutout_difference="")
+        assert self._fn()(obs) is None
+
+    def test_invalid_b64_returns_none(self):
+        import base64
+        from types import SimpleNamespace
+        b64 = base64.b64encode(b"\x01").decode()
+        obs = SimpleNamespace(cutout_difference=b64)
+        assert self._fn()(obs) is None
+
+    def test_valid_rms(self):
+        import base64
+        import struct
+        from types import SimpleNamespace
+        import math
+        vals = [1.0, 2.0, 3.0, 4.0]
+        raw = struct.pack(f"{len(vals)}f", *vals)
+        b64 = base64.b64encode(raw).decode()
+        obs = SimpleNamespace(cutout_difference=b64)
+        result = self._fn()(obs)
+        expected = math.sqrt(sum(v**2 for v in vals) / len(vals))
+        assert result is not None
+        assert abs(result - expected) < 1e-5
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import preprocess
+        assert "compute_image_rms" in preprocess.__all__

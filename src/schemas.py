@@ -47,6 +47,7 @@ __all__ = [
     "PipelineHealthReport",
     "ObservationQualityReport",
     "FieldCoverageReport",
+    "AlertSummaryRecord",
 ]
 
 from dataclasses import dataclass
@@ -1289,3 +1290,20 @@ class FieldCoverageReport(BaseModel):
     n_tracklets: int = 0
     limiting_mag: float | None = None
     pipeline_version: str = "unknown"
+
+
+class AlertSummaryRecord(BaseModel):
+    """Frozen summary record for a single alert-pathway decision.
+
+    Lightweight snapshot of a scored NEO's alert state, suitable for
+    export, logging, and downstream review workflows.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    neo_id: str = "unknown"
+    alert_pathway: str = "internal_candidate"
+    hazard_flag: str = "unknown"
+    discovery_priority: float | None = None
+    moid_au: float | None = None
+    submitted_at_jd: float | None = None

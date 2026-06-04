@@ -3280,3 +3280,85 @@ class TestComputeTrackletSpanNights:
         sys.path.insert(0, "src")
         import link
         assert "compute_tracklet_span_nights" in link.__all__
+
+
+class TestComputePositionAngleDispersion:
+    fn_name = "compute_position_angle_dispersion"
+
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+        return getattr(link, self.fn_name)
+
+    def test_no_observations_returns_none(self):
+        from types import SimpleNamespace
+        t = SimpleNamespace(observations=())
+        assert self._fn()(t) is None
+
+    def test_single_observation_returns_none(self):
+        from types import SimpleNamespace
+        obs = SimpleNamespace(obs_id="o1", ra_deg=10.0, dec_deg=5.0, jd=2460000.0,
+                              mag=20.0, mag_err=0.1, filter_band="r",
+                              real_bogus_score=0.9, mission="ZTF",
+                              cutout_science=None, cutout_reference=None,
+                              cutout_difference=None)
+        t = SimpleNamespace(observations=(obs,))
+        assert self._fn()(t) is None
+
+    def test_two_observations_returns_zero(self):
+        from types import SimpleNamespace
+        obs1 = SimpleNamespace(obs_id="o1", ra_deg=10.0, dec_deg=5.0, jd=2460000.0,
+                               mag=20.0, mag_err=0.1, filter_band="r",
+                               real_bogus_score=0.9, mission="ZTF",
+                               cutout_science=None, cutout_reference=None,
+                               cutout_difference=None)
+        obs2 = SimpleNamespace(obs_id="o2", ra_deg=10.01, dec_deg=5.01, jd=2460001.0,
+                               mag=20.0, mag_err=0.1, filter_band="r",
+                               real_bogus_score=0.9, mission="ZTF",
+                               cutout_science=None, cutout_reference=None,
+                               cutout_difference=None)
+        t = SimpleNamespace(observations=(obs1, obs2))
+        result = self._fn()(t)
+        assert result == 0.0
+
+    def test_three_observations_returns_float(self):
+        from types import SimpleNamespace
+        def make_obs(obs_id, ra, dec, jd):
+            return SimpleNamespace(obs_id=obs_id, ra_deg=ra, dec_deg=dec, jd=jd,
+                                   mag=20.0, mag_err=0.1, filter_band="r",
+                                   real_bogus_score=0.9, mission="ZTF",
+                                   cutout_science=None, cutout_reference=None,
+                                   cutout_difference=None)
+        obs1 = make_obs("o1", 10.0, 5.0, 2460000.0)
+        obs2 = make_obs("o2", 10.01, 5.0, 2460001.0)
+        obs3 = make_obs("o3", 10.02, 5.005, 2460002.0)
+        t = SimpleNamespace(observations=(obs1, obs2, obs3))
+        result = self._fn()(t)
+        assert result is not None
+        assert result >= 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+        assert "compute_position_angle_dispersion" in link.__all__
+
+
+class TestComputePositionAngleDispersionExceptionCoverage:
+    """Cover except branch and all-fail → None path."""
+
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+        return link.compute_position_angle_dispersion
+
+    def test_exception_in_motion_vector_returns_none(self):
+        from types import SimpleNamespace
+        # Observations without ra_deg will cause compute_motion_vector to raise
+        bad_obs1 = SimpleNamespace(obs_id="o1", jd=2460000.0)
+        bad_obs2 = SimpleNamespace(obs_id="o2", jd=2460001.0)
+        t = SimpleNamespace(observations=(bad_obs1, bad_obs2))
+        result = self._fn()(t)
+        assert result is None

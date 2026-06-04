@@ -31,7 +31,8 @@ __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus"
            "count_detections_by_mission",
            "filter_by_streak_score",
            "compute_rb_score_distribution",
-           "count_candidates_above_rb"]
+           "count_candidates_above_rb",
+           "get_brightest_candidate"]
 
 import math
 import uuid
@@ -1469,3 +1470,21 @@ def count_candidates_above_rb(result: DetectResult, threshold: float = 0.65) -> 
         if valid and max(valid) >= threshold:
             count += 1
     return count
+
+
+def get_brightest_candidate(result: DetectResult) -> object | None:
+    """Return the RawCandidate with the lowest-magnitude observation.
+
+    Considers all observations across all candidates and picks the candidate
+    that contains the observation with the minimum magnitude (excluding
+    sentinel magnitudes ≥ 90).  Returns ``None`` if the result is empty or
+    all magnitudes are sentinels.
+    """
+    best_cand = None
+    best_mag = float("inf")
+    for cand in result.candidates:
+        for obs in cand.observations:
+            if obs.mag < 90.0 and obs.mag < best_mag:
+                best_mag = obs.mag
+                best_cand = cand
+    return best_cand

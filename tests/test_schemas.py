@@ -2269,3 +2269,50 @@ class TestFieldCoverageReport:
         sys.path.insert(0, "src")
         import schemas
         assert "FieldCoverageReport" in schemas.__all__
+
+
+class TestAlertSummaryRecord:
+    cls_name = "AlertSummaryRecord"
+
+    def _cls(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        return getattr(schemas, self.cls_name)
+
+    def test_defaults(self):
+        r = self._cls()()
+        assert r.neo_id == "unknown"
+        assert r.alert_pathway == "internal_candidate"
+        assert r.hazard_flag == "unknown"
+        assert r.discovery_priority is None
+        assert r.moid_au is None
+        assert r.submitted_at_jd is None
+
+    def test_custom_values(self):
+        r = self._cls()(
+            neo_id="NEO-001",
+            alert_pathway="mpc_submission",
+            hazard_flag="pha_candidate",
+            discovery_priority=0.95,
+            moid_au=0.03,
+            submitted_at_jd=2460000.5,
+        )
+        assert r.neo_id == "NEO-001"
+        assert r.alert_pathway == "mpc_submission"
+        assert r.hazard_flag == "pha_candidate"
+        assert abs(r.discovery_priority - 0.95) < 1e-9
+        assert abs(r.moid_au - 0.03) < 1e-9
+        assert abs(r.submitted_at_jd - 2460000.5) < 1e-9
+
+    def test_immutable(self):
+        import pytest
+        r = self._cls()()
+        with pytest.raises(Exception):
+            r.neo_id = "X"
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        assert "AlertSummaryRecord" in schemas.__all__

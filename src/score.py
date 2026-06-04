@@ -37,7 +37,8 @@ __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "compute_alert_urgency_score",
            "filter_by_discovery_priority",
            "get_top_candidates",
-           "compute_pha_fraction"]
+           "compute_pha_fraction",
+           "count_by_alert_pathway"]
 
 import math
 import uuid
@@ -1571,3 +1572,17 @@ def compute_pha_fraction(neos: list) -> float:
         if getattr(getattr(neo, "hazard", None), "hazard_flag", None) == "pha_candidate"
     )
     return float(pha_count) / len(neos)
+
+
+def count_by_alert_pathway(neos: list) -> dict:
+    """Return a count of all scored NEOs grouped by alert_pathway.
+
+    Reads ``neo.hazard.alert_pathway`` for each NEO in *neos*.  NEOs with
+    a missing hazard or alert_pathway contribute to the ``"unknown"`` key.
+    Returns an empty dict for empty input.
+    """
+    counts: dict = {}
+    for neo in neos:
+        pathway = getattr(getattr(neo, "hazard", None), "alert_pathway", "unknown") or "unknown"
+        counts[pathway] = counts.get(pathway, 0) + 1
+    return counts

@@ -53,6 +53,7 @@ __all__ = [
     "format_complete_mpc_submission",
     "count_submissions_by_pathway",
     "validate_obs_code",
+    "format_candidate_summary_line",
 ]
 
 import json
@@ -2109,3 +2110,25 @@ def validate_obs_code(obs_code: str) -> tuple:
         if not (ch.isdigit() or ch.isupper()):
             return (False, f"invalid character '{ch}': must be digit or uppercase letter")
     return (True, "")
+
+
+def format_candidate_summary_line(neo: ScoredNEO) -> str:
+    """Return a single fixed-width summary line for a scored NEO candidate.
+
+    Format (80 characters):
+      ``<object_id:16> <pathway:20> <hazard_flag:14> <priority:6> <moid:8>``
+
+    All fields are truncated or padded to fit.  Priority and MOID display
+    ``N/A`` when unavailable.  This function does NOT transmit any data and
+    does NOT assert the candidate is a confirmed NEO.
+    """
+    obj_id = getattr(getattr(neo, "tracklet", None), "object_id", "unknown") or "unknown"
+    hazard = getattr(neo, "hazard", None)
+    pathway = getattr(hazard, "alert_pathway", "unknown") or "unknown"
+    flag = getattr(hazard, "hazard_flag", "unknown") or "unknown"
+    meta = getattr(neo, "metadata", None)
+    priority = getattr(meta, "discovery_priority", None) if meta else None
+    moid = getattr(hazard, "moid_au", None) if hazard else None
+    p_str = f"{priority:.3f}" if priority is not None else "N/A"
+    m_str = f"{moid:.4f}" if moid is not None else "N/A"
+    return f"{obj_id[:16]:<16} {pathway[:20]:<20} {flag[:14]:<14} {p_str:>6} {m_str:>8}"

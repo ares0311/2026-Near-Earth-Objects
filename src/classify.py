@@ -34,6 +34,7 @@ __all__ = [
     "batch_dominant_hypothesis",
     "filter_by_neo_probability",
     "count_by_dominant_hypothesis",
+    "compute_mean_neo_probability",
     "compute_posterior_update",
     "compute_tier1_confidence",
     "compute_posterior_stability",
@@ -2173,3 +2174,19 @@ def count_by_dominant_hypothesis(neos: list) -> dict:
             hyp, _ = dominant_hypothesis(posterior)
         counts[hyp] = counts.get(hyp, 0) + 1
     return counts
+
+
+def compute_mean_neo_probability(neos: list) -> float | None:
+    """Return the mean posterior neo_candidate probability across all NEOs.
+
+    Reads ``neo.posterior.neo_candidate`` for each NEO.  NEOs with a missing
+    or None posterior are excluded.  Returns ``None`` for an empty list or if
+    no NEO has a valid posterior.
+    """
+    probs = []
+    for neo in neos:
+        posterior = getattr(neo, "posterior", None)
+        prob = getattr(posterior, "neo_candidate", None) if posterior else None
+        if prob is not None:
+            probs.append(float(prob))
+    return float(sum(probs) / len(probs)) if probs else None

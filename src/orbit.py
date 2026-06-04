@@ -35,7 +35,8 @@ __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
            "compute_orbital_period_years",
            "compute_longitude_ascending_node_rate",
            "compute_argument_of_perihelion_rate",
-           "compute_perihelion_velocity"]
+           "compute_perihelion_velocity",
+           "compute_aphelion_velocity"]
 
 import math
 from typing import NamedTuple
@@ -1832,4 +1833,41 @@ def compute_perihelion_velocity(elements: object) -> float | None:
         return None
     q_val = a_val * (1.0 - e_val)
     v2 = GM_KM3_S2 * (2.0 / (q_val * AU_KM) - 1.0 / (a_val * AU_KM))
+    return float(math.sqrt(v2))
+
+
+def compute_aphelion_velocity(elements: object) -> float | None:
+    """Return the orbital speed at aphelion in km/s via the vis-viva equation.
+
+    At aphelion (r = Q = a(1+e)):
+
+    .. math::
+
+        v_Q = \\sqrt{\\mu \\left(\\frac{2}{Q} - \\frac{1}{a}\\right)}
+
+    Uses the same GM_Sun constant as :func:`compute_perihelion_velocity`.
+    Returns ``None`` if any required element is missing, ``a ≤ 0``,
+    ``e ≥ 1`` (hyperbolic), or the result would be non-real.
+    """
+    import math
+
+    AU_KM = 1.495978707e8
+    YR_S = 365.25 * 86400.0
+    GM_AU3_YR2 = 4.0 * math.pi ** 2
+    GM_KM3_S2 = GM_AU3_YR2 * (AU_KM ** 3) / (YR_S ** 2)
+
+    a = getattr(elements, "a_au", None) or getattr(elements, "semi_major_axis_au", None)
+    if a is None:
+        return None
+    a_val = float(a)
+    if a_val <= 0.0:
+        return None
+    e = getattr(elements, "e", None) or getattr(elements, "eccentricity", None)
+    if e is None:
+        return None
+    e_val = float(e)
+    if e_val >= 1.0:
+        return None
+    q_aph = a_val * (1.0 + e_val)
+    v2 = GM_KM3_S2 * (2.0 / (q_aph * AU_KM) - 1.0 / (a_val * AU_KM))
     return float(math.sqrt(v2))

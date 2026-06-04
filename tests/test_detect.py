@@ -2976,3 +2976,56 @@ class TestCountCandidatesAboveRb:
         sys.path.insert(0, "src")
         import detect
         assert "count_candidates_above_rb" in detect.__all__
+
+
+class TestGetBrightestCandidate:
+    fn_name = "get_brightest_candidate"
+
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import detect
+        return getattr(detect, self.fn_name)
+
+    def _obs(self, mag, obs_id="o1"):
+        from types import SimpleNamespace
+        return SimpleNamespace(
+            obs_id=obs_id, ra_deg=10.0, dec_deg=5.0, jd=2460000.0,
+            mag=mag, mag_err=0.1, filter_band="r", real_bogus_score=0.9,
+            mission="ZTF", cutout_science=None, cutout_reference=None,
+            cutout_difference=None,
+        )
+
+    def _cand(self, obs_list):
+        from types import SimpleNamespace
+        return SimpleNamespace(observations=tuple(obs_list), object_id="c1")
+
+    def _result(self, candidates):
+        from types import SimpleNamespace
+        return SimpleNamespace(candidates=candidates, known_matches=[], summary=None)
+
+    def test_empty_result_returns_none(self):
+        result = self._result([])
+        assert self._fn()(result) is None
+
+    def test_all_sentinel_returns_none(self):
+        cand = self._cand([self._obs(99.0), self._obs(95.0)])
+        result = self._result([cand])
+        assert self._fn()(result) is None
+
+    def test_returns_candidate_with_brightest_obs(self):
+        bright_cand = self._cand([self._obs(16.0, "o1")])
+        faint_cand = self._cand([self._obs(22.0, "o2")])
+        result = self._result([faint_cand, bright_cand])
+        assert self._fn()(result) is bright_cand
+
+    def test_single_candidate(self):
+        cand = self._cand([self._obs(20.0)])
+        result = self._result([cand])
+        assert self._fn()(result) is cand
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import detect
+        assert "get_brightest_candidate" in detect.__all__

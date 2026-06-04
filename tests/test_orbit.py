@@ -3198,3 +3198,56 @@ class TestComputePerihelionVelocity:
         sys.path.insert(0, "src")
         import orbit
         assert "compute_perihelion_velocity" in orbit.__all__
+
+
+class TestComputeAphelionVelocity:
+    fn_name = "compute_aphelion_velocity"
+
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import orbit
+        return getattr(orbit, self.fn_name)
+
+    def _elements(self, a=1.5, e=0.3):
+        from types import SimpleNamespace
+        return SimpleNamespace(a_au=a, e=e)
+
+    def test_no_a_returns_none(self):
+        from types import SimpleNamespace
+        el = SimpleNamespace(e=0.3)
+        assert self._fn()(el) is None
+
+    def test_zero_a_returns_none(self):
+        assert self._fn()(self._elements(a=0.0)) is None
+
+    def test_negative_a_returns_none(self):
+        assert self._fn()(self._elements(a=-1.0)) is None
+
+    def test_no_e_returns_none(self):
+        from types import SimpleNamespace
+        el = SimpleNamespace(a_au=1.5)
+        assert self._fn()(el) is None
+
+    def test_hyperbolic_returns_none(self):
+        assert self._fn()(self._elements(a=2.0, e=1.0)) is None
+
+    def test_hyperbolic_high_e_returns_none(self):
+        assert self._fn()(self._elements(a=2.0, e=1.5)) is None
+
+    def test_valid_returns_positive(self):
+        result = self._fn()(self._elements(a=1.5, e=0.3))
+        assert result is not None
+        assert result > 0.0
+
+    def test_higher_e_lower_aphelion_velocity(self):
+        v_low_e = self._fn()(self._elements(a=1.5, e=0.1))
+        v_high_e = self._fn()(self._elements(a=1.5, e=0.5))
+        assert v_low_e is not None and v_high_e is not None
+        assert v_high_e < v_low_e
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import orbit
+        assert "compute_aphelion_velocity" in orbit.__all__

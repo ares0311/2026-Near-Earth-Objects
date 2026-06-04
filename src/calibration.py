@@ -41,6 +41,7 @@ __all__ = [
     "compute_max_calibration_error",
     "compute_calibration_resolution",
     "compute_fraction_calibrated",
+    "compute_calibration_spread",
 ]
 
 import math
@@ -1593,3 +1594,42 @@ def compute_fraction_calibrated(
         if abs(mean_p - frac_pos) <= threshold:
             n_calibrated += 1
     return float(n_calibrated) / n_nonempty if n_nonempty > 0 else 0.0
+
+
+def compute_calibration_spread(
+    probs: list,
+    labels: list,
+    n_bins: int = 10,
+) -> float:
+    """Return the standard deviation of bin-wise calibration errors.
+
+    For each non-empty equal-width bin, computes |mean_predicted_prob −
+    fraction_positive|.  Returns the standard deviation of these per-bin
+    errors.  High spread indicates inconsistent calibration across the
+    probability range.
+
+    Returns 0.0 for empty input, mismatched lengths, fewer than 2 non-empty
+    bins, or n_bins < 1.
+    """
+    if not probs or not labels or len(probs) != len(labels):
+        return 0.0
+    n_bins = max(1, int(n_bins))
+    bin_probs: list[list[float]] = [[] for _ in range(n_bins)]
+    bin_labels: list[list[float]] = [[] for _ in range(n_bins)]
+    for p, y in zip(probs, labels):
+        idx = int(float(p) * n_bins)
+        if idx >= n_bins:
+            idx = n_bins - 1
+        bin_probs[idx].append(float(p))
+        bin_labels[idx].append(float(y))
+    errors = []
+    for bp, bl in zip(bin_probs, bin_labels):
+        if not bp:
+            continue
+        errors.append(abs(sum(bp) / len(bp) - sum(bl) / len(bl)))
+    if len(errors) < 2:
+        return 0.0
+    mean_err = sum(errors) / len(errors)
+    variance = sum((e - mean_err) ** 2 for e in errors) / len(errors)
+    import math
+    return float(math.sqrt(variance))

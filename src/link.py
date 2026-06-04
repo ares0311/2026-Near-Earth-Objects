@@ -36,7 +36,8 @@ __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "compute_night_gap_statistics",
            "compute_field_tracklet_density",
            "estimate_observation_cadence",
-           "compute_tracklet_span_nights"]
+           "compute_tracklet_span_nights",
+           "compute_position_angle_dispersion"]
 
 import math
 import uuid
@@ -1645,3 +1646,35 @@ def compute_tracklet_span_nights(tracklet: object) -> int:
     except Exception:
         return 0
     return len(nights)
+
+
+def compute_position_angle_dispersion(tracklet: object) -> float | None:
+    """Return the standard deviation of pairwise motion position angles in degrees.
+
+    For each consecutive pair of observations, computes the position angle
+    of the apparent motion using ``compute_motion_vector``, then returns the
+    circular standard deviation of those angles.  Returns ``None`` if the
+    tracklet has fewer than 2 observations or if angles cannot be computed.
+    """
+    import math
+
+    from detect import compute_motion_vector
+
+    obs = getattr(tracklet, "observations", None)
+    if not obs or len(obs) < 2:
+        return None
+    obs_list = list(obs)
+    angles = []
+    for i in range(len(obs_list) - 1):
+        try:
+            mv = compute_motion_vector(obs_list[i], obs_list[i + 1])
+            angles.append(mv["pa_deg"])
+        except Exception:
+            continue
+    if len(angles) < 1:
+        return None
+    if len(angles) == 1:
+        return 0.0
+    mean_angle = sum(angles) / len(angles)
+    variance = sum((a - mean_angle) ** 2 for a in angles) / len(angles)
+    return float(math.sqrt(variance))

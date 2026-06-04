@@ -2975,3 +2975,51 @@ class TestValidateObsCode:
         sys.path.insert(0, "src")
         import alert
         assert "validate_obs_code" in alert.__all__
+
+
+class TestFormatCandidateSummaryLine:
+    fn_name = "format_candidate_summary_line"
+
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+        return getattr(alert, self.fn_name)
+
+    def _neo(self, obj_id="NEO-001", pathway="mpc_submission", flag="pha_candidate",
+             priority=0.85, moid=0.03):
+        from types import SimpleNamespace
+        tracklet = SimpleNamespace(object_id=obj_id)
+        hazard = SimpleNamespace(alert_pathway=pathway, hazard_flag=flag, moid_au=moid)
+        metadata = SimpleNamespace(discovery_priority=priority)
+        return SimpleNamespace(tracklet=tracklet, hazard=hazard, metadata=metadata)
+
+    def test_returns_string(self):
+        neo = self._neo()
+        result = self._fn()(neo)
+        assert isinstance(result, str)
+
+    def test_contains_obj_id(self):
+        neo = self._neo(obj_id="MYOBJ")
+        result = self._fn()(neo)
+        assert "MYOBJ" in result
+
+    def test_contains_pathway(self):
+        neo = self._neo(pathway="mpc_submission")
+        result = self._fn()(neo)
+        assert "mpc_submission" in result
+
+    def test_none_priority_shows_na(self):
+        from types import SimpleNamespace
+        tracklet = SimpleNamespace(object_id="X")
+        hazard = SimpleNamespace(alert_pathway="internal_candidate", hazard_flag="nominal", moid_au=None)
+        metadata = SimpleNamespace(discovery_priority=None)
+        neo = SimpleNamespace(tracklet=tracklet, hazard=hazard, metadata=metadata)
+        result = self._fn()(neo)
+        assert "N/A" in result
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+        assert "format_candidate_summary_line" in alert.__all__
