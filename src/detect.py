@@ -28,7 +28,8 @@ __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus"
            "compute_magnitude_range",
            "compute_detection_density",
            "count_streak_detections",
-           "count_detections_by_mission"]
+           "count_detections_by_mission",
+           "filter_by_streak_score"]
 
 import math
 import uuid
@@ -1380,3 +1381,38 @@ def count_detections_by_mission(detect_result: object) -> dict:
         key = str(mission) if mission is not None else "unknown"
         counts[key] = counts.get(key, 0) + 1
     return counts
+
+
+def filter_by_streak_score(
+    result: DetectResult,
+    min_streak_score: float = 0.5,
+) -> DetectResult:
+    """Return a new DetectResult keeping only candidates with high streak severity.
+
+    For each candidate, computes the maximum ``compute_streak_metric`` across its
+    observations.  Candidates where the max streak metric ≥ *min_streak_score*
+    are kept.  Candidates with no observations are discarded.
+
+    The returned provenance reflects the reduced candidate count; other
+    provenance fields are inherited from the input.
+    """
+    from schemas import DetectProvenance
+
+    kept = []
+    for cand in result.candidates:
+        if not cand.observations:
+            continue
+        max_streak = max(compute_streak_metric(o) for o in cand.observations)
+        if max_streak >= min_streak_score:
+            kept.append(cand)
+    prov = DetectProvenance(
+        real_bogus_threshold=result.provenance.real_bogus_threshold,
+        n_candidates=len(kept),
+        n_known_matches=result.provenance.n_known_matches,
+        detected_at_jd=result.provenance.detected_at_jd,
+    )
+    return DetectResult(
+        candidates=tuple(kept),
+        known_matches=result.known_matches,
+        provenance=prov,
+    )

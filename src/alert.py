@@ -50,6 +50,7 @@ __all__ = [
     "count_submission_ready",
     "format_mpc_observation_block",
     "format_neocp_submission_header",
+    "format_complete_mpc_submission",
 ]
 
 import json
@@ -2046,3 +2047,23 @@ def format_neocp_submission_header(
         f"ACK MPCReport file {object_id}",
     ]
     return "\n".join(lines)
+
+
+def format_complete_mpc_submission(
+    neo: ScoredNEO,
+    obs_code: str = _MPC_OBS_CODE,
+) -> str:
+    """Return a complete, paste-ready MPC observation submission for a ScoredNEO.
+
+    Combines the 5-line header from :func:`format_neocp_submission_header`
+    with the 80-column observation block from :func:`format_mpc_observation_block`,
+    separated by a blank line — the standard MPC submission layout.
+
+    **Guardrail**: This function formats a submission document only.  It does
+    NOT transmit any data to the MPC and does NOT assert that the candidate is
+    a confirmed NEO.  Actual submission requires independent confirmation per
+    the alert protocol.
+    """
+    header = format_neocp_submission_header(neo, obs_code=obs_code)
+    obs_block = format_mpc_observation_block(neo, obs_code=obs_code)
+    return f"{header}\n\n{obs_block}"

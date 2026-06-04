@@ -2144,3 +2144,49 @@ class TestSurveyRunSummary:
         sys.path.insert(0, "src")
         import schemas
         assert "SurveyRunSummary" in schemas.__all__
+
+
+class TestPipelineHealthReport:
+    def test_defaults(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import PipelineHealthReport
+
+        r = PipelineHealthReport()
+        assert r.n_modules_tested == 0
+        assert r.coverage_pct == 0.0
+        assert r.lint_clean is False
+        assert r.pipeline_version == "unknown"
+
+    def test_custom_fields(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import PipelineHealthReport
+
+        r = PipelineHealthReport(
+            n_modules_tested=12,
+            coverage_pct=100.0,
+            lint_clean=True,
+            mypy_clean=True,
+            test_count=3062,
+            pipeline_version="0.81.0",
+        )
+        assert r.coverage_pct == 100.0
+        assert r.test_count == 3062
+
+    def test_frozen(self):
+        import sys
+        sys.path.insert(0, "src")
+        import pytest
+
+        from schemas import PipelineHealthReport
+
+        r = PipelineHealthReport()
+        with pytest.raises(Exception):
+            r.coverage_pct = 99.0  # type: ignore[misc]
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        assert "PipelineHealthReport" in schemas.__all__

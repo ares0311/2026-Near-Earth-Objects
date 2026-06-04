@@ -44,6 +44,7 @@ __all__ = [
     "MCPServerStatus",
     "BatchProcessingResult",
     "SurveyRunSummary",
+    "PipelineHealthReport",
 ]
 
 from dataclasses import dataclass
@@ -1229,4 +1230,21 @@ class SurveyRunSummary(BaseModel):
     n_candidates: int = 0
     n_pha_candidates: int = 0
     limiting_mag: float | None = None
+    pipeline_version: str = "unknown"
+
+
+class PipelineHealthReport(BaseModel):
+    """Snapshot of pipeline health from the most recent test and lint run.
+
+    Immutable after construction.  All fields have safe defaults so a partial
+    report can be constructed when not all checks have been run.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    n_modules_tested: int = 0
+    coverage_pct: float = 0.0
+    lint_clean: bool = False
+    mypy_clean: bool = False
+    test_count: int = 0
     pipeline_version: str = "unknown"

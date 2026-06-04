@@ -2701,3 +2701,162 @@ class TestCountDetectionsByMission:
         sys.path.insert(0, "src")
         import detect
         assert "count_detections_by_mission" in detect.__all__
+
+
+class TestFilterByStreakScore:
+    def _make_result(self, streak_metrics):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import DetectProvenance, DetectResult, Observation, RawCandidate
+
+        candidates = []
+        for i, _ in enumerate(streak_metrics):
+            obs = Observation(
+                obs_id=f"o{i}",
+                ra_deg=10.0,
+                dec_deg=5.0,
+                jd=2460000.5,
+                mag=20.0,
+                mag_err=0.1,
+                filter_band="r",
+                mission="ZTF",
+            )
+            cand = RawCandidate(
+                candidate_id=f"c{i}",
+                observations=(obs,),
+                is_streak=True,
+            )
+            candidates.append(cand)
+        prov = DetectProvenance(
+            real_bogus_threshold=0.65,
+            n_candidates=len(candidates),
+            n_known_matches=0,
+            detected_at_jd=2460000.5,
+        )
+        return DetectResult(candidates=tuple(candidates), known_matches=(), provenance=prov)
+
+    def test_empty_result(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import filter_by_streak_score
+        from schemas import DetectProvenance, DetectResult
+
+        prov = DetectProvenance(
+            real_bogus_threshold=0.65,
+            n_candidates=0,
+            n_known_matches=0,
+            detected_at_jd=2460000.5,
+        )
+        result = DetectResult(candidates=(), known_matches=(), provenance=prov)
+        filtered = filter_by_streak_score(result, min_streak_score=0.5)
+        assert len(filtered.candidates) == 0
+
+    def test_returns_detect_result(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import filter_by_streak_score
+        from schemas import DetectResult
+
+        result = self._make_result([0.0])
+        filtered = filter_by_streak_score(result)
+        assert isinstance(filtered, DetectResult)
+
+    def test_zero_streak_below_threshold(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import filter_by_streak_score
+
+        result = self._make_result([0.0])
+        # cutout is None so compute_streak_metric returns 0.0 < 0.5
+        filtered = filter_by_streak_score(result, min_streak_score=0.5)
+        assert len(filtered.candidates) == 0
+
+    def test_provenance_count_updated(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import filter_by_streak_score
+
+        result = self._make_result([0.0, 0.0])
+        filtered = filter_by_streak_score(result, min_streak_score=0.5)
+        assert filtered.provenance.n_candidates == len(filtered.candidates)
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import detect
+        assert "filter_by_streak_score" in detect.__all__
+
+    def _make_streaky_result(self):
+        """Create a DetectResult with one candidate that has a high streak score."""
+        import base64
+        import sys
+        sys.path.insert(0, "src")
+        import numpy as np
+
+        from schemas import DetectProvenance, DetectResult, Observation, RawCandidate
+
+        # Create a 9x9 float32 array with a strong horizontal streak
+        arr = np.zeros((9, 9), dtype=np.float32)
+        arr[4, :] = 10.0  # horizontal line = maximally elongated
+        cutout_b64 = base64.b64encode(arr.tobytes()).decode()
+
+        obs = Observation(
+            obs_id="streak_obs",
+            ra_deg=10.0,
+            dec_deg=5.0,
+            jd=2460000.5,
+            mag=20.0,
+            mag_err=0.1,
+            filter_band="r",
+            mission="ZTF",
+            cutout_difference=cutout_b64,
+        )
+        cand = RawCandidate(
+            candidate_id="streaky",
+            observations=(obs,),
+            is_streak=True,
+        )
+        prov = DetectProvenance(
+            real_bogus_threshold=0.65,
+            n_candidates=1,
+            n_known_matches=0,
+            detected_at_jd=2460000.5,
+        )
+        return DetectResult(candidates=(cand,), known_matches=(), provenance=prov)
+
+    def _make_empty_obs_result(self):
+        """Create a DetectResult with one candidate that has no observations."""
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import DetectProvenance, DetectResult, RawCandidate
+
+        cand = RawCandidate(
+            candidate_id="no_obs",
+            observations=(),
+            is_streak=False,
+        )
+        prov = DetectProvenance(
+            real_bogus_threshold=0.65,
+            n_candidates=1,
+            n_known_matches=0,
+            detected_at_jd=2460000.5,
+        )
+        return DetectResult(candidates=(cand,), known_matches=(), provenance=prov)
+
+    def test_candidate_with_no_observations_skipped(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import filter_by_streak_score
+
+        result = self._make_empty_obs_result()
+        filtered = filter_by_streak_score(result, min_streak_score=0.0)
+        assert len(filtered.candidates) == 0
+
+    def test_high_streak_candidate_kept(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import filter_by_streak_score
+
+        result = self._make_streaky_result()
+        filtered = filter_by_streak_score(result, min_streak_score=0.5)
+        assert len(filtered.candidates) == 1

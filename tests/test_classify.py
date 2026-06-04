@@ -3289,3 +3289,42 @@ class TestComputeTier1FeatureVector:
         sys.path.insert(0, "src")
         import classify
         assert "compute_tier1_feature_vector" in classify.__all__
+
+
+class TestBatchDominantHypothesis:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import batch_dominant_hypothesis
+        self.fn = batch_dominant_hypothesis
+
+    def test_basic(self, scored_neo):
+        rows = self.fn([scored_neo])
+        assert len(rows) == 1
+        assert "object_id" in rows[0]
+        assert "hypothesis" in rows[0]
+        assert "probability" in rows[0]
+
+    def test_probability_range(self, scored_neo):
+        rows = self.fn([scored_neo])
+        assert 0.0 <= rows[0]["probability"] <= 1.0
+
+    def test_no_posterior(self):
+        from types import SimpleNamespace
+        neo = SimpleNamespace(tracklet=SimpleNamespace(object_id="T999"), posterior=None)
+        rows = self.fn([neo])
+        assert rows[0]["hypothesis"] == "unknown"
+        assert rows[0]["probability"] == 0.0
+
+    def test_empty_list(self):
+        assert self.fn([]) == []
+
+    def test_multiple_neos(self, scored_neo):
+        rows = self.fn([scored_neo, scored_neo])
+        assert len(rows) == 2
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import classify
+        assert "batch_dominant_hypothesis" in classify.__all__

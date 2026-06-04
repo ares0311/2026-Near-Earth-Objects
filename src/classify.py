@@ -31,6 +31,7 @@ __all__ = [
     "compute_class_entropy_summary",
     "compute_neo_class_distribution",
     "compute_tier1_feature_vector",
+    "batch_dominant_hypothesis",
     "compute_posterior_update",
     "compute_tier1_confidence",
     "compute_posterior_stability",
@@ -2111,3 +2112,28 @@ def compute_tier1_feature_vector(tracklet: object) -> dict:
         "streak_fraction": streak_fraction,
         "mag_range": mag_range,
     }
+
+
+def batch_dominant_hypothesis(neos: list) -> list:
+    """Return a list of dominant-hypothesis dicts for each scored NEO.
+
+    For each NEO in *neos*, calls :func:`dominant_hypothesis` on its posterior
+    and returns a dict with keys:
+
+      - ``"object_id"``: tracklet object ID (str) or ``"unknown"`` if unavailable
+      - ``"hypothesis"``: dominant hypothesis name (str)
+      - ``"probability"``: probability of the dominant hypothesis (float)
+
+    NEOs with a missing or invalid posterior contribute
+    ``{"object_id": ..., "hypothesis": "unknown", "probability": 0.0}``.
+    """
+    results = []
+    for neo in neos:
+        obj_id = getattr(getattr(neo, "tracklet", None), "object_id", "unknown") or "unknown"
+        posterior = getattr(neo, "posterior", None)
+        if posterior is None:
+            results.append({"object_id": obj_id, "hypothesis": "unknown", "probability": 0.0})
+            continue
+        hyp, prob = dominant_hypothesis(posterior)
+        results.append({"object_id": obj_id, "hypothesis": hyp, "probability": float(prob)})
+    return results

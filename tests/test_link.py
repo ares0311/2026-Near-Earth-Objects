@@ -3151,3 +3151,37 @@ class TestComputeNightGapStatistics:
         sys.path.insert(0, "src")
         import link
         assert "compute_night_gap_statistics" in link.__all__
+
+
+class TestComputeFieldTrackletDensity:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_field_tracklet_density
+        self.fn = compute_field_tracklet_density
+
+    def test_basic(self, tracklet):
+        result = self.fn([tracklet], field_radius_deg=1.0)
+        assert result is not None
+        assert result > 0.0
+
+    def test_zero_radius_returns_none(self, tracklet):
+        assert self.fn([tracklet], field_radius_deg=0.0) is None
+
+    def test_negative_radius_returns_none(self, tracklet):
+        assert self.fn([tracklet], field_radius_deg=-1.0) is None
+
+    def test_empty_tracklets(self):
+        result = self.fn([], field_radius_deg=1.0)
+        assert result == 0.0
+
+    def test_larger_field_lower_density(self, tracklet):
+        d1 = self.fn([tracklet], field_radius_deg=1.0)
+        d2 = self.fn([tracklet], field_radius_deg=5.0)
+        assert d2 < d1
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+        assert "compute_field_tracklet_density" in link.__all__

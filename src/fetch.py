@@ -32,7 +32,8 @@ __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fet
            "compute_survey_overlap",
            "count_observations_by_night",
            "compute_temporal_coverage",
-           "compute_observation_rate"]
+           "compute_observation_rate",
+           "compute_magnitude_distribution"]
 
 import json
 import os
@@ -2081,3 +2082,39 @@ def compute_observation_rate(fetch_result: object) -> float | None:
     if len(nights) < 2:
         return None
     return float(sum(nights.values()) / len(nights))
+
+
+def compute_magnitude_distribution(fetch_result: object, n_bins: int = 10) -> dict:
+    """Return a histogram of alert magnitudes across a FetchResult.
+
+    Divides the observed magnitude range into *n_bins* equal-width bins and
+    counts observations in each bin.  Returns a dict with keys:
+
+      - ``"bin_edges"``: list of n_bins + 1 edge values
+      - ``"counts"``: list of n_bins integer counts
+      - ``"n_total"``: total number of valid magnitude observations (mag < 90)
+
+    Observations with mag ≥ 90 (sentinel / missing) are excluded.
+    *n_bins* is clamped to at least 1.  Returns zero counts and edges [0, 1]
+    if no valid magnitudes are present.
+    """
+    n_bins = max(1, int(n_bins))
+    alerts = getattr(fetch_result, "alerts", None) or []
+    mags = [
+        float(getattr(o, "mag", 99))
+        for o in alerts
+        if getattr(o, "mag", None) is not None and float(getattr(o, "mag", 99)) < 90.0
+    ]
+    if not mags:
+        edges = [float(i) / n_bins for i in range(n_bins + 1)]
+        return {"bin_edges": edges, "counts": [0] * n_bins, "n_total": 0}
+    lo, hi = min(mags), max(mags)
+    width = (hi - lo) / n_bins if hi > lo else 1.0
+    edges = [lo + i * width for i in range(n_bins + 1)]
+    counts = [0] * n_bins
+    for m in mags:
+        idx = int((m - lo) / width) if width > 0 else 0
+        if idx >= n_bins:
+            idx = n_bins - 1
+        counts[idx] += 1
+    return {"bin_edges": edges, "counts": counts, "n_total": len(mags)}

@@ -34,7 +34,8 @@ __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "compute_moid_hazard_score",
            "compute_size_estimate_range",
            "compute_priority_histogram",
-           "compute_alert_urgency_score"]
+           "compute_alert_urgency_score",
+           "filter_by_discovery_priority"]
 
 import math
 import uuid
@@ -1521,3 +1522,18 @@ def compute_alert_urgency_score(neo: object) -> float:
 
     score = 0.4 * moid_prox + 0.4 * disc_priority + 0.2 * orbit_quality
     return float(min(1.0, max(0.0, score)))
+
+
+def filter_by_discovery_priority(neos: list, min_priority: float = 0.5) -> list:
+    """Return the subset of ScoredNEOs with discovery_priority ≥ min_priority.
+
+    Reads ``neo.metadata.discovery_priority``.  NEOs with a missing or None
+    priority are excluded.  Returns an empty list if no candidates qualify.
+    """
+    result = []
+    for neo in neos:
+        metadata = getattr(neo, "metadata", None)
+        p = getattr(metadata, "discovery_priority", None) if metadata else None
+        if p is not None and float(p) >= min_priority:
+            result.append(neo)
+    return result

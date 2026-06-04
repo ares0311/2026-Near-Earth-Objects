@@ -32,7 +32,8 @@ __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
            "compute_orbital_speed_at_perihelion",
            "compute_impact_parameter",
            "compute_geocentric_velocity",
-           "compute_orbital_period_years"]
+           "compute_orbital_period_years",
+           "compute_longitude_ascending_node_rate"]
 
 import math
 from typing import NamedTuple
@@ -1698,3 +1699,50 @@ def compute_orbital_period_years(elements: object) -> float | None:
     if a_val <= 0.0:
         return None
     return float(math.sqrt(a_val ** 3))
+
+
+def compute_longitude_ascending_node_rate(elements: object) -> float | None:
+    """Return an approximate secular nodal precession rate in degrees per year.
+
+    Uses the first-order J2 secular perturbation formula for the rate of change
+    of the longitude of the ascending node due to Earth's oblateness (J2):
+
+    .. math::
+
+        \\dot{\\Omega} \\approx -\\frac{3}{2} n J_2
+            \\left(\\frac{R_\\oplus}{a}\\right)^2
+            \\frac{\\cos i}{(1-e^2)^2}
+
+    Here the Sun is treated as the central body; J2 is the solar oblateness
+    (J2_sun ≈ 2.0 × 10⁻⁷).  This gives a tiny but non-zero rate for
+    heliocentric orbits.  Returns ``None`` if any required element is missing
+    or if ``a ≤ 0``, ``e ≥ 1``, or ``inclination`` is absent.
+
+    Returns the rate in degrees per year (negative = retrograde precession).
+    """
+    a = getattr(elements, "a_au", None) or getattr(elements, "semi_major_axis_au", None)
+    if a is None:
+        return None
+    a_val = float(a)
+    if a_val <= 0.0:
+        return None
+    e = getattr(elements, "e", None) or getattr(elements, "eccentricity", None)
+    if e is None:
+        return None
+    e_val = float(e)
+    if e_val >= 1.0:
+        return None
+    incl = getattr(elements, "inclination_deg", None)
+    if incl is None:
+        return None
+    i_rad = math.radians(float(incl))
+    # Solar J2 ≈ 2.0e-7; R_sun ≈ 4.65e-3 AU
+    J2_SUN = 2.0e-7
+    R_SUN_AU = 4.65e-3
+    # Mean motion in degrees/year: n = 360 / T_years = 360 / sqrt(a^3)
+    n_deg_yr = 360.0 / math.sqrt(a_val ** 3)
+    rate = (
+        -1.5 * n_deg_yr * J2_SUN * (R_SUN_AU / a_val) ** 2
+        * math.cos(i_rad) / (1.0 - e_val ** 2) ** 2
+    )
+    return float(rate)

@@ -33,7 +33,8 @@ __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "compute_arc_endpoint_separation",
            "compute_pa_circular_std",
            "compute_sky_coverage_area",
-           "compute_night_gap_statistics"]
+           "compute_night_gap_statistics",
+           "compute_field_tracklet_density"]
 
 import math
 import uuid
@@ -1583,3 +1584,24 @@ def compute_night_gap_statistics(tracklets: list) -> dict:
         "max_gap_nights": max(all_gaps) if all_gaps else None,
         "n_tracklets": len(tracklets),
     }
+
+
+def compute_field_tracklet_density(
+    tracklets: list,
+    field_radius_deg: float,
+) -> float | None:
+    """Return the number of tracklets per square degree for a circular survey field.
+
+    Uses the solid-angle formula: Ω = 2π(1−cos(r)) steradians, converted to
+    square degrees.  Returns ``None`` if *field_radius_deg* ≤ 0.
+
+    Unlike :func:`compute_tracklet_sky_density` (which measures local crowding),
+    this function treats *tracklets* as the complete set within the field and
+    *field_radius_deg* as the field half-angle.
+    """
+    if field_radius_deg <= 0.0:
+        return None
+    r_rad = math.radians(abs(field_radius_deg))
+    steradians = 2.0 * math.pi * (1.0 - math.cos(r_rad))
+    sq_deg = steradians * (180.0 / math.pi) ** 2
+    return float(len(tracklets) / sq_deg) if sq_deg > 0.0 else None

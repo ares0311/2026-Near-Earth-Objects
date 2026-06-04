@@ -2790,3 +2790,44 @@ class TestComputeAlertUrgencyScore:
         sys.path.insert(0, "src")
         import score
         assert "compute_alert_urgency_score" in score.__all__
+
+
+class TestFilterByDiscoveryPriority:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import filter_by_discovery_priority
+        self.fn = filter_by_discovery_priority
+
+    def test_basic(self, scored_neo):
+        result = self.fn([scored_neo], min_priority=0.0)
+        assert len(result) == 1
+
+    def test_filters_below_threshold(self, scored_neo):
+        result = self.fn([scored_neo], min_priority=1.1)
+        assert len(result) == 0
+
+    def test_empty_list(self):
+        assert self.fn([]) == []
+
+    def test_no_metadata(self):
+        from types import SimpleNamespace
+        neo = SimpleNamespace(metadata=None)
+        assert self.fn([neo], min_priority=0.5) == []
+
+    def test_none_priority_excluded(self):
+        from types import SimpleNamespace
+        neo = SimpleNamespace(metadata=SimpleNamespace(discovery_priority=None))
+        assert self.fn([neo], min_priority=0.5) == []
+
+    def test_exact_threshold_included(self):
+        from types import SimpleNamespace
+        neo = SimpleNamespace(metadata=SimpleNamespace(discovery_priority=0.5))
+        result = self.fn([neo], min_priority=0.5)
+        assert len(result) == 1
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        assert "filter_by_discovery_priority" in score.__all__

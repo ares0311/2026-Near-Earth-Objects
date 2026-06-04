@@ -4339,3 +4339,70 @@ class TestComputeObservationRate:
         sys.path.insert(0, "src")
         import fetch
         assert "compute_observation_rate" in fetch.__all__
+
+
+class TestComputeMagnitudeDistribution:
+    def _make_result(self, mags):
+        from types import SimpleNamespace
+
+        obs = [SimpleNamespace(mag=m) for m in mags]
+        return SimpleNamespace(alerts=obs)
+
+    def test_empty_returns_zero_counts(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_magnitude_distribution
+
+        h = compute_magnitude_distribution(self._make_result([]))
+        assert h["n_total"] == 0
+        assert all(c == 0 for c in h["counts"])
+
+    def test_sentinel_mags_excluded(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_magnitude_distribution
+
+        h = compute_magnitude_distribution(self._make_result([99.0, 98.5]))
+        assert h["n_total"] == 0
+
+    def test_counts_sum_to_n_total(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_magnitude_distribution
+
+        result = self._make_result([18.0, 19.0, 20.0, 21.0, 22.0])
+        h = compute_magnitude_distribution(result, n_bins=5)
+        assert sum(h["counts"]) == 5
+        assert h["n_total"] == 5
+
+    def test_bin_edge_count(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_magnitude_distribution
+
+        h = compute_magnitude_distribution(self._make_result([20.0]), n_bins=8)
+        assert len(h["bin_edges"]) == 9
+        assert len(h["counts"]) == 8
+
+    def test_uniform_mags_go_to_bins(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_magnitude_distribution
+
+        result = self._make_result([18.0, 20.0])
+        h = compute_magnitude_distribution(result, n_bins=2)
+        assert sum(h["counts"]) == 2
+
+    def test_n_bins_clamped(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_magnitude_distribution
+
+        h = compute_magnitude_distribution(self._make_result([]), n_bins=0)
+        assert len(h["counts"]) == 1
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+        assert "compute_magnitude_distribution" in fetch.__all__

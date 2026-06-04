@@ -2863,3 +2863,76 @@ class TestComputeReferenceCutoutSnr:
         sys.path.insert(0, "src")
         import preprocess
         assert "compute_reference_cutout_snr" in preprocess.__all__
+
+
+class TestComputeCutoutNoiseLevel:
+    def _make_cutout_b64(self, values):
+        import base64
+
+        import numpy as np
+
+        arr = np.array(values, dtype=np.float32)
+        return base64.b64encode(arr.tobytes()).decode()
+
+    def test_no_cutout_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_cutout_noise_level
+
+        assert compute_cutout_noise_level(SimpleNamespace()) is None
+
+    def test_none_cutout_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_cutout_noise_level
+
+        assert compute_cutout_noise_level(SimpleNamespace(cutout_difference=None)) is None
+
+    def test_uniform_cutout_zero_std(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_cutout_noise_level
+
+        flat = [1.0] * (63 * 63)
+        b64 = self._make_cutout_b64(flat)
+        obs = SimpleNamespace(cutout_difference=b64)
+        assert compute_cutout_noise_level(obs) == 0.0
+
+    def test_noisy_cutout_positive_std(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        import numpy as np
+
+        from preprocess import compute_cutout_noise_level
+
+        rng = np.random.default_rng(42)
+        arr = rng.standard_normal(63 * 63).astype(np.float32)
+        import base64
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        obs = SimpleNamespace(cutout_difference=b64)
+        noise = compute_cutout_noise_level(obs)
+        assert noise is not None and noise > 0.0
+
+    def test_invalid_data_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_cutout_noise_level
+
+        obs = SimpleNamespace(cutout_difference="!!!notvalid!!!")
+        assert compute_cutout_noise_level(obs) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import preprocess
+        assert "compute_cutout_noise_level" in preprocess.__all__

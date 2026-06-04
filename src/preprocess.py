@@ -31,7 +31,8 @@ __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_
            "compute_cutout_entropy_normalized",
            "compute_image_contrast",
            "compute_pixel_saturation_fraction",
-           "compute_reference_cutout_snr"]
+           "compute_reference_cutout_snr",
+           "compute_cutout_noise_level"]
 
 import base64
 import math
@@ -1467,5 +1468,23 @@ def compute_reference_cutout_snr(obs: object) -> float | None:
         if rms == 0.0:
             return None
         return float(arr.max() / rms)
+    except Exception:
+        return None
+
+
+def compute_cutout_noise_level(obs: object) -> float | None:
+    """Return the standard deviation of pixel values in the difference-image cutout.
+
+    Provides a per-observation noise estimate without requiring an explicit
+    background model.  Returns ``None`` if no difference-image cutout is present
+    or if the cutout cannot be decoded.
+    """
+    cutout = getattr(obs, "cutout_difference", None)
+    if cutout is None:
+        return None
+    try:
+        raw = base64.b64decode(cutout)
+        arr = np.frombuffer(raw, dtype=np.float32).reshape(_CUTOUT_SIZE, _CUTOUT_SIZE).astype(float)
+        return float(np.std(arr))
     except Exception:
         return None

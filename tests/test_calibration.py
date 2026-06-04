@@ -2015,3 +2015,48 @@ class TestComputeOverconfidenceFraction:
         sys.path.insert(0, "src")
         import calibration
         assert "compute_overconfidence_fraction" in calibration.__all__
+
+
+class TestComputeMaxCalibrationError:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_max_calibration_error
+        self.fn = compute_max_calibration_error
+
+    def test_perfect_calibration(self):
+        probs = [0.0, 0.0, 1.0, 1.0]
+        labels = [0, 0, 1, 1]
+        assert self.fn(probs, labels) == 0.0
+
+    def test_empty_returns_zero(self):
+        assert self.fn([], []) == 0.0
+
+    def test_mismatched_lengths(self):
+        assert self.fn([0.5], [0, 1]) == 0.0
+
+    def test_all_wrong_high_mce(self):
+        probs = [0.9, 0.9, 0.9]
+        labels = [0, 0, 0]
+        mce = self.fn(probs, labels)
+        assert mce > 0.0
+
+    def test_range(self):
+        import random
+        random.seed(0)
+        probs = [random.random() for _ in range(100)]
+        labels = [random.randint(0, 1) for _ in range(100)]
+        mce = self.fn(probs, labels)
+        assert 0.0 <= mce <= 1.0
+
+    def test_custom_bins(self):
+        probs = [0.1, 0.5, 0.9]
+        labels = [0, 1, 1]
+        result = self.fn(probs, labels, n_bins=3)
+        assert isinstance(result, float)
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        assert "compute_max_calibration_error" in calibration.__all__

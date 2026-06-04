@@ -38,6 +38,7 @@ __all__ = [
     "compute_calibration_gain",
     "compute_calibration_bias",
     "compute_overconfidence_fraction",
+    "compute_max_calibration_error",
 ]
 
 import math
@@ -1474,3 +1475,36 @@ def compute_overconfidence_fraction(
         return 0.0
     wrong = sum(1 for _, y in high_conf if float(y) == 0.0)
     return float(wrong / len(high_conf))
+
+
+def compute_max_calibration_error(
+    probs: list,
+    labels: list,
+    n_bins: int = 10,
+) -> float:
+    """Return the Maximum Calibration Error (MCE) across equal-width bins.
+
+    MCE = max over non-empty bins of |mean_predicted_prob − fraction_positive|.
+
+    Bins span [0, 1] with width 1/n_bins.  Empty bins are skipped.
+    Returns 0.0 for empty input, mismatched lengths, or n_bins < 1.
+    """
+    if not probs or not labels or len(probs) != len(labels):
+        return 0.0
+    n_bins = max(1, int(n_bins))
+    bin_probs: list[list[float]] = [[] for _ in range(n_bins)]
+    bin_labels: list[list[float]] = [[] for _ in range(n_bins)]
+    for p, y in zip(probs, labels):
+        idx = int(float(p) * n_bins)
+        if idx >= n_bins:
+            idx = n_bins - 1
+        bin_probs[idx].append(float(p))
+        bin_labels[idx].append(float(y))
+    mce = 0.0
+    for bp, bl in zip(bin_probs, bin_labels):
+        if not bp:
+            continue
+        gap = abs(sum(bp) / len(bp) - sum(bl) / len(bl))
+        if gap > mce:
+            mce = gap
+    return float(mce)

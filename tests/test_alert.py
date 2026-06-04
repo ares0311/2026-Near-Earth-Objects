@@ -2845,3 +2845,38 @@ class TestFormatNeocpSubmissionHeader:
         sys.path.insert(0, "src")
         import alert
         assert "format_neocp_submission_header" in alert.__all__
+
+
+class TestFormatCompleteMpcSubmission:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_complete_mpc_submission
+        self.fn = format_complete_mpc_submission
+
+    def test_returns_string(self, scored_neo):
+        result = self.fn(scored_neo)
+        assert isinstance(result, str)
+
+    def test_contains_header_and_obs(self, scored_neo):
+        result = self.fn(scored_neo)
+        assert "COD" in result
+        assert len([ln for ln in result.splitlines() if len(ln) == 80]) >= 1
+
+    def test_blank_line_separator(self, scored_neo):
+        result = self.fn(scored_neo)
+        assert "\n\n" in result
+
+    def test_custom_obs_code(self, scored_neo):
+        result = self.fn(scored_neo, obs_code="568")
+        assert "568" in result
+
+    def test_no_impact_claim(self, scored_neo):
+        result = self.fn(scored_neo)
+        assert "impact probability" not in result.lower() or "NOT" in result
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+        assert "format_complete_mpc_submission" in alert.__all__
