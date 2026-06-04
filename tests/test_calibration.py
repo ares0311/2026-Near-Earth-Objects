@@ -1797,3 +1797,57 @@ class TestComputeWeightedBrierScore:
         sys.path.insert(0, "src")
         import calibration
         assert "compute_weighted_brier_score" in calibration.__all__
+
+
+class TestComputeCalibrationGap:
+    def test_perfect_calibration(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_calibration_gap
+        # All predictions in same bin: mean_pred=0.5, frac_pos=0.5 → gap=0
+        probs = [0.5, 0.5, 0.5, 0.5]
+        labels = [0.0, 1.0, 0.0, 1.0]
+        gap = compute_calibration_gap(probs, labels)
+        assert gap < 1e-9
+
+    def test_empty_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_calibration_gap
+        assert compute_calibration_gap([], []) == 0.0
+
+    def test_overconfident(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_calibration_gap
+        # Predict 0.9 for all, but only 50% positive
+        probs = [0.9] * 10
+        labels = [1.0, 0.0] * 5
+        gap = compute_calibration_gap(probs, labels)
+        assert gap > 0.2
+
+    def test_result_non_negative(self):
+        import sys
+        sys.path.insert(0, "src")
+        import random
+
+        from calibration import compute_calibration_gap
+        random.seed(42)
+        probs = [random.random() for _ in range(50)]
+        labels = [float(random.random() > 0.5) for _ in range(50)]
+        gap = compute_calibration_gap(probs, labels)
+        assert gap >= 0.0
+
+    def test_single_pair(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_calibration_gap
+        # One prediction of 0.8, label=1.0 → gap=|0.8-1.0|=0.2
+        gap = compute_calibration_gap([0.8], [1.0])
+        assert abs(gap - 0.2) < 1e-9
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        assert "compute_calibration_gap" in calibration.__all__

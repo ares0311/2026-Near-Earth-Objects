@@ -2599,3 +2599,72 @@ class TestFormatCandidateCountSummary:
         sys.path.insert(0, "src")
         import alert
         assert "format_candidate_count_summary" in alert.__all__
+
+
+class TestFormatObservationCountSummary:
+    def _make_neo(self, obs_missions):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+        obs = [SimpleNamespace(obs_id=f"O{i}", mission=m) for i, m in enumerate(obs_missions)]
+        tracklet = SimpleNamespace(observations=tuple(obs))
+        return SimpleNamespace(tracklet=tracklet)
+
+    def test_basic_counts(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_observation_count_summary
+        neos = [
+            self._make_neo(["ZTF", "ZTF", "ATLAS"]),
+            self._make_neo(["ZTF"]),
+        ]
+        result = format_observation_count_summary(neos)
+        assert result["total_observations"] == 4
+        assert result["by_mission"]["ZTF"] == 3
+        assert result["by_mission"]["ATLAS"] == 1
+        assert result["n_candidates"] == 2
+
+    def test_empty_list(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_observation_count_summary
+        result = format_observation_count_summary([])
+        assert result["total_observations"] == 0
+        assert result["n_candidates"] == 0
+        assert result["by_mission"] == {}
+
+    def test_guardrail_contains_not(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_observation_count_summary
+        result = format_observation_count_summary([])
+        assert "NOT" in result["guardrail"]
+
+    def test_no_tracklet_attr(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from alert import format_observation_count_summary
+        neo = SimpleNamespace(tracklet=None)
+        result = format_observation_count_summary([neo])
+        assert result["total_observations"] == 0
+        assert result["n_candidates"] == 1
+
+    def test_none_mission_mapped_to_unknown(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from alert import format_observation_count_summary
+        obs = [SimpleNamespace(obs_id="O1", mission=None)]
+        tracklet = SimpleNamespace(observations=tuple(obs))
+        neo = SimpleNamespace(tracklet=tracklet)
+        result = format_observation_count_summary([neo])
+        assert result["by_mission"]["unknown"] == 1
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+        assert "format_observation_count_summary" in alert.__all__

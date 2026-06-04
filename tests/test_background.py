@@ -4029,3 +4029,256 @@ class TestOperationsNextAction:
             {"overall_status": "pass"},
         )
         assert result == "continue_offline_scheduler"
+
+
+# ---------------------------------------------------------------------------
+# Coverage gap tests — background.py v0.76.0 additions
+# ---------------------------------------------------------------------------
+
+class TestInternalFollowUpDispositionUnsigned:
+    """Covers lines 1676-1677: awaiting_internal_review branch."""
+
+    def test_unsigned_entry_disposition(self, monkeypatch, tmp_path):
+        import sys
+        sys.path.insert(0, "src")
+        import background
+
+        fixture = tmp_path / "targets.json"
+        db_path = tmp_path / "Logs" / "background.sqlite"
+        write_fixture(fixture)
+        monkeypatch.setattr(background, "score_tracklet", lambda t, r: make_scored())
+        # Run but do NOT sign off
+        background.background_run_once(
+            fixture, db_path, tmp_path / "reports",
+            config_path=tmp_path / "missing_config.json",
+        )
+        summary = background.internal_follow_up_disposition_summary(db_path)
+        dispositions = [
+            d for d in summary["dispositions"]
+            if d["disposition"] == "awaiting_internal_review"
+        ]
+        assert len(dispositions) >= 1
+        assert dispositions[0]["signed_for_internal_tracking"] is False
+        assert dispositions[0]["next_action"] == "record_internal_review_decision"
+
+
+class TestKeychainSecretPresent:
+    """Covers lines 3080-3091: _keychain_secret_present subprocess path.
+
+    Override the module-level autouse fixture so the real function is NOT patched.
+    The class-scoped fixture of the same name shadows the autouse one for this class.
+    """
+
+    @pytest.fixture(autouse=True)
+    def no_keychain_credentials(self, monkeypatch):
+        # Override the module autouse fixture: do NOT patch _keychain_secret_present.
+        # Only disable the env-var guard so tests can control it per-test.
+        monkeypatch.delenv("NEO_DETECTION_DISABLE_KEYCHAIN_LOOKUP", raising=False)
+
+    def test_disable_flag_returns_false(self, monkeypatch):
+        monkeypatch.setenv("NEO_DETECTION_DISABLE_KEYCHAIN_LOOKUP", "1")
+        result = background._keychain_secret_present("neo-detection:TEST_SERVICE")
+        assert result is False
+
+    def test_no_security_command_returns_false(self):
+        # On Linux 'security' doesn't exist → OSError → False
+        result = background._keychain_secret_present("neo-detection:NONEXISTENT_SERVICE")
+        assert result is False
+
+    def test_subprocess_returncode_zero_returns_true(self, monkeypatch):
+        monkeypatch.setattr(
+            background.subprocess, "run",
+            lambda *a, **kw: type("R", (), {"returncode": 0})()
+        )
+        result = background._keychain_secret_present("neo-detection:TEST")
+        assert result is True
+
+    def test_subprocess_returncode_nonzero_returns_false(self, monkeypatch):
+        monkeypatch.setattr(
+            background.subprocess, "run",
+            lambda *a, **kw: type("R", (), {"returncode": 1})()
+        )
+        result = background._keychain_secret_present("neo-detection:TEST")
+        assert result is False
+
+
+class TestLiveCredentialInventoryNoCredentialProvider:
+    """Covers lines 3181-3196: empty credential_rows branch."""
+
+    def test_no_credential_provider_entry(self, monkeypatch, tmp_path):
+        import sys
+        sys.path.insert(0, "src")
+        import background
+        # Inject a provider with no required or optional credentials
+        fake_provider = {
+            "survey": "PublicSurvey",
+            "auth_mode": "public",
+            "fetch_api": "public_api",
+            "credential_status": [],
+            "optional_credential_status": [],
+        }
+        monkeypatch.setattr(
+            background, "live_provider_readiness",
+            lambda config_path: (fake_provider,),
+        )
+        policy_path = tmp_path / "policy.json"
+        config_path = tmp_path / "config.json"
+        write_live_policy(policy_path, approved=True)
+        write_live_config(config_path, policy_path, live_network_enabled=True)
+
+        inventory = background.live_credential_inventory(config_path)
+        entry = inventory["inventory"][0]
+        assert entry["survey"] == "PublicSurvey"
+        assert entry["credential_env"] is None
+        assert entry["credential_required"] is False
+        assert entry["credential_source"] == "not_required"
+        assert entry["network_access_performed"] is False
+
+
+class TestWriteLiveCredentialInventoryReport:
+    """Covers lines 3243-3246: write_live_credential_inventory_report path write."""
+
+    def test_writes_report_file(self, monkeypatch, tmp_path):
+        import sys
+        sys.path.insert(0, "src")
+        import background
+        policy_path = tmp_path / "policy.json"
+        config_path = tmp_path / "config.json"
+        report_path = tmp_path / "reports" / "cred_inv.json"
+        write_live_policy(policy_path, approved=True)
+        write_live_config(config_path, policy_path, live_network_enabled=True)
+        monkeypatch.setenv("ATLAS_TOKEN", "tok")
+
+        result = background.write_live_credential_inventory_report(
+            config_path=config_path, report_path=report_path
+        )
+        assert report_path.exists()
+        assert result["secret_values_recorded"] is False
+        assert result["network_access_performed"] is False
+        assert result["external_submission_enabled"] is False
+
+
+class TestLivePolicyApprovalChecklistAtlasTokenMissing:
+    """Covers line 3301: ATLAS_TOKEN_MISSING_FOR_ATLAS_SURVEY blocker."""
+
+    def test_atlas_token_missing_blocker(self, monkeypatch, tmp_path):
+        import sys
+        sys.path.insert(0, "src")
+        import background
+        policy_path = tmp_path / "policy.json"
+        config_path = tmp_path / "config.json"
+        write_live_policy(policy_path, approved=False)
+        write_live_config(config_path, policy_path, live_network_enabled=True)
+        monkeypatch.delenv("ATLAS_TOKEN", raising=False)
+        monkeypatch.setenv("NEO_DETECTION_DISABLE_KEYCHAIN_LOOKUP", "1")
+
+        checklist = background.live_policy_approval_checklist(config_path)
+        assert "ATLAS_TOKEN_MISSING_FOR_ATLAS_SURVEY" in checklist["approval_blockers"]
+
+
+class TestWriteLivePolicyApprovalChecklistReport:
+    """Covers lines 3339-3342: write_live_policy_approval_checklist_report path write."""
+
+    def test_writes_report_file(self, monkeypatch, tmp_path):
+        import sys
+        sys.path.insert(0, "src")
+        import background
+        policy_path = tmp_path / "policy.json"
+        config_path = tmp_path / "config.json"
+        report_path = tmp_path / "reports" / "checklist.json"
+        write_live_policy(policy_path, approved=False)
+        write_live_config(config_path, policy_path, live_network_enabled=False)
+        monkeypatch.setenv("ATLAS_TOKEN", "tok")
+
+        result = background.write_live_policy_approval_checklist_report(
+            config_path=config_path, report_path=report_path
+        )
+        assert report_path.exists()
+        assert result["secret_values_recorded"] is False
+        assert result["network_access_performed"] is False
+        assert result["external_submission_enabled"] is False
+
+
+class TestNumericValues:
+    """Covers lines 3495, 3504-3507: _numeric_values branches."""
+
+    def test_bool_returns_empty(self):
+        import sys
+        sys.path.insert(0, "src")
+        import background
+        assert background._numeric_values(True) == []
+        assert background._numeric_values(False) == []
+
+    def test_none_returns_empty(self):
+        import sys
+        sys.path.insert(0, "src")
+        import background
+        assert background._numeric_values(None) == []
+
+    def test_int_returns_float_list(self):
+        import sys
+        sys.path.insert(0, "src")
+        import background
+        assert background._numeric_values(5) == [5.0]
+
+    def test_list_returns_flattened(self):
+        import sys
+        sys.path.insert(0, "src")
+        import background
+        assert background._numeric_values([0.1, 0.2]) == [0.1, 0.2]
+
+    def test_tuple_returns_flattened(self):
+        import sys
+        sys.path.insert(0, "src")
+        import background
+        assert background._numeric_values((0.3, 0.4)) == [0.3, 0.4]
+
+    def test_unknown_type_returns_empty(self):
+        import sys
+        sys.path.insert(0, "src")
+        import background
+        assert background._numeric_values("hello") == []
+
+
+class TestScoreValuesInRange:
+    """Covers lines 3514, 3516: _score_values_in_range branches."""
+
+    def test_non_finite_returns_false(self):
+        import math
+        import sys
+        sys.path.insert(0, "src")
+        import background
+        assert background._score_values_in_range({"v": math.inf}) is False
+        assert background._score_values_in_range({"v": float("nan")}) is False
+
+    def test_out_of_range_returns_false(self):
+        import sys
+        sys.path.insert(0, "src")
+        import background
+        assert background._score_values_in_range({"v": 1.5}) is False
+        assert background._score_values_in_range({"v": -0.1}) is False
+
+    def test_valid_range_returns_true(self):
+        import sys
+        sys.path.insert(0, "src")
+        import background
+        assert background._score_values_in_range({"v": 0.5}) is True
+        assert background._score_values_in_range({"v": 0.0}) is True
+        assert background._score_values_in_range({"v": 1.0}) is True
+
+
+class TestWriteScoringMetricsKpiReport:
+    """Covers lines 3714-3717: write_scoring_metrics_kpi_report path write."""
+
+    def test_writes_report_file(self, tmp_path):
+        import sys
+        sys.path.insert(0, "src")
+        import background
+        report_path = tmp_path / "kpi_latest.json"
+
+        result = background.write_scoring_metrics_kpi_report(report_path=report_path)
+        assert report_path.exists()
+        assert result["secret_values_recorded"] is False
+        assert result["network_access_performed"] is False
+        assert result["external_submission_enabled"] is False
+        assert "report" in result

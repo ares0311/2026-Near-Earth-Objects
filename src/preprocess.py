@@ -27,7 +27,8 @@ __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_
            "compute_local_background_rms",
            "compute_cutout_peak_snr",
            "compute_gradient_magnitude",
-           "compute_cutout_rms"]
+           "compute_cutout_rms",
+           "compute_cutout_entropy_normalized"]
 
 import base64
 import math
@@ -1366,5 +1367,32 @@ def compute_cutout_rms(obs: object) -> float | None:
         raw = _b64.b64decode(cutout)
         arr = np.frombuffer(raw, dtype=np.float32).reshape(_CUTOUT_SIZE, _CUTOUT_SIZE).astype(float)
         return float(np.sqrt(np.mean(arr ** 2)))
+    except Exception:
+        return None
+
+
+def compute_cutout_entropy_normalized(obs: object) -> float | None:
+    """Return the Shannon entropy of the difference-image cutout normalized to [0, 1].
+
+    Entropy is computed over a 256-bin histogram of pixel values scaled to [0, 255].
+    Maximum entropy for 256 bins is log2(256) = 8.0 bits. Returns None if no
+    cutout is present or the cutout cannot be decoded.
+    """
+    cutout = getattr(obs, "cutout_difference", None)
+    if cutout is None:
+        return None
+    try:
+        import base64 as _b64
+        raw = _b64.b64decode(cutout)
+        arr = np.frombuffer(raw, dtype=np.float32).reshape(_CUTOUT_SIZE, _CUTOUT_SIZE).astype(float)
+        lo, hi = arr.min(), arr.max()
+        if hi <= lo:
+            return 0.0
+        scaled = ((arr - lo) / (hi - lo) * 255.0).astype(int)
+        counts = np.bincount(scaled.ravel(), minlength=256).astype(float)
+        probs = counts / counts.sum()
+        probs = probs[probs > 0.0]
+        entropy_bits = float(-np.sum(probs * np.log2(probs)))
+        return float(min(1.0, entropy_bits / 8.0))
     except Exception:
         return None

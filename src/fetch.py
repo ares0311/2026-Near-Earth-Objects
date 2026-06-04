@@ -28,7 +28,8 @@ __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fet
            "get_survey_coverage_fraction",
            "partition_by_field",
            "filter_by_magnitude",
-           "compute_field_sky_area"]
+           "compute_field_sky_area",
+           "compute_survey_overlap"]
 
 import json
 import os
@@ -1985,3 +1986,18 @@ def compute_field_sky_area(radius_deg: float) -> float:
     r_rad = math.radians(abs(radius_deg))
     steradians = 2.0 * math.pi * (1.0 - math.cos(r_rad))
     return steradians * (180.0 / math.pi) ** 2
+
+
+def compute_survey_overlap(result1: object, result2: object) -> float:
+    """Return the Jaccard overlap fraction between two FetchResult observation sets.
+
+    Overlap = |shared obs_ids| / |union obs_ids|. Returns 0.0 if both are empty.
+    """
+    alerts1 = getattr(result1, "alerts", None) or []
+    alerts2 = getattr(result2, "alerts", None) or []
+    ids1 = {getattr(o, "obs_id", None) for o in alerts1} - {None}
+    ids2 = {getattr(o, "obs_id", None) for o in alerts2} - {None}
+    union = ids1 | ids2
+    if not union:
+        return 0.0
+    return float(len(ids1 & ids2)) / float(len(union))

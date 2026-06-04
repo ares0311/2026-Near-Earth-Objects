@@ -4106,3 +4106,60 @@ class TestComputeFieldSkyArea:
         sys.path.insert(0, "src")
         import fetch
         assert "compute_field_sky_area" in fetch.__all__
+
+
+class TestComputeSurveyOverlap:
+    def _make_result(self, obs_ids):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+        alerts = [SimpleNamespace(obs_id=oid) for oid in obs_ids]
+        return SimpleNamespace(alerts=alerts)
+
+    def test_no_overlap(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_survey_overlap
+        r1 = self._make_result(["A", "B"])
+        r2 = self._make_result(["C", "D"])
+        assert compute_survey_overlap(r1, r2) == 0.0
+
+    def test_full_overlap(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_survey_overlap
+        r1 = self._make_result(["A", "B"])
+        r2 = self._make_result(["A", "B"])
+        assert compute_survey_overlap(r1, r2) == 1.0
+
+    def test_partial_overlap(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_survey_overlap
+        r1 = self._make_result(["A", "B", "C"])
+        r2 = self._make_result(["B", "C", "D"])
+        overlap = compute_survey_overlap(r1, r2)
+        # intersection=2, union=4
+        assert abs(overlap - 0.5) < 1e-9
+
+    def test_empty_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_survey_overlap
+        r1 = self._make_result([])
+        r2 = self._make_result([])
+        assert compute_survey_overlap(r1, r2) == 0.0
+
+    def test_one_empty(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_survey_overlap
+        r1 = self._make_result(["A"])
+        r2 = self._make_result([])
+        assert compute_survey_overlap(r1, r2) == 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+        assert "compute_survey_overlap" in fetch.__all__

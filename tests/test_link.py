@@ -2904,3 +2904,78 @@ class TestComputeTrackletBrightnessTrendNoneMag:
         trk = SimpleNamespace(observations=tuple(obs))
         # Only 1 valid mag after None exclusion → None
         assert compute_tracklet_brightness_trend(trk) is None
+
+
+class TestComputeArcEndpointSeparation:
+    def _make_tracklet(self, ra_dec_jd_list):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+        obs = [
+            SimpleNamespace(
+                obs_id=f"O{i}", ra_deg=ra, dec_deg=dec, jd=jd,
+                mag=18.0, mag_err=0.1, filter_band="r", mission="ZTF",
+            )
+            for i, (ra, dec, jd) in enumerate(ra_dec_jd_list)
+        ]
+        return SimpleNamespace(
+            object_id="T1",
+            observations=tuple(obs),
+            arc_days=1.0,
+            motion_rate_arcsec_per_hour=5.0,
+            motion_pa_degrees=0.0,
+        )
+
+    def test_same_position_zero_separation(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_arc_endpoint_separation
+        t = self._make_tracklet([(10.0, 20.0, 2460000.0), (10.0, 20.0, 2460001.0)])
+        result = compute_arc_endpoint_separation(t)
+        assert result is not None
+        assert result < 1e-6
+
+    def test_known_separation(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_arc_endpoint_separation
+        # 1 degree separation in RA at dec=0 → 3600 arcsec
+        t = self._make_tracklet([(10.0, 0.0, 2460000.0), (11.0, 0.0, 2460001.0)])
+        result = compute_arc_endpoint_separation(t)
+        assert result is not None
+        assert abs(result - 3600.0) < 1.0
+
+    def test_single_obs_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_arc_endpoint_separation
+        t = self._make_tracklet([(10.0, 20.0, 2460000.0)])
+        assert compute_arc_endpoint_separation(t) is None
+
+    def test_no_observations_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_arc_endpoint_separation
+        t = SimpleNamespace(observations=())
+        assert compute_arc_endpoint_separation(t) is None
+
+    def test_multi_obs(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_arc_endpoint_separation
+        t = self._make_tracklet([
+            (10.0, 0.0, 2460000.0),
+            (10.5, 0.0, 2460000.5),
+            (11.0, 0.0, 2460001.0),
+        ])
+        result = compute_arc_endpoint_separation(t)
+        assert result is not None
+        assert result > 3000.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+        assert "compute_arc_endpoint_separation" in link.__all__

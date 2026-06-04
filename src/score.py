@@ -30,7 +30,8 @@ __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "compute_impact_probability_proxy",
            "compute_survey_efficiency_score",
            "compute_novelty_rank",
-           "compute_followup_score"]
+           "compute_followup_score",
+           "compute_moid_hazard_score"]
 
 import math
 import uuid
@@ -1417,3 +1418,17 @@ def compute_followup_score(neo: object) -> float:
     br = float(getattr(features, "brightness_score", 0.0) or 0.0) if features else 0.0
 
     return float(min(1.0, max(0.0, 0.4 * disc + 0.4 * oq + 0.2 * br)))
+
+
+def compute_moid_hazard_score(neo: object) -> float:
+    """Return a [0, 1] hazard score based on MOID proximity to Earth.
+
+    Score = 1 − clip(moid_au / 0.5, 0, 1).
+    Objects with MOID ≤ 0 get 1.0; MOID ≥ 0.5 AU get 0.0.
+    Returns 0.5 if MOID is unavailable (conservative unknown).
+    """
+    hazard = getattr(neo, "hazard", None)
+    moid = getattr(hazard, "moid_au", None) if hazard else None
+    if moid is None:
+        return 0.5
+    return float(max(0.0, 1.0 - float(moid) / 0.5))

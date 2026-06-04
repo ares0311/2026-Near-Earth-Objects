@@ -46,6 +46,7 @@ __all__ = [
     "compute_entropy_weighted_score",
     "compute_tier1_neo_score",
     "compute_class_balance",
+    "compute_real_bogus_summary",
 ]
 
 import base64
@@ -2006,3 +2007,25 @@ def compute_class_balance(neos: list) -> dict[str, int]:
         name, _ = dominant_hypothesis(posterior)
         counts[name] = counts.get(name, 0) + 1
     return counts
+
+
+def compute_real_bogus_summary(neos: list) -> dict:
+    """Return mean, min, and max real_bogus_score across a list of ScoredNEO objects.
+
+    Only considers scores that are not None. Returns None for each stat if no
+    valid scores exist.
+    """
+    scores = []
+    for neo in neos:
+        features = getattr(neo, "features", None)
+        rb = getattr(features, "real_bogus_score", None) if features else None
+        if rb is not None:
+            scores.append(float(rb))
+    if not scores:
+        return {"mean": None, "min": None, "max": None, "n": 0}
+    return {
+        "mean": float(sum(scores) / len(scores)),
+        "min": float(min(scores)),
+        "max": float(max(scores)),
+        "n": len(scores),
+    }

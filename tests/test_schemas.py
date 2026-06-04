@@ -1956,3 +1956,59 @@ class TestFieldStatistics:
         sys.path.insert(0, "src")
         import schemas
         assert "FieldStatistics" in schemas.__all__
+
+
+class TestCandidateGrouping:
+    def test_defaults(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import CandidateGrouping
+        cg = CandidateGrouping(group_id="G001")
+        assert cg.group_id == "G001"
+        assert cg.field_id is None
+        assert cg.night_jd is None
+        assert cg.candidate_ids == ()
+        assert cg.n_candidates == 0
+        assert cg.dominant_hazard_flag == "unknown"
+
+    def test_with_fields(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import CandidateGrouping
+        cg = CandidateGrouping(
+            group_id="G002",
+            field_id="F001",
+            night_jd=2460000.5,
+            candidate_ids=("A", "B"),
+            n_candidates=2,
+            dominant_hazard_flag="pha_candidate",
+        )
+        assert cg.field_id == "F001"
+        assert cg.night_jd == 2460000.5
+        assert cg.candidate_ids == ("A", "B")
+        assert cg.n_candidates == 2
+        assert cg.dominant_hazard_flag == "pha_candidate"
+
+    def test_frozen(self):
+        import sys
+        sys.path.insert(0, "src")
+        import pytest
+
+        from schemas import CandidateGrouping
+        cg = CandidateGrouping(group_id="G003")
+        with pytest.raises(Exception):
+            cg.n_candidates = 5  # type: ignore[misc]
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        assert "CandidateGrouping" in schemas.__all__
+
+    def test_candidate_ids_tuple(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import CandidateGrouping
+        cg = CandidateGrouping(group_id="G004", candidate_ids=("X", "Y", "Z"))
+        assert len(cg.candidate_ids) == 3
+        assert "Z" in cg.candidate_ids
