@@ -2790,3 +2790,58 @@ class TestFormatMpcObservationBlock:
         sys.path.insert(0, "src")
         import alert
         assert "format_mpc_observation_block" in alert.__all__
+
+
+class TestFormatNeocpSubmissionHeader:
+    def test_returns_string(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_neocp_submission_header
+
+        neo = make_scored_neo()
+        header = format_neocp_submission_header(neo)
+        assert isinstance(header, str)
+
+    def test_five_lines(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_neocp_submission_header
+
+        neo = make_scored_neo()
+        lines = format_neocp_submission_header(neo).split("\n")
+        assert len(lines) == 5
+
+    def test_cod_line(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_neocp_submission_header
+
+        neo = make_scored_neo()
+        lines = format_neocp_submission_header(neo, obs_code="703").split("\n")
+        assert lines[0] == "COD 703"
+
+    def test_ack_contains_object_id(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_neocp_submission_header
+
+        neo = make_scored_neo()
+        header = format_neocp_submission_header(neo)
+        assert neo.tracklet.object_id in header
+
+    def test_obs_mea_tel_present(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_neocp_submission_header
+
+        neo = make_scored_neo()
+        header = format_neocp_submission_header(neo)
+        assert "OBS " in header
+        assert "MEA " in header
+        assert "TEL " in header
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+        assert "format_neocp_submission_header" in alert.__all__

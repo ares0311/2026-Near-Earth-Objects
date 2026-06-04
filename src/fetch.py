@@ -31,7 +31,8 @@ __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fet
            "compute_field_sky_area",
            "compute_survey_overlap",
            "count_observations_by_night",
-           "compute_temporal_coverage"]
+           "compute_temporal_coverage",
+           "compute_observation_rate"]
 
 import json
 import os
@@ -2059,3 +2060,24 @@ def compute_temporal_coverage(fetch_result: object) -> dict:
         "span_days": span,
         "n_nights": n_nights,
     }
+
+
+def compute_observation_rate(fetch_result: object) -> float | None:
+    """Return the mean number of observations per night in a FetchResult.
+
+    Night boundaries are determined by flooring each observation's JD to an
+    integer.  Returns ``None`` if fewer than 2 distinct nights are present
+    (rate is undefined for a single-night dataset).
+    Returns ``None`` if the FetchResult has no alerts.
+    """
+    alerts = getattr(fetch_result, "alerts", None) or []
+    nights: dict[int, int] = {}
+    for obs in alerts:
+        jd = getattr(obs, "jd", None)
+        if jd is None:
+            continue
+        night = int(float(jd))
+        nights[night] = nights.get(night, 0) + 1
+    if len(nights) < 2:
+        return None
+    return float(sum(nights.values()) / len(nights))

@@ -2619,3 +2619,85 @@ class TestCountStreakDetections:
         sys.path.insert(0, "src")
         import detect
         assert "count_streak_detections" in detect.__all__
+
+
+class TestCountDetectionsByMission:
+    def test_empty(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import count_detections_by_mission
+
+        result = SimpleNamespace(candidates=[])
+        assert count_detections_by_mission(result) == {}
+
+    def test_single_mission(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import count_detections_by_mission
+
+        cands = [
+            SimpleNamespace(observation=SimpleNamespace(mission="ZTF")),
+            SimpleNamespace(observation=SimpleNamespace(mission="ZTF")),
+        ]
+        result = SimpleNamespace(candidates=cands)
+        assert count_detections_by_mission(result) == {"ZTF": 2}
+
+    def test_multi_mission(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import count_detections_by_mission
+
+        cands = [
+            SimpleNamespace(observation=SimpleNamespace(mission="ZTF")),
+            SimpleNamespace(observation=SimpleNamespace(mission="ATLAS")),
+            SimpleNamespace(observation=SimpleNamespace(mission="ZTF")),
+        ]
+        result = SimpleNamespace(candidates=cands)
+        counts = count_detections_by_mission(result)
+        assert counts["ZTF"] == 2
+        assert counts["ATLAS"] == 1
+
+    def test_no_observation_attr(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import count_detections_by_mission
+
+        cands = [SimpleNamespace(mission="ZTF"), SimpleNamespace(mission="ZTF")]
+        result = SimpleNamespace(candidates=cands)
+        counts = count_detections_by_mission(result)
+        assert counts.get("ZTF", 0) == 2
+
+    def test_none_mission_becomes_unknown(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import count_detections_by_mission
+
+        cands = [SimpleNamespace(observation=SimpleNamespace(mission=None))]
+        result = SimpleNamespace(candidates=cands)
+        counts = count_detections_by_mission(result)
+        assert counts["unknown"] == 1
+
+    def test_no_candidates_attr(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import count_detections_by_mission
+
+        assert count_detections_by_mission(SimpleNamespace()) == {}
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import detect
+        assert "count_detections_by_mission" in detect.__all__

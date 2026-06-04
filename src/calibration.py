@@ -37,6 +37,7 @@ __all__ = [
     "compute_calibration_gap",
     "compute_calibration_gain",
     "compute_calibration_bias",
+    "compute_overconfidence_fraction",
 ]
 
 import math
@@ -1448,3 +1449,28 @@ def compute_calibration_bias(probs: list, labels: list) -> float:
     p_arr = np.array(probs, dtype=float)
     y_arr = np.array(labels, dtype=float)
     return float(np.mean(p_arr) - np.mean(y_arr))
+
+
+def compute_overconfidence_fraction(
+    probs: list,
+    labels: list,
+    threshold: float = 0.7,
+) -> float:
+    """Return the fraction of high-confidence predictions that are incorrect.
+
+    A prediction is "high-confidence" if its probability ≥ *threshold*.
+    Among those, the fraction where the true label is 0 (wrong prediction) is
+    returned.
+
+    Returns ``0.0`` if the input lists are empty, have different lengths, or
+    no prediction exceeds the threshold.
+    """
+    if not probs or not labels:
+        return 0.0
+    if len(probs) != len(labels):
+        return 0.0
+    high_conf = [(p, y) for p, y in zip(probs, labels) if float(p) >= threshold]
+    if not high_conf:
+        return 0.0
+    wrong = sum(1 for _, y in high_conf if float(y) == 0.0)
+    return float(wrong / len(high_conf))

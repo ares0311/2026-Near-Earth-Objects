@@ -49,6 +49,7 @@ __all__ = [
     "format_observation_count_summary",
     "count_submission_ready",
     "format_mpc_observation_block",
+    "format_neocp_submission_header",
 ]
 
 import json
@@ -2009,5 +2010,39 @@ def format_mpc_observation_block(
             obs_code=obs_code,
         )
         for i, obs in enumerate(tracklet.observations)
+    ]
+    return "\n".join(lines)
+
+
+def format_neocp_submission_header(
+    neo: ScoredNEO,
+    obs_code: str = _MPC_OBS_CODE,
+) -> str:
+    """Return the 5-line MPC submission header block for a ScoredNEO.
+
+    Produces the standard header lines prepended to an MPC observation report:
+
+    .. code-block:: text
+
+        COD <obs_code>
+        OBS Claude-NEO-Pipeline
+        MEA Claude-NEO-Pipeline
+        TEL 0.0-m + CCD
+        ACK MPCReport file <object_id>
+
+    This header can be concatenated with :func:`format_mpc_observation_block`
+    to produce a complete, paste-ready MPC submission.
+
+    **Guardrail**: This function formats a header only.  It does NOT submit
+    any data and does NOT assert that the candidate is a confirmed NEO.
+    Actual MPC submission requires independent confirmation per the alert protocol.
+    """
+    object_id = neo.tracklet.object_id
+    lines = [
+        f"COD {obs_code}",
+        "OBS Claude-NEO-Pipeline",
+        "MEA Claude-NEO-Pipeline",
+        "TEL 0.0-m + CCD",
+        f"ACK MPCReport file {object_id}",
     ]
     return "\n".join(lines)

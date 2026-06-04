@@ -2972,3 +2972,69 @@ class TestComputeGeocentricVelocity:
         sys.path.insert(0, "src")
         import orbit
         assert "compute_geocentric_velocity" in orbit.__all__
+
+
+class TestComputeOrbitalPeriodYears:
+    def test_earth_orbit(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_orbital_period_years
+
+        els = SimpleNamespace(a_au=1.0)
+        assert abs(compute_orbital_period_years(els) - 1.0) < 1e-9
+
+    def test_jupiter_orbit(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_orbital_period_years
+
+        els = SimpleNamespace(a_au=5.2)
+        period = compute_orbital_period_years(els)
+        assert abs(period - 5.2 ** 1.5) < 0.001
+
+    def test_semi_major_axis_fallback(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_orbital_period_years
+
+        els = SimpleNamespace(semi_major_axis_au=1.0)
+        assert abs(compute_orbital_period_years(els) - 1.0) < 1e-9
+
+    def test_zero_a_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_orbital_period_years
+
+        assert compute_orbital_period_years(SimpleNamespace(a_au=0.0)) is None
+
+    def test_negative_a_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_orbital_period_years
+
+        assert compute_orbital_period_years(SimpleNamespace(a_au=-1.0)) is None
+
+    def test_missing_a_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_orbital_period_years
+
+        assert compute_orbital_period_years(SimpleNamespace()) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import orbit
+        assert "compute_orbital_period_years" in orbit.__all__

@@ -30,7 +30,8 @@ __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_
            "compute_cutout_rms",
            "compute_cutout_entropy_normalized",
            "compute_image_contrast",
-           "compute_pixel_saturation_fraction"]
+           "compute_pixel_saturation_fraction",
+           "compute_reference_cutout_snr"]
 
 import base64
 import math
@@ -1445,5 +1446,26 @@ def compute_pixel_saturation_fraction(
             return 0.0
         normalized = arr / pix_max
         return float(np.mean(normalized >= saturation_threshold))
+    except Exception:
+        return None
+
+
+def compute_reference_cutout_snr(obs: object) -> float | None:
+    """Return the peak-to-RMS SNR of the reference (template) cutout.
+
+    Computes ``max_pixel / rms_pixel`` for the 63×63 reference cutout.
+    Returns ``None`` if no reference cutout is present, if the cutout cannot
+    be decoded, or if the RMS is zero (blank template).
+    """
+    cutout = getattr(obs, "cutout_template", None)
+    if cutout is None:
+        return None
+    try:
+        raw = base64.b64decode(cutout)
+        arr = np.frombuffer(raw, dtype=np.float32).reshape(_CUTOUT_SIZE, _CUTOUT_SIZE).astype(float)
+        rms = float(np.sqrt(np.mean(arr ** 2)))
+        if rms == 0.0:
+            return None
+        return float(arr.max() / rms)
     except Exception:
         return None

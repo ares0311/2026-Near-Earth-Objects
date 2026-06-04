@@ -2726,3 +2726,67 @@ class TestComputePriorityHistogram:
         sys.path.insert(0, "src")
         import score
         assert "compute_priority_histogram" in score.__all__
+
+
+class TestComputeAlertUrgencyScore:
+    def _make_neo(self, moid=None, discovery_priority=None, orbit_quality_score=None):
+        from types import SimpleNamespace
+
+        hazard = SimpleNamespace(moid_au=moid)
+        meta = SimpleNamespace(discovery_priority=discovery_priority)
+        feats = SimpleNamespace(orbit_quality_score=orbit_quality_score)
+        return SimpleNamespace(hazard=hazard, metadata=meta, features=feats)
+
+    def test_all_unknown_returns_half(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_alert_urgency_score
+
+        neo = self._make_neo()
+        score = compute_alert_urgency_score(neo)
+        # 0.4*0.5 + 0.4*0.5 + 0.2*0.5 = 0.5
+        assert abs(score - 0.5) < 1e-9
+
+    def test_pha_candidate_high_score(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_alert_urgency_score
+
+        neo = self._make_neo(moid=0.01, discovery_priority=0.9, orbit_quality_score=1.0)
+        score = compute_alert_urgency_score(neo)
+        assert score > 0.8
+
+    def test_distant_moid_lowers_score(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_alert_urgency_score
+
+        neo_near = self._make_neo(moid=0.01, discovery_priority=0.5, orbit_quality_score=0.5)
+        neo_far = self._make_neo(moid=0.5, discovery_priority=0.5, orbit_quality_score=0.5)
+        assert compute_alert_urgency_score(neo_near) > compute_alert_urgency_score(neo_far)
+
+    def test_result_clamped_to_unit_interval(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_alert_urgency_score
+
+        neo = self._make_neo(moid=0.0, discovery_priority=1.0, orbit_quality_score=1.0)
+        score = compute_alert_urgency_score(neo)
+        assert 0.0 <= score <= 1.0
+
+    def test_no_hazard_attr(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from score import compute_alert_urgency_score
+
+        neo = SimpleNamespace(hazard=None, metadata=None, features=None)
+        score = compute_alert_urgency_score(neo)
+        assert 0.0 <= score <= 1.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        assert "compute_alert_urgency_score" in score.__all__

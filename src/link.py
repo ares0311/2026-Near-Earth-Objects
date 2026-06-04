@@ -32,7 +32,8 @@ __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "compute_tracklet_brightness_trend",
            "compute_arc_endpoint_separation",
            "compute_pa_circular_std",
-           "compute_sky_coverage_area"]
+           "compute_sky_coverage_area",
+           "compute_night_gap_statistics"]
 
 import math
 import uuid
@@ -1554,3 +1555,31 @@ def compute_sky_coverage_area(tracklets: list) -> float:
     ddec = max(decs) - min(decs)
     mean_dec_rad = math.radians(sum(decs) / len(decs))
     return float(dra * math.cos(mean_dec_rad) * ddec)
+
+
+def compute_night_gap_statistics(tracklets: list) -> dict:
+    """Return statistics on inter-night gaps across a list of tracklets.
+
+    For each tracklet, computes the gap (in integer nights) between consecutive
+    observations.  Aggregates all gaps across all tracklets and returns:
+
+      - ``mean_gap_nights``: mean inter-night gap (float) or ``None`` if no gaps
+      - ``max_gap_nights``: maximum inter-night gap (int) or ``None`` if no gaps
+      - ``n_tracklets``: number of tracklets examined
+
+    A "night" is defined as the integer part of an observation's JD.
+    Single-observation tracklets contribute no gaps.
+    """
+    all_gaps: list[int] = []
+    for t in tracklets:
+        obs_seq = getattr(t, "observations", None) or ()
+        jds = [getattr(o, "jd", None) for o in obs_seq]
+        nights_set = {int(float(j)) for j in jds if j is not None}
+        nights = sorted(nights_set)
+        for i in range(1, len(nights)):
+            all_gaps.append(nights[i] - nights[i - 1])
+    return {
+        "mean_gap_nights": float(sum(all_gaps) / len(all_gaps)) if all_gaps else None,
+        "max_gap_nights": max(all_gaps) if all_gaps else None,
+        "n_tracklets": len(tracklets),
+    }

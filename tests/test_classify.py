@@ -3182,3 +3182,110 @@ class TestComputeClassAgreementUnknownHypothesis:
         )
         neo = SimpleNamespace(posterior=zero_posterior)
         assert compute_class_agreement([neo, neo]) == 0.0
+
+
+class TestComputeTier1FeatureVector:
+    def _make_tracklet(self, jds, mags, rbs, motion_rate=1.2, arc_days=2.0, streaks=None):
+        from types import SimpleNamespace
+
+        if streaks is None:
+            streaks = [False] * len(jds)
+        obs = [
+            SimpleNamespace(
+                jd=j,
+                mag=m,
+                real_bogus_score=r,
+                is_streak=s,
+            )
+            for j, m, r, s in zip(jds, mags, rbs, streaks)
+        ]
+        return SimpleNamespace(
+            observations=tuple(obs),
+            motion_rate_arcsec_per_hour=motion_rate,
+            arc_days=arc_days,
+        )
+
+    def test_basic_values(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_tier1_feature_vector
+
+        t = self._make_tracklet(
+            [2460000.5, 2460001.5, 2460002.5],
+            [19.0, 19.5, 20.0],
+            [0.9, 0.85, 0.88],
+        )
+        fv = compute_tier1_feature_vector(t)
+        assert fv["motion_rate_arcsec_hr"] == 1.2
+        assert fv["arc_days"] == 2.0
+        assert fv["n_nights"] == 3
+        assert abs(fv["mean_mag"] - (19.0 + 19.5 + 20.0) / 3) < 1e-6
+        assert fv["streak_fraction"] == 0.0
+
+    def test_streak_fraction(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_tier1_feature_vector
+
+        t = self._make_tracklet(
+            [2460000.5, 2460001.5],
+            [19.0, 19.5],
+            [0.9, 0.8],
+            streaks=[True, False],
+        )
+        fv = compute_tier1_feature_vector(t)
+        assert fv["streak_fraction"] == 0.5
+
+    def test_sentinel_mag_excluded(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_tier1_feature_vector
+
+        t = self._make_tracklet(
+            [2460000.5, 2460001.5],
+            [99.0, 20.0],    # 99.0 is sentinel
+            [0.9, 0.8],
+        )
+        fv = compute_tier1_feature_vector(t)
+        assert fv["mean_mag"] == 20.0
+
+    def test_all_sentinel_mags(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_tier1_feature_vector
+
+        t = self._make_tracklet([2460000.5], [99.0], [0.9])
+        fv = compute_tier1_feature_vector(t)
+        assert fv["mean_mag"] is None
+        assert fv["mag_range"] is None
+
+    def test_no_real_bogus(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from classify import compute_tier1_feature_vector
+
+        obs = [SimpleNamespace(jd=2460000.5, mag=19.0, is_streak=False)]
+        t = SimpleNamespace(observations=tuple(obs), motion_rate_arcsec_per_hour=1.0, arc_days=0.0)
+        fv = compute_tier1_feature_vector(t)
+        assert fv["mean_real_bogus"] is None
+
+    def test_empty_observations(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from classify import compute_tier1_feature_vector
+
+        t = SimpleNamespace(observations=(), motion_rate_arcsec_per_hour=None, arc_days=None)
+        fv = compute_tier1_feature_vector(t)
+        assert fv["motion_rate_arcsec_hr"] is None
+        assert fv["arc_days"] is None
+        assert fv["streak_fraction"] is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import classify
+        assert "compute_tier1_feature_vector" in classify.__all__

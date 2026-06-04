@@ -2776,3 +2776,90 @@ class TestComputePixelSaturationFraction:
         sys.path.insert(0, "src")
         import preprocess
         assert "compute_pixel_saturation_fraction" in preprocess.__all__
+
+
+class TestComputeReferenceCutoutSnr:
+    def _make_cutout_b64(self, values):
+        import base64
+        import sys
+        sys.path.insert(0, "src")
+        import numpy as np
+
+        arr = np.array(values, dtype=np.float32)
+        return base64.b64encode(arr.tobytes()).decode()
+
+    def test_no_cutout_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_reference_cutout_snr
+
+        assert compute_reference_cutout_snr(SimpleNamespace()) is None
+
+    def test_none_cutout(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_reference_cutout_snr
+
+        assert compute_reference_cutout_snr(SimpleNamespace(cutout_template=None)) is None
+
+    def test_uniform_non_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_reference_cutout_snr
+
+        flat = [1.0] * (63 * 63)
+        b64 = self._make_cutout_b64(flat)
+        obs = SimpleNamespace(cutout_template=b64)
+        snr = compute_reference_cutout_snr(obs)
+        # max=1, rms=1 → SNR=1
+        assert snr == 1.0
+
+    def test_zero_rms_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_reference_cutout_snr
+
+        flat = [0.0] * (63 * 63)
+        b64 = self._make_cutout_b64(flat)
+        obs = SimpleNamespace(cutout_template=b64)
+        assert compute_reference_cutout_snr(obs) is None
+
+    def test_peak_source(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        import numpy as np
+
+        from preprocess import compute_reference_cutout_snr
+
+        arr = np.ones(63 * 63, dtype=np.float32)
+        arr[63 * 31 + 31] = 10.0  # bright central pixel
+        b64 = __import__("base64").b64encode(arr.tobytes()).decode()
+        obs = SimpleNamespace(cutout_template=b64)
+        snr = compute_reference_cutout_snr(obs)
+        assert snr > 1.0
+
+    def test_invalid_data_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_reference_cutout_snr
+
+        obs = SimpleNamespace(cutout_template="!notbase64!")
+        assert compute_reference_cutout_snr(obs) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import preprocess
+        assert "compute_reference_cutout_snr" in preprocess.__all__

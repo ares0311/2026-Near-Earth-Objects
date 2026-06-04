@@ -43,6 +43,7 @@ __all__ = [
     "CandidateGrouping",
     "MCPServerStatus",
     "BatchProcessingResult",
+    "SurveyRunSummary",
 ]
 
 from dataclasses import dataclass
@@ -1209,4 +1210,23 @@ class BatchProcessingResult(BaseModel):
     n_scored: int = 0
     n_pha_candidates: int = 0
     elapsed_seconds: float = 0.0
+    pipeline_version: str = "unknown"
+
+
+class SurveyRunSummary(BaseModel):
+    """High-level summary of a single survey run for reporting and logging.
+
+    Aggregates pipeline output for one field/night combination.
+    Immutable after construction.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    run_id: str
+    field_id: str | None = None
+    night_jd: float | None = None
+    n_alerts: int = 0
+    n_candidates: int = 0
+    n_pha_candidates: int = 0
+    limiting_mag: float | None = None
     pipeline_version: str = "unknown"

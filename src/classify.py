@@ -30,6 +30,7 @@ __all__ = [
     "compute_tier1_score_distribution",
     "compute_class_entropy_summary",
     "compute_neo_class_distribution",
+    "compute_tier1_feature_vector",
     "compute_posterior_update",
     "compute_tier1_confidence",
     "compute_posterior_stability",
@@ -2053,3 +2054,60 @@ def compute_class_agreement(neos: list) -> float:
     if total == 0:
         return 0.0
     return float(max(counts.values()) / total)
+
+
+def compute_tier1_feature_vector(tracklet: object) -> dict:
+    """Extract the tabular feature dict used for Tier 1 XGBoost classification.
+
+    Computes features purely from the tracklet's observations without requiring
+    a trained model.  Returns a dict with the following keys (all float or None):
+
+      - ``motion_rate_arcsec_hr``: tracklet motion rate
+      - ``arc_days``: total arc length in days
+      - ``n_nights``: number of distinct integer-JD nights observed
+      - ``mean_mag``: mean magnitude of valid observations (mag < 90)
+      - ``mean_real_bogus``: mean real/bogus score of valid observations
+      - ``streak_fraction``: fraction of observations flagged as streaks
+      - ``mag_range``: max − min magnitude across valid observations
+
+    Missing or unavailable values are returned as ``None``.
+    """
+    motion_rate = getattr(tracklet, "motion_rate_arcsec_per_hour", None)
+    arc_days = getattr(tracklet, "arc_days", None)
+    obs_seq = getattr(tracklet, "observations", None) or ()
+
+    nights = {
+        int(float(getattr(o, "jd", 0)))
+        for o in obs_seq
+        if getattr(o, "jd", None) is not None
+    }
+    n_nights = len(nights) if nights else None
+
+    mags = [
+        float(getattr(o, "mag", 99))
+        for o in obs_seq
+        if getattr(o, "mag", None) is not None and float(getattr(o, "mag", 99)) < 90.0
+    ]
+    mean_mag = float(sum(mags) / len(mags)) if mags else None
+    mag_range = float(max(mags) - min(mags)) if len(mags) >= 2 else None
+
+    rbs = [
+        float(getattr(o, "real_bogus_score", None))
+        for o in obs_seq
+        if getattr(o, "real_bogus_score", None) is not None
+    ]
+    mean_rb = float(sum(rbs) / len(rbs)) if rbs else None
+
+    n_obs = len(obs_seq)
+    streak_count = sum(1 for o in obs_seq if getattr(o, "is_streak", False))
+    streak_fraction = float(streak_count / n_obs) if n_obs > 0 else None
+
+    return {
+        "motion_rate_arcsec_hr": float(motion_rate) if motion_rate is not None else None,
+        "arc_days": float(arc_days) if arc_days is not None else None,
+        "n_nights": n_nights,
+        "mean_mag": mean_mag,
+        "mean_real_bogus": mean_rb,
+        "streak_fraction": streak_fraction,
+        "mag_range": mag_range,
+    }

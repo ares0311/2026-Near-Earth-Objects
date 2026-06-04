@@ -1945,3 +1945,73 @@ class TestComputeCalibrationBias:
         sys.path.insert(0, "src")
         import calibration
         assert "compute_calibration_bias" in calibration.__all__
+
+
+class TestComputeOverconfidenceFraction:
+    def test_empty_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_overconfidence_fraction
+
+        assert compute_overconfidence_fraction([], []) == 0.0
+
+    def test_length_mismatch_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_overconfidence_fraction
+
+        assert compute_overconfidence_fraction([0.9], [0.0, 1.0]) == 0.0
+
+    def test_no_high_confidence_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_overconfidence_fraction
+
+        probs = [0.3, 0.5, 0.6]
+        labels = [1.0, 1.0, 0.0]
+        assert compute_overconfidence_fraction(probs, labels) == 0.0
+
+    def test_all_high_conf_wrong(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_overconfidence_fraction
+
+        probs = [0.9, 0.95]
+        labels = [0.0, 0.0]
+        assert compute_overconfidence_fraction(probs, labels) == 1.0
+
+    def test_all_high_conf_correct(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_overconfidence_fraction
+
+        probs = [0.9, 0.95]
+        labels = [1.0, 1.0]
+        assert compute_overconfidence_fraction(probs, labels) == 0.0
+
+    def test_mixed_high_confidence(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_overconfidence_fraction
+
+        # 2 high-conf: one correct (label=1), one wrong (label=0)
+        probs = [0.8, 0.9, 0.3]
+        labels = [1.0, 0.0, 0.0]
+        frac = compute_overconfidence_fraction(probs, labels, threshold=0.7)
+        assert abs(frac - 0.5) < 1e-9
+
+    def test_custom_threshold(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_overconfidence_fraction
+
+        probs = [0.6, 0.8]
+        labels = [0.0, 0.0]
+        # threshold=0.7: only 0.8 qualifies → 1 wrong / 1 = 1.0
+        assert compute_overconfidence_fraction(probs, labels, threshold=0.7) == 1.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        assert "compute_overconfidence_fraction" in calibration.__all__

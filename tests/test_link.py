@@ -3087,3 +3087,67 @@ class TestComputeSkyCoverageArea:
         sys.path.insert(0, "src")
         import link
         assert "compute_sky_coverage_area" in link.__all__
+
+
+class TestComputeNightGapStatistics:
+    def _make_tracklet(self, jds):
+        from types import SimpleNamespace
+
+        obs = [SimpleNamespace(jd=j) for j in jds]
+        return SimpleNamespace(observations=tuple(obs))
+
+    def test_empty_list(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_night_gap_statistics
+
+        stats = compute_night_gap_statistics([])
+        assert stats["mean_gap_nights"] is None
+        assert stats["max_gap_nights"] is None
+        assert stats["n_tracklets"] == 0
+
+    def test_single_observation_no_gaps(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_night_gap_statistics
+
+        t = self._make_tracklet([2460000.5])
+        stats = compute_night_gap_statistics([t])
+        assert stats["mean_gap_nights"] is None
+        assert stats["n_tracklets"] == 1
+
+    def test_two_night_tracklet(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_night_gap_statistics
+
+        t = self._make_tracklet([2460000.5, 2460001.5])
+        stats = compute_night_gap_statistics([t])
+        assert stats["mean_gap_nights"] == 1.0
+        assert stats["max_gap_nights"] == 1
+
+    def test_multi_tracklet_aggregation(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_night_gap_statistics
+
+        t1 = self._make_tracklet([2460000.5, 2460001.5])   # gap = 1
+        t2 = self._make_tracklet([2460000.5, 2460003.5])   # gap = 3
+        stats = compute_night_gap_statistics([t1, t2])
+        assert stats["max_gap_nights"] == 3
+        assert stats["mean_gap_nights"] == 2.0
+
+    def test_n_tracklets_correct(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_night_gap_statistics
+
+        tracklets = [self._make_tracklet([2460000.5, 2460002.5]) for _ in range(5)]
+        stats = compute_night_gap_statistics(tracklets)
+        assert stats["n_tracklets"] == 5
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+        assert "compute_night_gap_statistics" in link.__all__

@@ -27,7 +27,8 @@ __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus"
            "compute_apparent_motion_rate",
            "compute_magnitude_range",
            "compute_detection_density",
-           "count_streak_detections"]
+           "count_streak_detections",
+           "count_detections_by_mission"]
 
 import math
 import uuid
@@ -1360,3 +1361,22 @@ def count_streak_detections(detect_result: object) -> int:
     """
     candidates = getattr(detect_result, "candidates", None) or []
     return sum(1 for c in candidates if getattr(c, "is_streak", False))
+
+
+def count_detections_by_mission(detect_result: object) -> dict:
+    """Return a dict mapping survey mission name to candidate count.
+
+    Counts each candidate in ``detect_result.candidates`` by its ``mission``
+    attribute (falls back to ``"unknown"`` if the attribute is absent or None).
+    Returns an empty dict if there are no candidates.
+    """
+    candidates = getattr(detect_result, "candidates", None) or []
+    counts: dict[str, int] = {}
+    for c in candidates:
+        obs = getattr(c, "observation", None)
+        mission = getattr(obs, "mission", None) if obs is not None else None
+        if mission is None:
+            mission = getattr(c, "mission", None)
+        key = str(mission) if mission is not None else "unknown"
+        counts[key] = counts.get(key, 0) + 1
+    return counts

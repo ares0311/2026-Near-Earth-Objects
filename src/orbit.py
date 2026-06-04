@@ -31,7 +31,8 @@ __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
            "compute_orbital_eccentricity_class",
            "compute_orbital_speed_at_perihelion",
            "compute_impact_parameter",
-           "compute_geocentric_velocity"]
+           "compute_geocentric_velocity",
+           "compute_orbital_period_years"]
 
 import math
 from typing import NamedTuple
@@ -1677,3 +1678,23 @@ def compute_geocentric_velocity(elements: object) -> float | None:
     i_rad = math.radians(float(incl))
     v_enc_sq = v_obj**2 + V_EARTH_KM_S**2 - 2.0 * v_obj * V_EARTH_KM_S * math.cos(i_rad)
     return float(math.sqrt(max(0.0, v_enc_sq)))
+
+
+def compute_orbital_period_years(elements: object) -> float | None:
+    """Return the orbital period in years via Kepler's third law: T = sqrt(a³).
+
+    Uses ``a_au`` attribute (semi-major axis in AU).  Returns ``None`` if
+    ``a_au`` is missing, zero, or negative.
+
+    The conversion is exact under the Gaussian gravitational constant definition
+    where 1 AU and 1 year are the natural units of the solar system.
+    """
+    a = getattr(elements, "a_au", None)
+    if a is None:
+        a = getattr(elements, "semi_major_axis_au", None)
+    if a is None:
+        return None
+    a_val = float(a)
+    if a_val <= 0.0:
+        return None
+    return float(math.sqrt(a_val ** 3))

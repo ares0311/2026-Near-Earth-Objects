@@ -2096,3 +2096,51 @@ class TestBatchProcessingResult:
         sys.path.insert(0, "src")
         import schemas
         assert "BatchProcessingResult" in schemas.__all__
+
+
+class TestSurveyRunSummary:
+    def test_defaults(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import SurveyRunSummary
+
+        s = SurveyRunSummary(run_id="run-001")
+        assert s.run_id == "run-001"
+        assert s.n_alerts == 0
+        assert s.n_pha_candidates == 0
+        assert s.pipeline_version == "unknown"
+
+    def test_custom_fields(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import SurveyRunSummary
+
+        s = SurveyRunSummary(
+            run_id="r",
+            field_id="ZTF_001",
+            night_jd=2460000.5,
+            n_alerts=100,
+            n_candidates=10,
+            n_pha_candidates=1,
+            limiting_mag=20.5,
+            pipeline_version="0.80.0",
+        )
+        assert s.field_id == "ZTF_001"
+        assert s.limiting_mag == 20.5
+
+    def test_frozen(self):
+        import sys
+        sys.path.insert(0, "src")
+        import pytest
+
+        from schemas import SurveyRunSummary
+
+        s = SurveyRunSummary(run_id="x")
+        with pytest.raises(Exception):
+            s.n_alerts = 5  # type: ignore[misc]
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        assert "SurveyRunSummary" in schemas.__all__

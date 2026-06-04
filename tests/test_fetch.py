@@ -4278,3 +4278,64 @@ class TestComputeTemporalCoverage:
         sys.path.insert(0, "src")
         import fetch
         assert "compute_temporal_coverage" in fetch.__all__
+
+
+class TestComputeObservationRate:
+    def _make_result(self, jds):
+        from types import SimpleNamespace
+
+        obs = [SimpleNamespace(jd=j) for j in jds]
+        return SimpleNamespace(alerts=obs)
+
+    def test_single_night_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_observation_rate
+
+        result = self._make_result([2460000.1, 2460000.5, 2460000.9])
+        assert compute_observation_rate(result) is None
+
+    def test_two_nights(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_observation_rate
+
+        result = self._make_result([2460000.5, 2460000.6, 2460001.5, 2460001.7])
+        rate = compute_observation_rate(result)
+        assert rate == 2.0
+
+    def test_empty_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_observation_rate
+
+        result = self._make_result([])
+        assert compute_observation_rate(result) is None
+
+    def test_none_jd_skipped(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from fetch import compute_observation_rate
+
+        obs = [SimpleNamespace(jd=None), SimpleNamespace(jd=2460000.5)]
+        result = SimpleNamespace(alerts=obs)
+        assert compute_observation_rate(result) is None
+
+    def test_multi_night_mean(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_observation_rate
+
+        # 3 obs on night 0, 1 obs on night 1, 2 obs on night 2 → mean = 2.0
+        jds = [2460000.1, 2460000.2, 2460000.3, 2460001.5, 2460002.5, 2460002.6]
+        result = self._make_result(jds)
+        rate = compute_observation_rate(result)
+        assert abs(rate - 2.0) < 1e-9
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+        assert "compute_observation_rate" in fetch.__all__

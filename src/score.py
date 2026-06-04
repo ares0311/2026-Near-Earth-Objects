@@ -33,7 +33,8 @@ __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "compute_followup_score",
            "compute_moid_hazard_score",
            "compute_size_estimate_range",
-           "compute_priority_histogram"]
+           "compute_priority_histogram",
+           "compute_alert_urgency_score"]
 
 import math
 import uuid
@@ -1487,3 +1488,36 @@ def compute_priority_histogram(neos: list, n_bins: int = 5) -> dict:
         "counts": counts,
         "n_total": len(priorities),
     }
+
+
+def compute_alert_urgency_score(neo: object) -> float:
+    """Return a numeric [0, 1] urgency score for a ScoredNEO candidate.
+
+    Combines three components with fixed weights:
+
+    - **MOID proximity** (weight 0.4): 1 − min(moid_au, 0.5) / 0.5.
+      MOID ≤ 0 AU → 1.0; MOID ≥ 0.5 AU → 0.0.  Unknown MOID → 0.5.
+    - **Discovery priority** (weight 0.4): taken from metadata.discovery_priority.
+      Unknown → 0.5.
+    - **Orbit quality score** (weight 0.2): taken from features.orbit_quality_score.
+      Unknown → 0.5.
+
+    Returns a float clamped to [0, 1].
+    """
+    hazard = getattr(neo, "hazard", None)
+    moid = getattr(hazard, "moid_au", None) if hazard else None
+    if moid is None:
+        moid_prox = 0.5
+    else:
+        moid_prox = float(max(0.0, 1.0 - float(moid) / 0.5))
+
+    metadata = getattr(neo, "metadata", None)
+    dp = getattr(metadata, "discovery_priority", None) if metadata else None
+    disc_priority = float(dp) if dp is not None else 0.5
+
+    features = getattr(neo, "features", None)
+    oq = getattr(features, "orbit_quality_score", None) if features else None
+    orbit_quality = float(oq) if oq is not None else 0.5
+
+    score = 0.4 * moid_prox + 0.4 * disc_priority + 0.2 * orbit_quality
+    return float(min(1.0, max(0.0, score)))
