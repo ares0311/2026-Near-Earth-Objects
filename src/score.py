@@ -35,7 +35,8 @@ __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "compute_size_estimate_range",
            "compute_priority_histogram",
            "compute_alert_urgency_score",
-           "filter_by_discovery_priority"]
+           "filter_by_discovery_priority",
+           "get_top_candidates"]
 
 import math
 import uuid
@@ -1537,3 +1538,20 @@ def filter_by_discovery_priority(neos: list, min_priority: float = 0.5) -> list:
         if p is not None and float(p) >= min_priority:
             result.append(neo)
     return result
+
+
+def get_top_candidates(neos: list, n: int = 10) -> list:
+    """Return the top *n* ScoredNEOs sorted by discovery_priority descending.
+
+    Reads ``neo.metadata.discovery_priority``.  Candidates with missing or
+    None priority are sorted to the end (treated as priority 0.0).  Returns
+    at most *n* candidates; if fewer than *n* exist, returns all of them.
+    """
+
+    def _priority(neo: object) -> float:
+        meta = getattr(neo, "metadata", None)
+        p = getattr(meta, "discovery_priority", None) if meta else None
+        return float(p) if p is not None else 0.0
+
+    sorted_neos = sorted(neos, key=_priority, reverse=True)
+    return sorted_neos[: max(0, int(n))]

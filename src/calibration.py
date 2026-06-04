@@ -39,6 +39,7 @@ __all__ = [
     "compute_calibration_bias",
     "compute_overconfidence_fraction",
     "compute_max_calibration_error",
+    "compute_calibration_resolution",
 ]
 
 import math
@@ -1508,3 +1509,48 @@ def compute_max_calibration_error(
         if gap > mce:
             mce = gap
     return float(mce)
+
+
+def compute_calibration_resolution(
+    probs: list,
+    labels: list,
+    n_bins: int = 10,
+) -> float:
+    """Return a calibration resolution score in [0, 1].
+
+    Resolution measures how much the per-bin fraction_positive values deviate
+    from the overall base rate: high resolution means the model separates
+    positives from negatives well.
+
+    .. math::
+
+        \\text{Resolution} = \\frac{1}{n} \\sum_k n_k (\\bar{y}_k - \\bar{y})^2
+
+    where :math:`\\bar{y}` is the overall fraction of positives,
+    :math:`\\bar{y}_k` is the fraction of positives in bin *k*, and :math:`n_k`
+    is the number of samples in that bin.  The result is normalized by the
+    maximum possible value (base_rate × (1 − base_rate)), clamped to [0, 1].
+    Returns 0.0 for empty input, mismatched lengths, or n_bins < 1.
+    """
+    if not probs or not labels or len(probs) != len(labels):
+        return 0.0
+    n_bins = max(1, int(n_bins))
+    n = len(probs)
+    base_rate = sum(float(y) for y in labels) / n
+    bin_labels: list[list[float]] = [[] for _ in range(n_bins)]
+    for p, y in zip(probs, labels):
+        idx = int(float(p) * n_bins)
+        if idx >= n_bins:
+            idx = n_bins - 1
+        bin_labels[idx].append(float(y))
+    resolution = 0.0
+    for bl in bin_labels:
+        if not bl:
+            continue
+        frac = sum(bl) / len(bl)
+        resolution += len(bl) * (frac - base_rate) ** 2
+    resolution /= n
+    normalizer = base_rate * (1.0 - base_rate)
+    if normalizer <= 0.0:
+        return 0.0
+    return float(min(1.0, resolution / normalizer))

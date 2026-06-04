@@ -2190,3 +2190,45 @@ class TestPipelineHealthReport:
         sys.path.insert(0, "src")
         import schemas
         assert "PipelineHealthReport" in schemas.__all__
+
+
+class TestObservationQualityReport:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import ObservationQualityReport
+        self.cls = ObservationQualityReport
+
+    def test_defaults(self):
+        r = self.cls()
+        assert r.n_obs == 0
+        assert r.n_saturated == 0
+        assert r.mean_snr is None
+        assert r.mean_fwhm_arcsec is None
+        assert r.limiting_mag is None
+
+    def test_populated(self):
+        r = self.cls(
+            field_id="F001",
+            epoch_jd=2460000.5,
+            n_obs=100,
+            mean_snr=15.0,
+            mean_fwhm_arcsec=2.1,
+            n_saturated=3,
+            limiting_mag=21.5,
+        )
+        assert r.field_id == "F001"
+        assert r.n_obs == 100
+        assert r.mean_snr == 15.0
+
+    def test_immutable(self):
+        import pytest
+        r = self.cls()
+        with pytest.raises(Exception):
+            r.n_obs = 5
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        assert "ObservationQualityReport" in schemas.__all__

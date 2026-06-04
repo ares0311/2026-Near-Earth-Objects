@@ -2860,3 +2860,66 @@ class TestFilterByStreakScore:
         result = self._make_streaky_result()
         filtered = filter_by_streak_score(result, min_streak_score=0.5)
         assert len(filtered.candidates) == 1
+
+
+class TestComputeRbScoreDistribution:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_rb_score_distribution
+        self.fn = compute_rb_score_distribution
+
+    def _make_result(self, rb_scores):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import DetectProvenance, DetectResult, Observation, RawCandidate
+        candidates = []
+        for i, rb in enumerate(rb_scores):
+            obs = Observation(
+                obs_id=f"o{i}", ra_deg=10.0, dec_deg=5.0, jd=2460000.5,
+                mag=20.0, mag_err=0.1, filter_band="r", mission="ZTF",
+                real_bogus=rb,
+            )
+            cand = RawCandidate(candidate_id=f"c{i}", observations=(obs,))
+            candidates.append(cand)
+        prov = DetectProvenance(
+            real_bogus_threshold=0.65, n_candidates=len(candidates),
+            n_known_matches=0, detected_at_jd=2460000.5,
+        )
+        return DetectResult(candidates=tuple(candidates), known_matches=(), provenance=prov)
+
+    def test_basic_structure(self):
+        result = self._make_result([0.2, 0.5, 0.8])
+        hist = self.fn(result)
+        assert "bin_edges" in hist
+        assert "counts" in hist
+        assert "n_total" in hist
+        assert hist["n_total"] == 3
+
+    def test_empty_result(self):
+        result = self._make_result([])
+        hist = self.fn(result)
+        assert hist["n_total"] == 0
+        assert sum(hist["counts"]) == 0
+
+    def test_none_rb_excluded(self):
+        result = self._make_result([None, 0.5])
+        hist = self.fn(result)
+        assert hist["n_total"] == 1
+
+    def test_bin_count_correct(self):
+        result = self._make_result([0.2, 0.5, 0.8])
+        hist = self.fn(result, n_bins=5)
+        assert len(hist["counts"]) == 5
+        assert len(hist["bin_edges"]) == 6
+
+    def test_all_in_last_bin_for_score_one(self):
+        result = self._make_result([1.0])
+        hist = self.fn(result, n_bins=10)
+        assert hist["counts"][-1] == 1
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import detect
+        assert "compute_rb_score_distribution" in detect.__all__

@@ -33,7 +33,8 @@ __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fet
            "count_observations_by_night",
            "compute_temporal_coverage",
            "compute_observation_rate",
-           "compute_magnitude_distribution"]
+           "compute_magnitude_distribution",
+           "group_observations_by_night"]
 
 import json
 import os
@@ -2118,3 +2119,22 @@ def compute_magnitude_distribution(fetch_result: object, n_bins: int = 10) -> di
             idx = n_bins - 1
         counts[idx] += 1
     return {"bin_edges": edges, "counts": counts, "n_total": len(mags)}
+
+
+def group_observations_by_night(fetch_result: FetchResult) -> dict:
+    """Group observations in a FetchResult by integer night (floor of JD).
+
+    Returns a dict mapping each integer JD (``int(floor(jd))``) to the list
+    of :class:`Observation` objects whose Julian Date falls in that night.
+    Observations with non-finite JDs are skipped.  Returns an empty dict for
+    empty inputs.
+    """
+    import math
+
+    groups: dict[int, list] = {}
+    for obs in fetch_result.alerts:
+        if not math.isfinite(obs.jd):
+            continue
+        night = int(math.floor(obs.jd))
+        groups.setdefault(night, []).append(obs)
+    return groups

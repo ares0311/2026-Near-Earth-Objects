@@ -45,6 +45,7 @@ __all__ = [
     "BatchProcessingResult",
     "SurveyRunSummary",
     "PipelineHealthReport",
+    "ObservationQualityReport",
 ]
 
 from dataclasses import dataclass
@@ -1248,3 +1249,23 @@ class PipelineHealthReport(BaseModel):
     mypy_clean: bool = False
     test_count: int = 0
     pipeline_version: str = "unknown"
+
+
+class ObservationQualityReport(BaseModel):
+    """Frozen quality summary for a single survey field epoch.
+
+    Aggregates per-observation quality metrics for downstream filtering
+    and comparison.  All numeric fields use ``None`` to indicate that
+    the statistic could not be computed (e.g. empty field, missing
+    SNR measurements).
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    field_id: str = "unknown"
+    epoch_jd: float = 0.0
+    n_obs: int = 0
+    mean_snr: float | None = None
+    mean_fwhm_arcsec: float | None = None
+    n_saturated: int = 0
+    limiting_mag: float | None = None

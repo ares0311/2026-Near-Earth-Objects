@@ -3100,3 +3100,53 @@ class TestComputeLongitudeAscendingNodeRate:
         from types import SimpleNamespace
         el = SimpleNamespace(a_au=1.0, inclination_deg=10.0)
         assert self.fn(el) is None
+
+
+class TestComputeArgumentOfPerihelionRate:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_argument_of_perihelion_rate
+        self.fn = compute_argument_of_perihelion_rate
+
+    def test_basic_returns_float(self):
+        from types import SimpleNamespace
+        el = SimpleNamespace(a_au=1.0, e=0.1, inclination_deg=10.0)
+        result = self.fn(el)
+        assert isinstance(result, float)
+
+    def test_missing_a_returns_none(self):
+        from types import SimpleNamespace
+        el = SimpleNamespace(e=0.1, inclination_deg=10.0)
+        assert self.fn(el) is None
+
+    def test_zero_a_returns_none(self):
+        from types import SimpleNamespace
+        el = SimpleNamespace(a_au=0.0, e=0.1, inclination_deg=10.0)
+        assert self.fn(el) is None
+
+    def test_negative_a_returns_none(self):
+        from types import SimpleNamespace
+        el = SimpleNamespace(a_au=-1.0, e=0.1, inclination_deg=10.0)
+        assert self.fn(el) is None
+
+    def test_missing_e_returns_none(self):
+        from types import SimpleNamespace
+        el = SimpleNamespace(a_au=1.0, inclination_deg=10.0)
+        assert self.fn(el) is None
+
+    def test_parabolic_returns_none(self):
+        from types import SimpleNamespace
+        el = SimpleNamespace(a_au=1.0, e=1.0, inclination_deg=10.0)
+        assert self.fn(el) is None
+
+    def test_missing_inclination_returns_none(self):
+        from types import SimpleNamespace
+        el = SimpleNamespace(a_au=1.0, e=0.1)
+        assert self.fn(el) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import orbit
+        assert "compute_argument_of_perihelion_rate" in orbit.__all__

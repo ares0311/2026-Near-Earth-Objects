@@ -2831,3 +2831,43 @@ class TestFilterByDiscoveryPriority:
         sys.path.insert(0, "src")
         import score
         assert "filter_by_discovery_priority" in score.__all__
+
+
+class TestGetTopCandidates:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import get_top_candidates
+        self.fn = get_top_candidates
+
+    def test_basic(self, scored_neo):
+        result = self.fn([scored_neo])
+        assert len(result) == 1
+
+    def test_top_n(self, scored_neo):
+        result = self.fn([scored_neo, scored_neo, scored_neo], n=2)
+        assert len(result) == 2
+
+    def test_empty(self):
+        assert self.fn([]) == []
+
+    def test_n_larger_than_list(self, scored_neo):
+        result = self.fn([scored_neo], n=100)
+        assert len(result) == 1
+
+    def test_n_zero(self, scored_neo):
+        result = self.fn([scored_neo], n=0)
+        assert result == []
+
+    def test_sorted_by_priority(self):
+        from types import SimpleNamespace
+        high = SimpleNamespace(metadata=SimpleNamespace(discovery_priority=0.9))
+        low = SimpleNamespace(metadata=SimpleNamespace(discovery_priority=0.1))
+        result = self.fn([low, high], n=2)
+        assert result[0] is high
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        assert "get_top_candidates" in score.__all__

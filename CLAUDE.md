@@ -471,9 +471,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.81.0)
+## Current State (v0.82.0)
 
-All 10 pipeline modules are complete. Default collection finds 3128 non-live tests plus 2 deselected live/integration checks. CI is expected to remain green on Python 3.11 & 3.12 with the 100% coverage target. Background automation uses one unified CLI with automated offline scheduling readiness, live policy contract validation, provider-specific live readiness summaries, no-secret credential inventories with env/Keychain source reporting, no-secret live-policy approval checklist/report writing, offline scoring metrics KPI report writing, no-network live dry-run approval bundles, operator handoff exports, persisted operator handoff logs, persisted blueprint compliance summaries, persisted operations snapshots, internal signoff packets, packet-linked signoff decisions, packet-decision readiness summaries, background SQLite schema status and migration preview/reporting, schema operations triage, operator next-action summaries, internal follow-up disposition summaries, top-level SQLite logs for runs, readiness checks, approval bundles, no-network live dry-run plans, mock-only provider execution attempts, and auditable signoff readiness. Public APIs now extend through v0.76.0 with expanded calibration, orbit dynamics, survey statistics, alert packaging, schema summaries, conservative candidate-priority helpers, background blueprint auditing, operations snapshots, signoff packets, packet-linked signoff decisions, packet-decision readiness, SQLite schema status, migration preview, schema operations triage, operator next-action guidance, internal disposition reporting for signed fixture follow-ups, sanitized credential inventory report writing, no-secret live-policy approval checklist/report writing, and offline scoring metrics KPI report writing for split live-smoke approval preparation.
+All 10 pipeline modules are complete. Default collection finds 3189 non-live tests plus 2 deselected live/integration checks. CI is expected to remain green on Python 3.11 & 3.12 with the 100% coverage target. Background automation uses one unified CLI with automated offline scheduling readiness, live policy contract validation, provider-specific live readiness summaries, no-secret credential inventories with env/Keychain source reporting, no-secret live-policy approval checklist/report writing, offline scoring metrics KPI report writing, no-network live dry-run approval bundles, operator handoff exports, persisted operator handoff logs, persisted blueprint compliance summaries, persisted operations snapshots, internal signoff packets, packet-linked signoff decisions, packet-decision readiness summaries, background SQLite schema status and migration preview/reporting, schema operations triage, operator next-action summaries, internal follow-up disposition summaries, top-level SQLite logs for runs, readiness checks, approval bundles, no-network live dry-run plans, mock-only provider execution attempts, and auditable signoff readiness. Public APIs now extend through v0.76.0 with expanded calibration, orbit dynamics, survey statistics, alert packaging, schema summaries, conservative candidate-priority helpers, background blueprint auditing, operations snapshots, signoff packets, packet-linked signoff decisions, packet-decision readiness, SQLite schema status, migration preview, schema operations triage, operator next-action guidance, internal disposition reporting for signed fixture follow-ups, sanitized credential inventory report writing, no-secret live-policy approval checklist/report writing, and offline scoring metrics KPI report writing for split live-smoke approval preparation.
 
 ### Skills
 
@@ -555,6 +555,8 @@ All 10 pipeline modules are complete. Default collection finds 3128 non-live tes
 | `Skills/find_longest_tracklet.py` | Find the longest tracklet in a tracklet JSON file; `--json` flag |
 | `Skills/compute_magnitude_distributions.py` | Magnitude distribution histogram from tracklet/fetch-result JSON; `--bins`, `--json` flags |
 | `Skills/filter_priority_candidates.py` | Filter scored NEO JSON by discovery priority threshold; `--min-priority`, `--json` flags |
+| `Skills/get_top_candidates.py` | Top-N candidates by discovery priority from scored NEO JSON; `--n`, `--json` flags |
+| `Skills/group_observations_by_night.py` | Group and summarize observations by integer night from tracklet JSON; `--json` flag |
 
 ### Docs
 
@@ -588,6 +590,7 @@ All 10 pipeline modules are complete. Default collection finds 3128 non-live tes
 | `docs/ALERT_PATHWAY_GUIDE.md` | Alert pathway helper and guardrail guide |
 | `docs/SCHEMA_REFERENCE.md` | Schema model reference |
 | `docs/FILTERING_AND_DISTRIBUTION_GUIDE.md` | Filter helpers and histogram/distribution functions reference (v0.81.0) |
+| `docs/SURVEY_STATISTICS_GUIDE.md` | Survey-statistics helpers reference: temporal coverage, magnitude distribution, cadence, group-by-night (v0.82.0) |
 
 ### Data
 
@@ -604,7 +607,7 @@ All 10 pipeline modules are complete. Default collection finds 3128 non-live tes
 | `background/live_review_policy.schema.json` | JSON Schema for live dry-run review policy |
 | `background/targets.json` | Stable background automation fixture manifest |
 
-### Coverage by Module (v0.81.0)
+### Coverage by Module (v0.82.0)
 
 | Module | Coverage |
 |---|---|
@@ -646,6 +649,23 @@ All 10 pipeline modules are complete. Default collection finds 3128 non-live tes
 - Collect labeled training data via `Skills/generate_training_labels.py`.
 - Run credentialed live-data dry runs for ZTF/ATLAS/Pan-STARRS only when tokens and review policy are explicitly configured.
 - Train and evaluate Tier 2/Tier 3 model weights on real labeled data.
+
+### Key Changes in v0.82.0
+
+- `schemas.py`: added `ObservationQualityReport` — frozen model: field_id, epoch_jd, n_obs, mean_snr, mean_fwhm_arcsec, n_saturated, limiting_mag.
+- `fetch.py`: added `group_observations_by_night(fetch_result)` — dict[int_jd → list[Observation]] grouped by floor(jd); skips non-finite JDs.
+- `preprocess.py`: added `compute_cutout_peak_value(obs)` — peak pixel value in difference cutout; None if no cutout or decode error.
+- `detect.py`: added `compute_rb_score_distribution(result, n_bins=10)` — equal-width histogram of max RB scores per candidate; excludes None scores.
+- `link.py`: added `estimate_observation_cadence(tracklet)` — mean inter-observation time in hours; None for <2 obs.
+- `classify.py`: added `filter_by_neo_probability(neos, min_prob=0.5)` — filter ScoredNEOs by posterior neo_candidate probability.
+- `orbit.py`: added `compute_argument_of_perihelion_rate(elements)` — secular ω precession rate in deg/yr from solar J2 perturbation.
+- `score.py`: added `get_top_candidates(neos, n=10)` — top-N ScoredNEOs by discovery_priority descending.
+- `alert.py`: added `count_submissions_by_pathway(neos)` — dict[pathway → count] for candidates passing ready_for_submission gate.
+- `calibration.py`: added `compute_calibration_resolution(probs, labels, n_bins=10)` — normalized resolution score [0, 1] measuring class separation.
+- Added `Skills/get_top_candidates.py` and `Skills/group_observations_by_night.py`.
+- Added `docs/SURVEY_STATISTICS_GUIDE.md`.
+- 3189 tests passing; 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.82.0.
 
 ### Key Changes in v0.81.0
 

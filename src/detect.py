@@ -29,7 +29,8 @@ __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus"
            "compute_detection_density",
            "count_streak_detections",
            "count_detections_by_mission",
-           "filter_by_streak_score"]
+           "filter_by_streak_score",
+           "compute_rb_score_distribution"]
 
 import math
 import uuid
@@ -1416,3 +1417,35 @@ def filter_by_streak_score(
         known_matches=result.known_matches,
         provenance=prov,
     )
+
+
+def compute_rb_score_distribution(result: DetectResult, n_bins: int = 10) -> dict:
+    """Return an equal-width histogram of real/bogus scores across candidates.
+
+    Collects the maximum ``real_bogus`` score across observations for each
+    candidate, then bins the scores into *n_bins* equal-width bins spanning
+    [0, 1].  Candidates with no valid (non-None) scores are excluded.
+
+    Returns a dict with keys:
+      - ``"bin_edges"``: list of *n_bins + 1* floats from 0.0 to 1.0
+      - ``"counts"``: list of *n_bins* non-negative ints
+      - ``"n_total"``: total candidates with at least one valid RB score
+    """
+    n_bins = max(1, int(n_bins))
+    scores = []
+    for cand in result.candidates:
+        valid = [
+            obs.real_bogus
+            for obs in cand.observations
+            if obs.real_bogus is not None
+        ]
+        if valid:
+            scores.append(max(valid))
+    edges = [i / n_bins for i in range(n_bins + 1)]
+    counts = [0] * n_bins
+    for s in scores:
+        idx = int(float(s) * n_bins)
+        if idx >= n_bins:
+            idx = n_bins - 1
+        counts[idx] += 1
+    return {"bin_edges": edges, "counts": counts, "n_total": len(scores)}

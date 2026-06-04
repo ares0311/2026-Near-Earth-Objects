@@ -3328,3 +3328,39 @@ class TestBatchDominantHypothesis:
         sys.path.insert(0, "src")
         import classify
         assert "batch_dominant_hypothesis" in classify.__all__
+
+
+class TestFilterByNeoProbability:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import filter_by_neo_probability
+        self.fn = filter_by_neo_probability
+
+    def test_basic(self, scored_neo):
+        result = self.fn([scored_neo], min_prob=0.0)
+        assert len(result) == 1
+
+    def test_filters_below_threshold(self, scored_neo):
+        result = self.fn([scored_neo], min_prob=1.1)
+        assert len(result) == 0
+
+    def test_empty(self):
+        assert self.fn([]) == []
+
+    def test_none_posterior_excluded(self):
+        from types import SimpleNamespace
+        neo = SimpleNamespace(posterior=None)
+        assert self.fn([neo], min_prob=0.0) == []
+
+    def test_exact_threshold_included(self):
+        from types import SimpleNamespace
+        neo = SimpleNamespace(posterior=SimpleNamespace(neo_candidate=0.5))
+        result = self.fn([neo], min_prob=0.5)
+        assert len(result) == 1
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import classify
+        assert "filter_by_neo_probability" in classify.__all__

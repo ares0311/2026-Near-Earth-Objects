@@ -2060,3 +2060,42 @@ class TestComputeMaxCalibrationError:
         sys.path.insert(0, "src")
         import calibration
         assert "compute_max_calibration_error" in calibration.__all__
+
+
+class TestComputeCalibrationResolution:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_calibration_resolution
+        self.fn = compute_calibration_resolution
+
+    def test_perfect_separation(self):
+        probs = [0.0, 0.0, 1.0, 1.0]
+        labels = [0, 0, 1, 1]
+        result = self.fn(probs, labels)
+        assert result > 0.0
+
+    def test_empty_returns_zero(self):
+        assert self.fn([], []) == 0.0
+
+    def test_mismatched_lengths(self):
+        assert self.fn([0.5], [0, 1]) == 0.0
+
+    def test_all_same_label_zero(self):
+        probs = [0.1, 0.5, 0.9]
+        labels = [1, 1, 1]
+        assert self.fn(probs, labels) == 0.0
+
+    def test_range(self):
+        import random
+        random.seed(42)
+        probs = [random.random() for _ in range(100)]
+        labels = [random.randint(0, 1) for _ in range(100)]
+        result = self.fn(probs, labels)
+        assert 0.0 <= result <= 1.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        assert "compute_calibration_resolution" in calibration.__all__

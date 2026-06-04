@@ -4406,3 +4406,74 @@ class TestComputeMagnitudeDistribution:
         sys.path.insert(0, "src")
         import fetch
         assert "compute_magnitude_distribution" in fetch.__all__
+
+
+class TestGroupObservationsByNight:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import group_observations_by_night
+        self.fn = group_observations_by_night
+
+    def _make_fetch_result(self, jds):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import FetchProvenance, FetchResult, Observation
+        obs = [
+            Observation(
+                obs_id=f"o{i}", ra_deg=10.0, dec_deg=5.0, jd=jd,
+                mag=20.0, mag_err=0.1, filter_band="r", mission="ZTF",
+            )
+            for i, jd in enumerate(jds)
+        ]
+        prov = FetchProvenance(
+            surveys=["ZTF"], query_ra_deg=0.0, query_dec_deg=0.0,
+            query_radius_deg=1.0, start_jd=min(jds), end_jd=max(jds),
+        )
+        return FetchResult(alerts=obs, provenance=prov)
+
+    def test_single_night(self):
+        result = self._make_fetch_result([2460000.1, 2460000.5, 2460000.9])
+        groups = self.fn(result)
+        assert 2460000 in groups
+        assert len(groups[2460000]) == 3
+
+    def test_two_nights(self):
+        result = self._make_fetch_result([2460000.5, 2460001.5])
+        groups = self.fn(result)
+        assert len(groups) == 2
+        assert 2460000 in groups
+        assert 2460001 in groups
+
+    def test_empty(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import FetchProvenance, FetchResult
+        prov = FetchProvenance(
+            surveys=["ZTF"], query_ra_deg=0.0, query_dec_deg=0.0,
+            query_radius_deg=1.0, start_jd=0.0, end_jd=0.0,
+        )
+        result = FetchResult(alerts=[], provenance=prov)
+        assert self.fn(result) == {}
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+        assert "group_observations_by_night" in fetch.__all__
+
+    def test_non_finite_jd_skipped(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import FetchProvenance, FetchResult, Observation
+        obs_inf = Observation(
+            obs_id="inf_obs", ra_deg=10.0, dec_deg=5.0, jd=float("inf"),
+            mag=20.0, mag_err=0.1, filter_band="r", mission="ZTF",
+        )
+        prov = FetchProvenance(
+            surveys=["ZTF"], query_ra_deg=0.0, query_dec_deg=0.0,
+            query_radius_deg=1.0, start_jd=0.0, end_jd=0.0,
+        )
+        result = FetchResult(alerts=[obs_inf], provenance=prov)
+        groups = self.fn(result)
+        assert len(groups) == 0

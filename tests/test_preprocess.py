@@ -2936,3 +2936,54 @@ class TestComputeCutoutNoiseLevel:
         sys.path.insert(0, "src")
         import preprocess
         assert "compute_cutout_noise_level" in preprocess.__all__
+
+
+class TestComputeCutoutPeakValue:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from preprocess import compute_cutout_peak_value
+        self.fn = compute_cutout_peak_value
+
+    def _make_obs(self, values):
+        import base64
+        from types import SimpleNamespace
+
+        import numpy as np
+        arr = np.array(values, dtype=np.float32)
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        return SimpleNamespace(cutout_difference=b64)
+
+    def test_returns_max(self):
+        obs = self._make_obs([1.0, 5.0, 3.0, 2.0])
+        assert self.fn(obs) == 5.0
+
+    def test_no_cutout_none(self):
+        from types import SimpleNamespace
+        assert self.fn(SimpleNamespace()) is None
+
+    def test_none_cutout_none(self):
+        from types import SimpleNamespace
+        assert self.fn(SimpleNamespace(cutout_difference=None)) is None
+
+    def test_invalid_b64_none(self):
+        from types import SimpleNamespace
+        assert self.fn(SimpleNamespace(cutout_difference="!!!")) is None
+
+    def test_single_pixel(self):
+        obs = self._make_obs([7.5])
+        assert self.fn(obs) == 7.5
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import preprocess
+        assert "compute_cutout_peak_value" in preprocess.__all__
+
+    def test_non_multiple_of_4_bytes_none(self):
+        import base64
+        from types import SimpleNamespace
+        # 1-byte payload: np.frombuffer will raise ValueError (not mult of 4)
+        b = base64.b64encode(b"\x01").decode()
+        obs = SimpleNamespace(cutout_difference=b)
+        assert self.fn(obs) is None

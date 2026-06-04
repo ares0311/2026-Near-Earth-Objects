@@ -33,7 +33,8 @@ __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
            "compute_impact_parameter",
            "compute_geocentric_velocity",
            "compute_orbital_period_years",
-           "compute_longitude_ascending_node_rate"]
+           "compute_longitude_ascending_node_rate",
+           "compute_argument_of_perihelion_rate"]
 
 import math
 from typing import NamedTuple
@@ -1746,3 +1747,51 @@ def compute_longitude_ascending_node_rate(elements: object) -> float | None:
         * math.cos(i_rad) / (1.0 - e_val ** 2) ** 2
     )
     return float(rate)
+
+
+def compute_argument_of_perihelion_rate(elements: object) -> float | None:
+    """Return the secular precession rate of the argument of perihelion (ω) in deg/yr.
+
+    Uses the first-order J2 secular perturbation formula:
+
+    .. math::
+
+        \\dot{\\omega} \\approx \\frac{3}{2} n J_2
+            \\left(\\frac{R_\\odot}{a}\\right)^2
+            \\frac{5\\cos^2 i - 1}{2(1-e^2)^2}
+
+    The same J2_SUN and R_SUN constants as
+    :func:`compute_longitude_ascending_node_rate` are used.  Returns ``None``
+    if any required element is missing, ``a ≤ 0``, ``e ≥ 1``, or inclination
+    is absent.
+
+    Returns the rate in degrees per year; positive = prograde precession.
+    """
+    import math
+
+    J2_SUN = 2.0e-7
+    R_SUN_AU = 4.65e-3
+
+    a = getattr(elements, "a_au", None) or getattr(elements, "semi_major_axis_au", None)
+    if a is None:
+        return None
+    a_val = float(a)
+    if a_val <= 0.0:
+        return None
+    e = getattr(elements, "e", None) or getattr(elements, "eccentricity", None)
+    if e is None:
+        return None
+    e_val = float(e)
+    if e_val >= 1.0:
+        return None
+    incl = getattr(elements, "inclination_deg", None)
+    if incl is None:
+        return None
+    i_rad = math.radians(float(incl))
+    n_rad_yr = 2.0 * math.pi / (a_val ** 1.5)
+    denom = (1.0 - e_val ** 2) ** 2
+    rate_rad_yr = (
+        1.5 * n_rad_yr * J2_SUN * (R_SUN_AU / a_val) ** 2
+        * (5.0 * math.cos(i_rad) ** 2 - 1.0) / (2.0 * denom)
+    )
+    return float(math.degrees(rate_rad_yr))

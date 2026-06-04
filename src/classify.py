@@ -32,6 +32,7 @@ __all__ = [
     "compute_neo_class_distribution",
     "compute_tier1_feature_vector",
     "batch_dominant_hypothesis",
+    "filter_by_neo_probability",
     "compute_posterior_update",
     "compute_tier1_confidence",
     "compute_posterior_stability",
@@ -2137,3 +2138,18 @@ def batch_dominant_hypothesis(neos: list) -> list:
         hyp, prob = dominant_hypothesis(posterior)
         results.append({"object_id": obj_id, "hypothesis": hyp, "probability": float(prob)})
     return results
+
+
+def filter_by_neo_probability(neos: list, min_prob: float = 0.5) -> list:
+    """Return scored NEOs whose posterior neo_candidate probability ≥ min_prob.
+
+    Reads ``neo.posterior.neo_candidate``.  NEOs with a missing or None
+    posterior are excluded.  Returns an empty list if no candidates qualify.
+    """
+    result = []
+    for neo in neos:
+        posterior = getattr(neo, "posterior", None)
+        prob = getattr(posterior, "neo_candidate", None) if posterior else None
+        if prob is not None and float(prob) >= min_prob:
+            result.append(neo)
+    return result

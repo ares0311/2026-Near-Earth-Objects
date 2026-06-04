@@ -2880,3 +2880,53 @@ class TestFormatCompleteMpcSubmission:
         sys.path.insert(0, "src")
         import alert
         assert "format_complete_mpc_submission" in alert.__all__
+
+
+class TestCountSubmissionsByPathway:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import count_submissions_by_pathway
+        self.fn = count_submissions_by_pathway
+
+    def test_empty(self):
+        assert self.fn([]) == {}
+
+    def test_ready_neo_counted(self):
+        import sys
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        sys.path.insert(0, "src")
+        hazard = SimpleNamespace(alert_pathway="mpc_submission")
+        neo = SimpleNamespace(hazard=hazard)
+        with patch("alert.ready_for_submission", return_value=(True, [])):
+            result = self.fn([neo])
+        assert result.get("mpc_submission") == 1
+
+    def test_multiple_pathways(self):
+        import sys
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        sys.path.insert(0, "src")
+        neo1 = SimpleNamespace(hazard=SimpleNamespace(alert_pathway="mpc_submission"))
+        neo2 = SimpleNamespace(hazard=SimpleNamespace(alert_pathway="neocp_followup"))
+        with patch("alert.ready_for_submission", return_value=(True, [])):
+            result = self.fn([neo1, neo2])
+        assert result["mpc_submission"] == 1
+        assert result["neocp_followup"] == 1
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+        assert "count_submissions_by_pathway" in alert.__all__
+
+    def test_not_ready_excluded(self):
+        import sys
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        sys.path.insert(0, "src")
+        neo = SimpleNamespace(hazard=SimpleNamespace(alert_pathway="internal_candidate"))
+        with patch("alert.ready_for_submission", return_value=(False, ["missing rb"])):
+            result = self.fn([neo])
+        assert result == {}

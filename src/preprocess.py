@@ -32,7 +32,8 @@ __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_
            "compute_image_contrast",
            "compute_pixel_saturation_fraction",
            "compute_reference_cutout_snr",
-           "compute_cutout_noise_level"]
+           "compute_cutout_noise_level",
+           "compute_cutout_peak_value"]
 
 import base64
 import math
@@ -1486,5 +1487,30 @@ def compute_cutout_noise_level(obs: object) -> float | None:
         raw = base64.b64decode(cutout)
         arr = np.frombuffer(raw, dtype=np.float32).reshape(_CUTOUT_SIZE, _CUTOUT_SIZE).astype(float)
         return float(np.std(arr))
+    except Exception:
+        return None
+
+
+def compute_cutout_peak_value(obs: object) -> float | None:
+    """Return the peak (maximum) pixel value in the difference-image cutout.
+
+    Decodes the base64 float32 difference-image cutout and returns the
+    maximum pixel value.  Returns ``None`` if the observation has no
+    ``cutout_difference`` attribute, the attribute is ``None``, or the
+    bytes cannot be decoded as a valid float32 array.
+    """
+    import base64
+
+    import numpy as np
+
+    raw_b64 = getattr(obs, "cutout_difference", None)
+    if raw_b64 is None:
+        return None
+    try:
+        raw = base64.b64decode(raw_b64)
+        arr = np.frombuffer(raw, dtype=np.float32)
+        if arr.size == 0:
+            return None
+        return float(np.max(arr))
     except Exception:
         return None

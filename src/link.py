@@ -34,7 +34,8 @@ __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "compute_pa_circular_std",
            "compute_sky_coverage_area",
            "compute_night_gap_statistics",
-           "compute_field_tracklet_density"]
+           "compute_field_tracklet_density",
+           "estimate_observation_cadence"]
 
 import math
 import uuid
@@ -1605,3 +1606,22 @@ def compute_field_tracklet_density(
     steradians = 2.0 * math.pi * (1.0 - math.cos(r_rad))
     sq_deg = steradians * (180.0 / math.pi) ** 2
     return float(len(tracklets) / sq_deg) if sq_deg > 0.0 else None
+
+
+def estimate_observation_cadence(tracklet: object) -> float | None:
+    """Return the mean time between consecutive observations in hours.
+
+    Computes the mean of all consecutive observation time-deltas
+    ``(jd[i+1] - jd[i]) * 24`` for the sorted observation sequence.
+    Returns ``None`` if the tracklet has fewer than 2 observations or if
+    observations cannot be accessed.
+    """
+    obs = getattr(tracklet, "observations", None)
+    if not obs or len(obs) < 2:
+        return None
+    try:
+        jds = sorted(float(o.jd) for o in obs)
+    except Exception:
+        return None
+    deltas = [(jds[i + 1] - jds[i]) * 24.0 for i in range(len(jds) - 1)]
+    return float(sum(deltas) / len(deltas))

@@ -51,6 +51,7 @@ __all__ = [
     "format_mpc_observation_block",
     "format_neocp_submission_header",
     "format_complete_mpc_submission",
+    "count_submissions_by_pathway",
 ]
 
 import json
@@ -2067,3 +2068,23 @@ def format_complete_mpc_submission(
     header = format_neocp_submission_header(neo, obs_code=obs_code)
     obs_block = format_mpc_observation_block(neo, obs_code=obs_code)
     return f"{header}\n\n{obs_block}"
+
+
+def count_submissions_by_pathway(neos: list) -> dict:
+    """Return a count of candidates that are ready for submission by pathway.
+
+    For each NEO in *neos*, calls :func:`ready_for_submission` to determine
+    whether it passes all alert-protocol gate conditions, then groups counts
+    by ``alert_pathway``.  Only pathways with at least one ready candidate
+    appear in the result.
+
+    Returns a dict mapping ``alert_pathway`` strings to integer counts.
+    """
+    counts: dict = {}
+    for neo in neos:
+        is_ready, _ = ready_for_submission(neo)
+        if not is_ready:
+            continue
+        pathway = getattr(getattr(neo, "hazard", None), "alert_pathway", "unknown")
+        counts[pathway] = counts.get(pathway, 0) + 1
+    return counts

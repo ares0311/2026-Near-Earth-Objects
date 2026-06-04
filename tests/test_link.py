@@ -3185,3 +3185,54 @@ class TestComputeFieldTrackletDensity:
         sys.path.insert(0, "src")
         import link
         assert "compute_field_tracklet_density" in link.__all__
+
+
+class TestEstimateObservationCadence:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import estimate_observation_cadence
+        self.fn = estimate_observation_cadence
+
+    def test_basic(self, tracklet):
+        result = self.fn(tracklet)
+        assert result is not None
+        assert result > 0.0
+
+    def test_two_obs_one_hour_apart(self):
+        from types import SimpleNamespace
+        obs = [
+            SimpleNamespace(jd=2460000.0),
+            SimpleNamespace(jd=2460000.0 + 1/24),
+        ]
+        t = SimpleNamespace(observations=obs)
+        result = self.fn(t)
+        assert abs(result - 1.0) < 1e-6
+
+    def test_single_obs_none(self):
+        from types import SimpleNamespace
+        t = SimpleNamespace(observations=[SimpleNamespace(jd=2460000.0)])
+        assert self.fn(t) is None
+
+    def test_empty_obs_none(self):
+        from types import SimpleNamespace
+        assert self.fn(SimpleNamespace(observations=[])) is None
+
+    def test_no_observations_attr_none(self):
+        from types import SimpleNamespace
+        assert self.fn(SimpleNamespace()) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+        assert "estimate_observation_cadence" in link.__all__
+
+    def test_bad_jd_attribute_returns_none(self):
+        from types import SimpleNamespace
+        obs = [
+            SimpleNamespace(jd="not_a_number"),
+            SimpleNamespace(jd=2460000.0),
+        ]
+        t = SimpleNamespace(observations=obs)
+        assert self.fn(t) is None
