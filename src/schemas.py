@@ -50,6 +50,7 @@ __all__ = [
     "AlertSummaryRecord",
     "ScoredNEOBatch",
     "NightObservationSummary",
+    "SurveyNightRecord",
 ]
 
 from dataclasses import dataclass
@@ -1333,3 +1334,16 @@ class NightObservationSummary(BaseModel):
     mean_rb: float | None = None
     limiting_mag: float | None = None
     survey: str = "unknown"
+
+
+class SurveyNightRecord(BaseModel):
+    """Frozen summary record for a single survey night."""
+
+    model_config = ConfigDict(frozen=True)
+
+    night_jd: float | None = None
+    survey: str = "unknown"
+    n_obs: int = 0
+    n_tracklets: int = 0
+    limiting_mag: float | None = None
+    area_sq_deg: float | None = None

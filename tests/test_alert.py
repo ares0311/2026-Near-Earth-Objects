@@ -3098,3 +3098,36 @@ class TestCountReadyForSubmission:
         sys.path.insert(0, "src")
         import alert
         assert "count_ready_for_submission" in alert.__all__
+
+
+class TestFormatAlertPathwaySummary:
+    def test_empty_returns_no_candidates(self):
+        from alert import format_alert_pathway_summary
+        assert format_alert_pathway_summary([]) == "No candidates."
+
+    def test_single_neo(self, scored_neo):
+        from alert import format_alert_pathway_summary
+        result = format_alert_pathway_summary([scored_neo])
+        assert "1 candidates" in result
+        assert "100.0%" in result
+
+    def test_multiple_pathways(self):
+        from types import SimpleNamespace
+
+        from alert import format_alert_pathway_summary
+        def _neo(pathway):
+            hazard = SimpleNamespace(alert_pathway=pathway)
+            return SimpleNamespace(hazard=hazard)
+        neos = [_neo("mpc_submission"), _neo("mpc_submission"), _neo("internal_candidate")]
+        result = format_alert_pathway_summary(neos)
+        assert "3 candidates" in result
+        assert "mpc_submission" in result
+        assert "internal_candidate" in result
+
+    def test_no_hazard_attr(self):
+        from types import SimpleNamespace
+
+        from alert import format_alert_pathway_summary
+        neo = SimpleNamespace(hazard=None)
+        result = format_alert_pathway_summary([neo])
+        assert "unknown" in result

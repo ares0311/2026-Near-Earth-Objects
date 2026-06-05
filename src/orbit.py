@@ -38,7 +38,8 @@ __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
            "compute_perihelion_velocity",
            "compute_aphelion_velocity",
            "compute_specific_angular_momentum",
-           "compute_orbit_complexity"]
+           "compute_orbit_complexity",
+           "compute_mean_longitude"]
 
 import math
 from typing import NamedTuple
@@ -1937,3 +1938,26 @@ def compute_orbit_complexity(elements: object) -> float:
     i_norm = min(1.0, abs(i_val) / 90.0)
 
     return float(0.5 * e_norm + 0.5 * i_norm)
+
+
+def compute_mean_longitude(elements: object) -> float | None:
+    """Mean longitude of the orbit in degrees, normalised to [0, 360).
+
+    Defined as: λ = Ω + ω + M₀  (mod 360°)
+
+    where Ω is the longitude of the ascending node, ω is the argument
+    of perihelion, and M₀ is the mean anomaly at epoch.
+    Returns ``None`` if any required attribute is missing.
+    """
+    omega = getattr(elements, "longitude_ascending_node_deg", None)
+    if omega is None:
+        omega = getattr(elements, "Omega_deg", None)
+    w = getattr(elements, "argument_perihelion_deg", None)
+    if w is None:
+        w = getattr(elements, "omega_deg", None)
+    m0 = getattr(elements, "mean_anomaly_deg", None)
+    if m0 is None:
+        m0 = getattr(elements, "M0_deg", None)
+    if omega is None or w is None or m0 is None:
+        return None
+    return float((float(omega) + float(w) + float(m0)) % 360.0)

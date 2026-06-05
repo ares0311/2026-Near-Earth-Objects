@@ -40,7 +40,8 @@ __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "compute_pha_fraction",
            "count_by_alert_pathway",
            "compute_weighted_hazard_index",
-           "compute_candidate_priority_spread"]
+           "compute_candidate_priority_spread",
+           "compute_batch_priority_stats"]
 
 import math
 import uuid
@@ -1642,3 +1643,30 @@ def compute_candidate_priority_spread(neos: list) -> float:
     mean = sum(priorities) / len(priorities)
     variance = sum((p - mean) ** 2 for p in priorities) / len(priorities)
     return float(math.sqrt(variance))
+
+
+def compute_batch_priority_stats(neos: list) -> dict:
+    """Aggregate statistics of discovery_priority across all scored NEOs.
+
+    Returns a dict with keys: ``mean``, ``std``, ``min``, ``max``.
+    Returns an empty dict if no NEOs have a valid discovery_priority.
+    """
+    import math
+
+    priorities = []
+    for neo in neos:
+        meta = getattr(neo, "metadata", None)
+        p = getattr(meta, "discovery_priority", None) if meta else None
+        if p is not None:
+            priorities.append(float(p))
+    if not priorities:
+        return {}
+    n = len(priorities)
+    mean = sum(priorities) / n
+    variance = sum((p - mean) ** 2 for p in priorities) / n
+    return {
+        "mean": mean,
+        "std": math.sqrt(variance),
+        "min": min(priorities),
+        "max": max(priorities),
+    }

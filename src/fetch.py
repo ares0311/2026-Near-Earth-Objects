@@ -38,7 +38,8 @@ __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fet
            "count_observations_by_filter",
            "get_brightest_observation",
            "get_latest_observation",
-           "get_faintest_observation"]
+           "get_faintest_observation",
+           "compute_observation_time_span"]
 
 import json
 import os
@@ -2193,3 +2194,17 @@ def get_faintest_observation(fetch_result: FetchResult) -> object | None:
     if not valid:
         return None
     return max(valid, key=lambda o: o.mag)
+
+
+def compute_observation_time_span(fetch_result: FetchResult) -> float | None:
+    """Total time span in days covered by valid observations.
+
+    Returns max(JD) − min(JD) across all alerts with finite JDs.
+    Returns ``None`` if fewer than 2 valid JDs exist.
+    """
+    import math
+
+    jds = [obs.jd for obs in fetch_result.alerts if math.isfinite(obs.jd)]
+    if len(jds) < 2:
+        return None
+    return float(max(jds) - min(jds))

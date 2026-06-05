@@ -3335,3 +3335,48 @@ class TestComputeOrbitComplexity:
         sys.path.insert(0, "src")
         import orbit
         assert "compute_orbit_complexity" in orbit.__all__
+
+
+class TestComputeMeanLongitude:
+    def test_basic(self):
+        from types import SimpleNamespace
+
+        from orbit import compute_mean_longitude
+        el = SimpleNamespace(longitude_ascending_node_deg=30.0,
+                             argument_perihelion_deg=60.0,
+                             mean_anomaly_deg=90.0)
+        assert compute_mean_longitude(el) == pytest.approx(180.0)
+
+    def test_wrap_around(self):
+        from types import SimpleNamespace
+
+        from orbit import compute_mean_longitude
+        el = SimpleNamespace(longitude_ascending_node_deg=200.0,
+                             argument_perihelion_deg=200.0,
+                             mean_anomaly_deg=200.0)
+        result = compute_mean_longitude(el)
+        assert 0.0 <= result < 360.0
+        assert result == pytest.approx(240.0)
+
+    def test_missing_attribute_returns_none(self):
+        from types import SimpleNamespace
+
+        from orbit import compute_mean_longitude
+        el = SimpleNamespace(longitude_ascending_node_deg=30.0,
+                             argument_perihelion_deg=60.0)
+        assert compute_mean_longitude(el) is None
+
+    def test_all_missing_returns_none(self):
+        from types import SimpleNamespace
+
+        from orbit import compute_mean_longitude
+        assert compute_mean_longitude(SimpleNamespace()) is None
+
+    def test_zero_values(self):
+        from types import SimpleNamespace
+
+        from orbit import compute_mean_longitude
+        el = SimpleNamespace(longitude_ascending_node_deg=0.0,
+                             argument_perihelion_deg=0.0,
+                             mean_anomaly_deg=0.0)
+        assert compute_mean_longitude(el) == pytest.approx(0.0)

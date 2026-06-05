@@ -56,6 +56,7 @@ __all__ = [
     "compute_neo_class_distribution",
     "compute_composite_neo_score",
     "get_highest_confidence_neo",
+    "compute_classification_entropy_summary",
 ]
 
 import base64
@@ -2235,3 +2236,34 @@ def get_highest_confidence_neo(neos: list) -> object | None:
             best_prob = float(prob)
             best = neo
     return best
+
+
+def compute_classification_entropy_summary(neos: list) -> dict:
+    """Summary statistics of Shannon entropy across scored NEOs.
+
+    Returns a dict with keys: ``mean_entropy``, ``std_entropy``,
+    ``min_entropy``, ``max_entropy``.  Returns an empty dict if no
+    NEOs have a valid posterior.
+    """
+    import math
+
+    entropies = []
+    for neo in neos:
+        posterior = getattr(neo, "posterior", None)
+        if posterior is None:
+            continue
+        ent = posterior_entropy(posterior)
+        entropies.append(float(ent))
+
+    if not entropies:
+        return {}
+
+    n = len(entropies)
+    mean = sum(entropies) / n
+    variance = sum((e - mean) ** 2 for e in entropies) / n
+    return {
+        "mean_entropy": mean,
+        "std_entropy": math.sqrt(variance),
+        "min_entropy": min(entropies),
+        "max_entropy": max(entropies),
+    }

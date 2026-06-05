@@ -3187,3 +3187,52 @@ class TestComputePhotometricNoiseLevel:
         sys.path.insert(0, "src")
         import preprocess
         assert "compute_photometric_noise_level" in preprocess.__all__
+
+
+class TestComputeCutoutDynamicRange:
+    def test_valid_cutout(self):
+        import base64
+        import struct
+        from types import SimpleNamespace
+
+        from preprocess import compute_cutout_dynamic_range
+        pixels = [float(i) for i in range(16)]
+        raw = struct.pack(f"{len(pixels)}f", *pixels)
+        b64 = base64.b64encode(raw).decode()
+        obs = SimpleNamespace(cutout_difference=b64)
+        result = compute_cutout_dynamic_range(obs)
+        assert result == pytest.approx(15.0)
+
+    def test_no_cutout_returns_none(self):
+        from types import SimpleNamespace
+
+        from preprocess import compute_cutout_dynamic_range
+        obs = SimpleNamespace(cutout_difference=None)
+        assert compute_cutout_dynamic_range(obs) is None
+
+    def test_invalid_b64_returns_none(self):
+        from types import SimpleNamespace
+
+        from preprocess import compute_cutout_dynamic_range
+        obs = SimpleNamespace(cutout_difference="!!!notbase64!!!")
+        assert compute_cutout_dynamic_range(obs) is None
+
+    def test_empty_array_returns_none(self):
+        import base64
+        from types import SimpleNamespace
+
+        from preprocess import compute_cutout_dynamic_range
+        obs = SimpleNamespace(cutout_difference=base64.b64encode(b"").decode())
+        assert compute_cutout_dynamic_range(obs) is None
+
+    def test_uniform_pixels_zero_range(self):
+        import base64
+        import struct
+        from types import SimpleNamespace
+
+        from preprocess import compute_cutout_dynamic_range
+        pixels = [5.0] * 8
+        raw = struct.pack(f"{len(pixels)}f", *pixels)
+        b64 = base64.b64encode(raw).decode()
+        obs = SimpleNamespace(cutout_difference=b64)
+        assert compute_cutout_dynamic_range(obs) == pytest.approx(0.0)

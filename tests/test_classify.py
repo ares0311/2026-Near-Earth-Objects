@@ -3513,3 +3513,35 @@ class TestGetHighestConfidenceNeo:
         sys.path.insert(0, "src")
         import classify
         assert "get_highest_confidence_neo" in classify.__all__
+
+
+class TestComputeClassificationEntropySummary:
+    def test_with_scored_neos(self, scored_neo):
+        from classify import compute_classification_entropy_summary
+        result = compute_classification_entropy_summary([scored_neo])
+        assert "mean_entropy" in result
+        assert "std_entropy" in result
+        assert "min_entropy" in result
+        assert "max_entropy" in result
+
+    def test_empty_returns_empty_dict(self):
+        from classify import compute_classification_entropy_summary
+        assert compute_classification_entropy_summary([]) == {}
+
+    def test_no_posteriors_returns_empty(self):
+        from types import SimpleNamespace
+
+        from classify import compute_classification_entropy_summary
+        neo = SimpleNamespace(posterior=None)
+        assert compute_classification_entropy_summary([neo]) == {}
+
+    def test_single_neo_std_zero(self, scored_neo):
+        from classify import compute_classification_entropy_summary
+        result = compute_classification_entropy_summary([scored_neo])
+        assert result["std_entropy"] == pytest.approx(0.0)
+
+    def test_two_neos_stats(self, scored_neo):
+        from classify import compute_classification_entropy_summary
+        result = compute_classification_entropy_summary([scored_neo, scored_neo])
+        assert result["min_entropy"] == result["max_entropy"]
+        assert result["mean_entropy"] == result["min_entropy"]

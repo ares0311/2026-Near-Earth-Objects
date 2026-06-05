@@ -39,7 +39,8 @@ __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "compute_tracklet_span_nights",
            "compute_position_angle_dispersion",
            "compute_arc_coverage_fraction",
-           "compute_max_observation_gap"]
+           "compute_max_observation_gap",
+           "compute_inter_night_motion"]
 
 import math
 import uuid
@@ -1708,3 +1709,43 @@ def compute_max_observation_gap(tracklet: object) -> float | None:
     jds = sorted(float(o.jd) for o in obs)
     gaps = [jds[i + 1] - jds[i] for i in range(len(jds) - 1)]
     return float(max(gaps))
+
+
+def compute_inter_night_motion(tracklet: object) -> float | None:
+    """Mean angular displacement between consecutive distinct nights in arcsec/night.
+
+    Groups observations by integer JD night, computes the great-circle
+    separation between successive night centroids (mean RA, mean Dec), and
+    returns the mean separation in arcsec.  Returns ``None`` for fewer than
+    2 distinct nights.
+    """
+    obs = getattr(tracklet, "observations", None)
+    if not obs or len(obs) < 2:
+        return None
+
+    nights: dict[int, list] = {}
+    for o in obs:
+        night = int(float(o.jd))
+        nights.setdefault(night, []).append(o)
+
+    if len(nights) < 2:
+        return None
+
+    sorted_nights = sorted(nights.keys())
+    centroids = []
+    for night in sorted_nights:
+        group = nights[night]
+        mean_ra = sum(float(o.ra_deg) for o in group) / len(group)
+        mean_dec = sum(float(o.dec_deg) for o in group) / len(group)
+        centroids.append((mean_ra, mean_dec))
+
+    separations = []
+    for i in range(len(centroids) - 1):
+        ra1, dec1 = centroids[i]
+        ra2, dec2 = centroids[i + 1]
+        dra = (ra2 - ra1) * math.cos(math.radians((dec1 + dec2) / 2.0))
+        ddec = dec2 - dec1
+        sep_deg = math.hypot(dra, ddec)
+        separations.append(sep_deg * 3600.0)
+
+    return float(sum(separations) / len(separations))

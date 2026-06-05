@@ -56,6 +56,7 @@ __all__ = [
     "format_candidate_summary_line",
     "format_neo_summary_table",
     "count_ready_for_submission",
+    "format_alert_pathway_summary",
 ]
 
 import json
@@ -2192,3 +2193,28 @@ def count_ready_for_submission(neos: list) -> int:
         except Exception:
             continue
     return count
+
+
+def format_alert_pathway_summary(neos: list) -> str:
+    """Multi-line text summary of alert pathway distribution across scored NEOs.
+
+    Lists each pathway with its count and percentage of total.  Sorted by
+    count descending.  Returns a single-line "No candidates." for empty input.
+    """
+    if not neos:
+        return "No candidates."
+
+    from collections import Counter
+
+    counts: Counter = Counter()
+    for neo in neos:
+        hazard = getattr(neo, "hazard", None)
+        pathway = getattr(hazard, "alert_pathway", "unknown") if hazard else "unknown"
+        counts[pathway] += 1
+
+    total = len(neos)
+    lines = [f"Alert pathway summary ({total} candidates):"]
+    for pathway, count in counts.most_common():
+        pct = 100.0 * count / total
+        lines.append(f"  {pathway:<30} {count:>4}  ({pct:5.1f}%)")
+    return "\n".join(lines)

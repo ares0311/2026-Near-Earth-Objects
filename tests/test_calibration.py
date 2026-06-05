@@ -2275,3 +2275,39 @@ class TestComputePositivePredictiveValue:
         sys.path.insert(0, "src")
         import calibration
         assert "compute_positive_predictive_value" in calibration.__all__
+
+
+class TestComputeNegativePredictiveValue:
+    def test_perfect_npv(self):
+        from calibration import compute_negative_predictive_value
+        probs = [0.1, 0.2, 0.3]
+        labels = [0, 0, 0]
+        assert compute_negative_predictive_value(probs, labels) == pytest.approx(1.0)
+
+    def test_no_negatives_returns_zero(self):
+        from calibration import compute_negative_predictive_value
+        probs = [0.9, 0.8]
+        labels = [1, 1]
+        assert compute_negative_predictive_value(probs, labels) == pytest.approx(0.0)
+
+    def test_mixed(self):
+        from calibration import compute_negative_predictive_value
+        probs = [0.1, 0.2, 0.8, 0.9]
+        labels = [0, 1, 1, 0]
+        npv = compute_negative_predictive_value(probs, labels)
+        assert npv == pytest.approx(0.5)
+
+    def test_empty_returns_zero(self):
+        from calibration import compute_negative_predictive_value
+        assert compute_negative_predictive_value([], []) == pytest.approx(0.0)
+
+    def test_mismatched_lengths_returns_zero(self):
+        from calibration import compute_negative_predictive_value
+        assert compute_negative_predictive_value([0.1, 0.2], [0]) == pytest.approx(0.0)
+
+    def test_custom_threshold(self):
+        from calibration import compute_negative_predictive_value
+        probs = [0.3, 0.4, 0.6]
+        labels = [0, 0, 1]
+        npv = compute_negative_predictive_value(probs, labels, threshold=0.5)
+        assert npv == pytest.approx(1.0)

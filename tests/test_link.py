@@ -3440,3 +3440,59 @@ class TestComputeMaxObservationGap:
         sys.path.insert(0, "src")
         import link
         assert "compute_max_observation_gap" in link.__all__
+
+
+class TestComputeInterNightMotion:
+    def test_two_nights(self, tracklet):
+        from link import compute_inter_night_motion
+        result = compute_inter_night_motion(tracklet)
+        assert result is not None
+        assert result >= 0.0
+
+    def test_single_night_returns_none(self):
+        from types import SimpleNamespace
+
+        from link import compute_inter_night_motion
+        obs1 = SimpleNamespace(jd=2460000.1, ra_deg=10.0, dec_deg=20.0,
+                               mag=19.0, mag_err=0.1, filter_band="r",
+                               mission="ZTF", real_bogus=0.9)
+        obs2 = SimpleNamespace(jd=2460000.5, ra_deg=10.01, dec_deg=20.01,
+                               mag=19.1, mag_err=0.1, filter_band="r",
+                               mission="ZTF", real_bogus=0.9)
+        t = SimpleNamespace(observations=[obs1, obs2], arc_days=0.4,
+                            motion_rate_arcsec_per_hour=0.5,
+                            motion_pa_degrees=90.0, object_id="T1")
+        assert compute_inter_night_motion(t) is None
+
+    def test_no_obs_returns_none(self):
+        from types import SimpleNamespace
+
+        from link import compute_inter_night_motion
+        t = SimpleNamespace(observations=[], arc_days=0.0,
+                            motion_rate_arcsec_per_hour=0.0,
+                            motion_pa_degrees=0.0, object_id="T2")
+        assert compute_inter_night_motion(t) is None
+
+    def test_none_obs_returns_none(self):
+        from types import SimpleNamespace
+
+        from link import compute_inter_night_motion
+        t = SimpleNamespace(observations=None)
+        assert compute_inter_night_motion(t) is None
+
+    def test_two_nights_positive(self):
+        from types import SimpleNamespace
+
+        from link import compute_inter_night_motion
+        obs1 = SimpleNamespace(jd=2460000.5, ra_deg=10.0, dec_deg=20.0,
+                               mag=19.0, mag_err=0.1, filter_band="r",
+                               mission="ZTF", real_bogus=0.9)
+        obs2 = SimpleNamespace(jd=2460001.5, ra_deg=10.1, dec_deg=20.1,
+                               mag=19.1, mag_err=0.1, filter_band="r",
+                               mission="ZTF", real_bogus=0.9)
+        t = SimpleNamespace(observations=[obs1, obs2], arc_days=1.0,
+                            motion_rate_arcsec_per_hour=1.0,
+                            motion_pa_degrees=45.0, object_id="T3")
+        result = compute_inter_night_motion(t)
+        assert result is not None
+        assert result > 0.0

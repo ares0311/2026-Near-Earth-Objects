@@ -3112,3 +3112,41 @@ class TestComputeCandidatePrioritySpread:
         sys.path.insert(0, "src")
         import score
         assert "compute_candidate_priority_spread" in score.__all__
+
+
+class TestComputeBatchPriorityStats:
+    def test_with_scored_neos(self, scored_neo):
+        from score import compute_batch_priority_stats
+        result = compute_batch_priority_stats([scored_neo])
+        assert "mean" in result
+        assert "std" in result
+        assert "min" in result
+        assert "max" in result
+
+    def test_empty_returns_empty(self):
+        from score import compute_batch_priority_stats
+        assert compute_batch_priority_stats([]) == {}
+
+    def test_no_priority_returns_empty(self):
+        from types import SimpleNamespace
+
+        from score import compute_batch_priority_stats
+        neo = SimpleNamespace(metadata=SimpleNamespace(discovery_priority=None))
+        assert compute_batch_priority_stats([neo]) == {}
+
+    def test_single_neo_std_zero(self, scored_neo):
+        from score import compute_batch_priority_stats
+        result = compute_batch_priority_stats([scored_neo])
+        assert result["std"] == pytest.approx(0.0)
+        assert result["min"] == result["max"]
+
+    def test_two_neos_range(self):
+        from types import SimpleNamespace
+
+        from score import compute_batch_priority_stats
+        neo1 = SimpleNamespace(metadata=SimpleNamespace(discovery_priority=0.2))
+        neo2 = SimpleNamespace(metadata=SimpleNamespace(discovery_priority=0.8))
+        result = compute_batch_priority_stats([neo1, neo2])
+        assert result["min"] == pytest.approx(0.2)
+        assert result["max"] == pytest.approx(0.8)
+        assert result["mean"] == pytest.approx(0.5)

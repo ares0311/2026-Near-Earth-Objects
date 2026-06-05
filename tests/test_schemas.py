@@ -2388,3 +2388,38 @@ class TestNightObservationSummary:
         sys.path.insert(0, "src")
         import schemas
         assert "NightObservationSummary" in schemas.__all__
+
+
+class TestSurveyNightRecord:
+    def test_defaults(self):
+        from schemas import SurveyNightRecord
+        rec = SurveyNightRecord()
+        assert rec.night_jd is None
+        assert rec.survey == "unknown"
+        assert rec.n_obs == 0
+        assert rec.n_tracklets == 0
+        assert rec.limiting_mag is None
+        assert rec.area_sq_deg is None
+
+    def test_custom_values(self):
+        from schemas import SurveyNightRecord
+        rec = SurveyNightRecord(
+            night_jd=2460000.5,
+            survey="ZTF",
+            n_obs=120,
+            n_tracklets=5,
+            limiting_mag=20.5,
+            area_sq_deg=3.14,
+        )
+        assert rec.night_jd == 2460000.5
+        assert rec.survey == "ZTF"
+        assert rec.n_obs == 120
+        assert rec.n_tracklets == 5
+        assert rec.limiting_mag == 20.5
+        assert rec.area_sq_deg == 3.14
+
+    def test_frozen(self):
+        from schemas import SurveyNightRecord
+        rec = SurveyNightRecord(n_obs=1)
+        with pytest.raises(Exception):
+            rec.n_obs = 2

@@ -44,6 +44,7 @@ __all__ = [
     "compute_calibration_spread",
     "compute_sharpness",
     "compute_positive_predictive_value",
+    "compute_negative_predictive_value",
 ]
 
 import math
@@ -1669,3 +1670,23 @@ def compute_positive_predictive_value(
     if tp + fp == 0:
         return 0.0
     return float(tp / (tp + fp))
+
+
+def compute_negative_predictive_value(
+    probs: list[float],
+    labels: list[int],
+    threshold: float = 0.5,
+) -> float:
+    """Negative predictive value at a given probability threshold.
+
+    NPV = TN / (TN + FN)
+
+    Returns 0.0 for empty input, mismatched lengths, or no negative predictions.
+    """
+    if not probs or not labels or len(probs) != len(labels):
+        return 0.0
+    tn = sum(1 for p, y in zip(probs, labels) if float(p) < threshold and int(y) == 0)
+    fn = sum(1 for p, y in zip(probs, labels) if float(p) < threshold and int(y) == 1)
+    if tn + fn == 0:
+        return 0.0
+    return float(tn / (tn + fn))

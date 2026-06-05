@@ -37,7 +37,8 @@ __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_
            "compute_cutout_contrast_ratio",
            "compute_image_rms",
            "compute_cutout_fill_fraction",
-           "compute_photometric_noise_level"]
+           "compute_photometric_noise_level",
+           "compute_cutout_dynamic_range"]
 
 import base64
 import math
@@ -1615,3 +1616,26 @@ def compute_photometric_noise_level(observations: list) -> float | None:
     median = sorted(mags)[len(mags) // 2]
     mad = sorted(abs(m - median) for m in mags)[len(mags) // 2]
     return float(mad)
+
+
+def compute_cutout_dynamic_range(obs: object) -> float | None:
+    """Dynamic range of pixel values in the difference-image cutout.
+
+    Returns max(pixels) − min(pixels) for the float32 difference cutout.
+    Returns ``None`` if the cutout is absent, cannot be decoded, or is empty.
+    """
+    import base64
+
+    import numpy as np
+
+    raw_b64 = getattr(obs, "cutout_difference", None)
+    if raw_b64 is None:
+        return None
+    try:
+        raw = base64.b64decode(raw_b64)
+        arr = np.frombuffer(raw, dtype=np.float32)
+        if arr.size == 0:
+            return None
+        return float(np.max(arr) - np.min(arr))
+    except Exception:
+        return None

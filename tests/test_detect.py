@@ -3136,3 +3136,50 @@ class TestComputeCandidateSkyDensity:
         sys.path.insert(0, "src")
         import detect
         assert "compute_candidate_sky_density" in detect.__all__
+
+
+class TestComputeDetectionGapDays:
+    def test_two_candidates(self, raw_candidate):
+        from types import SimpleNamespace
+
+        from detect import compute_detection_gap_days
+        obs1 = SimpleNamespace(jd=2460000.0, ra_deg=10.0, dec_deg=20.0,
+                               mag=19.0, mag_err=0.1, filter_band="r",
+                               mission="ZTF", real_bogus=0.9)
+        obs2 = SimpleNamespace(jd=2460002.5, ra_deg=10.1, dec_deg=20.1,
+                               mag=19.1, mag_err=0.1, filter_band="r",
+                               mission="ZTF", real_bogus=0.9)
+        cand1 = SimpleNamespace(observations=[obs1])
+        cand2 = SimpleNamespace(observations=[obs2])
+        result_obj = SimpleNamespace(candidates=[cand1, cand2])
+        gap = compute_detection_gap_days(result_obj)
+        assert gap == pytest.approx(2.5)
+
+    def test_single_candidate_returns_none(self, raw_candidate):
+        from types import SimpleNamespace
+
+        from detect import compute_detection_gap_days
+        result_obj = SimpleNamespace(candidates=[raw_candidate])
+        assert compute_detection_gap_days(result_obj) is None
+
+    def test_empty_returns_none(self):
+        from types import SimpleNamespace
+
+        from detect import compute_detection_gap_days
+        result_obj = SimpleNamespace(candidates=[])
+        assert compute_detection_gap_days(result_obj) is None
+
+    def test_max_gap_chosen(self):
+        from types import SimpleNamespace
+
+        from detect import compute_detection_gap_days
+        def _cand(jd):
+            obs = SimpleNamespace(jd=jd, ra_deg=0.0, dec_deg=0.0,
+                                  mag=19.0, mag_err=0.1, filter_band="r",
+                                  mission="ZTF", real_bogus=0.9)
+            return SimpleNamespace(observations=[obs])
+        result_obj = SimpleNamespace(
+            candidates=[_cand(2460000.0), _cand(2460001.0), _cand(2460004.0)]
+        )
+        gap = compute_detection_gap_days(result_obj)
+        assert gap == pytest.approx(3.0)

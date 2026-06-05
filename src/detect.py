@@ -34,7 +34,8 @@ __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus"
            "count_candidates_above_rb",
            "get_brightest_candidate",
            "compute_mean_motion_rate",
-           "compute_candidate_sky_density"]
+           "compute_candidate_sky_density",
+           "compute_detection_gap_days"]
 
 import math
 import uuid
@@ -1536,3 +1537,24 @@ def compute_candidate_sky_density(result: DetectResult, field_radius_deg: float)
     area_sr = 2.0 * math.pi * (1.0 - math.cos(r_rad))
     area_sq_deg = area_sr * (180.0 / math.pi) ** 2
     return float(n / area_sq_deg)
+
+
+def compute_detection_gap_days(result: DetectResult) -> float | None:
+    """Maximum gap in days between consecutive candidate detections.
+
+    Extracts the best JD from each candidate (first observation), sorts them,
+    and returns the maximum consecutive gap.  Returns ``None`` for fewer than
+    2 candidates or if no valid JDs can be extracted.
+    """
+    jds = []
+    for cand in result.candidates:
+        obs_list = getattr(cand, "observations", None)
+        if obs_list:
+            jd = getattr(obs_list[0], "jd", None)
+            if jd is not None:
+                jds.append(float(jd))
+    if len(jds) < 2:
+        return None
+    jds.sort()
+    gaps = [jds[i + 1] - jds[i] for i in range(len(jds) - 1)]
+    return float(max(gaps))

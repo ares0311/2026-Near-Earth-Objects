@@ -4661,3 +4661,59 @@ class TestGetFaintestObservation:
         sys.path.insert(0, "src")
         import fetch
         assert "get_faintest_observation" in fetch.__all__
+
+
+class TestComputeObservationTimeSpan:
+    def test_two_obs(self):
+        from types import SimpleNamespace
+
+        from fetch import compute_observation_time_span
+        obs1 = SimpleNamespace(jd=2460000.0, mag=19.0, mission="ZTF",
+                               filter_band="r", real_bogus=0.9)
+        obs2 = SimpleNamespace(jd=2460002.0, mag=19.5, mission="ZTF",
+                               filter_band="r", real_bogus=0.9)
+        fr = SimpleNamespace(alerts=[obs1, obs2])
+        result = compute_observation_time_span(fr)
+        assert result is not None
+        assert result >= 0.0
+
+    def test_one_obs_returns_none(self):
+        from types import SimpleNamespace
+
+        from fetch import compute_observation_time_span
+        obs = SimpleNamespace(jd=2460000.5, mag=19.0, mission="ZTF",
+                              filter_band="r", real_bogus=0.9)
+        fr = SimpleNamespace(alerts=[obs])
+        assert compute_observation_time_span(fr) is None
+
+    def test_empty_returns_none(self):
+        from types import SimpleNamespace
+
+        from fetch import compute_observation_time_span
+        fr = SimpleNamespace(alerts=[])
+        assert compute_observation_time_span(fr) is None
+
+    def test_inf_jd_excluded(self):
+        import math
+        from types import SimpleNamespace
+
+        from fetch import compute_observation_time_span
+        obs1 = SimpleNamespace(jd=2460000.0, mag=19.0, mission="ZTF",
+                               filter_band="r", real_bogus=0.9)
+        obs2 = SimpleNamespace(jd=2460001.0, mag=19.1, mission="ZTF",
+                               filter_band="r", real_bogus=0.9)
+        obs3 = SimpleNamespace(jd=math.inf, mag=19.2, mission="ZTF",
+                               filter_band="r", real_bogus=0.9)
+        fr = SimpleNamespace(alerts=[obs1, obs2, obs3])
+        assert compute_observation_time_span(fr) == pytest.approx(1.0)
+
+    def test_span_value(self):
+        from types import SimpleNamespace
+
+        from fetch import compute_observation_time_span
+        obs1 = SimpleNamespace(jd=2460000.0, mag=19.0, mission="ZTF",
+                               filter_band="r", real_bogus=0.9)
+        obs2 = SimpleNamespace(jd=2460003.5, mag=20.0, mission="ZTF",
+                               filter_band="r", real_bogus=0.9)
+        fr = SimpleNamespace(alerts=[obs1, obs2])
+        assert compute_observation_time_span(fr) == pytest.approx(3.5)
