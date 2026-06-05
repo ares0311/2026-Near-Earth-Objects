@@ -36,6 +36,7 @@ If the highest-priority T1 gap cannot be resolved because a human blocker is unr
 
 ## Standing Rules
 
+- **Always comment all code**: Every function, class, script, shell command, and non-trivial code block must include comments explaining what it does and why. This applies to all Python source files, all Skills scripts, all shell commands given to the operator, and all inline code snippets in documentation. No exceptions. This rule overrides any default behavior that would omit comments.
 - **Skills directory**: Any standalone `.py` utility script created to perform a task must be saved in `Skills/` at the project root.
 - **No impact claims**: Never assert a probability of Earth impact from internally computed data alone. Always defer to MPC/CNEOS for authoritative hazard assessment.
 - **Alert protocol is sacred**: The NASA/MPC alert pathway (see §Alert Protocol) must never be triggered on unconfirmed detections. Require independent confirmation first.
