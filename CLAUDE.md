@@ -5,11 +5,42 @@ It contains the facts a coding agent needs to work productively without re-readi
 
 ---
 
+## MANDATORY SESSION-START PROTOCOL
+
+**At the start of every session, before planning or executing any steps, you must:**
+1. Call `Read` on `AGENTS.md` — do not rely on memory or prior context.
+2. Call `Read` on `docs/PRODUCTION_READINESS.md` — do not rely on memory or prior context.
+
+These reads are non-negotiable. No planning or code changes may happen before both files are read.
+
+---
+
+## PRIMARY DIRECTIVE
+
+**You may ONLY work on tasks that advance this project to PRODUCTION.**
+
+Before proposing or executing any task, apply this gate:
+
+> *Does this task close or directly unblock a named T1 or T2 gap from `docs/PRODUCTION_READINESS.md`?*
+
+If the answer is NO, do not do it. In particular:
+- **Never add new public helper APIs** unless they directly unblock a named gap. The v0.77–v0.87 API accumulation cycle (110 helpers, zero production impact) must never recur.
+- **Never add new Skills scripts** that are single-function wrappers. Only add a Skill if it is operationally necessary for a named gap.
+- **Never add new documentation files** that duplicate existing content.
+- **Never propose log modules, schemas, or scaffolding** that do not directly unblock a named T1 or T2 gap.
+- **Never repeat work listed under "What Is Complete"** in `docs/PRODUCTION_READINESS.md`.
+
+If the highest-priority T1 gap cannot be resolved because a human blocker is unresolved, **state that explicitly** and limit scope to T2 gaps or documentation sync.
+
+---
+
 ## Standing Rules
 
 - **Skills directory**: Any standalone `.py` utility script created to perform a task must be saved in `Skills/` at the project root.
 - **No impact claims**: Never assert a probability of Earth impact from internally computed data alone. Always defer to MPC/CNEOS for authoritative hazard assessment.
 - **Alert protocol is sacred**: The NASA/MPC alert pathway (see §Alert Protocol) must never be triggered on unconfirmed detections. Require independent confirmation first.
+- **Dead code must be removed, not tested**: If a function or class has no reachable callers, delete it rather than adding a test.
+- **Conservative by default**: When uncertain about classification, flag for human review. Never output "confirmed NEO" for internally detected objects.
 
 ---
 
