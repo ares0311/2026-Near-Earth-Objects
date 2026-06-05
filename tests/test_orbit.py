@@ -3251,3 +3251,50 @@ class TestComputeAphelionVelocity:
         sys.path.insert(0, "src")
         import orbit
         assert "compute_aphelion_velocity" in orbit.__all__
+
+
+class TestComputeSpecificAngularMomentum:
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import orbit
+        return orbit.compute_specific_angular_momentum
+
+    def _el(self, a=1.5, e=0.3):
+        from types import SimpleNamespace
+        return SimpleNamespace(a_au=a, e=e)
+
+    def test_no_a_returns_none(self):
+        from types import SimpleNamespace
+        assert self._fn()(SimpleNamespace(e=0.3)) is None
+
+    def test_zero_a_returns_none(self):
+        assert self._fn()(self._el(a=0.0)) is None
+
+    def test_negative_a_returns_none(self):
+        assert self._fn()(self._el(a=-1.0)) is None
+
+    def test_no_e_returns_none(self):
+        from types import SimpleNamespace
+        assert self._fn()(SimpleNamespace(a_au=1.5)) is None
+
+    def test_hyperbolic_returns_none(self):
+        assert self._fn()(self._el(a=2.0, e=1.0)) is None
+
+    def test_valid_returns_positive(self):
+        result = self._fn()(self._el(a=1.5, e=0.3))
+        assert result is not None
+        assert result > 0.0
+
+    def test_circular_orbit_e0(self):
+        import math
+        result = self._fn()(self._el(a=1.0, e=0.0))
+        expected = math.sqrt(4 * math.pi**2 * 1.0)
+        assert result is not None
+        assert abs(result - expected) < 1e-6
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import orbit
+        assert "compute_specific_angular_momentum" in orbit.__all__

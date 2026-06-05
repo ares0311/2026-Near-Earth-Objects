@@ -42,6 +42,7 @@ __all__ = [
     "compute_calibration_resolution",
     "compute_fraction_calibrated",
     "compute_calibration_spread",
+    "compute_sharpness",
 ]
 
 import math
@@ -1633,3 +1634,17 @@ def compute_calibration_spread(
     variance = sum((e - mean_err) ** 2 for e in errors) / len(errors)
     import math
     return float(math.sqrt(variance))
+
+
+def compute_sharpness(probs: list[float]) -> float:
+    """Mean squared deviation of predicted probabilities from 0.5.
+
+    Sharpness measures how decisive the model is regardless of calibration.
+    A perfectly sharp model assigns only 0 or 1; random guessing at 0.5 gives
+    sharpness = 0.  Result is in [0, 0.25].
+
+    Returns 0.0 for empty input.
+    """
+    if not probs:
+        return 0.0
+    return float(sum((float(p) - 0.5) ** 2 for p in probs) / len(probs))

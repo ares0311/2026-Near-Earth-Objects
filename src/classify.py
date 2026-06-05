@@ -54,6 +54,7 @@ __all__ = [
     "compute_real_bogus_summary",
     "compute_class_agreement",
     "compute_neo_class_distribution",
+    "compute_composite_neo_score",
 ]
 
 import base64
@@ -2190,3 +2191,29 @@ def compute_mean_neo_probability(neos: list) -> float | None:
         if prob is not None:
             probs.append(float(prob))
     return float(sum(probs) / len(probs)) if probs else None
+
+
+def compute_composite_neo_score(features: object) -> float:
+    """Weighted composite NEO score from candidate features.
+
+    Combines four detection-quality signals into a single [0, 1] score:
+
+    - real_bogus_score × 0.35
+    - arc_coverage_score × 0.25
+    - nights_observed_score × 0.25
+    - orbit_quality_score × 0.15
+
+    Missing (None) features contribute 0.  The result is clamped to [0, 1].
+    """
+
+    def _get(name: str) -> float:
+        v = getattr(features, name, None)
+        return float(v) if v is not None else 0.0
+
+    score = (
+        _get("real_bogus_score") * 0.35
+        + _get("arc_coverage_score") * 0.25
+        + _get("nights_observed_score") * 0.25
+        + _get("orbit_quality_score") * 0.15
+    )
+    return float(min(1.0, max(0.0, score)))

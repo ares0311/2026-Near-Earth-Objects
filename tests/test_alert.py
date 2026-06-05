@@ -3025,3 +3025,49 @@ class TestFormatCandidateSummaryLine:
         sys.path.insert(0, "src")
         import alert
         assert "format_candidate_summary_line" in alert.__all__
+
+
+class TestFormatNeoSummaryTable:
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+        return alert.format_neo_summary_table
+
+    def _neo(self, obj_id="NEO-001", pathway="mpc_submission",
+             flag="pha_candidate", priority=0.85, moid=0.03):
+        from types import SimpleNamespace
+        tracklet = SimpleNamespace(object_id=obj_id)
+        hazard = SimpleNamespace(alert_pathway=pathway, hazard_flag=flag, moid_au=moid)
+        metadata = SimpleNamespace(discovery_priority=priority)
+        return SimpleNamespace(tracklet=tracklet, hazard=hazard, metadata=metadata)
+
+    def test_returns_string(self):
+        neos = [self._neo()]
+        assert isinstance(self._fn()(neos), str)
+
+    def test_empty_list_returns_header_only(self):
+        result = self._fn()([])
+        assert "#" in result
+
+    def test_contains_object_id(self):
+        neos = [self._neo(obj_id="MYOBJ")]
+        assert "MYOBJ" in self._fn()(neos)
+
+    def test_sorted_by_priority_descending(self):
+        neo_high = self._neo(obj_id="HIGH", priority=0.9)
+        neo_low = self._neo(obj_id="LOW", priority=0.1)
+        result = self._fn()([neo_low, neo_high])
+        assert result.index("HIGH") < result.index("LOW")
+
+    def test_max_rows_respected(self):
+        neos = [self._neo(obj_id=f"N{i}", priority=float(i)/10) for i in range(20)]
+        result = self._fn()(neos, max_rows=3)
+        data_lines = [ln for ln in result.splitlines() if ln.strip() and ln.strip()[0].isdigit()]
+        assert len(data_lines) <= 3
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+        assert "format_neo_summary_table" in alert.__all__

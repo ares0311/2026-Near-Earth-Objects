@@ -2316,3 +2316,38 @@ class TestAlertSummaryRecord:
         sys.path.insert(0, "src")
         import schemas
         assert "AlertSummaryRecord" in schemas.__all__
+
+
+class TestScoredNEOBatch:
+    def _cls(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        return schemas.ScoredNEOBatch
+
+    def test_defaults(self):
+        b = self._cls()()
+        assert b.batch_id == "unknown"
+        assert b.pipeline_version == "unknown"
+        assert b.created_at_jd is None
+        assert b.n_candidates == 0
+
+    def test_custom_values(self):
+        b = self._cls()(
+            batch_id="B001", pipeline_version="0.85.0",
+            created_at_jd=2460100.5, n_candidates=42,
+        )
+        assert b.batch_id == "B001"
+        assert b.n_candidates == 42
+
+    def test_immutable(self):
+        import pytest
+        b = self._cls()()
+        with pytest.raises(Exception):
+            b.batch_id = "X"
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        assert "ScoredNEOBatch" in schemas.__all__

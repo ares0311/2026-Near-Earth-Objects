@@ -38,7 +38,8 @@ __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "filter_by_discovery_priority",
            "get_top_candidates",
            "compute_pha_fraction",
-           "count_by_alert_pathway"]
+           "count_by_alert_pathway",
+           "compute_weighted_hazard_index"]
 
 import math
 import uuid
@@ -1586,3 +1587,37 @@ def count_by_alert_pathway(neos: list) -> dict:
         pathway = getattr(getattr(neo, "hazard", None), "alert_pathway", "unknown") or "unknown"
         counts[pathway] = counts.get(pathway, 0) + 1
     return counts
+
+
+def compute_weighted_hazard_index(neo: object) -> float:
+    """Weighted hazard index combining threat score, MOID proximity, and orbit quality.
+
+    Components (each in [0, 1]):
+    - threat_score (from compute_threat_score): weight 0.4
+    - MOID proximity: 1 - moid_au/0.05, clamped [0,1]; 0.5 sentinel if unknown: weight 0.3
+    - orbit quality fraction (quality_code/4): weight 0.3
+
+    Returns a value in [0, 1].  Higher values indicate greater hazard concern.
+    """
+    from score import compute_threat_score
+
+    try:
+        threat = float(compute_threat_score(neo))
+    except Exception:
+        threat = 0.0
+
+    hazard = getattr(neo, "hazard", None)
+    moid = getattr(hazard, "moid_au", None) if hazard else None
+    if moid is None:
+        moid_prox = 0.5
+    else:
+        moid_prox = float(min(1.0, max(0.0, 1.0 - float(moid) / 0.05)))
+
+    meta = getattr(neo, "metadata", None)
+    quality_code = getattr(meta, "quality_code", None) if meta else None
+    if quality_code is None:
+        orbit_q = 0.0
+    else:
+        orbit_q = float(min(1.0, float(quality_code) / 4.0))
+
+    return float(min(1.0, max(0.0, 0.4 * threat + 0.3 * moid_prox + 0.3 * orbit_q)))

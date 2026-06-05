@@ -35,7 +35,8 @@ __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_
            "compute_cutout_noise_level",
            "compute_cutout_peak_value",
            "compute_cutout_contrast_ratio",
-           "compute_image_rms"]
+           "compute_image_rms",
+           "compute_cutout_fill_fraction"]
 
 import base64
 import math
@@ -1571,5 +1572,29 @@ def compute_image_rms(obs: object) -> float | None:
         if arr.size == 0:
             return None
         return float(np.sqrt(np.mean(arr ** 2)))
+    except Exception:
+        return None
+
+
+def compute_cutout_fill_fraction(obs: object) -> float | None:
+    """Fraction of non-zero pixels in the difference-image cutout.
+
+    Returns ``None`` if no cutout is present or decoding fails.
+    A value near 1.0 indicates most pixels are active (dense field or bright source).
+    A value near 0.0 indicates a mostly-empty cutout.
+    """
+    import base64
+
+    import numpy as np
+
+    raw_b64 = getattr(obs, "cutout_difference", None)
+    if raw_b64 is None:
+        return None
+    try:
+        raw = base64.b64decode(raw_b64)
+        arr = np.frombuffer(raw, dtype=np.float32)
+        if arr.size == 0:
+            return None
+        return float(np.count_nonzero(arr) / arr.size)
     except Exception:
         return None

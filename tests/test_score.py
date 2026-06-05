@@ -2957,3 +2957,122 @@ class TestCountByAlertPathway:
         sys.path.insert(0, "src")
         import score
         assert "count_by_alert_pathway" in score.__all__
+
+
+class TestComputeWeightedHazardIndex:
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        return score.compute_weighted_hazard_index
+
+    def _neo(self, moid=None, quality_code=None, hazard_flag="nominal"):
+        from types import SimpleNamespace
+        hazard = SimpleNamespace(
+            moid_au=moid, hazard_flag=hazard_flag,
+            alert_pathway="internal_candidate",
+            estimated_diameter_m=None,
+            absolute_magnitude_h=None,
+            neo_class="unknown",
+            explanation=None,
+        )
+        meta = SimpleNamespace(
+            discovery_priority=0.5,
+            quality_code=quality_code,
+            followup_value=0.3,
+            scientific_interest=0.2,
+            close_approach_au=moid,
+            scoring_model_version="test",
+            pipeline_version="test",
+        )
+        tracklet = SimpleNamespace(
+            object_id="T1",
+            observations=(),
+            arc_days=1.0,
+            motion_rate_arcsec_per_hour=1.0,
+            motion_pa_degrees=45.0,
+        )
+        features = SimpleNamespace(
+            real_bogus_score=0.9, streak_score=None, psf_quality_score=None,
+            motion_consistency_score=None, arc_coverage_score=None,
+            nights_observed_score=None, brightness_score=None,
+            color_score=None, lightcurve_variability_score=None,
+            orbit_quality_score=None, moid_score=None,
+            neo_class_confidence=None, pha_flag_confidence=None,
+            known_object_score=None,
+        )
+        posterior = SimpleNamespace(
+            neo_candidate=0.5, known_object=0.1, main_belt_asteroid=0.2,
+            stellar_artifact=0.1, other_solar_system=0.1,
+        )
+        return SimpleNamespace(
+            tracklet=tracklet, features=features,
+            posterior=posterior, hazard=hazard, metadata=meta,
+        )
+
+    def test_returns_float_in_range(self):
+        result = self._fn()(self._neo(moid=0.02, quality_code=2))
+        assert 0.0 <= result <= 1.0
+
+    def test_no_moid_uses_sentinel(self):
+        result = self._fn()(self._neo(moid=None, quality_code=2))
+        assert 0.0 <= result <= 1.0
+
+    def test_low_moid_high_quality_higher_score(self):
+        low = self._fn()(self._neo(moid=0.001, quality_code=4))
+        high_moid = self._fn()(self._neo(moid=0.1, quality_code=1))
+        assert low > high_moid
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        assert "compute_weighted_hazard_index" in score.__all__
+
+
+class TestComputeWeightedHazardIndexNoneQuality:
+    """Cover orbit_q=0.0 branch when quality_code is None."""
+
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        return score.compute_weighted_hazard_index
+
+    def test_none_quality_code(self):
+        from types import SimpleNamespace
+        hazard = SimpleNamespace(
+            moid_au=0.02, hazard_flag="nominal",
+            alert_pathway="internal_candidate",
+            estimated_diameter_m=None, absolute_magnitude_h=None,
+            neo_class="unknown", explanation=None,
+        )
+        meta = SimpleNamespace(
+            discovery_priority=0.5, quality_code=None,
+            followup_value=0.3, scientific_interest=0.2,
+            close_approach_au=0.02, scoring_model_version="test",
+            pipeline_version="test",
+        )
+        tracklet = SimpleNamespace(
+            object_id="T1", observations=(), arc_days=1.0,
+            motion_rate_arcsec_per_hour=1.0, motion_pa_degrees=45.0,
+        )
+        features = SimpleNamespace(
+            real_bogus_score=0.9, streak_score=None, psf_quality_score=None,
+            motion_consistency_score=None, arc_coverage_score=None,
+            nights_observed_score=None, brightness_score=None,
+            color_score=None, lightcurve_variability_score=None,
+            orbit_quality_score=None, moid_score=None,
+            neo_class_confidence=None, pha_flag_confidence=None,
+            known_object_score=None,
+        )
+        posterior = SimpleNamespace(
+            neo_candidate=0.5, known_object=0.1, main_belt_asteroid=0.2,
+            stellar_artifact=0.1, other_solar_system=0.1,
+        )
+        neo = SimpleNamespace(
+            tracklet=tracklet, features=features,
+            posterior=posterior, hazard=hazard, metadata=meta,
+        )
+        result = self._fn()(neo)
+        assert 0.0 <= result <= 1.0

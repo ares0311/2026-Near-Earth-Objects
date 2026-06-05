@@ -48,6 +48,7 @@ __all__ = [
     "ObservationQualityReport",
     "FieldCoverageReport",
     "AlertSummaryRecord",
+    "ScoredNEOBatch",
 ]
 
 from dataclasses import dataclass
@@ -1307,3 +1308,14 @@ class AlertSummaryRecord(BaseModel):
     discovery_priority: float | None = None
     moid_au: float | None = None
     submitted_at_jd: float | None = None
+
+
+class ScoredNEOBatch(BaseModel):
+    """Frozen batch container grouping ScoredNEOs from one pipeline run."""
+
+    model_config = ConfigDict(frozen=True)
+
+    batch_id: str = "unknown"
+    pipeline_version: str = "unknown"
+    created_at_jd: float | None = None
+    n_candidates: int = 0

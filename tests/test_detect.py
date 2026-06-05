@@ -3029,3 +3029,67 @@ class TestGetBrightestCandidate:
         sys.path.insert(0, "src")
         import detect
         assert "get_brightest_candidate" in detect.__all__
+
+
+class TestComputeMeanMotionRate:
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import detect
+        return detect.compute_mean_motion_rate
+
+    def _obs(self, obs_id, ra, dec, jd):
+        from types import SimpleNamespace
+        return SimpleNamespace(
+            obs_id=obs_id, ra_deg=ra, dec_deg=dec, jd=jd,
+            mag=20.0, mag_err=0.1, filter_band="r",
+            real_bogus_score=0.9, mission="ZTF",
+            cutout_science=None, cutout_reference=None, cutout_difference=None,
+        )
+
+    def _result(self, candidates):
+        from types import SimpleNamespace
+        return SimpleNamespace(candidates=candidates, known_matches=[], summary=None)
+
+    def test_empty_result_returns_none(self):
+        assert self._fn()(self._result([])) is None
+
+    def test_single_pair_returns_rate(self):
+        from types import SimpleNamespace
+        obs1 = self._obs("o1", 10.0, 5.0, 2460000.0)
+        obs2 = self._obs("o2", 10.01, 5.0, 2460001.0)
+        cand = SimpleNamespace(observations=(obs1, obs2))
+        result = self._result([cand])
+        rate = self._fn()(result)
+        assert rate is not None
+        assert rate >= 0.0
+
+    def test_single_obs_no_pairs_returns_none(self):
+        from types import SimpleNamespace
+        obs = self._obs("o1", 10.0, 5.0, 2460000.0)
+        cand = SimpleNamespace(observations=(obs,))
+        assert self._fn()(self._result([cand])) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import detect
+        assert "compute_mean_motion_rate" in detect.__all__
+
+
+class TestComputeMeanMotionRateCoverage:
+    """Cover except branch (bad obs) and quality_code=None in score."""
+
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import detect
+        return detect.compute_mean_motion_rate
+
+    def test_exception_in_motion_vector_skipped(self):
+        from types import SimpleNamespace
+        bad_obs1 = SimpleNamespace(obs_id="o1", jd=2460000.0)
+        bad_obs2 = SimpleNamespace(obs_id="o2", jd=2460001.0)
+        cand = SimpleNamespace(observations=(bad_obs1, bad_obs2))
+        result = SimpleNamespace(candidates=[cand], known_matches=[], summary=None)
+        assert self._fn()(result) is None

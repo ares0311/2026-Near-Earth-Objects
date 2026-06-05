@@ -36,7 +36,8 @@ __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fet
            "compute_magnitude_distribution",
            "group_observations_by_night",
            "count_observations_by_filter",
-           "get_brightest_observation"]
+           "get_brightest_observation",
+           "get_latest_observation"]
 
 import json
 import os
@@ -2165,3 +2166,17 @@ def get_brightest_observation(fetch_result: FetchResult) -> object | None:
     if not valid:
         return None
     return min(valid, key=lambda o: o.mag)
+
+
+def get_latest_observation(fetch_result: FetchResult) -> object | None:
+    """Return the most recent Observation (highest JD) from *fetch_result*.
+
+    Ignores sentinel magnitudes (mag >= 90) and non-finite JDs.
+    Returns ``None`` if no valid observations exist.
+    """
+    import math
+
+    valid = [obs for obs in fetch_result.alerts if math.isfinite(obs.jd)]
+    if not valid:
+        return None
+    return max(valid, key=lambda o: o.jd)

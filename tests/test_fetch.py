@@ -4580,3 +4580,42 @@ class TestGetBrightestObservation:
         sys.path.insert(0, "src")
         import fetch
         assert "get_brightest_observation" in fetch.__all__
+
+
+class TestGetLatestObservation:
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+        return fetch.get_latest_observation
+
+    def _obs(self, jd, obs_id="o1"):
+        from types import SimpleNamespace
+        return SimpleNamespace(
+            obs_id=obs_id, ra_deg=10.0, dec_deg=5.0, jd=jd,
+            mag=20.0, mag_err=0.1, filter_band="r",
+            real_bogus_score=None, mission="ZTF",
+            cutout_science=None, cutout_reference=None, cutout_difference=None,
+        )
+
+    def _result(self, alerts):
+        from types import SimpleNamespace
+        return SimpleNamespace(alerts=alerts, provenance=None)
+
+    def test_empty_returns_none(self):
+        assert self._fn()(self._result([])) is None
+
+    def test_returns_most_recent(self):
+        old = self._obs(2460000.0, "o1")
+        new = self._obs(2460010.0, "o2")
+        assert self._fn()(self._result([old, new])) is new
+
+    def test_single_obs(self):
+        obs = self._obs(2460005.0)
+        assert self._fn()(self._result([obs])) is obs
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+        assert "get_latest_observation" in fetch.__all__

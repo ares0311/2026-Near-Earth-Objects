@@ -3442,3 +3442,40 @@ class TestComputeMeanNeoProbability:
         sys.path.insert(0, "src")
         import classify
         assert "compute_mean_neo_probability" in classify.__all__
+
+
+class TestComputeCompositeNeoScore:
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import classify
+        return classify.compute_composite_neo_score
+
+    def _features(self, rb=None, arc=None, nights=None, orbit=None):
+        from types import SimpleNamespace
+        return SimpleNamespace(
+            real_bogus_score=rb,
+            arc_coverage_score=arc,
+            nights_observed_score=nights,
+            orbit_quality_score=orbit,
+        )
+
+    def test_all_none_returns_zero(self):
+        assert self._fn()(self._features()) == 0.0
+
+    def test_all_one_returns_one(self):
+        result = self._fn()(self._features(1.0, 1.0, 1.0, 1.0))
+        assert abs(result - 1.0) < 1e-9
+
+    def test_partial_features(self):
+        result = self._fn()(self._features(rb=1.0, arc=0.0, nights=0.0, orbit=0.0))
+        assert abs(result - 0.35) < 1e-9
+
+    def test_result_clamped_to_one(self):
+        assert self._fn()(self._features(1.0, 1.0, 1.0, 1.0)) <= 1.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import classify
+        assert "compute_composite_neo_score" in classify.__all__

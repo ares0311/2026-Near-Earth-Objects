@@ -3362,3 +3362,39 @@ class TestComputePositionAngleDispersionExceptionCoverage:
         t = SimpleNamespace(observations=(bad_obs1, bad_obs2))
         result = self._fn()(t)
         assert result is None
+
+
+class TestComputeArcCoverageFraction:
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+        return link.compute_arc_coverage_fraction
+
+    def _tracklet(self, arc_days):
+        from types import SimpleNamespace
+        return SimpleNamespace(arc_days=arc_days)
+
+    def test_zero_window_returns_zero(self):
+        assert self._fn()(self._tracklet(5.0), 0.0) == 0.0
+
+    def test_negative_window_returns_zero(self):
+        assert self._fn()(self._tracklet(5.0), -1.0) == 0.0
+
+    def test_none_arc_returns_zero(self):
+        assert self._fn()(self._tracklet(None), 10.0) == 0.0
+
+    def test_full_coverage(self):
+        assert abs(self._fn()(self._tracklet(10.0), 10.0) - 1.0) < 1e-9
+
+    def test_half_coverage(self):
+        assert abs(self._fn()(self._tracklet(5.0), 10.0) - 0.5) < 1e-9
+
+    def test_over_window_clamped_to_one(self):
+        assert self._fn()(self._tracklet(20.0), 10.0) == 1.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+        assert "compute_arc_coverage_fraction" in link.__all__

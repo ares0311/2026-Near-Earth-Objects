@@ -2202,3 +2202,39 @@ class TestComputeCalibrationSpreadCoverage:
         labels = [0, 1, 1]
         result = self._fn()(probs, labels, n_bins=10)
         assert isinstance(result, float)
+
+
+class TestComputeSharpness:
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        return calibration.compute_sharpness
+
+    def test_empty_returns_zero(self):
+        assert self._fn()([]) == 0.0
+
+    def test_all_half_returns_zero(self):
+        assert self._fn()([0.5, 0.5, 0.5]) == 0.0
+
+    def test_all_zero_returns_quarter(self):
+        result = self._fn()([0.0, 0.0])
+        assert abs(result - 0.25) < 1e-9
+
+    def test_all_one_returns_quarter(self):
+        result = self._fn()([1.0, 1.0])
+        assert abs(result - 0.25) < 1e-9
+
+    def test_mixed_decisive(self):
+        result = self._fn()([0.0, 1.0])
+        assert abs(result - 0.25) < 1e-9
+
+    def test_result_in_range(self):
+        result = self._fn()([0.1, 0.4, 0.7, 0.9])
+        assert 0.0 <= result <= 0.25
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        assert "compute_sharpness" in calibration.__all__

@@ -3094,3 +3094,58 @@ class TestComputeImageRms:
         sys.path.insert(0, "src")
         import preprocess
         assert "compute_image_rms" in preprocess.__all__
+
+
+class TestComputeCutoutFillFraction:
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import preprocess
+        return preprocess.compute_cutout_fill_fraction
+
+    def test_none_cutout_returns_none(self):
+        from types import SimpleNamespace
+        assert self._fn()(SimpleNamespace(cutout_difference=None)) is None
+
+    def test_empty_b64_returns_none(self):
+        from types import SimpleNamespace
+        assert self._fn()(SimpleNamespace(cutout_difference="")) is None
+
+    def test_invalid_b64_returns_none(self):
+        import base64
+        from types import SimpleNamespace
+        b64 = base64.b64encode(b"\x01").decode()
+        assert self._fn()(SimpleNamespace(cutout_difference=b64)) is None
+
+    def test_all_zero_returns_zero(self):
+        import base64
+        import struct
+        from types import SimpleNamespace
+        raw = struct.pack("4f", 0.0, 0.0, 0.0, 0.0)
+        b64 = base64.b64encode(raw).decode()
+        result = self._fn()(SimpleNamespace(cutout_difference=b64))
+        assert result == 0.0
+
+    def test_all_nonzero_returns_one(self):
+        import base64
+        import struct
+        from types import SimpleNamespace
+        raw = struct.pack("4f", 1.0, 2.0, 3.0, 4.0)
+        b64 = base64.b64encode(raw).decode()
+        result = self._fn()(SimpleNamespace(cutout_difference=b64))
+        assert result == 1.0
+
+    def test_partial_nonzero(self):
+        import base64
+        import struct
+        from types import SimpleNamespace
+        raw = struct.pack("4f", 1.0, 0.0, 1.0, 0.0)
+        b64 = base64.b64encode(raw).decode()
+        result = self._fn()(SimpleNamespace(cutout_difference=b64))
+        assert abs(result - 0.5) < 1e-9
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import preprocess
+        assert "compute_cutout_fill_fraction" in preprocess.__all__

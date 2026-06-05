@@ -36,7 +36,8 @@ __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
            "compute_longitude_ascending_node_rate",
            "compute_argument_of_perihelion_rate",
            "compute_perihelion_velocity",
-           "compute_aphelion_velocity"]
+           "compute_aphelion_velocity",
+           "compute_specific_angular_momentum"]
 
 import math
 from typing import NamedTuple
@@ -1871,3 +1872,38 @@ def compute_aphelion_velocity(elements: object) -> float | None:
     q_aph = a_val * (1.0 + e_val)
     v2 = GM_KM3_S2 * (2.0 / (q_aph * AU_KM) - 1.0 / (a_val * AU_KM))
     return float(math.sqrt(v2))
+
+
+def compute_specific_angular_momentum(elements: object) -> float | None:
+    """Specific angular momentum of the orbit in AU² yr⁻¹.
+
+    Uses the vis-viva-derived formula:
+
+        h = sqrt(GM_AU3_YR2 * a * (1 - e²))
+
+    where GM_AU3_YR2 = 4π².  Returns ``None`` for missing, non-positive *a*,
+    or eccentricity >= 1 (hyperbolic).
+    """
+    import math
+
+    GM = 4.0 * math.pi ** 2  # AU³ yr⁻²
+
+    a = getattr(elements, "a_au", None)
+    if a is None:
+        a = getattr(elements, "semi_major_axis_au", None)
+    if a is None:
+        return None
+    a_val = float(a)
+    if a_val <= 0.0:
+        return None
+
+    e = getattr(elements, "e", None)
+    if e is None:
+        e = getattr(elements, "eccentricity", None)
+    if e is None:
+        return None
+    e_val = float(e)
+    if e_val >= 1.0:
+        return None
+
+    return float(math.sqrt(GM * a_val * (1.0 - e_val ** 2)))

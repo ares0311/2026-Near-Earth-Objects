@@ -37,7 +37,8 @@ __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "compute_field_tracklet_density",
            "estimate_observation_cadence",
            "compute_tracklet_span_nights",
-           "compute_position_angle_dispersion"]
+           "compute_position_angle_dispersion",
+           "compute_arc_coverage_fraction"]
 
 import math
 import uuid
@@ -1678,3 +1679,17 @@ def compute_position_angle_dispersion(tracklet: object) -> float | None:
     mean_angle = sum(angles) / len(angles)
     variance = sum((a - mean_angle) ** 2 for a in angles) / len(angles)
     return float(math.sqrt(variance))
+
+
+def compute_arc_coverage_fraction(tracklet: object, survey_window_days: float) -> float:
+    """Arc coverage fraction: arc_days / survey_window_days, clamped to [0, 1].
+
+    A value of 1.0 means the tracklet spans the full survey window.
+    Returns 0.0 if the survey window is non-positive or arc_days is None.
+    """
+    if survey_window_days <= 0.0:
+        return 0.0
+    arc_days = getattr(tracklet, "arc_days", None)
+    if arc_days is None:
+        return 0.0
+    return float(min(1.0, max(0.0, arc_days / survey_window_days)))

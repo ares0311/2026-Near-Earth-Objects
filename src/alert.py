@@ -54,6 +54,7 @@ __all__ = [
     "count_submissions_by_pathway",
     "validate_obs_code",
     "format_candidate_summary_line",
+    "format_neo_summary_table",
 ]
 
 import json
@@ -2132,3 +2133,42 @@ def format_candidate_summary_line(neo: ScoredNEO) -> str:
     p_str = f"{priority:.3f}" if priority is not None else "N/A"
     m_str = f"{moid:.4f}" if moid is not None else "N/A"
     return f"{obj_id[:16]:<16} {pathway[:20]:<20} {flag[:14]:<14} {p_str:>6} {m_str:>8}"
+
+
+def format_neo_summary_table(neos: list, max_rows: int = 20) -> str:
+    """Plain-text ASCII summary table of top NEO candidates.
+
+    Columns: rank, object_id, alert_pathway, hazard_flag, priority, MOID.
+    Sorted by discovery_priority descending; capped at *max_rows*.
+    """
+
+    def _priority(neo: object) -> float:
+        meta = getattr(neo, "metadata", None)
+        p = getattr(meta, "discovery_priority", None) if meta else None
+        return float(p) if p is not None else -1.0
+
+    header = (
+        f"{'#':>4}  {'Object ID':<18}  {'Pathway':<22}  "
+        f"{'Hazard':<14}  {'Priority':>8}  {'MOID (AU)':>10}"
+    )
+    sep = "-" * len(header)
+    rows = [header, sep]
+
+    sorted_neos = sorted(neos, key=_priority, reverse=True)[:max_rows]
+    for rank, neo in enumerate(sorted_neos, 1):
+        tracklet = getattr(neo, "tracklet", None)
+        obj_id = getattr(tracklet, "object_id", "unknown") or "unknown"
+        hazard = getattr(neo, "hazard", None)
+        pathway = getattr(hazard, "alert_pathway", "unknown") or "unknown"
+        flag = getattr(hazard, "hazard_flag", "unknown") or "unknown"
+        meta = getattr(neo, "metadata", None)
+        priority = getattr(meta, "discovery_priority", None) if meta else None
+        moid = getattr(hazard, "moid_au", None) if hazard else None
+        p_str = f"{priority:.3f}" if priority is not None else "N/A"
+        m_str = f"{moid:.4f}" if moid is not None else "N/A"
+        rows.append(
+            f"{rank:>4}  {obj_id[:18]:<18}  {pathway[:22]:<22}  "
+            f"{flag[:14]:<14}  {p_str:>8}  {m_str:>10}"
+        )
+
+    return "\n".join(rows)

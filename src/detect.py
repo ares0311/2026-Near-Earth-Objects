@@ -32,7 +32,8 @@ __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus"
            "filter_by_streak_score",
            "compute_rb_score_distribution",
            "count_candidates_above_rb",
-           "get_brightest_candidate"]
+           "get_brightest_candidate",
+           "compute_mean_motion_rate"]
 
 import math
 import uuid
@@ -1488,3 +1489,29 @@ def get_brightest_candidate(result: DetectResult) -> object | None:
                 best_mag = obs.mag
                 best_cand = cand
     return best_cand
+
+
+def compute_mean_motion_rate(result: DetectResult) -> float | None:
+    """Mean apparent motion rate (arcsec/hr) across all candidates in *result*.
+
+    For each candidate the maximum real_bogus observation's motion is estimated
+    using ``compute_motion_vector`` on consecutive observation pairs.  The mean
+    over all valid rate values is returned.  Returns ``None`` if no valid rates
+    can be computed.
+    """
+    from detect import compute_motion_vector
+
+    rates: list[float] = []
+    for cand in result.candidates:
+        obs_list = list(cand.observations)
+        for i in range(len(obs_list) - 1):
+            try:
+                mv = compute_motion_vector(obs_list[i], obs_list[i + 1])
+                rate = mv.get("rate_arcsec_hr")
+                if rate is not None and rate >= 0.0:
+                    rates.append(float(rate))
+            except Exception:
+                continue
+    if not rates:
+        return None
+    return float(sum(rates) / len(rates))
