@@ -4619,3 +4619,45 @@ class TestGetLatestObservation:
         sys.path.insert(0, "src")
         import fetch
         assert "get_latest_observation" in fetch.__all__
+
+
+class TestGetFaintestObservation:
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+        return fetch.get_faintest_observation
+
+    def _obs(self, mag, obs_id="o1"):
+        from types import SimpleNamespace
+        return SimpleNamespace(
+            obs_id=obs_id, ra_deg=10.0, dec_deg=5.0, jd=2460000.0,
+            mag=mag, mag_err=0.1, filter_band="r",
+            real_bogus_score=None, mission="ZTF",
+            cutout_science=None, cutout_reference=None, cutout_difference=None,
+        )
+
+    def _result(self, alerts):
+        from types import SimpleNamespace
+        return SimpleNamespace(alerts=alerts, provenance=None)
+
+    def test_empty_returns_none(self):
+        assert self._fn()(self._result([])) is None
+
+    def test_all_sentinel_returns_none(self):
+        assert self._fn()(self._result([self._obs(99.0), self._obs(90.0)])) is None
+
+    def test_returns_faintest(self):
+        bright = self._obs(17.0, "bright")
+        faint = self._obs(22.0, "faint")
+        assert self._fn()(self._result([bright, faint])) is faint
+
+    def test_single_valid(self):
+        obs = self._obs(21.0)
+        assert self._fn()(self._result([obs])) is obs
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+        assert "get_faintest_observation" in fetch.__all__

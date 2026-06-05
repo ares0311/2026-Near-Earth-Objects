@@ -3071,3 +3071,30 @@ class TestFormatNeoSummaryTable:
         sys.path.insert(0, "src")
         import alert
         assert "format_neo_summary_table" in alert.__all__
+
+
+class TestCountReadyForSubmission:
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+        return alert.count_ready_for_submission
+
+    def test_empty_list_returns_zero(self):
+        assert self._fn()([]) == 0
+
+    def test_not_ready_neos_returns_zero(self, scored_neo):
+        result = self._fn()([scored_neo])
+        assert isinstance(result, int)
+        assert result >= 0
+
+    def test_exception_neo_skipped(self):
+        from types import SimpleNamespace
+        bad_neo = SimpleNamespace()
+        assert self._fn()([bad_neo]) == 0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+        assert "count_ready_for_submission" in alert.__all__

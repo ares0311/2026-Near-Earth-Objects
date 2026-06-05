@@ -39,7 +39,8 @@ __all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
            "get_top_candidates",
            "compute_pha_fraction",
            "count_by_alert_pathway",
-           "compute_weighted_hazard_index"]
+           "compute_weighted_hazard_index",
+           "compute_candidate_priority_spread"]
 
 import math
 import uuid
@@ -1621,3 +1622,23 @@ def compute_weighted_hazard_index(neo: object) -> float:
         orbit_q = float(min(1.0, float(quality_code) / 4.0))
 
     return float(min(1.0, max(0.0, 0.4 * threat + 0.3 * moid_prox + 0.3 * orbit_q)))
+
+
+def compute_candidate_priority_spread(neos: list) -> float:
+    """Standard deviation of discovery_priority values across all scored NEOs.
+
+    Returns 0.0 if fewer than 2 candidates have valid priority values.
+    """
+    import math
+
+    priorities = []
+    for neo in neos:
+        meta = getattr(neo, "metadata", None)
+        p = getattr(meta, "discovery_priority", None) if meta else None
+        if p is not None:
+            priorities.append(float(p))
+    if len(priorities) < 2:
+        return 0.0
+    mean = sum(priorities) / len(priorities)
+    variance = sum((p - mean) ** 2 for p in priorities) / len(priorities)
+    return float(math.sqrt(variance))

@@ -3149,3 +3149,41 @@ class TestComputeCutoutFillFraction:
         sys.path.insert(0, "src")
         import preprocess
         assert "compute_cutout_fill_fraction" in preprocess.__all__
+
+
+class TestComputePhotometricNoiseLevel:
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import preprocess
+        return preprocess.compute_photometric_noise_level
+
+    def _obs(self, mag):
+        from types import SimpleNamespace
+        return SimpleNamespace(mag=mag)
+
+    def test_empty_returns_none(self):
+        assert self._fn()([]) is None
+
+    def test_single_obs_returns_none(self):
+        assert self._fn()([self._obs(20.0)]) is None
+
+    def test_all_sentinel_returns_none(self):
+        assert self._fn()([self._obs(99.0), self._obs(99.0)]) is None
+
+    def test_identical_mags_returns_zero(self):
+        obs = [self._obs(20.0), self._obs(20.0), self._obs(20.0)]
+        result = self._fn()(obs)
+        assert result == 0.0
+
+    def test_varying_mags_returns_positive(self):
+        obs = [self._obs(20.0), self._obs(20.5), self._obs(21.0), self._obs(19.5)]
+        result = self._fn()(obs)
+        assert result is not None
+        assert result >= 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import preprocess
+        assert "compute_photometric_noise_level" in preprocess.__all__

@@ -2351,3 +2351,40 @@ class TestScoredNEOBatch:
         sys.path.insert(0, "src")
         import schemas
         assert "ScoredNEOBatch" in schemas.__all__
+
+
+class TestNightObservationSummary:
+    def _cls(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        return schemas.NightObservationSummary
+
+    def test_defaults(self):
+        s = self._cls()()
+        assert s.night_jd is None
+        assert s.n_obs == 0
+        assert s.n_candidates == 0
+        assert s.mean_rb is None
+        assert s.limiting_mag is None
+        assert s.survey == "unknown"
+
+    def test_custom_values(self):
+        s = self._cls()(
+            night_jd=2460100.5, n_obs=50, n_candidates=3,
+            mean_rb=0.85, limiting_mag=21.0, survey="ZTF",
+        )
+        assert s.n_obs == 50
+        assert s.survey == "ZTF"
+
+    def test_immutable(self):
+        import pytest
+        s = self._cls()()
+        with pytest.raises(Exception):
+            s.n_obs = 5
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        assert "NightObservationSummary" in schemas.__all__

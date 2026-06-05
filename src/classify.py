@@ -55,6 +55,7 @@ __all__ = [
     "compute_class_agreement",
     "compute_neo_class_distribution",
     "compute_composite_neo_score",
+    "get_highest_confidence_neo",
 ]
 
 import base64
@@ -2217,3 +2218,20 @@ def compute_composite_neo_score(features: object) -> float:
         + _get("orbit_quality_score") * 0.15
     )
     return float(min(1.0, max(0.0, score)))
+
+
+def get_highest_confidence_neo(neos: list) -> object | None:
+    """Return the ScoredNEO with the highest posterior neo_candidate probability.
+
+    Ignores NEOs with missing or None posteriors.  Returns ``None`` if the
+    list is empty or no valid posteriors exist.
+    """
+    best = None
+    best_prob = -1.0
+    for neo in neos:
+        posterior = getattr(neo, "posterior", None)
+        prob = getattr(posterior, "neo_candidate", None) if posterior else None
+        if prob is not None and float(prob) > best_prob:
+            best_prob = float(prob)
+            best = neo
+    return best

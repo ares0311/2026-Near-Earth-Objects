@@ -36,7 +36,8 @@ __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_
            "compute_cutout_peak_value",
            "compute_cutout_contrast_ratio",
            "compute_image_rms",
-           "compute_cutout_fill_fraction"]
+           "compute_cutout_fill_fraction",
+           "compute_photometric_noise_level"]
 
 import base64
 import math
@@ -1598,3 +1599,19 @@ def compute_cutout_fill_fraction(obs: object) -> float | None:
         return float(np.count_nonzero(arr) / arr.size)
     except Exception:
         return None
+
+
+def compute_photometric_noise_level(observations: list) -> float | None:
+    """Median absolute deviation (MAD) of valid observation magnitudes.
+
+    Provides a robust estimate of photometric noise level across a set of
+    observations.  Returns ``None`` for fewer than 2 valid magnitudes.
+    Sentinel magnitudes (>= 90) are excluded.
+    """
+    mags = [float(obs.mag) for obs in observations
+            if getattr(obs, "mag", None) is not None and obs.mag < 90.0]
+    if len(mags) < 2:
+        return None
+    median = sorted(mags)[len(mags) // 2]
+    mad = sorted(abs(m - median) for m in mags)[len(mags) // 2]
+    return float(mad)

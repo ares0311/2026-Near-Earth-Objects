@@ -49,6 +49,7 @@ __all__ = [
     "FieldCoverageReport",
     "AlertSummaryRecord",
     "ScoredNEOBatch",
+    "NightObservationSummary",
 ]
 
 from dataclasses import dataclass
@@ -1319,3 +1320,16 @@ class ScoredNEOBatch(BaseModel):
     pipeline_version: str = "unknown"
     created_at_jd: float | None = None
     n_candidates: int = 0
+
+
+class NightObservationSummary(BaseModel):
+    """Frozen summary of observations collected on a single night."""
+
+    model_config = ConfigDict(frozen=True)
+
+    night_jd: float | None = None
+    n_obs: int = 0
+    n_candidates: int = 0
+    mean_rb: float | None = None
+    limiting_mag: float | None = None
+    survey: str = "unknown"

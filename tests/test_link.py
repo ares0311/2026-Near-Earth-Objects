@@ -3398,3 +3398,45 @@ class TestComputeArcCoverageFraction:
         sys.path.insert(0, "src")
         import link
         assert "compute_arc_coverage_fraction" in link.__all__
+
+
+class TestComputeMaxObservationGap:
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+        return link.compute_max_observation_gap
+
+    def _obs(self, jd, obs_id="o"):
+        from types import SimpleNamespace
+        return SimpleNamespace(obs_id=obs_id, jd=jd, ra_deg=10.0, dec_deg=5.0,
+                               mag=20.0, mag_err=0.1, filter_band="r",
+                               real_bogus_score=0.9, mission="ZTF",
+                               cutout_science=None, cutout_reference=None,
+                               cutout_difference=None)
+
+    def test_no_obs_returns_none(self):
+        from types import SimpleNamespace
+        assert self._fn()(SimpleNamespace(observations=())) is None
+
+    def test_single_obs_returns_none(self):
+        from types import SimpleNamespace
+        t = SimpleNamespace(observations=(self._obs(2460000.0),))
+        assert self._fn()(t) is None
+
+    def test_two_obs_gap(self):
+        from types import SimpleNamespace
+        t = SimpleNamespace(observations=(self._obs(2460000.0), self._obs(2460003.0)))
+        assert abs(self._fn()(t) - 3.0) < 1e-9
+
+    def test_returns_max_gap(self):
+        from types import SimpleNamespace
+        obs = [self._obs(float(jd), f"o{i}") for i, jd in enumerate([2460000, 2460001, 2460005])]
+        t = SimpleNamespace(observations=tuple(obs))
+        assert abs(self._fn()(t) - 4.0) < 1e-9
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+        assert "compute_max_observation_gap" in link.__all__

@@ -3076,3 +3076,39 @@ class TestComputeWeightedHazardIndexNoneQuality:
         )
         result = self._fn()(neo)
         assert 0.0 <= result <= 1.0
+
+
+class TestComputeCandidatePrioritySpread:
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        return score.compute_candidate_priority_spread
+
+    def _neo(self, priority):
+        from types import SimpleNamespace
+        meta = SimpleNamespace(discovery_priority=priority)
+        return SimpleNamespace(metadata=meta)
+
+    def test_empty_returns_zero(self):
+        assert self._fn()([]) == 0.0
+
+    def test_single_returns_zero(self):
+        assert self._fn()([self._neo(0.5)]) == 0.0
+
+    def test_identical_priorities_returns_zero(self):
+        assert self._fn()([self._neo(0.5), self._neo(0.5)]) == 0.0
+
+    def test_spread_positive(self):
+        result = self._fn()([self._neo(0.1), self._neo(0.9)])
+        assert result > 0.0
+
+    def test_none_priority_excluded(self):
+        neos = [self._neo(None), self._neo(0.5), self._neo(None)]
+        assert self._fn()(neos) == 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        assert "compute_candidate_priority_spread" in score.__all__

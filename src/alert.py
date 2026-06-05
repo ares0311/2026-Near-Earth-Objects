@@ -55,6 +55,7 @@ __all__ = [
     "validate_obs_code",
     "format_candidate_summary_line",
     "format_neo_summary_table",
+    "count_ready_for_submission",
 ]
 
 import json
@@ -2172,3 +2173,22 @@ def format_neo_summary_table(neos: list, max_rows: int = 20) -> str:
         )
 
     return "\n".join(rows)
+
+
+def count_ready_for_submission(neos: list) -> int:
+    """Count NEOs where the alert-protocol gate is fully satisfied.
+
+    Calls ``ready_for_submission`` for each NEO and counts those returning
+    ``(True, [])``.  Never triggers actual submission.
+    """
+    from alert import ready_for_submission
+
+    count = 0
+    for neo in neos:
+        try:
+            ok, _ = ready_for_submission(neo)
+            if ok:
+                count += 1
+        except Exception:
+            continue
+    return count

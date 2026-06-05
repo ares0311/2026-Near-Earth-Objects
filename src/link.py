@@ -38,7 +38,8 @@ __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "estimate_observation_cadence",
            "compute_tracklet_span_nights",
            "compute_position_angle_dispersion",
-           "compute_arc_coverage_fraction"]
+           "compute_arc_coverage_fraction",
+           "compute_max_observation_gap"]
 
 import math
 import uuid
@@ -1693,3 +1694,17 @@ def compute_arc_coverage_fraction(tracklet: object, survey_window_days: float) -
     if arc_days is None:
         return 0.0
     return float(min(1.0, max(0.0, arc_days / survey_window_days)))
+
+
+def compute_max_observation_gap(tracklet: object) -> float | None:
+    """Maximum gap in days between consecutive observations in a tracklet.
+
+    Returns ``None`` for fewer than 2 observations.  Observations are sorted
+    by JD before computing gaps.
+    """
+    obs = getattr(tracklet, "observations", None)
+    if not obs or len(obs) < 2:
+        return None
+    jds = sorted(float(o.jd) for o in obs)
+    gaps = [jds[i + 1] - jds[i] for i in range(len(jds) - 1)]
+    return float(max(gaps))

@@ -37,7 +37,8 @@ __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
            "compute_argument_of_perihelion_rate",
            "compute_perihelion_velocity",
            "compute_aphelion_velocity",
-           "compute_specific_angular_momentum"]
+           "compute_specific_angular_momentum",
+           "compute_orbit_complexity"]
 
 import math
 from typing import NamedTuple
@@ -1907,3 +1908,32 @@ def compute_specific_angular_momentum(elements: object) -> float | None:
         return None
 
     return float(math.sqrt(GM * a_val * (1.0 - e_val ** 2)))
+
+
+def compute_orbit_complexity(elements: object) -> float:
+    """Orbital complexity index in [0, 1].
+
+    Combines eccentricity and inclination deviation from the ecliptic plane
+    into a single scalar:
+
+        complexity = 0.5 * e_norm + 0.5 * i_norm
+
+    where:
+        e_norm = min(e, 1) (eccentricity; 1 = parabolic/hyperbolic)
+        i_norm = min(|i|, 90) / 90 (inclination; 1 = polar orbit)
+
+    Returns 0.0 for missing or invalid elements.
+    """
+    e = getattr(elements, "e", None)
+    if e is None:
+        e = getattr(elements, "eccentricity", None)
+    e_val = float(e) if e is not None else 0.0
+    e_norm = min(1.0, max(0.0, e_val))
+
+    i = getattr(elements, "i_deg", None)
+    if i is None:
+        i = getattr(elements, "inclination_deg", None)
+    i_val = float(i) if i is not None else 0.0
+    i_norm = min(1.0, abs(i_val) / 90.0)
+
+    return float(0.5 * e_norm + 0.5 * i_norm)

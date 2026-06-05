@@ -43,6 +43,7 @@ __all__ = [
     "compute_fraction_calibrated",
     "compute_calibration_spread",
     "compute_sharpness",
+    "compute_positive_predictive_value",
 ]
 
 import math
@@ -1648,3 +1649,23 @@ def compute_sharpness(probs: list[float]) -> float:
     if not probs:
         return 0.0
     return float(sum((float(p) - 0.5) ** 2 for p in probs) / len(probs))
+
+
+def compute_positive_predictive_value(
+    probs: list[float],
+    labels: list[int],
+    threshold: float = 0.5,
+) -> float:
+    """Positive predictive value (precision) at a given probability threshold.
+
+    PPV = TP / (TP + FP)
+
+    Returns 0.0 for empty input, mismatched lengths, or no positive predictions.
+    """
+    if not probs or not labels or len(probs) != len(labels):
+        return 0.0
+    tp = sum(1 for p, y in zip(probs, labels) if float(p) >= threshold and int(y) == 1)
+    fp = sum(1 for p, y in zip(probs, labels) if float(p) >= threshold and int(y) == 0)
+    if tp + fp == 0:
+        return 0.0
+    return float(tp / (tp + fp))

@@ -3298,3 +3298,40 @@ class TestComputeSpecificAngularMomentum:
         sys.path.insert(0, "src")
         import orbit
         assert "compute_specific_angular_momentum" in orbit.__all__
+
+
+class TestComputeOrbitComplexity:
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import orbit
+        return orbit.compute_orbit_complexity
+
+    def _el(self, e=0.3, i=15.0):
+        from types import SimpleNamespace
+        return SimpleNamespace(e=e, i_deg=i)
+
+    def test_zero_returns_zero(self):
+        assert self._fn()(self._el(e=0.0, i=0.0)) == 0.0
+
+    def test_max_returns_one(self):
+        result = self._fn()(self._el(e=1.0, i=90.0))
+        assert abs(result - 1.0) < 1e-9
+
+    def test_missing_attrs_returns_zero(self):
+        from types import SimpleNamespace
+        assert self._fn()(SimpleNamespace()) == 0.0
+
+    def test_mid_range_value(self):
+        result = self._fn()(self._el(e=0.5, i=45.0))
+        assert abs(result - 0.5) < 1e-9
+
+    def test_result_in_range(self):
+        result = self._fn()(self._el(e=0.3, i=20.0))
+        assert 0.0 <= result <= 1.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import orbit
+        assert "compute_orbit_complexity" in orbit.__all__

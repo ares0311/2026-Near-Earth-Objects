@@ -33,7 +33,8 @@ __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus"
            "compute_rb_score_distribution",
            "count_candidates_above_rb",
            "get_brightest_candidate",
-           "compute_mean_motion_rate"]
+           "compute_mean_motion_rate",
+           "compute_candidate_sky_density"]
 
 import math
 import uuid
@@ -1515,3 +1516,23 @@ def compute_mean_motion_rate(result: DetectResult) -> float | None:
     if not rates:
         return None
     return float(sum(rates) / len(rates))
+
+
+def compute_candidate_sky_density(result: DetectResult, field_radius_deg: float) -> float:
+    """Candidates per square degree for a circular survey field.
+
+    Uses the solid-angle formula: area = 2π(1 − cos(r)) steradians,
+    converted to square degrees.  Returns 0.0 for non-positive *field_radius_deg*
+    or an empty candidate list.
+    """
+    import math
+
+    if field_radius_deg <= 0.0:
+        return 0.0
+    n = len(result.candidates)
+    if n == 0:
+        return 0.0
+    r_rad = math.radians(field_radius_deg)
+    area_sr = 2.0 * math.pi * (1.0 - math.cos(r_rad))
+    area_sq_deg = area_sr * (180.0 / math.pi) ** 2
+    return float(n / area_sq_deg)

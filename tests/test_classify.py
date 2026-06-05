@@ -3479,3 +3479,37 @@ class TestComputeCompositeNeoScore:
         sys.path.insert(0, "src")
         import classify
         assert "compute_composite_neo_score" in classify.__all__
+
+
+class TestGetHighestConfidenceNeo:
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import classify
+        return classify.get_highest_confidence_neo
+
+    def _neo(self, neo_prob):
+        from types import SimpleNamespace
+        posterior = SimpleNamespace(neo_candidate=neo_prob) if neo_prob is not None else None
+        return SimpleNamespace(posterior=posterior)
+
+    def test_empty_returns_none(self):
+        assert self._fn()([]) is None
+
+    def test_all_none_posterior_returns_none(self):
+        assert self._fn()([self._neo(None)]) is None
+
+    def test_single_neo_returned(self):
+        neo = self._neo(0.7)
+        assert self._fn()([neo]) is neo
+
+    def test_returns_highest_probability(self):
+        low = self._neo(0.3)
+        high = self._neo(0.9)
+        assert self._fn()([low, high]) is high
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import classify
+        assert "get_highest_confidence_neo" in classify.__all__

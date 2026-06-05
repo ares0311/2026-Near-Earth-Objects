@@ -2238,3 +2238,40 @@ class TestComputeSharpness:
         sys.path.insert(0, "src")
         import calibration
         assert "compute_sharpness" in calibration.__all__
+
+
+class TestComputePositivePredictiveValue:
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        return calibration.compute_positive_predictive_value
+
+    def test_empty_returns_zero(self):
+        assert self._fn()([], []) == 0.0
+
+    def test_no_positive_predictions_returns_zero(self):
+        probs = [0.1, 0.2, 0.3]
+        labels = [1, 0, 1]
+        assert self._fn()(probs, labels, threshold=0.5) == 0.0
+
+    def test_all_correct_positives_returns_one(self):
+        probs = [0.9, 0.8]
+        labels = [1, 1]
+        result = self._fn()(probs, labels, threshold=0.5)
+        assert abs(result - 1.0) < 1e-9
+
+    def test_mixed_ppv(self):
+        probs = [0.9, 0.8, 0.7]
+        labels = [1, 0, 1]
+        result = self._fn()(probs, labels, threshold=0.5)
+        assert abs(result - 2.0 / 3.0) < 1e-9
+
+    def test_mismatched_lengths_returns_zero(self):
+        assert self._fn()([0.5], [1, 0]) == 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        assert "compute_positive_predictive_value" in calibration.__all__

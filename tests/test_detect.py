@@ -3093,3 +3093,46 @@ class TestComputeMeanMotionRateCoverage:
         cand = SimpleNamespace(observations=(bad_obs1, bad_obs2))
         result = SimpleNamespace(candidates=[cand], known_matches=[], summary=None)
         assert self._fn()(result) is None
+
+
+class TestComputeCandidateSkyDensity:
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import detect
+        return detect.compute_candidate_sky_density
+
+    def _cand(self):
+        from types import SimpleNamespace
+        return SimpleNamespace(observations=(), object_id="c1")
+
+    def _result(self, n_cands):
+        from types import SimpleNamespace
+        return SimpleNamespace(
+            candidates=[self._cand() for _ in range(n_cands)],
+            known_matches=[], summary=None,
+        )
+
+    def test_zero_radius_returns_zero(self):
+        assert self._fn()(self._result(5), 0.0) == 0.0
+
+    def test_negative_radius_returns_zero(self):
+        assert self._fn()(self._result(5), -1.0) == 0.0
+
+    def test_empty_candidates_returns_zero(self):
+        assert self._fn()(self._result(0), 1.0) == 0.0
+
+    def test_returns_positive_density(self):
+        result = self._fn()(self._result(10), 1.0)
+        assert result > 0.0
+
+    def test_more_candidates_higher_density(self):
+        d1 = self._fn()(self._result(5), 1.0)
+        d2 = self._fn()(self._result(10), 1.0)
+        assert d2 > d1
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import detect
+        assert "compute_candidate_sky_density" in detect.__all__
