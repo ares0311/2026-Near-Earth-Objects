@@ -187,9 +187,27 @@ def main() -> None:
     print()
 
     if args.dry_run:
-        print("Dry run — URLs that would be downloaded:")
+        # HEAD-check each URL to confirm reachability before committing to a download
+        print("Dry run — checking URLs:")
+        all_ok = True
         for d in dates:
-            print(f"  {night_tarball_url(d)}")
+            url = night_tarball_url(d)
+            try:
+                r = requests.head(url, timeout=15)
+                size = r.headers.get("Content-Length", "?")
+                status = f"HTTP {r.status_code}"
+                ok = r.status_code == 200
+                symbol = "OK" if ok else "FAIL"
+                print(f"  [{symbol}] {url}  ({status}, size={size} bytes)")
+                if not ok:
+                    all_ok = False
+            except Exception as e:
+                print(f"  [FAIL] {url}  (error: {e})")
+                all_ok = False
+        if all_ok:
+            print("\nAll URLs reachable. Drop --dry-run to begin downloading.")
+        else:
+            print("\nSome URLs failed. Check network access or try different --nights value.")
         return
 
     results: list[dict] = []
