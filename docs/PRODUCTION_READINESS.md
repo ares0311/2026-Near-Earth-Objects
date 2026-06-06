@@ -49,29 +49,30 @@ These gaps prevent the pipeline from being safely or usefully operated on real s
 
 **What is missing**: The three-tier ML classifier has no trained weights.  
 - Tier 1 (XGBoost): `classify.py` initializes untrained models. `CandidateFeatures` are populated but the XGBoost decision function returns random/prior scores until trained on real labeled data.  
-- Tier 2 (CNN): `train_tier2_cnn.py` exists. A 500-alert cutout dataset has been built from real ZTF Avro alerts (2026-06-05 night; 427 real, 73 bogus). This is a proof-of-concept run — production training requires ≥10,000 labeled examples. No `models/tier2_cnn.pt` file exists yet.  
+- Tier 2 (CNN): **WEIGHTS TRAINED 2026-06-06.** `models/tier2_cnn.pt` saved locally (needs commit to repo). Trained on 10,000 real ZTF Avro alerts (8,000 train / 2,000 val); best val_loss=0.258, val_acc=91.3% at 20 epochs. Needs calibration evaluation before alert gate use.  
 - Tier 3 (Transformer): `train_tier3_transformer.py` exists but no token CSV from real MPC tracklet sequences has been built. No `models/tier3_transformer.pt` file exists.  
 
 **Why it is Tier 1**: Without trained weights, every candidate scores at prior probability (~5% NEO). The pipeline cannot distinguish real NEOs from artifacts on live data. All downstream hazard flags and alert pathways are meaningless without this.
 
 **Progress as of 2026-06-06**:
-- `data/training_labels.csv`: 1000 MPC labels (500 neo_candidate + 500 main_belt_asteroid) downloaded from MPC static catalogs. ✓
-- `data/ztf_labeled_alerts.json`: 500 real ZTF Avro alerts downloaded from public archive (ztf.uw.edu), cutouts decompressed from gzip-FITS to raw float32. ✓
-- `data/cutouts/`: 500 `.npz` cutout triplets (science, reference, difference) + `index.csv`. ✓
-- `Skills/download_ztf_training_alerts.py`: download pipeline operational. ✓
-- **Still needed**: ≥10,000 labeled alerts for production-quality training; CNN training run; Tier 3 training; calibration validation.
+- `data/ztf_labeled_alerts.json`: 10,000 real ZTF Avro alerts downloaded from public archive (ztf.uw.edu); cutouts decompressed from gzip-FITS to raw float32. ✓
+- `data/cutouts/`: 10,000 `.npz` cutout triplets (science, reference, difference) + `index.csv`. ✓
+- `data/training_labels.csv`: 1000 MPC labels (500 neo_candidate + 500 main_belt_asteroid). ✓
+- `models/tier2_cnn.pt`: CNN trained — val_loss=0.258, val_acc=91.3%, 20 epochs; 8,588 real / 1,412 bogus; inverse-frequency class weights. ✓ (local only; needs commit)
+- **Still needed**: Commit `models/tier2_cnn.pt`; Tier 1 XGBoost retraining; Tier 3 Transformer training; calibration evaluation (Brier < 0.10, ECE < 0.05).
 
 **What is needed to close it**:
-1. [HUMAN — PARTIALLY DONE] Download ≥10,000 labeled ZTF Avro alerts: `caffeinate -i python Skills/download_ztf_training_alerts.py --nights 3 --limit 10000`
-2. [HUMAN — DONE for 500] MPC NEO + MBA catalog labels: `data/training_labels.csv` exists with 1000 labels.
-3. [CODE — DONE for 500] Run `Skills/build_cutout_dataset.py` to produce `.npz` + CSV index. Re-run after step 1 on full dataset.
-4. [HUMAN] Run `caffeinate -i python Skills/train_tier2_cnn.py --labels data/cutouts/index.csv --epochs 20 --out models/tier2_cnn.pt`
-5. [CODE] Run `Skills/build_sequence_dataset.py` on MPC tracklet data to produce flat token CSV.
-6. [HUMAN] Run `caffeinate -i python Skills/train_tier3_transformer.py` on the token CSV to produce `models/tier3_transformer.pt`.
-7. [HUMAN] Retrain Tier 1 XGBoost stacker on combined real/bogus + MPC NEO labels.
-8. [CODE + HUMAN] Evaluate with `Skills/evaluate_calibration.py`; require Brier score < 0.10 and ECE < 0.05 before approval.
+1. [DONE] Download 10,000 labeled ZTF Avro alerts via `Skills/download_ztf_training_alerts.py`.
+2. [DONE] MPC labels: `data/training_labels.csv` with 1000 labels.
+3. [DONE] `Skills/build_cutout_dataset.py` — 10,000 `.npz` cutout triplets built.
+4. [DONE] `Skills/train_tier2_cnn.py` — `models/tier2_cnn.pt` saved; val_acc=91.3%.
+5. [HUMAN] Commit `models/tier2_cnn.pt` to repo (`.gitignore` updated to allow `models/*.pt`).
+6. [CODE] Run `Skills/build_sequence_dataset.py` on MPC tracklet data to produce flat token CSV for Tier 3.
+7. [HUMAN] Run `caffeinate -i python Skills/train_tier3_transformer.py` to produce `models/tier3_transformer.pt`.
+8. [HUMAN] Retrain Tier 1 XGBoost stacker on combined real/bogus + MPC NEO labels.
+9. [CODE + HUMAN] Evaluate with `Skills/evaluate_calibration.py`; require Brier < 0.10 and ECE < 0.05 before approval.
 
-**Blocking outside step**: Steps 1, 4, 6–8 require human action (Mac-side download and training runs). Step 3 can proceed once step 1 data exists.
+**Blocking outside step**: Steps 7–9 require human action (training runs, expert calibration review).
 
 ---
 
@@ -190,7 +191,7 @@ These items cannot be completed by code generation alone. They require real-worl
 
 Before the pipeline makes its first MPC submission, all of the following must be TRUE:
 
-- [ ] T1-A resolved: Tier 1 XGBoost, Tier 2 CNN, and Tier 3 Transformer weights trained on ≥10,000 real labeled examples each
+- [~] T1-A resolved: Tier 2 CNN trained on 10,000 ZTF alerts ✓ (val_acc=91.3%); Tier 1 XGBoost and Tier 3 Transformer weights still needed
 - [ ] T1-A resolved: Brier score < 0.10 and ECE < 0.05 on held-out real-data test set
 - [~] T1-B resolved: IRSA and ATLAS credentials configured ✓; live connection test passed ✓; automated live dry-run policy not yet signed off (pending human reviewer signature)
 - [ ] T1-C resolved: Full pipeline run completed on ≥1 real ZTF field; ≥90% known-object recovery verified

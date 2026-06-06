@@ -5,6 +5,7 @@ __pycache__/
 .neo_cache/
 alert_logs/
 models/
+!models/*.pt
 .mypy_cache/
 .pytest_cache/
 *.egg-info/
