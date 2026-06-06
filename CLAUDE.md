@@ -8,10 +8,11 @@ It contains the facts a coding agent needs to work productively without re-readi
 ## MANDATORY SESSION-START PROTOCOL
 
 **At the start of every session, before planning or executing any steps, you must:**
-1. Call `Read` on `AGENTS.md` — do not rely on memory or prior context.
-2. Call `Read` on `docs/PRODUCTION_READINESS.md` — do not rely on memory or prior context.
+1. Call `Read` on `CLAUDE.md` — do not rely on memory or prior context. (This file; re-read to reactivate all standing rules.)
+2. Call `Read` on `AGENTS.md` — do not rely on memory or prior context.
+3. Call `Read` on `docs/PRODUCTION_READINESS.md` — do not rely on memory or prior context.
 
-These reads are non-negotiable. No planning or code changes may happen before both files are read.
+These reads are non-negotiable. No planning or code changes may happen before all three files are read.
 
 ---
 
