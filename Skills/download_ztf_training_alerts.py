@@ -13,14 +13,16 @@ IMPORTANT: Run from your Mac, not from the coding agent server.
 
 Usage (from repo root on your Mac, with venv active):
     pip install fastavro                          # one-time setup
-    PYTHONPATH=src python Skills/download_ztf_training_alerts.py
-    PYTHONPATH=src python Skills/download_ztf_training_alerts.py --nights 3 --limit 5000
+    caffeinate -i python Skills/download_ztf_training_alerts.py
+    caffeinate -i python Skills/download_ztf_training_alerts.py --nights 3 --limit 5000
+    # dry-run is fast — no caffeinate needed:
     PYTHONPATH=src python Skills/download_ztf_training_alerts.py --dry-run
 
 Output: data/ztf_labeled_alerts.json
-    Feed directly into: PYTHONPATH=src python Skills/build_cutout_dataset.py
-        --input data/ztf_labeled_alerts.json
-        --output-dir data/cutouts/
+    Feed directly into:
+    caffeinate -i python Skills/build_cutout_dataset.py \
+        --input data/ztf_labeled_alerts.json \
+        --output-dir data/cutouts/ \
         --csv data/cutouts/index.csv
 """
 
