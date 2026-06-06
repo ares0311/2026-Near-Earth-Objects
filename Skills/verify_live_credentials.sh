@@ -43,7 +43,7 @@ mkdir -p Logs/reports
 
 echo "Running live connection test..."
 
-PYTHONPATH=src python Skills/_live_connection_test.py > Logs/reports/live_connection_test.json 2>&1
+PYTHONPATH=src python3 Skills/_live_connection_test.py > Logs/reports/live_connection_test.json 2>&1
 
 echo "Done. Results written to Logs/reports/live_connection_test.json"
 cat Logs/reports/live_connection_test.json
