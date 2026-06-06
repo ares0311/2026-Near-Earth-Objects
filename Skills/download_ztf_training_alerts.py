@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import gzip
 import io
 import json
 import sys
@@ -35,6 +36,7 @@ import tarfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import numpy as np
 import requests
 
 # Ensure src/ is importable when run directly
@@ -55,6 +57,31 @@ def night_tarball_url(date: datetime) -> str:
     # Filename pattern: ztf_public_YYYYMMDD.tar.gz
     date_str = date.strftime("%Y%m%d")
     return f"{ZTF_ARCHIVE_BASE}/ztf_public_{date_str}.tar.gz"
+
+
+def _decompress_ztf_stamp(stamp_bytes: bytes) -> bytes | None:
+    """Decompress a ZTF Avro stampData field to raw float32 bytes.
+
+    ZTF cutout stamps are gzip-compressed FITS files containing a single
+    63×63 float32 image. This function strips the gzip and FITS headers,
+    returning the 63*63*4 = 15876 raw bytes that build_cutout_dataset.py
+    expects to receive via np.frombuffer(..., dtype=np.float32).
+    """
+    if not stamp_bytes:
+        return None
+    try:
+        # Decompress gzip wrapper to get FITS bytes
+        fits_bytes = gzip.decompress(stamp_bytes)
+        # Parse FITS in-memory — astropy reads the header and returns the data array
+        from astropy.io import fits as astrofits  # type: ignore[import]
+        with astrofits.open(io.BytesIO(fits_bytes)) as hdul:
+            arr = hdul[0].data  # type: ignore[index]
+            if arr is None or arr.shape != (63, 63):
+                return None
+            # Convert to float32 and return as raw bytes
+            return arr.astype(np.float32).tobytes()
+    except Exception:
+        return None
 
 
 def parse_avro_alert(avro_bytes: bytes) -> dict | None:
@@ -90,20 +117,28 @@ def parse_avro_alert(avro_bytes: bytes) -> dict | None:
             else:
                 return None  # ambiguous zone — exclude
 
-            # Extract raw cutout bytes (gzip-compressed float32 arrays in ZTF schema)
-            sci_bytes = (record.get("cutoutScience") or {}).get("stampData", b"")
-            ref_bytes = (record.get("cutoutTemplate") or {}).get("stampData", b"")
-            diff_bytes = (record.get("cutoutDifference") or {}).get("stampData", b"")
+            # Extract and decompress cutouts — ZTF stampData is gzip-compressed FITS.
+            # We decompress to raw float32 bytes so build_cutout_dataset.py can decode
+            # them directly with np.frombuffer(..., dtype=np.float32).reshape(63, 63).
+            sci_raw = _decompress_ztf_stamp(
+                (record.get("cutoutScience") or {}).get("stampData", b"")
+            )
+            ref_raw = _decompress_ztf_stamp(
+                (record.get("cutoutTemplate") or {}).get("stampData", b"")
+            )
+            diff_raw = _decompress_ztf_stamp(
+                (record.get("cutoutDifference") or {}).get("stampData", b"")
+            )
 
-            # Skip alerts with missing cutouts — cannot train CNN without all three
-            if not sci_bytes or not ref_bytes or not diff_bytes:
+            # Skip alerts with missing or malformed cutouts
+            if sci_raw is None or ref_raw is None or diff_raw is None:
                 return None
 
-            # Base64-encode for JSON transport; build_cutout_dataset.py decodes these
+            # Base64-encode raw float32 bytes for JSON transport
             obs = {
-                "cutout_science": base64.b64encode(sci_bytes).decode("ascii"),
-                "cutout_reference": base64.b64encode(ref_bytes).decode("ascii"),
-                "cutout_difference": base64.b64encode(diff_bytes).decode("ascii"),
+                "cutout_science": base64.b64encode(sci_raw).decode("ascii"),
+                "cutout_reference": base64.b64encode(ref_raw).decode("ascii"),
+                "cutout_difference": base64.b64encode(diff_raw).decode("ascii"),
                 "rb": rb,
                 "drb": drb,
             }
