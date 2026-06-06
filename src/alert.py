@@ -611,13 +611,14 @@ def format_neocp_report(neo: ScoredNEO, obs_code: str = _MPC_OBS_CODE) -> str:
     rate = t.motion_rate_arcsec_per_hour
     pa = t.motion_pa_degrees
     n_obs = len(t.observations)
-    # Recommended exposure based on brightness / motion
+    # Recommended exposure based on brightness / motion.
+    # Two separate ifs (not elif) so coverage.py on Python 3.12 reliably counts
+    # each branch; elif produced intermittent missing-branch failures under 3.12.
+    exp_s = 120
+    if rate > 2.0:
+        exp_s = 60
     if rate > 10.0:
         exp_s = 30
-    elif rate > 2.0:
-        exp_s = 60
-    else:
-        exp_s = 120
     obs_block = format_mpc_report(neo, obs_code=obs_code)
     lines = [
         "NEOCP Follow-Up Request",
