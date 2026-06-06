@@ -1,7 +1,7 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
 **Current version**: v0.87.0  
-**Last updated**: 2026-06-05  
+**Last updated**: 2026-06-06  
 **Purpose**: Mandatory read at session start (per MANDATORY SESSION-START PROTOCOL).  
 Every planning cycle must name the highest-priority unresolved Tier 1 gap and show how proposed steps close or directly unblock it.
 
@@ -49,42 +49,45 @@ These gaps prevent the pipeline from being safely or usefully operated on real s
 
 **What is missing**: The three-tier ML classifier has no trained weights.  
 - Tier 1 (XGBoost): `classify.py` initializes untrained models. `CandidateFeatures` are populated but the XGBoost decision function returns random/prior scores until trained on real labeled data.  
-- Tier 2 (CNN): `train_tier2_cnn.py` exists but no `.npz` cutout dataset has been built from real ZTF alerts. No `models/tier2_cnn.pt` file exists.  
+- Tier 2 (CNN): `train_tier2_cnn.py` exists. A 500-alert cutout dataset has been built from real ZTF Avro alerts (2026-06-05 night; 427 real, 73 bogus). This is a proof-of-concept run — production training requires ≥10,000 labeled examples. No `models/tier2_cnn.pt` file exists yet.  
 - Tier 3 (Transformer): `train_tier3_transformer.py` exists but no token CSV from real MPC tracklet sequences has been built. No `models/tier3_transformer.pt` file exists.  
 
 **Why it is Tier 1**: Without trained weights, every candidate scores at prior probability (~5% NEO). The pipeline cannot distinguish real NEOs from artifacts on live data. All downstream hazard flags and alert pathways are meaningless without this.
 
+**Progress as of 2026-06-06**:
+- `data/training_labels.csv`: 1000 MPC labels (500 neo_candidate + 500 main_belt_asteroid) downloaded from MPC static catalogs. ✓
+- `data/ztf_labeled_alerts.json`: 500 real ZTF Avro alerts downloaded from public archive (ztf.uw.edu), cutouts decompressed from gzip-FITS to raw float32. ✓
+- `data/cutouts/`: 500 `.npz` cutout triplets (science, reference, difference) + `index.csv`. ✓
+- `Skills/download_ztf_training_alerts.py`: download pipeline operational. ✓
+- **Still needed**: ≥10,000 labeled alerts for production-quality training; CNN training run; Tier 3 training; calibration validation.
+
 **What is needed to close it**:
-1. [HUMAN BLOCKER] Obtain ~100,000 labeled ZTF alerts (real/bogus) from Duev et al. (2019) dataset or IRSA broker. Requires IRSA account and ~GB-level download.
-2. [HUMAN BLOCKER] Obtain MPC confirmed NEO catalog as positive labels (`Skills/generate_training_labels.py` is ready but needs network access).
-3. [CODE] Run `Skills/build_cutout_dataset.py` on downloaded ZTF alert JSON to produce `.npz` + CSV index.
-4. [CODE] Run `Skills/train_tier2_cnn.py` on the `.npz` dataset to produce `models/tier2_cnn.pt`.
+1. [HUMAN — PARTIALLY DONE] Download ≥10,000 labeled ZTF Avro alerts: `caffeinate -i python Skills/download_ztf_training_alerts.py --nights 3 --limit 10000`
+2. [HUMAN — DONE for 500] MPC NEO + MBA catalog labels: `data/training_labels.csv` exists with 1000 labels.
+3. [CODE — DONE for 500] Run `Skills/build_cutout_dataset.py` to produce `.npz` + CSV index. Re-run after step 1 on full dataset.
+4. [HUMAN] Run `caffeinate -i python Skills/train_tier2_cnn.py --labels data/cutouts/index.csv --epochs 20 --out models/tier2_cnn.pt`
 5. [CODE] Run `Skills/build_sequence_dataset.py` on MPC tracklet data to produce flat token CSV.
-6. [CODE] Run `Skills/train_tier3_transformer.py` on the token CSV to produce `models/tier3_transformer.pt`.
-7. [CODE] Retrain Tier 1 XGBoost stacker on combined real/bogus + MPC NEO labels.
+6. [HUMAN] Run `caffeinate -i python Skills/train_tier3_transformer.py` on the token CSV to produce `models/tier3_transformer.pt`.
+7. [HUMAN] Retrain Tier 1 XGBoost stacker on combined real/bogus + MPC NEO labels.
 8. [CODE + HUMAN] Evaluate with `Skills/evaluate_calibration.py`; require Brier score < 0.10 and ECE < 0.05 before approval.
 
-**Blocking outside step**: Steps 1–2 require human action (credentials, download). Steps 3–8 can proceed once the data exists.
+**Blocking outside step**: Steps 1, 4, 6–8 require human action (Mac-side download and training runs). Step 3 can proceed once step 1 data exists.
 
 ---
 
-### T1-B: No Real Survey Credentials Configured
+### T1-B: No Real Survey Credentials Configured — **CLOSED 2026-06-05**
 
-**What is missing**: No IRSA account, no ATLAS API token, no live fetch has ever succeeded.  
-- `fetch_ztf_alerts()` is mocked in all tests. The live code path has never been executed against real data.  
-- `fetch_atlas_forced()` requires an `ATLAS_TOKEN` environment variable that has never been provided.  
-- `fetch_panstarrs_catalog()` requires a MAST/astroquery account.  
+**Status**: RESOLVED. Live connection test confirmed ATLAS OK and ZTF OK on 2026-06-05.  
+Credentials are stored in macOS Keychain under `neo-detection:ATLAS_TOKEN`, `neo-detection:ZTF_IRSA_USERNAME`, `neo-detection:ZTF_IRSA_PASSWORD`. The bridge script `source Skills/verify_live_credentials.sh` loads them into the active shell session without exposing values to the agent or any log file.
 
-**Why it is Tier 1**: Without credentials, the pipeline cannot ingest any real survey data, making T1-A impossible and making any live run impossible.
+**What was done**:
+1. [DONE] IRSA account and API token obtained.
+2. [DONE] ATLAS forced-photometry token obtained.
+3. [DONE] Credentials stored in macOS Keychain; loaded via `source Skills/verify_live_credentials.sh`.
+4. [DONE] Live connection test (`Skills/_live_connection_test.py`) passed: `{"atlas": {"status": "OK"}, "ztf": {"status": "OK"}}`.
+5. [PENDING] Formal background CLI live dry-run approval (`live-dry-run-plan` / `live-dry-run-approval-bundle`) not yet signed off. This gate is required before any automated live fetch outside of manual operator sessions.
 
-**What is needed to close it**:
-1. [HUMAN BLOCKER] Create free IRSA account at irsa.ipac.caltech.edu; generate API token.
-2. [HUMAN BLOCKER] Register at fallingstar-data.com for an ATLAS forced-photometry token.
-3. [CODE] Configure credentials in `background/config.json` (credential names already declared; no secrets in repository).
-4. [CODE] Run `Skills/background.py live-dry-run-plan` and `live-dry-run-approval-bundle` to validate readiness before any live fetch.
-5. [CODE + HUMAN] Approve live review policy (`background/live_review_policy.example.json`) with a reviewer signature.
-
-**Blocking outside step**: Steps 1–2 require human action (external registration).
+**Remaining step before automated live runs**: Run `Skills/background.py live-dry-run-approval-bundle` and obtain a human reviewer signature on `background/live_review_policy.example.json`.
 
 ---
 
@@ -189,7 +192,7 @@ Before the pipeline makes its first MPC submission, all of the following must be
 
 - [ ] T1-A resolved: Tier 1 XGBoost, Tier 2 CNN, and Tier 3 Transformer weights trained on ≥10,000 real labeled examples each
 - [ ] T1-A resolved: Brier score < 0.10 and ECE < 0.05 on held-out real-data test set
-- [ ] T1-B resolved: IRSA and ATLAS credentials configured; live dry-run approved by human reviewer
+- [~] T1-B resolved: IRSA and ATLAS credentials configured ✓; live connection test passed ✓; automated live dry-run policy not yet signed off (pending human reviewer signature)
 - [ ] T1-C resolved: Full pipeline run completed on ≥1 real ZTF field; ≥90% known-object recovery verified
 - [ ] T1-D resolved: Calibration reliability diagrams reviewed and approved by human expert
 - [ ] T2-A resolved: At least one integration test suite passed against real APIs

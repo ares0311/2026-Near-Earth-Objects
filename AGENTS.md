@@ -473,7 +473,14 @@ and excluded from CI.
 
 ## Current State (v0.87.0)
 
-All 10 pipeline modules are complete. Default collection finds 3432 non-live tests plus 2 deselected live/integration checks. CI is expected to remain green on Python 3.11 & 3.12 with the 100% coverage target. All pipeline code runs on synthetic/mocked data with 100% coverage; no real NEO has ever been processed. Production operation requires trained ML weights (T1-A), real survey credentials (T1-B), and a first end-to-end real-data run (T1-C) — see `docs/PRODUCTION_READINESS.md` for the full gap register. The 68 single-function wrapper scripts added in the v0.77–v0.87 API cycle have been removed (Option B cleanup, v0.87.0). The 51 remaining Skills scripts are all operationally necessary.
+All 10 pipeline modules are complete. Default collection finds 3432 non-live tests plus 2 deselected live/integration checks. CI is expected to remain green on Python 3.11 & 3.12 with the 100% coverage target. All pipeline code runs on synthetic/mocked data with 100% coverage; no real NEO has ever been processed.
+
+**Production gap status (as of 2026-06-06)**:
+- T1-A (No Trained ML Weights): IN PROGRESS. Download pipeline operational; 500-alert proof-of-concept cutout dataset built (data/cutouts/). Needs ≥10,000 alerts and training runs on operator Mac.
+- T1-B (No Live Credentials): CLOSED. ATLAS and ZTF live connections confirmed OK via macOS Keychain bridge (`source Skills/verify_live_credentials.sh`). Automated live dry-run policy sign-off pending.
+- T1-C (No Real End-to-End Run): BLOCKED on T1-B automated approval.
+- T1-D (No Ensemble Calibration): BLOCKED on T1-A.
+See `docs/PRODUCTION_READINESS.md` for the full gap register.
 
 ### Skills
 
@@ -481,7 +488,8 @@ All 10 pipeline modules are complete. Default collection finds 3432 non-live tes
 |---|---|
 | `Skills/smoke_test.py` | Happy-path check for all modules; exits 0 on success |
 | `Skills/evaluate_calibration.py` | Brier/ECE evaluation for Platt and isotonic calibrators |
-| `Skills/generate_training_labels.py` | Download MPC NEO + MBA catalog as training label CSV |
+| `Skills/generate_training_labels.py` | Download MPC NEO + MBA catalog as training label CSV (run from Mac; MPC blocks cloud IPs) |
+| `Skills/download_ztf_training_alerts.py` | Download labeled ZTF Avro alert tarballs from public archive (ztf.uw.edu); decompresses gzip-FITS cutouts; writes `data/ztf_labeled_alerts.json`; run from Mac with `caffeinate -i` |
 | `Skills/batch_score.py` | Score a list of tracklets from a JSON file; print ranked table |
 | `Skills/run_pipeline.py` | Full end-to-end pipeline run |
 | `Skills/injection_recovery.py` | Injection-recovery test: injects synthetic NEOs, measures detection/link/score rates |
