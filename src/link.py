@@ -30,7 +30,17 @@ __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
            "compute_along_track_error",
            "compute_observation_rate",
            "compute_tracklet_brightness_trend",
-           "compute_arc_endpoint_separation"]
+           "compute_arc_endpoint_separation",
+           "compute_pa_circular_std",
+           "compute_sky_coverage_area",
+           "compute_night_gap_statistics",
+           "compute_field_tracklet_density",
+           "estimate_observation_cadence",
+           "compute_tracklet_span_nights",
+           "compute_position_angle_dispersion",
+           "compute_arc_coverage_fraction",
+           "compute_max_observation_gap",
+           "compute_inter_night_motion"]
 
 import math
 import uuid
@@ -1502,3 +1512,240 @@ def compute_arc_endpoint_separation(tracklet: object) -> float | None:
     )
     cos_sep = max(-1.0, min(1.0, cos_sep))
     return math.degrees(math.acos(cos_sep)) * 3600.0
+
+
+def compute_pa_circular_std(tracklets: list) -> float | None:
+    """Return the circular standard deviation of motion position angles across tracklets.
+
+    Uses the mean-resultant-vector formula: σ = sqrt(-2 * ln(R̄)) where
+    R̄ = |Σ exp(i·θ)| / N.  Angles are taken from tracklet.motion_pa_degrees.
+    Returns None if fewer than 2 tracklets have a valid PA.
+    """
+    pas = []
+    for t in tracklets:
+        pa = getattr(t, "motion_pa_degrees", None)
+        if pa is not None:
+            pas.append(math.radians(float(pa)))
+    if len(pas) < 2:
+        return None
+    sin_sum = sum(math.sin(a) for a in pas)
+    cos_sum = sum(math.cos(a) for a in pas)
+    r_bar = math.hypot(sin_sum, cos_sum) / len(pas)
+    r_bar = min(r_bar, 1.0 - 1e-12)
+    return float(math.degrees(math.sqrt(-2.0 * math.log(r_bar))))
+
+
+def compute_sky_coverage_area(tracklets: list) -> float:
+    """Return the approximate sky area covered by a list of tracklets in square degrees.
+
+    Computes the bounding box (ΔRA × ΔDec) in degrees multiplied by cos(mean Dec)
+    to account for the spherical projection.  Returns 0.0 if fewer than 2 tracklets
+    have valid position data or if all positions are identical.
+
+    Positions are taken from each tracklet's first observation (``observations[0]``).
+    """
+    ras: list[float] = []
+    decs: list[float] = []
+    for t in tracklets:
+        obs_seq = getattr(t, "observations", None) or ()
+        if not obs_seq:
+            continue
+        first = obs_seq[0]
+        ra = getattr(first, "ra", None)
+        dec = getattr(first, "dec", None)
+        if ra is not None and dec is not None:
+            ras.append(float(ra))
+            decs.append(float(dec))
+    if len(ras) < 2:
+        return 0.0
+    dra = max(ras) - min(ras)
+    ddec = max(decs) - min(decs)
+    mean_dec_rad = math.radians(sum(decs) / len(decs))
+    return float(dra * math.cos(mean_dec_rad) * ddec)
+
+
+def compute_night_gap_statistics(tracklets: list) -> dict:
+    """Return statistics on inter-night gaps across a list of tracklets.
+
+    For each tracklet, computes the gap (in integer nights) between consecutive
+    observations.  Aggregates all gaps across all tracklets and returns:
+
+      - ``mean_gap_nights``: mean inter-night gap (float) or ``None`` if no gaps
+      - ``max_gap_nights``: maximum inter-night gap (int) or ``None`` if no gaps
+      - ``n_tracklets``: number of tracklets examined
+
+    A "night" is defined as the integer part of an observation's JD.
+    Single-observation tracklets contribute no gaps.
+    """
+    all_gaps: list[int] = []
+    for t in tracklets:
+        obs_seq = getattr(t, "observations", None) or ()
+        jds = [getattr(o, "jd", None) for o in obs_seq]
+        nights_set = {int(float(j)) for j in jds if j is not None}
+        nights = sorted(nights_set)
+        for i in range(1, len(nights)):
+            all_gaps.append(nights[i] - nights[i - 1])
+    return {
+        "mean_gap_nights": float(sum(all_gaps) / len(all_gaps)) if all_gaps else None,
+        "max_gap_nights": max(all_gaps) if all_gaps else None,
+        "n_tracklets": len(tracklets),
+    }
+
+
+def compute_field_tracklet_density(
+    tracklets: list,
+    field_radius_deg: float,
+) -> float | None:
+    """Return the number of tracklets per square degree for a circular survey field.
+
+    Uses the solid-angle formula: Ω = 2π(1−cos(r)) steradians, converted to
+    square degrees.  Returns ``None`` if *field_radius_deg* ≤ 0.
+
+    Unlike :func:`compute_tracklet_sky_density` (which measures local crowding),
+    this function treats *tracklets* as the complete set within the field and
+    *field_radius_deg* as the field half-angle.
+    """
+    if field_radius_deg <= 0.0:
+        return None
+    r_rad = math.radians(abs(field_radius_deg))
+    steradians = 2.0 * math.pi * (1.0 - math.cos(r_rad))
+    sq_deg = steradians * (180.0 / math.pi) ** 2
+    return float(len(tracklets) / sq_deg) if sq_deg > 0.0 else None
+
+
+def estimate_observation_cadence(tracklet: object) -> float | None:
+    """Return the mean time between consecutive observations in hours.
+
+    Computes the mean of all consecutive observation time-deltas
+    ``(jd[i+1] - jd[i]) * 24`` for the sorted observation sequence.
+    Returns ``None`` if the tracklet has fewer than 2 observations or if
+    observations cannot be accessed.
+    """
+    obs = getattr(tracklet, "observations", None)
+    if not obs or len(obs) < 2:
+        return None
+    try:
+        jds = sorted(float(o.jd) for o in obs)
+    except Exception:
+        return None
+    deltas = [(jds[i + 1] - jds[i]) * 24.0 for i in range(len(jds) - 1)]
+    return float(sum(deltas) / len(deltas))
+
+
+def compute_tracklet_span_nights(tracklet: object) -> int:
+    """Return the number of distinct integer nights spanned by a tracklet.
+
+    Counts the number of unique ``int(floor(jd))`` values across all
+    observations.  Returns 0 if the tracklet has no observations or if
+    observations cannot be accessed.
+    """
+    import math
+
+    obs = getattr(tracklet, "observations", None)
+    if not obs:
+        return 0
+    try:
+        nights = {int(math.floor(float(o.jd))) for o in obs}
+    except Exception:
+        return 0
+    return len(nights)
+
+
+def compute_position_angle_dispersion(tracklet: object) -> float | None:
+    """Return the standard deviation of pairwise motion position angles in degrees.
+
+    For each consecutive pair of observations, computes the position angle
+    of the apparent motion using ``compute_motion_vector``, then returns the
+    circular standard deviation of those angles.  Returns ``None`` if the
+    tracklet has fewer than 2 observations or if angles cannot be computed.
+    """
+    import math
+
+    from detect import compute_motion_vector
+
+    obs = getattr(tracklet, "observations", None)
+    if not obs or len(obs) < 2:
+        return None
+    obs_list = list(obs)
+    angles = []
+    for i in range(len(obs_list) - 1):
+        try:
+            mv = compute_motion_vector(obs_list[i], obs_list[i + 1])
+            angles.append(mv["pa_deg"])
+        except Exception:
+            continue
+    if len(angles) < 1:
+        return None
+    if len(angles) == 1:
+        return 0.0
+    mean_angle = sum(angles) / len(angles)
+    variance = sum((a - mean_angle) ** 2 for a in angles) / len(angles)
+    return float(math.sqrt(variance))
+
+
+def compute_arc_coverage_fraction(tracklet: object, survey_window_days: float) -> float:
+    """Arc coverage fraction: arc_days / survey_window_days, clamped to [0, 1].
+
+    A value of 1.0 means the tracklet spans the full survey window.
+    Returns 0.0 if the survey window is non-positive or arc_days is None.
+    """
+    if survey_window_days <= 0.0:
+        return 0.0
+    arc_days = getattr(tracklet, "arc_days", None)
+    if arc_days is None:
+        return 0.0
+    return float(min(1.0, max(0.0, arc_days / survey_window_days)))
+
+
+def compute_max_observation_gap(tracklet: object) -> float | None:
+    """Maximum gap in days between consecutive observations in a tracklet.
+
+    Returns ``None`` for fewer than 2 observations.  Observations are sorted
+    by JD before computing gaps.
+    """
+    obs = getattr(tracklet, "observations", None)
+    if not obs or len(obs) < 2:
+        return None
+    jds = sorted(float(o.jd) for o in obs)
+    gaps = [jds[i + 1] - jds[i] for i in range(len(jds) - 1)]
+    return float(max(gaps))
+
+
+def compute_inter_night_motion(tracklet: object) -> float | None:
+    """Mean angular displacement between consecutive distinct nights in arcsec/night.
+
+    Groups observations by integer JD night, computes the great-circle
+    separation between successive night centroids (mean RA, mean Dec), and
+    returns the mean separation in arcsec.  Returns ``None`` for fewer than
+    2 distinct nights.
+    """
+    obs = getattr(tracklet, "observations", None)
+    if not obs or len(obs) < 2:
+        return None
+
+    nights: dict[int, list] = {}
+    for o in obs:
+        night = int(float(o.jd))
+        nights.setdefault(night, []).append(o)
+
+    if len(nights) < 2:
+        return None
+
+    sorted_nights = sorted(nights.keys())
+    centroids = []
+    for night in sorted_nights:
+        group = nights[night]
+        mean_ra = sum(float(o.ra_deg) for o in group) / len(group)
+        mean_dec = sum(float(o.dec_deg) for o in group) / len(group)
+        centroids.append((mean_ra, mean_dec))
+
+    separations = []
+    for i in range(len(centroids) - 1):
+        ra1, dec1 = centroids[i]
+        ra2, dec2 = centroids[i + 1]
+        dra = (ra2 - ra1) * math.cos(math.radians((dec1 + dec2) / 2.0))
+        ddec = dec2 - dec1
+        sep_deg = math.hypot(dra, ddec)
+        separations.append(sep_deg * 3600.0)
+
+    return float(sum(separations) / len(separations))

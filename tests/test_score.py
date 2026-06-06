@@ -2604,3 +2604,549 @@ class TestComputeMoidHazardScore:
         sys.path.insert(0, "src")
         import score
         assert "compute_moid_hazard_score" in score.__all__
+
+
+class TestComputeSizeEstimateRange:
+    def _make_neo(self, h_mag):
+        from types import SimpleNamespace
+        hazard = SimpleNamespace(absolute_magnitude_h=h_mag)
+        return SimpleNamespace(hazard=hazard)
+
+    def test_known_h(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_size_estimate_range
+        neo = self._make_neo(22.0)
+        rng = compute_size_estimate_range(neo)
+        assert rng["min_m"] is not None
+        assert rng["max_m"] is not None
+        assert rng["min_m"] < rng["max_m"]
+
+    def test_no_h_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_size_estimate_range
+        neo = self._make_neo(None)
+        rng = compute_size_estimate_range(neo)
+        assert rng["min_m"] is None
+        assert rng["max_m"] is None
+
+    def test_brighter_larger(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_size_estimate_range
+        # Lower H = brighter = larger object
+        small = compute_size_estimate_range(self._make_neo(25.0))
+        large = compute_size_estimate_range(self._make_neo(18.0))
+        assert large["max_m"] > small["max_m"]
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        assert "compute_size_estimate_range" in score.__all__
+
+
+class TestComputePriorityHistogram:
+    def _make_neo(self, priority):
+        from types import SimpleNamespace
+
+        meta = SimpleNamespace(discovery_priority=priority)
+        return SimpleNamespace(metadata=meta)
+
+    def test_empty_list(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_priority_histogram
+
+        h = compute_priority_histogram([])
+        assert h["n_total"] == 0
+        assert all(c == 0 for c in h["counts"])
+
+    def test_counts_sum_to_n_total(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_priority_histogram
+
+        neos = [self._make_neo(p) for p in [0.1, 0.3, 0.5, 0.7, 0.9]]
+        h = compute_priority_histogram(neos, n_bins=5)
+        assert sum(h["counts"]) == 5
+        assert h["n_total"] == 5
+
+    def test_bin_edges_correct_length(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_priority_histogram
+
+        h = compute_priority_histogram([], n_bins=10)
+        assert len(h["bin_edges"]) == 11
+        assert len(h["counts"]) == 10
+
+    def test_value_1_goes_to_last_bin(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_priority_histogram
+
+        neos = [self._make_neo(1.0)]
+        h = compute_priority_histogram(neos, n_bins=5)
+        assert h["counts"][-1] == 1
+
+    def test_none_priority_excluded(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from score import compute_priority_histogram
+
+        neos = [SimpleNamespace(metadata=SimpleNamespace(discovery_priority=None))]
+        h = compute_priority_histogram(neos)
+        assert h["n_total"] == 0
+
+    def test_no_metadata_excluded(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from score import compute_priority_histogram
+
+        neos = [SimpleNamespace(metadata=None)]
+        h = compute_priority_histogram(neos)
+        assert h["n_total"] == 0
+
+    def test_n_bins_clamped_to_one(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_priority_histogram
+
+        h = compute_priority_histogram([], n_bins=0)
+        assert len(h["counts"]) == 1
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        assert "compute_priority_histogram" in score.__all__
+
+
+class TestComputeAlertUrgencyScore:
+    def _make_neo(self, moid=None, discovery_priority=None, orbit_quality_score=None):
+        from types import SimpleNamespace
+
+        hazard = SimpleNamespace(moid_au=moid)
+        meta = SimpleNamespace(discovery_priority=discovery_priority)
+        feats = SimpleNamespace(orbit_quality_score=orbit_quality_score)
+        return SimpleNamespace(hazard=hazard, metadata=meta, features=feats)
+
+    def test_all_unknown_returns_half(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_alert_urgency_score
+
+        neo = self._make_neo()
+        score = compute_alert_urgency_score(neo)
+        # 0.4*0.5 + 0.4*0.5 + 0.2*0.5 = 0.5
+        assert abs(score - 0.5) < 1e-9
+
+    def test_pha_candidate_high_score(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_alert_urgency_score
+
+        neo = self._make_neo(moid=0.01, discovery_priority=0.9, orbit_quality_score=1.0)
+        score = compute_alert_urgency_score(neo)
+        assert score > 0.8
+
+    def test_distant_moid_lowers_score(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_alert_urgency_score
+
+        neo_near = self._make_neo(moid=0.01, discovery_priority=0.5, orbit_quality_score=0.5)
+        neo_far = self._make_neo(moid=0.5, discovery_priority=0.5, orbit_quality_score=0.5)
+        assert compute_alert_urgency_score(neo_near) > compute_alert_urgency_score(neo_far)
+
+    def test_result_clamped_to_unit_interval(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_alert_urgency_score
+
+        neo = self._make_neo(moid=0.0, discovery_priority=1.0, orbit_quality_score=1.0)
+        score = compute_alert_urgency_score(neo)
+        assert 0.0 <= score <= 1.0
+
+    def test_no_hazard_attr(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from score import compute_alert_urgency_score
+
+        neo = SimpleNamespace(hazard=None, metadata=None, features=None)
+        score = compute_alert_urgency_score(neo)
+        assert 0.0 <= score <= 1.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        assert "compute_alert_urgency_score" in score.__all__
+
+
+class TestFilterByDiscoveryPriority:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import filter_by_discovery_priority
+        self.fn = filter_by_discovery_priority
+
+    def test_basic(self, scored_neo):
+        result = self.fn([scored_neo], min_priority=0.0)
+        assert len(result) == 1
+
+    def test_filters_below_threshold(self, scored_neo):
+        result = self.fn([scored_neo], min_priority=1.1)
+        assert len(result) == 0
+
+    def test_empty_list(self):
+        assert self.fn([]) == []
+
+    def test_no_metadata(self):
+        from types import SimpleNamespace
+        neo = SimpleNamespace(metadata=None)
+        assert self.fn([neo], min_priority=0.5) == []
+
+    def test_none_priority_excluded(self):
+        from types import SimpleNamespace
+        neo = SimpleNamespace(metadata=SimpleNamespace(discovery_priority=None))
+        assert self.fn([neo], min_priority=0.5) == []
+
+    def test_exact_threshold_included(self):
+        from types import SimpleNamespace
+        neo = SimpleNamespace(metadata=SimpleNamespace(discovery_priority=0.5))
+        result = self.fn([neo], min_priority=0.5)
+        assert len(result) == 1
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        assert "filter_by_discovery_priority" in score.__all__
+
+
+class TestGetTopCandidates:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import get_top_candidates
+        self.fn = get_top_candidates
+
+    def test_basic(self, scored_neo):
+        result = self.fn([scored_neo])
+        assert len(result) == 1
+
+    def test_top_n(self, scored_neo):
+        result = self.fn([scored_neo, scored_neo, scored_neo], n=2)
+        assert len(result) == 2
+
+    def test_empty(self):
+        assert self.fn([]) == []
+
+    def test_n_larger_than_list(self, scored_neo):
+        result = self.fn([scored_neo], n=100)
+        assert len(result) == 1
+
+    def test_n_zero(self, scored_neo):
+        result = self.fn([scored_neo], n=0)
+        assert result == []
+
+    def test_sorted_by_priority(self):
+        from types import SimpleNamespace
+        high = SimpleNamespace(metadata=SimpleNamespace(discovery_priority=0.9))
+        low = SimpleNamespace(metadata=SimpleNamespace(discovery_priority=0.1))
+        result = self.fn([low, high], n=2)
+        assert result[0] is high
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        assert "get_top_candidates" in score.__all__
+
+
+class TestComputePhaFraction:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from score import compute_pha_fraction
+        self.fn = compute_pha_fraction
+
+    def test_empty(self):
+        assert self.fn([]) == 0.0
+
+    def test_all_pha(self):
+        from types import SimpleNamespace
+        neo = SimpleNamespace(hazard=SimpleNamespace(hazard_flag="pha_candidate"))
+        assert self.fn([neo, neo]) == 1.0
+
+    def test_none_pha(self):
+        from types import SimpleNamespace
+        neo = SimpleNamespace(hazard=SimpleNamespace(hazard_flag="nominal"))
+        assert self.fn([neo]) == 0.0
+
+    def test_mixed(self):
+        from types import SimpleNamespace
+        pha = SimpleNamespace(hazard=SimpleNamespace(hazard_flag="pha_candidate"))
+        nom = SimpleNamespace(hazard=SimpleNamespace(hazard_flag="nominal"))
+        result = self.fn([pha, nom])
+        assert abs(result - 0.5) < 1e-9
+
+    def test_no_hazard_attr(self):
+        from types import SimpleNamespace
+        neo = SimpleNamespace()
+        assert self.fn([neo]) == 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        assert "compute_pha_fraction" in score.__all__
+
+
+class TestCountByAlertPathway:
+    fn_name = "count_by_alert_pathway"
+
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        return getattr(score, self.fn_name)
+
+    def _neo(self, pathway):
+        from types import SimpleNamespace
+        hazard = SimpleNamespace(alert_pathway=pathway)
+        return SimpleNamespace(hazard=hazard)
+
+    def test_empty_list(self):
+        assert self._fn()([]) == {}
+
+    def test_single_pathway(self):
+        neos = [self._neo("mpc_submission"), self._neo("mpc_submission")]
+        result = self._fn()(neos)
+        assert result == {"mpc_submission": 2}
+
+    def test_multiple_pathways(self):
+        neos = [
+            self._neo("mpc_submission"),
+            self._neo("internal_candidate"),
+            self._neo("internal_candidate"),
+            self._neo("known_object"),
+        ]
+        result = self._fn()(neos)
+        assert result["mpc_submission"] == 1
+        assert result["internal_candidate"] == 2
+        assert result["known_object"] == 1
+
+    def test_no_hazard_attr(self):
+        from types import SimpleNamespace
+        neo = SimpleNamespace()
+        result = self._fn()([neo])
+        assert result == {"unknown": 1}
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        assert "count_by_alert_pathway" in score.__all__
+
+
+class TestComputeWeightedHazardIndex:
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        return score.compute_weighted_hazard_index
+
+    def _neo(self, moid=None, quality_code=None, hazard_flag="nominal"):
+        from types import SimpleNamespace
+        hazard = SimpleNamespace(
+            moid_au=moid, hazard_flag=hazard_flag,
+            alert_pathway="internal_candidate",
+            estimated_diameter_m=None,
+            absolute_magnitude_h=None,
+            neo_class="unknown",
+            explanation=None,
+        )
+        meta = SimpleNamespace(
+            discovery_priority=0.5,
+            quality_code=quality_code,
+            followup_value=0.3,
+            scientific_interest=0.2,
+            close_approach_au=moid,
+            scoring_model_version="test",
+            pipeline_version="test",
+        )
+        tracklet = SimpleNamespace(
+            object_id="T1",
+            observations=(),
+            arc_days=1.0,
+            motion_rate_arcsec_per_hour=1.0,
+            motion_pa_degrees=45.0,
+        )
+        features = SimpleNamespace(
+            real_bogus_score=0.9, streak_score=None, psf_quality_score=None,
+            motion_consistency_score=None, arc_coverage_score=None,
+            nights_observed_score=None, brightness_score=None,
+            color_score=None, lightcurve_variability_score=None,
+            orbit_quality_score=None, moid_score=None,
+            neo_class_confidence=None, pha_flag_confidence=None,
+            known_object_score=None,
+        )
+        posterior = SimpleNamespace(
+            neo_candidate=0.5, known_object=0.1, main_belt_asteroid=0.2,
+            stellar_artifact=0.1, other_solar_system=0.1,
+        )
+        return SimpleNamespace(
+            tracklet=tracklet, features=features,
+            posterior=posterior, hazard=hazard, metadata=meta,
+        )
+
+    def test_returns_float_in_range(self):
+        result = self._fn()(self._neo(moid=0.02, quality_code=2))
+        assert 0.0 <= result <= 1.0
+
+    def test_no_moid_uses_sentinel(self):
+        result = self._fn()(self._neo(moid=None, quality_code=2))
+        assert 0.0 <= result <= 1.0
+
+    def test_low_moid_high_quality_higher_score(self):
+        low = self._fn()(self._neo(moid=0.001, quality_code=4))
+        high_moid = self._fn()(self._neo(moid=0.1, quality_code=1))
+        assert low > high_moid
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        assert "compute_weighted_hazard_index" in score.__all__
+
+
+class TestComputeWeightedHazardIndexNoneQuality:
+    """Cover orbit_q=0.0 branch when quality_code is None."""
+
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        return score.compute_weighted_hazard_index
+
+    def test_none_quality_code(self):
+        from types import SimpleNamespace
+        hazard = SimpleNamespace(
+            moid_au=0.02, hazard_flag="nominal",
+            alert_pathway="internal_candidate",
+            estimated_diameter_m=None, absolute_magnitude_h=None,
+            neo_class="unknown", explanation=None,
+        )
+        meta = SimpleNamespace(
+            discovery_priority=0.5, quality_code=None,
+            followup_value=0.3, scientific_interest=0.2,
+            close_approach_au=0.02, scoring_model_version="test",
+            pipeline_version="test",
+        )
+        tracklet = SimpleNamespace(
+            object_id="T1", observations=(), arc_days=1.0,
+            motion_rate_arcsec_per_hour=1.0, motion_pa_degrees=45.0,
+        )
+        features = SimpleNamespace(
+            real_bogus_score=0.9, streak_score=None, psf_quality_score=None,
+            motion_consistency_score=None, arc_coverage_score=None,
+            nights_observed_score=None, brightness_score=None,
+            color_score=None, lightcurve_variability_score=None,
+            orbit_quality_score=None, moid_score=None,
+            neo_class_confidence=None, pha_flag_confidence=None,
+            known_object_score=None,
+        )
+        posterior = SimpleNamespace(
+            neo_candidate=0.5, known_object=0.1, main_belt_asteroid=0.2,
+            stellar_artifact=0.1, other_solar_system=0.1,
+        )
+        neo = SimpleNamespace(
+            tracklet=tracklet, features=features,
+            posterior=posterior, hazard=hazard, metadata=meta,
+        )
+        result = self._fn()(neo)
+        assert 0.0 <= result <= 1.0
+
+
+class TestComputeCandidatePrioritySpread:
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        return score.compute_candidate_priority_spread
+
+    def _neo(self, priority):
+        from types import SimpleNamespace
+        meta = SimpleNamespace(discovery_priority=priority)
+        return SimpleNamespace(metadata=meta)
+
+    def test_empty_returns_zero(self):
+        assert self._fn()([]) == 0.0
+
+    def test_single_returns_zero(self):
+        assert self._fn()([self._neo(0.5)]) == 0.0
+
+    def test_identical_priorities_returns_zero(self):
+        assert self._fn()([self._neo(0.5), self._neo(0.5)]) == 0.0
+
+    def test_spread_positive(self):
+        result = self._fn()([self._neo(0.1), self._neo(0.9)])
+        assert result > 0.0
+
+    def test_none_priority_excluded(self):
+        neos = [self._neo(None), self._neo(0.5), self._neo(None)]
+        assert self._fn()(neos) == 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import score
+        assert "compute_candidate_priority_spread" in score.__all__
+
+
+class TestComputeBatchPriorityStats:
+    def test_with_scored_neos(self, scored_neo):
+        from score import compute_batch_priority_stats
+        result = compute_batch_priority_stats([scored_neo])
+        assert "mean" in result
+        assert "std" in result
+        assert "min" in result
+        assert "max" in result
+
+    def test_empty_returns_empty(self):
+        from score import compute_batch_priority_stats
+        assert compute_batch_priority_stats([]) == {}
+
+    def test_no_priority_returns_empty(self):
+        from types import SimpleNamespace
+
+        from score import compute_batch_priority_stats
+        neo = SimpleNamespace(metadata=SimpleNamespace(discovery_priority=None))
+        assert compute_batch_priority_stats([neo]) == {}
+
+    def test_single_neo_std_zero(self, scored_neo):
+        from score import compute_batch_priority_stats
+        result = compute_batch_priority_stats([scored_neo])
+        assert result["std"] == pytest.approx(0.0)
+        assert result["min"] == result["max"]
+
+    def test_two_neos_range(self):
+        from types import SimpleNamespace
+
+        from score import compute_batch_priority_stats
+        neo1 = SimpleNamespace(metadata=SimpleNamespace(discovery_priority=0.2))
+        neo2 = SimpleNamespace(metadata=SimpleNamespace(discovery_priority=0.8))
+        result = compute_batch_priority_stats([neo1, neo2])
+        assert result["min"] == pytest.approx(0.2)
+        assert result["max"] == pytest.approx(0.8)
+        assert result["mean"] == pytest.approx(0.5)

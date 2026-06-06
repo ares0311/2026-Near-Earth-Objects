@@ -35,6 +35,16 @@ __all__ = [
     "compute_positive_rate",
     "compute_weighted_brier_score",
     "compute_calibration_gap",
+    "compute_calibration_gain",
+    "compute_calibration_bias",
+    "compute_overconfidence_fraction",
+    "compute_max_calibration_error",
+    "compute_calibration_resolution",
+    "compute_fraction_calibrated",
+    "compute_calibration_spread",
+    "compute_sharpness",
+    "compute_positive_predictive_value",
+    "compute_negative_predictive_value",
 ]
 
 import math
@@ -1407,3 +1417,276 @@ def compute_calibration_gap(probs: list[float], labels: list[float], n_bins: int
         frac_pos = bin_pos[idx] / cnt
         gaps.append(abs(mean_pred - frac_pos))
     return float(sum(gaps) / len(gaps)) if gaps else 0.0
+
+
+def compute_calibration_gain(
+    raw_probs: list[float],
+    cal_probs: list[float],
+    labels: list[float],
+) -> float:
+    """Return the Brier score reduction achieved by calibration.
+
+    Gain = Brier(raw_probs, labels) - Brier(cal_probs, labels).
+    Positive gain means calibration improved the predictions.
+    Returns 0.0 if either list is empty or lengths differ.
+    """
+    if not raw_probs or not cal_probs or not labels:
+        return 0.0
+    if len(raw_probs) != len(cal_probs) or len(raw_probs) != len(labels):
+        return 0.0
+    p_raw = np.array(raw_probs, dtype=float)
+    p_cal = np.array(cal_probs, dtype=float)
+    y = np.array(labels, dtype=float)
+    raw_brier = brier_score(p_raw, y)
+    cal_brier = brier_score(p_cal, y)
+    return float(raw_brier - cal_brier)
+
+
+def compute_calibration_bias(probs: list, labels: list) -> float:
+    """Return the mean calibration bias: mean(predicted_prob) - fraction_positive.
+
+    A positive bias means the model is over-confident (predicts higher probabilities
+    than the observed positive rate).  A negative bias means under-confidence.
+    Returns 0.0 if the input lists are empty or have different lengths.
+    """
+    if not probs or not labels:
+        return 0.0
+    if len(probs) != len(labels):
+        return 0.0
+    p_arr = np.array(probs, dtype=float)
+    y_arr = np.array(labels, dtype=float)
+    return float(np.mean(p_arr) - np.mean(y_arr))
+
+
+def compute_overconfidence_fraction(
+    probs: list,
+    labels: list,
+    threshold: float = 0.7,
+) -> float:
+    """Return the fraction of high-confidence predictions that are incorrect.
+
+    A prediction is "high-confidence" if its probability ≥ *threshold*.
+    Among those, the fraction where the true label is 0 (wrong prediction) is
+    returned.
+
+    Returns ``0.0`` if the input lists are empty, have different lengths, or
+    no prediction exceeds the threshold.
+    """
+    if not probs or not labels:
+        return 0.0
+    if len(probs) != len(labels):
+        return 0.0
+    high_conf = [(p, y) for p, y in zip(probs, labels) if float(p) >= threshold]
+    if not high_conf:
+        return 0.0
+    wrong = sum(1 for _, y in high_conf if float(y) == 0.0)
+    return float(wrong / len(high_conf))
+
+
+def compute_max_calibration_error(
+    probs: list,
+    labels: list,
+    n_bins: int = 10,
+) -> float:
+    """Return the Maximum Calibration Error (MCE) across equal-width bins.
+
+    MCE = max over non-empty bins of |mean_predicted_prob − fraction_positive|.
+
+    Bins span [0, 1] with width 1/n_bins.  Empty bins are skipped.
+    Returns 0.0 for empty input, mismatched lengths, or n_bins < 1.
+    """
+    if not probs or not labels or len(probs) != len(labels):
+        return 0.0
+    n_bins = max(1, int(n_bins))
+    bin_probs: list[list[float]] = [[] for _ in range(n_bins)]
+    bin_labels: list[list[float]] = [[] for _ in range(n_bins)]
+    for p, y in zip(probs, labels):
+        idx = int(float(p) * n_bins)
+        if idx >= n_bins:
+            idx = n_bins - 1
+        bin_probs[idx].append(float(p))
+        bin_labels[idx].append(float(y))
+    mce = 0.0
+    for bp, bl in zip(bin_probs, bin_labels):
+        if not bp:
+            continue
+        gap = abs(sum(bp) / len(bp) - sum(bl) / len(bl))
+        if gap > mce:
+            mce = gap
+    return float(mce)
+
+
+def compute_calibration_resolution(
+    probs: list,
+    labels: list,
+    n_bins: int = 10,
+) -> float:
+    """Return a calibration resolution score in [0, 1].
+
+    Resolution measures how much the per-bin fraction_positive values deviate
+    from the overall base rate: high resolution means the model separates
+    positives from negatives well.
+
+    .. math::
+
+        \\text{Resolution} = \\frac{1}{n} \\sum_k n_k (\\bar{y}_k - \\bar{y})^2
+
+    where :math:`\\bar{y}` is the overall fraction of positives,
+    :math:`\\bar{y}_k` is the fraction of positives in bin *k*, and :math:`n_k`
+    is the number of samples in that bin.  The result is normalized by the
+    maximum possible value (base_rate × (1 − base_rate)), clamped to [0, 1].
+    Returns 0.0 for empty input, mismatched lengths, or n_bins < 1.
+    """
+    if not probs or not labels or len(probs) != len(labels):
+        return 0.0
+    n_bins = max(1, int(n_bins))
+    n = len(probs)
+    base_rate = sum(float(y) for y in labels) / n
+    bin_labels: list[list[float]] = [[] for _ in range(n_bins)]
+    for p, y in zip(probs, labels):
+        idx = int(float(p) * n_bins)
+        if idx >= n_bins:
+            idx = n_bins - 1
+        bin_labels[idx].append(float(y))
+    resolution = 0.0
+    for bl in bin_labels:
+        if not bl:
+            continue
+        frac = sum(bl) / len(bl)
+        resolution += len(bl) * (frac - base_rate) ** 2
+    resolution /= n
+    normalizer = base_rate * (1.0 - base_rate)
+    if normalizer <= 0.0:
+        return 0.0
+    return float(min(1.0, resolution / normalizer))
+
+
+def compute_fraction_calibrated(
+    probs: list,
+    labels: list,
+    threshold: float = 0.1,
+    n_bins: int = 10,
+) -> float:
+    """Return the fraction of non-empty bins within *threshold* of perfect calibration.
+
+    For each non-empty equal-width bin, computes |mean_predicted_prob −
+    fraction_positive|.  Returns the fraction of non-empty bins where this
+    error is ≤ *threshold*.
+
+    Returns 0.0 for empty input, mismatched lengths, or no non-empty bins.
+    """
+    if not probs or not labels or len(probs) != len(labels):
+        return 0.0
+    n_bins = max(1, int(n_bins))
+    bin_probs: list[list[float]] = [[] for _ in range(n_bins)]
+    bin_labels: list[list[float]] = [[] for _ in range(n_bins)]
+    for p, y in zip(probs, labels):
+        idx = int(float(p) * n_bins)
+        if idx >= n_bins:
+            idx = n_bins - 1
+        bin_probs[idx].append(float(p))
+        bin_labels[idx].append(float(y))
+    n_calibrated = 0
+    n_nonempty = 0
+    for bp, bl in zip(bin_probs, bin_labels):
+        if not bp:
+            continue
+        n_nonempty += 1
+        mean_p = sum(bp) / len(bp)
+        frac_pos = sum(bl) / len(bl)
+        if abs(mean_p - frac_pos) <= threshold:
+            n_calibrated += 1
+    return float(n_calibrated) / n_nonempty if n_nonempty > 0 else 0.0
+
+
+def compute_calibration_spread(
+    probs: list,
+    labels: list,
+    n_bins: int = 10,
+) -> float:
+    """Return the standard deviation of bin-wise calibration errors.
+
+    For each non-empty equal-width bin, computes |mean_predicted_prob −
+    fraction_positive|.  Returns the standard deviation of these per-bin
+    errors.  High spread indicates inconsistent calibration across the
+    probability range.
+
+    Returns 0.0 for empty input, mismatched lengths, fewer than 2 non-empty
+    bins, or n_bins < 1.
+    """
+    if not probs or not labels or len(probs) != len(labels):
+        return 0.0
+    n_bins = max(1, int(n_bins))
+    bin_probs: list[list[float]] = [[] for _ in range(n_bins)]
+    bin_labels: list[list[float]] = [[] for _ in range(n_bins)]
+    for p, y in zip(probs, labels):
+        idx = int(float(p) * n_bins)
+        if idx >= n_bins:
+            idx = n_bins - 1
+        bin_probs[idx].append(float(p))
+        bin_labels[idx].append(float(y))
+    errors = []
+    for bp, bl in zip(bin_probs, bin_labels):
+        if not bp:
+            continue
+        errors.append(abs(sum(bp) / len(bp) - sum(bl) / len(bl)))
+    if len(errors) < 2:
+        return 0.0
+    mean_err = sum(errors) / len(errors)
+    variance = sum((e - mean_err) ** 2 for e in errors) / len(errors)
+    import math
+    return float(math.sqrt(variance))
+
+
+def compute_sharpness(probs: list[float]) -> float:
+    """Mean squared deviation of predicted probabilities from 0.5.
+
+    Sharpness measures how decisive the model is regardless of calibration.
+    A perfectly sharp model assigns only 0 or 1; random guessing at 0.5 gives
+    sharpness = 0.  Result is in [0, 0.25].
+
+    Returns 0.0 for empty input.
+    """
+    if not probs:
+        return 0.0
+    return float(sum((float(p) - 0.5) ** 2 for p in probs) / len(probs))
+
+
+def compute_positive_predictive_value(
+    probs: list[float],
+    labels: list[int],
+    threshold: float = 0.5,
+) -> float:
+    """Positive predictive value (precision) at a given probability threshold.
+
+    PPV = TP / (TP + FP)
+
+    Returns 0.0 for empty input, mismatched lengths, or no positive predictions.
+    """
+    if not probs or not labels or len(probs) != len(labels):
+        return 0.0
+    tp = sum(1 for p, y in zip(probs, labels) if float(p) >= threshold and int(y) == 1)
+    fp = sum(1 for p, y in zip(probs, labels) if float(p) >= threshold and int(y) == 0)
+    if tp + fp == 0:
+        return 0.0
+    return float(tp / (tp + fp))
+
+
+def compute_negative_predictive_value(
+    probs: list[float],
+    labels: list[int],
+    threshold: float = 0.5,
+) -> float:
+    """Negative predictive value at a given probability threshold.
+
+    NPV = TN / (TN + FN)
+
+    Returns 0.0 for empty input, mismatched lengths, or no negative predictions.
+    """
+    if not probs or not labels or len(probs) != len(labels):
+        return 0.0
+    tn = sum(1 for p, y in zip(probs, labels) if float(p) < threshold and int(y) == 0)
+    fn = sum(1 for p, y in zip(probs, labels) if float(p) < threshold and int(y) == 1)
+    if tn + fn == 0:
+        return 0.0
+    return float(tn / (tn + fn))

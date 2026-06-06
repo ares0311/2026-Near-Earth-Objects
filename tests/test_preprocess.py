@@ -2630,3 +2630,609 @@ class TestComputeCutoutEntropyNormalized:
         sys.path.insert(0, "src")
         import preprocess
         assert "compute_cutout_entropy_normalized" in preprocess.__all__
+
+
+class TestComputeImageContrast:
+    def _make_cutout_obs(self, fill_value: float = 1.0, pix_max: float = 2.0):
+        import base64
+        from types import SimpleNamespace
+
+        import numpy as np
+        arr = np.full((63, 63), fill_value, dtype=np.float32)
+        arr[31, 31] = pix_max
+        raw = base64.b64encode(arr.tobytes()).decode()
+        return SimpleNamespace(cutout_difference=raw)
+
+    def test_basic_contrast(self):
+        import sys
+        sys.path.insert(0, "src")
+        from preprocess import compute_image_contrast
+        obs = self._make_cutout_obs(fill_value=1.0, pix_max=3.0)
+        c = compute_image_contrast(obs)
+        assert c is not None
+        assert c > 0.0
+
+    def test_no_cutout_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_image_contrast
+        obs = SimpleNamespace(cutout_difference=None)
+        assert compute_image_contrast(obs) is None
+
+    def test_uniform_cutout_returns_none(self):
+        import base64
+        import sys
+        from types import SimpleNamespace
+
+        import numpy as np
+        sys.path.insert(0, "src")
+        from preprocess import compute_image_contrast
+        arr = np.zeros((63, 63), dtype=np.float32)
+        raw = base64.b64encode(arr.tobytes()).decode()
+        obs = SimpleNamespace(cutout_difference=raw)
+        assert compute_image_contrast(obs) is None
+
+    def test_bad_data_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_image_contrast
+        obs = SimpleNamespace(cutout_difference="!!!not_valid_base64!!!")
+        assert compute_image_contrast(obs) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import preprocess
+        assert "compute_image_contrast" in preprocess.__all__
+
+
+class TestComputePixelSaturationFraction:
+    def _make_cutout_b64(self, values):
+        import base64
+        import sys
+        sys.path.insert(0, "src")
+        import numpy as np
+
+        arr = np.array(values, dtype=np.float32).reshape(63, 63)
+        return base64.b64encode(arr.tobytes()).decode()
+
+    def test_no_cutout_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_pixel_saturation_fraction
+
+        assert compute_pixel_saturation_fraction(SimpleNamespace()) is None
+
+    def test_none_cutout(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_pixel_saturation_fraction
+
+        assert compute_pixel_saturation_fraction(SimpleNamespace(cutout_science=None)) is None
+
+    def test_all_uniform_returns_one(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_pixel_saturation_fraction
+
+        flat = [1.0] * (63 * 63)
+        b64 = self._make_cutout_b64(flat)
+        obs = SimpleNamespace(cutout_science=b64)
+        frac = compute_pixel_saturation_fraction(obs)
+        assert frac == 1.0
+
+    def test_all_zero_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_pixel_saturation_fraction
+
+        flat = [0.0] * (63 * 63)
+        b64 = self._make_cutout_b64(flat)
+        obs = SimpleNamespace(cutout_science=b64)
+        assert compute_pixel_saturation_fraction(obs) == 0.0
+
+    def test_partial_saturation(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        import numpy as np
+
+        from preprocess import compute_pixel_saturation_fraction
+
+        arr = np.zeros(63 * 63, dtype=np.float32)
+        # Set first half to max value (saturated after normalisation)
+        half = 63 * 63 // 2
+        arr[:half] = 1.0
+        b64 = __import__("base64").b64encode(arr.tobytes()).decode()
+        obs = SimpleNamespace(cutout_science=b64)
+        frac = compute_pixel_saturation_fraction(obs)
+        assert 0.0 < frac < 1.0
+
+    def test_invalid_data_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_pixel_saturation_fraction
+
+        obs = SimpleNamespace(cutout_science="not_valid_base64!!!")
+        assert compute_pixel_saturation_fraction(obs) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import preprocess
+        assert "compute_pixel_saturation_fraction" in preprocess.__all__
+
+
+class TestComputeReferenceCutoutSnr:
+    def _make_cutout_b64(self, values):
+        import base64
+        import sys
+        sys.path.insert(0, "src")
+        import numpy as np
+
+        arr = np.array(values, dtype=np.float32)
+        return base64.b64encode(arr.tobytes()).decode()
+
+    def test_no_cutout_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_reference_cutout_snr
+
+        assert compute_reference_cutout_snr(SimpleNamespace()) is None
+
+    def test_none_cutout(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_reference_cutout_snr
+
+        assert compute_reference_cutout_snr(SimpleNamespace(cutout_template=None)) is None
+
+    def test_uniform_non_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_reference_cutout_snr
+
+        flat = [1.0] * (63 * 63)
+        b64 = self._make_cutout_b64(flat)
+        obs = SimpleNamespace(cutout_template=b64)
+        snr = compute_reference_cutout_snr(obs)
+        # max=1, rms=1 → SNR=1
+        assert snr == 1.0
+
+    def test_zero_rms_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_reference_cutout_snr
+
+        flat = [0.0] * (63 * 63)
+        b64 = self._make_cutout_b64(flat)
+        obs = SimpleNamespace(cutout_template=b64)
+        assert compute_reference_cutout_snr(obs) is None
+
+    def test_peak_source(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        import numpy as np
+
+        from preprocess import compute_reference_cutout_snr
+
+        arr = np.ones(63 * 63, dtype=np.float32)
+        arr[63 * 31 + 31] = 10.0  # bright central pixel
+        b64 = __import__("base64").b64encode(arr.tobytes()).decode()
+        obs = SimpleNamespace(cutout_template=b64)
+        snr = compute_reference_cutout_snr(obs)
+        assert snr > 1.0
+
+    def test_invalid_data_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_reference_cutout_snr
+
+        obs = SimpleNamespace(cutout_template="!notbase64!")
+        assert compute_reference_cutout_snr(obs) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import preprocess
+        assert "compute_reference_cutout_snr" in preprocess.__all__
+
+
+class TestComputeCutoutNoiseLevel:
+    def _make_cutout_b64(self, values):
+        import base64
+
+        import numpy as np
+
+        arr = np.array(values, dtype=np.float32)
+        return base64.b64encode(arr.tobytes()).decode()
+
+    def test_no_cutout_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_cutout_noise_level
+
+        assert compute_cutout_noise_level(SimpleNamespace()) is None
+
+    def test_none_cutout_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_cutout_noise_level
+
+        assert compute_cutout_noise_level(SimpleNamespace(cutout_difference=None)) is None
+
+    def test_uniform_cutout_zero_std(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_cutout_noise_level
+
+        flat = [1.0] * (63 * 63)
+        b64 = self._make_cutout_b64(flat)
+        obs = SimpleNamespace(cutout_difference=b64)
+        assert compute_cutout_noise_level(obs) == 0.0
+
+    def test_noisy_cutout_positive_std(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        import numpy as np
+
+        from preprocess import compute_cutout_noise_level
+
+        rng = np.random.default_rng(42)
+        arr = rng.standard_normal(63 * 63).astype(np.float32)
+        import base64
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        obs = SimpleNamespace(cutout_difference=b64)
+        noise = compute_cutout_noise_level(obs)
+        assert noise is not None and noise > 0.0
+
+    def test_invalid_data_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from preprocess import compute_cutout_noise_level
+
+        obs = SimpleNamespace(cutout_difference="!!!notvalid!!!")
+        assert compute_cutout_noise_level(obs) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import preprocess
+        assert "compute_cutout_noise_level" in preprocess.__all__
+
+
+class TestComputeCutoutPeakValue:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from preprocess import compute_cutout_peak_value
+        self.fn = compute_cutout_peak_value
+
+    def _make_obs(self, values):
+        import base64
+        from types import SimpleNamespace
+
+        import numpy as np
+        arr = np.array(values, dtype=np.float32)
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        return SimpleNamespace(cutout_difference=b64)
+
+    def test_returns_max(self):
+        obs = self._make_obs([1.0, 5.0, 3.0, 2.0])
+        assert self.fn(obs) == 5.0
+
+    def test_no_cutout_none(self):
+        from types import SimpleNamespace
+        assert self.fn(SimpleNamespace()) is None
+
+    def test_none_cutout_none(self):
+        from types import SimpleNamespace
+        assert self.fn(SimpleNamespace(cutout_difference=None)) is None
+
+    def test_invalid_b64_none(self):
+        from types import SimpleNamespace
+        assert self.fn(SimpleNamespace(cutout_difference="!!!")) is None
+
+    def test_single_pixel(self):
+        obs = self._make_obs([7.5])
+        assert self.fn(obs) == 7.5
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import preprocess
+        assert "compute_cutout_peak_value" in preprocess.__all__
+
+    def test_non_multiple_of_4_bytes_none(self):
+        import base64
+        from types import SimpleNamespace
+        # 1-byte payload: np.frombuffer will raise ValueError (not mult of 4)
+        b = base64.b64encode(b"\x01").decode()
+        obs = SimpleNamespace(cutout_difference=b)
+        assert self.fn(obs) is None
+
+
+class TestComputeCutoutContrastRatio:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from preprocess import compute_cutout_contrast_ratio
+        self.fn = compute_cutout_contrast_ratio
+
+    def _make_obs(self, values):
+        import base64
+        from types import SimpleNamespace
+
+        import numpy as np
+        arr = np.array(values, dtype=np.float32)
+        b64 = base64.b64encode(arr.tobytes()).decode()
+        return SimpleNamespace(cutout_difference=b64)
+
+    def test_basic(self):
+        obs = self._make_obs([1.0, 2.0, 4.0, 2.0])
+        result = self.fn(obs)
+        assert result is not None
+        assert result > 1.0
+
+    def test_no_cutout_none(self):
+        from types import SimpleNamespace
+        assert self.fn(SimpleNamespace()) is None
+
+    def test_none_cutout_none(self):
+        from types import SimpleNamespace
+        assert self.fn(SimpleNamespace(cutout_difference=None)) is None
+
+    def test_all_zeros_none(self):
+        obs = self._make_obs([0.0, 0.0, 0.0, 0.0])
+        assert self.fn(obs) is None
+
+    def test_uniform_nonzero(self):
+        obs = self._make_obs([2.0, 2.0, 2.0, 2.0])
+        result = self.fn(obs)
+        assert result is not None
+        assert abs(result - 1.0) < 1e-5
+
+    def test_invalid_b64_none(self):
+        # 1-byte payload causes np.frombuffer error
+        import base64
+        from types import SimpleNamespace
+        b = base64.b64encode(b"\x01").decode()
+        assert self.fn(SimpleNamespace(cutout_difference=b)) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import preprocess
+        assert "compute_cutout_contrast_ratio" in preprocess.__all__
+
+    def test_empty_array_none(self):
+        from types import SimpleNamespace
+        # empty base64 → 0-byte array → arr.size == 0
+        obs = SimpleNamespace(cutout_difference="")
+        assert self.fn(obs) is None
+
+
+class TestComputeImageRms:
+    fn_name = "compute_image_rms"
+
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import preprocess
+        return getattr(preprocess, self.fn_name)
+
+    def test_none_cutout_returns_none(self):
+        from types import SimpleNamespace
+        obs = SimpleNamespace(cutout_difference=None)
+        assert self._fn()(obs) is None
+
+    def test_empty_b64_returns_none(self):
+        from types import SimpleNamespace
+        obs = SimpleNamespace(cutout_difference="")
+        assert self._fn()(obs) is None
+
+    def test_invalid_b64_returns_none(self):
+        import base64
+        from types import SimpleNamespace
+        b64 = base64.b64encode(b"\x01").decode()
+        obs = SimpleNamespace(cutout_difference=b64)
+        assert self._fn()(obs) is None
+
+    def test_valid_rms(self):
+        import base64
+        import math
+        import struct
+        from types import SimpleNamespace
+        vals = [1.0, 2.0, 3.0, 4.0]
+        raw = struct.pack(f"{len(vals)}f", *vals)
+        b64 = base64.b64encode(raw).decode()
+        obs = SimpleNamespace(cutout_difference=b64)
+        result = self._fn()(obs)
+        expected = math.sqrt(sum(v**2 for v in vals) / len(vals))
+        assert result is not None
+        assert abs(result - expected) < 1e-5
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import preprocess
+        assert "compute_image_rms" in preprocess.__all__
+
+
+class TestComputeCutoutFillFraction:
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import preprocess
+        return preprocess.compute_cutout_fill_fraction
+
+    def test_none_cutout_returns_none(self):
+        from types import SimpleNamespace
+        assert self._fn()(SimpleNamespace(cutout_difference=None)) is None
+
+    def test_empty_b64_returns_none(self):
+        from types import SimpleNamespace
+        assert self._fn()(SimpleNamespace(cutout_difference="")) is None
+
+    def test_invalid_b64_returns_none(self):
+        import base64
+        from types import SimpleNamespace
+        b64 = base64.b64encode(b"\x01").decode()
+        assert self._fn()(SimpleNamespace(cutout_difference=b64)) is None
+
+    def test_all_zero_returns_zero(self):
+        import base64
+        import struct
+        from types import SimpleNamespace
+        raw = struct.pack("4f", 0.0, 0.0, 0.0, 0.0)
+        b64 = base64.b64encode(raw).decode()
+        result = self._fn()(SimpleNamespace(cutout_difference=b64))
+        assert result == 0.0
+
+    def test_all_nonzero_returns_one(self):
+        import base64
+        import struct
+        from types import SimpleNamespace
+        raw = struct.pack("4f", 1.0, 2.0, 3.0, 4.0)
+        b64 = base64.b64encode(raw).decode()
+        result = self._fn()(SimpleNamespace(cutout_difference=b64))
+        assert result == 1.0
+
+    def test_partial_nonzero(self):
+        import base64
+        import struct
+        from types import SimpleNamespace
+        raw = struct.pack("4f", 1.0, 0.0, 1.0, 0.0)
+        b64 = base64.b64encode(raw).decode()
+        result = self._fn()(SimpleNamespace(cutout_difference=b64))
+        assert abs(result - 0.5) < 1e-9
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import preprocess
+        assert "compute_cutout_fill_fraction" in preprocess.__all__
+
+
+class TestComputePhotometricNoiseLevel:
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import preprocess
+        return preprocess.compute_photometric_noise_level
+
+    def _obs(self, mag):
+        from types import SimpleNamespace
+        return SimpleNamespace(mag=mag)
+
+    def test_empty_returns_none(self):
+        assert self._fn()([]) is None
+
+    def test_single_obs_returns_none(self):
+        assert self._fn()([self._obs(20.0)]) is None
+
+    def test_all_sentinel_returns_none(self):
+        assert self._fn()([self._obs(99.0), self._obs(99.0)]) is None
+
+    def test_identical_mags_returns_zero(self):
+        obs = [self._obs(20.0), self._obs(20.0), self._obs(20.0)]
+        result = self._fn()(obs)
+        assert result == 0.0
+
+    def test_varying_mags_returns_positive(self):
+        obs = [self._obs(20.0), self._obs(20.5), self._obs(21.0), self._obs(19.5)]
+        result = self._fn()(obs)
+        assert result is not None
+        assert result >= 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import preprocess
+        assert "compute_photometric_noise_level" in preprocess.__all__
+
+
+class TestComputeCutoutDynamicRange:
+    def test_valid_cutout(self):
+        import base64
+        import struct
+        from types import SimpleNamespace
+
+        from preprocess import compute_cutout_dynamic_range
+        pixels = [float(i) for i in range(16)]
+        raw = struct.pack(f"{len(pixels)}f", *pixels)
+        b64 = base64.b64encode(raw).decode()
+        obs = SimpleNamespace(cutout_difference=b64)
+        result = compute_cutout_dynamic_range(obs)
+        assert result == pytest.approx(15.0)
+
+    def test_no_cutout_returns_none(self):
+        from types import SimpleNamespace
+
+        from preprocess import compute_cutout_dynamic_range
+        obs = SimpleNamespace(cutout_difference=None)
+        assert compute_cutout_dynamic_range(obs) is None
+
+    def test_invalid_b64_returns_none(self):
+        from types import SimpleNamespace
+
+        from preprocess import compute_cutout_dynamic_range
+        obs = SimpleNamespace(cutout_difference="!!!notbase64!!!")
+        assert compute_cutout_dynamic_range(obs) is None
+
+    def test_empty_array_returns_none(self):
+        import base64
+        from types import SimpleNamespace
+
+        from preprocess import compute_cutout_dynamic_range
+        obs = SimpleNamespace(cutout_difference=base64.b64encode(b"").decode())
+        assert compute_cutout_dynamic_range(obs) is None
+
+    def test_uniform_pixels_zero_range(self):
+        import base64
+        import struct
+        from types import SimpleNamespace
+
+        from preprocess import compute_cutout_dynamic_range
+        pixels = [5.0] * 8
+        raw = struct.pack(f"{len(pixels)}f", *pixels)
+        b64 = base64.b64encode(raw).decode()
+        obs = SimpleNamespace(cutout_difference=b64)
+        assert compute_cutout_dynamic_range(obs) == pytest.approx(0.0)

@@ -28,7 +28,17 @@ __all__ = ["preprocess", "preprocess_batch", "quality_summary", "flag_saturated_
            "compute_cutout_peak_snr",
            "compute_gradient_magnitude",
            "compute_cutout_rms",
-           "compute_cutout_entropy_normalized"]
+           "compute_cutout_entropy_normalized",
+           "compute_image_contrast",
+           "compute_pixel_saturation_fraction",
+           "compute_reference_cutout_snr",
+           "compute_cutout_noise_level",
+           "compute_cutout_peak_value",
+           "compute_cutout_contrast_ratio",
+           "compute_image_rms",
+           "compute_cutout_fill_fraction",
+           "compute_photometric_noise_level",
+           "compute_cutout_dynamic_range"]
 
 import base64
 import math
@@ -1394,5 +1404,238 @@ def compute_cutout_entropy_normalized(obs: object) -> float | None:
         probs = probs[probs > 0.0]
         entropy_bits = float(-np.sum(probs * np.log2(probs)))
         return float(min(1.0, entropy_bits / 8.0))
+    except Exception:
+        return None
+
+
+def compute_image_contrast(obs: object) -> float | None:
+    """Return the pixel contrast ratio of a difference-image cutout.
+
+    Contrast = (max_pixel - min_pixel) / mean_pixel, where mean_pixel is the
+    absolute mean of all pixel values.  Returns None if no cutout is present,
+    if the cutout cannot be decoded, or if mean_pixel is zero.
+    """
+    cutout = getattr(obs, "cutout_difference", None)
+    if cutout is None:
+        return None
+    try:
+        raw = base64.b64decode(cutout)
+        arr = np.frombuffer(raw, dtype=np.float32).reshape(_CUTOUT_SIZE, _CUTOUT_SIZE).astype(float)
+        pix_min = arr.min()
+        pix_max = arr.max()
+        mean_abs = float(np.mean(np.abs(arr)))
+        if mean_abs == 0.0:
+            return None
+        return float((pix_max - pix_min) / mean_abs)
+    except Exception:
+        return None
+
+
+def compute_pixel_saturation_fraction(
+    obs: object,
+    saturation_threshold: float = 0.98,
+) -> float | None:
+    """Return the fraction of pixels in the science cutout that are near saturation.
+
+    Pixels with normalised value ≥ *saturation_threshold* (default 0.98) are
+    considered saturated.  The cutout is normalised to [0, 1] before comparison.
+    Returns None if no science cutout is available or if the cutout cannot be decoded.
+    Returns 0.0 if the max pixel value is zero (blank cutout).
+    """
+    cutout = getattr(obs, "cutout_science", None)
+    if cutout is None:
+        return None
+    try:
+        raw = base64.b64decode(cutout)
+        arr = np.frombuffer(raw, dtype=np.float32).reshape(_CUTOUT_SIZE, _CUTOUT_SIZE).astype(float)
+        pix_max = arr.max()
+        if pix_max == 0.0:
+            return 0.0
+        normalized = arr / pix_max
+        return float(np.mean(normalized >= saturation_threshold))
+    except Exception:
+        return None
+
+
+def compute_reference_cutout_snr(obs: object) -> float | None:
+    """Return the peak-to-RMS SNR of the reference (template) cutout.
+
+    Computes ``max_pixel / rms_pixel`` for the 63×63 reference cutout.
+    Returns ``None`` if no reference cutout is present, if the cutout cannot
+    be decoded, or if the RMS is zero (blank template).
+    """
+    cutout = getattr(obs, "cutout_template", None)
+    if cutout is None:
+        return None
+    try:
+        raw = base64.b64decode(cutout)
+        arr = np.frombuffer(raw, dtype=np.float32).reshape(_CUTOUT_SIZE, _CUTOUT_SIZE).astype(float)
+        rms = float(np.sqrt(np.mean(arr ** 2)))
+        if rms == 0.0:
+            return None
+        return float(arr.max() / rms)
+    except Exception:
+        return None
+
+
+def compute_cutout_noise_level(obs: object) -> float | None:
+    """Return the standard deviation of pixel values in the difference-image cutout.
+
+    Provides a per-observation noise estimate without requiring an explicit
+    background model.  Returns ``None`` if no difference-image cutout is present
+    or if the cutout cannot be decoded.
+    """
+    cutout = getattr(obs, "cutout_difference", None)
+    if cutout is None:
+        return None
+    try:
+        raw = base64.b64decode(cutout)
+        arr = np.frombuffer(raw, dtype=np.float32).reshape(_CUTOUT_SIZE, _CUTOUT_SIZE).astype(float)
+        return float(np.std(arr))
+    except Exception:
+        return None
+
+
+def compute_cutout_peak_value(obs: object) -> float | None:
+    """Return the peak (maximum) pixel value in the difference-image cutout.
+
+    Decodes the base64 float32 difference-image cutout and returns the
+    maximum pixel value.  Returns ``None`` if the observation has no
+    ``cutout_difference`` attribute, the attribute is ``None``, or the
+    bytes cannot be decoded as a valid float32 array.
+    """
+    import base64
+
+    import numpy as np
+
+    raw_b64 = getattr(obs, "cutout_difference", None)
+    if raw_b64 is None:
+        return None
+    try:
+        raw = base64.b64decode(raw_b64)
+        arr = np.frombuffer(raw, dtype=np.float32)
+        if arr.size == 0:
+            return None
+        return float(np.max(arr))
+    except Exception:
+        return None
+
+
+def compute_cutout_contrast_ratio(obs: object) -> float | None:
+    """Return the peak-to-median pixel ratio in the difference-image cutout.
+
+    Decodes the base64 float32 difference-image cutout, clips negative
+    values to zero, and returns ``max(arr) / median(arr)`` for the
+    non-zero pixels.  Returns ``None`` if the cutout is absent, cannot
+    be decoded, the array is empty, or the median is zero.
+    """
+    import base64
+    import math
+
+    import numpy as np
+
+    raw_b64 = getattr(obs, "cutout_difference", None)
+    if raw_b64 is None:
+        return None
+    try:
+        raw = base64.b64decode(raw_b64)
+        arr = np.frombuffer(raw, dtype=np.float32).astype(np.float64)
+        if arr.size == 0:
+            return None
+        arr = np.clip(arr, 0.0, None)
+        median_val = float(np.median(arr))
+        if median_val == 0.0:
+            return None
+        peak = float(np.max(arr))
+        result = peak / median_val
+        return result if math.isfinite(result) else None
+    except Exception:
+        return None
+
+
+def compute_image_rms(obs: object) -> float | None:
+    """Return the RMS of all pixels in the difference-image cutout.
+
+    Decodes the base64 float32 difference-image cutout and returns the
+    root-mean-square of all pixel values.  Returns ``None`` if the
+    observation has no ``cutout_difference`` attribute, it is ``None``,
+    or the bytes cannot be decoded as a valid float32 array.
+    """
+    import base64
+
+    import numpy as np
+
+    raw_b64 = getattr(obs, "cutout_difference", None)
+    if raw_b64 is None:
+        return None
+    try:
+        raw = base64.b64decode(raw_b64)
+        arr = np.frombuffer(raw, dtype=np.float32).astype(np.float64)
+        if arr.size == 0:
+            return None
+        return float(np.sqrt(np.mean(arr ** 2)))
+    except Exception:
+        return None
+
+
+def compute_cutout_fill_fraction(obs: object) -> float | None:
+    """Fraction of non-zero pixels in the difference-image cutout.
+
+    Returns ``None`` if no cutout is present or decoding fails.
+    A value near 1.0 indicates most pixels are active (dense field or bright source).
+    A value near 0.0 indicates a mostly-empty cutout.
+    """
+    import base64
+
+    import numpy as np
+
+    raw_b64 = getattr(obs, "cutout_difference", None)
+    if raw_b64 is None:
+        return None
+    try:
+        raw = base64.b64decode(raw_b64)
+        arr = np.frombuffer(raw, dtype=np.float32)
+        if arr.size == 0:
+            return None
+        return float(np.count_nonzero(arr) / arr.size)
+    except Exception:
+        return None
+
+
+def compute_photometric_noise_level(observations: list) -> float | None:
+    """Median absolute deviation (MAD) of valid observation magnitudes.
+
+    Provides a robust estimate of photometric noise level across a set of
+    observations.  Returns ``None`` for fewer than 2 valid magnitudes.
+    Sentinel magnitudes (>= 90) are excluded.
+    """
+    mags = [float(obs.mag) for obs in observations
+            if getattr(obs, "mag", None) is not None and obs.mag < 90.0]
+    if len(mags) < 2:
+        return None
+    median = sorted(mags)[len(mags) // 2]
+    mad = sorted(abs(m - median) for m in mags)[len(mags) // 2]
+    return float(mad)
+
+
+def compute_cutout_dynamic_range(obs: object) -> float | None:
+    """Dynamic range of pixel values in the difference-image cutout.
+
+    Returns max(pixels) − min(pixels) for the float32 difference cutout.
+    Returns ``None`` if the cutout is absent, cannot be decoded, or is empty.
+    """
+    import base64
+
+    import numpy as np
+
+    raw_b64 = getattr(obs, "cutout_difference", None)
+    if raw_b64 is None:
+        return None
+    try:
+        raw = base64.b64decode(raw_b64)
+        arr = np.frombuffer(raw, dtype=np.float32)
+        if arr.size == 0:
+            return None
+        return float(np.max(arr) - np.min(arr))
     except Exception:
         return None

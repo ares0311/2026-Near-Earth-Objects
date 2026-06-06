@@ -30,6 +30,11 @@ __all__ = [
     "compute_tier1_score_distribution",
     "compute_class_entropy_summary",
     "compute_neo_class_distribution",
+    "compute_tier1_feature_vector",
+    "batch_dominant_hypothesis",
+    "filter_by_neo_probability",
+    "count_by_dominant_hypothesis",
+    "compute_mean_neo_probability",
     "compute_posterior_update",
     "compute_tier1_confidence",
     "compute_posterior_stability",
@@ -47,6 +52,11 @@ __all__ = [
     "compute_tier1_neo_score",
     "compute_class_balance",
     "compute_real_bogus_summary",
+    "compute_class_agreement",
+    "compute_neo_class_distribution",
+    "compute_composite_neo_score",
+    "get_highest_confidence_neo",
+    "compute_classification_entropy_summary",
 ]
 
 import base64
@@ -2028,4 +2038,232 @@ def compute_real_bogus_summary(neos: list) -> dict:
         "min": float(min(scores)),
         "max": float(max(scores)),
         "n": len(scores),
+    }
+
+
+def compute_class_agreement(neos: list) -> float:
+    """Return the fraction of candidates that share the single most common dominant hypothesis.
+
+    Agreement = count(most_common_hypothesis) / total_valid_candidates.
+    Returns 0.0 if the list is empty or no posteriors are valid.
+    """
+    counts: dict[str, int] = {}
+    total = 0
+    for neo in neos:
+        posterior = getattr(neo, "posterior", None)
+        if posterior is None:
+            continue
+        name, _ = dominant_hypothesis(posterior)
+        if name == "unknown":
+            continue
+        counts[name] = counts.get(name, 0) + 1
+        total += 1
+    if total == 0:
+        return 0.0
+    return float(max(counts.values()) / total)
+
+
+def compute_tier1_feature_vector(tracklet: object) -> dict:
+    """Extract the tabular feature dict used for Tier 1 XGBoost classification.
+
+    Computes features purely from the tracklet's observations without requiring
+    a trained model.  Returns a dict with the following keys (all float or None):
+
+      - ``motion_rate_arcsec_hr``: tracklet motion rate
+      - ``arc_days``: total arc length in days
+      - ``n_nights``: number of distinct integer-JD nights observed
+      - ``mean_mag``: mean magnitude of valid observations (mag < 90)
+      - ``mean_real_bogus``: mean real/bogus score of valid observations
+      - ``streak_fraction``: fraction of observations flagged as streaks
+      - ``mag_range``: max − min magnitude across valid observations
+
+    Missing or unavailable values are returned as ``None``.
+    """
+    motion_rate = getattr(tracklet, "motion_rate_arcsec_per_hour", None)
+    arc_days = getattr(tracklet, "arc_days", None)
+    obs_seq = getattr(tracklet, "observations", None) or ()
+
+    nights = {
+        int(float(getattr(o, "jd", 0)))
+        for o in obs_seq
+        if getattr(o, "jd", None) is not None
+    }
+    n_nights = len(nights) if nights else None
+
+    mags = [
+        float(getattr(o, "mag", 99))
+        for o in obs_seq
+        if getattr(o, "mag", None) is not None and float(getattr(o, "mag", 99)) < 90.0
+    ]
+    mean_mag = float(sum(mags) / len(mags)) if mags else None
+    mag_range = float(max(mags) - min(mags)) if len(mags) >= 2 else None
+
+    rbs = [
+        float(getattr(o, "real_bogus_score", None))
+        for o in obs_seq
+        if getattr(o, "real_bogus_score", None) is not None
+    ]
+    mean_rb = float(sum(rbs) / len(rbs)) if rbs else None
+
+    n_obs = len(obs_seq)
+    streak_count = sum(1 for o in obs_seq if getattr(o, "is_streak", False))
+    streak_fraction = float(streak_count / n_obs) if n_obs > 0 else None
+
+    return {
+        "motion_rate_arcsec_hr": float(motion_rate) if motion_rate is not None else None,
+        "arc_days": float(arc_days) if arc_days is not None else None,
+        "n_nights": n_nights,
+        "mean_mag": mean_mag,
+        "mean_real_bogus": mean_rb,
+        "streak_fraction": streak_fraction,
+        "mag_range": mag_range,
+    }
+
+
+def batch_dominant_hypothesis(neos: list) -> list:
+    """Return a list of dominant-hypothesis dicts for each scored NEO.
+
+    For each NEO in *neos*, calls :func:`dominant_hypothesis` on its posterior
+    and returns a dict with keys:
+
+      - ``"object_id"``: tracklet object ID (str) or ``"unknown"`` if unavailable
+      - ``"hypothesis"``: dominant hypothesis name (str)
+      - ``"probability"``: probability of the dominant hypothesis (float)
+
+    NEOs with a missing or invalid posterior contribute
+    ``{"object_id": ..., "hypothesis": "unknown", "probability": 0.0}``.
+    """
+    results = []
+    for neo in neos:
+        obj_id = getattr(getattr(neo, "tracklet", None), "object_id", "unknown") or "unknown"
+        posterior = getattr(neo, "posterior", None)
+        if posterior is None:
+            results.append({"object_id": obj_id, "hypothesis": "unknown", "probability": 0.0})
+            continue
+        hyp, prob = dominant_hypothesis(posterior)
+        results.append({"object_id": obj_id, "hypothesis": hyp, "probability": float(prob)})
+    return results
+
+
+def filter_by_neo_probability(neos: list, min_prob: float = 0.5) -> list:
+    """Return scored NEOs whose posterior neo_candidate probability ≥ min_prob.
+
+    Reads ``neo.posterior.neo_candidate``.  NEOs with a missing or None
+    posterior are excluded.  Returns an empty list if no candidates qualify.
+    """
+    result = []
+    for neo in neos:
+        posterior = getattr(neo, "posterior", None)
+        prob = getattr(posterior, "neo_candidate", None) if posterior else None
+        if prob is not None and float(prob) >= min_prob:
+            result.append(neo)
+    return result
+
+
+def count_by_dominant_hypothesis(neos: list) -> dict:
+    """Return a count of scored NEOs by their dominant posterior hypothesis.
+
+    For each NEO in *neos*, calls :func:`dominant_hypothesis` on its
+    posterior and tallies the result.  NEOs with missing posteriors
+    contribute to the ``"unknown"`` key.  Returns an empty dict for
+    empty input.
+    """
+    counts: dict = {}
+    for neo in neos:
+        posterior = getattr(neo, "posterior", None)
+        if posterior is None:
+            hyp = "unknown"
+        else:
+            hyp, _ = dominant_hypothesis(posterior)
+        counts[hyp] = counts.get(hyp, 0) + 1
+    return counts
+
+
+def compute_mean_neo_probability(neos: list) -> float | None:
+    """Return the mean posterior neo_candidate probability across all NEOs.
+
+    Reads ``neo.posterior.neo_candidate`` for each NEO.  NEOs with a missing
+    or None posterior are excluded.  Returns ``None`` for an empty list or if
+    no NEO has a valid posterior.
+    """
+    probs = []
+    for neo in neos:
+        posterior = getattr(neo, "posterior", None)
+        prob = getattr(posterior, "neo_candidate", None) if posterior else None
+        if prob is not None:
+            probs.append(float(prob))
+    return float(sum(probs) / len(probs)) if probs else None
+
+
+def compute_composite_neo_score(features: object) -> float:
+    """Weighted composite NEO score from candidate features.
+
+    Combines four detection-quality signals into a single [0, 1] score:
+
+    - real_bogus_score × 0.35
+    - arc_coverage_score × 0.25
+    - nights_observed_score × 0.25
+    - orbit_quality_score × 0.15
+
+    Missing (None) features contribute 0.  The result is clamped to [0, 1].
+    """
+
+    def _get(name: str) -> float:
+        v = getattr(features, name, None)
+        return float(v) if v is not None else 0.0
+
+    score = (
+        _get("real_bogus_score") * 0.35
+        + _get("arc_coverage_score") * 0.25
+        + _get("nights_observed_score") * 0.25
+        + _get("orbit_quality_score") * 0.15
+    )
+    return float(min(1.0, max(0.0, score)))
+
+
+def get_highest_confidence_neo(neos: list) -> object | None:
+    """Return the ScoredNEO with the highest posterior neo_candidate probability.
+
+    Ignores NEOs with missing or None posteriors.  Returns ``None`` if the
+    list is empty or no valid posteriors exist.
+    """
+    best = None
+    best_prob = -1.0
+    for neo in neos:
+        posterior = getattr(neo, "posterior", None)
+        prob = getattr(posterior, "neo_candidate", None) if posterior else None
+        if prob is not None and float(prob) > best_prob:
+            best_prob = float(prob)
+            best = neo
+    return best
+
+
+def compute_classification_entropy_summary(neos: list) -> dict:
+    """Summary statistics of Shannon entropy across scored NEOs.
+
+    Returns a dict with keys: ``mean_entropy``, ``std_entropy``,
+    ``min_entropy``, ``max_entropy``.  Returns an empty dict if no
+    NEOs have a valid posterior.
+    """
+    import math
+
+    entropies = []
+    for neo in neos:
+        posterior = getattr(neo, "posterior", None)
+        if posterior is None:
+            continue
+        ent = posterior_entropy(posterior)
+        entropies.append(float(ent))
+
+    if not entropies:
+        return {}
+
+    n = len(entropies)
+    mean = sum(entropies) / n
+    variance = sum((e - mean) ** 2 for e in entropies) / n
+    return {
+        "mean_entropy": mean,
+        "std_entropy": math.sqrt(variance),
+        "min_entropy": min(entropies),
+        "max_entropy": max(entropies),
     }

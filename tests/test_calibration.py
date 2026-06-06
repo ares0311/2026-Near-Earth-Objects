@@ -1851,3 +1851,463 @@ class TestComputeCalibrationGap:
         sys.path.insert(0, "src")
         import calibration
         assert "compute_calibration_gap" in calibration.__all__
+
+
+class TestComputeCalibrationGain:
+    def test_positive_gain(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_calibration_gain
+        # raw probs far from labels, cal probs near labels → positive gain
+        raw = [0.9, 0.9, 0.1, 0.1]
+        cal = [0.1, 0.1, 0.9, 0.9]
+        labels = [0.0, 0.0, 1.0, 1.0]
+        gain = compute_calibration_gain(raw, cal, labels)
+        assert gain > 0.0
+
+    def test_negative_gain_if_cal_worse(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_calibration_gain
+        raw = [0.1, 0.1, 0.9, 0.9]
+        cal = [0.9, 0.9, 0.1, 0.1]
+        labels = [0.0, 0.0, 1.0, 1.0]
+        gain = compute_calibration_gain(raw, cal, labels)
+        assert gain < 0.0
+
+    def test_empty_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_calibration_gain
+        assert compute_calibration_gain([], [], []) == 0.0
+
+    def test_length_mismatch_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_calibration_gain
+        assert compute_calibration_gain([0.5, 0.5], [0.5], [1.0, 0.0]) == 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        assert "compute_calibration_gain" in calibration.__all__
+
+
+class TestComputeCalibrationBias:
+    def test_empty_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_calibration_bias
+
+        assert compute_calibration_bias([], []) == 0.0
+
+    def test_length_mismatch_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_calibration_bias
+
+        assert compute_calibration_bias([0.5], [0.0, 1.0]) == 0.0
+
+    def test_over_confident(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_calibration_bias
+
+        # Predicts 0.8 but only 50% are positive => bias = +0.3
+        probs = [0.8, 0.8]
+        labels = [1.0, 0.0]
+        bias = compute_calibration_bias(probs, labels)
+        assert abs(bias - 0.3) < 1e-9
+
+    def test_under_confident(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_calibration_bias
+
+        # Predicts 0.2 but 100% are positive => bias = -0.8
+        probs = [0.2, 0.2]
+        labels = [1.0, 1.0]
+        bias = compute_calibration_bias(probs, labels)
+        assert abs(bias - (-0.8)) < 1e-9
+
+    def test_perfect_calibration_near_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_calibration_bias
+
+        probs = [0.5, 0.5]
+        labels = [1.0, 0.0]
+        assert abs(compute_calibration_bias(probs, labels)) < 1e-9
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        assert "compute_calibration_bias" in calibration.__all__
+
+
+class TestComputeOverconfidenceFraction:
+    def test_empty_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_overconfidence_fraction
+
+        assert compute_overconfidence_fraction([], []) == 0.0
+
+    def test_length_mismatch_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_overconfidence_fraction
+
+        assert compute_overconfidence_fraction([0.9], [0.0, 1.0]) == 0.0
+
+    def test_no_high_confidence_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_overconfidence_fraction
+
+        probs = [0.3, 0.5, 0.6]
+        labels = [1.0, 1.0, 0.0]
+        assert compute_overconfidence_fraction(probs, labels) == 0.0
+
+    def test_all_high_conf_wrong(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_overconfidence_fraction
+
+        probs = [0.9, 0.95]
+        labels = [0.0, 0.0]
+        assert compute_overconfidence_fraction(probs, labels) == 1.0
+
+    def test_all_high_conf_correct(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_overconfidence_fraction
+
+        probs = [0.9, 0.95]
+        labels = [1.0, 1.0]
+        assert compute_overconfidence_fraction(probs, labels) == 0.0
+
+    def test_mixed_high_confidence(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_overconfidence_fraction
+
+        # 2 high-conf: one correct (label=1), one wrong (label=0)
+        probs = [0.8, 0.9, 0.3]
+        labels = [1.0, 0.0, 0.0]
+        frac = compute_overconfidence_fraction(probs, labels, threshold=0.7)
+        assert abs(frac - 0.5) < 1e-9
+
+    def test_custom_threshold(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_overconfidence_fraction
+
+        probs = [0.6, 0.8]
+        labels = [0.0, 0.0]
+        # threshold=0.7: only 0.8 qualifies → 1 wrong / 1 = 1.0
+        assert compute_overconfidence_fraction(probs, labels, threshold=0.7) == 1.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        assert "compute_overconfidence_fraction" in calibration.__all__
+
+
+class TestComputeMaxCalibrationError:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_max_calibration_error
+        self.fn = compute_max_calibration_error
+
+    def test_perfect_calibration(self):
+        probs = [0.0, 0.0, 1.0, 1.0]
+        labels = [0, 0, 1, 1]
+        assert self.fn(probs, labels) == 0.0
+
+    def test_empty_returns_zero(self):
+        assert self.fn([], []) == 0.0
+
+    def test_mismatched_lengths(self):
+        assert self.fn([0.5], [0, 1]) == 0.0
+
+    def test_all_wrong_high_mce(self):
+        probs = [0.9, 0.9, 0.9]
+        labels = [0, 0, 0]
+        mce = self.fn(probs, labels)
+        assert mce > 0.0
+
+    def test_range(self):
+        import random
+        random.seed(0)
+        probs = [random.random() for _ in range(100)]
+        labels = [random.randint(0, 1) for _ in range(100)]
+        mce = self.fn(probs, labels)
+        assert 0.0 <= mce <= 1.0
+
+    def test_custom_bins(self):
+        probs = [0.1, 0.5, 0.9]
+        labels = [0, 1, 1]
+        result = self.fn(probs, labels, n_bins=3)
+        assert isinstance(result, float)
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        assert "compute_max_calibration_error" in calibration.__all__
+
+
+class TestComputeCalibrationResolution:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_calibration_resolution
+        self.fn = compute_calibration_resolution
+
+    def test_perfect_separation(self):
+        probs = [0.0, 0.0, 1.0, 1.0]
+        labels = [0, 0, 1, 1]
+        result = self.fn(probs, labels)
+        assert result > 0.0
+
+    def test_empty_returns_zero(self):
+        assert self.fn([], []) == 0.0
+
+    def test_mismatched_lengths(self):
+        assert self.fn([0.5], [0, 1]) == 0.0
+
+    def test_all_same_label_zero(self):
+        probs = [0.1, 0.5, 0.9]
+        labels = [1, 1, 1]
+        assert self.fn(probs, labels) == 0.0
+
+    def test_range(self):
+        import random
+        random.seed(42)
+        probs = [random.random() for _ in range(100)]
+        labels = [random.randint(0, 1) for _ in range(100)]
+        result = self.fn(probs, labels)
+        assert 0.0 <= result <= 1.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        assert "compute_calibration_resolution" in calibration.__all__
+
+
+class TestComputeFractionCalibrated:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from calibration import compute_fraction_calibrated
+        self.fn = compute_fraction_calibrated
+
+    def test_perfect_calibration(self):
+        probs = [0.0, 0.0, 1.0, 1.0]
+        labels = [0, 0, 1, 1]
+        result = self.fn(probs, labels, threshold=0.1)
+        assert result == 1.0
+
+    def test_empty_returns_zero(self):
+        assert self.fn([], []) == 0.0
+
+    def test_mismatched_lengths(self):
+        assert self.fn([0.5], [0, 1]) == 0.0
+
+    def test_range(self):
+        import random
+        random.seed(99)
+        probs = [random.random() for _ in range(200)]
+        labels = [random.randint(0, 1) for _ in range(200)]
+        result = self.fn(probs, labels)
+        assert 0.0 <= result <= 1.0
+
+    def test_tight_threshold(self):
+        probs = [0.1, 0.9]
+        labels = [0, 1]
+        result = self.fn(probs, labels, threshold=0.0)
+        assert 0.0 <= result <= 1.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        assert "compute_fraction_calibrated" in calibration.__all__
+
+
+class TestComputeCalibrationSpread:
+    fn_name = "compute_calibration_spread"
+
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        return getattr(calibration, self.fn_name)
+
+    def test_empty_probs_returns_zero(self):
+        assert self._fn()([], []) == 0.0
+
+    def test_mismatched_lengths_returns_zero(self):
+        assert self._fn()([0.5, 0.6], [1]) == 0.0
+
+    def test_one_bin_returns_zero(self):
+        probs = [0.1, 0.2]
+        labels = [0, 1]
+        result = self._fn()(probs, labels, n_bins=1)
+        assert result == 0.0
+
+    def test_uniform_errors_returns_zero(self):
+        probs = [0.1] * 5 + [0.9] * 5
+        labels = [0] * 5 + [1] * 5
+        result = self._fn()(probs, labels)
+        assert result >= 0.0
+
+    def test_returns_float(self):
+        probs = [0.1, 0.3, 0.5, 0.7, 0.9]
+        labels = [0, 0, 1, 1, 1]
+        result = self._fn()(probs, labels)
+        assert isinstance(result, float)
+        assert result >= 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        assert "compute_calibration_spread" in calibration.__all__
+
+
+class TestComputeCalibrationSpreadCoverage:
+    """Coverage for clamp branch (prob=1.0 → idx clamped to n_bins-1)."""
+
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        return calibration.compute_calibration_spread
+
+    def test_prob_one_clamp_branch(self):
+        probs = [0.0, 1.0]
+        labels = [0, 1]
+        result = self._fn()(probs, labels, n_bins=1)
+        assert result == 0.0
+
+    def test_prob_one_with_multiple_bins(self):
+        probs = [0.1, 0.9, 1.0]
+        labels = [0, 1, 1]
+        result = self._fn()(probs, labels, n_bins=10)
+        assert isinstance(result, float)
+
+
+class TestComputeSharpness:
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        return calibration.compute_sharpness
+
+    def test_empty_returns_zero(self):
+        assert self._fn()([]) == 0.0
+
+    def test_all_half_returns_zero(self):
+        assert self._fn()([0.5, 0.5, 0.5]) == 0.0
+
+    def test_all_zero_returns_quarter(self):
+        result = self._fn()([0.0, 0.0])
+        assert abs(result - 0.25) < 1e-9
+
+    def test_all_one_returns_quarter(self):
+        result = self._fn()([1.0, 1.0])
+        assert abs(result - 0.25) < 1e-9
+
+    def test_mixed_decisive(self):
+        result = self._fn()([0.0, 1.0])
+        assert abs(result - 0.25) < 1e-9
+
+    def test_result_in_range(self):
+        result = self._fn()([0.1, 0.4, 0.7, 0.9])
+        assert 0.0 <= result <= 0.25
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        assert "compute_sharpness" in calibration.__all__
+
+
+class TestComputePositivePredictiveValue:
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        return calibration.compute_positive_predictive_value
+
+    def test_empty_returns_zero(self):
+        assert self._fn()([], []) == 0.0
+
+    def test_no_positive_predictions_returns_zero(self):
+        probs = [0.1, 0.2, 0.3]
+        labels = [1, 0, 1]
+        assert self._fn()(probs, labels, threshold=0.5) == 0.0
+
+    def test_all_correct_positives_returns_one(self):
+        probs = [0.9, 0.8]
+        labels = [1, 1]
+        result = self._fn()(probs, labels, threshold=0.5)
+        assert abs(result - 1.0) < 1e-9
+
+    def test_mixed_ppv(self):
+        probs = [0.9, 0.8, 0.7]
+        labels = [1, 0, 1]
+        result = self._fn()(probs, labels, threshold=0.5)
+        assert abs(result - 2.0 / 3.0) < 1e-9
+
+    def test_mismatched_lengths_returns_zero(self):
+        assert self._fn()([0.5], [1, 0]) == 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import calibration
+        assert "compute_positive_predictive_value" in calibration.__all__
+
+
+class TestComputeNegativePredictiveValue:
+    def test_perfect_npv(self):
+        from calibration import compute_negative_predictive_value
+        probs = [0.1, 0.2, 0.3]
+        labels = [0, 0, 0]
+        assert compute_negative_predictive_value(probs, labels) == pytest.approx(1.0)
+
+    def test_no_negatives_returns_zero(self):
+        from calibration import compute_negative_predictive_value
+        probs = [0.9, 0.8]
+        labels = [1, 1]
+        assert compute_negative_predictive_value(probs, labels) == pytest.approx(0.0)
+
+    def test_mixed(self):
+        from calibration import compute_negative_predictive_value
+        probs = [0.1, 0.2, 0.8, 0.9]
+        labels = [0, 1, 1, 0]
+        npv = compute_negative_predictive_value(probs, labels)
+        assert npv == pytest.approx(0.5)
+
+    def test_empty_returns_zero(self):
+        from calibration import compute_negative_predictive_value
+        assert compute_negative_predictive_value([], []) == pytest.approx(0.0)
+
+    def test_mismatched_lengths_returns_zero(self):
+        from calibration import compute_negative_predictive_value
+        assert compute_negative_predictive_value([0.1, 0.2], [0]) == pytest.approx(0.0)
+
+    def test_custom_threshold(self):
+        from calibration import compute_negative_predictive_value
+        probs = [0.3, 0.4, 0.6]
+        labels = [0, 0, 1]
+        npv = compute_negative_predictive_value(probs, labels, threshold=0.5)
+        assert npv == pytest.approx(1.0)

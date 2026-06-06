@@ -47,6 +47,16 @@ __all__ = [
     "format_alert_age_summary",
     "format_candidate_count_summary",
     "format_observation_count_summary",
+    "count_submission_ready",
+    "format_mpc_observation_block",
+    "format_neocp_submission_header",
+    "format_complete_mpc_submission",
+    "count_submissions_by_pathway",
+    "validate_obs_code",
+    "format_candidate_summary_line",
+    "format_neo_summary_table",
+    "count_ready_for_submission",
+    "format_alert_pathway_summary",
 ]
 
 import json
@@ -1959,3 +1969,252 @@ def format_observation_count_summary(neos: list) -> dict:
             "Do NOT report any impact probability without MPC/CNEOS independent confirmation."
         ),
     }
+
+
+def count_submission_ready(neos: list) -> int:
+    """Return the count of ScoredNEO candidates that pass all alert-protocol gates.
+
+    Gates (from ready_for_submission):
+      - Tier 1 real_bogus_score ≥ 0.90
+      - orbit quality_code ≥ 2
+      - MOID ≤ 0.05 AU
+      - Not matched to a known MPC object (known_object_score < 0.5)
+    Returns an integer count; never raises.
+    """
+    count = 0
+    for neo in neos:
+        ok, _ = ready_for_submission(neo)
+        if ok:
+            count += 1
+    return count
+
+
+def format_mpc_observation_block(
+    neo: ScoredNEO,
+    obs_code: str = _MPC_OBS_CODE,
+) -> str:
+    """Return a paste-ready MPC 80-column observation block for a ScoredNEO.
+
+    Produces one 80-character line per observation in the tracklet, formatted
+    using :func:`format_mpc_observation`, joined by newlines with no trailing
+    newline.  The first observation is flagged as the discovery observation
+    (asterisk in column 6).
+
+    This string can be pasted directly into an MPC submission form or included
+    in an e-mail to the Minor Planet Center.
+
+    **Guardrail**: This function formats observations only.  It does NOT
+    submit any data and does NOT assert that the candidate is a confirmed NEO.
+    Actual submission requires independent confirmation — see the alert protocol.
+    """
+    tracklet = neo.tracklet
+    designation = tracklet.object_id
+    lines = [
+        format_mpc_observation(
+            obs,
+            designation=designation,
+            is_discovery=(i == 0),
+            obs_code=obs_code,
+        )
+        for i, obs in enumerate(tracklet.observations)
+    ]
+    return "\n".join(lines)
+
+
+def format_neocp_submission_header(
+    neo: ScoredNEO,
+    obs_code: str = _MPC_OBS_CODE,
+) -> str:
+    """Return the 5-line MPC submission header block for a ScoredNEO.
+
+    Produces the standard header lines prepended to an MPC observation report:
+
+    .. code-block:: text
+
+        COD <obs_code>
+        OBS Claude-NEO-Pipeline
+        MEA Claude-NEO-Pipeline
+        TEL 0.0-m + CCD
+        ACK MPCReport file <object_id>
+
+    This header can be concatenated with :func:`format_mpc_observation_block`
+    to produce a complete, paste-ready MPC submission.
+
+    **Guardrail**: This function formats a header only.  It does NOT submit
+    any data and does NOT assert that the candidate is a confirmed NEO.
+    Actual MPC submission requires independent confirmation per the alert protocol.
+    """
+    object_id = neo.tracklet.object_id
+    lines = [
+        f"COD {obs_code}",
+        "OBS Claude-NEO-Pipeline",
+        "MEA Claude-NEO-Pipeline",
+        "TEL 0.0-m + CCD",
+        f"ACK MPCReport file {object_id}",
+    ]
+    return "\n".join(lines)
+
+
+def format_complete_mpc_submission(
+    neo: ScoredNEO,
+    obs_code: str = _MPC_OBS_CODE,
+) -> str:
+    """Return a complete, paste-ready MPC observation submission for a ScoredNEO.
+
+    Combines the 5-line header from :func:`format_neocp_submission_header`
+    with the 80-column observation block from :func:`format_mpc_observation_block`,
+    separated by a blank line — the standard MPC submission layout.
+
+    **Guardrail**: This function formats a submission document only.  It does
+    NOT transmit any data to the MPC and does NOT assert that the candidate is
+    a confirmed NEO.  Actual submission requires independent confirmation per
+    the alert protocol.
+    """
+    header = format_neocp_submission_header(neo, obs_code=obs_code)
+    obs_block = format_mpc_observation_block(neo, obs_code=obs_code)
+    return f"{header}\n\n{obs_block}"
+
+
+def count_submissions_by_pathway(neos: list) -> dict:
+    """Return a count of candidates that are ready for submission by pathway.
+
+    For each NEO in *neos*, calls :func:`ready_for_submission` to determine
+    whether it passes all alert-protocol gate conditions, then groups counts
+    by ``alert_pathway``.  Only pathways with at least one ready candidate
+    appear in the result.
+
+    Returns a dict mapping ``alert_pathway`` strings to integer counts.
+    """
+    counts: dict = {}
+    for neo in neos:
+        is_ready, _ = ready_for_submission(neo)
+        if not is_ready:
+            continue
+        pathway = getattr(getattr(neo, "hazard", None), "alert_pathway", "unknown")
+        counts[pathway] = counts.get(pathway, 0) + 1
+    return counts
+
+
+def validate_obs_code(obs_code: str) -> tuple:
+    """Validate an MPC observatory code.
+
+    MPC observatory codes are exactly 3 characters: the first may be a digit
+    or uppercase letter; the remaining two must be alphanumeric (digit or
+    uppercase letter).
+
+    Returns ``(True, "")`` for valid codes and ``(False, reason)`` for
+    invalid ones.
+    """
+    if not isinstance(obs_code, str):
+        return (False, "obs_code must be a string")
+    if len(obs_code) != 3:
+        return (False, f"obs_code must be 3 characters, got {len(obs_code)}")
+    for ch in obs_code:
+        if not (ch.isdigit() or ch.isupper()):
+            return (False, f"invalid character '{ch}': must be digit or uppercase letter")
+    return (True, "")
+
+
+def format_candidate_summary_line(neo: ScoredNEO) -> str:
+    """Return a single fixed-width summary line for a scored NEO candidate.
+
+    Format (80 characters):
+      ``<object_id:16> <pathway:20> <hazard_flag:14> <priority:6> <moid:8>``
+
+    All fields are truncated or padded to fit.  Priority and MOID display
+    ``N/A`` when unavailable.  This function does NOT transmit any data and
+    does NOT assert the candidate is a confirmed NEO.
+    """
+    obj_id = getattr(getattr(neo, "tracklet", None), "object_id", "unknown") or "unknown"
+    hazard = getattr(neo, "hazard", None)
+    pathway = getattr(hazard, "alert_pathway", "unknown") or "unknown"
+    flag = getattr(hazard, "hazard_flag", "unknown") or "unknown"
+    meta = getattr(neo, "metadata", None)
+    priority = getattr(meta, "discovery_priority", None) if meta else None
+    moid = getattr(hazard, "moid_au", None) if hazard else None
+    p_str = f"{priority:.3f}" if priority is not None else "N/A"
+    m_str = f"{moid:.4f}" if moid is not None else "N/A"
+    return f"{obj_id[:16]:<16} {pathway[:20]:<20} {flag[:14]:<14} {p_str:>6} {m_str:>8}"
+
+
+def format_neo_summary_table(neos: list, max_rows: int = 20) -> str:
+    """Plain-text ASCII summary table of top NEO candidates.
+
+    Columns: rank, object_id, alert_pathway, hazard_flag, priority, MOID.
+    Sorted by discovery_priority descending; capped at *max_rows*.
+    """
+
+    def _priority(neo: object) -> float:
+        meta = getattr(neo, "metadata", None)
+        p = getattr(meta, "discovery_priority", None) if meta else None
+        return float(p) if p is not None else -1.0
+
+    header = (
+        f"{'#':>4}  {'Object ID':<18}  {'Pathway':<22}  "
+        f"{'Hazard':<14}  {'Priority':>8}  {'MOID (AU)':>10}"
+    )
+    sep = "-" * len(header)
+    rows = [header, sep]
+
+    sorted_neos = sorted(neos, key=_priority, reverse=True)[:max_rows]
+    for rank, neo in enumerate(sorted_neos, 1):
+        tracklet = getattr(neo, "tracklet", None)
+        obj_id = getattr(tracklet, "object_id", "unknown") or "unknown"
+        hazard = getattr(neo, "hazard", None)
+        pathway = getattr(hazard, "alert_pathway", "unknown") or "unknown"
+        flag = getattr(hazard, "hazard_flag", "unknown") or "unknown"
+        meta = getattr(neo, "metadata", None)
+        priority = getattr(meta, "discovery_priority", None) if meta else None
+        moid = getattr(hazard, "moid_au", None) if hazard else None
+        p_str = f"{priority:.3f}" if priority is not None else "N/A"
+        m_str = f"{moid:.4f}" if moid is not None else "N/A"
+        rows.append(
+            f"{rank:>4}  {obj_id[:18]:<18}  {pathway[:22]:<22}  "
+            f"{flag[:14]:<14}  {p_str:>8}  {m_str:>10}"
+        )
+
+    return "\n".join(rows)
+
+
+def count_ready_for_submission(neos: list) -> int:
+    """Count NEOs where the alert-protocol gate is fully satisfied.
+
+    Calls ``ready_for_submission`` for each NEO and counts those returning
+    ``(True, [])``.  Never triggers actual submission.
+    """
+    from alert import ready_for_submission
+
+    count = 0
+    for neo in neos:
+        try:
+            ok, _ = ready_for_submission(neo)
+            if ok:
+                count += 1
+        except Exception:
+            continue
+    return count
+
+
+def format_alert_pathway_summary(neos: list) -> str:
+    """Multi-line text summary of alert pathway distribution across scored NEOs.
+
+    Lists each pathway with its count and percentage of total.  Sorted by
+    count descending.  Returns a single-line "No candidates." for empty input.
+    """
+    if not neos:
+        return "No candidates."
+
+    from collections import Counter
+
+    counts: Counter = Counter()
+    for neo in neos:
+        hazard = getattr(neo, "hazard", None)
+        pathway = getattr(hazard, "alert_pathway", "unknown") if hazard else "unknown"
+        counts[pathway] += 1
+
+    total = len(neos)
+    lines = [f"Alert pathway summary ({total} candidates):"]
+    for pathway, count in counts.most_common():
+        pct = 100.0 * count / total
+        lines.append(f"  {pathway:<30} {count:>4}  ({pct:5.1f}%)")
+    return "\n".join(lines)

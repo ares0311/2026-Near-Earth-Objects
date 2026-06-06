@@ -29,7 +29,17 @@ __all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
            "compute_jacobi_constant",
            "compute_earth_moid_estimate",
            "compute_orbital_eccentricity_class",
-           "compute_orbital_speed_at_perihelion"]
+           "compute_orbital_speed_at_perihelion",
+           "compute_impact_parameter",
+           "compute_geocentric_velocity",
+           "compute_orbital_period_years",
+           "compute_longitude_ascending_node_rate",
+           "compute_argument_of_perihelion_rate",
+           "compute_perihelion_velocity",
+           "compute_aphelion_velocity",
+           "compute_specific_angular_momentum",
+           "compute_orbit_complexity",
+           "compute_mean_longitude"]
 
 import math
 from typing import NamedTuple
@@ -1618,3 +1628,336 @@ def compute_orbital_speed_at_perihelion(elements: object) -> float | None:
     a_m = a * AU_TO_M
     v2 = GM_SUN_M3_S2 * (2.0 / r_m - 1.0 / a_m)
     return float(v2 ** 0.5 / 1000.0)
+
+
+def compute_impact_parameter(elements: object, v_inf_km_s: float = 20.0) -> float | None:
+    """Return the gravitational-focusing-corrected b-plane impact parameter in km.
+
+    b = q * sqrt(1 + v_esc² / v_inf²) where v_esc is the Earth escape speed at
+    perihelion distance (approximated using Earth's surface escape speed scaled to
+    the perihelion distance from Earth's centre) and v_inf is the hyperbolic excess
+    velocity.  Returns None if perihelion distance is unavailable, v_inf ≤ 0, or
+    the orbit is not Earth-crossing (q > 1.017 AU).
+    """
+    if v_inf_km_s <= 0.0:
+        return None
+    q = compute_perihelion_distance(elements)
+    if q is None or q > 1.017:
+        return None
+    R_EARTH_KM = 6371.0
+    V_ESC_SURFACE_KM_S = 11.186
+    AU_TO_KM = 1.495978707e8
+    q_km = q * AU_TO_KM
+    v_esc_sq = V_ESC_SURFACE_KM_S**2 * (R_EARTH_KM / max(q_km, R_EARTH_KM))
+    b = q_km * math.sqrt(1.0 + v_esc_sq / (v_inf_km_s**2))
+    return float(b)
+
+
+def compute_geocentric_velocity(elements: object) -> float | None:
+    """Return the geocentric encounter velocity in km/s at perihelion.
+
+    Uses the inclination-based encounter velocity formula:
+
+    .. math::
+
+        v_{\\rm enc} = \\sqrt{v_{\\rm obj}^2 + v_{\\oplus}^2
+                        - 2\\,v_{\\rm obj}\\,v_{\\oplus}\\cos(i)}
+
+    where *v_obj* is the object's orbital speed at perihelion (via vis-viva),
+    *v_Earth* = 29.78 km/s (mean Earth orbital speed), and *i* is the orbital
+    inclination.  This is the rigorous vector-subtraction formula for the
+    relative velocity of a coplanar or inclined orbit at the Earth's distance.
+
+    Returns ``None`` if perihelion distance, semi-major axis, or inclination
+    are unavailable.
+    """
+    V_EARTH_KM_S = 29.78
+
+    q = compute_perihelion_distance(elements)
+    if q is None:
+        return None
+    v_obj = compute_vis_viva_velocity(elements, q)
+    if v_obj is None:
+        return None
+    incl = getattr(elements, "inclination_deg", None)
+    if incl is None:
+        return None
+    i_rad = math.radians(float(incl))
+    v_enc_sq = v_obj**2 + V_EARTH_KM_S**2 - 2.0 * v_obj * V_EARTH_KM_S * math.cos(i_rad)
+    return float(math.sqrt(max(0.0, v_enc_sq)))
+
+
+def compute_orbital_period_years(elements: object) -> float | None:
+    """Return the orbital period in years via Kepler's third law: T = sqrt(a³).
+
+    Uses ``a_au`` attribute (semi-major axis in AU).  Returns ``None`` if
+    ``a_au`` is missing, zero, or negative.
+
+    The conversion is exact under the Gaussian gravitational constant definition
+    where 1 AU and 1 year are the natural units of the solar system.
+    """
+    a = getattr(elements, "a_au", None)
+    if a is None:
+        a = getattr(elements, "semi_major_axis_au", None)
+    if a is None:
+        return None
+    a_val = float(a)
+    if a_val <= 0.0:
+        return None
+    return float(math.sqrt(a_val ** 3))
+
+
+def compute_longitude_ascending_node_rate(elements: object) -> float | None:
+    """Return an approximate secular nodal precession rate in degrees per year.
+
+    Uses the first-order J2 secular perturbation formula for the rate of change
+    of the longitude of the ascending node due to Earth's oblateness (J2):
+
+    .. math::
+
+        \\dot{\\Omega} \\approx -\\frac{3}{2} n J_2
+            \\left(\\frac{R_\\oplus}{a}\\right)^2
+            \\frac{\\cos i}{(1-e^2)^2}
+
+    Here the Sun is treated as the central body; J2 is the solar oblateness
+    (J2_sun ≈ 2.0 × 10⁻⁷).  This gives a tiny but non-zero rate for
+    heliocentric orbits.  Returns ``None`` if any required element is missing
+    or if ``a ≤ 0``, ``e ≥ 1``, or ``inclination`` is absent.
+
+    Returns the rate in degrees per year (negative = retrograde precession).
+    """
+    a = getattr(elements, "a_au", None) or getattr(elements, "semi_major_axis_au", None)
+    if a is None:
+        return None
+    a_val = float(a)
+    if a_val <= 0.0:
+        return None
+    e = getattr(elements, "e", None) or getattr(elements, "eccentricity", None)
+    if e is None:
+        return None
+    e_val = float(e)
+    if e_val >= 1.0:
+        return None
+    incl = getattr(elements, "inclination_deg", None)
+    if incl is None:
+        return None
+    i_rad = math.radians(float(incl))
+    # Solar J2 ≈ 2.0e-7; R_sun ≈ 4.65e-3 AU
+    J2_SUN = 2.0e-7
+    R_SUN_AU = 4.65e-3
+    # Mean motion in degrees/year: n = 360 / T_years = 360 / sqrt(a^3)
+    n_deg_yr = 360.0 / math.sqrt(a_val ** 3)
+    rate = (
+        -1.5 * n_deg_yr * J2_SUN * (R_SUN_AU / a_val) ** 2
+        * math.cos(i_rad) / (1.0 - e_val ** 2) ** 2
+    )
+    return float(rate)
+
+
+def compute_argument_of_perihelion_rate(elements: object) -> float | None:
+    """Return the secular precession rate of the argument of perihelion (ω) in deg/yr.
+
+    Uses the first-order J2 secular perturbation formula:
+
+    .. math::
+
+        \\dot{\\omega} \\approx \\frac{3}{2} n J_2
+            \\left(\\frac{R_\\odot}{a}\\right)^2
+            \\frac{5\\cos^2 i - 1}{2(1-e^2)^2}
+
+    The same J2_SUN and R_SUN constants as
+    :func:`compute_longitude_ascending_node_rate` are used.  Returns ``None``
+    if any required element is missing, ``a ≤ 0``, ``e ≥ 1``, or inclination
+    is absent.
+
+    Returns the rate in degrees per year; positive = prograde precession.
+    """
+    import math
+
+    J2_SUN = 2.0e-7
+    R_SUN_AU = 4.65e-3
+
+    a = getattr(elements, "a_au", None) or getattr(elements, "semi_major_axis_au", None)
+    if a is None:
+        return None
+    a_val = float(a)
+    if a_val <= 0.0:
+        return None
+    e = getattr(elements, "e", None) or getattr(elements, "eccentricity", None)
+    if e is None:
+        return None
+    e_val = float(e)
+    if e_val >= 1.0:
+        return None
+    incl = getattr(elements, "inclination_deg", None)
+    if incl is None:
+        return None
+    i_rad = math.radians(float(incl))
+    n_rad_yr = 2.0 * math.pi / (a_val ** 1.5)
+    denom = (1.0 - e_val ** 2) ** 2
+    rate_rad_yr = (
+        1.5 * n_rad_yr * J2_SUN * (R_SUN_AU / a_val) ** 2
+        * (5.0 * math.cos(i_rad) ** 2 - 1.0) / (2.0 * denom)
+    )
+    return float(math.degrees(rate_rad_yr))
+
+
+def compute_perihelion_velocity(elements: object) -> float | None:
+    """Return the orbital speed at perihelion in km/s via the vis-viva equation.
+
+    At perihelion (r = q = a(1-e)):
+
+    .. math::
+
+        v_q = \\sqrt{\\mu \\left(\\frac{2}{q} - \\frac{1}{a}\\right)}
+
+    where μ = GM_Sun = 4π² AU³/yr² converted to km²/s².  Returns ``None``
+    if any required element is missing, ``a ≤ 0``, ``e ≥ 1``, or
+    ``q ≤ 0`` (degenerate orbit).
+    """
+    import math
+
+    AU_KM = 1.495978707e8
+    YR_S = 365.25 * 86400.0
+    GM_AU3_YR2 = 4.0 * math.pi ** 2
+    GM_KM3_S2 = GM_AU3_YR2 * (AU_KM ** 3) / (YR_S ** 2)
+
+    a = getattr(elements, "a_au", None) or getattr(elements, "semi_major_axis_au", None)
+    if a is None:
+        return None
+    a_val = float(a)
+    if a_val <= 0.0:
+        return None
+    e = getattr(elements, "e", None) or getattr(elements, "eccentricity", None)
+    if e is None:
+        return None
+    e_val = float(e)
+    if e_val >= 1.0:
+        return None
+    q_val = a_val * (1.0 - e_val)
+    v2 = GM_KM3_S2 * (2.0 / (q_val * AU_KM) - 1.0 / (a_val * AU_KM))
+    return float(math.sqrt(v2))
+
+
+def compute_aphelion_velocity(elements: object) -> float | None:
+    """Return the orbital speed at aphelion in km/s via the vis-viva equation.
+
+    At aphelion (r = Q = a(1+e)):
+
+    .. math::
+
+        v_Q = \\sqrt{\\mu \\left(\\frac{2}{Q} - \\frac{1}{a}\\right)}
+
+    Uses the same GM_Sun constant as :func:`compute_perihelion_velocity`.
+    Returns ``None`` if any required element is missing, ``a ≤ 0``,
+    ``e ≥ 1`` (hyperbolic), or the result would be non-real.
+    """
+    import math
+
+    AU_KM = 1.495978707e8
+    YR_S = 365.25 * 86400.0
+    GM_AU3_YR2 = 4.0 * math.pi ** 2
+    GM_KM3_S2 = GM_AU3_YR2 * (AU_KM ** 3) / (YR_S ** 2)
+
+    a = getattr(elements, "a_au", None) or getattr(elements, "semi_major_axis_au", None)
+    if a is None:
+        return None
+    a_val = float(a)
+    if a_val <= 0.0:
+        return None
+    e = getattr(elements, "e", None) or getattr(elements, "eccentricity", None)
+    if e is None:
+        return None
+    e_val = float(e)
+    if e_val >= 1.0:
+        return None
+    q_aph = a_val * (1.0 + e_val)
+    v2 = GM_KM3_S2 * (2.0 / (q_aph * AU_KM) - 1.0 / (a_val * AU_KM))
+    return float(math.sqrt(v2))
+
+
+def compute_specific_angular_momentum(elements: object) -> float | None:
+    """Specific angular momentum of the orbit in AU² yr⁻¹.
+
+    Uses the vis-viva-derived formula:
+
+        h = sqrt(GM_AU3_YR2 * a * (1 - e²))
+
+    where GM_AU3_YR2 = 4π².  Returns ``None`` for missing, non-positive *a*,
+    or eccentricity >= 1 (hyperbolic).
+    """
+    import math
+
+    GM = 4.0 * math.pi ** 2  # AU³ yr⁻²
+
+    a = getattr(elements, "a_au", None)
+    if a is None:
+        a = getattr(elements, "semi_major_axis_au", None)
+    if a is None:
+        return None
+    a_val = float(a)
+    if a_val <= 0.0:
+        return None
+
+    e = getattr(elements, "e", None)
+    if e is None:
+        e = getattr(elements, "eccentricity", None)
+    if e is None:
+        return None
+    e_val = float(e)
+    if e_val >= 1.0:
+        return None
+
+    return float(math.sqrt(GM * a_val * (1.0 - e_val ** 2)))
+
+
+def compute_orbit_complexity(elements: object) -> float:
+    """Orbital complexity index in [0, 1].
+
+    Combines eccentricity and inclination deviation from the ecliptic plane
+    into a single scalar:
+
+        complexity = 0.5 * e_norm + 0.5 * i_norm
+
+    where:
+        e_norm = min(e, 1) (eccentricity; 1 = parabolic/hyperbolic)
+        i_norm = min(|i|, 90) / 90 (inclination; 1 = polar orbit)
+
+    Returns 0.0 for missing or invalid elements.
+    """
+    e = getattr(elements, "e", None)
+    if e is None:
+        e = getattr(elements, "eccentricity", None)
+    e_val = float(e) if e is not None else 0.0
+    e_norm = min(1.0, max(0.0, e_val))
+
+    i = getattr(elements, "i_deg", None)
+    if i is None:
+        i = getattr(elements, "inclination_deg", None)
+    i_val = float(i) if i is not None else 0.0
+    i_norm = min(1.0, abs(i_val) / 90.0)
+
+    return float(0.5 * e_norm + 0.5 * i_norm)
+
+
+def compute_mean_longitude(elements: object) -> float | None:
+    """Mean longitude of the orbit in degrees, normalised to [0, 360).
+
+    Defined as: λ = Ω + ω + M₀  (mod 360°)
+
+    where Ω is the longitude of the ascending node, ω is the argument
+    of perihelion, and M₀ is the mean anomaly at epoch.
+    Returns ``None`` if any required attribute is missing.
+    """
+    omega = getattr(elements, "longitude_ascending_node_deg", None)
+    if omega is None:
+        omega = getattr(elements, "Omega_deg", None)
+    w = getattr(elements, "argument_perihelion_deg", None)
+    if w is None:
+        w = getattr(elements, "omega_deg", None)
+    m0 = getattr(elements, "mean_anomaly_deg", None)
+    if m0 is None:
+        m0 = getattr(elements, "M0_deg", None)
+    if omega is None or w is None or m0 is None:
+        return None
+    return float((float(omega) + float(w) + float(m0)) % 360.0)

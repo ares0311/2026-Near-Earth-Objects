@@ -41,6 +41,16 @@ __all__ = [
     "ObservationFilter",
     "FieldStatistics",
     "CandidateGrouping",
+    "MCPServerStatus",
+    "BatchProcessingResult",
+    "SurveyRunSummary",
+    "PipelineHealthReport",
+    "ObservationQualityReport",
+    "FieldCoverageReport",
+    "AlertSummaryRecord",
+    "ScoredNEOBatch",
+    "NightObservationSummary",
+    "SurveyNightRecord",
 ]
 
 from dataclasses import dataclass
@@ -1177,3 +1187,163 @@ class CandidateGrouping(BaseModel):
     candidate_ids: tuple[str, ...] = ()
     n_candidates: int = 0
     dominant_hazard_flag: str = "unknown"
+
+
+class MCPServerStatus(BaseModel):
+    """Status snapshot for a single MCP server used by the NEO pipeline."""
+
+    model_config = ConfigDict(frozen=True)
+
+    server_name: str
+    is_healthy: bool = False
+    tool_count: int = 0
+    offline_mode: bool = True
+
+
+class BatchProcessingResult(BaseModel):
+    """Summary result from a batch pipeline processing run.
+
+    Aggregates high-level counts and timing for a single batch of candidates
+    processed through the full pipeline (detect → link → classify → score).
+    Immutable after construction.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    batch_id: str
+    n_input: int = 0
+    n_detected: int = 0
+    n_linked: int = 0
+    n_scored: int = 0
+    n_pha_candidates: int = 0
+    elapsed_seconds: float = 0.0
+    pipeline_version: str = "unknown"
+
+
+class SurveyRunSummary(BaseModel):
+    """High-level summary of a single survey run for reporting and logging.
+
+    Aggregates pipeline output for one field/night combination.
+    Immutable after construction.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    run_id: str
+    field_id: str | None = None
+    night_jd: float | None = None
+    n_alerts: int = 0
+    n_candidates: int = 0
+    n_pha_candidates: int = 0
+    limiting_mag: float | None = None
+    pipeline_version: str = "unknown"
+
+
+class PipelineHealthReport(BaseModel):
+    """Snapshot of pipeline health from the most recent test and lint run.
+
+    Immutable after construction.  All fields have safe defaults so a partial
+    report can be constructed when not all checks have been run.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    n_modules_tested: int = 0
+    coverage_pct: float = 0.0
+    lint_clean: bool = False
+    mypy_clean: bool = False
+    test_count: int = 0
+    pipeline_version: str = "unknown"
+
+
+class ObservationQualityReport(BaseModel):
+    """Frozen quality summary for a single survey field epoch.
+
+    Aggregates per-observation quality metrics for downstream filtering
+    and comparison.  All numeric fields use ``None`` to indicate that
+    the statistic could not be computed (e.g. empty field, missing
+    SNR measurements).
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    field_id: str = "unknown"
+    epoch_jd: float = 0.0
+    n_obs: int = 0
+    mean_snr: float | None = None
+    mean_fwhm_arcsec: float | None = None
+    n_saturated: int = 0
+    limiting_mag: float | None = None
+
+
+class FieldCoverageReport(BaseModel):
+    """Frozen coverage summary for a single survey field.
+
+    Aggregates spatial and observational metadata for a field, suitable
+    for survey efficiency assessment and scheduling decisions.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    field_id: str = "unknown"
+    ra_deg: float = 0.0
+    dec_deg: float = 0.0
+    area_sq_deg: float = 0.0
+    n_obs: int = 0
+    n_tracklets: int = 0
+    limiting_mag: float | None = None
+    pipeline_version: str = "unknown"
+
+
+class AlertSummaryRecord(BaseModel):
+    """Frozen summary record for a single alert-pathway decision.
+
+    Lightweight snapshot of a scored NEO's alert state, suitable for
+    export, logging, and downstream review workflows.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    neo_id: str = "unknown"
+    alert_pathway: str = "internal_candidate"
+    hazard_flag: str = "unknown"
+    discovery_priority: float | None = None
+    moid_au: float | None = None
+    submitted_at_jd: float | None = None
+
+
+class ScoredNEOBatch(BaseModel):
+    """Frozen batch container grouping ScoredNEOs from one pipeline run."""
+
+    model_config = ConfigDict(frozen=True)
+
+    batch_id: str = "unknown"
+    pipeline_version: str = "unknown"
+    created_at_jd: float | None = None
+    n_candidates: int = 0
+
+
+class NightObservationSummary(BaseModel):
+    """Frozen summary of observations collected on a single night."""
+
+    model_config = ConfigDict(frozen=True)
+
+    night_jd: float | None = None
+    n_obs: int = 0
+    n_candidates: int = 0
+    mean_rb: float | None = None
+    limiting_mag: float | None = None
+    survey: str = "unknown"
+
+
+class SurveyNightRecord(BaseModel):
+    """Frozen summary record for a single survey night."""
+
+    model_config = ConfigDict(frozen=True)
+
+    night_jd: float | None = None
+    survey: str = "unknown"
+    n_obs: int = 0
+    n_tracklets: int = 0
+    limiting_mag: float | None = None
+    area_sq_deg: float | None = None

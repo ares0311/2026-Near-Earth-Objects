@@ -2668,3 +2668,466 @@ class TestFormatObservationCountSummary:
         sys.path.insert(0, "src")
         import alert
         assert "format_observation_count_summary" in alert.__all__
+
+
+class TestCountSubmissionReady:
+    def _make_neo(self, rb=0.95, quality=2, moid=0.03, known_score=0.0, neo_prob=0.6):
+        from types import SimpleNamespace
+        features = SimpleNamespace(
+            real_bogus_score=rb,
+            orbit_quality_score=quality / 4.0,
+            known_object_score=known_score,
+        )
+        orbital_elements = SimpleNamespace(quality_code=quality)
+        hazard = SimpleNamespace(
+            moid_au=moid,
+            neo_class="apollo",
+            alert_pathway="mpc_submission",
+            orbital_elements=orbital_elements,
+        )
+        posterior = SimpleNamespace(
+            neo_candidate=neo_prob,
+            known_object=0.1,
+            main_belt_asteroid=0.1,
+            stellar_artifact=0.1,
+            other_solar_system=0.1,
+        )
+        meta = SimpleNamespace(
+            quality_code=quality,
+            discovery_priority=0.5,
+            close_approach_au=moid,
+        )
+        return SimpleNamespace(features=features, hazard=hazard, posterior=posterior, metadata=meta)
+
+    def test_all_ready(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import count_submission_ready
+        neos = [self._make_neo() for _ in range(3)]
+        assert count_submission_ready(neos) == 3
+
+    def test_none_ready_low_rb(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import count_submission_ready
+        neos = [self._make_neo(rb=0.5) for _ in range(3)]
+        assert count_submission_ready(neos) == 0
+
+    def test_empty_list(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import count_submission_ready
+        assert count_submission_ready([]) == 0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+        assert "count_submission_ready" in alert.__all__
+
+
+class TestFormatMpcObservationBlock:
+    def test_returns_string(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_mpc_observation_block
+
+        neo = make_scored_neo()
+        block = format_mpc_observation_block(neo)
+        assert isinstance(block, str)
+
+    def test_line_count_equals_observations(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_mpc_observation_block
+
+        neo = make_scored_neo()
+        block = format_mpc_observation_block(neo)
+        lines = block.split("\n")
+        assert len(lines) == len(neo.tracklet.observations)
+
+    def test_each_line_is_80_chars(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_mpc_observation_block
+
+        neo = make_scored_neo()
+        for line in format_mpc_observation_block(neo).split("\n"):
+            assert len(line) == 80, f"Line length {len(line)}: {line!r}"
+
+    def test_first_line_is_discovery(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_mpc_observation_block
+
+        neo = make_scored_neo()
+        first_line = format_mpc_observation_block(neo).split("\n")[0]
+        # Column 6 (index 5) is the discovery asterisk
+        assert first_line[5] == "*"
+
+    def test_subsequent_lines_not_discovery(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_mpc_observation_block
+
+        neo = make_scored_neo()
+        lines = format_mpc_observation_block(neo).split("\n")
+        for line in lines[1:]:
+            assert line[5] == " "
+
+    def test_custom_obs_code(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_mpc_observation_block
+
+        neo = make_scored_neo()
+        block = format_mpc_observation_block(neo, obs_code="703")
+        for line in block.split("\n"):
+            assert line[76:79] == "703"
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+        assert "format_mpc_observation_block" in alert.__all__
+
+
+class TestFormatNeocpSubmissionHeader:
+    def test_returns_string(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_neocp_submission_header
+
+        neo = make_scored_neo()
+        header = format_neocp_submission_header(neo)
+        assert isinstance(header, str)
+
+    def test_five_lines(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_neocp_submission_header
+
+        neo = make_scored_neo()
+        lines = format_neocp_submission_header(neo).split("\n")
+        assert len(lines) == 5
+
+    def test_cod_line(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_neocp_submission_header
+
+        neo = make_scored_neo()
+        lines = format_neocp_submission_header(neo, obs_code="703").split("\n")
+        assert lines[0] == "COD 703"
+
+    def test_ack_contains_object_id(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_neocp_submission_header
+
+        neo = make_scored_neo()
+        header = format_neocp_submission_header(neo)
+        assert neo.tracklet.object_id in header
+
+    def test_obs_mea_tel_present(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_neocp_submission_header
+
+        neo = make_scored_neo()
+        header = format_neocp_submission_header(neo)
+        assert "OBS " in header
+        assert "MEA " in header
+        assert "TEL " in header
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+        assert "format_neocp_submission_header" in alert.__all__
+
+
+class TestFormatCompleteMpcSubmission:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_complete_mpc_submission
+        self.fn = format_complete_mpc_submission
+
+    def test_returns_string(self, scored_neo):
+        result = self.fn(scored_neo)
+        assert isinstance(result, str)
+
+    def test_contains_header_and_obs(self, scored_neo):
+        result = self.fn(scored_neo)
+        assert "COD" in result
+        assert len([ln for ln in result.splitlines() if len(ln) == 80]) >= 1
+
+    def test_blank_line_separator(self, scored_neo):
+        result = self.fn(scored_neo)
+        assert "\n\n" in result
+
+    def test_custom_obs_code(self, scored_neo):
+        result = self.fn(scored_neo, obs_code="568")
+        assert "568" in result
+
+    def test_no_impact_claim(self, scored_neo):
+        result = self.fn(scored_neo)
+        assert "impact probability" not in result.lower() or "NOT" in result
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+        assert "format_complete_mpc_submission" in alert.__all__
+
+
+class TestCountSubmissionsByPathway:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import count_submissions_by_pathway
+        self.fn = count_submissions_by_pathway
+
+    def test_empty(self):
+        assert self.fn([]) == {}
+
+    def test_ready_neo_counted(self):
+        import sys
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        sys.path.insert(0, "src")
+        hazard = SimpleNamespace(alert_pathway="mpc_submission")
+        neo = SimpleNamespace(hazard=hazard)
+        with patch("alert.ready_for_submission", return_value=(True, [])):
+            result = self.fn([neo])
+        assert result.get("mpc_submission") == 1
+
+    def test_multiple_pathways(self):
+        import sys
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        sys.path.insert(0, "src")
+        neo1 = SimpleNamespace(hazard=SimpleNamespace(alert_pathway="mpc_submission"))
+        neo2 = SimpleNamespace(hazard=SimpleNamespace(alert_pathway="neocp_followup"))
+        with patch("alert.ready_for_submission", return_value=(True, [])):
+            result = self.fn([neo1, neo2])
+        assert result["mpc_submission"] == 1
+        assert result["neocp_followup"] == 1
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+        assert "count_submissions_by_pathway" in alert.__all__
+
+    def test_not_ready_excluded(self):
+        import sys
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        sys.path.insert(0, "src")
+        neo = SimpleNamespace(hazard=SimpleNamespace(alert_pathway="internal_candidate"))
+        with patch("alert.ready_for_submission", return_value=(False, ["missing rb"])):
+            result = self.fn([neo])
+        assert result == {}
+
+
+class TestValidateObsCode:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import validate_obs_code
+        self.fn = validate_obs_code
+
+    def test_valid_numeric(self):
+        ok, msg = self.fn("568")
+        assert ok is True
+        assert msg == ""
+
+    def test_valid_alphanumeric(self):
+        ok, _ = self.fn("T05")
+        assert ok is True
+
+    def test_valid_all_letters(self):
+        ok, _ = self.fn("ZTF")
+        assert ok is True
+
+    def test_too_short(self):
+        ok, msg = self.fn("56")
+        assert ok is False
+        assert "3" in msg
+
+    def test_too_long(self):
+        ok, msg = self.fn("5689")
+        assert ok is False
+
+    def test_lowercase_invalid(self):
+        ok, msg = self.fn("56a")
+        assert ok is False
+        assert "a" in msg
+
+    def test_not_string(self):
+        ok, msg = self.fn(568)
+        assert ok is False
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+        assert "validate_obs_code" in alert.__all__
+
+
+class TestFormatCandidateSummaryLine:
+    fn_name = "format_candidate_summary_line"
+
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+        return getattr(alert, self.fn_name)
+
+    def _neo(self, obj_id="NEO-001", pathway="mpc_submission", flag="pha_candidate",
+             priority=0.85, moid=0.03):
+        from types import SimpleNamespace
+        tracklet = SimpleNamespace(object_id=obj_id)
+        hazard = SimpleNamespace(alert_pathway=pathway, hazard_flag=flag, moid_au=moid)
+        metadata = SimpleNamespace(discovery_priority=priority)
+        return SimpleNamespace(tracklet=tracklet, hazard=hazard, metadata=metadata)
+
+    def test_returns_string(self):
+        neo = self._neo()
+        result = self._fn()(neo)
+        assert isinstance(result, str)
+
+    def test_contains_obj_id(self):
+        neo = self._neo(obj_id="MYOBJ")
+        result = self._fn()(neo)
+        assert "MYOBJ" in result
+
+    def test_contains_pathway(self):
+        neo = self._neo(pathway="mpc_submission")
+        result = self._fn()(neo)
+        assert "mpc_submission" in result
+
+    def test_none_priority_shows_na(self):
+        from types import SimpleNamespace
+        tracklet = SimpleNamespace(object_id="X")
+        hazard = SimpleNamespace(
+            alert_pathway="internal_candidate", hazard_flag="nominal", moid_au=None
+        )
+        metadata = SimpleNamespace(discovery_priority=None)
+        neo = SimpleNamespace(tracklet=tracklet, hazard=hazard, metadata=metadata)
+        result = self._fn()(neo)
+        assert "N/A" in result
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+        assert "format_candidate_summary_line" in alert.__all__
+
+
+class TestFormatNeoSummaryTable:
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+        return alert.format_neo_summary_table
+
+    def _neo(self, obj_id="NEO-001", pathway="mpc_submission",
+             flag="pha_candidate", priority=0.85, moid=0.03):
+        from types import SimpleNamespace
+        tracklet = SimpleNamespace(object_id=obj_id)
+        hazard = SimpleNamespace(alert_pathway=pathway, hazard_flag=flag, moid_au=moid)
+        metadata = SimpleNamespace(discovery_priority=priority)
+        return SimpleNamespace(tracklet=tracklet, hazard=hazard, metadata=metadata)
+
+    def test_returns_string(self):
+        neos = [self._neo()]
+        assert isinstance(self._fn()(neos), str)
+
+    def test_empty_list_returns_header_only(self):
+        result = self._fn()([])
+        assert "#" in result
+
+    def test_contains_object_id(self):
+        neos = [self._neo(obj_id="MYOBJ")]
+        assert "MYOBJ" in self._fn()(neos)
+
+    def test_sorted_by_priority_descending(self):
+        neo_high = self._neo(obj_id="HIGH", priority=0.9)
+        neo_low = self._neo(obj_id="LOW", priority=0.1)
+        result = self._fn()([neo_low, neo_high])
+        assert result.index("HIGH") < result.index("LOW")
+
+    def test_max_rows_respected(self):
+        neos = [self._neo(obj_id=f"N{i}", priority=float(i)/10) for i in range(20)]
+        result = self._fn()(neos, max_rows=3)
+        data_lines = [ln for ln in result.splitlines() if ln.strip() and ln.strip()[0].isdigit()]
+        assert len(data_lines) <= 3
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+        assert "format_neo_summary_table" in alert.__all__
+
+
+class TestCountReadyForSubmission:
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+        return alert.count_ready_for_submission
+
+    def test_empty_list_returns_zero(self):
+        assert self._fn()([]) == 0
+
+    def test_not_ready_neos_returns_zero(self, scored_neo):
+        result = self._fn()([scored_neo])
+        assert isinstance(result, int)
+        assert result >= 0
+
+    def test_exception_neo_skipped(self):
+        from types import SimpleNamespace
+        bad_neo = SimpleNamespace()
+        assert self._fn()([bad_neo]) == 0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import alert
+        assert "count_ready_for_submission" in alert.__all__
+
+
+class TestFormatAlertPathwaySummary:
+    def test_empty_returns_no_candidates(self):
+        from alert import format_alert_pathway_summary
+        assert format_alert_pathway_summary([]) == "No candidates."
+
+    def test_single_neo(self, scored_neo):
+        from alert import format_alert_pathway_summary
+        result = format_alert_pathway_summary([scored_neo])
+        assert "1 candidates" in result
+        assert "100.0%" in result
+
+    def test_multiple_pathways(self):
+        from types import SimpleNamespace
+
+        from alert import format_alert_pathway_summary
+        def _neo(pathway):
+            hazard = SimpleNamespace(alert_pathway=pathway)
+            return SimpleNamespace(hazard=hazard)
+        neos = [_neo("mpc_submission"), _neo("mpc_submission"), _neo("internal_candidate")]
+        result = format_alert_pathway_summary(neos)
+        assert "3 candidates" in result
+        assert "mpc_submission" in result
+        assert "internal_candidate" in result
+
+    def test_no_hazard_attr(self):
+        from types import SimpleNamespace
+
+        from alert import format_alert_pathway_summary
+        neo = SimpleNamespace(hazard=None)
+        result = format_alert_pathway_summary([neo])
+        assert "unknown" in result

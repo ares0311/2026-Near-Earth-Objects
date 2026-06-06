@@ -2841,3 +2841,542 @@ class TestComputeOrbitalSpeedAtPerihelion:
         sys.path.insert(0, "src")
         import orbit
         assert "compute_orbital_speed_at_perihelion" in orbit.__all__
+
+
+class TestComputeImpactParameter:
+    def _make_elements(self, a_au, e):
+        from types import SimpleNamespace
+        return SimpleNamespace(a_au=a_au, eccentricity=e, semi_major_axis_au=None)
+
+    def test_earth_crossing(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_impact_parameter
+        # Apollo-type: a=1.5, e=0.5 → q=0.75 AU (Earth-crossing)
+        els = self._make_elements(1.5, 0.5)
+        b = compute_impact_parameter(els, v_inf_km_s=20.0)
+        assert b is not None
+        assert b > 0.0
+
+    def test_non_earth_crossing_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_impact_parameter
+        # Amor: q > 1.017 AU
+        els = self._make_elements(1.5, 0.1)  # q = 1.35 AU
+        assert compute_impact_parameter(els) is None
+
+    def test_zero_vinf_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_impact_parameter
+        els = self._make_elements(1.5, 0.5)
+        assert compute_impact_parameter(els, v_inf_km_s=0.0) is None
+
+    def test_gravitational_focusing_larger_than_geometric(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_impact_parameter
+        els = self._make_elements(1.5, 0.5)
+        b = compute_impact_parameter(els, v_inf_km_s=20.0)
+        AU_TO_KM = 1.495978707e8
+        q_km = 0.75 * AU_TO_KM
+        assert b > q_km
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import orbit
+        assert "compute_impact_parameter" in orbit.__all__
+
+
+class TestComputeGeocentricVelocity:
+    def _make_elements(self, a, e, incl_deg):
+        from types import SimpleNamespace
+
+        return SimpleNamespace(
+            a_au=a,
+            e=e,
+            inclination_deg=incl_deg,
+        )
+
+    def test_apollo_low_inclination(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_geocentric_velocity
+
+        # Apollo-like: a=1.5, e=0.6, i=10 deg => q = 0.6 AU
+        els = self._make_elements(1.5, 0.6, 10.0)
+        v = compute_geocentric_velocity(els)
+        assert v is not None
+        assert v > 0.0
+
+    def test_coplanar_gives_speed_difference(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_geocentric_velocity, compute_vis_viva_velocity
+
+        # i=0: v_enc = |v_obj - v_Earth|
+        els = self._make_elements(1.5, 0.6, 0.0)
+        v = compute_geocentric_velocity(els)
+        v_obj = compute_vis_viva_velocity(els, 1.5 * (1 - 0.6))
+        V_EARTH = 29.78
+        expected = abs(v_obj - V_EARTH)
+        assert abs(v - expected) < 0.01
+
+    def test_high_inclination_increases_velocity(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_geocentric_velocity
+
+        els_low_i = self._make_elements(1.5, 0.6, 5.0)
+        els_high_i = self._make_elements(1.5, 0.6, 60.0)
+        v_low = compute_geocentric_velocity(els_low_i)
+        v_high = compute_geocentric_velocity(els_high_i)
+        assert v_high > v_low
+
+    def test_missing_inclination_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_geocentric_velocity
+
+        els = SimpleNamespace(a_au=1.5, e=0.6)
+        assert compute_geocentric_velocity(els) is None
+
+    def test_missing_a_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_geocentric_velocity
+
+        els = SimpleNamespace(e=0.6, inclination_deg=10.0)
+        assert compute_geocentric_velocity(els) is None
+
+    def test_v_obj_none_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_geocentric_velocity
+
+        # semi_major_axis_au lets compute_perihelion_distance succeed,
+        # but compute_vis_viva_velocity needs a_au (not found → returns None)
+        els = SimpleNamespace(semi_major_axis_au=1.5, e=0.6, inclination_deg=10.0)
+        assert compute_geocentric_velocity(els) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import orbit
+        assert "compute_geocentric_velocity" in orbit.__all__
+
+
+class TestComputeOrbitalPeriodYears:
+    def test_earth_orbit(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_orbital_period_years
+
+        els = SimpleNamespace(a_au=1.0)
+        assert abs(compute_orbital_period_years(els) - 1.0) < 1e-9
+
+    def test_jupiter_orbit(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_orbital_period_years
+
+        els = SimpleNamespace(a_au=5.2)
+        period = compute_orbital_period_years(els)
+        assert abs(period - 5.2 ** 1.5) < 0.001
+
+    def test_semi_major_axis_fallback(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_orbital_period_years
+
+        els = SimpleNamespace(semi_major_axis_au=1.0)
+        assert abs(compute_orbital_period_years(els) - 1.0) < 1e-9
+
+    def test_zero_a_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_orbital_period_years
+
+        assert compute_orbital_period_years(SimpleNamespace(a_au=0.0)) is None
+
+    def test_negative_a_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_orbital_period_years
+
+        assert compute_orbital_period_years(SimpleNamespace(a_au=-1.0)) is None
+
+    def test_missing_a_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from orbit import compute_orbital_period_years
+
+        assert compute_orbital_period_years(SimpleNamespace()) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import orbit
+        assert "compute_orbital_period_years" in orbit.__all__
+
+
+class TestComputeLongitudeAscendingNodeRate:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_longitude_ascending_node_rate
+        self.fn = compute_longitude_ascending_node_rate
+
+    def test_basic_returns_float(self):
+        from types import SimpleNamespace
+        el = SimpleNamespace(a_au=1.0, e=0.1, inclination_deg=10.0)
+        result = self.fn(el)
+        assert isinstance(result, float)
+
+    def test_retrograde_sign(self):
+        from types import SimpleNamespace
+        el = SimpleNamespace(a_au=1.0, e=0.1, inclination_deg=10.0)
+        result = self.fn(el)
+        assert result < 0.0
+
+    def test_zero_inclination_zero_rate(self):
+        from types import SimpleNamespace
+        el = SimpleNamespace(a_au=1.0, e=0.1, inclination_deg=90.0)
+        result = self.fn(el)
+        assert result is not None
+
+    def test_missing_a_returns_none(self):
+        from types import SimpleNamespace
+        el = SimpleNamespace(e=0.1, inclination_deg=10.0)
+        assert self.fn(el) is None
+
+    def test_zero_a_returns_none(self):
+        from types import SimpleNamespace
+        el = SimpleNamespace(a_au=0.0, e=0.1, inclination_deg=10.0)
+        assert self.fn(el) is None
+
+    def test_missing_inclination_returns_none(self):
+        from types import SimpleNamespace
+        el = SimpleNamespace(a_au=1.0, e=0.1)
+        assert self.fn(el) is None
+
+    def test_parabolic_returns_none(self):
+        from types import SimpleNamespace
+        el = SimpleNamespace(a_au=1.0, e=1.0, inclination_deg=10.0)
+        assert self.fn(el) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import orbit
+        assert "compute_longitude_ascending_node_rate" in orbit.__all__
+
+    def test_negative_a_returns_none(self):
+        from types import SimpleNamespace
+        el = SimpleNamespace(a_au=-1.0, e=0.1, inclination_deg=10.0)
+        assert self.fn(el) is None
+
+    def test_missing_e_returns_none(self):
+        from types import SimpleNamespace
+        el = SimpleNamespace(a_au=1.0, inclination_deg=10.0)
+        assert self.fn(el) is None
+
+
+class TestComputeArgumentOfPerihelionRate:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_argument_of_perihelion_rate
+        self.fn = compute_argument_of_perihelion_rate
+
+    def test_basic_returns_float(self):
+        from types import SimpleNamespace
+        el = SimpleNamespace(a_au=1.0, e=0.1, inclination_deg=10.0)
+        result = self.fn(el)
+        assert isinstance(result, float)
+
+    def test_missing_a_returns_none(self):
+        from types import SimpleNamespace
+        el = SimpleNamespace(e=0.1, inclination_deg=10.0)
+        assert self.fn(el) is None
+
+    def test_zero_a_returns_none(self):
+        from types import SimpleNamespace
+        el = SimpleNamespace(a_au=0.0, e=0.1, inclination_deg=10.0)
+        assert self.fn(el) is None
+
+    def test_negative_a_returns_none(self):
+        from types import SimpleNamespace
+        el = SimpleNamespace(a_au=-1.0, e=0.1, inclination_deg=10.0)
+        assert self.fn(el) is None
+
+    def test_missing_e_returns_none(self):
+        from types import SimpleNamespace
+        el = SimpleNamespace(a_au=1.0, inclination_deg=10.0)
+        assert self.fn(el) is None
+
+    def test_parabolic_returns_none(self):
+        from types import SimpleNamespace
+        el = SimpleNamespace(a_au=1.0, e=1.0, inclination_deg=10.0)
+        assert self.fn(el) is None
+
+    def test_missing_inclination_returns_none(self):
+        from types import SimpleNamespace
+        el = SimpleNamespace(a_au=1.0, e=0.1)
+        assert self.fn(el) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import orbit
+        assert "compute_argument_of_perihelion_rate" in orbit.__all__
+
+
+class TestComputePerihelionVelocity:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from orbit import compute_perihelion_velocity
+        self.fn = compute_perihelion_velocity
+
+    def test_earth_like(self):
+        from types import SimpleNamespace
+        el = SimpleNamespace(a_au=1.0, e=0.0167)
+        result = self.fn(el)
+        assert result is not None
+        assert 25.0 < result < 35.0
+
+    def test_missing_a_none(self):
+        from types import SimpleNamespace
+        assert self.fn(SimpleNamespace(e=0.1)) is None
+
+    def test_zero_a_none(self):
+        from types import SimpleNamespace
+        assert self.fn(SimpleNamespace(a_au=0.0, e=0.1)) is None
+
+    def test_missing_e_none(self):
+        from types import SimpleNamespace
+        assert self.fn(SimpleNamespace(a_au=1.0)) is None
+
+    def test_parabolic_none(self):
+        from types import SimpleNamespace
+        assert self.fn(SimpleNamespace(a_au=1.0, e=1.0)) is None
+
+    def test_high_eccentricity(self):
+        from types import SimpleNamespace
+        el = SimpleNamespace(a_au=2.0, e=0.9)
+        result = self.fn(el)
+        assert result is not None
+        assert result > 0.0
+
+    def test_negative_a_none(self):
+        from types import SimpleNamespace
+        assert self.fn(SimpleNamespace(a_au=-1.0, e=0.1)) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import orbit
+        assert "compute_perihelion_velocity" in orbit.__all__
+
+
+class TestComputeAphelionVelocity:
+    fn_name = "compute_aphelion_velocity"
+
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import orbit
+        return getattr(orbit, self.fn_name)
+
+    def _elements(self, a=1.5, e=0.3):
+        from types import SimpleNamespace
+        return SimpleNamespace(a_au=a, e=e)
+
+    def test_no_a_returns_none(self):
+        from types import SimpleNamespace
+        el = SimpleNamespace(e=0.3)
+        assert self._fn()(el) is None
+
+    def test_zero_a_returns_none(self):
+        assert self._fn()(self._elements(a=0.0)) is None
+
+    def test_negative_a_returns_none(self):
+        assert self._fn()(self._elements(a=-1.0)) is None
+
+    def test_no_e_returns_none(self):
+        from types import SimpleNamespace
+        el = SimpleNamespace(a_au=1.5)
+        assert self._fn()(el) is None
+
+    def test_hyperbolic_returns_none(self):
+        assert self._fn()(self._elements(a=2.0, e=1.0)) is None
+
+    def test_hyperbolic_high_e_returns_none(self):
+        assert self._fn()(self._elements(a=2.0, e=1.5)) is None
+
+    def test_valid_returns_positive(self):
+        result = self._fn()(self._elements(a=1.5, e=0.3))
+        assert result is not None
+        assert result > 0.0
+
+    def test_higher_e_lower_aphelion_velocity(self):
+        v_low_e = self._fn()(self._elements(a=1.5, e=0.1))
+        v_high_e = self._fn()(self._elements(a=1.5, e=0.5))
+        assert v_low_e is not None and v_high_e is not None
+        assert v_high_e < v_low_e
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import orbit
+        assert "compute_aphelion_velocity" in orbit.__all__
+
+
+class TestComputeSpecificAngularMomentum:
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import orbit
+        return orbit.compute_specific_angular_momentum
+
+    def _el(self, a=1.5, e=0.3):
+        from types import SimpleNamespace
+        return SimpleNamespace(a_au=a, e=e)
+
+    def test_no_a_returns_none(self):
+        from types import SimpleNamespace
+        assert self._fn()(SimpleNamespace(e=0.3)) is None
+
+    def test_zero_a_returns_none(self):
+        assert self._fn()(self._el(a=0.0)) is None
+
+    def test_negative_a_returns_none(self):
+        assert self._fn()(self._el(a=-1.0)) is None
+
+    def test_no_e_returns_none(self):
+        from types import SimpleNamespace
+        assert self._fn()(SimpleNamespace(a_au=1.5)) is None
+
+    def test_hyperbolic_returns_none(self):
+        assert self._fn()(self._el(a=2.0, e=1.0)) is None
+
+    def test_valid_returns_positive(self):
+        result = self._fn()(self._el(a=1.5, e=0.3))
+        assert result is not None
+        assert result > 0.0
+
+    def test_circular_orbit_e0(self):
+        import math
+        result = self._fn()(self._el(a=1.0, e=0.0))
+        expected = math.sqrt(4 * math.pi**2 * 1.0)
+        assert result is not None
+        assert abs(result - expected) < 1e-6
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import orbit
+        assert "compute_specific_angular_momentum" in orbit.__all__
+
+
+class TestComputeOrbitComplexity:
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import orbit
+        return orbit.compute_orbit_complexity
+
+    def _el(self, e=0.3, i=15.0):
+        from types import SimpleNamespace
+        return SimpleNamespace(e=e, i_deg=i)
+
+    def test_zero_returns_zero(self):
+        assert self._fn()(self._el(e=0.0, i=0.0)) == 0.0
+
+    def test_max_returns_one(self):
+        result = self._fn()(self._el(e=1.0, i=90.0))
+        assert abs(result - 1.0) < 1e-9
+
+    def test_missing_attrs_returns_zero(self):
+        from types import SimpleNamespace
+        assert self._fn()(SimpleNamespace()) == 0.0
+
+    def test_mid_range_value(self):
+        result = self._fn()(self._el(e=0.5, i=45.0))
+        assert abs(result - 0.5) < 1e-9
+
+    def test_result_in_range(self):
+        result = self._fn()(self._el(e=0.3, i=20.0))
+        assert 0.0 <= result <= 1.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import orbit
+        assert "compute_orbit_complexity" in orbit.__all__
+
+
+class TestComputeMeanLongitude:
+    def test_basic(self):
+        from types import SimpleNamespace
+
+        from orbit import compute_mean_longitude
+        el = SimpleNamespace(longitude_ascending_node_deg=30.0,
+                             argument_perihelion_deg=60.0,
+                             mean_anomaly_deg=90.0)
+        assert compute_mean_longitude(el) == pytest.approx(180.0)
+
+    def test_wrap_around(self):
+        from types import SimpleNamespace
+
+        from orbit import compute_mean_longitude
+        el = SimpleNamespace(longitude_ascending_node_deg=200.0,
+                             argument_perihelion_deg=200.0,
+                             mean_anomaly_deg=200.0)
+        result = compute_mean_longitude(el)
+        assert 0.0 <= result < 360.0
+        assert result == pytest.approx(240.0)
+
+    def test_missing_attribute_returns_none(self):
+        from types import SimpleNamespace
+
+        from orbit import compute_mean_longitude
+        el = SimpleNamespace(longitude_ascending_node_deg=30.0,
+                             argument_perihelion_deg=60.0)
+        assert compute_mean_longitude(el) is None
+
+    def test_all_missing_returns_none(self):
+        from types import SimpleNamespace
+
+        from orbit import compute_mean_longitude
+        assert compute_mean_longitude(SimpleNamespace()) is None
+
+    def test_zero_values(self):
+        from types import SimpleNamespace
+
+        from orbit import compute_mean_longitude
+        el = SimpleNamespace(longitude_ascending_node_deg=0.0,
+                             argument_perihelion_deg=0.0,
+                             mean_anomaly_deg=0.0)
+        assert compute_mean_longitude(el) == pytest.approx(0.0)

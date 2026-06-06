@@ -2012,3 +2012,414 @@ class TestCandidateGrouping:
         cg = CandidateGrouping(group_id="G004", candidate_ids=("X", "Y", "Z"))
         assert len(cg.candidate_ids) == 3
         assert "Z" in cg.candidate_ids
+
+
+class TestMCPServerStatus:
+    def test_defaults(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import MCPServerStatus
+        s = MCPServerStatus(server_name="neo-project_files")
+        assert s.is_healthy is False
+        assert s.tool_count == 0
+        assert s.offline_mode is True
+
+    def test_healthy(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import MCPServerStatus
+        s = MCPServerStatus(server_name="neo-git_read", is_healthy=True, tool_count=5)
+        assert s.is_healthy is True
+        assert s.tool_count == 5
+
+    def test_frozen(self):
+        import sys
+        sys.path.insert(0, "src")
+        import pytest
+
+        from schemas import MCPServerStatus
+        s = MCPServerStatus(server_name="test")
+        with pytest.raises(Exception):
+            s.is_healthy = True  # type: ignore[misc]
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        assert "MCPServerStatus" in schemas.__all__
+
+
+class TestBatchProcessingResult:
+    def test_defaults(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import BatchProcessingResult
+
+        r = BatchProcessingResult(batch_id="run-001")
+        assert r.batch_id == "run-001"
+        assert r.n_input == 0
+        assert r.n_pha_candidates == 0
+        assert r.pipeline_version == "unknown"
+
+    def test_custom_fields(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import BatchProcessingResult
+
+        r = BatchProcessingResult(
+            batch_id="test",
+            n_input=100,
+            n_detected=90,
+            n_linked=70,
+            n_scored=65,
+            n_pha_candidates=2,
+            elapsed_seconds=12.5,
+            pipeline_version="0.79.0",
+        )
+        assert r.n_detected == 90
+        assert r.elapsed_seconds == 12.5
+        assert r.pipeline_version == "0.79.0"
+
+    def test_frozen(self):
+        import sys
+        sys.path.insert(0, "src")
+        import pytest
+
+        from schemas import BatchProcessingResult
+
+        r = BatchProcessingResult(batch_id="x")
+        with pytest.raises(Exception):
+            r.n_input = 5  # type: ignore[misc]
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        assert "BatchProcessingResult" in schemas.__all__
+
+
+class TestSurveyRunSummary:
+    def test_defaults(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import SurveyRunSummary
+
+        s = SurveyRunSummary(run_id="run-001")
+        assert s.run_id == "run-001"
+        assert s.n_alerts == 0
+        assert s.n_pha_candidates == 0
+        assert s.pipeline_version == "unknown"
+
+    def test_custom_fields(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import SurveyRunSummary
+
+        s = SurveyRunSummary(
+            run_id="r",
+            field_id="ZTF_001",
+            night_jd=2460000.5,
+            n_alerts=100,
+            n_candidates=10,
+            n_pha_candidates=1,
+            limiting_mag=20.5,
+            pipeline_version="0.80.0",
+        )
+        assert s.field_id == "ZTF_001"
+        assert s.limiting_mag == 20.5
+
+    def test_frozen(self):
+        import sys
+        sys.path.insert(0, "src")
+        import pytest
+
+        from schemas import SurveyRunSummary
+
+        s = SurveyRunSummary(run_id="x")
+        with pytest.raises(Exception):
+            s.n_alerts = 5  # type: ignore[misc]
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        assert "SurveyRunSummary" in schemas.__all__
+
+
+class TestPipelineHealthReport:
+    def test_defaults(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import PipelineHealthReport
+
+        r = PipelineHealthReport()
+        assert r.n_modules_tested == 0
+        assert r.coverage_pct == 0.0
+        assert r.lint_clean is False
+        assert r.pipeline_version == "unknown"
+
+    def test_custom_fields(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import PipelineHealthReport
+
+        r = PipelineHealthReport(
+            n_modules_tested=12,
+            coverage_pct=100.0,
+            lint_clean=True,
+            mypy_clean=True,
+            test_count=3062,
+            pipeline_version="0.81.0",
+        )
+        assert r.coverage_pct == 100.0
+        assert r.test_count == 3062
+
+    def test_frozen(self):
+        import sys
+        sys.path.insert(0, "src")
+        import pytest
+
+        from schemas import PipelineHealthReport
+
+        r = PipelineHealthReport()
+        with pytest.raises(Exception):
+            r.coverage_pct = 99.0  # type: ignore[misc]
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        assert "PipelineHealthReport" in schemas.__all__
+
+
+class TestObservationQualityReport:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import ObservationQualityReport
+        self.cls = ObservationQualityReport
+
+    def test_defaults(self):
+        r = self.cls()
+        assert r.n_obs == 0
+        assert r.n_saturated == 0
+        assert r.mean_snr is None
+        assert r.mean_fwhm_arcsec is None
+        assert r.limiting_mag is None
+
+    def test_populated(self):
+        r = self.cls(
+            field_id="F001",
+            epoch_jd=2460000.5,
+            n_obs=100,
+            mean_snr=15.0,
+            mean_fwhm_arcsec=2.1,
+            n_saturated=3,
+            limiting_mag=21.5,
+        )
+        assert r.field_id == "F001"
+        assert r.n_obs == 100
+        assert r.mean_snr == 15.0
+
+    def test_immutable(self):
+        import pytest
+        r = self.cls()
+        with pytest.raises(Exception):
+            r.n_obs = 5
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        assert "ObservationQualityReport" in schemas.__all__
+
+
+class TestFieldCoverageReport:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import FieldCoverageReport
+        self.cls = FieldCoverageReport
+
+    def test_defaults(self):
+        r = self.cls()
+        assert r.n_obs == 0
+        assert r.n_tracklets == 0
+        assert r.limiting_mag is None
+        assert r.area_sq_deg == 0.0
+
+    def test_populated(self):
+        r = self.cls(
+            field_id="F001", ra_deg=10.0, dec_deg=5.0,
+            area_sq_deg=9.6, n_obs=150, n_tracklets=3,
+            limiting_mag=21.5, pipeline_version="0.83.0",
+        )
+        assert r.field_id == "F001"
+        assert r.n_obs == 150
+        assert r.limiting_mag == 21.5
+
+    def test_immutable(self):
+        import pytest
+        r = self.cls()
+        with pytest.raises(Exception):
+            r.n_obs = 5
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        assert "FieldCoverageReport" in schemas.__all__
+
+
+class TestAlertSummaryRecord:
+    cls_name = "AlertSummaryRecord"
+
+    def _cls(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        return getattr(schemas, self.cls_name)
+
+    def test_defaults(self):
+        r = self._cls()()
+        assert r.neo_id == "unknown"
+        assert r.alert_pathway == "internal_candidate"
+        assert r.hazard_flag == "unknown"
+        assert r.discovery_priority is None
+        assert r.moid_au is None
+        assert r.submitted_at_jd is None
+
+    def test_custom_values(self):
+        r = self._cls()(
+            neo_id="NEO-001",
+            alert_pathway="mpc_submission",
+            hazard_flag="pha_candidate",
+            discovery_priority=0.95,
+            moid_au=0.03,
+            submitted_at_jd=2460000.5,
+        )
+        assert r.neo_id == "NEO-001"
+        assert r.alert_pathway == "mpc_submission"
+        assert r.hazard_flag == "pha_candidate"
+        assert abs(r.discovery_priority - 0.95) < 1e-9
+        assert abs(r.moid_au - 0.03) < 1e-9
+        assert abs(r.submitted_at_jd - 2460000.5) < 1e-9
+
+    def test_immutable(self):
+        import pytest
+        r = self._cls()()
+        with pytest.raises(Exception):
+            r.neo_id = "X"
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        assert "AlertSummaryRecord" in schemas.__all__
+
+
+class TestScoredNEOBatch:
+    def _cls(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        return schemas.ScoredNEOBatch
+
+    def test_defaults(self):
+        b = self._cls()()
+        assert b.batch_id == "unknown"
+        assert b.pipeline_version == "unknown"
+        assert b.created_at_jd is None
+        assert b.n_candidates == 0
+
+    def test_custom_values(self):
+        b = self._cls()(
+            batch_id="B001", pipeline_version="0.85.0",
+            created_at_jd=2460100.5, n_candidates=42,
+        )
+        assert b.batch_id == "B001"
+        assert b.n_candidates == 42
+
+    def test_immutable(self):
+        import pytest
+        b = self._cls()()
+        with pytest.raises(Exception):
+            b.batch_id = "X"
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        assert "ScoredNEOBatch" in schemas.__all__
+
+
+class TestNightObservationSummary:
+    def _cls(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        return schemas.NightObservationSummary
+
+    def test_defaults(self):
+        s = self._cls()()
+        assert s.night_jd is None
+        assert s.n_obs == 0
+        assert s.n_candidates == 0
+        assert s.mean_rb is None
+        assert s.limiting_mag is None
+        assert s.survey == "unknown"
+
+    def test_custom_values(self):
+        s = self._cls()(
+            night_jd=2460100.5, n_obs=50, n_candidates=3,
+            mean_rb=0.85, limiting_mag=21.0, survey="ZTF",
+        )
+        assert s.n_obs == 50
+        assert s.survey == "ZTF"
+
+    def test_immutable(self):
+        import pytest
+        s = self._cls()()
+        with pytest.raises(Exception):
+            s.n_obs = 5
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import schemas
+        assert "NightObservationSummary" in schemas.__all__
+
+
+class TestSurveyNightRecord:
+    def test_defaults(self):
+        from schemas import SurveyNightRecord
+        rec = SurveyNightRecord()
+        assert rec.night_jd is None
+        assert rec.survey == "unknown"
+        assert rec.n_obs == 0
+        assert rec.n_tracklets == 0
+        assert rec.limiting_mag is None
+        assert rec.area_sq_deg is None
+
+    def test_custom_values(self):
+        from schemas import SurveyNightRecord
+        rec = SurveyNightRecord(
+            night_jd=2460000.5,
+            survey="ZTF",
+            n_obs=120,
+            n_tracklets=5,
+            limiting_mag=20.5,
+            area_sq_deg=3.14,
+        )
+        assert rec.night_jd == 2460000.5
+        assert rec.survey == "ZTF"
+        assert rec.n_obs == 120
+        assert rec.n_tracklets == 5
+        assert rec.limiting_mag == 20.5
+        assert rec.area_sq_deg == 3.14
+
+    def test_frozen(self):
+        from schemas import SurveyNightRecord
+        rec = SurveyNightRecord(n_obs=1)
+        with pytest.raises(Exception):
+            rec.n_obs = 2

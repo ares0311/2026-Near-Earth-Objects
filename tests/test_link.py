@@ -2979,3 +2979,520 @@ class TestComputeArcEndpointSeparation:
         sys.path.insert(0, "src")
         import link
         assert "compute_arc_endpoint_separation" in link.__all__
+
+
+class TestComputePaCircularStd:
+    def _make_tracklet(self, pa: float):
+        from types import SimpleNamespace
+        return SimpleNamespace(motion_pa_degrees=pa)
+
+    def test_spread_angles(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_pa_circular_std
+        tracklets = [self._make_tracklet(pa) for pa in [0.0, 90.0, 180.0, 270.0]]
+        result = compute_pa_circular_std(tracklets)
+        assert result is not None
+        assert result > 0.0
+
+    def test_consistent_angles(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_pa_circular_std
+        tracklets = [self._make_tracklet(45.0) for _ in range(5)]
+        result = compute_pa_circular_std(tracklets)
+        assert result is not None
+        assert result < 1.0
+
+    def test_too_few_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_pa_circular_std
+        result = compute_pa_circular_std([self._make_tracklet(45.0)])
+        assert result is None
+
+    def test_no_pa_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_pa_circular_std
+        t = SimpleNamespace(motion_pa_degrees=None)
+        assert compute_pa_circular_std([t, t]) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+        assert "compute_pa_circular_std" in link.__all__
+
+
+class TestComputeSkyCoverageArea:
+    def _make_tracklet(self, ra, dec):
+        from types import SimpleNamespace
+
+        obs = SimpleNamespace(ra=ra, dec=dec)
+        return SimpleNamespace(observations=(obs,))
+
+    def test_empty_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_sky_coverage_area
+
+        assert compute_sky_coverage_area([]) == 0.0
+
+    def test_single_tracklet_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_sky_coverage_area
+
+        assert compute_sky_coverage_area([self._make_tracklet(10.0, 5.0)]) == 0.0
+
+    def test_two_tracklets(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_sky_coverage_area
+
+        tracklets = [self._make_tracklet(10.0, 0.0), self._make_tracklet(11.0, 1.0)]
+        area = compute_sky_coverage_area(tracklets)
+        assert area > 0.0
+
+    def test_equatorial_field(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_sky_coverage_area
+
+        # At dec=0, cos(dec)=1 so area ~ dra * ddec
+        tracklets = [
+            self._make_tracklet(0.0, 0.0),
+            self._make_tracklet(2.0, 2.0),
+        ]
+        area = compute_sky_coverage_area(tracklets)
+        assert abs(area - 4.0) < 0.01
+
+    def test_no_observations_skipped(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from link import compute_sky_coverage_area
+
+        empty = SimpleNamespace(observations=())
+        valid = self._make_tracklet(10.0, 5.0)
+        # only one with valid obs; returns 0
+        assert compute_sky_coverage_area([empty, valid]) == 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+        assert "compute_sky_coverage_area" in link.__all__
+
+
+class TestComputeNightGapStatistics:
+    def _make_tracklet(self, jds):
+        from types import SimpleNamespace
+
+        obs = [SimpleNamespace(jd=j) for j in jds]
+        return SimpleNamespace(observations=tuple(obs))
+
+    def test_empty_list(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_night_gap_statistics
+
+        stats = compute_night_gap_statistics([])
+        assert stats["mean_gap_nights"] is None
+        assert stats["max_gap_nights"] is None
+        assert stats["n_tracklets"] == 0
+
+    def test_single_observation_no_gaps(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_night_gap_statistics
+
+        t = self._make_tracklet([2460000.5])
+        stats = compute_night_gap_statistics([t])
+        assert stats["mean_gap_nights"] is None
+        assert stats["n_tracklets"] == 1
+
+    def test_two_night_tracklet(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_night_gap_statistics
+
+        t = self._make_tracklet([2460000.5, 2460001.5])
+        stats = compute_night_gap_statistics([t])
+        assert stats["mean_gap_nights"] == 1.0
+        assert stats["max_gap_nights"] == 1
+
+    def test_multi_tracklet_aggregation(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_night_gap_statistics
+
+        t1 = self._make_tracklet([2460000.5, 2460001.5])   # gap = 1
+        t2 = self._make_tracklet([2460000.5, 2460003.5])   # gap = 3
+        stats = compute_night_gap_statistics([t1, t2])
+        assert stats["max_gap_nights"] == 3
+        assert stats["mean_gap_nights"] == 2.0
+
+    def test_n_tracklets_correct(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_night_gap_statistics
+
+        tracklets = [self._make_tracklet([2460000.5, 2460002.5]) for _ in range(5)]
+        stats = compute_night_gap_statistics(tracklets)
+        assert stats["n_tracklets"] == 5
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+        assert "compute_night_gap_statistics" in link.__all__
+
+
+class TestComputeFieldTrackletDensity:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_field_tracklet_density
+        self.fn = compute_field_tracklet_density
+
+    def test_basic(self, tracklet):
+        result = self.fn([tracklet], field_radius_deg=1.0)
+        assert result is not None
+        assert result > 0.0
+
+    def test_zero_radius_returns_none(self, tracklet):
+        assert self.fn([tracklet], field_radius_deg=0.0) is None
+
+    def test_negative_radius_returns_none(self, tracklet):
+        assert self.fn([tracklet], field_radius_deg=-1.0) is None
+
+    def test_empty_tracklets(self):
+        result = self.fn([], field_radius_deg=1.0)
+        assert result == 0.0
+
+    def test_larger_field_lower_density(self, tracklet):
+        d1 = self.fn([tracklet], field_radius_deg=1.0)
+        d2 = self.fn([tracklet], field_radius_deg=5.0)
+        assert d2 < d1
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+        assert "compute_field_tracklet_density" in link.__all__
+
+
+class TestEstimateObservationCadence:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import estimate_observation_cadence
+        self.fn = estimate_observation_cadence
+
+    def test_basic(self, tracklet):
+        result = self.fn(tracklet)
+        assert result is not None
+        assert result > 0.0
+
+    def test_two_obs_one_hour_apart(self):
+        from types import SimpleNamespace
+        obs = [
+            SimpleNamespace(jd=2460000.0),
+            SimpleNamespace(jd=2460000.0 + 1/24),
+        ]
+        t = SimpleNamespace(observations=obs)
+        result = self.fn(t)
+        assert abs(result - 1.0) < 1e-6
+
+    def test_single_obs_none(self):
+        from types import SimpleNamespace
+        t = SimpleNamespace(observations=[SimpleNamespace(jd=2460000.0)])
+        assert self.fn(t) is None
+
+    def test_empty_obs_none(self):
+        from types import SimpleNamespace
+        assert self.fn(SimpleNamespace(observations=[])) is None
+
+    def test_no_observations_attr_none(self):
+        from types import SimpleNamespace
+        assert self.fn(SimpleNamespace()) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+        assert "estimate_observation_cadence" in link.__all__
+
+    def test_bad_jd_attribute_returns_none(self):
+        from types import SimpleNamespace
+        obs = [
+            SimpleNamespace(jd="not_a_number"),
+            SimpleNamespace(jd=2460000.0),
+        ]
+        t = SimpleNamespace(observations=obs)
+        assert self.fn(t) is None
+
+
+class TestComputeTrackletSpanNights:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from link import compute_tracklet_span_nights
+        self.fn = compute_tracklet_span_nights
+
+    def test_two_nights(self, tracklet):
+        result = self.fn(tracklet)
+        assert result >= 1
+
+    def test_single_night(self):
+        from types import SimpleNamespace
+        obs = [SimpleNamespace(jd=2460000.1), SimpleNamespace(jd=2460000.9)]
+        t = SimpleNamespace(observations=obs)
+        assert self.fn(t) == 1
+
+    def test_two_distinct_nights(self):
+        from types import SimpleNamespace
+        obs = [SimpleNamespace(jd=2460000.5), SimpleNamespace(jd=2460001.5)]
+        t = SimpleNamespace(observations=obs)
+        assert self.fn(t) == 2
+
+    def test_empty_obs(self):
+        from types import SimpleNamespace
+        assert self.fn(SimpleNamespace(observations=[])) == 0
+
+    def test_no_obs_attr(self):
+        from types import SimpleNamespace
+        assert self.fn(SimpleNamespace()) == 0
+
+    def test_bad_jd_returns_zero(self):
+        from types import SimpleNamespace
+        obs = [SimpleNamespace(jd="bad")]
+        t = SimpleNamespace(observations=obs)
+        assert self.fn(t) == 0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+        assert "compute_tracklet_span_nights" in link.__all__
+
+
+class TestComputePositionAngleDispersion:
+    fn_name = "compute_position_angle_dispersion"
+
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+        return getattr(link, self.fn_name)
+
+    def test_no_observations_returns_none(self):
+        from types import SimpleNamespace
+        t = SimpleNamespace(observations=())
+        assert self._fn()(t) is None
+
+    def test_single_observation_returns_none(self):
+        from types import SimpleNamespace
+        obs = SimpleNamespace(obs_id="o1", ra_deg=10.0, dec_deg=5.0, jd=2460000.0,
+                              mag=20.0, mag_err=0.1, filter_band="r",
+                              real_bogus_score=0.9, mission="ZTF",
+                              cutout_science=None, cutout_reference=None,
+                              cutout_difference=None)
+        t = SimpleNamespace(observations=(obs,))
+        assert self._fn()(t) is None
+
+    def test_two_observations_returns_zero(self):
+        from types import SimpleNamespace
+        obs1 = SimpleNamespace(obs_id="o1", ra_deg=10.0, dec_deg=5.0, jd=2460000.0,
+                               mag=20.0, mag_err=0.1, filter_band="r",
+                               real_bogus_score=0.9, mission="ZTF",
+                               cutout_science=None, cutout_reference=None,
+                               cutout_difference=None)
+        obs2 = SimpleNamespace(obs_id="o2", ra_deg=10.01, dec_deg=5.01, jd=2460001.0,
+                               mag=20.0, mag_err=0.1, filter_band="r",
+                               real_bogus_score=0.9, mission="ZTF",
+                               cutout_science=None, cutout_reference=None,
+                               cutout_difference=None)
+        t = SimpleNamespace(observations=(obs1, obs2))
+        result = self._fn()(t)
+        assert result == 0.0
+
+    def test_three_observations_returns_float(self):
+        from types import SimpleNamespace
+        def make_obs(obs_id, ra, dec, jd):
+            return SimpleNamespace(obs_id=obs_id, ra_deg=ra, dec_deg=dec, jd=jd,
+                                   mag=20.0, mag_err=0.1, filter_band="r",
+                                   real_bogus_score=0.9, mission="ZTF",
+                                   cutout_science=None, cutout_reference=None,
+                                   cutout_difference=None)
+        obs1 = make_obs("o1", 10.0, 5.0, 2460000.0)
+        obs2 = make_obs("o2", 10.01, 5.0, 2460001.0)
+        obs3 = make_obs("o3", 10.02, 5.005, 2460002.0)
+        t = SimpleNamespace(observations=(obs1, obs2, obs3))
+        result = self._fn()(t)
+        assert result is not None
+        assert result >= 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+        assert "compute_position_angle_dispersion" in link.__all__
+
+
+class TestComputePositionAngleDispersionExceptionCoverage:
+    """Cover except branch and all-fail → None path."""
+
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+        return link.compute_position_angle_dispersion
+
+    def test_exception_in_motion_vector_returns_none(self):
+        from types import SimpleNamespace
+        # Observations without ra_deg will cause compute_motion_vector to raise
+        bad_obs1 = SimpleNamespace(obs_id="o1", jd=2460000.0)
+        bad_obs2 = SimpleNamespace(obs_id="o2", jd=2460001.0)
+        t = SimpleNamespace(observations=(bad_obs1, bad_obs2))
+        result = self._fn()(t)
+        assert result is None
+
+
+class TestComputeArcCoverageFraction:
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+        return link.compute_arc_coverage_fraction
+
+    def _tracklet(self, arc_days):
+        from types import SimpleNamespace
+        return SimpleNamespace(arc_days=arc_days)
+
+    def test_zero_window_returns_zero(self):
+        assert self._fn()(self._tracklet(5.0), 0.0) == 0.0
+
+    def test_negative_window_returns_zero(self):
+        assert self._fn()(self._tracklet(5.0), -1.0) == 0.0
+
+    def test_none_arc_returns_zero(self):
+        assert self._fn()(self._tracklet(None), 10.0) == 0.0
+
+    def test_full_coverage(self):
+        assert abs(self._fn()(self._tracklet(10.0), 10.0) - 1.0) < 1e-9
+
+    def test_half_coverage(self):
+        assert abs(self._fn()(self._tracklet(5.0), 10.0) - 0.5) < 1e-9
+
+    def test_over_window_clamped_to_one(self):
+        assert self._fn()(self._tracklet(20.0), 10.0) == 1.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+        assert "compute_arc_coverage_fraction" in link.__all__
+
+
+class TestComputeMaxObservationGap:
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+        return link.compute_max_observation_gap
+
+    def _obs(self, jd, obs_id="o"):
+        from types import SimpleNamespace
+        return SimpleNamespace(obs_id=obs_id, jd=jd, ra_deg=10.0, dec_deg=5.0,
+                               mag=20.0, mag_err=0.1, filter_band="r",
+                               real_bogus_score=0.9, mission="ZTF",
+                               cutout_science=None, cutout_reference=None,
+                               cutout_difference=None)
+
+    def test_no_obs_returns_none(self):
+        from types import SimpleNamespace
+        assert self._fn()(SimpleNamespace(observations=())) is None
+
+    def test_single_obs_returns_none(self):
+        from types import SimpleNamespace
+        t = SimpleNamespace(observations=(self._obs(2460000.0),))
+        assert self._fn()(t) is None
+
+    def test_two_obs_gap(self):
+        from types import SimpleNamespace
+        t = SimpleNamespace(observations=(self._obs(2460000.0), self._obs(2460003.0)))
+        assert abs(self._fn()(t) - 3.0) < 1e-9
+
+    def test_returns_max_gap(self):
+        from types import SimpleNamespace
+        obs = [self._obs(float(jd), f"o{i}") for i, jd in enumerate([2460000, 2460001, 2460005])]
+        t = SimpleNamespace(observations=tuple(obs))
+        assert abs(self._fn()(t) - 4.0) < 1e-9
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import link
+        assert "compute_max_observation_gap" in link.__all__
+
+
+class TestComputeInterNightMotion:
+    def test_two_nights(self, tracklet):
+        from link import compute_inter_night_motion
+        result = compute_inter_night_motion(tracklet)
+        assert result is not None
+        assert result >= 0.0
+
+    def test_single_night_returns_none(self):
+        from types import SimpleNamespace
+
+        from link import compute_inter_night_motion
+        obs1 = SimpleNamespace(jd=2460000.1, ra_deg=10.0, dec_deg=20.0,
+                               mag=19.0, mag_err=0.1, filter_band="r",
+                               mission="ZTF", real_bogus=0.9)
+        obs2 = SimpleNamespace(jd=2460000.5, ra_deg=10.01, dec_deg=20.01,
+                               mag=19.1, mag_err=0.1, filter_band="r",
+                               mission="ZTF", real_bogus=0.9)
+        t = SimpleNamespace(observations=[obs1, obs2], arc_days=0.4,
+                            motion_rate_arcsec_per_hour=0.5,
+                            motion_pa_degrees=90.0, object_id="T1")
+        assert compute_inter_night_motion(t) is None
+
+    def test_no_obs_returns_none(self):
+        from types import SimpleNamespace
+
+        from link import compute_inter_night_motion
+        t = SimpleNamespace(observations=[], arc_days=0.0,
+                            motion_rate_arcsec_per_hour=0.0,
+                            motion_pa_degrees=0.0, object_id="T2")
+        assert compute_inter_night_motion(t) is None
+
+    def test_none_obs_returns_none(self):
+        from types import SimpleNamespace
+
+        from link import compute_inter_night_motion
+        t = SimpleNamespace(observations=None)
+        assert compute_inter_night_motion(t) is None
+
+    def test_two_nights_positive(self):
+        from types import SimpleNamespace
+
+        from link import compute_inter_night_motion
+        obs1 = SimpleNamespace(jd=2460000.5, ra_deg=10.0, dec_deg=20.0,
+                               mag=19.0, mag_err=0.1, filter_band="r",
+                               mission="ZTF", real_bogus=0.9)
+        obs2 = SimpleNamespace(jd=2460001.5, ra_deg=10.1, dec_deg=20.1,
+                               mag=19.1, mag_err=0.1, filter_band="r",
+                               mission="ZTF", real_bogus=0.9)
+        t = SimpleNamespace(observations=[obs1, obs2], arc_days=1.0,
+                            motion_rate_arcsec_per_hour=1.0,
+                            motion_pa_degrees=45.0, object_id="T3")
+        result = compute_inter_night_motion(t)
+        assert result is not None
+        assert result > 0.0

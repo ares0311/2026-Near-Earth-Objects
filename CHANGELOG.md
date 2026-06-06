@@ -5,41 +5,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
-- `.mcp.json`, `.codex/config.toml`, and `Skills/neo_mcp_server.py`: added
-  project-scoped MCP bootstrap config for read-only project file access,
-  limited git inspection, and fixed offline validation/readiness commands.
-- `Skills/background.py`: clarified that `record-signoff-from-packet` records
-  an internal-only review decision and does not approve live search or external
-  submission.
-- `docs/BACKGROUND_SEARCH_AUTOMATION.md` and `README.md`: updated the roadmap
-  and signoff language after the local `BACKGROUND_001` internal-tracking
-  signoff, including persisted blueprint and operations snapshot evidence.
-- `background.py` / `Skills/background.py`: added
-  `internal_follow_up_disposition_summary` and
-  `internal-follow-up-disposition` for review-only internal disposition of signed
-  fixture follow-ups.
-- `background.py` / `Skills/background.py`: added
-  `live_credential_inventory` and `live-credential-inventory` to report
-  live dry-run credential names, provider mappings, presence booleans, and
-  storage guidance without recording secret values.
-- `background.py` / `Skills/background.py`: updated live dry-run credential
-  readiness to use environment-variable checks first and macOS Keychain service
-  presence second, corrected ZTF public/Pan-STARRS public auth as no-credential
-  by default, and added `live-credential-inventory --write-report` for
-  sanitized local operator review.
-- `background.py` / `Skills/background.py`: added
-  `live_policy_approval_checklist`,
-  `write_live_policy_approval_checklist_report`, and the
-  `live-policy-approval-checklist --write-report` CLI path for no-secret local
-  policy approval preparation.
-- `.gitignore`: added local live dry-run config/policy filenames so an operator
-  can prepare bounded approvals without committing local operational files.
-- `background.py` / `Skills/background.py`: added
-  `scoring_metrics_kpi_report`, `write_scoring_metrics_kpi_report`, and the
-  `scoring-metrics-kpi-report --write-report` CLI path for split metrics-test
-  approval evidence before systems smoke testing.
-- Bumped package/background version metadata to v0.76.0 and updated the roadmap
-  test count to 2816 default tests plus 2 deselected live/integration checks.
+## v0.87.0 — Option B Cleanup + Production Readiness (2026-06-05)
+
+### Removed
+- 68 single-function wrapper Skills scripts added during the v0.77–v0.87 API accumulation cycle. None closed a T1 or T2 production gap. Full list: all `Skills/compute_*.py`, `Skills/estimate_*.py`, `Skills/find_*.py`, `Skills/format_*.py`, `Skills/generate_night_summary.py`, `Skills/group_observations_by_night.py`, `Skills/summarize_alert_pathways.py`, `Skills/filter_priority_candidates.py`, `Skills/get_latest_observation.py`, `Skills/get_faintest_observation.py`, `Skills/count_by_hypothesis.py`, `Skills/estimate_confirmation_times.py`.
+- 30 duplicate or near-duplicate documentation files added during the same cycle. Full list: `SCORING_MODEL_V2.md`, `ORBIT_DYNAMICS.md`, `CALIBRATION_METRICS.md`, `DETECTION_STATISTICS.md`, `HAZARD_SCORING.md`, `ORBITAL_MECHANICS.md`, `SCORING_REFERENCE.md`, `CLASSIFICATION_FEATURES.md`, `DATA_PIPELINE_OVERVIEW.md`, `ASTROMETRY_GUIDE.md`, `BATCH_PROCESSING_GUIDE.md`, `CANDIDATE_CLUSTERING.md`, `CANDIDATE_GROUPING_GUIDE.md`, `CLASSIFICATION_TIERS_GUIDE.md`, `DETECTION_FEATURES_GUIDE.md`, `FEATURE_ENGINEERING.md`, `MOTION_ANALYSIS_GUIDE.md`, `OBSERVATION_QUALITY.md`, `OBSERVATION_STATISTICS_GUIDE.md`, `ORBIT_ELEMENTS_REFERENCE.md`, `PHOTOMETRY_GUIDE.md`, `PIPELINE_INTERNALS.md`, `SCORING_PIPELINE_GUIDE.md`, `BATCH_STATISTICS_GUIDE.md`, `ORBIT_VELOCITY_GUIDE.md`, `COMPOSITE_SCORING_GUIDE.md`, `PIPELINE_QUALITY_GUIDE.md`, `SURVEY_STATISTICS_GUIDE.md`, `CLASSIFICATION_METRICS_GUIDE.md`, `FILTERING_AND_DISTRIBUTION_GUIDE.md`.
+- 8 test classes in `tests/test_pipeline.py` that tested deleted Skills scripts.
+
+### Added
+- `docs/PRODUCTION_READINESS.md` — mandatory session-start read. Defines all T1/T2 production gaps, outside human blockers, production readiness checklist, and compliance rules preventing further API accumulation.
+
+### Changed
+- AGENTS.md, README.md, CHANGELOG.md updated to v0.87.0. Test count corrected to 3432.
+- CLAUDE.md System Directives updated with production-first gate.
+- 3432 tests passing; 100% coverage maintained; ruff + mypy clean.
+
+## v0.77.0–v0.86.0 — API accumulation cycle (2026-06-04 to 2026-06-05)
+
+These ten versions each added 10 new public helper APIs across all 10 pipeline modules (batch statistics, orbital dynamics, survey statistics, classification metrics, calibration helpers), 2 new Skills wrapper scripts, and 1 new doc per version. None of the changes in this cycle closed a T1 or T2 production gap. The wrapper scripts and duplicate docs were removed in the Option B cleanup above.
+
+## v0.76.0
 
 ## v0.60.0
 

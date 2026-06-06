@@ -25,7 +25,17 @@ __all__ = ["detect", "detect_batch", "streak_candidates", "filter_by_real_bogus"
            "compute_photon_noise_limit",
            "compute_source_flux",
            "compute_apparent_motion_rate",
-           "compute_magnitude_range"]
+           "compute_magnitude_range",
+           "compute_detection_density",
+           "count_streak_detections",
+           "count_detections_by_mission",
+           "filter_by_streak_score",
+           "compute_rb_score_distribution",
+           "count_candidates_above_rb",
+           "get_brightest_candidate",
+           "compute_mean_motion_rate",
+           "compute_candidate_sky_density",
+           "compute_detection_gap_days"]
 
 import math
 import uuid
@@ -1333,3 +1343,218 @@ def compute_magnitude_range(observations: list) -> float | None:
     if len(mags) < 2:
         return None
     return float(max(mags) - min(mags))
+
+
+def compute_detection_density(candidates: list, field_radius_deg: float) -> float | None:
+    """Return the number of candidates per square degree.
+
+    Uses the solid-angle formula for a circular field: Ω = 2π(1−cos(r)) steradians,
+    converted to square degrees.  Returns None if field_radius_deg ≤ 0.
+    """
+    if field_radius_deg <= 0.0:
+        return None
+    r_rad = math.radians(abs(field_radius_deg))
+    steradians = 2.0 * math.pi * (1.0 - math.cos(r_rad))
+    sq_deg = steradians * (180.0 / math.pi) ** 2
+    return float(len(candidates) / sq_deg) if sq_deg > 0.0 else None
+
+
+def count_streak_detections(detect_result: object) -> int:
+    """Return the number of streak/trail candidates in a DetectResult.
+
+    Counts candidates whose ``is_streak`` attribute is True.  If the
+    *detect_result* has no ``candidates`` attribute or no candidates have
+    streak metadata, returns 0.
+    """
+    candidates = getattr(detect_result, "candidates", None) or []
+    return sum(1 for c in candidates if getattr(c, "is_streak", False))
+
+
+def count_detections_by_mission(detect_result: object) -> dict:
+    """Return a dict mapping survey mission name to candidate count.
+
+    Counts each candidate in ``detect_result.candidates`` by its ``mission``
+    attribute (falls back to ``"unknown"`` if the attribute is absent or None).
+    Returns an empty dict if there are no candidates.
+    """
+    candidates = getattr(detect_result, "candidates", None) or []
+    counts: dict[str, int] = {}
+    for c in candidates:
+        obs = getattr(c, "observation", None)
+        mission = getattr(obs, "mission", None) if obs is not None else None
+        if mission is None:
+            mission = getattr(c, "mission", None)
+        key = str(mission) if mission is not None else "unknown"
+        counts[key] = counts.get(key, 0) + 1
+    return counts
+
+
+def filter_by_streak_score(
+    result: DetectResult,
+    min_streak_score: float = 0.5,
+) -> DetectResult:
+    """Return a new DetectResult keeping only candidates with high streak severity.
+
+    For each candidate, computes the maximum ``compute_streak_metric`` across its
+    observations.  Candidates where the max streak metric ≥ *min_streak_score*
+    are kept.  Candidates with no observations are discarded.
+
+    The returned provenance reflects the reduced candidate count; other
+    provenance fields are inherited from the input.
+    """
+    from schemas import DetectProvenance
+
+    kept = []
+    for cand in result.candidates:
+        if not cand.observations:
+            continue
+        max_streak = max(compute_streak_metric(o) for o in cand.observations)
+        if max_streak >= min_streak_score:
+            kept.append(cand)
+    prov = DetectProvenance(
+        real_bogus_threshold=result.provenance.real_bogus_threshold,
+        n_candidates=len(kept),
+        n_known_matches=result.provenance.n_known_matches,
+        detected_at_jd=result.provenance.detected_at_jd,
+    )
+    return DetectResult(
+        candidates=tuple(kept),
+        known_matches=result.known_matches,
+        provenance=prov,
+    )
+
+
+def compute_rb_score_distribution(result: DetectResult, n_bins: int = 10) -> dict:
+    """Return an equal-width histogram of real/bogus scores across candidates.
+
+    Collects the maximum ``real_bogus`` score across observations for each
+    candidate, then bins the scores into *n_bins* equal-width bins spanning
+    [0, 1].  Candidates with no valid (non-None) scores are excluded.
+
+    Returns a dict with keys:
+      - ``"bin_edges"``: list of *n_bins + 1* floats from 0.0 to 1.0
+      - ``"counts"``: list of *n_bins* non-negative ints
+      - ``"n_total"``: total candidates with at least one valid RB score
+    """
+    n_bins = max(1, int(n_bins))
+    scores = []
+    for cand in result.candidates:
+        valid = [
+            obs.real_bogus
+            for obs in cand.observations
+            if obs.real_bogus is not None
+        ]
+        if valid:
+            scores.append(max(valid))
+    edges = [i / n_bins for i in range(n_bins + 1)]
+    counts = [0] * n_bins
+    for s in scores:
+        idx = int(float(s) * n_bins)
+        if idx >= n_bins:
+            idx = n_bins - 1
+        counts[idx] += 1
+    return {"bin_edges": edges, "counts": counts, "n_total": len(scores)}
+
+
+def count_candidates_above_rb(result: DetectResult, threshold: float = 0.65) -> int:
+    """Return the count of candidates with at least one real_bogus score ≥ threshold.
+
+    For each candidate, considers all ``real_bogus`` scores across its
+    observations.  Candidates with no valid (non-None) scores are excluded.
+    Returns 0 for an empty result or if no candidates meet the threshold.
+    """
+    count = 0
+    for cand in result.candidates:
+        valid = [
+            obs.real_bogus
+            for obs in cand.observations
+            if obs.real_bogus is not None
+        ]
+        if valid and max(valid) >= threshold:
+            count += 1
+    return count
+
+
+def get_brightest_candidate(result: DetectResult) -> object | None:
+    """Return the RawCandidate with the lowest-magnitude observation.
+
+    Considers all observations across all candidates and picks the candidate
+    that contains the observation with the minimum magnitude (excluding
+    sentinel magnitudes ≥ 90).  Returns ``None`` if the result is empty or
+    all magnitudes are sentinels.
+    """
+    best_cand = None
+    best_mag = float("inf")
+    for cand in result.candidates:
+        for obs in cand.observations:
+            if obs.mag < 90.0 and obs.mag < best_mag:
+                best_mag = obs.mag
+                best_cand = cand
+    return best_cand
+
+
+def compute_mean_motion_rate(result: DetectResult) -> float | None:
+    """Mean apparent motion rate (arcsec/hr) across all candidates in *result*.
+
+    For each candidate the maximum real_bogus observation's motion is estimated
+    using ``compute_motion_vector`` on consecutive observation pairs.  The mean
+    over all valid rate values is returned.  Returns ``None`` if no valid rates
+    can be computed.
+    """
+    from detect import compute_motion_vector
+
+    rates: list[float] = []
+    for cand in result.candidates:
+        obs_list = list(cand.observations)
+        for i in range(len(obs_list) - 1):
+            try:
+                mv = compute_motion_vector(obs_list[i], obs_list[i + 1])
+                rate = mv.get("rate_arcsec_hr")
+                if rate is not None and rate >= 0.0:
+                    rates.append(float(rate))
+            except Exception:
+                continue
+    if not rates:
+        return None
+    return float(sum(rates) / len(rates))
+
+
+def compute_candidate_sky_density(result: DetectResult, field_radius_deg: float) -> float:
+    """Candidates per square degree for a circular survey field.
+
+    Uses the solid-angle formula: area = 2π(1 − cos(r)) steradians,
+    converted to square degrees.  Returns 0.0 for non-positive *field_radius_deg*
+    or an empty candidate list.
+    """
+    import math
+
+    if field_radius_deg <= 0.0:
+        return 0.0
+    n = len(result.candidates)
+    if n == 0:
+        return 0.0
+    r_rad = math.radians(field_radius_deg)
+    area_sr = 2.0 * math.pi * (1.0 - math.cos(r_rad))
+    area_sq_deg = area_sr * (180.0 / math.pi) ** 2
+    return float(n / area_sq_deg)
+
+
+def compute_detection_gap_days(result: DetectResult) -> float | None:
+    """Maximum gap in days between consecutive candidate detections.
+
+    Extracts the best JD from each candidate (first observation), sorts them,
+    and returns the maximum consecutive gap.  Returns ``None`` for fewer than
+    2 candidates or if no valid JDs can be extracted.
+    """
+    jds = []
+    for cand in result.candidates:
+        obs_list = getattr(cand, "observations", None)
+        if obs_list:
+            jd = getattr(obs_list[0], "jd", None)
+            if jd is not None:
+                jds.append(float(jd))
+    if len(jds) < 2:
+        return None
+    jds.sort()
+    gaps = [jds[i + 1] - jds[i] for i in range(len(jds) - 1)]
+    return float(max(gaps))

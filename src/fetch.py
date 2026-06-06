@@ -29,7 +29,17 @@ __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fet
            "partition_by_field",
            "filter_by_magnitude",
            "compute_field_sky_area",
-           "compute_survey_overlap"]
+           "compute_survey_overlap",
+           "count_observations_by_night",
+           "compute_temporal_coverage",
+           "compute_observation_rate",
+           "compute_magnitude_distribution",
+           "group_observations_by_night",
+           "count_observations_by_filter",
+           "get_brightest_observation",
+           "get_latest_observation",
+           "get_faintest_observation",
+           "compute_observation_time_span"]
 
 import json
 import os
@@ -2001,3 +2011,200 @@ def compute_survey_overlap(result1: object, result2: object) -> float:
     if not union:
         return 0.0
     return float(len(ids1 & ids2)) / float(len(union))
+
+
+def count_observations_by_night(fetch_result: object) -> dict:
+    """Return a dict mapping integer JD (floor) to observation count.
+
+    Each observation's JD is floored to an integer night key.
+    Returns an empty dict if the FetchResult has no alerts.
+    """
+    alerts = getattr(fetch_result, "alerts", None) or []
+    counts: dict[int, int] = {}
+    for obs in alerts:
+        jd = getattr(obs, "jd", None)
+        if jd is None:
+            continue
+        night = int(float(jd))
+        counts[night] = counts.get(night, 0) + 1
+    return counts
+
+
+def compute_temporal_coverage(fetch_result: object) -> dict:
+    """Return a summary of the temporal span covered by a FetchResult.
+
+    Returns a dict with keys:
+      - ``n_observations``: total observation count
+      - ``min_jd``: earliest JD (float) or None
+      - ``max_jd``: latest JD (float) or None
+      - ``span_days``: max_jd - min_jd (float) or None if fewer than 2 obs
+      - ``n_nights``: number of distinct integer-JD nights
+
+    Returns all-None / zero values if the FetchResult has no alerts.
+    """
+    alerts = getattr(fetch_result, "alerts", None) or []
+    jds: list[float] = []
+    for obs in alerts:
+        jd = getattr(obs, "jd", None)
+        if jd is not None:
+            jds.append(float(jd))
+    if not jds:
+        return {
+            "n_observations": 0,
+            "min_jd": None,
+            "max_jd": None,
+            "span_days": None,
+            "n_nights": 0,
+        }
+    min_jd = min(jds)
+    max_jd = max(jds)
+    span = (max_jd - min_jd) if len(jds) >= 2 else None
+    n_nights = len({int(j) for j in jds})
+    return {
+        "n_observations": len(jds),
+        "min_jd": min_jd,
+        "max_jd": max_jd,
+        "span_days": span,
+        "n_nights": n_nights,
+    }
+
+
+def compute_observation_rate(fetch_result: object) -> float | None:
+    """Return the mean number of observations per night in a FetchResult.
+
+    Night boundaries are determined by flooring each observation's JD to an
+    integer.  Returns ``None`` if fewer than 2 distinct nights are present
+    (rate is undefined for a single-night dataset).
+    Returns ``None`` if the FetchResult has no alerts.
+    """
+    alerts = getattr(fetch_result, "alerts", None) or []
+    nights: dict[int, int] = {}
+    for obs in alerts:
+        jd = getattr(obs, "jd", None)
+        if jd is None:
+            continue
+        night = int(float(jd))
+        nights[night] = nights.get(night, 0) + 1
+    if len(nights) < 2:
+        return None
+    return float(sum(nights.values()) / len(nights))
+
+
+def compute_magnitude_distribution(fetch_result: object, n_bins: int = 10) -> dict:
+    """Return a histogram of alert magnitudes across a FetchResult.
+
+    Divides the observed magnitude range into *n_bins* equal-width bins and
+    counts observations in each bin.  Returns a dict with keys:
+
+      - ``"bin_edges"``: list of n_bins + 1 edge values
+      - ``"counts"``: list of n_bins integer counts
+      - ``"n_total"``: total number of valid magnitude observations (mag < 90)
+
+    Observations with mag ≥ 90 (sentinel / missing) are excluded.
+    *n_bins* is clamped to at least 1.  Returns zero counts and edges [0, 1]
+    if no valid magnitudes are present.
+    """
+    n_bins = max(1, int(n_bins))
+    alerts = getattr(fetch_result, "alerts", None) or []
+    mags = [
+        float(getattr(o, "mag", 99))
+        for o in alerts
+        if getattr(o, "mag", None) is not None and float(getattr(o, "mag", 99)) < 90.0
+    ]
+    if not mags:
+        edges = [float(i) / n_bins for i in range(n_bins + 1)]
+        return {"bin_edges": edges, "counts": [0] * n_bins, "n_total": 0}
+    lo, hi = min(mags), max(mags)
+    width = (hi - lo) / n_bins if hi > lo else 1.0
+    edges = [lo + i * width for i in range(n_bins + 1)]
+    counts = [0] * n_bins
+    for m in mags:
+        idx = int((m - lo) / width) if width > 0 else 0
+        if idx >= n_bins:
+            idx = n_bins - 1
+        counts[idx] += 1
+    return {"bin_edges": edges, "counts": counts, "n_total": len(mags)}
+
+
+def group_observations_by_night(fetch_result: FetchResult) -> dict:
+    """Group observations in a FetchResult by integer night (floor of JD).
+
+    Returns a dict mapping each integer JD (``int(floor(jd))``) to the list
+    of :class:`Observation` objects whose Julian Date falls in that night.
+    Observations with non-finite JDs are skipped.  Returns an empty dict for
+    empty inputs.
+    """
+    import math
+
+    groups: dict[int, list] = {}
+    for obs in fetch_result.alerts:
+        if not math.isfinite(obs.jd):
+            continue
+        night = int(math.floor(obs.jd))
+        groups.setdefault(night, []).append(obs)
+    return groups
+
+
+def count_observations_by_filter(fetch_result: FetchResult) -> dict:
+    """Return the count of observations per filter band in a FetchResult.
+
+    Returns a dict mapping each ``filter_band`` string to the number of
+    observations in that band.  Returns an empty dict for empty inputs.
+    """
+    counts: dict = {}
+    for obs in fetch_result.alerts:
+        band = obs.filter_band
+        counts[band] = counts.get(band, 0) + 1
+    return counts
+
+
+def get_brightest_observation(fetch_result: FetchResult) -> object | None:
+    """Return the single brightest (lowest-magnitude) Observation in a FetchResult.
+
+    Excludes observations with sentinel magnitudes ≥ 90.  Returns ``None``
+    if the result is empty or all magnitudes are sentinels.
+    """
+    valid = [obs for obs in fetch_result.alerts if obs.mag < 90.0]
+    if not valid:
+        return None
+    return min(valid, key=lambda o: o.mag)
+
+
+def get_latest_observation(fetch_result: FetchResult) -> object | None:
+    """Return the most recent Observation (highest JD) from *fetch_result*.
+
+    Ignores sentinel magnitudes (mag >= 90) and non-finite JDs.
+    Returns ``None`` if no valid observations exist.
+    """
+    import math
+
+    valid = [obs for obs in fetch_result.alerts if math.isfinite(obs.jd)]
+    if not valid:
+        return None
+    return max(valid, key=lambda o: o.jd)
+
+
+def get_faintest_observation(fetch_result: FetchResult) -> object | None:
+    """Return the faintest Observation (highest valid mag) from *fetch_result*.
+
+    Ignores sentinel magnitudes (mag >= 90).  Returns ``None`` if no valid
+    observations exist.
+    """
+    valid = [obs for obs in fetch_result.alerts if obs.mag < 90.0]
+    if not valid:
+        return None
+    return max(valid, key=lambda o: o.mag)
+
+
+def compute_observation_time_span(fetch_result: FetchResult) -> float | None:
+    """Total time span in days covered by valid observations.
+
+    Returns max(JD) − min(JD) across all alerts with finite JDs.
+    Returns ``None`` if fewer than 2 valid JDs exist.
+    """
+    import math
+
+    jds = [obs.jd for obs in fetch_result.alerts if math.isfinite(obs.jd)]
+    if len(jds) < 2:
+        return None
+    return float(max(jds) - min(jds))

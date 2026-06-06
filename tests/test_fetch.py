@@ -4163,3 +4163,557 @@ class TestComputeSurveyOverlap:
         sys.path.insert(0, "src")
         import fetch
         assert "compute_survey_overlap" in fetch.__all__
+
+
+class TestCountObservationsByNight:
+    def _make_result(self, jds):
+        from types import SimpleNamespace
+        alerts = [SimpleNamespace(obs_id=str(i), jd=j) for i, j in enumerate(jds)]
+        return SimpleNamespace(alerts=alerts)
+
+    def test_basic_grouping(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import count_observations_by_night
+        result = self._make_result([2460000.1, 2460000.9, 2460001.5])
+        counts = count_observations_by_night(result)
+        assert counts[2460000] == 2
+        assert counts[2460001] == 1
+
+    def test_empty(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from fetch import count_observations_by_night
+        result = SimpleNamespace(alerts=[])
+        assert count_observations_by_night(result) == {}
+
+    def test_none_jd_skipped(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from fetch import count_observations_by_night
+        obs_no_jd = SimpleNamespace(obs_id="x", jd=None)
+        result = SimpleNamespace(alerts=[obs_no_jd])
+        assert count_observations_by_night(result) == {}
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+        assert "count_observations_by_night" in fetch.__all__
+
+
+class TestComputeTemporalCoverage:
+    def _make_result(self, jds):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        obs = [SimpleNamespace(jd=j) for j in jds]
+        return SimpleNamespace(alerts=obs)
+
+    def test_empty(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_temporal_coverage
+
+        result = self._make_result([])
+        s = compute_temporal_coverage(result)
+        assert s["n_observations"] == 0
+        assert s["min_jd"] is None
+        assert s["span_days"] is None
+        assert s["n_nights"] == 0
+
+    def test_single_observation(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_temporal_coverage
+
+        result = self._make_result([2460000.5])
+        s = compute_temporal_coverage(result)
+        assert s["n_observations"] == 1
+        assert s["min_jd"] == 2460000.5
+        assert s["max_jd"] == 2460000.5
+        assert s["span_days"] is None
+        assert s["n_nights"] == 1
+
+    def test_multi_night(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_temporal_coverage
+
+        result = self._make_result([2460000.5, 2460001.5, 2460002.5])
+        s = compute_temporal_coverage(result)
+        assert s["n_observations"] == 3
+        assert abs(s["span_days"] - 2.0) < 1e-9
+        assert s["n_nights"] == 3
+
+    def test_none_jd_skipped(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from fetch import compute_temporal_coverage
+
+        obs = [SimpleNamespace(jd=None), SimpleNamespace(jd=2460000.5)]
+        result = SimpleNamespace(alerts=obs)
+        s = compute_temporal_coverage(result)
+        assert s["n_observations"] == 1
+
+    def test_no_alerts_attr(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from fetch import compute_temporal_coverage
+
+        s = compute_temporal_coverage(SimpleNamespace())
+        assert s["n_observations"] == 0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+        assert "compute_temporal_coverage" in fetch.__all__
+
+
+class TestComputeObservationRate:
+    def _make_result(self, jds):
+        from types import SimpleNamespace
+
+        obs = [SimpleNamespace(jd=j) for j in jds]
+        return SimpleNamespace(alerts=obs)
+
+    def test_single_night_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_observation_rate
+
+        result = self._make_result([2460000.1, 2460000.5, 2460000.9])
+        assert compute_observation_rate(result) is None
+
+    def test_two_nights(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_observation_rate
+
+        result = self._make_result([2460000.5, 2460000.6, 2460001.5, 2460001.7])
+        rate = compute_observation_rate(result)
+        assert rate == 2.0
+
+    def test_empty_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_observation_rate
+
+        result = self._make_result([])
+        assert compute_observation_rate(result) is None
+
+    def test_none_jd_skipped(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from fetch import compute_observation_rate
+
+        obs = [SimpleNamespace(jd=None), SimpleNamespace(jd=2460000.5)]
+        result = SimpleNamespace(alerts=obs)
+        assert compute_observation_rate(result) is None
+
+    def test_multi_night_mean(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_observation_rate
+
+        # 3 obs on night 0, 1 obs on night 1, 2 obs on night 2 → mean = 2.0
+        jds = [2460000.1, 2460000.2, 2460000.3, 2460001.5, 2460002.5, 2460002.6]
+        result = self._make_result(jds)
+        rate = compute_observation_rate(result)
+        assert abs(rate - 2.0) < 1e-9
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+        assert "compute_observation_rate" in fetch.__all__
+
+
+class TestComputeMagnitudeDistribution:
+    def _make_result(self, mags):
+        from types import SimpleNamespace
+
+        obs = [SimpleNamespace(mag=m) for m in mags]
+        return SimpleNamespace(alerts=obs)
+
+    def test_empty_returns_zero_counts(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_magnitude_distribution
+
+        h = compute_magnitude_distribution(self._make_result([]))
+        assert h["n_total"] == 0
+        assert all(c == 0 for c in h["counts"])
+
+    def test_sentinel_mags_excluded(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_magnitude_distribution
+
+        h = compute_magnitude_distribution(self._make_result([99.0, 98.5]))
+        assert h["n_total"] == 0
+
+    def test_counts_sum_to_n_total(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_magnitude_distribution
+
+        result = self._make_result([18.0, 19.0, 20.0, 21.0, 22.0])
+        h = compute_magnitude_distribution(result, n_bins=5)
+        assert sum(h["counts"]) == 5
+        assert h["n_total"] == 5
+
+    def test_bin_edge_count(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_magnitude_distribution
+
+        h = compute_magnitude_distribution(self._make_result([20.0]), n_bins=8)
+        assert len(h["bin_edges"]) == 9
+        assert len(h["counts"]) == 8
+
+    def test_uniform_mags_go_to_bins(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_magnitude_distribution
+
+        result = self._make_result([18.0, 20.0])
+        h = compute_magnitude_distribution(result, n_bins=2)
+        assert sum(h["counts"]) == 2
+
+    def test_n_bins_clamped(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import compute_magnitude_distribution
+
+        h = compute_magnitude_distribution(self._make_result([]), n_bins=0)
+        assert len(h["counts"]) == 1
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+        assert "compute_magnitude_distribution" in fetch.__all__
+
+
+class TestGroupObservationsByNight:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import group_observations_by_night
+        self.fn = group_observations_by_night
+
+    def _make_fetch_result(self, jds):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import FetchProvenance, FetchResult, Observation
+        obs = [
+            Observation(
+                obs_id=f"o{i}", ra_deg=10.0, dec_deg=5.0, jd=jd,
+                mag=20.0, mag_err=0.1, filter_band="r", mission="ZTF",
+            )
+            for i, jd in enumerate(jds)
+        ]
+        prov = FetchProvenance(
+            surveys=["ZTF"], query_ra_deg=0.0, query_dec_deg=0.0,
+            query_radius_deg=1.0, start_jd=min(jds), end_jd=max(jds),
+        )
+        return FetchResult(alerts=obs, provenance=prov)
+
+    def test_single_night(self):
+        result = self._make_fetch_result([2460000.1, 2460000.5, 2460000.9])
+        groups = self.fn(result)
+        assert 2460000 in groups
+        assert len(groups[2460000]) == 3
+
+    def test_two_nights(self):
+        result = self._make_fetch_result([2460000.5, 2460001.5])
+        groups = self.fn(result)
+        assert len(groups) == 2
+        assert 2460000 in groups
+        assert 2460001 in groups
+
+    def test_empty(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import FetchProvenance, FetchResult
+        prov = FetchProvenance(
+            surveys=["ZTF"], query_ra_deg=0.0, query_dec_deg=0.0,
+            query_radius_deg=1.0, start_jd=0.0, end_jd=0.0,
+        )
+        result = FetchResult(alerts=[], provenance=prov)
+        assert self.fn(result) == {}
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+        assert "group_observations_by_night" in fetch.__all__
+
+    def test_non_finite_jd_skipped(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import FetchProvenance, FetchResult, Observation
+        obs_inf = Observation(
+            obs_id="inf_obs", ra_deg=10.0, dec_deg=5.0, jd=float("inf"),
+            mag=20.0, mag_err=0.1, filter_band="r", mission="ZTF",
+        )
+        prov = FetchProvenance(
+            surveys=["ZTF"], query_ra_deg=0.0, query_dec_deg=0.0,
+            query_radius_deg=1.0, start_jd=0.0, end_jd=0.0,
+        )
+        result = FetchResult(alerts=[obs_inf], provenance=prov)
+        groups = self.fn(result)
+        assert len(groups) == 0
+
+
+class TestCountObservationsByFilter:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from fetch import count_observations_by_filter
+        self.fn = count_observations_by_filter
+
+    def _make_result(self, bands):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import FetchProvenance, FetchResult, Observation
+        obs = [
+            Observation(
+                obs_id=f"o{i}", ra_deg=10.0, dec_deg=5.0, jd=2460000.5 + i,
+                mag=20.0, mag_err=0.1, filter_band=b, mission="ZTF",
+            )
+            for i, b in enumerate(bands)
+        ]
+        prov = FetchProvenance(
+            surveys=["ZTF"], query_ra_deg=0.0, query_dec_deg=0.0,
+            query_radius_deg=1.0, start_jd=2460000.0, end_jd=2460001.0,
+        )
+        return FetchResult(alerts=obs, provenance=prov)
+
+    def test_single_band(self):
+        result = self._make_result(["r", "r", "r"])
+        counts = self.fn(result)
+        assert counts == {"r": 3}
+
+    def test_multiple_bands(self):
+        result = self._make_result(["r", "g", "r", "i"])
+        counts = self.fn(result)
+        assert counts["r"] == 2
+        assert counts["g"] == 1
+        assert counts["i"] == 1
+
+    def test_empty(self):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import FetchProvenance, FetchResult
+        prov = FetchProvenance(
+            surveys=["ZTF"], query_ra_deg=0.0, query_dec_deg=0.0,
+            query_radius_deg=1.0, start_jd=0.0, end_jd=0.0,
+        )
+        result = FetchResult(alerts=[], provenance=prov)
+        assert self.fn(result) == {}
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+        assert "count_observations_by_filter" in fetch.__all__
+
+
+class TestGetBrightestObservation:
+    fn_name = "get_brightest_observation"
+
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+        return getattr(fetch, self.fn_name)
+
+    def _obs(self, mag):
+        from types import SimpleNamespace
+        return SimpleNamespace(
+            obs_id=f"obs-{mag}", ra_deg=10.0, dec_deg=5.0,
+            jd=2460000.0, mag=mag, mag_err=0.1, filter_band="r",
+            real_bogus_score=None, mission="ZTF", cutout_science=None,
+            cutout_reference=None, cutout_difference=None,
+        )
+
+    def _result(self, alerts):
+        from types import SimpleNamespace
+        return SimpleNamespace(alerts=alerts, provenance=None)
+
+    def test_empty_returns_none(self):
+        result = self._result([])
+        assert self._fn()(result) is None
+
+    def test_all_sentinel_returns_none(self):
+        result = self._result([self._obs(99.0), self._obs(90.0)])
+        assert self._fn()(result) is None
+
+    def test_returns_brightest(self):
+        obs_bright = self._obs(17.5)
+        obs_faint = self._obs(20.0)
+        result = self._result([obs_faint, obs_bright])
+        best = self._fn()(result)
+        assert best is obs_bright
+
+    def test_single_valid(self):
+        obs = self._obs(18.0)
+        result = self._result([obs])
+        assert self._fn()(result) is obs
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+        assert "get_brightest_observation" in fetch.__all__
+
+
+class TestGetLatestObservation:
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+        return fetch.get_latest_observation
+
+    def _obs(self, jd, obs_id="o1"):
+        from types import SimpleNamespace
+        return SimpleNamespace(
+            obs_id=obs_id, ra_deg=10.0, dec_deg=5.0, jd=jd,
+            mag=20.0, mag_err=0.1, filter_band="r",
+            real_bogus_score=None, mission="ZTF",
+            cutout_science=None, cutout_reference=None, cutout_difference=None,
+        )
+
+    def _result(self, alerts):
+        from types import SimpleNamespace
+        return SimpleNamespace(alerts=alerts, provenance=None)
+
+    def test_empty_returns_none(self):
+        assert self._fn()(self._result([])) is None
+
+    def test_returns_most_recent(self):
+        old = self._obs(2460000.0, "o1")
+        new = self._obs(2460010.0, "o2")
+        assert self._fn()(self._result([old, new])) is new
+
+    def test_single_obs(self):
+        obs = self._obs(2460005.0)
+        assert self._fn()(self._result([obs])) is obs
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+        assert "get_latest_observation" in fetch.__all__
+
+
+class TestGetFaintestObservation:
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+        return fetch.get_faintest_observation
+
+    def _obs(self, mag, obs_id="o1"):
+        from types import SimpleNamespace
+        return SimpleNamespace(
+            obs_id=obs_id, ra_deg=10.0, dec_deg=5.0, jd=2460000.0,
+            mag=mag, mag_err=0.1, filter_band="r",
+            real_bogus_score=None, mission="ZTF",
+            cutout_science=None, cutout_reference=None, cutout_difference=None,
+        )
+
+    def _result(self, alerts):
+        from types import SimpleNamespace
+        return SimpleNamespace(alerts=alerts, provenance=None)
+
+    def test_empty_returns_none(self):
+        assert self._fn()(self._result([])) is None
+
+    def test_all_sentinel_returns_none(self):
+        assert self._fn()(self._result([self._obs(99.0), self._obs(90.0)])) is None
+
+    def test_returns_faintest(self):
+        bright = self._obs(17.0, "bright")
+        faint = self._obs(22.0, "faint")
+        assert self._fn()(self._result([bright, faint])) is faint
+
+    def test_single_valid(self):
+        obs = self._obs(21.0)
+        assert self._fn()(self._result([obs])) is obs
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import fetch
+        assert "get_faintest_observation" in fetch.__all__
+
+
+class TestComputeObservationTimeSpan:
+    def test_two_obs(self):
+        from types import SimpleNamespace
+
+        from fetch import compute_observation_time_span
+        obs1 = SimpleNamespace(jd=2460000.0, mag=19.0, mission="ZTF",
+                               filter_band="r", real_bogus=0.9)
+        obs2 = SimpleNamespace(jd=2460002.0, mag=19.5, mission="ZTF",
+                               filter_band="r", real_bogus=0.9)
+        fr = SimpleNamespace(alerts=[obs1, obs2])
+        result = compute_observation_time_span(fr)
+        assert result is not None
+        assert result >= 0.0
+
+    def test_one_obs_returns_none(self):
+        from types import SimpleNamespace
+
+        from fetch import compute_observation_time_span
+        obs = SimpleNamespace(jd=2460000.5, mag=19.0, mission="ZTF",
+                              filter_band="r", real_bogus=0.9)
+        fr = SimpleNamespace(alerts=[obs])
+        assert compute_observation_time_span(fr) is None
+
+    def test_empty_returns_none(self):
+        from types import SimpleNamespace
+
+        from fetch import compute_observation_time_span
+        fr = SimpleNamespace(alerts=[])
+        assert compute_observation_time_span(fr) is None
+
+    def test_inf_jd_excluded(self):
+        import math
+        from types import SimpleNamespace
+
+        from fetch import compute_observation_time_span
+        obs1 = SimpleNamespace(jd=2460000.0, mag=19.0, mission="ZTF",
+                               filter_band="r", real_bogus=0.9)
+        obs2 = SimpleNamespace(jd=2460001.0, mag=19.1, mission="ZTF",
+                               filter_band="r", real_bogus=0.9)
+        obs3 = SimpleNamespace(jd=math.inf, mag=19.2, mission="ZTF",
+                               filter_band="r", real_bogus=0.9)
+        fr = SimpleNamespace(alerts=[obs1, obs2, obs3])
+        assert compute_observation_time_span(fr) == pytest.approx(1.0)
+
+    def test_span_value(self):
+        from types import SimpleNamespace
+
+        from fetch import compute_observation_time_span
+        obs1 = SimpleNamespace(jd=2460000.0, mag=19.0, mission="ZTF",
+                               filter_band="r", real_bogus=0.9)
+        obs2 = SimpleNamespace(jd=2460003.5, mag=20.0, mission="ZTF",
+                               filter_band="r", real_bogus=0.9)
+        fr = SimpleNamespace(alerts=[obs1, obs2])
+        assert compute_observation_time_span(fr) == pytest.approx(3.5)

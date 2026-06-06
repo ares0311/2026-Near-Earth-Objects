@@ -3119,3 +3119,429 @@ class TestComputeRealBogusSummary:
         sys.path.insert(0, "src")
         import classify
         assert "compute_real_bogus_summary" in classify.__all__
+
+
+class TestComputeClassAgreement:
+    def _make_neo(self, dominant: str):
+        from types import SimpleNamespace
+        vals = {"neo_candidate": 0.1, "known_object": 0.1, "main_belt_asteroid": 0.1,
+                "stellar_artifact": 0.1, "other_solar_system": 0.1}
+        vals[dominant] = 0.9
+        posterior = SimpleNamespace(**vals)
+        return SimpleNamespace(posterior=posterior)
+
+    def test_full_agreement(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_class_agreement
+        neos = [self._make_neo("neo_candidate") for _ in range(5)]
+        assert compute_class_agreement(neos) == 1.0
+
+    def test_split(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_class_agreement
+        neos = [self._make_neo("neo_candidate"), self._make_neo("neo_candidate"),
+                self._make_neo("stellar_artifact")]
+        result = compute_class_agreement(neos)
+        assert abs(result - 2 / 3) < 0.01
+
+    def test_empty_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_class_agreement
+        assert compute_class_agreement([]) == 0.0
+
+    def test_no_posterior_returns_zero(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from classify import compute_class_agreement
+        neos = [SimpleNamespace(posterior=None)]
+        assert compute_class_agreement(neos) == 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import classify
+        assert "compute_class_agreement" in classify.__all__
+
+
+class TestComputeClassAgreementUnknownHypothesis:
+    def test_all_zero_posterior_skipped(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from classify import compute_class_agreement
+        # All-zero posterior → dominant_hypothesis returns ("unknown", 0.0) → skipped
+        zero_posterior = SimpleNamespace(
+            neo_candidate=0.0, known_object=0.0, main_belt_asteroid=0.0,
+            stellar_artifact=0.0, other_solar_system=0.0
+        )
+        neo = SimpleNamespace(posterior=zero_posterior)
+        assert compute_class_agreement([neo, neo]) == 0.0
+
+
+class TestComputeTier1FeatureVector:
+    def _make_tracklet(self, jds, mags, rbs, motion_rate=1.2, arc_days=2.0, streaks=None):
+        from types import SimpleNamespace
+
+        if streaks is None:
+            streaks = [False] * len(jds)
+        obs = [
+            SimpleNamespace(
+                jd=j,
+                mag=m,
+                real_bogus_score=r,
+                is_streak=s,
+            )
+            for j, m, r, s in zip(jds, mags, rbs, streaks)
+        ]
+        return SimpleNamespace(
+            observations=tuple(obs),
+            motion_rate_arcsec_per_hour=motion_rate,
+            arc_days=arc_days,
+        )
+
+    def test_basic_values(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_tier1_feature_vector
+
+        t = self._make_tracklet(
+            [2460000.5, 2460001.5, 2460002.5],
+            [19.0, 19.5, 20.0],
+            [0.9, 0.85, 0.88],
+        )
+        fv = compute_tier1_feature_vector(t)
+        assert fv["motion_rate_arcsec_hr"] == 1.2
+        assert fv["arc_days"] == 2.0
+        assert fv["n_nights"] == 3
+        assert abs(fv["mean_mag"] - (19.0 + 19.5 + 20.0) / 3) < 1e-6
+        assert fv["streak_fraction"] == 0.0
+
+    def test_streak_fraction(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_tier1_feature_vector
+
+        t = self._make_tracklet(
+            [2460000.5, 2460001.5],
+            [19.0, 19.5],
+            [0.9, 0.8],
+            streaks=[True, False],
+        )
+        fv = compute_tier1_feature_vector(t)
+        assert fv["streak_fraction"] == 0.5
+
+    def test_sentinel_mag_excluded(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_tier1_feature_vector
+
+        t = self._make_tracklet(
+            [2460000.5, 2460001.5],
+            [99.0, 20.0],    # 99.0 is sentinel
+            [0.9, 0.8],
+        )
+        fv = compute_tier1_feature_vector(t)
+        assert fv["mean_mag"] == 20.0
+
+    def test_all_sentinel_mags(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import compute_tier1_feature_vector
+
+        t = self._make_tracklet([2460000.5], [99.0], [0.9])
+        fv = compute_tier1_feature_vector(t)
+        assert fv["mean_mag"] is None
+        assert fv["mag_range"] is None
+
+    def test_no_real_bogus(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from classify import compute_tier1_feature_vector
+
+        obs = [SimpleNamespace(jd=2460000.5, mag=19.0, is_streak=False)]
+        t = SimpleNamespace(observations=tuple(obs), motion_rate_arcsec_per_hour=1.0, arc_days=0.0)
+        fv = compute_tier1_feature_vector(t)
+        assert fv["mean_real_bogus"] is None
+
+    def test_empty_observations(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from classify import compute_tier1_feature_vector
+
+        t = SimpleNamespace(observations=(), motion_rate_arcsec_per_hour=None, arc_days=None)
+        fv = compute_tier1_feature_vector(t)
+        assert fv["motion_rate_arcsec_hr"] is None
+        assert fv["arc_days"] is None
+        assert fv["streak_fraction"] is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import classify
+        assert "compute_tier1_feature_vector" in classify.__all__
+
+
+class TestBatchDominantHypothesis:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import batch_dominant_hypothesis
+        self.fn = batch_dominant_hypothesis
+
+    def test_basic(self, scored_neo):
+        rows = self.fn([scored_neo])
+        assert len(rows) == 1
+        assert "object_id" in rows[0]
+        assert "hypothesis" in rows[0]
+        assert "probability" in rows[0]
+
+    def test_probability_range(self, scored_neo):
+        rows = self.fn([scored_neo])
+        assert 0.0 <= rows[0]["probability"] <= 1.0
+
+    def test_no_posterior(self):
+        from types import SimpleNamespace
+        neo = SimpleNamespace(tracklet=SimpleNamespace(object_id="T999"), posterior=None)
+        rows = self.fn([neo])
+        assert rows[0]["hypothesis"] == "unknown"
+        assert rows[0]["probability"] == 0.0
+
+    def test_empty_list(self):
+        assert self.fn([]) == []
+
+    def test_multiple_neos(self, scored_neo):
+        rows = self.fn([scored_neo, scored_neo])
+        assert len(rows) == 2
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import classify
+        assert "batch_dominant_hypothesis" in classify.__all__
+
+
+class TestFilterByNeoProbability:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import filter_by_neo_probability
+        self.fn = filter_by_neo_probability
+
+    def test_basic(self, scored_neo):
+        result = self.fn([scored_neo], min_prob=0.0)
+        assert len(result) == 1
+
+    def test_filters_below_threshold(self, scored_neo):
+        result = self.fn([scored_neo], min_prob=1.1)
+        assert len(result) == 0
+
+    def test_empty(self):
+        assert self.fn([]) == []
+
+    def test_none_posterior_excluded(self):
+        from types import SimpleNamespace
+        neo = SimpleNamespace(posterior=None)
+        assert self.fn([neo], min_prob=0.0) == []
+
+    def test_exact_threshold_included(self):
+        from types import SimpleNamespace
+        neo = SimpleNamespace(posterior=SimpleNamespace(neo_candidate=0.5))
+        result = self.fn([neo], min_prob=0.5)
+        assert len(result) == 1
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import classify
+        assert "filter_by_neo_probability" in classify.__all__
+
+
+class TestCountByDominantHypothesis:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from classify import count_by_dominant_hypothesis
+        self.fn = count_by_dominant_hypothesis
+
+    def test_basic(self, scored_neo):
+        result = self.fn([scored_neo])
+        assert isinstance(result, dict)
+        assert sum(result.values()) == 1
+
+    def test_empty(self):
+        assert self.fn([]) == {}
+
+    def test_none_posterior(self):
+        from types import SimpleNamespace
+        neo = SimpleNamespace(posterior=None)
+        result = self.fn([neo])
+        assert result.get("unknown") == 1
+
+    def test_multiple(self, scored_neo):
+        result = self.fn([scored_neo, scored_neo])
+        assert sum(result.values()) == 2
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import classify
+        assert "count_by_dominant_hypothesis" in classify.__all__
+
+
+class TestComputeMeanNeoProbability:
+    fn_name = "compute_mean_neo_probability"
+
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import classify
+        return getattr(classify, self.fn_name)
+
+    def _make_neo(self, neo_prob):
+        from types import SimpleNamespace
+        posterior = SimpleNamespace(neo_candidate=neo_prob) if neo_prob is not None else None
+        return SimpleNamespace(posterior=posterior)
+
+    def test_empty_list_returns_none(self):
+        assert self._fn()([]) is None
+
+    def test_all_none_posterior_returns_none(self):
+        neos = [self._make_neo(None)]
+        assert self._fn()(neos) is None
+
+    def test_single_neo(self):
+        neos = [self._make_neo(0.7)]
+        result = self._fn()(neos)
+        assert result is not None
+        assert abs(result - 0.7) < 1e-9
+
+    def test_multiple_neos(self):
+        neos = [self._make_neo(0.4), self._make_neo(0.6)]
+        result = self._fn()(neos)
+        assert result is not None
+        assert abs(result - 0.5) < 1e-9
+
+    def test_mixed_none_and_valid(self):
+        neos = [self._make_neo(None), self._make_neo(0.8)]
+        result = self._fn()(neos)
+        assert result is not None
+        assert abs(result - 0.8) < 1e-9
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import classify
+        assert "compute_mean_neo_probability" in classify.__all__
+
+
+class TestComputeCompositeNeoScore:
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import classify
+        return classify.compute_composite_neo_score
+
+    def _features(self, rb=None, arc=None, nights=None, orbit=None):
+        from types import SimpleNamespace
+        return SimpleNamespace(
+            real_bogus_score=rb,
+            arc_coverage_score=arc,
+            nights_observed_score=nights,
+            orbit_quality_score=orbit,
+        )
+
+    def test_all_none_returns_zero(self):
+        assert self._fn()(self._features()) == 0.0
+
+    def test_all_one_returns_one(self):
+        result = self._fn()(self._features(1.0, 1.0, 1.0, 1.0))
+        assert abs(result - 1.0) < 1e-9
+
+    def test_partial_features(self):
+        result = self._fn()(self._features(rb=1.0, arc=0.0, nights=0.0, orbit=0.0))
+        assert abs(result - 0.35) < 1e-9
+
+    def test_result_clamped_to_one(self):
+        assert self._fn()(self._features(1.0, 1.0, 1.0, 1.0)) <= 1.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import classify
+        assert "compute_composite_neo_score" in classify.__all__
+
+
+class TestGetHighestConfidenceNeo:
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import classify
+        return classify.get_highest_confidence_neo
+
+    def _neo(self, neo_prob):
+        from types import SimpleNamespace
+        posterior = SimpleNamespace(neo_candidate=neo_prob) if neo_prob is not None else None
+        return SimpleNamespace(posterior=posterior)
+
+    def test_empty_returns_none(self):
+        assert self._fn()([]) is None
+
+    def test_all_none_posterior_returns_none(self):
+        assert self._fn()([self._neo(None)]) is None
+
+    def test_single_neo_returned(self):
+        neo = self._neo(0.7)
+        assert self._fn()([neo]) is neo
+
+    def test_returns_highest_probability(self):
+        low = self._neo(0.3)
+        high = self._neo(0.9)
+        assert self._fn()([low, high]) is high
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import classify
+        assert "get_highest_confidence_neo" in classify.__all__
+
+
+class TestComputeClassificationEntropySummary:
+    def test_with_scored_neos(self, scored_neo):
+        from classify import compute_classification_entropy_summary
+        result = compute_classification_entropy_summary([scored_neo])
+        assert "mean_entropy" in result
+        assert "std_entropy" in result
+        assert "min_entropy" in result
+        assert "max_entropy" in result
+
+    def test_empty_returns_empty_dict(self):
+        from classify import compute_classification_entropy_summary
+        assert compute_classification_entropy_summary([]) == {}
+
+    def test_no_posteriors_returns_empty(self):
+        from types import SimpleNamespace
+
+        from classify import compute_classification_entropy_summary
+        neo = SimpleNamespace(posterior=None)
+        assert compute_classification_entropy_summary([neo]) == {}
+
+    def test_single_neo_std_zero(self, scored_neo):
+        from classify import compute_classification_entropy_summary
+        result = compute_classification_entropy_summary([scored_neo])
+        assert result["std_entropy"] == pytest.approx(0.0)
+
+    def test_two_neos_stats(self, scored_neo):
+        from classify import compute_classification_entropy_summary
+        result = compute_classification_entropy_summary([scored_neo, scored_neo])
+        assert result["min_entropy"] == result["max_entropy"]
+        assert result["mean_entropy"] == result["min_entropy"]

@@ -2508,3 +2508,678 @@ class TestComputeMagnitudeRange:
         sys.path.insert(0, "src")
         import detect
         assert "compute_magnitude_range" in detect.__all__
+
+
+class TestComputeDetectionDensity:
+    def test_basic(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_detection_density
+        candidates = list(range(100))
+        density = compute_detection_density(candidates, field_radius_deg=1.0)
+        assert density is not None
+        assert density > 0.0
+
+    def test_zero_radius_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_detection_density
+        assert compute_detection_density([], field_radius_deg=0.0) is None
+
+    def test_negative_radius_returns_none(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_detection_density
+        assert compute_detection_density([], field_radius_deg=-1.0) is None
+
+    def test_empty_candidates(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_detection_density
+        density = compute_detection_density([], field_radius_deg=2.0)
+        assert density == 0.0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import detect
+        assert "compute_detection_density" in detect.__all__
+
+
+class TestCountStreakDetections:
+    def test_no_streaks(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import count_streak_detections
+
+        cands = [SimpleNamespace(is_streak=False), SimpleNamespace(is_streak=False)]
+        result = SimpleNamespace(candidates=cands)
+        assert count_streak_detections(result) == 0
+
+    def test_all_streaks(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import count_streak_detections
+
+        cands = [SimpleNamespace(is_streak=True), SimpleNamespace(is_streak=True)]
+        result = SimpleNamespace(candidates=cands)
+        assert count_streak_detections(result) == 2
+
+    def test_mixed(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import count_streak_detections
+
+        cands = [
+            SimpleNamespace(is_streak=True),
+            SimpleNamespace(is_streak=False),
+            SimpleNamespace(is_streak=True),
+        ]
+        result = SimpleNamespace(candidates=cands)
+        assert count_streak_detections(result) == 2
+
+    def test_no_is_streak_attr(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import count_streak_detections
+
+        cands = [SimpleNamespace(), SimpleNamespace()]
+        result = SimpleNamespace(candidates=cands)
+        assert count_streak_detections(result) == 0
+
+    def test_empty_candidates(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import count_streak_detections
+
+        result = SimpleNamespace(candidates=[])
+        assert count_streak_detections(result) == 0
+
+    def test_no_candidates_attr(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import count_streak_detections
+
+        assert count_streak_detections(SimpleNamespace()) == 0
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import detect
+        assert "count_streak_detections" in detect.__all__
+
+
+class TestCountDetectionsByMission:
+    def test_empty(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import count_detections_by_mission
+
+        result = SimpleNamespace(candidates=[])
+        assert count_detections_by_mission(result) == {}
+
+    def test_single_mission(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import count_detections_by_mission
+
+        cands = [
+            SimpleNamespace(observation=SimpleNamespace(mission="ZTF")),
+            SimpleNamespace(observation=SimpleNamespace(mission="ZTF")),
+        ]
+        result = SimpleNamespace(candidates=cands)
+        assert count_detections_by_mission(result) == {"ZTF": 2}
+
+    def test_multi_mission(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import count_detections_by_mission
+
+        cands = [
+            SimpleNamespace(observation=SimpleNamespace(mission="ZTF")),
+            SimpleNamespace(observation=SimpleNamespace(mission="ATLAS")),
+            SimpleNamespace(observation=SimpleNamespace(mission="ZTF")),
+        ]
+        result = SimpleNamespace(candidates=cands)
+        counts = count_detections_by_mission(result)
+        assert counts["ZTF"] == 2
+        assert counts["ATLAS"] == 1
+
+    def test_no_observation_attr(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import count_detections_by_mission
+
+        cands = [SimpleNamespace(mission="ZTF"), SimpleNamespace(mission="ZTF")]
+        result = SimpleNamespace(candidates=cands)
+        counts = count_detections_by_mission(result)
+        assert counts.get("ZTF", 0) == 2
+
+    def test_none_mission_becomes_unknown(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import count_detections_by_mission
+
+        cands = [SimpleNamespace(observation=SimpleNamespace(mission=None))]
+        result = SimpleNamespace(candidates=cands)
+        counts = count_detections_by_mission(result)
+        assert counts["unknown"] == 1
+
+    def test_no_candidates_attr(self):
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from detect import count_detections_by_mission
+
+        assert count_detections_by_mission(SimpleNamespace()) == {}
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import detect
+        assert "count_detections_by_mission" in detect.__all__
+
+
+class TestFilterByStreakScore:
+    def _make_result(self, streak_metrics):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import DetectProvenance, DetectResult, Observation, RawCandidate
+
+        candidates = []
+        for i, _ in enumerate(streak_metrics):
+            obs = Observation(
+                obs_id=f"o{i}",
+                ra_deg=10.0,
+                dec_deg=5.0,
+                jd=2460000.5,
+                mag=20.0,
+                mag_err=0.1,
+                filter_band="r",
+                mission="ZTF",
+            )
+            cand = RawCandidate(
+                candidate_id=f"c{i}",
+                observations=(obs,),
+                is_streak=True,
+            )
+            candidates.append(cand)
+        prov = DetectProvenance(
+            real_bogus_threshold=0.65,
+            n_candidates=len(candidates),
+            n_known_matches=0,
+            detected_at_jd=2460000.5,
+        )
+        return DetectResult(candidates=tuple(candidates), known_matches=(), provenance=prov)
+
+    def test_empty_result(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import filter_by_streak_score
+        from schemas import DetectProvenance, DetectResult
+
+        prov = DetectProvenance(
+            real_bogus_threshold=0.65,
+            n_candidates=0,
+            n_known_matches=0,
+            detected_at_jd=2460000.5,
+        )
+        result = DetectResult(candidates=(), known_matches=(), provenance=prov)
+        filtered = filter_by_streak_score(result, min_streak_score=0.5)
+        assert len(filtered.candidates) == 0
+
+    def test_returns_detect_result(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import filter_by_streak_score
+        from schemas import DetectResult
+
+        result = self._make_result([0.0])
+        filtered = filter_by_streak_score(result)
+        assert isinstance(filtered, DetectResult)
+
+    def test_zero_streak_below_threshold(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import filter_by_streak_score
+
+        result = self._make_result([0.0])
+        # cutout is None so compute_streak_metric returns 0.0 < 0.5
+        filtered = filter_by_streak_score(result, min_streak_score=0.5)
+        assert len(filtered.candidates) == 0
+
+    def test_provenance_count_updated(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import filter_by_streak_score
+
+        result = self._make_result([0.0, 0.0])
+        filtered = filter_by_streak_score(result, min_streak_score=0.5)
+        assert filtered.provenance.n_candidates == len(filtered.candidates)
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import detect
+        assert "filter_by_streak_score" in detect.__all__
+
+    def _make_streaky_result(self):
+        """Create a DetectResult with one candidate that has a high streak score."""
+        import base64
+        import sys
+        sys.path.insert(0, "src")
+        import numpy as np
+
+        from schemas import DetectProvenance, DetectResult, Observation, RawCandidate
+
+        # Create a 9x9 float32 array with a strong horizontal streak
+        arr = np.zeros((9, 9), dtype=np.float32)
+        arr[4, :] = 10.0  # horizontal line = maximally elongated
+        cutout_b64 = base64.b64encode(arr.tobytes()).decode()
+
+        obs = Observation(
+            obs_id="streak_obs",
+            ra_deg=10.0,
+            dec_deg=5.0,
+            jd=2460000.5,
+            mag=20.0,
+            mag_err=0.1,
+            filter_band="r",
+            mission="ZTF",
+            cutout_difference=cutout_b64,
+        )
+        cand = RawCandidate(
+            candidate_id="streaky",
+            observations=(obs,),
+            is_streak=True,
+        )
+        prov = DetectProvenance(
+            real_bogus_threshold=0.65,
+            n_candidates=1,
+            n_known_matches=0,
+            detected_at_jd=2460000.5,
+        )
+        return DetectResult(candidates=(cand,), known_matches=(), provenance=prov)
+
+    def _make_empty_obs_result(self):
+        """Create a DetectResult with one candidate that has no observations."""
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import DetectProvenance, DetectResult, RawCandidate
+
+        cand = RawCandidate(
+            candidate_id="no_obs",
+            observations=(),
+            is_streak=False,
+        )
+        prov = DetectProvenance(
+            real_bogus_threshold=0.65,
+            n_candidates=1,
+            n_known_matches=0,
+            detected_at_jd=2460000.5,
+        )
+        return DetectResult(candidates=(cand,), known_matches=(), provenance=prov)
+
+    def test_candidate_with_no_observations_skipped(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import filter_by_streak_score
+
+        result = self._make_empty_obs_result()
+        filtered = filter_by_streak_score(result, min_streak_score=0.0)
+        assert len(filtered.candidates) == 0
+
+    def test_high_streak_candidate_kept(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import filter_by_streak_score
+
+        result = self._make_streaky_result()
+        filtered = filter_by_streak_score(result, min_streak_score=0.5)
+        assert len(filtered.candidates) == 1
+
+
+class TestComputeRbScoreDistribution:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import compute_rb_score_distribution
+        self.fn = compute_rb_score_distribution
+
+    def _make_result(self, rb_scores):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import DetectProvenance, DetectResult, Observation, RawCandidate
+        candidates = []
+        for i, rb in enumerate(rb_scores):
+            obs = Observation(
+                obs_id=f"o{i}", ra_deg=10.0, dec_deg=5.0, jd=2460000.5,
+                mag=20.0, mag_err=0.1, filter_band="r", mission="ZTF",
+                real_bogus=rb,
+            )
+            cand = RawCandidate(candidate_id=f"c{i}", observations=(obs,))
+            candidates.append(cand)
+        prov = DetectProvenance(
+            real_bogus_threshold=0.65, n_candidates=len(candidates),
+            n_known_matches=0, detected_at_jd=2460000.5,
+        )
+        return DetectResult(candidates=tuple(candidates), known_matches=(), provenance=prov)
+
+    def test_basic_structure(self):
+        result = self._make_result([0.2, 0.5, 0.8])
+        hist = self.fn(result)
+        assert "bin_edges" in hist
+        assert "counts" in hist
+        assert "n_total" in hist
+        assert hist["n_total"] == 3
+
+    def test_empty_result(self):
+        result = self._make_result([])
+        hist = self.fn(result)
+        assert hist["n_total"] == 0
+        assert sum(hist["counts"]) == 0
+
+    def test_none_rb_excluded(self):
+        result = self._make_result([None, 0.5])
+        hist = self.fn(result)
+        assert hist["n_total"] == 1
+
+    def test_bin_count_correct(self):
+        result = self._make_result([0.2, 0.5, 0.8])
+        hist = self.fn(result, n_bins=5)
+        assert len(hist["counts"]) == 5
+        assert len(hist["bin_edges"]) == 6
+
+    def test_all_in_last_bin_for_score_one(self):
+        result = self._make_result([1.0])
+        hist = self.fn(result, n_bins=10)
+        assert hist["counts"][-1] == 1
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import detect
+        assert "compute_rb_score_distribution" in detect.__all__
+
+
+class TestCountCandidatesAboveRb:
+    def setup_method(self):
+        import sys
+        sys.path.insert(0, "src")
+        from detect import count_candidates_above_rb
+        self.fn = count_candidates_above_rb
+
+    def _make_result(self, rb_scores):
+        import sys
+        sys.path.insert(0, "src")
+        from schemas import DetectProvenance, DetectResult, Observation, RawCandidate
+        candidates = []
+        for i, rb in enumerate(rb_scores):
+            obs = Observation(
+                obs_id=f"o{i}", ra_deg=10.0, dec_deg=5.0, jd=2460000.5,
+                mag=20.0, mag_err=0.1, filter_band="r", mission="ZTF",
+                real_bogus=rb,
+            )
+            cand = RawCandidate(candidate_id=f"c{i}", observations=(obs,))
+            candidates.append(cand)
+        prov = DetectProvenance(
+            real_bogus_threshold=0.65, n_candidates=len(candidates),
+            n_known_matches=0, detected_at_jd=2460000.5,
+        )
+        return DetectResult(candidates=tuple(candidates), known_matches=(), provenance=prov)
+
+    def test_all_above(self):
+        result = self._make_result([0.7, 0.8, 0.9])
+        assert self.fn(result, threshold=0.65) == 3
+
+    def test_none_above(self):
+        result = self._make_result([0.2, 0.3])
+        assert self.fn(result, threshold=0.65) == 0
+
+    def test_empty(self):
+        result = self._make_result([])
+        assert self.fn(result) == 0
+
+    def test_none_rb_excluded(self):
+        result = self._make_result([None])
+        assert self.fn(result) == 0
+
+    def test_mixed(self):
+        result = self._make_result([0.8, 0.3, 0.9])
+        assert self.fn(result, threshold=0.65) == 2
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import detect
+        assert "count_candidates_above_rb" in detect.__all__
+
+
+class TestGetBrightestCandidate:
+    fn_name = "get_brightest_candidate"
+
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import detect
+        return getattr(detect, self.fn_name)
+
+    def _obs(self, mag, obs_id="o1"):
+        from types import SimpleNamespace
+        return SimpleNamespace(
+            obs_id=obs_id, ra_deg=10.0, dec_deg=5.0, jd=2460000.0,
+            mag=mag, mag_err=0.1, filter_band="r", real_bogus_score=0.9,
+            mission="ZTF", cutout_science=None, cutout_reference=None,
+            cutout_difference=None,
+        )
+
+    def _cand(self, obs_list):
+        from types import SimpleNamespace
+        return SimpleNamespace(observations=tuple(obs_list), object_id="c1")
+
+    def _result(self, candidates):
+        from types import SimpleNamespace
+        return SimpleNamespace(candidates=candidates, known_matches=[], summary=None)
+
+    def test_empty_result_returns_none(self):
+        result = self._result([])
+        assert self._fn()(result) is None
+
+    def test_all_sentinel_returns_none(self):
+        cand = self._cand([self._obs(99.0), self._obs(95.0)])
+        result = self._result([cand])
+        assert self._fn()(result) is None
+
+    def test_returns_candidate_with_brightest_obs(self):
+        bright_cand = self._cand([self._obs(16.0, "o1")])
+        faint_cand = self._cand([self._obs(22.0, "o2")])
+        result = self._result([faint_cand, bright_cand])
+        assert self._fn()(result) is bright_cand
+
+    def test_single_candidate(self):
+        cand = self._cand([self._obs(20.0)])
+        result = self._result([cand])
+        assert self._fn()(result) is cand
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import detect
+        assert "get_brightest_candidate" in detect.__all__
+
+
+class TestComputeMeanMotionRate:
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import detect
+        return detect.compute_mean_motion_rate
+
+    def _obs(self, obs_id, ra, dec, jd):
+        from types import SimpleNamespace
+        return SimpleNamespace(
+            obs_id=obs_id, ra_deg=ra, dec_deg=dec, jd=jd,
+            mag=20.0, mag_err=0.1, filter_band="r",
+            real_bogus_score=0.9, mission="ZTF",
+            cutout_science=None, cutout_reference=None, cutout_difference=None,
+        )
+
+    def _result(self, candidates):
+        from types import SimpleNamespace
+        return SimpleNamespace(candidates=candidates, known_matches=[], summary=None)
+
+    def test_empty_result_returns_none(self):
+        assert self._fn()(self._result([])) is None
+
+    def test_single_pair_returns_rate(self):
+        from types import SimpleNamespace
+        obs1 = self._obs("o1", 10.0, 5.0, 2460000.0)
+        obs2 = self._obs("o2", 10.01, 5.0, 2460001.0)
+        cand = SimpleNamespace(observations=(obs1, obs2))
+        result = self._result([cand])
+        rate = self._fn()(result)
+        assert rate is not None
+        assert rate >= 0.0
+
+    def test_single_obs_no_pairs_returns_none(self):
+        from types import SimpleNamespace
+        obs = self._obs("o1", 10.0, 5.0, 2460000.0)
+        cand = SimpleNamespace(observations=(obs,))
+        assert self._fn()(self._result([cand])) is None
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import detect
+        assert "compute_mean_motion_rate" in detect.__all__
+
+
+class TestComputeMeanMotionRateCoverage:
+    """Cover except branch (bad obs) and quality_code=None in score."""
+
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import detect
+        return detect.compute_mean_motion_rate
+
+    def test_exception_in_motion_vector_skipped(self):
+        from types import SimpleNamespace
+        bad_obs1 = SimpleNamespace(obs_id="o1", jd=2460000.0)
+        bad_obs2 = SimpleNamespace(obs_id="o2", jd=2460001.0)
+        cand = SimpleNamespace(observations=(bad_obs1, bad_obs2))
+        result = SimpleNamespace(candidates=[cand], known_matches=[], summary=None)
+        assert self._fn()(result) is None
+
+
+class TestComputeCandidateSkyDensity:
+    def _fn(self):
+        import sys
+        sys.path.insert(0, "src")
+        import detect
+        return detect.compute_candidate_sky_density
+
+    def _cand(self):
+        from types import SimpleNamespace
+        return SimpleNamespace(observations=(), object_id="c1")
+
+    def _result(self, n_cands):
+        from types import SimpleNamespace
+        return SimpleNamespace(
+            candidates=[self._cand() for _ in range(n_cands)],
+            known_matches=[], summary=None,
+        )
+
+    def test_zero_radius_returns_zero(self):
+        assert self._fn()(self._result(5), 0.0) == 0.0
+
+    def test_negative_radius_returns_zero(self):
+        assert self._fn()(self._result(5), -1.0) == 0.0
+
+    def test_empty_candidates_returns_zero(self):
+        assert self._fn()(self._result(0), 1.0) == 0.0
+
+    def test_returns_positive_density(self):
+        result = self._fn()(self._result(10), 1.0)
+        assert result > 0.0
+
+    def test_more_candidates_higher_density(self):
+        d1 = self._fn()(self._result(5), 1.0)
+        d2 = self._fn()(self._result(10), 1.0)
+        assert d2 > d1
+
+    def test_in_all(self):
+        import sys
+        sys.path.insert(0, "src")
+        import detect
+        assert "compute_candidate_sky_density" in detect.__all__
+
+
+class TestComputeDetectionGapDays:
+    def test_two_candidates(self, raw_candidate):
+        from types import SimpleNamespace
+
+        from detect import compute_detection_gap_days
+        obs1 = SimpleNamespace(jd=2460000.0, ra_deg=10.0, dec_deg=20.0,
+                               mag=19.0, mag_err=0.1, filter_band="r",
+                               mission="ZTF", real_bogus=0.9)
+        obs2 = SimpleNamespace(jd=2460002.5, ra_deg=10.1, dec_deg=20.1,
+                               mag=19.1, mag_err=0.1, filter_band="r",
+                               mission="ZTF", real_bogus=0.9)
+        cand1 = SimpleNamespace(observations=[obs1])
+        cand2 = SimpleNamespace(observations=[obs2])
+        result_obj = SimpleNamespace(candidates=[cand1, cand2])
+        gap = compute_detection_gap_days(result_obj)
+        assert gap == pytest.approx(2.5)
+
+    def test_single_candidate_returns_none(self, raw_candidate):
+        from types import SimpleNamespace
+
+        from detect import compute_detection_gap_days
+        result_obj = SimpleNamespace(candidates=[raw_candidate])
+        assert compute_detection_gap_days(result_obj) is None
+
+    def test_empty_returns_none(self):
+        from types import SimpleNamespace
+
+        from detect import compute_detection_gap_days
+        result_obj = SimpleNamespace(candidates=[])
+        assert compute_detection_gap_days(result_obj) is None
+
+    def test_max_gap_chosen(self):
+        from types import SimpleNamespace
+
+        from detect import compute_detection_gap_days
+        def _cand(jd):
+            obs = SimpleNamespace(jd=jd, ra_deg=0.0, dec_deg=0.0,
+                                  mag=19.0, mag_err=0.1, filter_band="r",
+                                  mission="ZTF", real_bogus=0.9)
+            return SimpleNamespace(observations=[obs])
+        result_obj = SimpleNamespace(
+            candidates=[_cand(2460000.0), _cand(2460001.0), _cand(2460004.0)]
+        )
+        gap = compute_detection_gap_days(result_obj)
+        assert gap == pytest.approx(3.0)
