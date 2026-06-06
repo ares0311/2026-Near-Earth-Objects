@@ -50,9 +50,9 @@ try:
     from fetch import fetch_ztf_alerts  # type: ignore[import]
 
     obs = fetch_ztf_alerts(
-        ra=83.8221,
-        dec=-5.3911,
-        radius=0.5,
+        ra_deg=83.8221,
+        dec_deg=-5.3911,
+        radius_deg=0.5,
         start_jd=2460700.5,
         end_jd=2460701.5,
         force_refresh=True,  # bypass cache so we actually hit the API
