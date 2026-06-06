@@ -5,8 +5,8 @@
 # load them into env vars for this shell session, then run a live connection
 # test against both APIs and write the result to Logs/reports/live_connection_test.json.
 #
-# USAGE (run from repo root on your Mac, with the project venv activated):
-#   zsh Skills/verify_live_credentials.sh
+# USAGE (run from repo root on your Mac, sourced so python resolves from your shell):
+#   source Skills/verify_live_credentials.sh
 #
 # OUTPUT: Logs/reports/live_connection_test.json
 #   Contains pass/fail status and observation counts for ATLAS and ZTF.
@@ -16,14 +16,6 @@
 # under neo-detection:* — values never leave your Keychain or this shell session.
 
 set -euo pipefail
-
-# ── 0. Verify Python is available (requires the project venv to be activated) ──
-# The project uses `python` from the active venv — never call python3 directly.
-if ! command -v python &>/dev/null; then
-    echo "ERROR: 'python' not found. Activate the project virtual environment first:"
-    echo "  source .venv/bin/activate   # or however your venv is named"
-    exit 1
-fi
 
 # ── 1. Load credentials from Keychain into env vars ──────────────────────────
 
