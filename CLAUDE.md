@@ -8,11 +8,12 @@ It contains the facts a coding agent needs to work productively without re-readi
 ## MANDATORY SESSION-START PROTOCOL
 
 **At the start of every session, before planning or executing any steps, you must:**
+0. Run `git pull origin main` — the local repo resets to a checkpoint at each session start; pull ensures all files reflect the latest committed state before reading them.
 1. Call `Read` on `CLAUDE.md` — do not rely on memory or prior context. (This file; re-read to reactivate all standing rules.)
 2. Call `Read` on `AGENTS.md` — do not rely on memory or prior context.
 3. Call `Read` on `docs/PRODUCTION_READINESS.md` — do not rely on memory or prior context.
 
-These reads are non-negotiable. No planning or code changes may happen before all three files are read.
+These steps are non-negotiable. No planning or code changes may happen before all four are complete.
 
 ---
 
