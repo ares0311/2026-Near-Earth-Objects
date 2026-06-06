@@ -35,6 +35,7 @@ import csv
 import pathlib
 import sys
 from pathlib import Path
+from typing import Any
 
 # Ensure src/ modules (classify.py etc.) are importable when run as a script
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
@@ -88,14 +89,16 @@ def _build_dataset(rows: list[dict]):
     return CutoutDataset(rows)
 
 
-def _compute_class_weights(rows: list[dict]) -> "torch.Tensor":
+def _compute_class_weights(rows: list[dict]) -> Any:
     """Compute inverse-frequency class weights for NLLLoss.
 
     Only classes that appear in `rows` contribute; unused classes get weight 1.0
     so they don't produce NaN gradients if the model ever predicts them.
+    Returns a torch.Tensor of shape (n_classes,).
     """
-    import torch
     from collections import Counter
+
+    import torch
 
     counts: Counter[int] = Counter(int(r["label"]) for r in rows)
     total = sum(counts.values())
@@ -150,7 +153,12 @@ def train(labels_csv: str, epochs: int, out_path: str, lr: float,
     print(f"Training on {n_train} samples, validating on {n_val} samples")
     print(f"  Train label counts: { {LABEL_NAMES[k]: v for k, v in sorted(train_counts.items())} }")
     print(f"  Val   label counts: { {LABEL_NAMES[k]: v for k, v in sorted(val_counts.items())} }")
-    print(f"  Class weights:      { {LABEL_NAMES[i]: round(class_weights[i].item(), 3) for i in range(len(LABEL_NAMES)) if class_weights[i] != 1.0 or i in train_counts} }")
+    cw_display = {
+        LABEL_NAMES[i]: round(class_weights[i].item(), 3)
+        for i in range(len(LABEL_NAMES))
+        if class_weights[i] != 1.0 or i in train_counts
+    }
+    print(f"  Class weights:      {cw_display}")
     print()
 
     train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True,
