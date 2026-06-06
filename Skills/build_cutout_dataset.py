@@ -38,6 +38,10 @@ def _decode_b64(b64_str: str, size: int = 63) -> np.ndarray | None:
         if arr.size != size * size:
             return None
         arr_f = arr.reshape(size, size).copy()
+        # ZTF FITS cutouts can contain NaN/Inf pixels (bad pixels, masked regions).
+        # np.percentile propagates NaN, making the entire normalization output NaN,
+        # which then silently corrupts .npz files and causes NaN loss during training.
+        arr_f = np.nan_to_num(arr_f, nan=0.0, posinf=0.0, neginf=0.0)
         lo, hi = np.percentile(arr_f, 1), np.percentile(arr_f, 99)
         if hi > lo:
             arr_f = (arr_f - lo) / (hi - lo)

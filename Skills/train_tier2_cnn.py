@@ -61,10 +61,19 @@ def _load_cutout_npz(npz_path: str):  # noqa: ANN201
     import torch
 
     data = np.load(npz_path)
-    # unsqueeze(0) adds channel dim: (63,63) → (1,63,63)
-    sci = torch.from_numpy(data["science"].astype(np.float32)).unsqueeze(0)
-    ref = torch.from_numpy(data["reference"].astype(np.float32)).unsqueeze(0)
-    diff = torch.from_numpy(data["difference"].astype(np.float32)).unsqueeze(0)
+    # Replace any NaN/Inf with 0 before converting to tensor.
+    # ZTF FITS cutouts can have NaN pixels (bad/masked regions); a single NaN
+    # propagates through all conv layers, makes the loss NaN on the first batch,
+    # corrupts weights with NaN gradients, and keeps loss NaN for every epoch.
+    sci = torch.from_numpy(
+        np.nan_to_num(data["science"], nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32)
+    ).unsqueeze(0)   # (63,63) → (1,63,63) channel dim
+    ref = torch.from_numpy(
+        np.nan_to_num(data["reference"], nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32)
+    ).unsqueeze(0)
+    diff = torch.from_numpy(
+        np.nan_to_num(data["difference"], nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32)
+    ).unsqueeze(0)
     return sci, ref, diff
 
 
