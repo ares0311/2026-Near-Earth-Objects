@@ -675,6 +675,25 @@ class TestFormatNeocopReport:
         result = format_neocp_report(neo2)
         assert "30 s" in result
 
+    def test_medium_mover_medium_exposure(self):
+        # Covers the elif rate > 2.0 branch (exp_s = 60) in format_neocp_report.
+        from alert import format_neocp_report
+        from schemas import Tracklet
+
+        from .conftest import build_scored_neo, build_tracklet
+        t = build_tracklet(n_obs=3)
+        medium_tracklet = Tracklet(
+            object_id=t.object_id,
+            observations=t.observations,
+            arc_days=t.arc_days,
+            motion_rate_arcsec_per_hour=5.0,  # 2 < rate <= 10 → exp_s = 60
+            motion_pa_degrees=t.motion_pa_degrees,
+        )
+        neo = build_scored_neo()
+        neo2 = neo.model_copy(update={"tracklet": medium_tracklet})
+        result = format_neocp_report(neo2)
+        assert "60 s" in result
+
 
 class TestReadyForSubmission:
     def _make_neo(self, moid_au: float = 0.03, rb: float = 0.95,
