@@ -5,7 +5,7 @@
 # load them into env vars for this shell session, then run a live connection
 # test against both APIs and write the result to Logs/reports/live_connection_test.json.
 #
-# USAGE (run from repo root on your Mac, sourced so python resolves from your shell):
+# USAGE (run from repo root on your Mac, sourced so python resolves from your active shell):
 #   source Skills/verify_live_credentials.sh
 #
 # OUTPUT: Logs/reports/live_connection_test.json
