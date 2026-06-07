@@ -4,7 +4,7 @@ __pycache__/
 *.pyo
 .neo_cache/
 alert_logs/
-models/
+models/*
 !models/*.pt
 data/cutouts/
 data/ztf_labeled_alerts.json
