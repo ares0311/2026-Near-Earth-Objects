@@ -528,6 +528,7 @@ All 10 pipeline modules are complete. Default collection finds 3467 non-live tes
 | `Skills/visualize_tracklets.py` | Plot sky positions and light curves for a tracklet JSON file |
 | `Skills/export_mpc_report.py` | Export MPC 80-column reports from a scored NEO JSON file |
 | `Skills/benchmark_pipeline.py` | Time classify + score on N synthetic tracklets; print throughput table |
+| `Skills/train_tier1_xgboost.py` | Train Tier 1 XGBoost on ZTF alerts + MPC labels; saves `models/tier1_xgb.json`; run from Mac with `caffeinate -i` |
 | `Skills/train_tier2_cnn.py` | Fine-tune CNN on labeled ZTF cutout CSV; saves `models/tier2_cnn.pt` |
 | `Skills/train_tier3_transformer.py` | Train Transformer on MPC tracklet CSV; saves `models/tier3_transformer.pt` |
 | `Skills/tune_linker.py` | Parametric sweep of `position_tolerance_arcsec` × `chi2_threshold` vs link/score rate |
@@ -650,6 +651,14 @@ All 10 pipeline modules are complete. Default collection finds 3467 non-live tes
 - Collect labeled training data via `Skills/generate_training_labels.py`.
 - Run credentialed live-data dry runs for ZTF/ATLAS/Pan-STARRS only when tokens and review policy are explicitly configured.
 - Train and evaluate Tier 2/Tier 3 model weights on real labeled data.
+- Commit `models/tier1_xgb.json` after `.gitignore` update to allow `models/*.json` is merged.
+
+### Key Changes in v0.87.1 (training milestone)
+
+- `Skills/train_tier1_xgboost.py`: new — trains 5-class XGBoost on ZTF labeled alerts (rb/drb features) + MPC NEO/MBA catalog labels; 80/20 stratified val split; inverse-frequency class weights; saves `models/tier1_xgb.json`; auto-loaded by `classify._load_xgb_model`.
+- `.gitignore`: added `!models/*.json` to allow `models/tier1_xgb.json` to be committed alongside `models/tier2_cnn.pt`.
+- `docs/PRODUCTION_READINESS.md`: T1-A step 8 marked DONE; step 9 added (commit model JSON); checklist updated (Tier 1 XGBoost ✓).
+- Tier 1 XGBoost training results: val_acc=99.95%, macro AUC=1.000, 11,100 examples (8,588 ZTF real + 1,412 ZTF bogus + 500 MPC NEO + 500 MPC MBA + 100 synthetic minor-class), 300 estimators, max_depth=5.
 
 ### Key Changes in v0.87.0
 

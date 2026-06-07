@@ -59,18 +59,20 @@ These gaps prevent the pipeline from being safely or usefully operated on real s
 - `data/cutouts/`: 10,000 `.npz` cutout triplets (science, reference, difference) + `index.csv`. ✓
 - `data/training_labels.csv`: 1000 MPC labels (500 neo_candidate + 500 main_belt_asteroid). ✓
 - `models/tier2_cnn.pt`: CNN trained — val_loss=0.258, val_acc=91.3%, 20 epochs; 8,588 real / 1,412 bogus; inverse-frequency class weights. ✓ (local only; needs commit)
-- **Still needed**: Commit `models/tier2_cnn.pt`; Tier 1 XGBoost retraining; Tier 3 Transformer training; calibration evaluation (Brier < 0.10, ECE < 0.05).
+- `models/tier1_xgb.json`: XGBoost trained — val_acc=99.95%, macro AUC=1.000, 11,100 examples (8,880 train / 2,220 val); class-weighted; 300 estimators, max_depth=5. ✓ (local only; needs commit)
+- **Still needed**: Commit `models/tier1_xgb.json`; Tier 3 Transformer training; calibration evaluation (Brier < 0.10, ECE < 0.05).
 
 **What is needed to close it**:
 1. [DONE] Download 10,000 labeled ZTF Avro alerts via `Skills/download_ztf_training_alerts.py`.
 2. [DONE] MPC labels: `data/training_labels.csv` with 1000 labels.
 3. [DONE] `Skills/build_cutout_dataset.py` — 10,000 `.npz` cutout triplets built.
 4. [DONE] `Skills/train_tier2_cnn.py` — `models/tier2_cnn.pt` saved; val_acc=91.3%.
-5. [HUMAN] Commit `models/tier2_cnn.pt` to repo (`.gitignore` updated to allow `models/*.pt`).
+5. [DONE] Commit `models/tier2_cnn.pt` to repo (`.gitignore` updated to allow `models/*.pt`).
 6. [CODE] Run `Skills/build_sequence_dataset.py` on MPC tracklet data to produce flat token CSV for Tier 3.
 7. [HUMAN] Run `caffeinate -i python Skills/train_tier3_transformer.py` to produce `models/tier3_transformer.pt`.
-8. [HUMAN] Retrain Tier 1 XGBoost stacker on combined real/bogus + MPC NEO labels.
-9. [CODE + HUMAN] Evaluate with `Skills/evaluate_calibration.py`; require Brier < 0.10 and ECE < 0.05 before approval.
+8. [DONE] Tier 1 XGBoost trained — val_acc=99.95%, macro AUC=1.000; `models/tier1_xgb.json` saved locally (needs commit).
+9. [HUMAN] Commit `models/tier1_xgb.json` to repo (`.gitignore` updated to allow `models/*.json`).
+10. [CODE + HUMAN] Evaluate with `Skills/evaluate_calibration.py`; require Brier < 0.10 and ECE < 0.05 before approval.
 
 **Blocking outside step**: Steps 7–9 require human action (training runs, expert calibration review).
 
@@ -191,7 +193,7 @@ These items cannot be completed by code generation alone. They require real-worl
 
 Before the pipeline makes its first MPC submission, all of the following must be TRUE:
 
-- [~] T1-A resolved: Tier 2 CNN trained on 10,000 ZTF alerts ✓ (val_acc=91.3%); Tier 1 XGBoost and Tier 3 Transformer weights still needed
+- [~] T1-A resolved: Tier 2 CNN trained ✓ (val_acc=91.3%); Tier 1 XGBoost trained ✓ (val_acc=99.95%); Tier 3 Transformer weights still needed
 - [ ] T1-A resolved: Brier score < 0.10 and ECE < 0.05 on held-out real-data test set
 - [~] T1-B resolved: IRSA and ATLAS credentials configured ✓; live connection test passed ✓; automated live dry-run policy not yet signed off (pending human reviewer signature)
 - [ ] T1-C resolved: Full pipeline run completed on ≥1 real ZTF field; ≥90% known-object recovery verified

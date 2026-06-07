@@ -6,6 +6,7 @@ __pycache__/
 alert_logs/
 models/*
 !models/*.pt
+!models/*.json
 data/cutouts/
 data/ztf_labeled_alerts.json
 .mypy_cache/
