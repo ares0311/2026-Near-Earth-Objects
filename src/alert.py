@@ -530,7 +530,7 @@ def batch_process_alerts(
     for neo in neos:
         try:
             results.append(process_alert(neo, dry_run=dry_run, mpc_obs_code=mpc_obs_code))
-        except Exception as exc:  # pragma: no cover — defensive wrapper
+        except Exception as exc:
             results.append({"object_id": neo.tracklet.object_id, "error": str(exc)})
     return results
 

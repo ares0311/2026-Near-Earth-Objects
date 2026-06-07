@@ -462,6 +462,22 @@ class TestBatchProcessAlerts:
     def test_empty_input_returns_empty_list(self):
         assert batch_process_alerts([], dry_run=True) == []
 
+    def test_error_in_one_neo_captured_not_raised(self, monkeypatch):
+        # Verifies the defensive except block (lines 533-534): a broken NEO
+        # causes process_alert to raise; batch_process_alerts captures the
+        # error and returns an error dict rather than propagating.
+        import alert as alert_mod
+
+        def _explode(neo, **_):
+            raise RuntimeError("synthetic failure")
+
+        monkeypatch.setattr(alert_mod, "process_alert", _explode)
+        neo = make_scored_neo(alert_pathway="internal_candidate")
+        results = batch_process_alerts([neo], dry_run=True)
+        assert len(results) == 1
+        assert "error" in results[0]
+        assert "synthetic failure" in results[0]["error"]
+
 
 class TestGenerateAlertPackage:
     def test_returns_all_required_keys(self, tmp_path, monkeypatch):
