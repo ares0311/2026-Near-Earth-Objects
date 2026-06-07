@@ -321,8 +321,10 @@ class TestStackPredictions:
 
 
 class TestLoadXgbModel:
-    def test_returns_none_when_no_file(self):
-        # Default model dir has no model file → returns None
+    def test_returns_none_when_no_file(self, tmp_path, monkeypatch):
+        # Redirect _MODEL_DIR to empty temp dir — no model file present → returns None
+        import classify as cls_mod
+        monkeypatch.setattr(cls_mod, "_MODEL_DIR", tmp_path)
         result = _load_xgb_model()
         assert result is None
 
