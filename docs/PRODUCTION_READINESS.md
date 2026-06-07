@@ -59,8 +59,8 @@ These gaps prevent the pipeline from being safely or usefully operated on real s
 - `data/cutouts/`: 10,000 `.npz` cutout triplets (science, reference, difference) + `index.csv`. ✓
 - `data/training_labels.csv`: 1000 MPC labels (500 neo_candidate + 500 main_belt_asteroid). ✓
 - `models/tier2_cnn.pt`: CNN trained — val_loss=0.258, val_acc=91.3%, 20 epochs; 8,588 real / 1,412 bogus; inverse-frequency class weights. ✓ (local only; needs commit)
-- `models/tier1_xgb.json`: XGBoost trained — val_acc=99.95%, macro AUC=1.000, 11,100 examples (8,880 train / 2,220 val); class-weighted; 300 estimators, max_depth=5. ✓ (local only; needs commit)
-- **Still needed**: Commit `models/tier1_xgb.json`; Tier 3 Transformer training; calibration evaluation (Brier < 0.10, ECE < 0.05).
+- `models/tier1_xgb.json`: XGBoost trained — val_acc=99.95%, macro AUC=1.000, 11,100 examples (8,880 train / 2,220 val); class-weighted; 300 estimators, max_depth=5. ✓ Committed to repo at commit 13946ea.
+- **Still needed**: Tier 3 Transformer training; calibration evaluation (Brier < 0.10, ECE < 0.05).
 
 **What is needed to close it**:
 1. [DONE] Download 10,000 labeled ZTF Avro alerts via `Skills/download_ztf_training_alerts.py`.
@@ -70,8 +70,8 @@ These gaps prevent the pipeline from being safely or usefully operated on real s
 5. [DONE] Commit `models/tier2_cnn.pt` to repo (`.gitignore` updated to allow `models/*.pt`).
 6. [CODE] Run `Skills/build_sequence_dataset.py` on MPC tracklet data to produce flat token CSV for Tier 3.
 7. [HUMAN] Run `caffeinate -i python Skills/train_tier3_transformer.py` to produce `models/tier3_transformer.pt`.
-8. [DONE] Tier 1 XGBoost trained — val_acc=99.95%, macro AUC=1.000; `models/tier1_xgb.json` saved locally (needs commit).
-9. [HUMAN] Commit `models/tier1_xgb.json` to repo (`.gitignore` updated to allow `models/*.json`).
+8. [DONE] Tier 1 XGBoost trained — val_acc=99.95%, macro AUC=1.000; `models/tier1_xgb.json` saved.
+9. [DONE] Commit `models/tier1_xgb.json` to repo (committed at 13946ea).
 10. [CODE + HUMAN] Evaluate with `Skills/evaluate_calibration.py`; require Brier < 0.10 and ECE < 0.05 before approval.
 
 **Blocking outside step**: Steps 7–9 require human action (training runs, expert calibration review).

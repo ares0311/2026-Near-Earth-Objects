@@ -475,8 +475,8 @@ and excluded from CI.
 
 All 10 pipeline modules are complete. Default collection finds 3432 non-live tests plus 2 deselected live/integration checks. CI is expected to remain green on Python 3.11 & 3.12 with the 100% coverage target. All pipeline code runs on synthetic/mocked data with 100% coverage; no real NEO has ever been processed.
 
-**Production gap status (as of 2026-06-06)**:
-- T1-A (No Trained ML Weights): IN PROGRESS. 10,000 ZTF alerts downloaded; 10,000 `.npz` cutouts built; **Tier 2 CNN trained — val_loss=0.258, val_acc=91.3%**; `models/tier2_cnn.pt` saved locally (needs commit). Tier 1 XGBoost and Tier 3 Transformer still untrained.
+**Production gap status (as of 2026-06-07)**:
+- T1-A (No Trained ML Weights): IN PROGRESS. **Tier 2 CNN trained — val_loss=0.258, val_acc=91.3%**; `models/tier2_cnn.pt` committed. **Tier 1 XGBoost trained — val_acc=99.95%, macro AUC=1.000**; `models/tier1_xgb.json` committed (13946ea). Tier 3 Transformer still untrained; calibration evaluation pending.
 - T1-B (No Live Credentials): CLOSED. ATLAS and ZTF live connections confirmed OK via macOS Keychain bridge (`source Skills/verify_live_credentials.sh`). Automated live dry-run policy sign-off pending.
 - T1-C (No Real End-to-End Run): BLOCKED on T1-B automated approval.
 - T1-D (No Ensemble Calibration): BLOCKED on T1-A.
@@ -497,6 +497,7 @@ See `docs/PRODUCTION_READINESS.md` for the full gap register.
 | `Skills/visualize_tracklets.py` | Plot sky positions and light curves for a tracklet JSON file |
 | `Skills/export_mpc_report.py` | Export MPC 80-column reports from a scored NEO JSON file |
 | `Skills/benchmark_pipeline.py` | Time classify + score on N synthetic tracklets; print throughput table |
+| `Skills/train_tier1_xgboost.py` | Train Tier 1 XGBoost on ZTF alerts + MPC labels; saves `models/tier1_xgb.json`; run from Mac with `caffeinate -i` |
 | `Skills/train_tier2_cnn.py` | Fine-tune CNN on labeled ZTF cutout CSV; saves `models/tier2_cnn.pt` |
 | `Skills/train_tier3_transformer.py` | Train Transformer on MPC tracklet CSV; saves `models/tier3_transformer.pt` |
 | `Skills/tune_linker.py` | Parametric sweep of `position_tolerance_arcsec` × `chi2_threshold` vs link/score rate |
