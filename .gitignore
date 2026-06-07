@@ -6,6 +6,8 @@ __pycache__/
 alert_logs/
 models/
 !models/*.pt
+data/cutouts/
+data/ztf_labeled_alerts.json
 .mypy_cache/
 .pytest_cache/
 *.egg-info/
