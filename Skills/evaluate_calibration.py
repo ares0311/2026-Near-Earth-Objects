@@ -225,23 +225,18 @@ def evaluate_xgboost(
     print()
     _print_row("Raw XGBoost", bs, ece)
 
-    # Apply Platt calibration to raw scores
-    # Use training portion for calibration fit, val for evaluation
-    _, X_cal_val, _, y_cal_val = train_test_split(
-        X_ztf, y_ztf.astype(float), test_size=val_frac, random_state=seed, stratify=y_ztf,
-    )
-    _, p_cal_real_tr, _, _ = train_test_split(
-        X_ztf,
-        1.0 - clf.predict_proba(X_ztf)[:, art_idx if 3 in classes else -1],
-        test_size=val_frac, random_state=seed, stratify=y_ztf,
-    )
-    platt = PlattCalibrator().fit(p_cal_real_tr, y_cal_val)
-    iso = IsotonicCalibrator().fit(p_cal_real_tr, y_cal_val)
+    # Platt and isotonic on the XGBoost raw scores
+    # Use a 50/50 split of the val set: fit on first half, evaluate on second half
+    n_cal = len(p_real) // 2
+    platt = PlattCalibrator().fit(p_real[:n_cal], y_binary[:n_cal])
+    iso = IsotonicCalibrator().fit(p_real[:n_cal], y_binary[:n_cal])
 
-    bs_p = float(brier_score(platt.predict(p_real), y_binary))
-    ece_p = float(expected_calibration_error(platt.predict(p_real), y_binary))
-    bs_i = float(brier_score(iso.predict(p_real), y_binary))
-    ece_i = float(expected_calibration_error(iso.predict(p_real), y_binary))
+    p_eval = p_real[n_cal:]
+    y_eval = y_binary[n_cal:]
+    bs_p = float(brier_score(platt.predict(p_eval), y_eval))
+    ece_p = float(expected_calibration_error(platt.predict(p_eval), y_eval))
+    bs_i = float(brier_score(iso.predict(p_eval), y_eval))
+    ece_i = float(expected_calibration_error(iso.predict(p_eval), y_eval))
 
     _print_row("+ Platt", bs_p, ece_p)
     _print_row("+ Isotonic", bs_i, ece_i)
