@@ -407,6 +407,16 @@ class TestMonitorNeocpDirect:
         assert result["status"] == "error"
         assert "unreachable" in result["error"]
 
+    def test_success_path_returns_checked_dict(self):
+        # Covers the try-body success path (line 310): requests.get returns
+        # a mock response with .text so the return statement is reached.
+        mock_resp = type("R", (), {"text": "NEOCP page content"})()
+        with patch("requests.get", return_value=mock_resp):
+            result = _monitor_neocp("TEST001")
+        assert result["status"] == "checked"
+        assert result["confirmed"] is False
+        assert "NEOCP" in result["raw"]
+
 
 class TestFormatMpcJson:
     def test_returns_dict_with_required_keys(self):
