@@ -45,6 +45,7 @@ import json
 import os
 import time
 from pathlib import Path
+from typing import Any
 
 from schemas import (
     FetchProvenance,
@@ -647,16 +648,37 @@ def count_known_objects_in_field(
         return 0
 
 
-def fetch_mpc_observations(designation: str) -> list:
+def _mpc_row_value(row: object, *names: str, default: Any = None) -> Any:
+    """Read the first available MPC column from Astropy rows or test fixtures."""
+    colnames = getattr(row, "colnames", None)
+    known_columns = set(colnames) if isinstance(colnames, (list, tuple)) else None
+    for name in names:
+        if known_columns is not None and name not in known_columns:
+            continue
+        try:
+            value = row[name]  # type: ignore[index]
+        except (KeyError, TypeError, IndexError):
+            continue
+        if value is not None:
+            return value
+    return default
+
+
+def fetch_mpc_observations(designation: str, force_refresh: bool = False) -> list:
     """Fetch MPC observation history for a known-object designation.
 
     Queries ``astroquery.mpc`` for all observations of the given designation
     and returns a list of :class:`schemas.Observation` objects.
     Returns an empty list on any error (network failure, unknown designation).
+
+    Args:
+        designation: Official MPC number or unpacked provisional designation.
+        force_refresh: Bypass both the project cache and astroquery cache.
     """
     import hashlib
+
     cache_key = hashlib.md5(f"mpc_obs_{designation}".encode()).hexdigest()
-    cached = _load_cache(cache_key)
+    cached = _load_cache(cache_key, force_refresh=force_refresh)
     if cached is not None:
         obs_list = []
         for d in cached:
@@ -668,18 +690,38 @@ def fetch_mpc_observations(designation: str) -> list:
 
     try:
         from astroquery.mpc import MPC  # type: ignore[import]
-        table = MPC.get_observations(designation)
+
+        # astroquery exposes the authoritative MPC observation-history query.
+        table = MPC.get_observations(designation, cache=not force_refresh)
         obs_list = []
-        for row in table:
+        for row_index, row in enumerate(table):
             try:
+                # Current astroquery columns use ``epoch`` and ``DEC``.  The
+                # fallbacks preserve compatibility with older cached fixtures.
+                jd = float(_mpc_row_value(row, "epoch", "JD"))
+                dec = float(_mpc_row_value(row, "DEC", "Dec"))
+                ra = float(_mpc_row_value(row, "RA"))
+                mag_value = _mpc_row_value(row, "mag", default=99.0)
+                band_value = _mpc_row_value(row, "band", default="?")
+                observatory = str(_mpc_row_value(row, "observatory", default="UNK"))
+                mag = float(mag_value) if not getattr(mag_value, "mask", False) else 99.0
+                band = str(band_value) if not getattr(band_value, "mask", False) else "?"
+
+                # Hash stable observation fields so every historical record has
+                # a deterministic unique identifier across retries and caches.
+                identity = (
+                    f"{designation}|{jd:.8f}|{ra:.8f}|{dec:.8f}|"
+                    f"{observatory}|{row_index}"
+                )
+                obs_hash = hashlib.sha256(identity.encode()).hexdigest()[:16]
                 obs = Observation(
-                    obs_id=f"{designation}_{row['number']}",
-                    ra_deg=float(row["RA"]),
-                    dec_deg=float(row["Dec"]),
-                    jd=float(row["JD"]),
-                    mag=float(row.get("mag", 99.0) or 99.0),
+                    obs_id=f"MPC_{obs_hash}",
+                    ra_deg=ra,
+                    dec_deg=dec,
+                    jd=jd,
+                    mag=mag,
                     mag_err=0.1,
-                    filter_band=str(row.get("band", "?")),
+                    filter_band=band,
                     mission="MPC",
                     real_bogus=1.0,
                 )

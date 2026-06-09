@@ -3,7 +3,7 @@
 ![Status](https://img.shields.io/badge/status-active%20development-blue)
 ![Version](https://img.shields.io/badge/version-0.76.0-informational)
 ![License](https://img.shields.io/badge/license-Apache%202.0-green)
-![Tests](https://img.shields.io/badge/tests-2816%20default-brightgreen)
+![Tests](https://img.shields.io/badge/tests-3446%20passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
 ![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)
 ![CI](https://img.shields.io/badge/CI-passing-brightgreen)
@@ -12,7 +12,7 @@
 
 ## Abstract
 
-Near-Earth Objects (NEOs) — small solar system bodies with perihelion distances $q < 1.3$ AU — represent both a premier target for planetary science and the only known category of natural disaster that is, in principle, preventable. Despite three decades of systematic survey effort, population completeness models estimate that the majority of NEOs larger than 140 meters remain undetected, sustaining the need for automated, high-throughput discovery pipelines capable of operating at the cadence and scale of modern wide-field photometric surveys. This work presents a complete, research-grade automated pipeline for the detection, multi-night linking, orbital characterization, and hazard ranking of NEO candidates derived from the Zwicky Transient Facility (ZTF) alert stream, ATLAS forced photometry, and the Minor Planet Center (MPC) catalog. The system implements a seven-stage directed acyclic processing graph — fetch, preprocess, detect, link, classify, orbit, score — followed by a mandatory three-step alert protocol governing all external communications. Classification employs a three-tier ensemble architecture: a gradient-boosted tree classifier on tabular features (Tier 1), a convolutional neural network operating on 63×63-pixel ZTF image triplets following the architecture of Duev et al. (2019) (Tier 2), and a BERT-style Transformer trained on multi-night observation sequences following Lin et al. (2022) (Tier 3), with outputs combined by a logistic regression meta-learner and calibrated via Platt scaling or isotonic regression. Hazard assessment follows a Bayesian log-score model over five competing hypotheses with deliberately pessimistic priors for new NEO candidates. Preliminary orbit determination uses Gauss's method with differential correction, and Potentially Hazardous Asteroid (PHA) flags are gated on orbit quality code ≥ 2 and independently confirmed MOID ≤ 0.05 AU. As of version 0.76.0, all ten pipeline modules are complete, default collection finds 2816 non-live tests plus 2 deselected live/integration checks, and background automation includes offline scheduling readiness, provider-specific live readiness summaries, no-secret credential inventories with environment-variable and macOS Keychain presence checks, no-secret live-policy approval checklists, offline scoring metrics KPI reports, no-network live dry-run approval bundles, operator handoff exports, persisted blueprint and operations snapshots, internal signoff packets, packet-linked signoff decisions, packet-decision readiness, SQLite schema migration/reporting, schema-gated operator next-action summaries, internal follow-up disposition summaries, and conservative post-signoff follow-up recommendations. Injection-recovery validation on $n = 200$ synthetic NEO tracklets reports 100% detection, link, and score rates. The pipeline produces MPC-compatible 80-column, ADES PSV, and JSON observation reports and implements a non-negotiable three-step pathway — MPC submission, independent observatory confirmation, and conditional NASA PDCO notification — ensuring that no autonomous impact claim is ever issued.
+Near-Earth Objects (NEOs) — small solar system bodies with perihelion distances $q < 1.3$ AU — represent both a premier target for planetary science and the only known category of natural disaster that is, in principle, preventable. Despite three decades of systematic survey effort, population completeness models estimate that the majority of NEOs larger than 140 meters remain undetected, sustaining the need for automated, high-throughput discovery pipelines capable of operating at the cadence and scale of modern wide-field photometric surveys. This work presents a research pipeline for the detection, multi-night linking, orbital characterization, and hazard ranking of NEO candidates derived from the Zwicky Transient Facility (ZTF) alert stream, ATLAS forced photometry, and the Minor Planet Center (MPC) catalog. The system implements a seven-stage directed acyclic processing graph — fetch, preprocess, detect, link, classify, orbit, score — followed by a mandatory three-step alert protocol governing all external communications. Classification employs a three-tier ensemble architecture: a gradient-boosted tree classifier on tabular features (Tier 1), a convolutional neural network operating on 63×63-pixel ZTF image triplets following the architecture of Duev et al. (2019) (Tier 2), and a BERT-style Transformer trained on multi-night observation sequences following Lin et al. (2022) (Tier 3), with outputs combined by a logistic regression meta-learner and calibrated via Platt scaling or isotonic regression. Hazard assessment follows a Bayesian log-score model over five competing hypotheses with deliberately pessimistic priors for new NEO candidates. Preliminary orbit determination uses Gauss's method with differential correction, and Potentially Hazardous Asteroid (PHA) flags are gated on orbit quality code ≥ 2 and independently confirmed MOID ≤ 0.05 AU. As of version 0.87.0, all ten pipeline modules are implemented, 3,446 offline tests pass, Tier 1 and Tier 2 weights are trained, and production remains blocked on real five-class Tier 3 sequences, ensemble calibration, and a supervised real end-to-end run. Background automation provides top-level SQLite audit logs and fail-closed readiness controls. Injection-recovery validation on $n = 200$ synthetic NEO tracklets reports 100% detection, link, and score rates, but synthetic results are not treated as evidence of live-sky performance. The pipeline produces MPC-compatible 80-column, ADES PSV, and JSON observation reports and implements a non-negotiable three-step pathway — MPC submission, independent observatory confirmation, and conditional NASA PDCO notification — ensuring that no autonomous impact claim is ever issued.
 
 **Keywords:** near-Earth objects, planetary defense, asteroid detection, automated pipeline, machine learning, real/bogus classification, orbit determination, Bayesian scoring, ZTF, Minor Planet Center
 
@@ -57,7 +57,7 @@ This repository implements a complete, research-grade automated detection and ra
 4. **Independent confirmation before alert** — the NASA PDCO notification pathway is gated on MPC submission *and* independent observatory confirmation, not on pipeline confidence alone.
 5. **No autonomous impact claims** — the system produces ranked candidates and hazard flags; it defers all authoritative impact probability statements to CNEOS Scout and Sentry.
 
-The pipeline follows the build order: `schemas` → `fetch` → `preprocess` → `detect` → `link` → `classify` → `orbit` → `score` → `alert` → `calibration`. Each stage consumes the immutable, typed output of all prior stages. As of v0.87.0, all ten pipeline modules plus background automation are complete, default collection finds 3432 non-live tests plus 2 deselected live/integration checks. No real survey data has ever been processed; see `docs/PRODUCTION_READINESS.md` for the full production gap register.
+The pipeline follows the build order: `schemas` → `fetch` → `preprocess` → `detect` → `link` → `classify` → `orbit` → `score` → `alert` → `calibration`. Each stage consumes the immutable, typed output of all prior stages. As of v0.87.0, all ten pipeline modules plus background automation are complete, and the offline suite passes 3,446 tests with 2 live checks deselected. Real labeled ZTF data has trained Tier 1 and Tier 2, but no real survey field has completed the full pipeline; see `docs/PRODUCTION_READINESS.md` for the production gap register.
 
 ---
 
@@ -534,7 +534,7 @@ The diagram below shows how data and artifacts move between the repository's top
 │   ├── calibration.py            # Platt / isotonic PAVA calibration
 │   └── py.typed                  # PEP 561 type information marker
 │
-├── tests/                        # pytest suite (3432 default tests collected; 2 live/integration deselected)
+├── tests/                        # pytest suite (3446 passing; 2 live/integration deselected)
 │   ├── conftest.py               # Shared fixtures and synthetic tracklet factories
 │   ├── test_schemas.py
 │   ├── test_fetch.py
@@ -881,7 +881,7 @@ Compare the output against the baseline in `data/injection_recovery_baseline.jso
 | 5. Calibrator refit | `evaluate_calibration.py` | ECE ≤ 0.05; Brier ≤ 0.10 |
 | 6. Linker tuned (if needed) | `tune_linker.py` | Link rate ≥ baseline − 5% |
 | 7. Injection-recovery passed | `injection_recovery.py` | Link + score rate ≥ baseline − 5% |
-| 8. Full default test collection is stable | `pytest --collect-only` | 3432 default tests collected; 2 live/integration tests deselected |
+| 8. Full default test collection is stable | `pytest --collect-only` | 3446 passing tests; 2 live/integration tests deselected |
 | 9. Models committed | `git add models/` | New weights in version control |
 
 ---
@@ -955,7 +955,7 @@ PYTHONPATH=src python Skills/smoke_test.py
 
 ```bash
 OMP_NUM_THREADS=1 PYTHONPATH=src python -m pytest --collect-only -q
-# Expected collection: 3432 default tests collected; 2 deselected
+# Expected result: 3446 passing tests; 2 live/integration checks deselected.
 ```
 
 For a full local run, use:
@@ -1145,7 +1145,7 @@ The older n=50 baseline remains in `data/injection_recovery_baseline.json` for h
 | `score.py` | — | 100% |
 | `alert.py` | — | 100% |
 | `calibration.py` | — | 100% |
-| **Total** | **3432 default tests collected** | **100% target; verify with coverage run before release** |
+| **Total** | **3446 passing tests** | **100% target; verify with coverage run before release** |
 
 ---
 
@@ -1153,17 +1153,20 @@ The older n=50 baseline remains in `data/injection_recovery_baseline.json` for h
 
 **Primary directive: all work must advance the project to production. See `docs/PRODUCTION_READINESS.md` for the authoritative gap register.**
 
-**Highest-priority gap: T1-A — No Trained ML Model Weights.** All T1-A resolution steps have human blockers (credentials, labeled data download). No code change can close T1-A without human action first.
+**Highest-priority gap: T1-A — Incomplete Trained ML Model Set.** Tier 1
+XGBoost and Tier 2 CNN weights are trained and committed. The remaining blocker
+is a real multi-night MPC/ZTF sequence dataset for Tier 3 Transformer training,
+followed by the quantitative production calibration gate.
 
 ### 15.1 Current State Snapshot (v0.87.0)
 
 | Area | Status | Notes |
 |---|---|---|
-| Core pipeline modules | **Complete** | All 10 modules: 3432 tests, 100% coverage, ruff + mypy clean |
+| Core pipeline modules | **Complete** | All 10 modules: 3446 tests passing, 100% coverage target, ruff + mypy clean |
 | Synthetic validation | **Complete** | 100% detection/link/score on n=200 synthetic tracklets. Not a substitute for real-data validation. |
 | Background automation CLI | **Complete** | `Skills/background.py` — offline scheduler, SQLite audit logs, signoff packets, readiness summaries |
-| ML model weights | **NOT PRESENT** | T1-A gap. No trained Tier 1/2/3 weights. Pipeline scores everything at prior (~5% NEO). |
-| Real survey credentials | **NOT PRESENT** | T1-B gap. No IRSA account, no ATLAS token. No live fetch has ever succeeded. |
+| ML model weights | **PARTIAL** | T1-A gap. Tier 1 XGBoost and Tier 2 CNN weights are trained and committed; Tier 3 Transformer sequence data and weights are missing. |
+| Real survey credentials | **CONFIGURED** | T1-B credentials are stored in macOS Keychain and manual ZTF/ATLAS connection tests passed. Automated live policy approval remains pending. |
 | Real data processed | **NEVER** | T1-C gap. No real ZTF/ATLAS/MPC data has ever passed through the pipeline. |
 | Production calibration | **NOT DONE** | T1-D gap. Calibration not validated on real model outputs. |
 | External reporting | **Disabled** | No MPC, NEOCP, NASA, or CNEOS submission path is active. Alert protocol requires MPC submission + independent confirmation before any NASA pathway. |
@@ -1186,15 +1189,16 @@ The older n=50 baseline remains in `data/injection_recovery_baseline.json` for h
 
 | Milestone | Gap Closed | Human Blocker | Status |
 |---|---|---|---|
-| **M4a** | T1-B: IRSA account + API token | **[HUMAN]** Register at irsa.ipac.caltech.edu (free) | **Pending human action** |
-| **M4b** | T1-B: ATLAS token | **[HUMAN]** Register at fallingstar-data.com/forcedphot (free) | **Pending human action** |
+| **M4a** | T1-B: IRSA account + credentials | None | **Complete** |
+| **M4b** | T1-B: ATLAS token | None | **Complete** |
 | **M4c** | T1-B: Live review policy approved | Reviewer sign-off on `background/live_review_policy.example.json` | **Pending human action** |
-| **M4d** | T1-C: First credentialed live dry-run (ZTF, 1 field) | Requires M4a + M4c | **Blocked on M4a/M4c** |
-| **M5a** | T1-A: Download labeled ZTF real/bogus dataset (~100K alerts) | **[HUMAN]** Download from IRSA (requires M4a) | **Blocked on M4a** |
-| **M5b** | T1-A: Build cutout dataset + train Tier 2 CNN | Code ready (`build_cutout_dataset.py`, `train_tier2_cnn.py`); M4 Max 64GB can train locally via MPS | **Blocked on M5a** |
-| **M5c** | T1-A: Build sequence dataset + train Tier 3 Transformer | Code ready (`build_sequence_dataset.py`, `train_tier3_transformer.py`) | **Blocked on M5a** |
-| **M5d** | T1-A: Retrain Tier 1 XGBoost stacker | Code ready; requires real labeled data | **Blocked on M5a** |
-| **M6a** | T1-D + T1-C: Calibration review + known-object recovery audit | **[HUMAN]** Expert reviews reliability diagrams; verifies ≥90% known-object recovery | **Blocked on M5b/M5c/M4d** |
+| **M4d** | T1-C: First credentialed live dry-run (ZTF, 1 field) | Requires M4c | **Blocked on M4c** |
+| **M5a** | T1-A: Download labeled ZTF real/bogus dataset | 10,000 real alerts downloaded | **Complete** |
+| **M5b** | T1-A: Build cutout dataset + train Tier 2 CNN | `models/tier2_cnn.pt`; validation accuracy 91.3% | **Complete** |
+| **M5c** | T1-A: Acquire real multi-night sequences, build dataset, and train Tier 3 Transformer | Real MPC/ZTF sequence source and operator training run required | **Pending** |
+| **M5d** | T1-A: Train Tier 1 XGBoost | `models/tier1_xgb.json`; validation accuracy 99.95%, macro AUC 1.000 | **Complete** |
+| **M6a** | T1-D: Quantitative production calibration gate | Held-out real labeled data; all Brier, ECE, log-loss, AUC, cross-validation, and bootstrap-confidence KPIs pass | **Blocked on M5b/M5c** |
+| **M6b** | T1-C: Known-object recovery audit | Verify ≥90% known-object recovery on the first bounded real-data run | **Blocked on M4d** |
 | **M7** | All T1 gaps closed; first MPC submission | Requires M4–M6 complete + T2-C peer review | **Pending** |
 
 ### 15.4 Progress Tracker
@@ -1205,19 +1209,20 @@ The older n=50 baseline remains in `data/injection_recovery_baseline.json` for h
 | **P17** | Complete | Option B cleanup: 68 Skills + 30 docs removed | Commit `b4f83d8` (2026-06-05) |
 | **P18** | Complete | `docs/PRODUCTION_READINESS.md` created | Commit `dfb1b15` (2026-06-05) |
 | **P19** | Complete | AGENTS.md, README.md, CHANGELOG.md synced to v0.87.0 | This commit |
-| **P20** | **Pending** | IRSA account created | Human action: irsa.ipac.caltech.edu |
-| **P21** | **Pending** | ATLAS token obtained | Human action: fallingstar-data.com/forcedphot |
-| **P22** | **Pending** | Labeled ZTF dataset downloaded | Human action; requires P20 |
-| **P23** | **Pending** | Tier 2 CNN trained (`models/tier2_cnn.pt`) | Code: `Skills/train_tier2_cnn.py`; requires P22 |
-| **P24** | **Pending** | Tier 3 Transformer trained (`models/tier3_transformer.pt`) | Code: `Skills/train_tier3_transformer.py`; requires P22 |
-| **P25** | **Pending** | Calibration reviewed by expert; gates armed | Human action; requires P23/P24 |
+| **P20** | Complete | IRSA account and credentials configured | macOS Keychain; live connection test passed |
+| **P21** | Complete | ATLAS token obtained | macOS Keychain; live connection test passed |
+| **P22** | Complete | Labeled ZTF dataset downloaded | 10,000 real ZTF Avro alerts |
+| **P23** | Complete | Tier 2 CNN trained (`models/tier2_cnn.pt`) | Validation accuracy 91.3%; weights committed |
+| **P24** | **Pending** | Tier 3 Transformer trained (`models/tier3_transformer.pt`) | Requires real multi-night MPC/ZTF sequence data, dataset build, and operator training run |
+| **P25** | **Pending** | Calibration KPI report passes; gates eligible to be armed | Automated fail-closed gate; requires P23/P24 and held-out real labels |
 | **P26** | **Pending** | First real-data pipeline run; ≥90% known-object recovery | Code + human audit; requires P20 + P21 |
+| **P27** | Complete | Bounded Tier 3 MPC sequence acquisition path | Resumable collection, atomic checkpoints, source-manifest hash, query log, provenance, and safety flags |
+| **P28** | **Blocked** | Five-class Tier 3 raw dataset accepted | Current manifest covers two classes; authoritative ZTF labels are required for artifact and candidate/known-object discrimination |
 
 ### 15.5 Known Limitations
 
 - **No real data ever processed**: The pipeline has only ever run on synthetic data. Real-world failure modes are unknown until M4d.
-- **No trained weights**: All ML tiers score at prior probabilities (~5% NEO) until T1-A is resolved.
-- **Tier 2/3 weights need real training**: CNN and Transformer architectures exist; production performance requires labeled cutouts and multi-night sequences.
+- **Incomplete production ensemble**: Tier 1 and Tier 2 weights exist, but Tier 3 still requires real multi-night sequence data and training.
 - **Model calibration is survey-dependent**: Synthetic baselines do not replace real-survey holdout validation.
 - **MOID accuracy on short arcs**: Arcs < 24 hours produce unreliable MOID; quality-code gate (≥2) mitigates but does not eliminate this.
 
