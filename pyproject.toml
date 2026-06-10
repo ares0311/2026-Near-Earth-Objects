@@ -36,6 +36,8 @@ where = ["src"]
 
 [tool.ruff]
 line-length = 100
+# py314 is not yet a valid ruff target-version; py313 is the highest supported value.
+# Update to py314 once ruff adds support.
 target-version = "py313"
 # Exclude shell scripts — ruff only lints Python files
 exclude = ["Skills/*.sh"]
