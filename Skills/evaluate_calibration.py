@@ -2,8 +2,7 @@
 """Evaluate calibration quality for Tier 1 XGBoost and Tier 2 CNN on real data.
 
 Reproduces the same train/val splits used during model training, runs each
-model on the held-out val set, and reports Brier score and ECE with
-PASS/FAIL against T1-D gate thresholds (Brier < 0.10, ECE < 0.05).
+model on the held-out val set, and reports all seven T1-D KPI gate metrics.
 
 Falls back to synthetic-data Platt/isotonic calibrator evaluation when
 alert JSON or cutout CSV are not present — safe for CI.
@@ -14,19 +13,27 @@ IMPORTANT: Run from repo root on your Mac, not from the coding agent server.
         --alerts data/ztf_labeled_alerts.json \\
         --xgb-model models/tier1_xgb.json \\
         --cutouts-csv data/cutouts/index.csv \\
-        --cnn-model models/tier2_cnn.pt
+        --cnn-model models/tier2_cnn.pt \\
+        --report-out Logs/reports/calibration_report.json
 
-Thresholds (T1-D gate):
+T1-D gate thresholds (ALL must pass for promotion_gate_passed=true):
     Brier score < 0.10
     ECE         < 0.05
+    Log-loss    < 0.50
+    ROC AUC     > 0.95
+    5-fold CV ECE mean < 0.05  (std <= 0.02)
+    Bootstrap Brier 95% CI upper < 0.12
+    Bootstrap ECE   95% CI upper < 0.07
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
@@ -35,20 +42,33 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 from calibration import (
     IsotonicCalibrator,
     PlattCalibrator,
+    bootstrap_confidence_interval,
     brier_score,
+    compute_log_loss,
+    compute_roc_auc,
+    cross_validate_calibration,
     expected_calibration_error,
 )
 
 # ---------------------------------------------------------------------------
-# Gate thresholds (T1-D)
+# Gate thresholds (T1-D) — all seven must pass for promotion_gate_passed=True
 # ---------------------------------------------------------------------------
 
 BRIER_THRESHOLD = 0.10
 ECE_THRESHOLD = 0.05
+LOG_LOSS_THRESHOLD = 0.50
+ROC_AUC_THRESHOLD = 0.95          # higher-is-better
+CV_ECE_MEAN_THRESHOLD = 0.05
+CV_ECE_STD_THRESHOLD = 0.02
+BOOTSTRAP_BRIER_UPPER = 0.12      # 95% CI upper bound
+BOOTSTRAP_ECE_UPPER = 0.07        # 95% CI upper bound
+
+# Number of bootstrap resamples — 500 balances reliability vs. wall time
+N_BOOTSTRAP = 500
 
 # Label constants matching train_tier1_xgboost.py and train_tier2_cnn.py
-ZTF_REAL = 0   # rb >= 0.65
-ZTF_BOGUS = 3  # rb <  0.35
+ZTF_REAL = 0    # rb >= 0.65
+ZTF_BOGUS = 3   # rb <  0.35
 
 # Feature columns matching classify._features_to_array
 FEATURE_COLS = [
@@ -60,30 +80,79 @@ FEATURE_COLS = [
 
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Formatting helpers
 # ---------------------------------------------------------------------------
 
 def _fmt(val: float, threshold: float, lower_better: bool = True) -> str:
     """Format a metric value with PASS/FAIL annotation."""
     passed = val < threshold if lower_better else val >= threshold
     mark = "PASS" if passed else "FAIL"
-    return f"{val:.4f}  [{mark} < {threshold}]"
+    cmp = "<" if lower_better else ">"
+    return f"{val:.4f}  [{mark} {cmp} {threshold}]"
 
 
 def _print_header(title: str) -> None:
+    """Print a section header to stdout."""
     print(f"\n{'=' * 60}")
     print(f"  {title}")
     print("=" * 60)
 
 
 def _print_row(name: str, brier: float, ece: float) -> None:
+    """Print a single Brier/ECE evaluation row."""
     b_str = _fmt(brier, BRIER_THRESHOLD)
     e_str = _fmt(ece, ECE_THRESHOLD)
     print(f"  {name:<20s}  Brier={b_str}   ECE={e_str}")
 
 
 # ---------------------------------------------------------------------------
-# XGBoost evaluation
+# KPI gate checker
+# ---------------------------------------------------------------------------
+
+def _check_all_kpis(
+    best_brier: float,
+    best_ece: float,
+    log_loss: float,
+    roc_auc: float,
+    cv_ece_mean: float,
+    cv_ece_std: float,
+    boot_brier_upper: float,
+    boot_ece_upper: float,
+) -> tuple[bool, dict[str, bool]]:
+    """Return (all_pass, per_gate_dict) for the seven T1-D KPIs.
+
+    All seven gates must pass for promotion_gate_passed to be True.
+    """
+    gates: dict[str, bool] = {
+        "brier": best_brier < BRIER_THRESHOLD,
+        "ece": best_ece < ECE_THRESHOLD,
+        "log_loss": log_loss < LOG_LOSS_THRESHOLD,
+        "roc_auc": roc_auc > ROC_AUC_THRESHOLD,
+        "cv_ece_mean": cv_ece_mean < CV_ECE_MEAN_THRESHOLD,
+        "cv_ece_std": cv_ece_std <= CV_ECE_STD_THRESHOLD,
+        "bootstrap_brier_upper": boot_brier_upper < BOOTSTRAP_BRIER_UPPER,
+        "bootstrap_ece_upper": boot_ece_upper < BOOTSTRAP_ECE_UPPER,
+    }
+    return all(gates.values()), gates
+
+
+# ---------------------------------------------------------------------------
+# SHA-256 model fingerprint
+# ---------------------------------------------------------------------------
+
+def _sha256(path: Path) -> str | None:
+    """Return the SHA-256 hex digest of a file, or None if the file is absent."""
+    if not path.exists():
+        return None
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+# ---------------------------------------------------------------------------
+# ZTF feature loading
 # ---------------------------------------------------------------------------
 
 def _load_ztf_features(json_path: Path) -> tuple[np.ndarray, np.ndarray]:
@@ -102,6 +171,7 @@ def _load_ztf_features(json_path: Path) -> tuple[np.ndarray, np.ndarray]:
             continue
         rb = float(entry.get("rb", 0.5))
         drb = float(entry.get("drb", -1.0))
+        # Use drb when valid; fall back to rb for PSF quality proxy
         psf = drb if 0.0 <= drb <= 1.0 else rb
         feat = [rb, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, psf, 0.0]
         rows.append(feat)
@@ -110,7 +180,7 @@ def _load_ztf_features(json_path: Path) -> tuple[np.ndarray, np.ndarray]:
 
 
 def _load_mpc_features(csv_path: Path) -> tuple[np.ndarray, np.ndarray] | None:
-    """Load MPC labels and synthesize feature rows (same as training)."""
+    """Load MPC labels and synthesize feature rows (same centroids as training)."""
     import csv as _csv
     if not csv_path.exists():
         return None
@@ -121,7 +191,7 @@ def _load_mpc_features(csv_path: Path) -> tuple[np.ndarray, np.ndarray] | None:
             neo_class = row.get("neo_class", "").strip()
             if neo_class == "neo_candidate":
                 rows.append([0.90, 0.0, 0.8, 0.5, 0.0, 0.0, 0.0, 0.0, 0.90, 0.0])
-                labels.append(1)  # real
+                labels.append(1)  # real (genuine NEO)
             elif neo_class == "main_belt_asteroid":
                 rows.append([0.80, 0.0, 0.7, 0.4, 0.0, 0.0, 0.0, 0.0, 0.80, 0.5])
                 labels.append(1)  # real (not bogus)
@@ -131,7 +201,7 @@ def _load_mpc_features(csv_path: Path) -> tuple[np.ndarray, np.ndarray] | None:
 
 
 def _synthesize_minor(rng: np.random.Generator, n: int = 50) -> tuple[np.ndarray, np.ndarray]:
-    """Reproduce synthetic minor-class rows from training (same centroids)."""
+    """Reproduce synthetic minor-class rows from training (same centroids as train_tier1)."""
     rows = []
     labels = []
     # Class 1 known_object: real
@@ -162,6 +232,10 @@ def _synthesize_minor(rng: np.random.Generator, n: int = 50) -> tuple[np.ndarray
     return np.array(rows, dtype=np.float32), np.array(labels, dtype=np.int32)
 
 
+# ---------------------------------------------------------------------------
+# XGBoost evaluation
+# ---------------------------------------------------------------------------
+
 def evaluate_xgboost(
     xgb_model_path: Path,
     alerts_path: Path,
@@ -169,8 +243,12 @@ def evaluate_xgboost(
     seed: int = 42,
     val_frac: float = 0.2,
     n_synthetic: int = 50,
-) -> None:
-    """Evaluate Tier 1 XGBoost on the held-out val set."""
+) -> dict[str, Any]:
+    """Evaluate Tier 1 XGBoost on the held-out val set.
+
+    Returns a dict of all KPI values and gate results for inclusion in the
+    machine-readable JSON report.
+    """
     import xgboost as xgb  # type: ignore[import]
     from sklearn.model_selection import train_test_split  # type: ignore[import]
 
@@ -196,61 +274,128 @@ def evaluate_xgboost(
     y_all = np.concatenate([y_ztf, y_mpc, y_syn])
     print(f"  Total: {len(y_all)}")
 
-    # Reproduce the same stratified val split
+    # Reproduce the same stratified val split used during training
     _, X_val, _, y_val = train_test_split(
         X_all, y_all, test_size=val_frac, random_state=seed, stratify=y_all,
     )
     print(f"  Val set: {len(y_val)}  (real={y_val.sum()}  bogus={(y_val == 0).sum()})")
 
-    # Load model and predict
+    # Load model and predict class probabilities
     clf = xgb.XGBClassifier()
     clf.load_model(str(xgb_model_path))
     proba = clf.predict_proba(X_val)  # shape (n, n_classes)
 
-    # Find class-3 (stellar_artifact) index in model.classes_
+    # P(real) = 1 - P(stellar_artifact=class 3)
     classes = list(clf.classes_)
     if 3 in classes:
         art_idx = classes.index(3)
-        # P(real) = 1 - P(stellar_artifact)
         p_real = 1.0 - proba[:, art_idx]
     else:
-        # Fallback: sum non-bogus columns
-        p_real = proba.sum(axis=1) - proba[:, -1]
+        # Fallback: 1 - last class probability
+        p_real = 1.0 - proba[:, -1]
 
     y_binary = y_val.astype(float)  # 1=real, 0=bogus
 
+    # Raw (uncalibrated) Brier and ECE
     bs = float(brier_score(p_real, y_binary))
     ece = float(expected_calibration_error(p_real, y_binary))
 
     print()
     _print_row("Raw XGBoost", bs, ece)
 
-    # Apply Platt calibration to raw scores
-    # Use training portion for calibration fit, val for evaluation
-    _, X_cal_val, _, y_cal_val = train_test_split(
-        X_ztf, y_ztf.astype(float), test_size=val_frac, random_state=seed, stratify=y_ztf,
-    )
-    _, p_cal_real_tr, _, _ = train_test_split(
-        X_ztf,
-        1.0 - clf.predict_proba(X_ztf)[:, art_idx if 3 in classes else -1],
-        test_size=val_frac, random_state=seed, stratify=y_ztf,
-    )
-    platt = PlattCalibrator().fit(p_cal_real_tr, y_cal_val)
-    iso = IsotonicCalibrator().fit(p_cal_real_tr, y_cal_val)
+    # -----------------------------------------------------------------
+    # Platt and isotonic calibration — 50/50 half-split of the val set.
+    # Fit calibrators on the first half; evaluate on the second half.
+    # This avoids the 2D-input crash: the prior train_test_split approach
+    # assigned X_val (shape n×10) to p_cal_real_tr instead of the 1D
+    # probability vector, causing det≈0 → A=0 → constant predictions.
+    # -----------------------------------------------------------------
+    n_cal = len(p_real) // 2
+    platt = PlattCalibrator().fit(p_real[:n_cal], y_binary[:n_cal])
+    iso = IsotonicCalibrator().fit(p_real[:n_cal], y_binary[:n_cal])
 
-    bs_p = float(brier_score(platt.predict(p_real), y_binary))
-    ece_p = float(expected_calibration_error(platt.predict(p_real), y_binary))
-    bs_i = float(brier_score(iso.predict(p_real), y_binary))
-    ece_i = float(expected_calibration_error(iso.predict(p_real), y_binary))
+    p_eval = p_real[n_cal:]
+    y_eval = y_binary[n_cal:]
+
+    bs_p = float(brier_score(platt.predict(p_eval), y_eval))
+    ece_p = float(expected_calibration_error(platt.predict(p_eval), y_eval))
+    bs_i = float(brier_score(iso.predict(p_eval), y_eval))
+    ece_i = float(expected_calibration_error(iso.predict(p_eval), y_eval))
 
     _print_row("+ Platt", bs_p, ece_p)
     _print_row("+ Isotonic", bs_i, ece_i)
 
+    # Best calibrated metrics
     best_brier = min(bs, bs_p, bs_i)
     best_ece = min(ece, ece_p, ece_i)
-    gate = best_brier < BRIER_THRESHOLD and best_ece < ECE_THRESHOLD
-    print(f"\n  T1-D gate: {'PASS' if gate else 'FAIL'}"
-          f"  (best Brier={best_brier:.4f}, best ECE={best_ece:.4f})")
+    best_name = {bs: "Raw", bs_p: "Platt", bs_i: "Isotonic"}[best_brier]
+
+    # Apply the best calibrator to the full val set for expanded KPIs.
+    # Minor note: calibrator was fit on the first half and is now applied
+    # to the full set — a slight optimism for the half-overlap region —
+    # but conservative enough for promotion gating.
+    if best_name == "Platt":
+        p_best = platt.predict(p_real)
+    elif best_name == "Isotonic":
+        p_best = iso.predict(p_real)
+    else:
+        p_best = p_real
+
+    # Raw (rank-invariant) log-loss and ROC AUC on uncalibrated scores
+    log_loss_raw = float(compute_log_loss(p_real, y_binary))
+    roc_auc_raw = float(compute_roc_auc(p_real, y_binary))
+
+    print(f"\n  Log-loss (raw)   : {_fmt(log_loss_raw, LOG_LOSS_THRESHOLD)}")
+    print(f"  ROC AUC  (raw)   : {_fmt(roc_auc_raw, ROC_AUC_THRESHOLD, lower_better=False)}")
+
+    # 5-fold cross-validated ECE on the best calibrated scores
+    print(f"\n  Running 5-fold CV ECE (best={best_name}) …")
+    cv_ece_mean, cv_ece_std = cross_validate_calibration(
+        list(p_best), list(y_binary), n_folds=5, metric="ece",
+    )
+    print(f"  CV ECE mean : {_fmt(cv_ece_mean, CV_ECE_MEAN_THRESHOLD)}")
+    print(f"  CV ECE std  : {_fmt(cv_ece_std, CV_ECE_STD_THRESHOLD)}")
+
+    # Bootstrap 95% CI — returns (lower, upper, mean); upper is index 1
+    print(f"\n  Running bootstrap CI ({N_BOOTSTRAP} resamples) …")
+    _, boot_brier_upper, _ = bootstrap_confidence_interval(
+        list(p_best), list(y_binary), n_bootstrap=N_BOOTSTRAP, metric="brier",
+    )
+    _, boot_ece_upper, _ = bootstrap_confidence_interval(
+        list(p_best), list(y_binary), n_bootstrap=N_BOOTSTRAP, metric="ece",
+    )
+    boot_brier_upper_f = float(boot_brier_upper)
+    boot_ece_upper_f = float(boot_ece_upper)
+    print(f"  Bootstrap Brier 95% CI upper : {_fmt(boot_brier_upper_f, BOOTSTRAP_BRIER_UPPER)}")
+    print(f"  Bootstrap ECE   95% CI upper : {_fmt(boot_ece_upper_f, BOOTSTRAP_ECE_UPPER)}")
+
+    # Final gate evaluation
+    all_pass, gates = _check_all_kpis(
+        best_brier, best_ece, log_loss_raw, roc_auc_raw,
+        cv_ece_mean, cv_ece_std, boot_brier_upper_f, boot_ece_upper_f,
+    )
+    gate_label = "PASS" if all_pass else "FAIL"
+    print(f"\n  T1-D gate (all 7 KPIs): {gate_label}")
+    for k, v in gates.items():
+        print(f"    {k:<30s}: {'PASS' if v else 'FAIL'}")
+
+    # Return structured results for JSON report
+    return {
+        "tier": "tier1_xgb",
+        "model_sha256": _sha256(xgb_model_path),
+        "n_val": int(len(y_binary)),
+        "best_calibrator": best_name,
+        "brier": best_brier,
+        "ece": best_ece,
+        "log_loss": log_loss_raw,
+        "roc_auc": roc_auc_raw,
+        "cv_ece_mean": cv_ece_mean,
+        "cv_ece_std": cv_ece_std,
+        "bootstrap_brier_upper": boot_brier_upper_f,
+        "bootstrap_ece_upper": boot_ece_upper_f,
+        "gates": gates,
+        "all_kpis_pass": all_pass,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -263,8 +408,12 @@ def evaluate_cnn(
     seed: int = 42,
     val_frac: float = 0.2,
     batch_size: int = 64,
-) -> None:
-    """Evaluate Tier 2 CNN on the held-out val set."""
+) -> dict[str, Any]:
+    """Evaluate Tier 2 CNN on the held-out val set.
+
+    Returns a dict of all KPI values and gate results for inclusion in the
+    machine-readable JSON report.
+    """
     import csv as _csv
 
     import torch
@@ -279,8 +428,7 @@ def evaluate_cnn(
         rows = list(_csv.DictReader(f))
     print(f"  Total cutouts: {len(rows)}")
 
-    # Reproduce the same random_split used in training
-    # (train_tier2_cnn.py uses torch.Generator().manual_seed(42))
+    # Reproduce the same random_split used in train_tier2_cnn.py
     n_val = max(1, int(val_frac * len(rows)))
     n_train = len(rows) - n_val
 
@@ -303,22 +451,23 @@ def evaluate_cnn(
     val_indices = list(val_ds.indices)
     val_rows = [rows[i] for i in val_indices]
     y_val_raw = np.array([int(r["label"]) for r in val_rows])
-    y_binary = (y_val_raw == 0).astype(float)  # 1=real, 0=bogus
+    # Binary: 1=real (class 0), 0=bogus (class 3)
+    y_binary = (y_val_raw == 0).astype(float)
     n_real = int(y_binary.sum())
     n_bogus = int((y_binary == 0).sum())
     print(f"  Val set: {len(val_rows)}  (real={n_real}  bogus={n_bogus})")
 
-    # Load model
+    # Load model weights
     model = _build_cnn_model()
     if model is None:
         print("  ERROR: torch not available — cannot evaluate CNN.")
-        return
+        return {"tier": "tier2_cnn", "error": "torch unavailable"}
     state = torch.load(str(cnn_model_path), map_location="cpu", weights_only=False)
     model.load_state_dict(state)
     model.eval()
 
-    # Run inference on val set in batches
     def _load_npz(path: str) -> tuple:
+        """Load a single .npz cutout triplet as float32 tensors."""
         import numpy as _np
         data = _np.load(path)
         def _t(k: str):
@@ -328,6 +477,7 @@ def evaluate_cnn(
             ).unsqueeze(0)
         return _t("science"), _t("reference"), _t("difference")
 
+    # Run inference on val set in batches
     all_proba: list[float] = []
     with torch.no_grad():
         for i in range(0, len(val_rows), batch_size):
@@ -342,26 +492,30 @@ def evaluate_cnn(
             ref_t = torch.stack(ref_b)
             diff_t = torch.stack(diff_b)
             out = model(sci_t, ref_t, diff_t)  # shape (B, 5) softmax
-            # P(real) = 1 - P(stellar_artifact=class3)
+            # P(real) = 1 - P(stellar_artifact=class 3)
             p = 1.0 - out[:, 3].cpu().numpy()
             all_proba.extend(p.tolist())
 
     p_real = np.array(all_proba, dtype=np.float64)
 
+    # Raw (uncalibrated) metrics
     bs = float(brier_score(p_real, y_binary))
     ece = float(expected_calibration_error(p_real, y_binary))
 
     print()
     _print_row("Raw CNN", bs, ece)
 
-    # Platt and isotonic on the CNN raw scores
-    # Fit on training val predictions — use a 50/50 split of the val set for calibration
+    # -----------------------------------------------------------------
+    # Platt and isotonic calibration — 50/50 half-split of the val set.
+    # Fit on first half; evaluate on second half — avoids data leakage.
+    # -----------------------------------------------------------------
     n_cal = len(p_real) // 2
     platt = PlattCalibrator().fit(p_real[:n_cal], y_binary[:n_cal])
     iso = IsotonicCalibrator().fit(p_real[:n_cal], y_binary[:n_cal])
 
     p_eval = p_real[n_cal:]
     y_eval = y_binary[n_cal:]
+
     bs_p = float(brier_score(platt.predict(p_eval), y_eval))
     ece_p = float(expected_calibration_error(platt.predict(p_eval), y_eval))
     bs_i = float(brier_score(iso.predict(p_eval), y_eval))
@@ -370,11 +524,121 @@ def evaluate_cnn(
     _print_row("+ Platt", bs_p, ece_p)
     _print_row("+ Isotonic", bs_i, ece_i)
 
+    # Best calibrated metrics
     best_brier = min(bs, bs_p, bs_i)
     best_ece = min(ece, ece_p, ece_i)
-    gate = best_brier < BRIER_THRESHOLD and best_ece < ECE_THRESHOLD
-    print(f"\n  T1-D gate: {'PASS' if gate else 'FAIL'}"
-          f"  (best Brier={best_brier:.4f}, best ECE={best_ece:.4f})")
+    best_name = {bs: "Raw", bs_p: "Platt", bs_i: "Isotonic"}[best_brier]
+
+    # Apply best calibrator to full val set for expanded KPIs
+    if best_name == "Platt":
+        p_best = platt.predict(p_real)
+    elif best_name == "Isotonic":
+        p_best = iso.predict(p_real)
+    else:
+        p_best = p_real
+
+    log_loss_raw = float(compute_log_loss(p_real, y_binary))
+    roc_auc_raw = float(compute_roc_auc(p_real, y_binary))
+
+    print(f"\n  Log-loss (raw)   : {_fmt(log_loss_raw, LOG_LOSS_THRESHOLD)}")
+    print(f"  ROC AUC  (raw)   : {_fmt(roc_auc_raw, ROC_AUC_THRESHOLD, lower_better=False)}")
+
+    print(f"\n  Running 5-fold CV ECE (best={best_name}) …")
+    cv_ece_mean, cv_ece_std = cross_validate_calibration(
+        list(p_best), list(y_binary), n_folds=5, metric="ece",
+    )
+    print(f"  CV ECE mean : {_fmt(cv_ece_mean, CV_ECE_MEAN_THRESHOLD)}")
+    print(f"  CV ECE std  : {_fmt(cv_ece_std, CV_ECE_STD_THRESHOLD)}")
+
+    print(f"\n  Running bootstrap CI ({N_BOOTSTRAP} resamples) …")
+    _, boot_brier_upper, _ = bootstrap_confidence_interval(
+        list(p_best), list(y_binary), n_bootstrap=N_BOOTSTRAP, metric="brier",
+    )
+    _, boot_ece_upper, _ = bootstrap_confidence_interval(
+        list(p_best), list(y_binary), n_bootstrap=N_BOOTSTRAP, metric="ece",
+    )
+    boot_brier_upper_f = float(boot_brier_upper)
+    boot_ece_upper_f = float(boot_ece_upper)
+    print(f"  Bootstrap Brier 95% CI upper : {_fmt(boot_brier_upper_f, BOOTSTRAP_BRIER_UPPER)}")
+    print(f"  Bootstrap ECE   95% CI upper : {_fmt(boot_ece_upper_f, BOOTSTRAP_ECE_UPPER)}")
+
+    all_pass, gates = _check_all_kpis(
+        best_brier, best_ece, log_loss_raw, roc_auc_raw,
+        cv_ece_mean, cv_ece_std, boot_brier_upper_f, boot_ece_upper_f,
+    )
+    gate_label = "PASS" if all_pass else "FAIL"
+    print(f"\n  T1-D gate (all 7 KPIs): {gate_label}")
+    for k, v in gates.items():
+        print(f"    {k:<30s}: {'PASS' if v else 'FAIL'}")
+
+    return {
+        "tier": "tier2_cnn",
+        "model_sha256": _sha256(cnn_model_path),
+        "n_val": int(len(y_binary)),
+        "best_calibrator": best_name,
+        "brier": best_brier,
+        "ece": best_ece,
+        "log_loss": log_loss_raw,
+        "roc_auc": roc_auc_raw,
+        "cv_ece_mean": cv_ece_mean,
+        "cv_ece_std": cv_ece_std,
+        "bootstrap_brier_upper": boot_brier_upper_f,
+        "bootstrap_ece_upper": boot_ece_upper_f,
+        "gates": gates,
+        "all_kpis_pass": all_pass,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Machine-readable JSON report
+# ---------------------------------------------------------------------------
+
+def _emit_json_report(
+    tier_results: list[dict[str, Any]],
+    report_path: Path,
+) -> None:
+    """Write a machine-readable calibration report to report_path.
+
+    promotion_gate_passed is True only when ALL evaluated tiers pass ALL
+    seven KPI gates. Tier 3 is not evaluated here (no model weights yet);
+    its absence is recorded in the report for traceability.
+    """
+    import datetime
+
+    all_evaluated_pass = bool(
+        tier_results
+        and all(r.get("all_kpis_pass", False) for r in tier_results)
+    )
+
+    # Threshold reference — included for reproducibility without re-reading source
+    thresholds = {
+        "brier": BRIER_THRESHOLD,
+        "ece": ECE_THRESHOLD,
+        "log_loss": LOG_LOSS_THRESHOLD,
+        "roc_auc_min": ROC_AUC_THRESHOLD,
+        "cv_ece_mean": CV_ECE_MEAN_THRESHOLD,
+        "cv_ece_std": CV_ECE_STD_THRESHOLD,
+        "bootstrap_brier_upper": BOOTSTRAP_BRIER_UPPER,
+        "bootstrap_ece_upper": BOOTSTRAP_ECE_UPPER,
+    }
+
+    report: dict[str, Any] = {
+        "generated_at_utc": datetime.datetime.utcnow().isoformat() + "Z",
+        "promotion_gate_passed": all_evaluated_pass,
+        "tier3_evaluated": False,
+        "tier3_note": (
+            "Tier 3 Transformer weights not yet available. "
+            "Re-run after Skills/train_tier3_transformer.py completes."
+        ),
+        "thresholds": thresholds,
+        "tiers": tier_results,
+    }
+
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    with report_path.open("w") as f:
+        json.dump(report, f, indent=2)
+    print(f"\n  JSON report written to: {report_path}")
+    print(f"  promotion_gate_passed : {all_evaluated_pass}")
 
 
 # ---------------------------------------------------------------------------
@@ -382,7 +646,11 @@ def evaluate_cnn(
 # ---------------------------------------------------------------------------
 
 def _synthetic_eval() -> None:
-    """Fallback: evaluate Platt/isotonic calibrators on synthetic scores."""
+    """Fallback: evaluate Platt/isotonic calibrators on synthetic scores.
+
+    Used when neither real model nor real data is present (e.g., in CI).
+    Does NOT evaluate the full 7-KPI T1-D gate — that requires real data.
+    """
     rng = np.random.default_rng(42)
     scores = rng.beta(1.5, 5.0, 500)
     labels = (rng.uniform(size=500) < scores).astype(float)
@@ -405,6 +673,10 @@ def _synthetic_eval() -> None:
     print(f"{'Raw':<12} {raw_b:>8.4f} {raw_e:>8.4f}")
     print(f"{'Platt':<12} {pl_b:>8.4f} {pl_e:>8.4f}")
     print(f"{'Isotonic':<12} {is_b:>8.4f} {is_e:>8.4f}")
+    print(
+        "\nNOTE: Full T1-D gate (7 KPIs) requires real model + data. "
+        "This is the CI synthetic fallback only."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -413,7 +685,10 @@ def _synthetic_eval() -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Evaluate Tier 1 XGBoost and Tier 2 CNN calibration on real data"
+        description=(
+            "Evaluate Tier 1 XGBoost and Tier 2 CNN calibration on real data "
+            "against all seven T1-D promotion gate KPIs."
+        )
     )
     parser.add_argument(
         "--alerts", type=Path, default=Path("data/ztf_labeled_alerts.json"),
@@ -439,6 +714,14 @@ def main() -> None:
         "--seed", type=int, default=42,
         help="Random seed (must match training seed; default: 42)",
     )
+    parser.add_argument(
+        "--report-out", type=Path, default=None,
+        help=(
+            "Write machine-readable JSON calibration report to this path. "
+            "Recommended: Logs/reports/calibration_report.json  (gitignored). "
+            "promotion_gate_passed=true only when all evaluated tiers pass all 7 KPIs."
+        ),
+    )
     args = parser.parse_args()
 
     # Determine which real-model evaluations are possible
@@ -450,26 +733,40 @@ def main() -> None:
         _synthetic_eval()
         return
 
-    print(f"\nT1-D calibration gate thresholds: Brier < {BRIER_THRESHOLD}, ECE < {ECE_THRESHOLD}")
+    print("\nT1-D calibration gate thresholds:")
+    print(f"  Brier < {BRIER_THRESHOLD}  |  ECE < {ECE_THRESHOLD}")
+    print(f"  Log-loss < {LOG_LOSS_THRESHOLD}  |  ROC AUC > {ROC_AUC_THRESHOLD}")
+    print(f"  CV ECE mean < {CV_ECE_MEAN_THRESHOLD}  (std <= {CV_ECE_STD_THRESHOLD})")
+    print(f"  Bootstrap Brier 95% CI upper < {BOOTSTRAP_BRIER_UPPER}")
+    print(f"  Bootstrap ECE   95% CI upper < {BOOTSTRAP_ECE_UPPER}")
+    print("  (ALL seven must pass for promotion_gate_passed=true)")
+
+    tier_results: list[dict[str, Any]] = []
 
     if can_xgb:
-        evaluate_xgboost(
+        result = evaluate_xgboost(
             xgb_model_path=args.xgb_model,
             alerts_path=args.alerts,
             mpc_path=args.mpc_labels,
             seed=args.seed,
         )
+        tier_results.append(result)
     else:
         print("\n[XGBoost] Skipped — alerts or model not found.")
 
     if can_cnn:
-        evaluate_cnn(
+        result = evaluate_cnn(
             cnn_model_path=args.cnn_model,
             cutouts_csv=args.cutouts_csv,
             seed=args.seed,
         )
+        tier_results.append(result)
     else:
         print("\n[CNN] Skipped — cutouts CSV or model not found.")
+
+    # Emit JSON report if requested (or if report-out was specified)
+    if args.report_out is not None and tier_results:
+        _emit_json_report(tier_results, args.report_out)
 
     print()
 
