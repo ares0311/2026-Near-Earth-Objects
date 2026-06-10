@@ -28,6 +28,15 @@ def _write_manifest(path: Path, rows: list[tuple[str, str]]) -> None:
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def _write_window_manifest(path: Path, window: str) -> None:
+    """Write one policy-aware manifest row for temporal-window tests."""
+    path.write_text(
+        "designation,neo_class,h_mag,source,sequence_window,label_basis\n"
+        f"433,neo_candidate,20.0,test,{window},test policy\n",
+        encoding="utf-8",
+    )
+
+
 def _observations(prefix: str = "obj") -> list[SimpleNamespace]:
     """Create a multi-night observation sequence that satisfies acceptance gates."""
     return [
@@ -132,6 +141,44 @@ def test_collection_retries_and_rejects_short_sequences(tmp_path: Path) -> None:
     assert dataset["query_log"][0]["attempts"] == 2
 
 
+def test_collection_applies_temporal_window_and_cap(tmp_path: Path) -> None:
+    """Early policy rows should retain multiple nights without exceeding the cap."""
+    module = _load_skill()
+    manifest = tmp_path / "labels.csv"
+    output = tmp_path / "raw.json"
+    _write_window_manifest(manifest, "early")
+    observations = _observations("dense")
+    observations.extend(
+        SimpleNamespace(
+            obs_id=f"dense-extra-{index}",
+            ra_deg=20.0,
+            dec_deg=5.0,
+            jd=2460000.41 + index * 0.001,
+            mag=20.0,
+            mag_err=0.1,
+            filter_band="V",
+            mission="MPC",
+        )
+        for index in range(10)
+    )
+
+    dataset = module.collect_sequence_dataset(
+        manifest,
+        output,
+        1,
+        max_observations_per_object=4,
+        query_delay_seconds=0,
+        fetcher=lambda designation, force_refresh=False: observations,
+    )
+
+    entry = dataset["entries"][0]
+    assert entry["sequence_window"] == "early"
+    assert entry["label_basis"] == "test policy"
+    assert entry["observation_count"] == 4
+    assert entry["night_count"] >= 2
+    assert dataset["query_log"][0]["raw_observation_count"] == 13
+
+
 def test_resume_skips_already_accepted_designations(tmp_path: Path) -> None:
     """Resume mode must preserve checkpoints and avoid duplicate provider queries."""
     module = _load_skill()
@@ -219,6 +266,7 @@ def test_manifest_validation_fails_closed(
         ("max_objects", 0, "max_objects"),
         ("min_observations", 1, "min_observations"),
         ("min_nights", 0, "min_nights"),
+        ("max_observations_per_object", 1, "max_observations_per_object"),
         ("retries", -1, "retries"),
         ("query_delay_seconds", -1, "query_delay_seconds"),
     ],

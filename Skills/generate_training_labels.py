@@ -1,8 +1,12 @@
 #!/usr/bin/env python
-"""Download MPC NEO + MBA catalog entries and write a training label CSV.
+"""Download MPC catalog entries and write approved training label manifests.
 
 Outputs a CSV with columns: designation, neo_class, h_mag, source
 suitable for training the Tier 1 XGBoost classifier.
+
+Tier 3 pilot mode writes the approved four-class MPC manifest. The fifth
+``stellar_artifact`` class is acquired separately from ALeRCE because the MPC
+does not catalog instrumental artifacts.
 
 IMPORTANT: Run from your Mac, not from the coding agent server.
 The MPC blocks cloud/data-center IP ranges. This script must be run
@@ -12,6 +16,9 @@ Usage (from repo root on your Mac, with venv active):
     PYTHONPATH=src python Skills/generate_training_labels.py
     PYTHONPATH=src python Skills/generate_training_labels.py --limit 2000
     PYTHONPATH=src python Skills/generate_training_labels.py --dry-run
+    PYTHONPATH=src python Skills/generate_training_labels.py \
+        --tier3-pilot --limit 50 \
+        --output data/sequences/tier3_pilot_manifest.csv
 """
 
 from __future__ import annotations
@@ -19,6 +26,7 @@ from __future__ import annotations
 import argparse
 import csv
 import io
+import json
 import sys
 from pathlib import Path
 
@@ -31,6 +39,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 # These are updated daily by the MPC and are stable long-term URLs.
 MPC_NEA_URL = "https://www.minorplanetcenter.net/iau/MPCORB/NEA.txt"
 MPC_MPCORB_URL = "https://www.minorplanetcenter.net/iau/MPCORB/MPCORB.DAT"
+TIER3_FIELDNAMES = [
+    "designation",
+    "neo_class",
+    "h_mag",
+    "source",
+    "sequence_window",
+    "label_basis",
+]
 
 
 def parse_mpc_80col_line(line: str) -> dict | None:
@@ -48,7 +64,17 @@ def parse_mpc_80col_line(line: str) -> dict | None:
         designation = line[0:7].strip()
         h_mag_str = line[8:13].strip()
         h_mag = float(h_mag_str) if h_mag_str else 99.0
-        return {"designation": designation, "h_mag": h_mag}
+        # MPCORB extends past column 80 with eccentricity and semimajor axis.
+        eccentricity_text = line[70:79].strip() if len(line) >= 79 else ""
+        semimajor_axis_text = line[92:103].strip() if len(line) >= 103 else ""
+        return {
+            "designation": designation,
+            "h_mag": h_mag,
+            "eccentricity": float(eccentricity_text) if eccentricity_text else None,
+            "semimajor_axis_au": (
+                float(semimajor_axis_text) if semimajor_axis_text else None
+            ),
+        }
     except (ValueError, IndexError):
         return None
 
@@ -126,6 +152,59 @@ def fetch_neo_labels(limit: int = 500) -> list[dict]:
     return rows
 
 
+def _is_numbered_designation(designation: str) -> bool:
+    """Return whether an MPC packed designation represents a numbered object."""
+    return designation.strip().isdigit()
+
+
+def build_tier3_nea_rows(text: str, limit: int) -> list[dict]:
+    """Build temporally distinct NEO-candidate and known-object manifest rows."""
+    if limit < 1:
+        raise ValueError("limit must be at least 1")
+
+    candidates: list[dict] = []
+    known: list[dict] = []
+    for line in io.StringIO(text):
+        record = parse_mpc_80col_line(line.rstrip("\n"))
+        if record is None:
+            continue
+        designation = record["designation"]
+        if _is_numbered_designation(designation):
+            if len(known) < limit:
+                known.append(
+                    {
+                        "designation": designation,
+                        "neo_class": "known_object",
+                        "h_mag": record["h_mag"],
+                        "source": "MPC_NEA",
+                        "sequence_window": "late",
+                        "label_basis": "numbered NEO; late catalog-era observations",
+                    }
+                )
+        elif len(candidates) < limit:
+            candidates.append(
+                {
+                    "designation": designation,
+                    "neo_class": "neo_candidate",
+                    "h_mag": record["h_mag"],
+                    "source": "MPC_NEA",
+                    "sequence_window": "early",
+                    "label_basis": "provisional NEO; earliest discovery-arc observations",
+                }
+            )
+        if len(candidates) >= limit and len(known) >= limit:
+            break
+    return candidates + known
+
+
+def fetch_tier3_nea_rows(limit: int) -> list[dict]:
+    """Download NEA.txt and build the approved temporal NEO label classes."""
+    print(f"  Downloading {MPC_NEA_URL} ...", file=sys.stderr)
+    response = requests.get(MPC_NEA_URL, timeout=120)
+    response.raise_for_status()
+    return build_tier3_nea_rows(response.text, limit)
+
+
 def fetch_mba_labels_from_catalog(limit: int = 500) -> list[dict]:
     """Download a sample of MBAs from MPCORB.DAT as negative training labels.
 
@@ -146,8 +225,17 @@ def fetch_mba_labels_from_catalog(limit: int = 500) -> list[dict]:
                 if rec is None:
                     continue
                 h = rec["h_mag"]
-                # Only include H > 15 to avoid overlap with large NEOs
-                if h < 15:
+                semimajor_axis = rec["semimajor_axis_au"]
+                eccentricity = rec["eccentricity"]
+                # Use numbered, dynamically main-belt objects and exclude NEO orbits.
+                if (
+                    not _is_numbered_designation(rec["designation"])
+                    or semimajor_axis is None
+                    or eccentricity is None
+                    or not 2.0 < semimajor_axis < 3.5
+                    or semimajor_axis * (1.0 - eccentricity) <= 1.3
+                    or h < 15
+                ):
                     continue
                 rows.append(
                     {
@@ -203,11 +291,98 @@ def fetch_mba_labels(limit: int = 500) -> list[dict]:
     return rows
 
 
+def fetch_tier3_mba_rows(limit: int) -> list[dict]:
+    """Convert authoritative numbered MBA labels into Tier 3 manifest rows."""
+    rows = fetch_mba_labels_from_catalog(limit)
+    return [
+        {
+            **row,
+            "sequence_window": "full",
+            "label_basis": "numbered MPC object with 2<a<3.5 AU and q>1.3 AU",
+        }
+        for row in rows
+    ]
+
+
+def _catalog_value(row: object, *names: str, default: object = "") -> object:
+    """Read a field from an astropy row or mapping without assuming one type."""
+    for name in names:
+        try:
+            value = row[name]  # type: ignore[index]
+        except (KeyError, IndexError, TypeError):
+            continue
+        if value is not None:
+            return value
+    return default
+
+
+def fetch_other_solar_system_rows(limit: int) -> list[dict]:
+    """Fetch confirmed comet records for the approved other-solar-system class."""
+    from astroquery.mpc import MPC  # type: ignore[import]
+
+    result = MPC.query_objects("comet", limit=limit)
+    rows: list[dict] = []
+    for row in result:
+        designation = str(
+            _catalog_value(row, "designation", "name", "number", default="")
+        ).strip()
+        if not designation:
+            continue
+        magnitude = _catalog_value(row, "absolute_magnitude", "H", default=99.0)
+        try:
+            h_mag = float(magnitude)
+        except (TypeError, ValueError):
+            h_mag = 99.0
+        rows.append(
+            {
+                "designation": designation,
+                "neo_class": "other_solar_system",
+                "h_mag": h_mag,
+                "source": "MPC_COMET",
+                "sequence_window": "full",
+                "label_basis": "confirmed MPC comet",
+            }
+        )
+        if len(rows) >= limit:
+            break
+    return rows
+
+
+def build_tier3_pilot_manifest(limit: int) -> list[dict]:
+    """Acquire the four MPC-backed classes in the approved five-class policy."""
+    nea_rows = fetch_tier3_nea_rows(limit)
+    mba_rows = fetch_tier3_mba_rows(limit)
+    other_rows = fetch_other_solar_system_rows(limit)
+    rows = nea_rows + mba_rows + other_rows
+
+    # Fail closed unless every MPC-backed class reaches the approved pilot size.
+    required = {
+        "neo_candidate",
+        "known_object",
+        "main_belt_asteroid",
+        "other_solar_system",
+    }
+    counts = {class_name: 0 for class_name in required}
+    for row in rows:
+        if row["neo_class"] in counts:
+            counts[row["neo_class"]] += 1
+    short = {name: count for name, count in counts.items() if count < limit}
+    if short:
+        raise RuntimeError(f"Tier 3 pilot manifest is incomplete: {short}")
+    return rows
+
+
 def write_csv(rows: list[dict], output: Path) -> None:
     """Write label rows to CSV with header."""
     output.parent.mkdir(parents=True, exist_ok=True)
+    fieldnames = TIER3_FIELDNAMES if any("sequence_window" in row for row in rows) else [
+        "designation",
+        "neo_class",
+        "h_mag",
+        "source",
+    ]
     with output.open("w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=["designation", "neo_class", "h_mag", "source"])
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
 
@@ -219,7 +394,26 @@ def main() -> None:
     parser.add_argument("--output", type=Path, default=Path("data/training_labels.csv"))
     parser.add_argument("--limit", type=int, default=500, help="Max objects per class")
     parser.add_argument("--dry-run", action="store_true", help="Print counts without writing file")
+    parser.add_argument(
+        "--tier3-pilot",
+        action="store_true",
+        help="Build the approved four-class MPC manifest for the Tier 3 pilot",
+    )
     args = parser.parse_args()
+
+    if args.tier3_pilot:
+        print(f"Building approved Tier 3 MPC manifest with {args.limit} objects per class...")
+        all_rows = build_tier3_pilot_manifest(args.limit)
+        counts: dict[str, int] = {}
+        for row in all_rows:
+            counts[row["neo_class"]] = counts.get(row["neo_class"], 0) + 1
+        print(json.dumps(counts, indent=2, sort_keys=True))
+        if args.dry_run:
+            print("Dry run — no file written.")
+            return
+        write_csv(all_rows, args.output)
+        print(f"Written to {args.output}")
+        return
 
     print(f"Fetching up to {args.limit} NEOs from MPC...")
     neo_rows = fetch_neo_labels(limit=args.limit)

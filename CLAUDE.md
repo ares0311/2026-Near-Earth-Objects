@@ -516,7 +516,7 @@ and excluded from CI.
 
 ## Current State (v0.87.0)
 
-All 10 pipeline modules are complete. The offline suite passes 3447 tests, with
+All 10 pipeline modules are complete. The offline suite passes 3456 tests, with
 2 live/integration checks deselected and 2 existing skips. CI is expected to
 remain green on Python 3.11 and 3.12 with the 100% coverage target. Background
 automation uses one unified CLI with top-level SQLite audit logs, offline
@@ -524,7 +524,10 @@ readiness checks, live policy validation, no-secret credential inventories,
 approval bundles, operator handoffs, and fail-closed signoff readiness. Tier 1
 and Tier 2 weights are trained; production remains blocked on the Tier 3
 five-class sequence dataset, ensemble calibration, and a supervised real
-end-to-end run.
+end-to-end run. Jerome W. Lindsey III approved the five-class label policy and
+a 50-sequence-per-class pilot on 2026-06-10. Acquisition and split tooling are
+implemented; the operator network run is pending and is not production
+approval.
 
 ### Skills
 
@@ -532,7 +535,7 @@ end-to-end run.
 |---|---|
 | `Skills/smoke_test.py` | Happy-path check for all modules; exits 0 on success |
 | `Skills/evaluate_calibration.py` | Brier/ECE evaluation for Platt and isotonic calibrators |
-| `Skills/generate_training_labels.py` | Download MPC NEO + MBA catalog as training label CSV |
+| `Skills/generate_training_labels.py` | Download Tier 1 labels or build the approved four-class MPC Tier 3 pilot manifest |
 | `Skills/batch_score.py` | Score a list of tracklets from a JSON file; print ranked table |
 | `Skills/run_pipeline.py` | Full end-to-end pipeline run |
 | `Skills/injection_recovery.py` | Injection-recovery test: injects synthetic NEOs, measures detection/link/score rates |
@@ -548,7 +551,8 @@ end-to-end run.
 | `Skills/neo_mcp_server.py` | Project-scoped MCP guard server for bounded file reads, read-only git inspection, and fixed offline validation/readiness commands |
 | `Skills/stress_test_high_motion.py` | Stress-test linker across 3 motion bins (1–10, 10–30, 30–60 arcsec/hr); saves results to `data/` |
 | `Skills/build_cutout_dataset.py` | Convert ZTF alert JSON (base64 cutouts) to `.npz` + CSV index for Tier 2 CNN training |
-| `Skills/build_sequence_dataset.py` | Convert tracklet JSON to flat token CSV for Tier 3 Transformer training |
+| `Skills/build_sequence_dataset.py` | Validate five classes, create designation-grouped splits, and tokenize Tier 3 sequences |
+| `Skills/fetch_alerce_artifact_sequences.py` | Acquire bounded public ALeRCE bogus-object histories for the Tier 3 artifact class |
 | `Skills/validate_mpc_report.py` | Validate MPC 80-column observation report files; CLI with `--json` flag |
 | `Skills/diagnose_pipeline.py` | Run each pipeline stage with synthetic data; report pass/fail per stage |
 | `Skills/compare_baselines.py` | Compare two injection-recovery JSON baselines; exits 1 on regression |
@@ -684,7 +688,7 @@ end-to-end run.
 - `score.py`: added `compute_batch_priority_stats(neos)` — dict: mean, std, min, max of discovery_priority; empty dict if no valid priorities.
 - `alert.py`: added `format_alert_pathway_summary(neos)` — multi-line text block with pathway counts and fractions sorted by frequency.
 - `calibration.py`: added `compute_negative_predictive_value(probs, labels, threshold=0.5)` — NPV = TN/(TN+FN); 0.0 for empty input or no negative predictions.
-- 3447 tests passing; 100% coverage target maintained; ruff + mypy clean.
+- 3456 tests passing; 100% coverage target maintained; ruff + mypy clean.
 - Version bumped to 0.87.0.
 
 ### Key Changes in v0.86.0

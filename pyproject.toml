@@ -26,6 +26,10 @@ dev = [
     "ruff>=0.1",
     "mypy>=1.6",
 ]
+training = [
+    # Public broker client used only for real Tier 3 artifact-sequence acquisition.
+    "alerce>=2,<3",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]

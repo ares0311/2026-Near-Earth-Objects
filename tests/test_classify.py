@@ -382,6 +382,13 @@ class TestBuildCnnModel:
         loaded = cls_mod._load_cnn_model()
         assert loaded is not None
 
+    def test_load_cnn_model_returns_none_without_weights(self, tmp_path, monkeypatch):
+        """Missing Tier 2 weights should fail closed without constructing a model."""
+        import classify as cls_mod
+
+        monkeypatch.setattr(cls_mod, "_MODEL_DIR", tmp_path)
+        assert cls_mod._load_cnn_model() is None
+
 
 class TestBuildTransformerModel:
     def test_returns_model_with_torch(self):
@@ -446,6 +453,22 @@ class TestTier2PredictWithCutouts:
         t = make_tracklet(n_obs=2)
         result = _tier2_predict(t, model=model)
         assert result is None
+
+    def test_tier2_cutouts_without_available_model_returns_none(self, monkeypatch):
+        """Valid cutouts should still fail closed when lazy model loading is unavailable."""
+        import classify as cls_mod
+
+        b64 = self._make_cutout_b64()
+        obs = make_obs(
+            obs_id="t2_missing_model",
+            cutout_science=b64,
+            cutout_reference=b64,
+            cutout_difference=b64,
+        )
+        tracklet = Tracklet("T2-missing", (obs,), 0.0, 0.0, 0.0)
+        monkeypatch.setattr(cls_mod, "_load_cnn_model", lambda: None)
+
+        assert cls_mod._tier2_predict(tracklet, model=None) is None
 
 
 class TestTier3PredictWithModel:
