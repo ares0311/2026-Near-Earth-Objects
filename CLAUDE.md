@@ -42,6 +42,13 @@ If the highest-priority T1 gap cannot be resolved because a human blocker is unr
   `Logs/tier3_pilot.active.json`. If present, do not alter the shared checkout
   until the operator run exits and removes the marker.
 
+- **Python runtime is 3.14.3 — always use `uv run`**: The project venv is
+  Python 3.14.3, managed by uv from `uv.lock`. Never invoke bare `python`,
+  `pytest`, `mypy`, or `ruff` directly — always prefix with `uv run` so the
+  correct interpreter and locked dependencies are used. CI enforces the same
+  via `astral-sh/setup-uv@v5` with `python-version: "3.14"`.
+  Example: `PYTHONPATH=src uv run python -m pytest`
+
 - **Always comment all code**: Every function, class, script, shell command, and non-trivial code block must include comments explaining what it does and why. This applies to all Python source files, all Skills scripts, all shell commands given to the operator, and all inline code snippets in documentation. No exceptions. This rule overrides any default behavior that would omit comments.
 - **caffeinate all long-running Mac commands**: Any operator command expected to run longer than ~30 seconds must be prefixed with `caffeinate -i` to prevent macOS from sleeping mid-run. This applies to all downloads, training runs, and pipeline executions. Example: `caffeinate -i python Skills/download_ztf_training_alerts.py ...`
 - **Operator always runs from main — no exceptions**: The operator's Mac always runs code from the `main` branch. Never instruct the operator to `git checkout` a feature branch or `git pull origin <feature-branch>`. Feature branch code must not be given to the operator to run until it is merged to main.
@@ -529,7 +536,7 @@ and excluded from CI.
 
 All 10 pipeline modules are complete. The offline suite passes 3475 tests, with
 2 live/integration checks deselected. CI is expected to
-remain green on Python 3.11 and 3.12 with the 100% coverage target. Background
+remain green on Python 3.14 with the 100% coverage target. Background
 automation uses one unified CLI with top-level SQLite audit logs, offline
 readiness checks, live policy validation, no-secret credential inventories,
 approval bundles, operator handoffs, and fail-closed signoff readiness. Tier 1
