@@ -331,17 +331,19 @@ def fetch_other_solar_system_rows(
 
         query_objects = MPC.query_objects
 
-    # MPC rows can omit every supported designation field, so fetch a bounded
-    # surplus and retain exactly the approved number of usable catalog records.
-    query_limit = max(limit * 2, limit + 10)
+    # MPC comet searches can return multiple orbit solutions for one designation.
+    # Fetch a bounded surplus and retain exactly the approved number of unique rows.
+    query_limit = max(limit * 5, limit + 50)
     result = query_objects("comet", limit=query_limit)
     rows: list[dict] = []
+    seen: set[str] = set()
     for row in result:
         designation = str(
             _catalog_value(row, "designation", "name", "number", default="")
         ).strip()
-        if not designation:
+        if not designation or designation in seen:
             continue
+        seen.add(designation)
         magnitude = _catalog_value(row, "absolute_magnitude", "H", default=99.0)
         try:
             h_mag = float(magnitude)
@@ -369,7 +371,7 @@ def build_tier3_pilot_manifest(limit: int) -> list[dict]:
     other_rows = fetch_other_solar_system_rows(limit)
     rows = nea_rows + mba_rows + other_rows
 
-    # Fail closed unless every MPC-backed class reaches the approved pilot size.
+    # Fail closed unless every MPC-backed class has the exact approved unique size.
     required = {
         "neo_candidate",
         "known_object",
@@ -380,9 +382,14 @@ def build_tier3_pilot_manifest(limit: int) -> list[dict]:
     for row in rows:
         if row["neo_class"] in counts:
             counts[row["neo_class"]] += 1
-    short = {name: count for name, count in counts.items() if count < limit}
-    if short:
-        raise RuntimeError(f"Tier 3 pilot manifest is incomplete: {short}")
+    invalid_counts = {name: count for name, count in counts.items() if count != limit}
+    designations = [str(row.get("designation", "")).strip() for row in rows]
+    duplicate_count = len(designations) - len(set(designations))
+    if invalid_counts or duplicate_count:
+        raise RuntimeError(
+            "Tier 3 pilot manifest is incomplete: "
+            f"counts={invalid_counts}, duplicate_designations={duplicate_count}"
+        )
     return rows
 
 

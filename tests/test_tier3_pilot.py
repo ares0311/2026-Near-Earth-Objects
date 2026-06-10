@@ -119,18 +119,19 @@ def test_other_solar_system_fetch_overfetches_after_unusable_row() -> None:
     captured: dict[str, Any] = {}
 
     def query_objects(target_type: str, *, limit: int) -> list[dict[str, Any]]:
-        """Return one blank row followed by enough usable confirmed comets."""
+        """Return duplicate/blank rows followed by enough usable confirmed comets."""
         captured["target_type"] = target_type
         captured["limit"] = limit
         return [
             {"designation": ""},
+            {"designation": "1P", "absolute_magnitude": 10.0},
             {"designation": "1P", "absolute_magnitude": 10.0},
             {"designation": "2P", "absolute_magnitude": 11.0},
         ]
 
     rows = module.fetch_other_solar_system_rows(2, query_objects=query_objects)
 
-    assert captured == {"target_type": "comet", "limit": 12}
+    assert captured == {"target_type": "comet", "limit": 52}
     assert [row["designation"] for row in rows] == ["1P", "2P"]
 
 
@@ -203,6 +204,7 @@ def test_alerce_failure_is_bounded_and_checkpointed(tmp_path: Path) -> None:
             1,
             query_delay_seconds=0.5,
             request_attempts=2,
+            retry_delay_seconds=0.5,
             client_factory=_FailingAlerce,
             sleep_fn=sleeps.append,
         )
@@ -212,6 +214,72 @@ def test_alerce_failure_is_bounded_and_checkpointed(tmp_path: Path) -> None:
     assert checkpoint["summary"]["accepted_objects"] == 0
     assert checkpoint["acquisition_errors"][0]["error_type"] == "TimeoutError"
     assert checkpoint["safety"]["secret_values_recorded"] is False
+
+
+def test_alerce_uses_small_stable_candidate_pages(tmp_path: Path) -> None:
+    """Candidate discovery should avoid the expensive detection-count sort."""
+    module = _load_skill("fetch_alerce_artifact_sequences.py")
+    output = tmp_path / "artifacts.json"
+    calls: list[dict[str, Any]] = []
+
+    class Client(_FakeAlerce):
+        """Capture candidate-page arguments before returning one valid object."""
+
+        def query_objects(self, **kwargs: Any) -> list[dict[str, Any]]:
+            """Record the lightweight stable query contract."""
+            calls.append(kwargs)
+            return super().query_objects(**kwargs)
+
+    module.collect_artifact_sequences(
+        output,
+        1,
+        candidate_page_size=7,
+        query_delay_seconds=0,
+        client_factory=Client,
+    )
+
+    assert calls[0]["page_size"] == 7
+    assert calls[0]["order_by"] == "oid"
+    assert calls[0]["order_mode"] == "ASC"
+
+
+def test_alerce_resume_retries_prior_detection_error(tmp_path: Path) -> None:
+    """A transient object failure must remain eligible on the resumed run."""
+    module = _load_skill("fetch_alerce_artifact_sequences.py")
+    output = tmp_path / "artifacts.json"
+
+    class FailingDetections(_FakeAlerce):
+        """Return a candidate but fail its first detection-history request."""
+
+        def query_detections(self, oid: str, **kwargs: Any) -> list[dict[str, Any]]:
+            """Simulate one transient broker timeout."""
+            raise TimeoutError("temporary timeout")
+
+    with pytest.raises(RuntimeError, match="only 0 accepted"):
+        module.collect_artifact_sequences(
+            output,
+            1,
+            query_delay_seconds=0,
+            request_attempts=1,
+            max_candidate_pages=1,
+            client_factory=FailingDetections,
+        )
+
+    resumed = module.collect_artifact_sequences(
+        output,
+        1,
+        query_delay_seconds=0,
+        request_attempts=1,
+        max_candidate_pages=1,
+        resume=True,
+        client_factory=_FakeAlerce,
+    )
+
+    assert resumed["summary"]["accepted_objects"] == 1
+    assert [item["status"] for item in resumed["query_log"]] == [
+        "query_error",
+        "accepted",
+    ]
 
 
 def test_alerce_client_network_configuration_normalizes_and_times_out() -> None:
@@ -311,3 +379,85 @@ def test_validation_rejects_missing_five_class_minimum() -> None:
 
     with pytest.raises(ValueError, match="five-class minimum"):
         module.validate_entries([_entry("neo_candidate", 0)], min_per_class=1)
+
+
+def _write_training_split(path: Path) -> None:
+    """Write five balanced two-token examples for trainer evidence tests."""
+    import csv
+
+    token_columns = [
+        f"tok_{time_index}_{feature_index}"
+        for time_index in range(2)
+        for feature_index in range(5)
+    ]
+    fieldnames = ["designation", "class_name", *token_columns, "label"]
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        for label, class_name in enumerate(
+            [
+                "neo_candidate",
+                "known_object",
+                "main_belt_asteroid",
+                "stellar_artifact",
+                "other_solar_system",
+            ]
+        ):
+            row = {column: "0.1" for column in token_columns}
+            row.update(
+                {
+                    "designation": f"{class_name}-1",
+                    "class_name": class_name,
+                    "label": str(label),
+                }
+            )
+            writer.writerow(row)
+
+
+def test_tier3_training_emits_held_out_evidence(tmp_path: Path) -> None:
+    """Training should save the best checkpoint and transparent pilot metrics."""
+    import torch.nn as nn
+
+    module = _load_skill("train_tier3_transformer.py")
+    train_csv = tmp_path / "train.csv"
+    validation_csv = tmp_path / "validation.csv"
+    test_csv = tmp_path / "test.csv"
+    for path in (train_csv, validation_csv, test_csv):
+        _write_training_split(path)
+
+    class TinySequenceModel(nn.Module):
+        """Provide a fast trainable model with the production logits contract."""
+
+        def __init__(self) -> None:
+            """Create one mean-pooled linear five-class classifier."""
+            super().__init__()
+            self.linear = nn.Linear(5, 5)
+
+        def forward(self, sequence: Any) -> Any:
+            """Return logits for one variable-length sequence."""
+            return self.linear(sequence.mean(dim=1))
+
+    model_path = tmp_path / "tier3.pt"
+    report_path = tmp_path / "training_report.json"
+    report = module.train(
+        train_csv,
+        validation_csv,
+        test_csv,
+        epochs=1,
+        out_path=model_path,
+        report_path=report_path,
+        model_factory=TinySequenceModel,
+    )
+
+    assert model_path.exists()
+    assert report_path.exists()
+    assert report["best_epoch"] == 1
+    assert set(report["test"]) == {
+        "accuracy",
+        "loss",
+        "macro_f1",
+        "per_class_recall",
+    }
+    assert report["model_sha256"] == module._sha256_file(model_path)
+    assert report["pilot_only"] is True
+    assert report["production_promotion_allowed"] is False

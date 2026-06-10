@@ -423,7 +423,9 @@ def _build_transformer_model() -> Any:
                 self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
                 self.cls_token = nn.Parameter(torch.randn(1, 1, d_model))
                 self.head = nn.Sequential(
-                    nn.Linear(d_model, 64), nn.ReLU(), nn.Linear(64, num_classes), nn.Softmax(dim=1)
+                    nn.Linear(d_model, 64),
+                    nn.ReLU(),
+                    nn.Linear(64, num_classes),
                 )
 
             def forward(self, x: Any) -> Any:
@@ -493,7 +495,7 @@ def _tier3_predict(
 
         x = torch.from_numpy(seq).unsqueeze(0)  # (1, T, 5)
         with torch.no_grad():
-            proba = model(x).squeeze().numpy()
+            proba = torch.softmax(model(x), dim=1).squeeze().numpy()
 
         labels = [
             "neo_candidate", "known_object", "main_belt_asteroid",

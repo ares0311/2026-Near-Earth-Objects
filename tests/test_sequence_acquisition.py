@@ -238,6 +238,131 @@ def test_resume_rejects_changed_manifest(tmp_path: Path) -> None:
         )
 
 
+def test_manifest_rejects_duplicate_designations(tmp_path: Path) -> None:
+    """Duplicate labels must fail instead of silently shrinking a balanced pilot."""
+    module = _load_skill()
+    manifest = tmp_path / "labels.csv"
+    _write_manifest(
+        manifest,
+        [
+            ("duplicate", "neo_candidate"),
+            ("duplicate", "other_solar_system"),
+        ],
+    )
+
+    with pytest.raises(ValueError, match="duplicate designation"):
+        module._load_manifest_rows(manifest)
+
+
+def test_provider_errors_are_checkpointed_and_trip_circuit_breaker(
+    tmp_path: Path,
+) -> None:
+    """Repeated MPC failures should stop quickly with auditable query-error records."""
+    module = _load_skill()
+    manifest = tmp_path / "labels.csv"
+    output = tmp_path / "raw.json"
+    _write_manifest(
+        manifest,
+        [
+            ("neo-1", "neo_candidate"),
+            ("known-1", "known_object"),
+            ("mba-1", "main_belt_asteroid"),
+        ],
+    )
+
+    def failing_fetcher(
+        designation: str,
+        force_refresh: bool = False,
+    ) -> list[SimpleNamespace]:
+        """Simulate an unavailable provider without exposing request details."""
+        raise ConnectionError(f"provider unavailable for {designation}")
+
+    with pytest.raises(RuntimeError, match="2 consecutive provider errors"):
+        module.collect_sequence_dataset(
+            manifest,
+            output,
+            3,
+            retries=0,
+            query_delay_seconds=0,
+            max_consecutive_query_errors=2,
+            fetcher=failing_fetcher,
+        )
+
+    checkpoint = json.loads(output.read_text(encoding="utf-8"))
+    assert checkpoint["schema_version"] == "mpc-tracklet-sequences-v3"
+    assert [item["status"] for item in checkpoint["query_log"]] == [
+        "query_error",
+        "query_error",
+    ]
+    assert {item["error_type"] for item in checkpoint["query_log"]} == {
+        "ConnectionError"
+    }
+    assert checkpoint["safety"]["secret_values_recorded"] is False
+
+
+def test_target_per_class_uses_reserve_pool_and_stops_at_target(tmp_path: Path) -> None:
+    """Rejected candidates should be replaced from the same class reserve pool."""
+    module = _load_skill()
+    manifest = tmp_path / "labels.csv"
+    output = tmp_path / "raw.json"
+    _write_manifest(
+        manifest,
+        [
+            ("neo-short", "neo_candidate"),
+            ("known-short", "known_object"),
+            ("neo-good", "neo_candidate"),
+            ("known-good", "known_object"),
+            ("neo-unused", "neo_candidate"),
+            ("known-unused", "known_object"),
+        ],
+    )
+    calls: list[str] = []
+
+    def fetcher(designation: str, force_refresh: bool = False) -> list[SimpleNamespace]:
+        """Return empty histories for reserves ending in short."""
+        calls.append(designation)
+        return [] if designation.endswith("short") else _observations(designation)
+
+    dataset = module.collect_sequence_dataset(
+        manifest,
+        output,
+        6,
+        retries=0,
+        query_delay_seconds=0,
+        target_per_class=1,
+        fetcher=fetcher,
+    )
+
+    assert dataset["summary"]["target_met"] is True
+    assert dataset["summary"]["accepted_class_counts"] == {
+        "known_object": 1,
+        "neo_candidate": 1,
+    }
+    assert calls == ["neo-short", "known-short", "neo-good", "known-good"]
+
+
+def test_target_per_class_fails_when_reserve_pool_is_exhausted(tmp_path: Path) -> None:
+    """An undersized accepted set must stop before dataset preparation."""
+    module = _load_skill()
+    manifest = tmp_path / "labels.csv"
+    output = tmp_path / "raw.json"
+    _write_manifest(manifest, [("neo-short", "neo_candidate")])
+
+    with pytest.raises(RuntimeError, match="candidate pool exhausted"):
+        module.collect_sequence_dataset(
+            manifest,
+            output,
+            1,
+            retries=0,
+            query_delay_seconds=0,
+            target_per_class=1,
+            fetcher=lambda designation, force_refresh=False: [],
+        )
+
+    checkpoint = json.loads(output.read_text(encoding="utf-8"))
+    assert checkpoint["summary"]["target_met"] is False
+
+
 @pytest.mark.parametrize(
     ("rows", "message"),
     [
@@ -269,6 +394,8 @@ def test_manifest_validation_fails_closed(
         ("max_observations_per_object", 1, "max_observations_per_object"),
         ("retries", -1, "retries"),
         ("query_delay_seconds", -1, "query_delay_seconds"),
+        ("max_consecutive_query_errors", 0, "max_consecutive_query_errors"),
+        ("target_per_class", 0, "target_per_class"),
     ],
 )
 def test_collection_bounds_are_validated(

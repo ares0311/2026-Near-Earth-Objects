@@ -38,6 +38,10 @@ If the highest-priority T1 gap cannot be resolved because a human blocker is unr
 
 ## Standing Rules
 
+- Before switching branches or editing tracked files, check for
+  `Logs/tier3_pilot.active.json`. If present, do not alter the shared checkout
+  until the operator run exits and removes the marker.
+
 - **Always comment all code**: Every function, class, script, shell command, and non-trivial code block must include comments explaining what it does and why. This applies to all Python source files, all Skills scripts, all shell commands given to the operator, and all inline code snippets in documentation. No exceptions. This rule overrides any default behavior that would omit comments.
 - **caffeinate all long-running Mac commands**: Any operator command expected to run longer than ~30 seconds must be prefixed with `caffeinate -i` to prevent macOS from sleeping mid-run. This applies to all downloads, training runs, and pipeline executions. Example: `caffeinate -i python Skills/download_ztf_training_alerts.py ...`
 - **Operator always runs from main — no exceptions**: The operator's Mac always runs code from the `main` branch. Never instruct the operator to `git checkout` a feature branch or `git pull origin <feature-branch>`. Feature branch code must not be given to the operator to run until it is merged to main.
@@ -516,8 +520,8 @@ and excluded from CI.
 
 ## Current State (v0.87.0)
 
-All 10 pipeline modules are complete. The offline suite passes 3461 tests, with
-2 live/integration checks deselected and 2 existing skips. CI is expected to
+All 10 pipeline modules are complete. The offline suite passes 3475 tests, with
+2 live/integration checks deselected. CI is expected to
 remain green on Python 3.11 and 3.12 with the 100% coverage target. Background
 automation uses one unified CLI with top-level SQLite audit logs, offline
 readiness checks, live policy validation, no-secret credential inventories,
@@ -528,6 +532,12 @@ end-to-end run. Jerome W. Lindsey III approved the five-class label policy and
 a 50-sequence-per-class pilot on 2026-06-10. Acquisition and split tooling are
 implemented; the operator network run is pending and is not production
 approval.
+
+The first operator pilot attempt was retained as diagnostic evidence. Its
+200-row manifest contained 28 duplicate comet rows, reducing collection to 172
+unique objects, and its MPC checkpoint recorded 103 zero-result queries without
+distinguishing provider errors. Corrected uniqueness, provider-error circuit
+breaker, and held-out Tier 3 training-report gates must be merged before rerun.
 
 ### Skills
 
@@ -553,6 +563,7 @@ approval.
 | `Skills/build_cutout_dataset.py` | Convert ZTF alert JSON (base64 cutouts) to `.npz` + CSV index for Tier 2 CNN training |
 | `Skills/build_sequence_dataset.py` | Validate five classes, create designation-grouped splits, and tokenize Tier 3 sequences |
 | `Skills/fetch_alerce_artifact_sequences.py` | Acquire bounded public ALeRCE bogus-object histories for the Tier 3 artifact class |
+| `Skills/run_tier3_pilot.py` | One-command, fail-closed Tier 3 pilot with commit pinning, reserve pools, resumable checkpoints, and top-level SQLite stage logs |
 | `Skills/validate_mpc_report.py` | Validate MPC 80-column observation report files; CLI with `--json` flag |
 | `Skills/diagnose_pipeline.py` | Run each pipeline stage with synthetic data; report pass/fail per stage |
 | `Skills/compare_baselines.py` | Compare two injection-recovery JSON baselines; exits 1 on regression |
@@ -688,7 +699,7 @@ approval.
 - `score.py`: added `compute_batch_priority_stats(neos)` — dict: mean, std, min, max of discovery_priority; empty dict if no valid priorities.
 - `alert.py`: added `format_alert_pathway_summary(neos)` — multi-line text block with pathway counts and fractions sorted by frequency.
 - `calibration.py`: added `compute_negative_predictive_value(probs, labels, threshold=0.5)` — NPV = TN/(TN+FN); 0.0 for empty input or no negative predictions.
-- 3461 tests passing; 100% coverage target maintained; ruff + mypy clean.
+- 3475 tests passing; 100% coverage target maintained; ruff + mypy clean.
 - Version bumped to 0.87.0.
 
 ### Key Changes in v0.86.0

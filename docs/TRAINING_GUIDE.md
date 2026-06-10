@@ -184,54 +184,31 @@ read-only with respect to external services and produce checkpointed JSON
 evidence; they do not submit observations or generate impact probabilities.
 
 ```bash
-# Update main before running the approved read-only Tier 3 pilot.
+# Update merged main and install the public training clients.
 git pull origin main
-
-# Stop immediately if any acquisition or validation stage fails.
-set -euo pipefail
-
-# Confirm every stage uses the repository-local Python 3.14.3 environment.
-test "$(.venv/bin/python -c 'import platform; print(platform.python_version())')" = "3.14.3"
-.venv/bin/python --version
-
-# Install the public ALeRCE client used only by Tier 3 data acquisition.
 caffeinate -i .venv/bin/python -m pip install -e ".[training]"
 
-# Build 50 labels for each of the four MPC-backed classes.
-caffeinate -i .venv/bin/python Skills/generate_training_labels.py \
-    --tier3-pilot \
-    --limit 50 \
-    --output data/sequences/tier3_pilot_manifest.csv
+# Run the complete resumable pilot; every later stage is blocked on prior success.
+caffeinate -i .venv/bin/python Skills/run_tier3_pilot.py
 
-# Download bounded MPC histories for the 200 solar-system objects.
-caffeinate -i .venv/bin/python Skills/query_mpc_observations.py \
-    --labels-csv data/sequences/tier3_pilot_manifest.csv \
-    --output data/sequences/mpc_pilot.json \
-    --max-objects 200 \
-    --min-observations 3 \
-    --min-nights 2 \
-    --max-observations-per-object 20 \
-    --query-delay-seconds 1 \
-    --resume
-
-# Acquire 50 public broker-labeled multi-night ZTF artifact sequences.
-caffeinate -i .venv/bin/python Skills/fetch_alerce_artifact_sequences.py \
-    --output data/sequences/alerce_artifact_pilot.json \
-    --max-objects 50 \
-    --probability 0.90 \
-    --request-timeout-seconds 30 \
-    --request-attempts 3 \
-    --resume
-
-# Validate all five classes and emit designation-grouped model splits.
-.venv/bin/python Skills/build_sequence_dataset.py \
-    --input data/sequences/mpc_pilot.json \
-            data/sequences/alerce_artifact_pilot.json \
-    --output-dir data/sequences/pilot \
-    --min-per-class 50
+# Inspect the latest SQLite-backed run and stage outcomes.
+.venv/bin/python Skills/run_tier3_pilot.py --status
 ```
 
-The collector uses the authoritative
+The runner requires Python 3.14.3, a clean `main` checkout, and an unchanged git
+commit throughout the run. It creates `Logs/tier3_pilot.active.json` while
+active so coding agents do not switch the shared checkout underneath the
+operator. Every stage is recorded in `Logs/tier3_pilot.sqlite`; failure stops
+the workflow immediately and the same command resumes from atomic JSON
+checkpoints.
+
+The runner generates a reserve pool of 100 candidates for each MPC-backed class
+and requires 50 accepted sequences per class. Rejected or inadequate histories
+are replaced from the reserve instead of silently shrinking the pilot. ALeRCE
+candidate discovery uses small object-ID-ordered pages to avoid the expensive
+detection-count sort observed to time out on the public broker.
+
+The MPC collector uses the authoritative
 `astroquery.mpc.MPC.get_observations` history endpoint. It is bounded,
 rate-limited, retryable, and checkpointed after every designation. The output
 records the manifest SHA-256, provider, retrieval timestamps, class map, query
@@ -281,28 +258,36 @@ Each row is a flat tokenized tracklet: `tok_0_ra`, `tok_0_dec`, `tok_0_mag`,
 ### 5e. Train
 
 ```bash
-# Keep macOS awake during the operator-run training job.
-caffeinate -i python Skills/train_tier3_transformer.py \
-    --labels data/sequences/production/train.csv \
+# Keep macOS awake and train only from the prepared object-grouped splits.
+caffeinate -i .venv/bin/python Skills/train_tier3_transformer.py \
+    --train data/sequences/production/train.csv \
+    --validation data/sequences/production/calibration.csv \
+    --test data/sequences/production/test.csv \
     --epochs 30 \
-    --out models/tier3_transformer.pt
+    --out models/tier3_transformer.pt \
+    --report data/sequences/production/tier3_training_report.json
 ```
 
 Architecture (BERT-style encoder-only):
 - Linear embedding of (ra, dec, mag, jd, filter_id) per observation token
 - Sinusoidal positional encoding keyed on observation JD (not sequence index)
 - `n-layers` transformer encoder layers
-- CLS token pooled → Linear(d_model, 5) → Softmax over 5 hypotheses
+- CLS token pooled → Linear(d_model, 5) logits
+- Cross-entropy training on logits; softmax is applied only for inference
 
-Target: macro-F1 > 0.80 on held-out 20% split.
+The trainer selects the lowest-validation-loss checkpoint and evaluates it once
+on the untouched test split. Pilot acceptance requires validation accuracy
+≥ 0.85 and test macro-F1 ≥ 0.80. The report also records per-class recall,
+split/model SHA-256 hashes, class counts, and
+`production_promotion_allowed=false`; model training alone cannot bypass the
+production calibration KPI gate.
 
 ### 5f. Evaluate
 
 ```bash
-# Evaluate only against the untouched object-grouped test split.
-python Skills/evaluate_calibration.py \
-    --tier 3 \
-    --sequences data/sequences/production/test.csv
+# Inspect the machine-readable held-out metrics emitted by the trainer.
+.venv/bin/python -m json.tool \
+    data/sequences/production/tier3_training_report.json
 ```
 
 ---

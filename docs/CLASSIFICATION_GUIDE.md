@@ -96,15 +96,18 @@ Architecture:
 
 - Observation token: (RA, Dec, magnitude, time_offset, filter_id) → linear projection.
 - Standard encoder-only transformer (BERT-style) with sinusoidal positional encoding based on observation Julian Date.
-- CLS token output → 5-class softmax → `NEOPosterior`.
+- CLS token output → 5-class logits; inference softmax → `NEOPosterior`.
 
 Training data: MPC observation history exported via `Skills/build_sequence_dataset.py`.
 
 ```bash
-python Skills/train_tier3_transformer.py \
-    --sequence-csv data/sequences/tracklets.csv \
+caffeinate -i .venv/bin/python Skills/train_tier3_transformer.py \
+    --train data/sequences/production/train.csv \
+    --validation data/sequences/production/calibration.csv \
+    --test data/sequences/production/test.csv \
     --epochs 30 \
-    --output models/tier3_transformer.pt
+    --out models/tier3_transformer.pt \
+    --report data/sequences/production/tier3_training_report.json
 ```
 
 ---
