@@ -477,7 +477,7 @@ and excluded from CI.
 
 ## Current State (v0.87.0)
 
-All 10 pipeline modules are complete. The offline suite passes 3446 tests, with
+All 10 pipeline modules are complete. The offline suite passes 3447 tests, with
 2 live/integration checks deselected and 2 existing skips. CI is expected to
 remain green on Python 3.11 and 3.12 with the 100% coverage target. Tier 1 and
 Tier 2 were trained on real labeled data, but no real survey field has completed
