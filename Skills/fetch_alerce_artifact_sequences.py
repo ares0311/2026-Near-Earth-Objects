@@ -44,6 +44,60 @@ def _new_client() -> Any:
     return Alerce()
 
 
+def _configure_client_network(client: Any, request_timeout_seconds: float) -> None:
+    """Normalize the legacy ZTF endpoint and enforce a timeout on every request."""
+    if request_timeout_seconds <= 0:
+        raise ValueError("request_timeout_seconds must be positive")
+    legacy_client = getattr(client, "legacy_ztf_client", None)
+    if legacy_client is None:
+        return
+
+    # ALeRCE 2.3.0 combines a slash-terminated base with slash-prefixed routes.
+    # Removing the trailing slash avoids an unnecessary redirect on every call.
+    config = getattr(legacy_client, "config", None)
+    if isinstance(config, dict) and isinstance(config.get("ZTF_API_URL"), str):
+        config["ZTF_API_URL"] = config["ZTF_API_URL"].rstrip("/")
+
+    session = getattr(legacy_client, "session", None)
+    if session is None or not callable(getattr(session, "request", None)):
+        return
+    original_request = session.request
+
+    def request_with_timeout(method: str, url: str, **kwargs: Any) -> Any:
+        """Delegate to Requests while supplying the timeout omitted by ALeRCE."""
+        kwargs.setdefault("timeout", request_timeout_seconds)
+        return original_request(method, url, **kwargs)
+
+    session.request = request_with_timeout
+
+
+def _request_with_retries(
+    operation: Callable[..., Any],
+    *,
+    operation_name: str,
+    attempts: int,
+    retry_delay_seconds: float,
+    sleep_fn: Callable[[float], None],
+    args: tuple[Any, ...] = (),
+    kwargs: dict[str, Any] | None = None,
+) -> Any:
+    """Run one broker request with bounded retries and a useful final error."""
+    if attempts < 1:
+        raise ValueError("request attempts must be at least 1")
+    request_kwargs = kwargs or {}
+    for attempt in range(1, attempts + 1):
+        try:
+            return operation(*args, **request_kwargs)
+        except Exception as exc:
+            if attempt == attempts:
+                raise RuntimeError(
+                    f"{operation_name} failed after {attempts} attempts"
+                ) from exc
+            if retry_delay_seconds:
+                sleep_fn(retry_delay_seconds * attempt)
+    raise AssertionError("bounded retry loop exited unexpectedly")
+
+
 def _records(payload: Any) -> list[dict[str, Any]]:
     """Normalize ALeRCE list and paginated JSON response shapes."""
     if isinstance(payload, list):
@@ -121,6 +175,8 @@ def _new_dataset(
     max_objects: int,
     probability: float,
     class_name: str,
+    request_timeout_seconds: float,
+    request_attempts: int,
 ) -> dict[str, Any]:
     """Create the versioned, secret-free ALeRCE acquisition envelope."""
     now = _utc_now()
@@ -135,6 +191,8 @@ def _new_dataset(
             "class_name": class_name,
             "minimum_probability": probability,
             "requested_object_count": max_objects,
+            "request_timeout_seconds": request_timeout_seconds,
+            "request_attempts": request_attempts,
         },
         "safety": {
             "external_submission_enabled": False,
@@ -144,6 +202,8 @@ def _new_dataset(
         "summary": {},
         "entries": [],
         "query_log": [],
+        "candidate_pages": [],
+        "acquisition_errors": [],
     }
 
 
@@ -170,6 +230,9 @@ def collect_artifact_sequences(
     min_nights: int = 2,
     max_observations_per_object: int = 20,
     query_delay_seconds: float = 0.25,
+    request_timeout_seconds: float = 30.0,
+    request_attempts: int = 3,
+    max_candidate_pages: int = 10,
     resume: bool = False,
     client_factory: Callable[[], Any] = _new_client,
     sleep_fn: Callable[[float], None] = time.sleep,
@@ -185,6 +248,10 @@ def collect_artifact_sequences(
         raise ValueError("max_observations_per_object cannot be below min_observations")
     if query_delay_seconds < 0:
         raise ValueError("query_delay_seconds cannot be negative")
+    if request_timeout_seconds <= 0:
+        raise ValueError("request_timeout_seconds must be positive")
+    if request_attempts < 1 or max_candidate_pages < 1:
+        raise ValueError("request attempts and candidate pages must be at least 1")
 
     if resume and output_json.exists():
         dataset = json.loads(output_json.read_text(encoding="utf-8"))
@@ -196,82 +263,159 @@ def collect_artifact_sequences(
             or source.get("minimum_probability") != probability
         ):
             raise ValueError("existing output uses different ALeRCE label criteria")
+        dataset.setdefault("candidate_pages", [])
+        dataset.setdefault("acquisition_errors", [])
     else:
-        dataset = _new_dataset(max_objects, probability, class_name)
+        dataset = _new_dataset(
+            max_objects,
+            probability,
+            class_name,
+            request_timeout_seconds,
+            request_attempts,
+        )
 
     client = client_factory()
-    # Request more candidates than required because arc-quality gates reject some objects.
-    payload = client.query_objects(
-        survey="ztf",
-        classifier="stamp_classifier",
-        class_name=class_name,
-        probability=probability,
-        order_by="ndet",
-        order_mode="DESC",
-        page_size=min(max(max_objects * 20, 100), 1000),
-        format="json",
-    )
-    objects = _records(payload)
+    _configure_client_network(client, request_timeout_seconds)
     completed = {item["oid"] for item in dataset["query_log"]}
     accepted = {entry["designation"] for entry in dataset["entries"]}
+    _update_summary(dataset, max_objects)
+    # Write the envelope before the first request so even connection failures
+    # leave durable, secret-free evidence for diagnosis and a subsequent resume.
+    _atomic_write_json(output_json, dataset)
 
-    for item in objects:
+    # Query modest pages because the ordered classifier join can be expensive
+    # for the public broker. Pagination still provides a bounded candidate pool.
+    page_size = min(max(max_objects * 4, 100), 250)
+    for page in range(1, max_candidate_pages + 1):
         if len(accepted) >= max_objects:
             break
-        oid = str(item.get("oid", "")).strip()
-        if not oid or oid in completed:
-            continue
-        detections = _records(client.query_detections(oid, survey="ztf", format="json"))
-        observations = [
-            observation
-            for detection in detections
-            if (observation := _serialize_detection(oid, detection)) is not None
-        ]
-        observations = _sample_full_arc(observations, max_observations_per_object)
-        night_count = _night_count(observations)
-        status = "accepted"
-        if len(observations) < min_observations:
-            status = "insufficient_observations"
-        elif night_count < min_nights:
-            status = "insufficient_nights"
+        try:
+            payload = _request_with_retries(
+                client.query_objects,
+                operation_name=f"ALeRCE object page {page}",
+                attempts=request_attempts,
+                retry_delay_seconds=query_delay_seconds,
+                sleep_fn=sleep_fn,
+                kwargs={
+                    "survey": "ztf",
+                    "classifier": "stamp_classifier",
+                    "class_name": class_name,
+                    "probability": probability,
+                    "order_by": "ndet",
+                    "order_mode": "DESC",
+                    "page": page,
+                    "page_size": page_size,
+                    "format": "json",
+                },
+            )
+        except RuntimeError as exc:
+            dataset["acquisition_errors"].append(
+                {
+                    "operation": "query_objects",
+                    "page": page,
+                    "error_type": type(exc.__cause__).__name__,
+                    "failed_at_utc": _utc_now(),
+                }
+            )
+            _update_summary(dataset, max_objects)
+            _atomic_write_json(output_json, dataset)
+            raise
 
-        dataset["query_log"].append(
+        objects = _records(payload)
+        dataset["candidate_pages"].append(
             {
-                "oid": oid,
-                "status": status,
-                "observation_count": len(observations),
-                "night_count": night_count,
+                "page": page,
+                "returned_objects": len(objects),
                 "queried_at_utc": _utc_now(),
             }
         )
-        completed.add(oid)
-        if status == "accepted":
-            dataset["entries"].append(
+        _atomic_write_json(output_json, dataset)
+        if not objects:
+            break
+
+        for item in objects:
+            if len(accepted) >= max_objects:
+                break
+            oid = str(item.get("oid", "")).strip()
+            if not oid or oid in completed:
+                continue
+            try:
+                detection_payload = _request_with_retries(
+                    client.query_detections,
+                    operation_name=f"ALeRCE detections for {oid}",
+                    attempts=request_attempts,
+                    retry_delay_seconds=query_delay_seconds,
+                    sleep_fn=sleep_fn,
+                    args=(oid,),
+                    kwargs={"survey": "ztf", "format": "json"},
+                )
+                detections = _records(detection_payload)
+                observations = [
+                    observation
+                    for detection in detections
+                    if (observation := _serialize_detection(oid, detection)) is not None
+                ]
+                observations = _sample_full_arc(
+                    observations,
+                    max_observations_per_object,
+                )
+                night_count = _night_count(observations)
+                status = "accepted"
+                if len(observations) < min_observations:
+                    status = "insufficient_observations"
+                elif night_count < min_nights:
+                    status = "insufficient_nights"
+            except RuntimeError as exc:
+                observations = []
+                night_count = 0
+                status = "query_error"
+                dataset["acquisition_errors"].append(
+                    {
+                        "operation": "query_detections",
+                        "oid": oid,
+                        "error_type": type(exc.__cause__).__name__,
+                        "failed_at_utc": _utc_now(),
+                    }
+                )
+
+            dataset["query_log"].append(
                 {
-                    "designation": oid,
-                    "label": ARTIFACT_LABEL,
-                    "class_name": "stellar_artifact",
-                    "label_source": "ALeRCE_stamp_classifier",
-                    "label_basis": (
-                        f"ALeRCE stamp_classifier={class_name}, probability>={probability}"
-                    ),
-                    "sequence_window": "full",
+                    "oid": oid,
+                    "status": status,
                     "observation_count": len(observations),
                     "night_count": night_count,
-                    "observations": observations,
-                    "provenance": {
-                        "provider": "ALeRCE public ZTF broker",
-                        "retrieval_client": "alerce.core.Alerce",
-                        "retrieved_at_utc": _utc_now(),
-                    },
+                    "queried_at_utc": _utc_now(),
                 }
             )
-            accepted.add(oid)
+            completed.add(oid)
+            if status == "accepted":
+                dataset["entries"].append(
+                    {
+                        "designation": oid,
+                        "label": ARTIFACT_LABEL,
+                        "class_name": "stellar_artifact",
+                        "label_source": "ALeRCE_stamp_classifier",
+                        "label_basis": (
+                            f"ALeRCE stamp_classifier={class_name}, "
+                            f"probability>={probability}"
+                        ),
+                        "sequence_window": "full",
+                        "observation_count": len(observations),
+                        "night_count": night_count,
+                        "observations": observations,
+                        "provenance": {
+                            "provider": "ALeRCE public ZTF broker",
+                            "retrieval_client": "alerce.core.Alerce",
+                            "retrieved_at_utc": _utc_now(),
+                        },
+                    }
+                )
+                accepted.add(oid)
 
-        _update_summary(dataset, max_objects)
-        _atomic_write_json(output_json, dataset)
-        if query_delay_seconds:
-            sleep_fn(query_delay_seconds)
+            _update_summary(dataset, max_objects)
+            _atomic_write_json(output_json, dataset)
+            if query_delay_seconds:
+                sleep_fn(query_delay_seconds)
 
     _update_summary(dataset, max_objects)
     _atomic_write_json(output_json, dataset)
@@ -296,6 +440,9 @@ def main() -> None:
     parser.add_argument("--min-nights", type=int, default=2)
     parser.add_argument("--max-observations-per-object", type=int, default=20)
     parser.add_argument("--query-delay-seconds", type=float, default=0.25)
+    parser.add_argument("--request-timeout-seconds", type=float, default=30.0)
+    parser.add_argument("--request-attempts", type=int, default=3)
+    parser.add_argument("--max-candidate-pages", type=int, default=10)
     parser.add_argument("--resume", action="store_true")
     args = parser.parse_args()
     dataset = collect_artifact_sequences(
@@ -307,6 +454,9 @@ def main() -> None:
         min_nights=args.min_nights,
         max_observations_per_object=args.max_observations_per_object,
         query_delay_seconds=args.query_delay_seconds,
+        request_timeout_seconds=args.request_timeout_seconds,
+        request_attempts=args.request_attempts,
+        max_candidate_pages=args.max_candidate_pages,
         resume=args.resume,
     )
     print(json.dumps(dataset["summary"], indent=2, sort_keys=True))

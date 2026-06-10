@@ -113,6 +113,27 @@ def test_tier3_manifest_fails_closed_when_a_class_is_short(
         module.build_tier3_pilot_manifest(1)
 
 
+def test_other_solar_system_fetch_overfetches_after_unusable_row() -> None:
+    """Comet acquisition should retain the target after blank rows are filtered."""
+    module = _load_skill("generate_training_labels.py")
+    captured: dict[str, Any] = {}
+
+    def query_objects(target_type: str, *, limit: int) -> list[dict[str, Any]]:
+        """Return one blank row followed by enough usable confirmed comets."""
+        captured["target_type"] = target_type
+        captured["limit"] = limit
+        return [
+            {"designation": ""},
+            {"designation": "1P", "absolute_magnitude": 10.0},
+            {"designation": "2P", "absolute_magnitude": 11.0},
+        ]
+
+    rows = module.fetch_other_solar_system_rows(2, query_objects=query_objects)
+
+    assert captured == {"target_type": "comet", "limit": 12}
+    assert [row["designation"] for row in rows] == ["1P", "2P"]
+
+
 class _FakeAlerce:
     """Return deterministic public-broker shapes without network access."""
 
@@ -120,6 +141,7 @@ class _FakeAlerce:
         """Return one object that satisfies the configured bogus query."""
         assert kwargs["survey"] == "ztf"
         assert kwargs["classifier"] == "stamp_classifier"
+        assert kwargs["page"] == 1
         return [{"oid": "ZTF-test-artifact"}]
 
     def query_detections(self, oid: str, **kwargs: Any) -> list[dict[str, Any]]:
@@ -159,6 +181,79 @@ def test_alerce_artifact_collection_records_safe_provenance(tmp_path: Path) -> N
     assert dataset["entries"][0]["observations"][0]["mission"] == "ZTF"
     assert dataset["safety"]["external_submission_enabled"] is False
     assert "password" not in output.read_text(encoding="utf-8").lower()
+
+
+class _FailingAlerce:
+    """Raise a network-like error so bounded retry evidence can be inspected."""
+
+    def query_objects(self, **kwargs: Any) -> list[dict[str, Any]]:
+        """Fail every candidate request without contacting the public broker."""
+        raise TimeoutError("offline timeout")
+
+
+def test_alerce_failure_is_bounded_and_checkpointed(tmp_path: Path) -> None:
+    """An initial broker timeout should leave resumable, secret-free evidence."""
+    module = _load_skill("fetch_alerce_artifact_sequences.py")
+    output = tmp_path / "artifacts.json"
+    sleeps: list[float] = []
+
+    with pytest.raises(RuntimeError, match="after 2 attempts"):
+        module.collect_artifact_sequences(
+            output,
+            1,
+            query_delay_seconds=0.5,
+            request_attempts=2,
+            client_factory=_FailingAlerce,
+            sleep_fn=sleeps.append,
+        )
+
+    checkpoint = json.loads(output.read_text(encoding="utf-8"))
+    assert sleeps == [0.5]
+    assert checkpoint["summary"]["accepted_objects"] == 0
+    assert checkpoint["acquisition_errors"][0]["error_type"] == "TimeoutError"
+    assert checkpoint["safety"]["secret_values_recorded"] is False
+
+
+def test_alerce_client_network_configuration_normalizes_and_times_out() -> None:
+    """The ALeRCE 2.3 legacy client should avoid redirects and bound requests."""
+    module = _load_skill("fetch_alerce_artifact_sequences.py")
+    calls: list[tuple[str, str, dict[str, Any]]] = []
+
+    class Session:
+        """Capture delegated request arguments for timeout verification."""
+
+        def request(self, method: str, url: str, **kwargs: Any) -> str:
+            """Record one synthetic request and return a sentinel response."""
+            calls.append((method, url, kwargs))
+            return "ok"
+
+    class LegacyClient:
+        """Provide the ALeRCE attributes modified by the network hardener."""
+
+        def __init__(self) -> None:
+            """Create the slash-terminated URL shape shipped by ALeRCE 2.3."""
+            self.config = {"ZTF_API_URL": "https://api.example/v1/"}
+            self.session = Session()
+
+    class Client:
+        """Expose one legacy client through the public ALeRCE attribute."""
+
+        def __init__(self) -> None:
+            """Create the nested legacy client used by the compatibility API."""
+            self.legacy_ztf_client = LegacyClient()
+
+    client = Client()
+    module._configure_client_network(client, 12.5)
+    response = client.legacy_ztf_client.session.request(
+        "GET",
+        "https://api.example/v1/objects",
+    )
+
+    assert client.legacy_ztf_client.config["ZTF_API_URL"] == "https://api.example/v1"
+    assert response == "ok"
+    assert calls == [
+        ("GET", "https://api.example/v1/objects", {"timeout": 12.5})
+    ]
 
 
 def test_prepare_sequence_splits_is_balanced_and_leak_free(tmp_path: Path) -> None:

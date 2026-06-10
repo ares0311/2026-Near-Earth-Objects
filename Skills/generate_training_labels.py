@@ -28,7 +28,9 @@ import csv
 import io
 import json
 import sys
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import requests
 
@@ -316,11 +318,23 @@ def _catalog_value(row: object, *names: str, default: object = "") -> object:
     return default
 
 
-def fetch_other_solar_system_rows(limit: int) -> list[dict]:
-    """Fetch confirmed comet records for the approved other-solar-system class."""
-    from astroquery.mpc import MPC  # type: ignore[import]
+def fetch_other_solar_system_rows(
+    limit: int,
+    *,
+    query_objects: Callable[..., Any] | None = None,
+) -> list[dict]:
+    """Fetch enough usable confirmed comets for the other-solar-system class."""
+    if limit < 1:
+        raise ValueError("limit must be at least 1")
+    if query_objects is None:
+        from astroquery.mpc import MPC  # type: ignore[import]
 
-    result = MPC.query_objects("comet", limit=limit)
+        query_objects = MPC.query_objects
+
+    # MPC rows can omit every supported designation field, so fetch a bounded
+    # surplus and retain exactly the approved number of usable catalog records.
+    query_limit = max(limit * 2, limit + 10)
+    result = query_objects("comet", limit=query_limit)
     rows: list[dict] = []
     for row in result:
         designation = str(

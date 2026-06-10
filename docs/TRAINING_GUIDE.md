@@ -187,6 +187,13 @@ evidence; they do not submit observations or generate impact probabilities.
 # Update main before running the approved read-only Tier 3 pilot.
 git pull origin main
 
+# Stop immediately if any acquisition or validation stage fails.
+set -euo pipefail
+
+# Confirm every stage uses the repository-local Python 3.14.3 environment.
+test "$(.venv/bin/python -c 'import platform; print(platform.python_version())')" = "3.14.3"
+.venv/bin/python --version
+
 # Install the public ALeRCE client used only by Tier 3 data acquisition.
 caffeinate -i .venv/bin/python -m pip install -e ".[training]"
 
@@ -212,6 +219,8 @@ caffeinate -i .venv/bin/python Skills/fetch_alerce_artifact_sequences.py \
     --output data/sequences/alerce_artifact_pilot.json \
     --max-objects 50 \
     --probability 0.90 \
+    --request-timeout-seconds 30 \
+    --request-attempts 3 \
     --resume
 
 # Validate all five classes and emit designation-grouped model splits.
