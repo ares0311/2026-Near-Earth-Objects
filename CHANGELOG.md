@@ -28,7 +28,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   machine-readable evidence report.
 - Added the optional `training` dependency group for the ALeRCE client and
   refreshed the lockfile.
-- 3454 offline tests pass; 2 live checks deselected; ruff and mypy clean.
+- 3456 offline tests pass; 2 live checks deselected; ruff and mypy clean.
 
 ## v0.87.0 — Option B Cleanup + Production Readiness (2026-06-05)
 

@@ -26,7 +26,7 @@ The following work is done and must NOT be repeated:
 | `calibration.py` | test_calibration.py | 100% |
 
 ### Infrastructure
-- 3454 offline tests pass; 2 live checks deselected; `ruff` clean; `mypy` clean
+- 3456 offline tests pass; 2 live checks deselected; `ruff` clean; `mypy` clean
 - Background automation CLI (`Skills/background.py`) with SQLite audit logs
 - 90+ Skills scripts for batch operations, export, diagnostics, visualization
 - 30+ documentation files covering all pipeline stages
