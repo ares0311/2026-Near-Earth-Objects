@@ -1178,6 +1178,16 @@ class TestBuildObservationWindowDefaultEndJd:
 
 
 class TestFetchMpcObservations:
+    def test_row_value_skips_absent_named_columns(self):
+        """Column fallback should skip names absent from an Astropy row schema."""
+        from fetch import _mpc_row_value
+
+        row = MagicMock()
+        row.colnames = ["JD"]
+        row.__getitem__ = MagicMock(side_effect=lambda key: {"JD": 2460000.5}[key])
+
+        assert _mpc_row_value(row, "epoch", "JD") == 2460000.5
+
     def test_returns_list_on_import_error(self):
         from unittest.mock import patch
 
