@@ -477,14 +477,14 @@ and excluded from CI.
 
 ## Current State (v0.87.0)
 
-All 10 pipeline modules are complete. The offline suite passes 3461 tests, with
-2 live/integration checks deselected and 2 existing skips. CI is expected to
+All 10 pipeline modules are complete. The offline suite passes 3466 tests, with
+2 live/integration checks deselected. CI is expected to
 remain green on Python 3.11 and 3.12 with the 100% coverage target. Tier 1 and
 Tier 2 were trained on real labeled data, but no real survey field has completed
 the full pipeline and no internally detected object has been externally reported.
 
 **Production gap status (as of 2026-06-10)**:
-- T1-A (Incomplete Trained ML Model Set): IN PROGRESS. **Tier 2 CNN trained — val_loss=0.258, val_acc=91.3%**; `models/tier2_cnn.pt` committed. **Tier 1 XGBoost trained — val_acc=99.95%, macro AUC=1.000**; `models/tier1_xgb.json` committed (13946ea). Jerome W. Lindsey III approved the five-class label policy and a 50-sequence-per-class pilot on 2026-06-10. Policy-aware MPC acquisition, public ALeRCE artifact acquisition, five-class validation, and grouped split tooling are implemented; the operator network run, Tier 3 training, and calibration evaluation remain pending.
+- T1-A (Incomplete Trained ML Model Set): IN PROGRESS. **Tier 2 CNN trained — val_loss=0.258, val_acc=91.3%**; `models/tier2_cnn.pt` committed. **Tier 1 XGBoost trained — val_acc=99.95%, macro AUC=1.000**; `models/tier1_xgb.json` committed (13946ea). Jerome W. Lindsey III approved the five-class label policy and a 50-sequence-per-class pilot on 2026-06-10. The first pilot attempt exposed duplicate comet labels and suppressed MPC provider failures; corrected fail-closed acquisition and held-out Tier 3 training evidence are required before the operator rerun, Tier 3 training, and calibration evaluation.
 - T1-B (No Live Credentials): CLOSED. ATLAS and ZTF live connections confirmed OK via macOS Keychain bridge (`source Skills/verify_live_credentials.sh`). Automated live dry-run policy sign-off pending.
 - T1-C (No Real End-to-End Run): BLOCKED on T1-B automated approval.
 - T1-D (No Ensemble Calibration): BLOCKED on T1-A. Promotion will be determined

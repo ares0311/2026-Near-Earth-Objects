@@ -119,18 +119,19 @@ def test_other_solar_system_fetch_overfetches_after_unusable_row() -> None:
     captured: dict[str, Any] = {}
 
     def query_objects(target_type: str, *, limit: int) -> list[dict[str, Any]]:
-        """Return one blank row followed by enough usable confirmed comets."""
+        """Return duplicate/blank rows followed by enough usable confirmed comets."""
         captured["target_type"] = target_type
         captured["limit"] = limit
         return [
             {"designation": ""},
+            {"designation": "1P", "absolute_magnitude": 10.0},
             {"designation": "1P", "absolute_magnitude": 10.0},
             {"designation": "2P", "absolute_magnitude": 11.0},
         ]
 
     rows = module.fetch_other_solar_system_rows(2, query_objects=query_objects)
 
-    assert captured == {"target_type": "comet", "limit": 12}
+    assert captured == {"target_type": "comet", "limit": 52}
     assert [row["designation"] for row in rows] == ["1P", "2P"]
 
 
@@ -311,3 +312,85 @@ def test_validation_rejects_missing_five_class_minimum() -> None:
 
     with pytest.raises(ValueError, match="five-class minimum"):
         module.validate_entries([_entry("neo_candidate", 0)], min_per_class=1)
+
+
+def _write_training_split(path: Path) -> None:
+    """Write five balanced two-token examples for trainer evidence tests."""
+    import csv
+
+    token_columns = [
+        f"tok_{time_index}_{feature_index}"
+        for time_index in range(2)
+        for feature_index in range(5)
+    ]
+    fieldnames = ["designation", "class_name", *token_columns, "label"]
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        for label, class_name in enumerate(
+            [
+                "neo_candidate",
+                "known_object",
+                "main_belt_asteroid",
+                "stellar_artifact",
+                "other_solar_system",
+            ]
+        ):
+            row = {column: "0.1" for column in token_columns}
+            row.update(
+                {
+                    "designation": f"{class_name}-1",
+                    "class_name": class_name,
+                    "label": str(label),
+                }
+            )
+            writer.writerow(row)
+
+
+def test_tier3_training_emits_held_out_evidence(tmp_path: Path) -> None:
+    """Training should save the best checkpoint and transparent pilot metrics."""
+    import torch.nn as nn
+
+    module = _load_skill("train_tier3_transformer.py")
+    train_csv = tmp_path / "train.csv"
+    validation_csv = tmp_path / "validation.csv"
+    test_csv = tmp_path / "test.csv"
+    for path in (train_csv, validation_csv, test_csv):
+        _write_training_split(path)
+
+    class TinySequenceModel(nn.Module):
+        """Provide a fast trainable model with the production logits contract."""
+
+        def __init__(self) -> None:
+            """Create one mean-pooled linear five-class classifier."""
+            super().__init__()
+            self.linear = nn.Linear(5, 5)
+
+        def forward(self, sequence: Any) -> Any:
+            """Return logits for one variable-length sequence."""
+            return self.linear(sequence.mean(dim=1))
+
+    model_path = tmp_path / "tier3.pt"
+    report_path = tmp_path / "training_report.json"
+    report = module.train(
+        train_csv,
+        validation_csv,
+        test_csv,
+        epochs=1,
+        out_path=model_path,
+        report_path=report_path,
+        model_factory=TinySequenceModel,
+    )
+
+    assert model_path.exists()
+    assert report_path.exists()
+    assert report["best_epoch"] == 1
+    assert set(report["test"]) == {
+        "accuracy",
+        "loss",
+        "macro_f1",
+        "per_class_recall",
+    }
+    assert report["model_sha256"] == module._sha256_file(model_path)
+    assert report["pilot_only"] is True
+    assert report["production_promotion_allowed"] is False

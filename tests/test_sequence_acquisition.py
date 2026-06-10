@@ -238,6 +238,68 @@ def test_resume_rejects_changed_manifest(tmp_path: Path) -> None:
         )
 
 
+def test_manifest_rejects_duplicate_designations(tmp_path: Path) -> None:
+    """Duplicate labels must fail instead of silently shrinking a balanced pilot."""
+    module = _load_skill()
+    manifest = tmp_path / "labels.csv"
+    _write_manifest(
+        manifest,
+        [
+            ("duplicate", "neo_candidate"),
+            ("duplicate", "other_solar_system"),
+        ],
+    )
+
+    with pytest.raises(ValueError, match="duplicate designation"):
+        module._load_manifest_rows(manifest)
+
+
+def test_provider_errors_are_checkpointed_and_trip_circuit_breaker(
+    tmp_path: Path,
+) -> None:
+    """Repeated MPC failures should stop quickly with auditable query-error records."""
+    module = _load_skill()
+    manifest = tmp_path / "labels.csv"
+    output = tmp_path / "raw.json"
+    _write_manifest(
+        manifest,
+        [
+            ("neo-1", "neo_candidate"),
+            ("known-1", "known_object"),
+            ("mba-1", "main_belt_asteroid"),
+        ],
+    )
+
+    def failing_fetcher(
+        designation: str,
+        force_refresh: bool = False,
+    ) -> list[SimpleNamespace]:
+        """Simulate an unavailable provider without exposing request details."""
+        raise ConnectionError(f"provider unavailable for {designation}")
+
+    with pytest.raises(RuntimeError, match="2 consecutive provider errors"):
+        module.collect_sequence_dataset(
+            manifest,
+            output,
+            3,
+            retries=0,
+            query_delay_seconds=0,
+            max_consecutive_query_errors=2,
+            fetcher=failing_fetcher,
+        )
+
+    checkpoint = json.loads(output.read_text(encoding="utf-8"))
+    assert checkpoint["schema_version"] == "mpc-tracklet-sequences-v3"
+    assert [item["status"] for item in checkpoint["query_log"]] == [
+        "query_error",
+        "query_error",
+    ]
+    assert {item["error_type"] for item in checkpoint["query_log"]} == {
+        "ConnectionError"
+    }
+    assert checkpoint["safety"]["secret_values_recorded"] is False
+
+
 @pytest.mark.parametrize(
     ("rows", "message"),
     [
@@ -269,6 +331,7 @@ def test_manifest_validation_fails_closed(
         ("max_observations_per_object", 1, "max_observations_per_object"),
         ("retries", -1, "retries"),
         ("query_delay_seconds", -1, "query_delay_seconds"),
+        ("max_consecutive_query_errors", 0, "max_consecutive_query_errors"),
     ],
 )
 def test_collection_bounds_are_validated(

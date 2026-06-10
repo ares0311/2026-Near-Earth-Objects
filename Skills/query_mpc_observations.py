@@ -34,7 +34,7 @@ if str(PYTHONPATH_SRC) not in sys.path:
 
 from fetch import fetch_mpc_observations  # noqa: E402
 
-SCHEMA_VERSION = "mpc-tracklet-sequences-v2"
+SCHEMA_VERSION = "mpc-tracklet-sequences-v3"
 LABEL_MAP = {
     "neo_candidate": 0,
     "known_object": 1,
@@ -130,8 +130,10 @@ def _load_manifest_rows(labels_csv: Path) -> list[dict[str, str]]:
     for row in rows:
         designation = str(row.get("designation", "")).strip()
         class_name = str(row.get("neo_class", "")).strip()
-        if not designation or designation in seen:
+        if not designation:
             continue
+        if designation in seen:
+            raise ValueError(f"duplicate designation in label manifest: {designation}")
         if class_name not in LABEL_MAP:
             raise ValueError(f"unsupported neo_class for {designation}: {class_name}")
         seen.add(designation)
@@ -139,6 +141,15 @@ def _load_manifest_rows(labels_csv: Path) -> list[dict[str, str]]:
     if not validated:
         raise ValueError("label manifest contains no usable unique designations")
     return validated
+
+
+def _strict_fetcher(designation: str, force_refresh: bool = False) -> list[Any]:
+    """Fetch one MPC history while preserving provider failures for audit logs."""
+    return fetch_mpc_observations(
+        designation,
+        force_refresh=force_refresh,
+        raise_on_error=True,
+    )
 
 
 def _balanced_selection(rows: list[dict[str, str]], max_objects: int) -> list[dict[str, str]]:
@@ -282,8 +293,9 @@ def collect_sequence_dataset(
     max_observations_per_object: int = 20,
     retries: int = 2,
     query_delay_seconds: float = 1.0,
+    max_consecutive_query_errors: int = 3,
     resume: bool = False,
-    fetcher: Callable[..., list[Any]] = fetch_mpc_observations,
+    fetcher: Callable[..., list[Any]] = _strict_fetcher,
     sleep_fn: Callable[[float], None] = time.sleep,
 ) -> dict[str, Any]:
     """Collect a bounded, resumable MPC sequence dataset for Tier 3 training."""
@@ -297,6 +309,8 @@ def collect_sequence_dataset(
         raise ValueError("retries cannot be negative")
     if query_delay_seconds < 0:
         raise ValueError("query_delay_seconds cannot be negative")
+    if max_consecutive_query_errors < 1:
+        raise ValueError("max_consecutive_query_errors must be at least 1")
 
     rows = _load_manifest_rows(labels_csv)
     selected = _balanced_selection(rows, max_objects)
@@ -310,6 +324,7 @@ def collect_sequence_dataset(
         dataset = _new_dataset(labels_csv, selected)
 
     accepted = {entry["designation"] for entry in dataset["entries"]}
+    consecutive_query_errors = 0
     for index, row in enumerate(selected):
         designation = row["designation"]
         if designation in accepted:
@@ -317,9 +332,15 @@ def collect_sequence_dataset(
 
         observations: list[Any] = []
         attempts = 0
+        provider_error: Exception | None = None
         for attempt in range(retries + 1):
             attempts = attempt + 1
-            observations = fetcher(designation, force_refresh=attempt > 0)
+            try:
+                observations = fetcher(designation, force_refresh=attempt > 0)
+                provider_error = None
+            except Exception as exc:
+                provider_error = exc
+                observations = []
             if observations:
                 break
             if attempt < retries and query_delay_seconds:
@@ -335,7 +356,9 @@ def collect_sequence_dataset(
         )
         n_nights = _night_count(observations)
         status = "accepted"
-        if len(observations) < min_observations:
+        if provider_error is not None:
+            status = "query_error"
+        elif len(observations) < min_observations:
             status = "insufficient_observations"
         elif n_nights < min_nights:
             status = "insufficient_nights"
@@ -351,6 +374,7 @@ def collect_sequence_dataset(
                 "night_count": n_nights,
                 "sequence_window": sequence_window,
                 "queried_at_utc": _utc_now(),
+                "error_type": type(provider_error).__name__ if provider_error else None,
             }
         )
         if status == "accepted":
@@ -379,6 +403,16 @@ def collect_sequence_dataset(
 
         _update_summary(dataset, len(selected))
         _atomic_write_json(output_json, dataset)
+        if status == "query_error":
+            consecutive_query_errors += 1
+            if consecutive_query_errors >= max_consecutive_query_errors:
+                raise RuntimeError(
+                    "MPC acquisition stopped after "
+                    f"{consecutive_query_errors} consecutive provider errors; "
+                    f"inspect {output_json}"
+                ) from provider_error
+        else:
+            consecutive_query_errors = 0
         if index < len(selected) - 1 and query_delay_seconds:
             sleep_fn(query_delay_seconds)
 
@@ -412,6 +446,7 @@ def main() -> None:
     parser.add_argument("--max-observations-per-object", type=int, default=20)
     parser.add_argument("--retries", type=int, default=2)
     parser.add_argument("--query-delay-seconds", type=float, default=1.0)
+    parser.add_argument("--max-consecutive-query-errors", type=int, default=3)
     parser.add_argument("--resume", action="store_true")
     args = parser.parse_args()
 
@@ -428,6 +463,7 @@ def main() -> None:
             max_observations_per_object=args.max_observations_per_object,
             retries=args.retries,
             query_delay_seconds=args.query_delay_seconds,
+            max_consecutive_query_errors=args.max_consecutive_query_errors,
             resume=args.resume,
         )
         print(json.dumps(dataset["summary"], indent=2, sort_keys=True))

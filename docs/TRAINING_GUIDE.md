@@ -281,28 +281,36 @@ Each row is a flat tokenized tracklet: `tok_0_ra`, `tok_0_dec`, `tok_0_mag`,
 ### 5e. Train
 
 ```bash
-# Keep macOS awake during the operator-run training job.
-caffeinate -i python Skills/train_tier3_transformer.py \
-    --labels data/sequences/production/train.csv \
+# Keep macOS awake and train only from the prepared object-grouped splits.
+caffeinate -i .venv/bin/python Skills/train_tier3_transformer.py \
+    --train data/sequences/production/train.csv \
+    --validation data/sequences/production/calibration.csv \
+    --test data/sequences/production/test.csv \
     --epochs 30 \
-    --out models/tier3_transformer.pt
+    --out models/tier3_transformer.pt \
+    --report data/sequences/production/tier3_training_report.json
 ```
 
 Architecture (BERT-style encoder-only):
 - Linear embedding of (ra, dec, mag, jd, filter_id) per observation token
 - Sinusoidal positional encoding keyed on observation JD (not sequence index)
 - `n-layers` transformer encoder layers
-- CLS token pooled → Linear(d_model, 5) → Softmax over 5 hypotheses
+- CLS token pooled → Linear(d_model, 5) logits
+- Cross-entropy training on logits; softmax is applied only for inference
 
-Target: macro-F1 > 0.80 on held-out 20% split.
+The trainer selects the lowest-validation-loss checkpoint and evaluates it once
+on the untouched test split. Pilot acceptance requires validation accuracy
+≥ 0.85 and test macro-F1 ≥ 0.80. The report also records per-class recall,
+split/model SHA-256 hashes, class counts, and
+`production_promotion_allowed=false`; model training alone cannot bypass the
+production calibration KPI gate.
 
 ### 5f. Evaluate
 
 ```bash
-# Evaluate only against the untouched object-grouped test split.
-python Skills/evaluate_calibration.py \
-    --tier 3 \
-    --sequences data/sequences/production/test.csv
+# Inspect the machine-readable held-out metrics emitted by the trainer.
+.venv/bin/python -m json.tool \
+    data/sequences/production/tier3_training_report.json
 ```
 
 ---

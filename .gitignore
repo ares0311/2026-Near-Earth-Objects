@@ -9,6 +9,8 @@ models/*
 !models/*.json
 data/cutouts/
 data/ztf_labeled_alerts.json
+# Operator-generated Tier 3 acquisition, split, and training evidence.
+data/sequences/
 .mypy_cache/
 .pytest_cache/
 *.egg-info/

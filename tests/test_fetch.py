@@ -1245,6 +1245,27 @@ class TestFetchMpcObservations:
             result = fetch_mpc_observations("unknown_xyz_test_999")
         assert result == []
 
+    def test_strict_mode_reraises_provider_exception(self):
+        """Audited acquisition must distinguish provider failure from no observations."""
+        from unittest.mock import MagicMock, patch
+
+        from fetch import fetch_mpc_observations
+
+        mock_mpc_cls = MagicMock()
+        mock_mpc_cls.get_observations.side_effect = ConnectionError("network error")
+        mock_mpc_mod = MagicMock()
+        mock_mpc_mod.MPC = mock_mpc_cls
+
+        with (
+            patch.dict("sys.modules", {"astroquery.mpc": mock_mpc_mod}),
+            pytest.raises(ConnectionError, match="network error"),
+        ):
+            fetch_mpc_observations(
+                "strict_provider_failure_test",
+                force_refresh=True,
+                raise_on_error=True,
+            )
+
     def test_returns_list_type(self):
         # Call with a designation unlikely to be cached; result is always list
         from unittest.mock import patch
