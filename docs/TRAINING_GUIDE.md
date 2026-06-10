@@ -104,7 +104,10 @@ python Skills/batch_score.py data/training_labels.csv --train
 python Skills/evaluate_calibration.py --tier 1 --labels data/training_labels.csv
 ```
 
-Expected output: Brier score < 0.10, ECE < 0.05 on held-out 20% split.
+Production promotion uses the complete fail-closed KPI gate in
+`docs/PRODUCTION_READINESS.md`, not a human review. At minimum, evaluation must
+use held-out real labeled data and satisfy the documented Brier, ECE, log-loss,
+AUC, cross-validation stability, and bootstrap-confidence thresholds.
 
 ### 3d. Feature importances
 
@@ -158,26 +161,73 @@ curve.  Target: AUC > 0.95, Brier score < 0.08.
 
 ## Step 5 — Tier 3: Transformer on Tracklet Sequences
 
-### 5a. Build the sequence dataset
+### 5a. Acquire the versioned raw sequence dataset
 
 ```bash
+# Run from merged `main`; this is a long network job, so keep macOS awake.
+caffeinate -i .venv/bin/python Skills/query_mpc_observations.py \
+    --labels-csv data/training_labels.csv \
+    --output data/sequences/mpc_raw_sequences.json \
+    --max-objects 1000 \
+    --min-observations 3 \
+    --min-nights 2 \
+    --query-delay-seconds 1 \
+    --resume
+```
+
+The collector uses the authoritative
+`astroquery.mpc.MPC.get_observations` history endpoint. It is bounded,
+rate-limited, retryable, and checkpointed after every designation. The output
+records the manifest SHA-256, provider, retrieval timestamps, class map, query
+outcomes, and explicit safety flags. It never submits observations, stores
+credentials, or generates an impact probability.
+
+The current `data/training_labels.csv` contains only `neo_candidate` and
+`main_belt_asteroid` rows. It is sufficient to exercise MPC sequence retrieval,
+but it cannot qualify the five-class production model by itself.
+
+### 5b. Raw-data acceptance contract
+
+Before building model inputs, the raw dataset must satisfy all of these checks:
+
+- All five labels are represented: `neo_candidate`, `known_object`,
+  `main_belt_asteroid`, `stellar_artifact`, and `other_solar_system`.
+- At least 200 independent object sequences exist per class.
+- Every accepted sequence contains at least three observations on at least two
+  UTC nights.
+- Designations are unique, observation IDs are unique within each sequence,
+  and coordinates, Julian dates, magnitudes, and filters pass schema checks.
+- Train, calibration, and test splits are grouped by designation so one object
+  cannot leak across splits.
+- MPC histories provide cataloged solar-system sequences. Real ZTF
+  alert/tracklet labels are additionally required for artifact and
+  candidate/known-object discrimination; MPC histories alone cannot supply a
+  scientifically valid `stellar_artifact` class.
+- The source manifest hash and retrieval provenance are retained with every
+  derived dataset and model report.
+
+Any missing class, failed validation, or unknown provenance blocks Tier 3
+training and production promotion.
+
+### 5c. Build the flat token dataset
+
+```bash
+# Convert an accepted raw dataset into padded Transformer input rows.
 python Skills/build_sequence_dataset.py \
-    data/sample_tracklets.json \
-    --out data/sequences.csv
+    --input data/sequences/mpc_raw_sequences.json \
+    --output data/sequences/train.csv
 ```
 
 Each row is a flat tokenized tracklet: `tok_0_ra`, `tok_0_dec`, `tok_0_mag`,
 `tok_0_jd`, `tok_0_filter`, `tok_1_ra`, … up to `max_seq_len` observations.
 
-### 5b. Train
+### 5d. Train
 
 ```bash
-python Skills/train_tier3_transformer.py \
-    --sequences data/sequences.csv \
+# Keep macOS awake during the operator-run training job.
+caffeinate -i python Skills/train_tier3_transformer.py \
+    --labels data/sequences/train.csv \
     --epochs 30 \
-    --d-model 128 \
-    --n-heads 4 \
-    --n-layers 3 \
     --out models/tier3_transformer.pt
 ```
 
@@ -189,10 +239,11 @@ Architecture (BERT-style encoder-only):
 
 Target: macro-F1 > 0.80 on held-out 20% split.
 
-### 5c. Evaluate
+### 5e. Evaluate
 
 ```bash
-python Skills/evaluate_calibration.py --tier 3 --sequences data/sequences.csv
+# Evaluate only against the untouched object-grouped test split.
+python Skills/evaluate_calibration.py --tier 3 --sequences data/sequences/test.csv
 ```
 
 ---

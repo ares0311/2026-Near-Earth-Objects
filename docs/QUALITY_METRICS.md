@@ -206,6 +206,29 @@ A large std relative to mean indicates overfitting to the training split.
 **Interpretation**: 95% bootstrap confidence interval for the chosen metric.
 Use to decide whether two calibrators are statistically different.
 
+### 6.6 Production Calibration Promotion Gate
+
+Production promotion is automatic and fail-closed; it does not require a human
+calibration review. The evaluation set must contain at least 1,000 held-out real
+labeled examples, including at least 200 positive and 200 negative examples.
+Every KPI must pass:
+
+| KPI | Production threshold |
+|---|---|
+| Brier score | < 0.10 |
+| ECE, 10 equal-width bins | < 0.05 |
+| Log loss | < 0.50 |
+| ROC AUC | > 0.95 |
+| Five-fold mean ECE | < 0.05 |
+| Five-fold ECE standard deviation | ≤ 0.02 |
+| Bootstrap 95% Brier upper bound | < 0.12 |
+| Bootstrap 95% ECE upper bound | < 0.07 |
+
+Missing metrics count as failures. A machine-readable report must record dataset
+provenance, model hashes, calibrator method, metric values, thresholds, and
+`promotion_gate_passed`. Reliability diagrams are retained for audit evidence
+but do not determine approval.
+
 ---
 
 ## 7. Classification Quality

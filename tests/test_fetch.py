@@ -1178,6 +1178,16 @@ class TestBuildObservationWindowDefaultEndJd:
 
 
 class TestFetchMpcObservations:
+    def test_row_value_skips_absent_named_columns(self):
+        """Column fallback should skip names absent from an Astropy row schema."""
+        from fetch import _mpc_row_value
+
+        row = MagicMock()
+        row.colnames = ["JD"]
+        row.__getitem__ = MagicMock(side_effect=lambda key: {"JD": 2460000.5}[key])
+
+        assert _mpc_row_value(row, "epoch", "JD") == 2460000.5
+
     def test_returns_list_on_import_error(self):
         from unittest.mock import patch
 
@@ -1280,7 +1290,7 @@ class TestFetchMpcObservationsCacheHit:
         assert len(result) == 1
 
     def test_successful_mpc_query_and_cache(self, tmp_path, monkeypatch):
-        """Cover the successful astroquery path (lines 638-656)."""
+        """Parse current Astroquery columns and persist deterministic observations."""
         from unittest.mock import MagicMock, patch
 
         import fetch as fetch_mod
@@ -1290,16 +1300,15 @@ class TestFetchMpcObservationsCacheHit:
         desig = "433_eros_full_path_test"
 
         mock_row = MagicMock()
+        mock_row.colnames = ["epoch", "RA", "DEC", "mag", "band", "observatory"]
         mock_row.__getitem__ = MagicMock(side_effect=lambda k: {
-            "number": "433",
+            "epoch": 2460000.5,
             "RA": 180.0,
-            "Dec": 5.0,
-            "JD": 2460000.5,
-        }.get(k, None))
-        mock_row.get = MagicMock(side_effect=lambda k, default=None: {
+            "DEC": 5.0,
             "mag": 18.5,
             "band": "V",
-        }.get(k, default))
+            "observatory": "500",
+        }.get(k, None))
 
         mock_table = MagicMock()
         mock_table.__iter__ = MagicMock(return_value=iter([mock_row]))
@@ -1312,7 +1321,47 @@ class TestFetchMpcObservationsCacheHit:
 
         with patch.dict("sys.modules", {"astroquery.mpc": mock_mpc_mod}):
             result = fetch_mod.fetch_mpc_observations(desig)
-        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0].ra_deg == 180.0
+        assert result[0].dec_deg == 5.0
+        assert result[0].jd == 2460000.5
+        assert result[0].filter_band == "V"
+        assert result[0].obs_id.startswith("MPC_")
+        mock_mpc_cls.get_observations.assert_called_once_with(desig, cache=True)
+
+    def test_force_refresh_bypasses_both_cache_layers(self, tmp_path, monkeypatch):
+        """Force refresh must ignore disk data and disable Astroquery caching."""
+        from unittest.mock import MagicMock, patch
+
+        import fetch as fetch_mod
+
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        desig = "433_force_refresh_test"
+        cache_key = hashlib.md5(f"mpc_obs_{desig}".encode()).hexdigest()
+        fetch_mod._save_cache(
+            cache_key,
+            [
+                {
+                    "obs_id": "stale",
+                    "ra_deg": 1.0,
+                    "dec_deg": 1.0,
+                    "jd": 2460000.5,
+                    "mag": 20.0,
+                    "mag_err": 0.1,
+                    "filter_band": "V",
+                    "mission": "MPC",
+                }
+            ],
+        )
+        mock_mpc_cls = MagicMock()
+        mock_mpc_cls.get_observations.return_value = []
+        mock_mpc_mod = MagicMock(MPC=mock_mpc_cls)
+
+        with patch.dict("sys.modules", {"astroquery.mpc": mock_mpc_mod}):
+            result = fetch_mod.fetch_mpc_observations(desig, force_refresh=True)
+
+        assert result == []
+        mock_mpc_cls.get_observations.assert_called_once_with(desig, cache=False)
 
 
 class TestFetchMpcObservationsEdgeCases:

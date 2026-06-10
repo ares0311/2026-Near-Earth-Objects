@@ -456,6 +456,10 @@ and excluded from CI.
 - Store scoring model version and observation provenance with every result
 - Prefer conservative classifications; when uncertain, flag for human review
 - The alert protocol is non-negotiable and must be followed in full
+- Production calibration promotion is quantitative and fail-closed. Apply the
+  KPI gate in `docs/PRODUCTION_READINESS.md` to held-out real labeled data;
+  reliability diagrams provide supporting evidence but do not require human
+  calibration approval.
 
 ---
 
@@ -473,13 +477,18 @@ and excluded from CI.
 
 ## Current State (v0.87.0)
 
-All 10 pipeline modules are complete. Default collection finds 3432 non-live tests plus 2 deselected live/integration checks. CI is expected to remain green on Python 3.11 & 3.12 with the 100% coverage target. All pipeline code runs on synthetic/mocked data with 100% coverage; no real NEO has ever been processed.
+All 10 pipeline modules are complete. The offline suite passes 3447 tests, with
+2 live/integration checks deselected and 2 existing skips. CI is expected to
+remain green on Python 3.11 and 3.12 with the 100% coverage target. Tier 1 and
+Tier 2 were trained on real labeled data, but no real survey field has completed
+the full pipeline and no internally detected object has been externally reported.
 
 **Production gap status (as of 2026-06-07)**:
-- T1-A (No Trained ML Weights): IN PROGRESS. **Tier 2 CNN trained — val_loss=0.258, val_acc=91.3%**; `models/tier2_cnn.pt` committed. **Tier 1 XGBoost trained — val_acc=99.95%, macro AUC=1.000**; `models/tier1_xgb.json` committed (13946ea). Tier 3 Transformer still untrained; calibration evaluation pending.
+- T1-A (Incomplete Trained ML Model Set): IN PROGRESS. **Tier 2 CNN trained — val_loss=0.258, val_acc=91.3%**; `models/tier2_cnn.pt` committed. **Tier 1 XGBoost trained — val_acc=99.95%, macro AUC=1.000**; `models/tier1_xgb.json` committed (13946ea). Tier 3 Transformer still untrained; calibration evaluation pending.
 - T1-B (No Live Credentials): CLOSED. ATLAS and ZTF live connections confirmed OK via macOS Keychain bridge (`source Skills/verify_live_credentials.sh`). Automated live dry-run policy sign-off pending.
 - T1-C (No Real End-to-End Run): BLOCKED on T1-B automated approval.
-- T1-D (No Ensemble Calibration): BLOCKED on T1-A.
+- T1-D (No Ensemble Calibration): BLOCKED on T1-A. Promotion will be determined
+  by the production calibration KPI gate, not a human calibration review.
 See `docs/PRODUCTION_READINESS.md` for the full gap register.
 
 ### Skills
@@ -526,7 +535,7 @@ See `docs/PRODUCTION_READINESS.md` for the full gap register.
 | `Skills/compute_orbital_energy.py` | Batch orbital energy computation; bound/parabolic/hyperbolic label; `--json` flag |
 | `Skills/assess_survey_coverage.py` | Survey field coverage report (area, limiting mag, source count, fields per night); `--json` flag |
 | `Skills/grade_tracklets.py` | Batch-grade tracklets from JSON (A/B/C/D) using arc, nights, and astrometric RMS; `--json` flag |
-| `Skills/query_mpc_observations.py` | Query MPC observation history for a designation; prints table or JSON |
+| `Skills/query_mpc_observations.py` | Inspect one MPC history or collect a bounded, resumable, versioned Tier 3 raw sequence dataset |
 | `Skills/compute_threat_scores.py` | Batch-compute threat scores for ScoredNEOs from JSON; `--threshold` and `--json` flags |
 | `Skills/fetch_atlas_data.py` | Fetch ATLAS forced photometry for a sky position; `--token`, `--force-refresh`, `--json` flags |
 | `Skills/plot_calibration.py` | Plot reliability diagram from scored NEO or prob/label JSON; saves PNG; prints Brier/ECE/log-loss |

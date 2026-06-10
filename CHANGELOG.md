@@ -5,6 +5,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+- Replaced the obsolete human calibration-review requirement with a
+  quantitative, fail-closed production promotion gate covering held-out sample
+  size, Brier score, ECE, log loss, ROC AUC, cross-validation stability, and
+  bootstrap confidence bounds.
+- Synchronized the production roadmap with the current repository state:
+  credentials, Tier 1 XGBoost, Tier 2 CNN, and the 10,000-alert ZTF dataset are
+  complete; real Tier 3 multi-night sequence data remains pending.
+- Added bounded, rate-limited, retryable, resumable MPC observation-history
+  acquisition for Tier 3, with atomic checkpoints, manifest hashing, provider
+  provenance, query outcomes, and explicit no-submission/no-secret safety flags.
+- Corrected MPC observation parsing for current Astroquery `epoch` and `DEC`
+  columns while retaining compatibility with older fixtures.
+
 ## v0.87.0 — Option B Cleanup + Production Readiness (2026-06-05)
 
 ### Removed

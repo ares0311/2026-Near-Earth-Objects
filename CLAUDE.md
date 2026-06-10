@@ -49,6 +49,10 @@ If the highest-priority T1 gap cannot be resolved because a human blocker is unr
 - **Alert protocol is sacred**: The NASA/MPC alert pathway (see §Alert Protocol) must never be triggered on unconfirmed detections. Require independent confirmation first.
 - **Dead code must be removed, not tested**: If a function or class has no reachable callers, delete it rather than adding a test.
 - **Conservative by default**: When uncertain about classification, flag for human review. Never output "confirmed NEO" for internally detected objects.
+- **Calibration promotion is KPI-based**: Production calibration is approved only
+  when the quantitative gate in `docs/PRODUCTION_READINESS.md` passes on held-out
+  real labeled data. Reliability diagrams are evidence artifacts, not a human
+  approval gate. Any failed or missing KPI blocks promotion.
 
 ---
 
@@ -512,7 +516,15 @@ and excluded from CI.
 
 ## Current State (v0.87.0)
 
-All 10 pipeline modules are complete. Default collection finds 3467 non-live tests plus 2 deselected live/integration checks. CI is expected to remain green on Python 3.11 & 3.12 with the 100% coverage target. Background automation uses one unified CLI with automated offline scheduling readiness, live policy contract validation, provider-specific live readiness summaries, no-secret credential inventories with env/Keychain source reporting, no-secret live-policy approval checklist/report writing, offline scoring metrics KPI report writing, no-network live dry-run approval bundles, operator handoff exports, persisted operator handoff logs, persisted blueprint compliance summaries, persisted operations snapshots, internal signoff packets, packet-linked signoff decisions, packet-decision readiness summaries, background SQLite schema status and migration preview/reporting, schema operations triage, operator next-action summaries, internal follow-up disposition summaries, top-level SQLite logs for runs, readiness checks, approval bundles, no-network live dry-run plans, mock-only provider execution attempts, and auditable signoff readiness. Public APIs now extend through v0.76.0 with expanded calibration, orbit dynamics, survey statistics, alert packaging, schema summaries, conservative candidate-priority helpers, background blueprint auditing, operations snapshots, signoff packets, packet-linked signoff decisions, packet-decision readiness, SQLite schema status, migration preview, schema operations triage, operator next-action guidance, internal disposition reporting for signed fixture follow-ups, sanitized credential inventory report writing, no-secret live-policy approval checklist/report writing, and offline scoring metrics KPI report writing for split live-smoke approval preparation.
+All 10 pipeline modules are complete. The offline suite passes 3447 tests, with
+2 live/integration checks deselected and 2 existing skips. CI is expected to
+remain green on Python 3.11 and 3.12 with the 100% coverage target. Background
+automation uses one unified CLI with top-level SQLite audit logs, offline
+readiness checks, live policy validation, no-secret credential inventories,
+approval bundles, operator handoffs, and fail-closed signoff readiness. Tier 1
+and Tier 2 weights are trained; production remains blocked on the Tier 3
+five-class sequence dataset, ensemble calibration, and a supervised real
+end-to-end run.
 
 ### Skills
 
@@ -557,7 +569,7 @@ All 10 pipeline modules are complete. Default collection finds 3467 non-live tes
 | `Skills/flag_comet_candidates.py` | Combined Tisserand + eccentricity comet-candidate flag; `--threshold`, `--min-ecc`, `--json` flags |
 | `Skills/assess_survey_coverage.py` | Survey field coverage report (area, limiting mag, source count, fields per night); `--json` flag |
 | `Skills/grade_tracklets.py` | Batch-grade tracklets from JSON (A/B/C/D) using arc, nights, and astrometric RMS; `--json` flag |
-| `Skills/query_mpc_observations.py` | Query MPC observation history for a designation; prints table or JSON |
+| `Skills/query_mpc_observations.py` | Inspect one MPC history or collect a bounded, resumable, versioned Tier 3 raw sequence dataset |
 | `Skills/fetch_atlas_data.py` | Fetch ATLAS forced photometry for a sky position; `--token`, `--force-refresh`, `--json` flags |
 | `Skills/plot_calibration.py` | Plot reliability diagram from scored NEO or prob/label JSON; saves PNG; prints Brier/ECE/log-loss |
 | `Skills/export_survey_summary.py` | Export per-candidate detection summary from pipeline run JSON to CSV or HTML |
@@ -672,7 +684,7 @@ All 10 pipeline modules are complete. Default collection finds 3467 non-live tes
 - `score.py`: added `compute_batch_priority_stats(neos)` — dict: mean, std, min, max of discovery_priority; empty dict if no valid priorities.
 - `alert.py`: added `format_alert_pathway_summary(neos)` — multi-line text block with pathway counts and fractions sorted by frequency.
 - `calibration.py`: added `compute_negative_predictive_value(probs, labels, threshold=0.5)` — NPV = TN/(TN+FN); 0.0 for empty input or no negative predictions.
-- 3467 tests passing; 100% coverage maintained; ruff + mypy clean.
+- 3447 tests passing; 100% coverage target maintained; ruff + mypy clean.
 - Version bumped to 0.87.0.
 
 ### Key Changes in v0.86.0

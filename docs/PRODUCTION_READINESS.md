@@ -1,7 +1,7 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
 **Current version**: v0.87.0  
-**Last updated**: 2026-06-06  
+**Last updated**: 2026-06-09
 **Purpose**: Mandatory read at session start (per MANDATORY SESSION-START PROTOCOL).  
 Every planning cycle must name the highest-priority unresolved Tier 1 gap and show how proposed steps close or directly unblock it.
 
@@ -26,7 +26,7 @@ The following work is done and must NOT be repeated:
 | `calibration.py` | test_calibration.py | 100% |
 
 ### Infrastructure
-- 3467 unit tests; all pass; `ruff` clean; `mypy` clean
+- 3447 offline tests pass; 2 live checks deselected; `ruff` clean; `mypy` clean
 - Background automation CLI (`Skills/background.py`) with SQLite audit logs
 - 90+ Skills scripts for batch operations, export, diagnostics, visualization
 - 30+ documentation files covering all pipeline stages
@@ -37,7 +37,10 @@ The following work is done and must NOT be repeated:
 - Conservative scoring model with log-likelihood framework and calibrated posteriors
 
 ### What "complete" means here
-All modules compile, pass 100% branch coverage, and produce correct output **on synthetic/mocked data**. No real NEO has ever been processed. No real survey data has been ingested. No trained model weights exist.
+All modules compile, pass 100% branch coverage, and produce correct output
+**on synthetic/mocked pipeline data**. Real labeled ZTF alerts have been used
+to train Tier 1 and Tier 2, but no real survey field has completed the full
+pipeline and the Tier 3 production model is not trained.
 
 ---
 
@@ -45,22 +48,25 @@ All modules compile, pass 100% branch coverage, and produce correct output **on 
 
 These gaps prevent the pipeline from being safely or usefully operated on real sky data. They are ordered by priority; the **highest-priority gap is listed first**.
 
-### T1-A: No Trained ML Model Weights (HIGHEST PRIORITY)
+### T1-A: Incomplete Trained ML Model Set (HIGHEST PRIORITY)
 
-**What is missing**: The three-tier ML classifier has no trained weights.  
-- Tier 1 (XGBoost): `classify.py` initializes untrained models. `CandidateFeatures` are populated but the XGBoost decision function returns random/prior scores until trained on real labeled data.  
-- Tier 2 (CNN): **WEIGHTS TRAINED 2026-06-06.** `models/tier2_cnn.pt` saved locally (needs commit to repo). Trained on 10,000 real ZTF Avro alerts (8,000 train / 2,000 val); best val_loss=0.258, val_acc=91.3% at 20 epochs. Needs calibration evaluation before alert gate use.  
+**What is missing**: The three-tier ML classifier is not yet complete.
+- Tier 1 (XGBoost): **WEIGHTS TRAINED AND COMMITTED.** `models/tier1_xgb.json`; validation accuracy 99.95%, macro AUC 1.000.
+- Tier 2 (CNN): **WEIGHTS TRAINED AND COMMITTED.** `models/tier2_cnn.pt`; trained on 10,000 real ZTF Avro alerts (8,000 train / 2,000 validation); best validation loss 0.258 and validation accuracy 91.3% at 20 epochs. Needs calibration evaluation before alert-gate use.
 - Tier 3 (Transformer): `train_tier3_transformer.py` exists but no token CSV from real MPC tracklet sequences has been built. No `models/tier3_transformer.pt` file exists.  
 
-**Why it is Tier 1**: Without trained weights, every candidate scores at prior probability (~5% NEO). The pipeline cannot distinguish real NEOs from artifacts on live data. All downstream hazard flags and alert pathways are meaningless without this.
+**Why it is Tier 1**: Without the real multi-night sequence dataset and trained
+Tier 3 weights, the intended production ensemble is incomplete. Downstream
+calibration and alert-gate qualification cannot be completed.
 
 **Progress as of 2026-06-06**:
 - `data/ztf_labeled_alerts.json`: 10,000 real ZTF Avro alerts downloaded from public archive (ztf.uw.edu); cutouts decompressed from gzip-FITS to raw float32. ✓
 - `data/cutouts/`: 10,000 `.npz` cutout triplets (science, reference, difference) + `index.csv`. ✓
 - `data/training_labels.csv`: 1000 MPC labels (500 neo_candidate + 500 main_belt_asteroid). ✓
-- `models/tier2_cnn.pt`: CNN trained — val_loss=0.258, val_acc=91.3%, 20 epochs; 8,588 real / 1,412 bogus; inverse-frequency class weights. ✓ (local only; needs commit)
+- `models/tier2_cnn.pt`: CNN trained — val_loss=0.258, val_acc=91.3%, 20 epochs; 8,588 real / 1,412 bogus; inverse-frequency class weights. ✓ Committed.
 - `models/tier1_xgb.json`: XGBoost trained — val_acc=99.95%, macro AUC=1.000, 11,100 examples (8,880 train / 2,220 val); class-weighted; 300 estimators, max_depth=5. ✓ Committed to repo at commit 13946ea.
-- **Still needed**: Tier 3 Transformer training; calibration evaluation (Brier < 0.10, ECE < 0.05).
+- **Still needed**: A five-class real sequence dataset, Tier 3 Transformer
+  training, and the complete production calibration KPI evaluation.
 
 **What is needed to close it**:
 1. [DONE] Download 10,000 labeled ZTF Avro alerts via `Skills/download_ztf_training_alerts.py`.
@@ -68,13 +74,28 @@ These gaps prevent the pipeline from being safely or usefully operated on real s
 3. [DONE] `Skills/build_cutout_dataset.py` — 10,000 `.npz` cutout triplets built.
 4. [DONE] `Skills/train_tier2_cnn.py` — `models/tier2_cnn.pt` saved; val_acc=91.3%.
 5. [DONE] Commit `models/tier2_cnn.pt` to repo (`.gitignore` updated to allow `models/*.pt`).
-6. [CODE] Run `Skills/build_sequence_dataset.py` on MPC tracklet data to produce flat token CSV for Tier 3.
-7. [HUMAN] Run `caffeinate -i python Skills/train_tier3_transformer.py` to produce `models/tier3_transformer.pt`.
-8. [DONE] Tier 1 XGBoost trained — val_acc=99.95%, macro AUC=1.000; `models/tier1_xgb.json` saved.
-9. [DONE] Commit `models/tier1_xgb.json` to repo (committed at 13946ea).
-10. [CODE + HUMAN] Evaluate with `Skills/evaluate_calibration.py`; require Brier < 0.10 and ECE < 0.05 before approval.
+6. [CODE] Use the bounded, resumable
+   `Skills/query_mpc_observations.py --labels-csv ...` collector to acquire
+   versioned MPC histories with source hashes, query logs, and safety flags.
+7. [DATA + HUMAN] Complete the five-class sequence manifest. The current
+   1,000-row manifest covers only `neo_candidate` and
+   `main_belt_asteroid`; MPC histories cannot provide a valid
+   `stellar_artifact` class. Real ZTF labeled tracklets are required.
+8. [CODE] Validate the raw-data contract, create designation-grouped
+   train/calibration/test splits, and build the flat token CSVs.
+9. [HUMAN] Run the long Tier 3 training command under `caffeinate -i` to
+   produce `models/tier3_transformer.pt`.
+10. [DONE] Tier 1 XGBoost trained — val_acc=99.95%, macro AUC=1.000;
+    `models/tier1_xgb.json` saved and committed at 13946ea.
+11. [CODE] Evaluate with `Skills/evaluate_calibration.py` and apply the
+    production calibration KPI gate defined under T1-D. Promotion is automatic
+    only when every required KPI passes.
 
-**Blocking outside step**: Steps 7–9 require human action (training runs, expert calibration review).
+**Blocking outside step**: Step 7 requires human partnership to approve and
+assemble authoritative labels for the three missing/ambiguous classes. Step 9
+requires an operator-run training job on the available compute hardware.
+Calibration promotion itself has no human-review dependency; it is controlled
+by the quantitative T1-D gate.
 
 ---
 
@@ -101,13 +122,16 @@ Credentials are stored in macOS Keychain under `neo-detection:ATLAS_TOKEN`, `neo
 **Why it is Tier 1**: Synthetic data cannot expose real failure modes — coordinate edge cases, survey-specific format quirks, real noise distributions, real artifact morphologies, or real rate-limiting behavior. The pipeline's real-world correctness is unknown until it processes real data.
 
 **What is needed to close it**:
-1. [DEPENDS ON T1-B] Obtain live credentials (T1-B must be resolved first).
+1. [DEPENDS ON T1-B] Complete the automated live-review policy approval; the
+   credentials and manual provider connection tests are already complete.
 2. [CODE] Run `Skills/run_pipeline.py` on a small real ZTF field (e.g., 1-degree cone, single night) in dry-run mode.
 3. [CODE + HUMAN] Manually inspect pipeline output against MPC known objects in that field; verify ≥90% known-object recovery rate.
 4. [CODE] Run `Skills/check_mpc_known.py` on pipeline output to audit cross-match completeness.
 5. [HUMAN] Human expert reviews candidate output for any false positives that passed all gates.
 
-**Blocking outside step**: T1-B must be resolved first. Step 5 requires human expert review.
+**Blocking outside step**: The automated live-review policy must be approved
+first. Step 5 requires human expert review of candidate false positives; this
+is separate from calibration promotion.
 
 ---
 
@@ -119,12 +143,29 @@ Credentials are stored in macOS Keychain under `neo-detection:ATLAS_TOKEN`, `neo
 
 **What is needed to close it**:
 1. [DEPENDS ON T1-A] Trained model weights must exist first (T1-A).
-2. [CODE] Run `Skills/evaluate_calibration.py` on held-out labeled data.
-3. [CODE] Run `Skills/plot_calibration.py` to generate reliability diagrams.
-4. [HUMAN] Human expert must review reliability diagrams and approve calibration quality before live alert gates are armed.
-5. [CODE] If calibration fails (ECE > 0.05), apply isotonic regression recalibration and re-evaluate.
+2. [DATA] Use a held-out real labeled evaluation set that was not used for
+   model fitting or calibrator fitting. Require at least 1,000 examples,
+   including at least 200 positive and 200 negative examples.
+3. [CODE] Run `Skills/evaluate_calibration.py` and
+   `Skills/plot_calibration.py`. The reliability diagram is retained as an
+   auditable evidence artifact; it is not a human approval step.
+4. [KPI] Require every production calibration KPI below to pass:
+   - Brier score < 0.10.
+   - ECE < 0.05 using 10 equal-width bins.
+   - Log loss < 0.50.
+   - ROC AUC > 0.95.
+   - Five-fold cross-validation mean ECE < 0.05 with standard deviation ≤ 0.02.
+   - Bootstrap 95% upper confidence bound < 0.12 for Brier score and < 0.07 for ECE.
+5. [CODE] Emit a machine-readable calibration report containing dataset
+   provenance, model hashes, calibrator method, all KPI values, thresholds, and
+   a single `promotion_gate_passed` boolean.
+6. [FAIL CLOSED] If any KPI is missing or fails, keep alert gates unarmed,
+   apply Platt or isotonic recalibration as appropriate, and rerun the complete
+   gate. No metric may be waived manually.
 
-**Blocking outside step**: T1-A must be resolved first. Step 4 requires human expert review and sign-off.
+**Blocking outside step**: T1-A must be resolved first and a sufficiently sized
+held-out real labeled dataset must exist. There is no human calibration-review
+or sign-off requirement.
 
 ---
 
@@ -163,11 +204,11 @@ CI currently runs only unit tests. There is no CI job for:
 
 **Needed**: Add CI job definitions (`.github/workflows/`) for integration and end-to-end test stages, gated on secret availability.
 
-### T2-E: AGENTS.md Is Outdated
+### T2-E: Session-Start Documents Synchronized — **CLOSED 2026-06-09**
 
-`AGENTS.md` currently shows `Current State (v0.76.0)` and does not list any Skills, Docs, or Key Changes added in v0.77.0–v0.87.0. This means the mandatory session-start read of `AGENTS.md` provides a stale picture of the codebase.
-
-**Needed**: Update `AGENTS.md` to v0.87.0 to match `CLAUDE.md`. This is a documentation-sync task that directly supports the mandatory session-start protocol and does not require new code.
+`AGENTS.md`, `CLAUDE.md`, `README.md`, and this gap register now agree on the
+trained-weight state, live-credential state, Tier 3 blocker, calibration KPI
+gate, and current offline test result.
 
 ---
 
@@ -177,13 +218,8 @@ These items cannot be completed by code generation alone. They require real-worl
 
 | Blocker | Owner | Unblocks |
 |---|---|---|
-| IRSA account + API token | Human operator | T1-B, T1-C, T2-A |
-| ATLAS forced-photometry token | Human operator | T1-B, T1-C, T2-A |
-| ZTF real/bogus labeled dataset (~100K alerts) | Human operator (download from IRSA) | T1-A |
-| MPC confirmed NEO + MBA catalog download | Human operator (network access) | T1-A |
-| GPU or CPU training run for Tier 2 CNN | Human operator (compute resource) | T1-A |
+| Five-class real MPC/ZTF sequence manifest and data | Human operator (label-source approval and network/data access) | T1-A Tier 3 |
 | GPU or CPU training run for Tier 3 Transformer | Human operator (compute resource) | T1-A |
-| Expert review of calibration reliability diagram | Astronomer / ML reviewer | T1-D |
 | Expert review of ML architecture | NEO survey astronomer | T2-C |
 | Live review policy sign-off | Human reviewer | T1-B |
 
@@ -194,10 +230,12 @@ These items cannot be completed by code generation alone. They require real-worl
 Before the pipeline makes its first MPC submission, all of the following must be TRUE:
 
 - [~] T1-A resolved: Tier 2 CNN trained ✓ (val_acc=91.3%); Tier 1 XGBoost trained ✓ (val_acc=99.95%); Tier 3 Transformer weights still needed
-- [ ] T1-A resolved: Brier score < 0.10 and ECE < 0.05 on held-out real-data test set
+- [ ] T1-A resolved: Tier 3 Transformer trained on real multi-night sequences
 - [~] T1-B resolved: IRSA and ATLAS credentials configured ✓; live connection test passed ✓; automated live dry-run policy not yet signed off (pending human reviewer signature)
 - [ ] T1-C resolved: Full pipeline run completed on ≥1 real ZTF field; ≥90% known-object recovery verified
-- [ ] T1-D resolved: Calibration reliability diagrams reviewed and approved by human expert
+- [ ] T1-D resolved: Machine-readable calibration report passes every required
+      KPI on held-out real labeled data and records
+      `promotion_gate_passed=true`
 - [ ] T2-A resolved: At least one integration test suite passed against real APIs
 - [ ] T2-B resolved: False-positive rate on real artifact data < 5%
 - [ ] T2-C resolved: ML architecture reviewed by domain expert
