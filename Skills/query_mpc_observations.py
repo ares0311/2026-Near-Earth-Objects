@@ -34,7 +34,7 @@ if str(PYTHONPATH_SRC) not in sys.path:
 
 from fetch import fetch_mpc_observations  # noqa: E402
 
-SCHEMA_VERSION = "mpc-tracklet-sequences-v1"
+SCHEMA_VERSION = "mpc-tracklet-sequences-v2"
 LABEL_MAP = {
     "neo_candidate": 0,
     "known_object": 1,
@@ -167,6 +167,46 @@ def _night_count(observations: list[Any]) -> int:
     return len({int(float(obs.jd) + 0.5) for obs in observations})
 
 
+def _select_observation_window(
+    observations: list[Any],
+    window: str,
+    max_observations: int,
+    min_nights: int,
+) -> list[Any]:
+    """Bound a history while retaining temporal coverage for its label policy."""
+    if window not in {"early", "late", "full"}:
+        raise ValueError(f"unsupported sequence_window: {window}")
+    if max_observations < 2:
+        raise ValueError("max_observations must be at least 2")
+
+    ordered = sorted(observations, key=lambda observation: observation.jd)
+    if len(ordered) <= max_observations:
+        return ordered
+
+    # Full histories are sampled across the complete arc instead of truncating it.
+    if window == "full":
+        denominator = max_observations - 1
+        indices = {
+            round(index * (len(ordered) - 1) / denominator)
+            for index in range(max_observations)
+        }
+        return [ordered[index] for index in sorted(indices)]
+
+    directed = ordered if window == "early" else list(reversed(ordered))
+    selected = directed[:max_observations]
+    selected_nights = {int(float(obs.jd) + 0.5) for obs in selected}
+
+    # Replace tail observations when a dense night would otherwise hide other nights.
+    for observation in directed[max_observations:]:
+        night = int(float(observation.jd) + 0.5)
+        if night not in selected_nights:
+            selected[-1] = observation
+            selected_nights.add(night)
+            if len(selected_nights) >= min_nights:
+                break
+    return sorted(selected, key=lambda observation: observation.jd)
+
+
 def _serialize_observation(observation: Any) -> dict[str, Any]:
     """Convert one immutable Observation into the Tier 3 raw-data contract."""
     return {
@@ -239,6 +279,7 @@ def collect_sequence_dataset(
     *,
     min_observations: int = 3,
     min_nights: int = 2,
+    max_observations_per_object: int = 20,
     retries: int = 2,
     query_delay_seconds: float = 1.0,
     resume: bool = False,
@@ -250,6 +291,8 @@ def collect_sequence_dataset(
         raise ValueError("min_observations must be at least 2")
     if min_nights < 1:
         raise ValueError("min_nights must be at least 1")
+    if max_observations_per_object < min_observations:
+        raise ValueError("max_observations_per_object cannot be below min_observations")
     if retries < 0:
         raise ValueError("retries cannot be negative")
     if query_delay_seconds < 0:
@@ -282,7 +325,14 @@ def collect_sequence_dataset(
             if attempt < retries and query_delay_seconds:
                 sleep_fn(query_delay_seconds)
 
-        observations = sorted(observations, key=lambda observation: observation.jd)
+        raw_observation_count = len(observations)
+        sequence_window = row.get("sequence_window", "full") or "full"
+        observations = _select_observation_window(
+            observations,
+            sequence_window,
+            max_observations_per_object,
+            min_nights,
+        )
         n_nights = _night_count(observations)
         status = "accepted"
         if len(observations) < min_observations:
@@ -296,8 +346,10 @@ def collect_sequence_dataset(
                 "class_name": row["neo_class"],
                 "status": status,
                 "attempts": attempts,
+                "raw_observation_count": raw_observation_count,
                 "observation_count": len(observations),
                 "night_count": n_nights,
+                "sequence_window": sequence_window,
                 "queried_at_utc": _utc_now(),
             }
         )
@@ -309,6 +361,8 @@ def collect_sequence_dataset(
                     "class_name": row["neo_class"],
                     "h_mag": row.get("h_mag", ""),
                     "label_source": row.get("source", ""),
+                    "label_basis": row.get("label_basis", ""),
+                    "sequence_window": sequence_window,
                     "observation_count": len(observations),
                     "night_count": n_nights,
                     "observations": [
@@ -355,6 +409,7 @@ def main() -> None:
     parser.add_argument("--max-objects", type=int, help="Hard cap on queried designations")
     parser.add_argument("--min-observations", type=int, default=3)
     parser.add_argument("--min-nights", type=int, default=2)
+    parser.add_argument("--max-observations-per-object", type=int, default=20)
     parser.add_argument("--retries", type=int, default=2)
     parser.add_argument("--query-delay-seconds", type=float, default=1.0)
     parser.add_argument("--resume", action="store_true")
@@ -370,6 +425,7 @@ def main() -> None:
             args.max_objects,
             min_observations=args.min_observations,
             min_nights=args.min_nights,
+            max_observations_per_object=args.max_observations_per_object,
             retries=args.retries,
             query_delay_seconds=args.query_delay_seconds,
             resume=args.resume,

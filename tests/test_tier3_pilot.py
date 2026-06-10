@@ -1,0 +1,218 @@
+"""Offline tests for the approved five-class Tier 3 pilot workflow."""
+
+from __future__ import annotations
+
+import importlib.util
+import json
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+
+def _load_skill(filename: str) -> Any:
+    """Load a Skill module directly so its operator implementation is tested."""
+    skill_path = Path(__file__).resolve().parents[1] / "Skills" / filename
+    spec = importlib.util.spec_from_file_location(filename.removesuffix(".py"), skill_path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _mpc_line(
+    designation: str,
+    *,
+    h_mag: float = 20.0,
+    eccentricity: float = 0.1,
+    semimajor_axis: float = 2.5,
+) -> str:
+    """Create one fixed-column MPC record for parser and policy tests."""
+    characters = [" "] * 120
+    characters[0:7] = f"{designation:<7}"[:7]
+    characters[8:13] = f"{h_mag:5.1f}"
+    characters[70:79] = f"{eccentricity:9.6f}"
+    characters[92:103] = f"{semimajor_axis:11.7f}"
+    return "".join(characters)
+
+
+def _entry(class_name: str, index: int) -> dict[str, Any]:
+    """Create a valid multi-night sequence for preparation tests."""
+    label_map = {
+        "neo_candidate": 0,
+        "known_object": 1,
+        "main_belt_asteroid": 2,
+        "stellar_artifact": 3,
+        "other_solar_system": 4,
+    }
+    return {
+        "designation": f"{class_name}-{index}",
+        "class_name": class_name,
+        "label": label_map[class_name],
+        "observations": [
+            {
+                "obs_id": f"{class_name}-{index}-{observation}",
+                "ra_deg": 10.0 + observation,
+                "dec_deg": 2.0,
+                "jd": 2460000.0 + observation,
+                "mag": 20.0,
+                "mag_err": 0.1,
+                "filter_band": "r",
+                "mission": "MPC",
+            }
+            for observation in range(3)
+        ],
+    }
+
+
+def test_tier3_nea_policy_separates_temporal_classes() -> None:
+    """Numbered NEOs must use late windows and provisional NEOs early windows."""
+    module = _load_skill("generate_training_labels.py")
+    text = "\n".join(
+        [
+            _mpc_line("00433"),
+            _mpc_line("K23A00A"),
+            _mpc_line("00719"),
+            _mpc_line("K24B00B"),
+        ]
+    )
+
+    rows = module.build_tier3_nea_rows(text, 2)
+
+    assert [row["neo_class"] for row in rows] == [
+        "neo_candidate",
+        "neo_candidate",
+        "known_object",
+        "known_object",
+    ]
+    assert {row["sequence_window"] for row in rows[:2]} == {"early"}
+    assert {row["sequence_window"] for row in rows[2:]} == {"late"}
+
+
+def test_tier3_manifest_fails_closed_when_a_class_is_short(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The approved pilot size is a hard gate for every MPC-backed class."""
+    module = _load_skill("generate_training_labels.py")
+    monkeypatch.setattr(
+        module,
+        "fetch_tier3_nea_rows",
+        lambda limit: [
+            {"neo_class": "neo_candidate"},
+            {"neo_class": "known_object"},
+        ],
+    )
+    monkeypatch.setattr(
+        module,
+        "fetch_tier3_mba_rows",
+        lambda limit: [{"neo_class": "main_belt_asteroid"}],
+    )
+    monkeypatch.setattr(module, "fetch_other_solar_system_rows", lambda limit: [])
+
+    with pytest.raises(RuntimeError, match="incomplete"):
+        module.build_tier3_pilot_manifest(1)
+
+
+class _FakeAlerce:
+    """Return deterministic public-broker shapes without network access."""
+
+    def query_objects(self, **kwargs: Any) -> list[dict[str, Any]]:
+        """Return one object that satisfies the configured bogus query."""
+        assert kwargs["survey"] == "ztf"
+        assert kwargs["classifier"] == "stamp_classifier"
+        return [{"oid": "ZTF-test-artifact"}]
+
+    def query_detections(self, oid: str, **kwargs: Any) -> list[dict[str, Any]]:
+        """Return a valid multi-night ZTF detection history."""
+        assert oid == "ZTF-test-artifact"
+        assert kwargs["survey"] == "ztf"
+        return [
+            {
+                "candid": index,
+                "mjd": 60000.0 + index,
+                "ra": 20.0 + index,
+                "dec": -5.0,
+                "magpsf": 19.5,
+                "sigmapsf": 0.1,
+                "fid": 1,
+                "rb": 0.1,
+                "drb": 0.05,
+            }
+            for index in range(3)
+        ]
+
+
+def test_alerce_artifact_collection_records_safe_provenance(tmp_path: Path) -> None:
+    """Broker acquisition should produce the shared contract without secrets."""
+    module = _load_skill("fetch_alerce_artifact_sequences.py")
+    output = tmp_path / "artifacts.json"
+
+    dataset = module.collect_artifact_sequences(
+        output,
+        1,
+        query_delay_seconds=0,
+        client_factory=_FakeAlerce,
+    )
+
+    assert dataset["summary"]["accepted_objects"] == 1
+    assert dataset["entries"][0]["class_name"] == "stellar_artifact"
+    assert dataset["entries"][0]["observations"][0]["mission"] == "ZTF"
+    assert dataset["safety"]["external_submission_enabled"] is False
+    assert "password" not in output.read_text(encoding="utf-8").lower()
+
+
+def test_prepare_sequence_splits_is_balanced_and_leak_free(tmp_path: Path) -> None:
+    """Preparation should emit all three splits with no designation overlap."""
+    module = _load_skill("build_sequence_dataset.py")
+    classes = list(module.LABEL_MAP)
+    entries = [_entry(class_name, index) for class_name in classes for index in range(10)]
+    source = tmp_path / "raw.json"
+    source.write_text(
+        json.dumps(
+            {
+                "schema_version": "test-v1",
+                "entries": entries,
+                "source": {"provider": "offline-test"},
+                "safety": {
+                    "external_submission_enabled": False,
+                    "impact_probability_generated": False,
+                    "secret_values_recorded": False,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    report = module.prepare_sequence_splits(
+        [source],
+        tmp_path / "prepared",
+        min_per_class=10,
+    )
+
+    assert report["validation"]["passed"] is True
+    assert report["pilot_only"] is True
+    assert report["production_promotion_allowed"] is False
+    split_designations: list[set[str]] = []
+    for split_name in ("train", "calibration", "test"):
+        rows = list(csv_rows(tmp_path / "prepared" / f"{split_name}.csv"))
+        split_designations.append({row["designation"] for row in rows})
+        assert set(row["class_name"] for row in rows) == set(classes)
+    assert split_designations[0].isdisjoint(split_designations[1])
+    assert split_designations[0].isdisjoint(split_designations[2])
+    assert split_designations[1].isdisjoint(split_designations[2])
+
+
+def csv_rows(path: Path) -> list[dict[str, str]]:
+    """Read generated CSV rows without introducing a pandas dependency."""
+    import csv
+
+    with path.open(newline="", encoding="utf-8") as handle:
+        return list(csv.DictReader(handle))
+
+
+def test_validation_rejects_missing_five_class_minimum() -> None:
+    """Partial datasets must not reach tokenization or training."""
+    module = _load_skill("build_sequence_dataset.py")
+
+    with pytest.raises(ValueError, match="five-class minimum"):
+        module.validate_entries([_entry("neo_candidate", 0)], min_per_class=1)

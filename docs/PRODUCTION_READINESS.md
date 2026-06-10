@@ -1,7 +1,7 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
 **Current version**: v0.87.0  
-**Last updated**: 2026-06-09
+**Last updated**: 2026-06-10
 **Purpose**: Mandatory read at session start (per MANDATORY SESSION-START PROTOCOL).  
 Every planning cycle must name the highest-priority unresolved Tier 1 gap and show how proposed steps close or directly unblock it.
 
@@ -26,7 +26,7 @@ The following work is done and must NOT be repeated:
 | `calibration.py` | test_calibration.py | 100% |
 
 ### Infrastructure
-- 3447 offline tests pass; 2 live checks deselected; `ruff` clean; `mypy` clean
+- 3454 offline tests pass; 2 live checks deselected; `ruff` clean; `mypy` clean
 - Background automation CLI (`Skills/background.py`) with SQLite audit logs
 - 90+ Skills scripts for batch operations, export, diagnostics, visualization
 - 30+ documentation files covering all pipeline stages
@@ -59,12 +59,18 @@ These gaps prevent the pipeline from being safely or usefully operated on real s
 Tier 3 weights, the intended production ensemble is incomplete. Downstream
 calibration and alert-gate qualification cannot be completed.
 
-**Progress as of 2026-06-06**:
+**Progress as of 2026-06-10**:
 - `data/ztf_labeled_alerts.json`: 10,000 real ZTF Avro alerts downloaded from public archive (ztf.uw.edu); cutouts decompressed from gzip-FITS to raw float32. ✓
 - `data/cutouts/`: 10,000 `.npz` cutout triplets (science, reference, difference) + `index.csv`. ✓
 - `data/training_labels.csv`: 1000 MPC labels (500 neo_candidate + 500 main_belt_asteroid). ✓
 - `models/tier2_cnn.pt`: CNN trained — val_loss=0.258, val_acc=91.3%, 20 epochs; 8,588 real / 1,412 bogus; inverse-frequency class weights. ✓ Committed.
 - `models/tier1_xgb.json`: XGBoost trained — val_acc=99.95%, macro AUC=1.000, 11,100 examples (8,880 train / 2,220 val); class-weighted; 300 estimators, max_depth=5. ✓ Committed to repo at commit 13946ea.
+- Five-class label policy and 50-sequence-per-class pilot approved by Jerome W.
+  Lindsey III on 2026-06-10. The approval covers label sources and pilot
+  execution only; it is not model or production approval. ✓
+- Policy-aware MPC windows, public ALeRCE artifact acquisition, five-class
+  validation, source hashing, and designation-grouped split generation are
+  implemented and offline-tested. ✓
 - **Still needed**: A five-class real sequence dataset, Tier 3 Transformer
   training, and the complete production calibration KPI evaluation.
 
@@ -74,14 +80,13 @@ calibration and alert-gate qualification cannot be completed.
 3. [DONE] `Skills/build_cutout_dataset.py` — 10,000 `.npz` cutout triplets built.
 4. [DONE] `Skills/train_tier2_cnn.py` — `models/tier2_cnn.pt` saved; val_acc=91.3%.
 5. [DONE] Commit `models/tier2_cnn.pt` to repo (`.gitignore` updated to allow `models/*.pt`).
-6. [CODE] Use the bounded, resumable
+6. [DONE] Use the bounded, resumable
    `Skills/query_mpc_observations.py --labels-csv ...` collector to acquire
    versioned MPC histories with source hashes, query logs, and safety flags.
-7. [DATA + HUMAN] Complete the five-class sequence manifest. The current
-   1,000-row manifest covers only `neo_candidate` and
-   `main_belt_asteroid`; MPC histories cannot provide a valid
-   `stellar_artifact` class. Real ZTF labeled tracklets are required.
-8. [CODE] Validate the raw-data contract, create designation-grouped
+7. [APPROVED + OPERATOR RUN] Execute the 50-per-class pilot using provisional
+   early-arc NEOs, numbered late-arc known NEOs, numbered MBAs, confirmed MPC
+   comets, and ALeRCE high-confidence bogus ZTF histories.
+8. [DONE] Validate the raw-data contract, create designation-grouped
    train/calibration/test splits, and build the flat token CSVs.
 9. [HUMAN] Run the long Tier 3 training command under `caffeinate -i` to
    produce `models/tier3_transformer.pt`.
@@ -91,9 +96,10 @@ calibration and alert-gate qualification cannot be completed.
     production calibration KPI gate defined under T1-D. Promotion is automatic
     only when every required KPI passes.
 
-**Blocking outside step**: Step 7 requires human partnership to approve and
-assemble authoritative labels for the three missing/ambiguous classes. Step 9
-requires an operator-run training job on the available compute hardware.
+**Blocking outside step**: The label-policy decision is complete. Step 7 now
+requires the human operator to run the approved read-only network pilot on the
+Mac and return its JSON evidence. Step 9 requires an operator-run training job
+on the available compute hardware.
 Calibration promotion itself has no human-review dependency; it is controlled
 by the quantitative T1-D gate.
 
@@ -218,7 +224,7 @@ These items cannot be completed by code generation alone. They require real-worl
 
 | Blocker | Owner | Unblocks |
 |---|---|---|
-| Five-class real MPC/ZTF sequence manifest and data | Human operator (label-source approval and network/data access) | T1-A Tier 3 |
+| Approved five-class pilot data acquisition | Human operator (network/data access; policy approved 2026-06-10) | T1-A Tier 3 |
 | GPU or CPU training run for Tier 3 Transformer | Human operator (compute resource) | T1-A |
 | Expert review of ML architecture | NEO survey astronomer | T2-C |
 | Live review policy sign-off | Human reviewer | T1-B |

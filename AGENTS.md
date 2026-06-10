@@ -477,14 +477,14 @@ and excluded from CI.
 
 ## Current State (v0.87.0)
 
-All 10 pipeline modules are complete. The offline suite passes 3447 tests, with
+All 10 pipeline modules are complete. The offline suite passes 3454 tests, with
 2 live/integration checks deselected and 2 existing skips. CI is expected to
 remain green on Python 3.11 and 3.12 with the 100% coverage target. Tier 1 and
 Tier 2 were trained on real labeled data, but no real survey field has completed
 the full pipeline and no internally detected object has been externally reported.
 
-**Production gap status (as of 2026-06-07)**:
-- T1-A (Incomplete Trained ML Model Set): IN PROGRESS. **Tier 2 CNN trained — val_loss=0.258, val_acc=91.3%**; `models/tier2_cnn.pt` committed. **Tier 1 XGBoost trained — val_acc=99.95%, macro AUC=1.000**; `models/tier1_xgb.json` committed (13946ea). Tier 3 Transformer still untrained; calibration evaluation pending.
+**Production gap status (as of 2026-06-10)**:
+- T1-A (Incomplete Trained ML Model Set): IN PROGRESS. **Tier 2 CNN trained — val_loss=0.258, val_acc=91.3%**; `models/tier2_cnn.pt` committed. **Tier 1 XGBoost trained — val_acc=99.95%, macro AUC=1.000**; `models/tier1_xgb.json` committed (13946ea). Jerome W. Lindsey III approved the five-class label policy and a 50-sequence-per-class pilot on 2026-06-10. Policy-aware MPC acquisition, public ALeRCE artifact acquisition, five-class validation, and grouped split tooling are implemented; the operator network run, Tier 3 training, and calibration evaluation remain pending.
 - T1-B (No Live Credentials): CLOSED. ATLAS and ZTF live connections confirmed OK via macOS Keychain bridge (`source Skills/verify_live_credentials.sh`). Automated live dry-run policy sign-off pending.
 - T1-C (No Real End-to-End Run): BLOCKED on T1-B automated approval.
 - T1-D (No Ensemble Calibration): BLOCKED on T1-A. Promotion will be determined
@@ -497,7 +497,7 @@ See `docs/PRODUCTION_READINESS.md` for the full gap register.
 |---|---|
 | `Skills/smoke_test.py` | Happy-path check for all modules; exits 0 on success |
 | `Skills/evaluate_calibration.py` | Brier/ECE evaluation for Platt and isotonic calibrators |
-| `Skills/generate_training_labels.py` | Download MPC NEO + MBA catalog as training label CSV (run from Mac; MPC blocks cloud IPs) |
+| `Skills/generate_training_labels.py` | Download Tier 1 labels or build the approved four-class MPC Tier 3 pilot manifest |
 | `Skills/download_ztf_training_alerts.py` | Download labeled ZTF Avro alert tarballs from public archive (ztf.uw.edu); decompresses gzip-FITS cutouts; writes `data/ztf_labeled_alerts.json`; run from Mac with `caffeinate -i` |
 | `Skills/batch_score.py` | Score a list of tracklets from a JSON file; print ranked table |
 | `Skills/run_pipeline.py` | Full end-to-end pipeline run |
@@ -513,7 +513,8 @@ See `docs/PRODUCTION_READINESS.md` for the full gap register.
 | `Skills/background.py` | Unified background automation CLI with run, readiness, live dry-run, summary, detail, history, and signoff subcommands |
 | `Skills/stress_test_high_motion.py` | Stress-test linker across 3 motion bins (1–10, 10–30, 30–60 arcsec/hr); saves results to `data/` |
 | `Skills/build_cutout_dataset.py` | Convert ZTF alert JSON (base64 cutouts) to `.npz` + CSV index for Tier 2 CNN training |
-| `Skills/build_sequence_dataset.py` | Convert tracklet JSON to flat token CSV for Tier 3 Transformer training |
+| `Skills/build_sequence_dataset.py` | Validate five classes, create designation-grouped splits, and tokenize Tier 3 sequences |
+| `Skills/fetch_alerce_artifact_sequences.py` | Acquire bounded public ALeRCE bogus-object histories for the Tier 3 artifact class |
 | `Skills/validate_mpc_report.py` | Validate MPC 80-column observation report files; CLI with `--json` flag |
 | `Skills/diagnose_pipeline.py` | Run each pipeline stage with synthetic data; report pass/fail per stage |
 | `Skills/compare_baselines.py` | Compare two injection-recovery JSON baselines; exits 1 on regression |

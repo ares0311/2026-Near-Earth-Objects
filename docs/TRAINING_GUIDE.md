@@ -27,21 +27,19 @@ Required environment variables (set in `.env` or export):
 
 ```bash
 python Skills/generate_training_labels.py \
-    --out data/training_labels.csv \
-    --n-neo 5000 \
-    --n-mba 10000
+    --output data/training_labels.csv \
+    --limit 500
 ```
 
-This downloads MPC-numbered NEOs (positive labels) and a random MBA sample
-(negative labels) via `astroquery.mpc`.  Output is a CSV with columns:
+This downloads MPC NEOs and a dynamically filtered numbered MBA sample.
+Output is a CSV with columns:
 
 | Column | Description |
 |---|---|
-| `object_id` | MPC provisional or numbered designation |
-| `label` | `neo`, `mba`, or `artifact` |
-| `ra_deg`, `dec_deg` | Representative sky position |
-| `mag` | Reported magnitude |
-| `filter_band` | Photometric band |
+| `designation` | MPC packed provisional or numbered designation |
+| `neo_class` | `neo_candidate` or `main_belt_asteroid` |
+| `h_mag` | MPC absolute magnitude |
+| `source` | Label catalog provenance |
 
 **Label quality note**: Use only MPC-numbered objects as high-confidence
 positives.  Provisional designations should be down-weighted (`sample_weight=0.5`).
@@ -161,18 +159,67 @@ curve.  Target: AUC > 0.95, Brier score < 0.08.
 
 ## Step 5 — Tier 3: Transformer on Tracklet Sequences
 
-### 5a. Acquire the versioned raw sequence dataset
+### 5a. Approved five-class policy and pilot
+
+Jerome W. Lindsey III approved the following policy and bounded pilot on
+2026-06-10:
+
+| Class | Authoritative label basis | Sequence window |
+|---|---|---|
+| `neo_candidate` | Provisional object later confirmed by MPC as an NEO | Earliest discovery-arc observations |
+| `known_object` | Numbered MPC NEO | Late catalog-era observations |
+| `main_belt_asteroid` | Numbered MPC object with $2<a<3.5$ AU and $q>1.3$ AU | Full bounded arc |
+| `stellar_artifact` | ALeRCE ZTF `stamp_classifier=bogus`, probability $\geq0.90$ | Full bounded multi-night history |
+| `other_solar_system` | Confirmed MPC comet | Full bounded arc |
+
+The pilot requires 50 accepted independent sequences per class. Its purpose is
+to validate source yield, schema quality, temporal separation, and training
+plumbing. It does not approve a production model. Production preparation
+requires at least 200 accepted sequences per class plus all held-out KPI gates.
+
+### 5b. Run the approved bounded pilot
+
+Run this only from merged `main` on the operator's Mac. The commands are
+read-only with respect to external services and produce checkpointed JSON
+evidence; they do not submit observations or generate impact probabilities.
 
 ```bash
-# Run from merged `main`; this is a long network job, so keep macOS awake.
+# Update main before running the approved read-only Tier 3 pilot.
+git pull origin main
+
+# Install the public ALeRCE client used only by Tier 3 data acquisition.
+caffeinate -i .venv/bin/python -m pip install -e ".[training]"
+
+# Build 50 labels for each of the four MPC-backed classes.
+caffeinate -i .venv/bin/python Skills/generate_training_labels.py \
+    --tier3-pilot \
+    --limit 50 \
+    --output data/sequences/tier3_pilot_manifest.csv
+
+# Download bounded MPC histories for the 200 solar-system objects.
 caffeinate -i .venv/bin/python Skills/query_mpc_observations.py \
-    --labels-csv data/training_labels.csv \
-    --output data/sequences/mpc_raw_sequences.json \
-    --max-objects 1000 \
+    --labels-csv data/sequences/tier3_pilot_manifest.csv \
+    --output data/sequences/mpc_pilot.json \
+    --max-objects 200 \
     --min-observations 3 \
     --min-nights 2 \
+    --max-observations-per-object 20 \
     --query-delay-seconds 1 \
     --resume
+
+# Acquire 50 public broker-labeled multi-night ZTF artifact sequences.
+caffeinate -i .venv/bin/python Skills/fetch_alerce_artifact_sequences.py \
+    --output data/sequences/alerce_artifact_pilot.json \
+    --max-objects 50 \
+    --probability 0.90 \
+    --resume
+
+# Validate all five classes and emit designation-grouped model splits.
+.venv/bin/python Skills/build_sequence_dataset.py \
+    --input data/sequences/mpc_pilot.json \
+            data/sequences/alerce_artifact_pilot.json \
+    --output-dir data/sequences/pilot \
+    --min-per-class 50
 ```
 
 The collector uses the authoritative
@@ -180,13 +227,12 @@ The collector uses the authoritative
 rate-limited, retryable, and checkpointed after every designation. The output
 records the manifest SHA-256, provider, retrieval timestamps, class map, query
 outcomes, and explicit safety flags. It never submits observations, stores
-credentials, or generates an impact probability.
+credentials, or generates an impact probability. The ALeRCE collector uses the
+public ZTF broker API and requires no project credential. The preparation
+report records source hashes, class counts, split counts, the approved policy,
+and `production_promotion_allowed=false`.
 
-The current `data/training_labels.csv` contains only `neo_candidate` and
-`main_belt_asteroid` rows. It is sufficient to exercise MPC sequence retrieval,
-but it cannot qualify the five-class production model by itself.
-
-### 5b. Raw-data acceptance contract
+### 5c. Raw-data acceptance contract
 
 Before building model inputs, the raw dataset must satisfy all of these checks:
 
@@ -209,24 +255,26 @@ Before building model inputs, the raw dataset must satisfy all of these checks:
 Any missing class, failed validation, or unknown provenance blocks Tier 3
 training and production promotion.
 
-### 5c. Build the flat token dataset
+### 5d. Build the production flat token dataset
 
 ```bash
 # Convert an accepted raw dataset into padded Transformer input rows.
 python Skills/build_sequence_dataset.py \
-    --input data/sequences/mpc_raw_sequences.json \
-    --output data/sequences/train.csv
+    --input data/sequences/mpc_production.json \
+            data/sequences/alerce_artifact_production.json \
+    --output-dir data/sequences/production \
+    --min-per-class 200
 ```
 
 Each row is a flat tokenized tracklet: `tok_0_ra`, `tok_0_dec`, `tok_0_mag`,
 `tok_0_jd`, `tok_0_filter`, `tok_1_ra`, … up to `max_seq_len` observations.
 
-### 5d. Train
+### 5e. Train
 
 ```bash
 # Keep macOS awake during the operator-run training job.
 caffeinate -i python Skills/train_tier3_transformer.py \
-    --labels data/sequences/train.csv \
+    --labels data/sequences/production/train.csv \
     --epochs 30 \
     --out models/tier3_transformer.pt
 ```
@@ -239,11 +287,13 @@ Architecture (BERT-style encoder-only):
 
 Target: macro-F1 > 0.80 on held-out 20% split.
 
-### 5e. Evaluate
+### 5f. Evaluate
 
 ```bash
 # Evaluate only against the untouched object-grouped test split.
-python Skills/evaluate_calibration.py --tier 3 --sequences data/sequences/test.csv
+python Skills/evaluate_calibration.py \
+    --tier 3 \
+    --sequences data/sequences/production/test.csv
 ```
 
 ---

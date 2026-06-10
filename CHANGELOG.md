@@ -17,6 +17,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   provenance, query outcomes, and explicit no-submission/no-secret safety flags.
 - Corrected MPC observation parsing for current Astroquery `epoch` and `DEC`
   columns while retaining compatibility with older fixtures.
+- Recorded Jerome W. Lindsey III's 2026-06-10 approval of the five-class Tier 3
+  label policy and bounded 50-sequence-per-class pilot.
+- Added policy-aware early/late MPC sequence windows, dynamically filtered
+  numbered MBA labels, confirmed MPC comet labels, and public ALeRCE
+  high-confidence bogus-object histories.
+- Upgraded Tier 3 preparation to fail closed on missing provenance, unsafe
+  acquisition flags, class imbalance, malformed observations, or designation
+  leakage; preparation now emits grouped train/calibration/test splits and a
+  machine-readable evidence report.
+- Added the optional `training` dependency group for the ALeRCE client and
+  refreshed the lockfile.
+- 3454 offline tests pass; 2 live checks deselected; ruff and mypy clean.
 
 ## v0.87.0 — Option B Cleanup + Production Readiness (2026-06-05)
 
