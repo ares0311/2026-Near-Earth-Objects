@@ -26,7 +26,7 @@ The following work is done and must NOT be repeated:
 | `calibration.py` | test_calibration.py | 100% |
 
 ### Infrastructure
-- 3466 offline tests pass; 2 live checks deselected; `ruff` clean; `mypy` clean
+- 3475 offline tests pass; 2 live checks deselected; `ruff` clean; `mypy` clean
 - Background automation CLI (`Skills/background.py`) with SQLite audit logs
 - 90+ Skills scripts for batch operations, export, diagnostics, visualization
 - 30+ documentation files covering all pipeline stages
@@ -76,6 +76,11 @@ calibration and alert-gate qualification cannot be completed.
   objects, and 103 zero-result MPC queries recorded as insufficient
   observations because provider failures were suppressed. The evidence is
   retained locally; a corrected fail-closed rerun is required.
+- The operator transcript also showed that a shell command chain could continue
+  into split preparation after acquisition failure, and that the shared checkout
+  changed branches during the long run. The replacement is one atomic runner
+  with commit pinning, an active-run marker, reserve candidate pools, resumable
+  checkpoints, and top-level SQLite stage outcomes.
 - **Still needed**: A five-class real sequence dataset, Tier 3 Transformer
   training, and the complete production calibration KPI evaluation.
 
@@ -90,7 +95,8 @@ calibration and alert-gate qualification cannot be completed.
    versioned MPC histories with source hashes, query logs, and safety flags.
 7. [APPROVED + OPERATOR RERUN] Execute the corrected 50-per-class pilot using provisional
    early-arc NEOs, numbered late-arc known NEOs, numbered MBAs, confirmed MPC
-   comets, and ALeRCE high-confidence bogus ZTF histories.
+   comets, and ALeRCE high-confidence bogus ZTF histories through
+   `Skills/run_tier3_pilot.py`.
 8. [DONE] Validate the raw-data contract, create designation-grouped
    train/calibration/test splits, and build the flat token CSVs.
 9. [HUMAN] Run the long Tier 3 training command under `caffeinate -i` to

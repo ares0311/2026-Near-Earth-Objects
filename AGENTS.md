@@ -10,6 +10,9 @@ It contains the facts a coding agent needs to work productively without re-readi
 - **Skills directory**: Any standalone `.py` utility script created to perform a task must be saved in `Skills/` at the project root.
 - **No impact claims**: Never assert a probability of Earth impact from internally computed data alone. Always defer to MPC/CNEOS for authoritative hazard assessment.
 - **Alert protocol is sacred**: The NASA/MPC alert pathway (see §Alert Protocol) must never be triggered on unconfirmed detections. Require independent confirmation first.
+- **Protect active operator runs**: Before switching branches or editing tracked
+  files, check for `Logs/tier3_pilot.active.json`. If present, do not alter the
+  shared checkout until the operator run exits and removes the marker.
 
 ---
 
@@ -477,7 +480,7 @@ and excluded from CI.
 
 ## Current State (v0.87.0)
 
-All 10 pipeline modules are complete. The offline suite passes 3466 tests, with
+All 10 pipeline modules are complete. The offline suite passes 3475 tests, with
 2 live/integration checks deselected. CI is expected to
 remain green on Python 3.11 and 3.12 with the 100% coverage target. Tier 1 and
 Tier 2 were trained on real labeled data, but no real survey field has completed
@@ -515,6 +518,7 @@ See `docs/PRODUCTION_READINESS.md` for the full gap register.
 | `Skills/build_cutout_dataset.py` | Convert ZTF alert JSON (base64 cutouts) to `.npz` + CSV index for Tier 2 CNN training |
 | `Skills/build_sequence_dataset.py` | Validate five classes, create designation-grouped splits, and tokenize Tier 3 sequences |
 | `Skills/fetch_alerce_artifact_sequences.py` | Acquire bounded public ALeRCE bogus-object histories for the Tier 3 artifact class |
+| `Skills/run_tier3_pilot.py` | One-command, fail-closed Tier 3 pilot with commit pinning, reserve pools, resumable checkpoints, and top-level SQLite stage logs |
 | `Skills/validate_mpc_report.py` | Validate MPC 80-column observation report files; CLI with `--json` flag |
 | `Skills/diagnose_pipeline.py` | Run each pipeline stage with synthetic data; report pass/fail per stage |
 | `Skills/compare_baselines.py` | Compare two injection-recovery JSON baselines; exits 1 on regression |

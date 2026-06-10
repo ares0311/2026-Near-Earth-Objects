@@ -204,6 +204,7 @@ def test_alerce_failure_is_bounded_and_checkpointed(tmp_path: Path) -> None:
             1,
             query_delay_seconds=0.5,
             request_attempts=2,
+            retry_delay_seconds=0.5,
             client_factory=_FailingAlerce,
             sleep_fn=sleeps.append,
         )
@@ -213,6 +214,72 @@ def test_alerce_failure_is_bounded_and_checkpointed(tmp_path: Path) -> None:
     assert checkpoint["summary"]["accepted_objects"] == 0
     assert checkpoint["acquisition_errors"][0]["error_type"] == "TimeoutError"
     assert checkpoint["safety"]["secret_values_recorded"] is False
+
+
+def test_alerce_uses_small_stable_candidate_pages(tmp_path: Path) -> None:
+    """Candidate discovery should avoid the expensive detection-count sort."""
+    module = _load_skill("fetch_alerce_artifact_sequences.py")
+    output = tmp_path / "artifacts.json"
+    calls: list[dict[str, Any]] = []
+
+    class Client(_FakeAlerce):
+        """Capture candidate-page arguments before returning one valid object."""
+
+        def query_objects(self, **kwargs: Any) -> list[dict[str, Any]]:
+            """Record the lightweight stable query contract."""
+            calls.append(kwargs)
+            return super().query_objects(**kwargs)
+
+    module.collect_artifact_sequences(
+        output,
+        1,
+        candidate_page_size=7,
+        query_delay_seconds=0,
+        client_factory=Client,
+    )
+
+    assert calls[0]["page_size"] == 7
+    assert calls[0]["order_by"] == "oid"
+    assert calls[0]["order_mode"] == "ASC"
+
+
+def test_alerce_resume_retries_prior_detection_error(tmp_path: Path) -> None:
+    """A transient object failure must remain eligible on the resumed run."""
+    module = _load_skill("fetch_alerce_artifact_sequences.py")
+    output = tmp_path / "artifacts.json"
+
+    class FailingDetections(_FakeAlerce):
+        """Return a candidate but fail its first detection-history request."""
+
+        def query_detections(self, oid: str, **kwargs: Any) -> list[dict[str, Any]]:
+            """Simulate one transient broker timeout."""
+            raise TimeoutError("temporary timeout")
+
+    with pytest.raises(RuntimeError, match="only 0 accepted"):
+        module.collect_artifact_sequences(
+            output,
+            1,
+            query_delay_seconds=0,
+            request_attempts=1,
+            max_candidate_pages=1,
+            client_factory=FailingDetections,
+        )
+
+    resumed = module.collect_artifact_sequences(
+        output,
+        1,
+        query_delay_seconds=0,
+        request_attempts=1,
+        max_candidate_pages=1,
+        resume=True,
+        client_factory=_FakeAlerce,
+    )
+
+    assert resumed["summary"]["accepted_objects"] == 1
+    assert [item["status"] for item in resumed["query_log"]] == [
+        "query_error",
+        "accepted",
+    ]
 
 
 def test_alerce_client_network_configuration_normalizes_and_times_out() -> None:

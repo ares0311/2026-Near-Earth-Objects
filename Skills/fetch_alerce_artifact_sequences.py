@@ -22,7 +22,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = "alerce-artifact-sequences-v1"
+SCHEMA_VERSION = "alerce-artifact-sequences-v2"
 ARTIFACT_LABEL = 3
 FILTER_MAP = {1: "g", 2: "r", 3: "i"}
 
@@ -94,7 +94,7 @@ def _request_with_retries(
                     f"{operation_name} failed after {attempts} attempts"
                 ) from exc
             if retry_delay_seconds:
-                sleep_fn(retry_delay_seconds * attempt)
+                sleep_fn(min(retry_delay_seconds * (2 ** (attempt - 1)), 60.0))
     raise AssertionError("bounded retry loop exited unexpectedly")
 
 
@@ -177,6 +177,7 @@ def _new_dataset(
     class_name: str,
     request_timeout_seconds: float,
     request_attempts: int,
+    candidate_page_size: int,
 ) -> dict[str, Any]:
     """Create the versioned, secret-free ALeRCE acquisition envelope."""
     now = _utc_now()
@@ -193,6 +194,7 @@ def _new_dataset(
             "requested_object_count": max_objects,
             "request_timeout_seconds": request_timeout_seconds,
             "request_attempts": request_attempts,
+            "candidate_page_size": candidate_page_size,
         },
         "safety": {
             "external_submission_enabled": False,
@@ -232,7 +234,9 @@ def collect_artifact_sequences(
     query_delay_seconds: float = 0.25,
     request_timeout_seconds: float = 30.0,
     request_attempts: int = 3,
-    max_candidate_pages: int = 10,
+    retry_delay_seconds: float = 5.0,
+    candidate_page_size: int = 25,
+    max_candidate_pages: int = 40,
     resume: bool = False,
     client_factory: Callable[[], Any] = _new_client,
     sleep_fn: Callable[[float], None] = time.sleep,
@@ -250,6 +254,10 @@ def collect_artifact_sequences(
         raise ValueError("query_delay_seconds cannot be negative")
     if request_timeout_seconds <= 0:
         raise ValueError("request_timeout_seconds must be positive")
+    if retry_delay_seconds < 0:
+        raise ValueError("retry_delay_seconds cannot be negative")
+    if not 1 <= candidate_page_size <= 250:
+        raise ValueError("candidate_page_size must be between 1 and 250")
     if request_attempts < 1 or max_candidate_pages < 1:
         raise ValueError("request attempts and candidate pages must be at least 1")
 
@@ -261,6 +269,8 @@ def collect_artifact_sequences(
         if (
             source.get("class_name") != class_name
             or source.get("minimum_probability") != probability
+            or source.get("requested_object_count") != max_objects
+            or source.get("candidate_page_size") != candidate_page_size
         ):
             raise ValueError("existing output uses different ALeRCE label criteria")
         dataset.setdefault("candidate_pages", [])
@@ -272,20 +282,24 @@ def collect_artifact_sequences(
             class_name,
             request_timeout_seconds,
             request_attempts,
+            candidate_page_size,
         )
 
     client = client_factory()
     _configure_client_network(client, request_timeout_seconds)
-    completed = {item["oid"] for item in dataset["query_log"]}
+    completed = {
+        item["oid"]
+        for item in dataset["query_log"]
+        if item.get("status") != "query_error"
+    }
     accepted = {entry["designation"] for entry in dataset["entries"]}
     _update_summary(dataset, max_objects)
     # Write the envelope before the first request so even connection failures
     # leave durable, secret-free evidence for diagnosis and a subsequent resume.
     _atomic_write_json(output_json, dataset)
 
-    # Query modest pages because the ordered classifier join can be expensive
-    # for the public broker. Pagination still provides a bounded candidate pool.
-    page_size = min(max(max_objects * 4, 100), 250)
+    # Small, oid-ordered pages avoid the expensive detection-count sort that can
+    # time out on the public classifier join.
     for page in range(1, max_candidate_pages + 1):
         if len(accepted) >= max_objects:
             break
@@ -294,17 +308,17 @@ def collect_artifact_sequences(
                 client.query_objects,
                 operation_name=f"ALeRCE object page {page}",
                 attempts=request_attempts,
-                retry_delay_seconds=query_delay_seconds,
+                retry_delay_seconds=retry_delay_seconds,
                 sleep_fn=sleep_fn,
                 kwargs={
                     "survey": "ztf",
                     "classifier": "stamp_classifier",
                     "class_name": class_name,
                     "probability": probability,
-                    "order_by": "ndet",
-                    "order_mode": "DESC",
+                    "order_by": "oid",
+                    "order_mode": "ASC",
                     "page": page,
-                    "page_size": page_size,
+                    "page_size": candidate_page_size,
                     "format": "json",
                 },
             )
@@ -344,7 +358,7 @@ def collect_artifact_sequences(
                     client.query_detections,
                     operation_name=f"ALeRCE detections for {oid}",
                     attempts=request_attempts,
-                    retry_delay_seconds=query_delay_seconds,
+                    retry_delay_seconds=retry_delay_seconds,
                     sleep_fn=sleep_fn,
                     args=(oid,),
                     kwargs={"survey": "ztf", "format": "json"},
@@ -442,7 +456,9 @@ def main() -> None:
     parser.add_argument("--query-delay-seconds", type=float, default=0.25)
     parser.add_argument("--request-timeout-seconds", type=float, default=30.0)
     parser.add_argument("--request-attempts", type=int, default=3)
-    parser.add_argument("--max-candidate-pages", type=int, default=10)
+    parser.add_argument("--retry-delay-seconds", type=float, default=5.0)
+    parser.add_argument("--candidate-page-size", type=int, default=25)
+    parser.add_argument("--max-candidate-pages", type=int, default=40)
     parser.add_argument("--resume", action="store_true")
     args = parser.parse_args()
     dataset = collect_artifact_sequences(
@@ -456,6 +472,8 @@ def main() -> None:
         query_delay_seconds=args.query_delay_seconds,
         request_timeout_seconds=args.request_timeout_seconds,
         request_attempts=args.request_attempts,
+        retry_delay_seconds=args.retry_delay_seconds,
+        candidate_page_size=args.candidate_page_size,
         max_candidate_pages=args.max_candidate_pages,
         resume=args.resume,
     )

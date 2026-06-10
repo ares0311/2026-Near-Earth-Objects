@@ -23,6 +23,8 @@ Logs/*.sqlite-*
 Logs/*.db
 Logs/*.db-*
 Logs/*.log
+Logs/*.lock
+Logs/*.json
 Logs/reports/*.md
 Logs/reports/*.json
 !Logs/.gitkeep

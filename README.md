@@ -3,7 +3,7 @@
 ![Status](https://img.shields.io/badge/status-active%20development-blue)
 ![Version](https://img.shields.io/badge/version-0.76.0-informational)
 ![License](https://img.shields.io/badge/license-Apache%202.0-green)
-![Tests](https://img.shields.io/badge/tests-3466%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-3475%20passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
 ![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)
 ![CI](https://img.shields.io/badge/CI-passing-brightgreen)
@@ -12,7 +12,7 @@
 
 ## Abstract
 
-Near-Earth Objects (NEOs) — small solar system bodies with perihelion distances $q < 1.3$ AU — represent both a premier target for planetary science and the only known category of natural disaster that is, in principle, preventable. Despite three decades of systematic survey effort, population completeness models estimate that the majority of NEOs larger than 140 meters remain undetected, sustaining the need for automated, high-throughput discovery pipelines capable of operating at the cadence and scale of modern wide-field photometric surveys. This work presents a research pipeline for the detection, multi-night linking, orbital characterization, and hazard ranking of NEO candidates derived from the Zwicky Transient Facility (ZTF) alert stream, ATLAS forced photometry, and the Minor Planet Center (MPC) catalog. The system implements a seven-stage directed acyclic processing graph — fetch, preprocess, detect, link, classify, orbit, score — followed by a mandatory three-step alert protocol governing all external communications. Classification employs a three-tier ensemble architecture: a gradient-boosted tree classifier on tabular features (Tier 1), a convolutional neural network operating on 63×63-pixel ZTF image triplets following the architecture of Duev et al. (2019) (Tier 2), and a BERT-style Transformer trained on multi-night observation sequences following Lin et al. (2022) (Tier 3), with outputs combined by a logistic regression meta-learner and calibrated via Platt scaling or isotonic regression. Hazard assessment follows a Bayesian log-score model over five competing hypotheses with deliberately pessimistic priors for new NEO candidates. Preliminary orbit determination uses Gauss's method with differential correction, and Potentially Hazardous Asteroid (PHA) flags are gated on orbit quality code ≥ 2 and independently confirmed MOID ≤ 0.05 AU. As of version 0.87.0, all ten pipeline modules are implemented, 3,466 offline tests pass, Tier 1 and Tier 2 weights are trained, and production remains blocked on real five-class Tier 3 sequences, ensemble calibration, and a supervised real end-to-end run. Background automation provides top-level SQLite audit logs and fail-closed readiness controls. Injection-recovery validation on $n = 200$ synthetic NEO tracklets reports 100% detection, link, and score rates, but synthetic results are not treated as evidence of live-sky performance. The pipeline produces MPC-compatible 80-column, ADES PSV, and JSON observation reports and implements a non-negotiable three-step pathway — MPC submission, independent observatory confirmation, and conditional NASA PDCO notification — ensuring that no autonomous impact claim is ever issued.
+Near-Earth Objects (NEOs) — small solar system bodies with perihelion distances $q < 1.3$ AU — represent both a premier target for planetary science and the only known category of natural disaster that is, in principle, preventable. Despite three decades of systematic survey effort, population completeness models estimate that the majority of NEOs larger than 140 meters remain undetected, sustaining the need for automated, high-throughput discovery pipelines capable of operating at the cadence and scale of modern wide-field photometric surveys. This work presents a research pipeline for the detection, multi-night linking, orbital characterization, and hazard ranking of NEO candidates derived from the Zwicky Transient Facility (ZTF) alert stream, ATLAS forced photometry, and the Minor Planet Center (MPC) catalog. The system implements a seven-stage directed acyclic processing graph — fetch, preprocess, detect, link, classify, orbit, score — followed by a mandatory three-step alert protocol governing all external communications. Classification employs a three-tier ensemble architecture: a gradient-boosted tree classifier on tabular features (Tier 1), a convolutional neural network operating on 63×63-pixel ZTF image triplets following the architecture of Duev et al. (2019) (Tier 2), and a BERT-style Transformer trained on multi-night observation sequences following Lin et al. (2022) (Tier 3), with outputs combined by a logistic regression meta-learner and calibrated via Platt scaling or isotonic regression. Hazard assessment follows a Bayesian log-score model over five competing hypotheses with deliberately pessimistic priors for new NEO candidates. Preliminary orbit determination uses Gauss's method with differential correction, and Potentially Hazardous Asteroid (PHA) flags are gated on orbit quality code ≥ 2 and independently confirmed MOID ≤ 0.05 AU. As of version 0.87.0, all ten pipeline modules are implemented, 3,475 offline tests pass, Tier 1 and Tier 2 weights are trained, and production remains blocked on real five-class Tier 3 sequences, ensemble calibration, and a supervised real end-to-end run. Background automation provides top-level SQLite audit logs and fail-closed readiness controls. Injection-recovery validation on $n = 200$ synthetic NEO tracklets reports 100% detection, link, and score rates, but synthetic results are not treated as evidence of live-sky performance. The pipeline produces MPC-compatible 80-column, ADES PSV, and JSON observation reports and implements a non-negotiable three-step pathway — MPC submission, independent observatory confirmation, and conditional NASA PDCO notification — ensuring that no autonomous impact claim is ever issued.
 
 **Keywords:** near-Earth objects, planetary defense, asteroid detection, automated pipeline, machine learning, real/bogus classification, orbit determination, Bayesian scoring, ZTF, Minor Planet Center
 
@@ -57,7 +57,7 @@ This repository implements a complete, research-grade automated detection and ra
 4. **Independent confirmation before alert** — the NASA PDCO notification pathway is gated on MPC submission *and* independent observatory confirmation, not on pipeline confidence alone.
 5. **No autonomous impact claims** — the system produces ranked candidates and hazard flags; it defers all authoritative impact probability statements to CNEOS Scout and Sentry.
 
-The pipeline follows the build order: `schemas` → `fetch` → `preprocess` → `detect` → `link` → `classify` → `orbit` → `score` → `alert` → `calibration`. Each stage consumes the immutable, typed output of all prior stages. As of v0.87.0, all ten pipeline modules plus background automation are complete, and the offline suite passes 3,466 tests with 2 live checks deselected. Real labeled ZTF data has trained Tier 1 and Tier 2, but no real survey field has completed the full pipeline; see `docs/PRODUCTION_READINESS.md` for the production gap register.
+The pipeline follows the build order: `schemas` → `fetch` → `preprocess` → `detect` → `link` → `classify` → `orbit` → `score` → `alert` → `calibration`. Each stage consumes the immutable, typed output of all prior stages. As of v0.87.0, all ten pipeline modules plus background automation are complete, and the offline suite passes 3,475 tests with 2 live checks deselected. Real labeled ZTF data has trained Tier 1 and Tier 2, but no real survey field has completed the full pipeline; see `docs/PRODUCTION_READINESS.md` for the production gap register.
 
 ---
 
@@ -534,7 +534,7 @@ The diagram below shows how data and artifacts move between the repository's top
 │   ├── calibration.py            # Platt / isotonic PAVA calibration
 │   └── py.typed                  # PEP 561 type information marker
 │
-├── tests/                        # pytest suite (3466 passing; 2 live/integration deselected)
+├── tests/                        # pytest suite (3475 passing; 2 live/integration deselected)
 │   ├── conftest.py               # Shared fixtures and synthetic tracklet factories
 │   ├── test_schemas.py
 │   ├── test_fetch.py
@@ -563,6 +563,7 @@ The diagram below shows how data and artifacts move between the repository's top
 │   ├── benchmark_pipeline.py     # Time classify + score on N synthetic tracklets
 │   ├── train_tier2_cnn.py        # Fine-tune CNN on labeled ZTF cutout CSV
 │   ├── train_tier3_transformer.py # Train Transformer on MPC tracklet CSV
+│   ├── run_tier3_pilot.py        # Atomic, resumable Tier 3 pilot workflow
 │   ├── validate_pipeline_run.py  # Validate run JSON and guardrail language
 │   ├── export_atlas_lightcurve.py # Export ATLAS forced-photometry lightcurves
 │   ├── neo_mcp_server.py         # Project-scoped MCP guard server
@@ -570,6 +571,7 @@ The diagram below shows how data and artifacts move between the repository's top
 │
 ├── Logs/                         # Top-level SQLite background automation logs
 │   ├── background.sqlite         # Created by `Skills/background.py run-once`
+│   ├── tier3_pilot.sqlite        # Tier 3 operator run and stage ledger
 │   └── reports/                  # Internal needs-follow-up report drafts
 │
 ├── data/                         # Reference data and baselines
@@ -887,7 +889,7 @@ Compare the output against the baseline in `data/injection_recovery_baseline.jso
 | 5. Calibrator refit | `evaluate_calibration.py` | ECE ≤ 0.05; Brier ≤ 0.10 |
 | 6. Linker tuned (if needed) | `tune_linker.py` | Link rate ≥ baseline − 5% |
 | 7. Injection-recovery passed | `injection_recovery.py` | Link + score rate ≥ baseline − 5% |
-| 8. Full default test collection is stable | `pytest --collect-only` | 3466 passing tests; 2 live/integration tests deselected |
+| 8. Full default test collection is stable | `pytest --collect-only` | 3475 passing tests; 2 live/integration tests deselected |
 | 9. Models committed | `git add models/` | New weights in version control |
 
 ---
@@ -961,7 +963,7 @@ PYTHONPATH=src python Skills/smoke_test.py
 
 ```bash
 OMP_NUM_THREADS=1 PYTHONPATH=src python -m pytest --collect-only -q
-# Expected result: 3466 passing tests; 2 live/integration checks deselected.
+# Expected result: 3475 passing tests; 2 live/integration checks deselected.
 ```
 
 For a full local run, use:
@@ -1151,7 +1153,7 @@ The older n=50 baseline remains in `data/injection_recovery_baseline.json` for h
 | `score.py` | — | 100% |
 | `alert.py` | — | 100% |
 | `calibration.py` | — | 100% |
-| **Total** | **3466 passing tests** | **100% target; verify with coverage run before release** |
+| **Total** | **3475 passing tests** | **100% target; verify with coverage run before release** |
 
 ---
 
@@ -1168,7 +1170,7 @@ followed by the quantitative production calibration gate.
 
 | Area | Status | Notes |
 |---|---|---|
-| Core pipeline modules | **Complete** | All 10 modules: 3466 tests passing, 100% coverage target, ruff + mypy clean |
+| Core pipeline modules | **Complete** | All 10 modules: 3475 tests passing, 100% coverage target, ruff + mypy clean |
 | Synthetic validation | **Complete** | 100% detection/link/score on n=200 synthetic tracklets. Not a substitute for real-data validation. |
 | Background automation CLI | **Complete** | `Skills/background.py` — offline scheduler, SQLite audit logs, signoff packets, readiness summaries |
 | ML model weights | **PARTIAL** | T1-A gap. Tier 1 XGBoost and Tier 2 CNN weights are trained and committed; Tier 3 Transformer sequence data and weights are missing. |
@@ -1227,6 +1229,7 @@ followed by the quantitative production calibration gate.
 | **P29** | Complete | Five-class acquisition and split tooling | MPC early/late windows, ALeRCE bogus histories, fail-closed validation, source hashes, grouped splits |
 | **P30** | **Pending operator run** | Five-class Tier 3 pilot accepted | Run 50/class read-only acquisition on Mac and review `data/sequences/pilot/preparation_report.json` |
 | **P31** | **In progress** | First Tier 3 pilot evidence audited | Initial manifest had 28 duplicate comet rows and the MPC checkpoint recorded 103 zero-result queries without provider-error detail; fail-closed uniqueness, provider-error, and training-evidence gates are being applied before rerun |
+| **P32** | **In progress** | Atomic Tier 3 operator workflow | One command pins Python and git state, blocks checkout changes, uses reserve pools, stops after the first failed contract, resumes checkpoints, and writes top-level SQLite stage evidence |
 
 ### 15.5 Known Limitations
 
