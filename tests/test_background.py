@@ -681,9 +681,11 @@ def test_background_cli_blueprint_compliance_summary(monkeypatch, tmp_path):
         ],
         cwd=repo,
         env=env,
+        stdin=subprocess.DEVNULL,
         text=True,
         capture_output=True,
         check=True,
+        timeout=30,
     )
 
     payload = json.loads(result.stdout)

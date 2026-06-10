@@ -338,12 +338,8 @@ def _tier2_predict(
     model: Any = None,
 ) -> dict[str, OptScore] | None:
     """Return Tier 2 CNN probabilities, or None if cutouts unavailable."""
-    if model is None:
-        model = _load_cnn_model()
-    if model is None:
-        return None
-
-    # Collect first observation with all three cutouts
+    # Collect first observation with all three cutouts before loading Torch/CNN.
+    # This keeps summary/CLI paths lightweight when fixtures have no image triplets.
     triplet = None
     for obs in tracklet.observations:
         if obs.cutout_science and obs.cutout_reference and obs.cutout_difference:
@@ -355,6 +351,11 @@ def _tier2_predict(
                 break
 
     if triplet is None:
+        return None
+
+    if model is None:
+        model = _load_cnn_model()
+    if model is None:
         return None
 
     try:
