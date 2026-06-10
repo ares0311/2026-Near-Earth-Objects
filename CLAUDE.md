@@ -467,23 +467,30 @@ log_score_neo =
 
 ## Quality Commands
 
+**Always use `uv run` — never call `python` or `pytest` directly.**
+The project venv is Python 3.14.3 managed by uv from `uv.lock`. Using bare
+`python` risks picking up a different system interpreter and diverging from CI.
+
 ```bash
 # Lint
-ruff check .
-ruff check . --fix
+uv run ruff check .
+uv run ruff check . --fix
 
 # Type-check
-python -m mypy src
+uv run python -m mypy src
 
-# Tests
-PYTHONPATH=src python -m pytest
+# Tests (PYTHONPATH=src set via env for uv run)
+PYTHONPATH=src uv run python -m pytest
 
 # macOS local runs with XGBoost/OpenMP may need deterministic threading
-OMP_NUM_THREADS=1 PYTHONPATH=src python -m pytest
+OMP_NUM_THREADS=1 PYTHONPATH=src uv run python -m pytest
 
 # All three
-ruff check . && python -m mypy src && PYTHONPATH=src python -m pytest
+uv run ruff check . && uv run python -m mypy src && PYTHONPATH=src uv run python -m pytest
 ```
+
+CI uses `uv sync --extra dev` (from `uv.lock`) then `uv run` — identical to
+the local venv. Python version is pinned to 3.14 in `.github/workflows/ci.yml`.
 
 Live integration tests (require network access to ZTF/ATLAS/MPC) must be marked:
 
