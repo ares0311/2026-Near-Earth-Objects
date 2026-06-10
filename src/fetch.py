@@ -664,7 +664,12 @@ def _mpc_row_value(row: object, *names: str, default: Any = None) -> Any:
     return default
 
 
-def fetch_mpc_observations(designation: str, force_refresh: bool = False) -> list:
+def fetch_mpc_observations(
+    designation: str,
+    force_refresh: bool = False,
+    *,
+    raise_on_error: bool = False,
+) -> list:
     """Fetch MPC observation history for a known-object designation.
 
     Queries ``astroquery.mpc`` for all observations of the given designation
@@ -674,6 +679,7 @@ def fetch_mpc_observations(designation: str, force_refresh: bool = False) -> lis
     Args:
         designation: Official MPC number or unpacked provisional designation.
         force_refresh: Bypass both the project cache and astroquery cache.
+        raise_on_error: Re-raise provider failures for audited acquisition workflows.
     """
     import hashlib
 
@@ -731,6 +737,8 @@ def fetch_mpc_observations(designation: str, force_refresh: bool = False) -> lis
         _save_cache(cache_key, [o.model_dump() for o in obs_list])
         return obs_list
     except Exception:
+        if raise_on_error:
+            raise
         return []
 
 
