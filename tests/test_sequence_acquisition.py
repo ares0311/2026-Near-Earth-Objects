@@ -549,3 +549,83 @@ def test_parallel_resume_skips_already_accepted(tmp_path: Path) -> None:
     assert set(first_calls) == {"433", "434"}
     assert calls == []
     assert resumed["summary"]["accepted_objects"] == 2
+
+
+def test_parallel_circuit_breaker_threshold_scales_with_workers(tmp_path: Path) -> None:
+    """With workers=4, base threshold 3 needs 3+(4-1)=6 consecutive errors to trip.
+
+    With the old code, 3 errors from 3 concurrent workers would trip immediately
+    because as_completed() returns errors before successes.  The fix adds
+    (workers-1) to the threshold so the initial worker burst cannot false-trip.
+    """
+    module = _load_skill()
+    manifest = tmp_path / "labels.csv"
+    output = tmp_path / "raw.json"
+    # 4 failing + 2 succeeding: errors should NOT trip (4 < effective threshold 6)
+    _write_manifest(
+        manifest,
+        [
+            ("fail-1", "neo_candidate"),
+            ("fail-2", "neo_candidate"),
+            ("fail-3", "main_belt_asteroid"),
+            ("fail-4", "main_belt_asteroid"),
+            ("ok-1", "neo_candidate"),
+            ("ok-2", "main_belt_asteroid"),
+        ],
+    )
+
+    def selective_fetcher(
+        designation: str, force_refresh: bool = False
+    ) -> list[SimpleNamespace]:
+        if designation.startswith("fail-"):
+            raise ConnectionError(f"provider down for {designation}")
+        return _observations(designation)
+
+    # With workers=4 and max_consecutive_query_errors=3, effective threshold = 6.
+    # Four errors do not reach 6, so no RuntimeError should be raised.
+    result = module.collect_sequence_dataset(
+        manifest,
+        output,
+        6,
+        retries=0,
+        query_delay_seconds=0,
+        max_consecutive_query_errors=3,
+        workers=4,
+        fetcher=selective_fetcher,
+    )
+    assert result["summary"]["accepted_objects"] == 2
+    checkpoint = json.loads(output.read_text(encoding="utf-8"))
+    error_count = sum(
+        1 for item in checkpoint["query_log"] if item["status"] == "query_error"
+    )
+    assert error_count == 4
+
+
+def test_parallel_circuit_breaker_error_message_includes_diagnostics(
+    tmp_path: Path,
+) -> None:
+    """The circuit-break error message must include failing designation and error type."""
+    module = _load_skill()
+    manifest = tmp_path / "labels.csv"
+    output = tmp_path / "raw.json"
+    _write_manifest(
+        manifest,
+        [("bad-1", "neo_candidate"), ("bad-2", "neo_candidate")],
+    )
+
+    def failing_fetcher(
+        designation: str, force_refresh: bool = False
+    ) -> list[SimpleNamespace]:
+        raise ConnectionError("mpc down")
+
+    with pytest.raises(RuntimeError, match=r"recent failures:.*bad-1.*ConnectionError"):
+        module.collect_sequence_dataset(
+            manifest,
+            output,
+            2,
+            retries=0,
+            query_delay_seconds=0,
+            max_consecutive_query_errors=1,
+            workers=1,
+            fetcher=failing_fetcher,
+        )
