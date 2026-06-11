@@ -1,7 +1,7 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.87.0  
-**Last updated**: 2026-06-10
+**Current version**: v0.87.2  
+**Last updated**: 2026-06-11
 **Purpose**: Mandatory read at session start (per MANDATORY SESSION-START PROTOCOL).  
 Every planning cycle must name the highest-priority unresolved Tier 1 gap and show how proposed steps close or directly unblock it.
 
@@ -26,7 +26,7 @@ The following work is done and must NOT be repeated:
 | `calibration.py` | test_calibration.py | 100% |
 
 ### Infrastructure
-- 3475 offline tests pass; 2 live checks deselected; `ruff` clean; `mypy` clean
+- 3499 offline tests pass; 2 live checks deselected; `ruff` clean; `mypy` clean
 - Background automation CLI (`Skills/background.py`) with SQLite audit logs
 - 90+ Skills scripts for batch operations, export, diagnostics, visualization
 - 30+ documentation files covering all pipeline stages
@@ -81,6 +81,11 @@ calibration and alert-gate qualification cannot be completed.
   changed branches during the long run. The replacement is one atomic runner
   with commit pinning, an active-run marker, reserve candidate pools, resumable
   checkpoints, and top-level SQLite stage outcomes.
+- v0.87.2 (2026-06-11): Three further pilot-robustness fixes merged — parallel
+  circuit-breaker bias adjustment (threshold now `max_errors + workers - 1`),
+  `None`-table guard in `fetch_mpc_observations`, and query-level exception
+  classification (non-infrastructure errors no longer feed the circuit breaker).
+  Pilot rerun in progress with `--workers 4`.
 - **Still needed**: A five-class real sequence dataset, Tier 3 Transformer
   training, and the complete production calibration KPI evaluation.
 

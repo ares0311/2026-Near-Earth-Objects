@@ -532,9 +532,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.87.0)
+## Current State (v0.87.2)
 
-All 10 pipeline modules are complete. The offline suite passes 3475 tests, with
+All 10 pipeline modules are complete. The offline suite passes 3499 tests, with
 2 live/integration checks deselected. CI is expected to
 remain green on Python 3.14 with the 100% coverage target. Background
 automation uses one unified CLI with top-level SQLite audit logs, offline
@@ -551,7 +551,11 @@ The first operator pilot attempt was retained as diagnostic evidence. Its
 200-row manifest contained 28 duplicate comet rows, reducing collection to 172
 unique objects, and its MPC checkpoint recorded 103 zero-result queries without
 distinguishing provider errors. Corrected uniqueness, provider-error circuit
-breaker, and held-out Tier 3 training-report gates must be merged before rerun.
+breaker, parallel-mode circuit-breaker bias fix, and held-out Tier 3
+training-report gates are merged. The MPC fetcher now correctly classifies
+None-table returns and query-level errors as insufficient_observations rather
+than provider failures, preventing false circuit-breaker trips on bad
+designations.
 
 ### Skills
 
@@ -693,6 +697,26 @@ breaker, and held-out Tier 3 training-report gates must be merged before rerun.
 - Run credentialed live-data dry runs for ZTF/ATLAS/Pan-STARRS only when tokens and review policy are explicitly configured.
 - Train and evaluate Tier 2/Tier 3 model weights on real labeled data.
 - Commit `models/tier1_xgb.json` after `.gitignore` update to allow `models/*.json` is merged.
+
+### Key Changes in v0.87.2 (pilot robustness)
+
+- `src/fetch.py`: `fetch_mpc_observations` — added `None`-table guard (MPC returns `None`
+  for unknown designations; was causing `TypeError` treated as provider failure); added
+  `_INFRA_ERRORS` tuple to distinguish infrastructure failures (`ConnectionError`,
+  `TimeoutError`, `OSError`) from query-level errors; query-level errors now return `[]`
+  regardless of `raise_on_error` so they are classified as `insufficient_observations`
+  rather than `query_error` and do not feed the circuit breaker.
+- `src/alert.py`: two remaining `elif` chains in `validate_alert_package` converted to
+  independent `if` statements to fix Python 3.14.5 branch-coverage miss.
+- `Skills/query_mpc_observations.py`: parallel circuit-breaker effective threshold raised
+  to `max_consecutive_query_errors + (workers - 1)` to compensate for `as_completed()`
+  ordering bias; error messages now include failing designation names and error types.
+- `tests/test_fetch.py`: 4 new tests covering None-table, query-level non-raise, and
+  infrastructure-raise behaviour in `fetch_mpc_observations`.
+- `tests/test_sequence_acquisition.py`: 2 new tests covering parallel threshold scaling
+  and diagnostic message content.
+- 3499 tests passing; 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.87.2.
 
 ### Key Changes in v0.87.1 (training milestone)
 
