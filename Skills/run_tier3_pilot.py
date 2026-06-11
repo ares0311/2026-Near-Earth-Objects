@@ -271,6 +271,7 @@ def _default_stages(
     *,
     candidate_pool_per_class: int,
     target_per_class: int,
+    workers: int = 1,
 ) -> dict[str, Callable[[], dict[str, Any]]]:
     """Build the four production pilot stages from modules loaded once."""
     labels = _load_skill("generate_training_labels.py")
@@ -310,6 +311,7 @@ def _default_stages(
             max_consecutive_query_errors=3,
             target_per_class=target_per_class,
             resume=True,
+            workers=workers,
         )
         return {"path": str(paths.mpc), **dataset["summary"]}
 
@@ -329,6 +331,7 @@ def _default_stages(
             candidate_page_size=25,
             max_candidate_pages=40,
             resume=True,
+            workers=workers,
         )
         return {"path": str(paths.alerce), **dataset["summary"]}
 
@@ -359,6 +362,7 @@ def run_pilot(
     *,
     candidate_pool_per_class: int = 100,
     target_per_class: int = 50,
+    workers: int = 1,
     active_marker: Path = DEFAULT_ACTIVE_MARKER,
     preflight_fn: Callable[[], dict[str, str]] = _preflight,
     guard_fn: Callable[[dict[str, str]], None] = _assert_repo_unchanged,
@@ -383,6 +387,7 @@ def run_pilot(
                 paths,
                 candidate_pool_per_class=candidate_pool_per_class,
                 target_per_class=target_per_class,
+                workers=workers,
             )
             results: dict[str, Any] = {}
             for stage in STAGE_ORDER:
@@ -469,6 +474,15 @@ def main() -> int:
     parser.add_argument("--db", type=Path, default=DEFAULT_DB_PATH)
     parser.add_argument("--candidate-pool-per-class", type=int, default=100)
     parser.add_argument("--target-per-class", type=int, default=50)
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help=(
+            "Parallel fetch threads for MPC and ALeRCE acquisition stages (default 1). "
+            "Recommended: --workers 4 with --query-delay-seconds 1.0 for MPC."
+        ),
+    )
     parser.add_argument("--status", action="store_true")
     args = parser.parse_args()
 
@@ -481,6 +495,7 @@ def main() -> int:
             args.db,
             candidate_pool_per_class=args.candidate_pool_per_class,
             target_per_class=args.target_per_class,
+            workers=args.workers,
         )
     except Exception as exc:
         print(f"Tier 3 pilot stopped safely: {exc}", file=sys.stderr)
