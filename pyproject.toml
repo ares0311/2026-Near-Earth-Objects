@@ -36,7 +36,9 @@ where = ["src"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+# py314 is not yet a valid ruff target-version; py313 is the highest supported value.
+# Update to py314 once ruff adds support.
+target-version = "py313"
 # Exclude shell scripts — ruff only lints Python files
 exclude = ["Skills/*.sh"]
 
@@ -44,7 +46,7 @@ exclude = ["Skills/*.sh"]
 select = ["E", "F", "W", "I", "UP"]
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.14"
 ignore_missing_imports = true
 no_strict_optional = true
 

@@ -11,38 +11,29 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.11", "3.12"]
+        # Python 3.14.3 matches the project venv (.venv) on the operator Mac.
+        # uv manages the venv from uv.lock so CI uses identical pinned deps.
+        python-version: ["3.14"]
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+      # Install uv — used to sync the venv from uv.lock, matching the local .venv exactly.
+      - name: Set up uv with Python ${{ matrix.python-version }}
+        uses: astral-sh/setup-uv@v5
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Cache pip
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('pyproject.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-${{ matrix.python-version }}-
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install ruff mypy
-          pip install pydantic numpy scipy astropy requests pytest pytest-cov xgboost scikit-learn
-          pip install types-requests
-          pip install torch --index-url https://download.pytorch.org/whl/cpu
+      # Sync all dev dependencies from the lockfile — no loose pip installs.
+      - name: Install dependencies (from uv.lock)
+        run: uv sync --extra dev
 
       - name: Lint (ruff)
-        run: ruff check .
+        run: uv run ruff check .
 
       - name: Type-check (mypy)
         run: |
-          python -m mypy src \
+          uv run python -m mypy src \
             --ignore-missing-imports \
             --no-strict-optional \
             --disable-error-code=no-any-return \
@@ -51,4 +42,11 @@ jobs:
             --disable-error-code=unused-ignore
 
       - name: Test
-        run: PYTHONPATH=src python -m pytest -m "not integration_live" -q --cov=src --cov-fail-under=100
+        run: |
+          uv run python -m pytest \
+            -m "not integration_live" \
+            -q \
+            --cov=src \
+            --cov-fail-under=100
+        env:
+          PYTHONPATH: src

@@ -14,6 +14,13 @@ It contains the facts a coding agent needs to work productively without re-readi
   files, check for `Logs/tier3_pilot.active.json`. If present, do not alter the
   shared checkout until the operator run exits and removes the marker.
 
+- **Python runtime is 3.14.3 — always use `uv run`**: The project venv is
+  Python 3.14.3, managed by uv from `uv.lock`. Never invoke bare `python`,
+  `pytest`, `mypy`, or `ruff` directly — always prefix with `uv run` so the
+  correct interpreter and locked dependencies are used. CI enforces the same
+  via `astral-sh/setup-uv@v5` with `python-version: "3.14"`.
+  Example: `PYTHONPATH=src uv run python -m pytest`
+
 ---
 
 ## Project
@@ -423,22 +430,25 @@ log_score_neo =
 
 ## Quality Commands
 
+**Always use `uv run` — never call `python`, `pytest`, `mypy`, or `ruff` directly.**
+The project venv is Python 3.14.3 managed by uv from `uv.lock`.
+
 ```bash
 # Lint
-ruff check .
-ruff check . --fix
+uv run ruff check .
+uv run ruff check . --fix
 
 # Type-check
-python -m mypy src
+uv run python -m mypy src
 
 # Tests
-PYTHONPATH=src python -m pytest
+PYTHONPATH=src uv run python -m pytest
 
 # macOS local runs with XGBoost/OpenMP may need deterministic threading
-OMP_NUM_THREADS=1 PYTHONPATH=src python -m pytest
+OMP_NUM_THREADS=1 PYTHONPATH=src uv run python -m pytest
 
 # All three
-ruff check . && python -m mypy src && PYTHONPATH=src python -m pytest
+uv run ruff check . && uv run python -m mypy src && PYTHONPATH=src uv run python -m pytest
 ```
 
 Live integration tests (require network access to ZTF/ATLAS/MPC) must be marked:
@@ -482,7 +492,7 @@ and excluded from CI.
 
 All 10 pipeline modules are complete. The offline suite passes 3475 tests, with
 2 live/integration checks deselected. CI is expected to
-remain green on Python 3.11 and 3.12 with the 100% coverage target. Tier 1 and
+remain green on Python 3.14 with the 100% coverage target. Tier 1 and
 Tier 2 were trained on real labeled data, but no real survey field has completed
 the full pipeline and no internally detected object has been externally reported.
 

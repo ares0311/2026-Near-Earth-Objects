@@ -396,6 +396,7 @@ def test_manifest_validation_fails_closed(
         ("query_delay_seconds", -1, "query_delay_seconds"),
         ("max_consecutive_query_errors", 0, "max_consecutive_query_errors"),
         ("target_per_class", 0, "target_per_class"),
+        ("workers", 0, "workers"),
     ],
 )
 def test_collection_bounds_are_validated(
@@ -419,3 +420,132 @@ def test_collection_bounds_are_validated(
 
     with pytest.raises(ValueError, match=message):
         module.collect_sequence_dataset(**arguments)
+
+
+def test_parallel_workers_produce_complete_dataset(tmp_path: Path) -> None:
+    """Multiple workers must accept all designations and write a valid checkpoint."""
+    module = _load_skill()
+    manifest = tmp_path / "labels.csv"
+    output = tmp_path / "raw.json"
+    _write_manifest(
+        manifest,
+        [
+            ("neo-1", "neo_candidate"),
+            ("neo-2", "neo_candidate"),
+            ("mba-1", "main_belt_asteroid"),
+            ("mba-2", "main_belt_asteroid"),
+        ],
+    )
+
+    dataset = module.collect_sequence_dataset(
+        manifest,
+        output,
+        4,
+        query_delay_seconds=0,
+        workers=4,
+        fetcher=lambda designation, force_refresh=False: _observations(designation),
+    )
+
+    assert dataset["summary"]["accepted_objects"] == 4
+    accepted = {entry["designation"] for entry in dataset["entries"]}
+    assert accepted == {"neo-1", "neo-2", "mba-1", "mba-2"}
+    assert dataset["safety"]["external_submission_enabled"] is False
+    # checkpoint on disk must also reflect all four entries
+    persisted = json.loads(output.read_text(encoding="utf-8"))
+    assert persisted["summary"]["accepted_objects"] == 4
+
+
+def test_parallel_mode_respects_target_per_class(tmp_path: Path) -> None:
+    """Parallel workers must not exceed the accepted quota per class."""
+    module = _load_skill()
+    manifest = tmp_path / "labels.csv"
+    output = tmp_path / "raw.json"
+    _write_manifest(
+        manifest,
+        [
+            ("neo-1", "neo_candidate"),
+            ("neo-2", "neo_candidate"),
+            ("neo-3", "neo_candidate"),
+            ("mba-1", "main_belt_asteroid"),
+            ("mba-2", "main_belt_asteroid"),
+            ("mba-3", "main_belt_asteroid"),
+        ],
+    )
+
+    dataset = module.collect_sequence_dataset(
+        manifest,
+        output,
+        6,
+        query_delay_seconds=0,
+        workers=4,
+        target_per_class=1,
+        fetcher=lambda designation, force_refresh=False: _observations(designation),
+    )
+
+    counts = dataset["summary"]["accepted_class_counts"]
+    assert counts.get("neo_candidate", 0) <= 1
+    assert counts.get("main_belt_asteroid", 0) <= 1
+
+
+def test_parallel_circuit_breaker_trips_on_consecutive_errors(tmp_path: Path) -> None:
+    """The circuit breaker must still stop acquisition when errors exceed the threshold."""
+    module = _load_skill()
+    manifest = tmp_path / "labels.csv"
+    output = tmp_path / "raw.json"
+    _write_manifest(
+        manifest,
+        [
+            ("neo-1", "neo_candidate"),
+            ("neo-2", "neo_candidate"),
+            ("mba-1", "main_belt_asteroid"),
+        ],
+    )
+
+    def failing_fetcher(designation: str, force_refresh: bool = False) -> list[SimpleNamespace]:
+        """Simulate an unavailable provider for all designations."""
+        raise ConnectionError(f"provider down for {designation}")
+
+    with pytest.raises(RuntimeError, match="consecutive provider errors"):
+        module.collect_sequence_dataset(
+            manifest,
+            output,
+            3,
+            retries=0,
+            query_delay_seconds=0,
+            max_consecutive_query_errors=2,
+            workers=2,
+            fetcher=failing_fetcher,
+        )
+
+    checkpoint = json.loads(output.read_text(encoding="utf-8"))
+    assert checkpoint["schema_version"] == module.SCHEMA_VERSION
+    assert all(item["status"] == "query_error" for item in checkpoint["query_log"])
+
+
+def test_parallel_resume_skips_already_accepted(tmp_path: Path) -> None:
+    """Resume mode must work correctly with workers > 1."""
+    module = _load_skill()
+    manifest = tmp_path / "labels.csv"
+    output = tmp_path / "raw.json"
+    _write_manifest(manifest, [("433", "neo_candidate"), ("434", "neo_candidate")])
+    calls: list[str] = []
+
+    def fetcher(designation: str, force_refresh: bool = False) -> list[SimpleNamespace]:
+        calls.append(designation)
+        return _observations(designation)
+
+    # First run: fetch both.
+    module.collect_sequence_dataset(
+        manifest, output, 2, query_delay_seconds=0, workers=2, fetcher=fetcher
+    )
+    first_calls = list(calls)
+    calls.clear()
+
+    # Second run with resume: no new fetches should occur.
+    resumed = module.collect_sequence_dataset(
+        manifest, output, 2, query_delay_seconds=0, workers=2, resume=True, fetcher=fetcher
+    )
+
+    assert set(first_calls) == {"433", "434"}
+    assert calls == []
+    assert resumed["summary"]["accepted_objects"] == 2

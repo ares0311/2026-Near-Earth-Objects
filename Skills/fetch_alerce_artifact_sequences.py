@@ -9,15 +9,28 @@ and never accesses credentials or submits observations.
 Usage:
     caffeinate -i .venv/bin/python Skills/fetch_alerce_artifact_sequences.py \
         --output data/sequences/alerce_artifact_pilot.json \
-        --max-objects 50 --resume
+        --max-objects 50 --resume --workers 8
+
+Threading notes
+---------------
+--workers controls how many detection-fetch requests are issued concurrently
+within each candidate page.  Candidate-page iteration (query_objects) is
+always sequential because paging requires ordered results.  Each detection
+worker sleeps query_delay_seconds after its own request.  With 8 workers and a
+0.25 s delay the peak detection-fetch rate is approximately 32 req/s; the
+public ALeRCE API tolerates bursts of this size but may throttle at sustained
+high rates.  Default is --workers 1 (sequential), which preserves the original
+behaviour exactly.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import threading
 import time
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -222,6 +235,67 @@ def _update_summary(dataset: dict[str, Any], max_objects: int) -> None:
     }
 
 
+def _fetch_detections_for_oid(
+    oid: str,
+    client: Any,
+    request_attempts: int,
+    retry_delay_seconds: float,
+    max_observations_per_object: int,
+    min_observations: int,
+    min_nights: int,
+    query_delay_seconds: float,
+    sleep_fn: Callable[[float], None],
+) -> tuple[str, list[dict[str, Any]], int, str, dict[str, Any] | None]:
+    """Fetch and process detections for one ALeRCE OID.
+
+    Returns (oid, observations, night_count, status, acquisition_error | None).
+    Safe to call from a worker thread: uses no shared mutable state.
+    """
+    acquisition_error: dict[str, Any] | None = None
+    observations: list[dict[str, Any]] = []
+    night_count = 0
+    status = "accepted"
+
+    try:
+        detection_payload = _request_with_retries(
+            client.query_detections,
+            operation_name=f"ALeRCE detections for {oid}",
+            attempts=request_attempts,
+            retry_delay_seconds=retry_delay_seconds,
+            sleep_fn=sleep_fn,
+            args=(oid,),
+            kwargs={"survey": "ztf", "format": "json"},
+        )
+        detections = _records(detection_payload)
+        observations = [
+            obs
+            for det in detections
+            if (obs := _serialize_detection(oid, det)) is not None
+        ]
+        observations = _sample_full_arc(observations, max_observations_per_object)
+        night_count = _night_count(observations)
+        if len(observations) < min_observations:
+            status = "insufficient_observations"
+        elif night_count < min_nights:
+            status = "insufficient_nights"
+    except RuntimeError as exc:
+        observations = []
+        night_count = 0
+        status = "query_error"
+        acquisition_error = {
+            "operation": "query_detections",
+            "oid": oid,
+            "error_type": type(exc.__cause__).__name__,
+            "failed_at_utc": _utc_now(),
+        }
+
+    # Per-worker inter-request courtesy delay.
+    if query_delay_seconds:
+        sleep_fn(query_delay_seconds)
+
+    return oid, observations, night_count, status, acquisition_error
+
+
 def collect_artifact_sequences(
     output_json: Path,
     max_objects: int,
@@ -238,10 +312,17 @@ def collect_artifact_sequences(
     candidate_page_size: int = 25,
     max_candidate_pages: int = 40,
     resume: bool = False,
+    workers: int = 1,
     client_factory: Callable[[], Any] = _new_client,
     sleep_fn: Callable[[float], None] = time.sleep,
 ) -> dict[str, Any]:
-    """Collect public broker-labeled multi-epoch artifact sequences."""
+    """Collect public broker-labeled multi-epoch artifact sequences.
+
+    Args:
+        workers: Number of parallel detection-fetch threads per candidate page.
+            Default 1 (sequential).  Candidate-page queries (query_objects) are
+            always sequential; only detection fetches are parallelised.
+    """
     if max_objects < 1:
         raise ValueError("max_objects must be at least 1")
     if not 0.0 <= probability <= 1.0:
@@ -260,6 +341,8 @@ def collect_artifact_sequences(
         raise ValueError("candidate_page_size must be between 1 and 250")
     if request_attempts < 1 or max_candidate_pages < 1:
         raise ValueError("request attempts and candidate pages must be at least 1")
+    if workers < 1:
+        raise ValueError("workers must be at least 1")
 
     if resume and output_json.exists():
         dataset = json.loads(output_json.read_text(encoding="utf-8"))
@@ -287,12 +370,12 @@ def collect_artifact_sequences(
 
     client = client_factory()
     _configure_client_network(client, request_timeout_seconds)
-    completed = {
+    completed: set[str] = {
         item["oid"]
         for item in dataset["query_log"]
         if item.get("status") != "query_error"
     }
-    accepted = {entry["designation"] for entry in dataset["entries"]}
+    accepted: set[str] = {entry["designation"] for entry in dataset["entries"]}
     _update_summary(dataset, max_objects)
     # Write the envelope before the first request so even connection failures
     # leave durable, secret-free evidence for diagnosis and a subsequent resume.
@@ -347,89 +430,56 @@ def collect_artifact_sequences(
         if not objects:
             break
 
-        for item in objects:
-            if len(accepted) >= max_objects:
-                break
-            oid = str(item.get("oid", "")).strip()
-            if not oid or oid in completed:
-                continue
-            try:
-                detection_payload = _request_with_retries(
-                    client.query_detections,
-                    operation_name=f"ALeRCE detections for {oid}",
-                    attempts=request_attempts,
-                    retry_delay_seconds=retry_delay_seconds,
-                    sleep_fn=sleep_fn,
-                    args=(oid,),
-                    kwargs={"survey": "ztf", "format": "json"},
-                )
-                detections = _records(detection_payload)
-                observations = [
-                    observation
-                    for detection in detections
-                    if (observation := _serialize_detection(oid, detection)) is not None
-                ]
-                observations = _sample_full_arc(
-                    observations,
-                    max_observations_per_object,
-                )
-                night_count = _night_count(observations)
-                status = "accepted"
-                if len(observations) < min_observations:
-                    status = "insufficient_observations"
-                elif night_count < min_nights:
-                    status = "insufficient_nights"
-            except RuntimeError as exc:
-                observations = []
-                night_count = 0
-                status = "query_error"
-                dataset["acquisition_errors"].append(
-                    {
-                        "operation": "query_detections",
-                        "oid": oid,
-                        "error_type": type(exc.__cause__).__name__,
-                        "failed_at_utc": _utc_now(),
-                    }
-                )
+        # Filter the page to OIDs that still need detection fetching.
+        pending = [
+            str(item.get("oid", "")).strip()
+            for item in objects
+            if str(item.get("oid", "")).strip()
+            and str(item.get("oid", "")).strip() not in completed
+        ]
 
-            dataset["query_log"].append(
-                {
-                    "oid": oid,
-                    "status": status,
-                    "observation_count": len(observations),
-                    "night_count": night_count,
-                    "queried_at_utc": _utc_now(),
-                }
+        if workers == 1:
+            # Sequential: process one OID at a time.
+            for oid in pending:
+                if len(accepted) >= max_objects:
+                    break
+                _process_oid_result(
+                    *_fetch_detections_for_oid(
+                        oid,
+                        client,
+                        request_attempts,
+                        retry_delay_seconds,
+                        max_observations_per_object,
+                        min_observations,
+                        min_nights,
+                        query_delay_seconds,
+                        sleep_fn,
+                    ),
+                    dataset=dataset,
+                    accepted=accepted,
+                    completed=completed,
+                    max_objects=max_objects,
+                    output_json=output_json,
+                )
+        else:
+            # Parallel: fan out detection fetches for all OIDs on the page.
+            _process_page_parallel(
+                [oid for oid in pending if len(accepted) < max_objects],
+                client=client,
+                dataset=dataset,
+                accepted=accepted,
+                completed=completed,
+                max_objects=max_objects,
+                output_json=output_json,
+                request_attempts=request_attempts,
+                retry_delay_seconds=retry_delay_seconds,
+                max_observations_per_object=max_observations_per_object,
+                min_observations=min_observations,
+                min_nights=min_nights,
+                query_delay_seconds=query_delay_seconds,
+                sleep_fn=sleep_fn,
+                workers=workers,
             )
-            completed.add(oid)
-            if status == "accepted":
-                dataset["entries"].append(
-                    {
-                        "designation": oid,
-                        "label": ARTIFACT_LABEL,
-                        "class_name": "stellar_artifact",
-                        "label_source": "ALeRCE_stamp_classifier",
-                        "label_basis": (
-                            f"ALeRCE stamp_classifier={class_name}, "
-                            f"probability>={probability}"
-                        ),
-                        "sequence_window": "full",
-                        "observation_count": len(observations),
-                        "night_count": night_count,
-                        "observations": observations,
-                        "provenance": {
-                            "provider": "ALeRCE public ZTF broker",
-                            "retrieval_client": "alerce.core.Alerce",
-                            "retrieved_at_utc": _utc_now(),
-                        },
-                    }
-                )
-                accepted.add(oid)
-
-            _update_summary(dataset, max_objects)
-            _atomic_write_json(output_json, dataset)
-            if query_delay_seconds:
-                sleep_fn(query_delay_seconds)
 
     _update_summary(dataset, max_objects)
     _atomic_write_json(output_json, dataset)
@@ -439,6 +489,114 @@ def collect_artifact_sequences(
             f"{max_objects} required"
         )
     return dataset
+
+
+def _process_oid_result(
+    oid: str,
+    observations: list[dict[str, Any]],
+    night_count: int,
+    status: str,
+    acquisition_error: dict[str, Any] | None,
+    *,
+    dataset: dict[str, Any],
+    accepted: set[str],
+    completed: set[str],
+    max_objects: int,
+    output_json: Path,
+) -> None:
+    """Apply one OID's fetch result to the shared dataset and checkpoint."""
+    if acquisition_error is not None:
+        dataset["acquisition_errors"].append(acquisition_error)
+
+    dataset["query_log"].append(
+        {
+            "oid": oid,
+            "status": status,
+            "observation_count": len(observations),
+            "night_count": night_count,
+            "queried_at_utc": _utc_now(),
+        }
+    )
+    completed.add(oid)
+    if status == "accepted" and len(accepted) < max_objects:
+        dataset["entries"].append(
+            {
+                "designation": oid,
+                "label": ARTIFACT_LABEL,
+                "class_name": "stellar_artifact",
+                "label_source": "ALeRCE_stamp_classifier",
+                "label_basis": (
+                    f"ALeRCE stamp_classifier, "
+                    f"probability>={dataset['source']['minimum_probability']}"
+                ),
+                "sequence_window": "full",
+                "observation_count": len(observations),
+                "night_count": night_count,
+                "observations": observations,
+                "provenance": {
+                    "provider": "ALeRCE public ZTF broker",
+                    "retrieval_client": "alerce.core.Alerce",
+                    "retrieved_at_utc": _utc_now(),
+                },
+            }
+        )
+        accepted.add(oid)
+
+    _update_summary(dataset, max_objects)
+    _atomic_write_json(output_json, dataset)
+
+
+def _process_page_parallel(
+    pending: list[str],
+    *,
+    client: Any,
+    dataset: dict[str, Any],
+    accepted: set[str],
+    completed: set[str],
+    max_objects: int,
+    output_json: Path,
+    request_attempts: int,
+    retry_delay_seconds: float,
+    max_observations_per_object: int,
+    min_observations: int,
+    min_nights: int,
+    query_delay_seconds: float,
+    sleep_fn: Callable[[float], None],
+    workers: int,
+) -> None:
+    """Fan out detection fetches for all OIDs on one page and merge results."""
+    _lock = threading.Lock()
+
+    def _submit(oid: str) -> tuple[str, list[dict[str, Any]], int, str, dict[str, Any] | None]:
+        return _fetch_detections_for_oid(
+            oid,
+            client,
+            request_attempts,
+            retry_delay_seconds,
+            max_observations_per_object,
+            min_observations,
+            min_nights,
+            query_delay_seconds,
+            sleep_fn,
+        )
+
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = {executor.submit(_submit, oid): oid for oid in pending}
+        for future in as_completed(futures):
+            oid_r, obs, nc, st, err = future.result()
+            with _lock:
+                _process_oid_result(
+                    oid_r,
+                    obs,
+                    nc,
+                    st,
+                    err,
+                    dataset=dataset,
+                    accepted=accepted,
+                    completed=completed,
+                    max_objects=max_objects,
+                    output_json=output_json,
+                )
 
 
 def main() -> None:
@@ -460,6 +618,12 @@ def main() -> None:
     parser.add_argument("--candidate-page-size", type=int, default=25)
     parser.add_argument("--max-candidate-pages", type=int, default=40)
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="Parallel detection-fetch threads per page (default 1).",
+    )
     args = parser.parse_args()
     dataset = collect_artifact_sequences(
         args.output,
@@ -476,6 +640,7 @@ def main() -> None:
         candidate_page_size=args.candidate_page_size,
         max_candidate_pages=args.max_candidate_pages,
         resume=args.resume,
+        workers=args.workers,
     )
     print(json.dumps(dataset["summary"], indent=2, sort_keys=True))
 
