@@ -594,6 +594,8 @@ def _collect_sequential(
 ) -> None:
     """Process designations one at a time (workers=1).  Exact original semantics."""
     consecutive_query_errors = 0
+    # Recent error hints for operator-facing diagnostics in the error message.
+    recent_error_hints: list[str] = []
 
     for row in todo:
         if target_per_class is not None and accepted_counts[row["neo_class"]] >= target_per_class:
@@ -624,14 +626,23 @@ def _collect_sequential(
 
         if log_item["status"] == "query_error":
             consecutive_query_errors += 1
+            hint = (
+                f"{log_item['designation']}"
+                f" ({log_item.get('error_type') or 'unknown'})"
+            )
+            recent_error_hints.append(hint)
+            if len(recent_error_hints) > max_consecutive_query_errors:
+                recent_error_hints.pop(0)
             if consecutive_query_errors >= max_consecutive_query_errors:
                 raise RuntimeError(
                     "MPC acquisition stopped after "
                     f"{consecutive_query_errors} consecutive provider errors; "
+                    f"recent failures: {', '.join(recent_error_hints)}; "
                     f"inspect {output_json}"
                 ) from None
         else:
             consecutive_query_errors = 0
+            recent_error_hints.clear()
 
         if target_per_class is not None and all(
             accepted_counts[class_name] >= target_per_class
@@ -665,11 +676,23 @@ def _collect_parallel(
     serialised through _lock.  The circuit breaker counter is also lock-protected.
     When the error threshold is exceeded, _abort is set so in-flight futures
     drain without updating shared state.
+
+    Parallel-mode threshold adjustment: as_completed() returns futures in
+    wall-clock completion order.  Error responses arrive faster than successes,
+    so the first `workers` completions are statistically biased toward errors.
+    We add (workers - 1) to the trip threshold so that the circuit breaker
+    requires evidence from at least `workers` distinct worker completions before
+    declaring the provider unreachable.
     """
     _lock = threading.Lock()
     _abort = threading.Event()
     consecutive_query_errors = 0
     circuit_break_error: RuntimeError | None = None
+    # Effective threshold accounts for as_completed() ordering bias: with N
+    # workers, we need N-1 extra consecutive error completions before tripping.
+    _effective_threshold = max_consecutive_query_errors + max(0, workers - 1)
+    # Recent error hints for operator-facing diagnostics in the error message.
+    _recent_error_hints: list[str] = []
     # One global rate limiter staggered request *starts* across all threads so
     # they never pile up simultaneously.  Workers remain pipelined (their
     # in-flight requests overlap) but each new request start waits its turn.
@@ -725,15 +748,27 @@ def _collect_parallel(
 
                 if log_item["status"] == "query_error":
                     consecutive_query_errors += 1
-                    if consecutive_query_errors >= max_consecutive_query_errors:
+                    hint = (
+                        f"{log_item['designation']}"
+                        f" ({log_item.get('error_type') or 'unknown'})"
+                    )
+                    _recent_error_hints.append(hint)
+                    if len(_recent_error_hints) > _effective_threshold:
+                        _recent_error_hints.pop(0)
+                    if consecutive_query_errors >= _effective_threshold:
                         circuit_break_error = RuntimeError(
                             "MPC acquisition stopped after "
-                            f"{consecutive_query_errors} consecutive provider errors; "
+                            f"{consecutive_query_errors} consecutive provider errors"
+                            f" (threshold {_effective_threshold} = "
+                            f"{max_consecutive_query_errors} base"
+                            f" + {workers - 1} worker bias); "
+                            f"recent failures: {', '.join(_recent_error_hints)}; "
                             f"inspect {output_json}"
                         )
                         _abort.set()
                 else:
                     consecutive_query_errors = 0
+                    _recent_error_hints.clear()
 
     if circuit_break_error is not None:
         raise circuit_break_error
