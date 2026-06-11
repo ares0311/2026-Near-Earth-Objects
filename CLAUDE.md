@@ -534,7 +534,7 @@ and excluded from CI.
 
 ## Current State (v0.87.2)
 
-All 10 pipeline modules are complete. The offline suite passes 3499 tests, with
+All 10 pipeline modules are complete. The offline suite passes 3500 tests, with
 2 live/integration checks deselected. CI is expected to
 remain green on Python 3.14 with the 100% coverage target. Background
 automation uses one unified CLI with top-level SQLite audit logs, offline
@@ -715,7 +715,7 @@ designations.
   infrastructure-raise behaviour in `fetch_mpc_observations`.
 - `tests/test_sequence_acquisition.py`: 2 new tests covering parallel threshold scaling
   and diagnostic message content.
-- 3499 tests passing; 100% coverage maintained; ruff + mypy clean.
+- 3500 tests passing; 100% coverage maintained; ruff + mypy clean.
 - Version bumped to 0.87.2.
 
 ### Key Changes in v0.87.1 (training milestone)
