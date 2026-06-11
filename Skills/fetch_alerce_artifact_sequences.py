@@ -15,12 +15,13 @@ Threading notes
 ---------------
 --workers controls how many detection-fetch requests are issued concurrently
 within each candidate page.  Candidate-page iteration (query_objects) is
-always sequential because paging requires ordered results.  Each detection
-worker sleeps query_delay_seconds after its own request.  With 8 workers and a
-0.25 s delay the peak detection-fetch rate is approximately 32 req/s; the
-public ALeRCE API tolerates bursts of this size but may throttle at sustained
-high rates.  Default is --workers 1 (sequential), which preserves the original
-behaviour exactly.
+always sequential because paging requires ordered results.  Request *starts*
+within a page are staggered globally by --query-delay-seconds via a rate
+limiter: only one thread may start a new detection request per interval.
+Workers still pipeline (in-flight requests overlap), so --workers 4 with a
+0.25 s delay gives ~4× throughput while the request-start rate stays at 4/s —
+well within the public ALeRCE API's tolerance.  Default is --workers 1
+(sequential), which preserves the original behaviour exactly.
 """
 
 from __future__ import annotations
@@ -235,6 +236,36 @@ def _update_summary(dataset: dict[str, Any], max_objects: int) -> None:
     }
 
 
+class _RateLimiter:
+    """Stagger request starts across threads: one slot per min_interval seconds.
+
+    Same implementation as query_mpc_observations._RateLimiter.  Each thread
+    atomically reserves a time slot, releases the lock, then sleeps only for
+    its own slot's wait time.  N workers pipeline while the aggregate
+    request-start rate never exceeds 1 / min_interval per second.
+    With min_interval=0 the limiter is a no-op (used by tests with delay=0).
+    """
+
+    def __init__(self, min_interval: float, sleep_fn: Callable[[float], None]) -> None:
+        self._min_interval = min_interval
+        self._lock = threading.Lock()
+        self._next_slot = 0.0
+        self._sleep_fn = sleep_fn
+
+    def acquire(self) -> None:
+        """Block until this thread's reserved time slot arrives."""
+        if self._min_interval <= 0:
+            return
+        with self._lock:
+            now = time.monotonic()
+            if now >= self._next_slot:
+                self._next_slot = now + self._min_interval
+                return
+            wait = self._next_slot - now
+            self._next_slot += self._min_interval
+        self._sleep_fn(wait)
+
+
 def _fetch_detections_for_oid(
     oid: str,
     client: Any,
@@ -243,13 +274,13 @@ def _fetch_detections_for_oid(
     max_observations_per_object: int,
     min_observations: int,
     min_nights: int,
-    query_delay_seconds: float,
     sleep_fn: Callable[[float], None],
 ) -> tuple[str, list[dict[str, Any]], int, str, dict[str, Any] | None]:
     """Fetch and process detections for one ALeRCE OID.
 
     Returns (oid, observations, night_count, status, acquisition_error | None).
     Safe to call from a worker thread: uses no shared mutable state.
+    Pacing (inter-request delay) is the caller's responsibility.
     """
     acquisition_error: dict[str, Any] | None = None
     observations: list[dict[str, Any]] = []
@@ -288,10 +319,6 @@ def _fetch_detections_for_oid(
             "error_type": type(exc.__cause__).__name__,
             "failed_at_utc": _utc_now(),
         }
-
-    # Per-worker inter-request courtesy delay.
-    if query_delay_seconds:
-        sleep_fn(query_delay_seconds)
 
     return oid, observations, night_count, status, acquisition_error
 
@@ -443,6 +470,9 @@ def collect_artifact_sequences(
             for oid in pending:
                 if len(accepted) >= max_objects:
                     break
+                # Sequential mode: pace requests with an explicit post-fetch delay.
+                if query_delay_seconds:
+                    sleep_fn(query_delay_seconds)
                 _process_oid_result(
                     *_fetch_detections_for_oid(
                         oid,
@@ -452,7 +482,6 @@ def collect_artifact_sequences(
                         max_observations_per_object,
                         min_observations,
                         min_nights,
-                        query_delay_seconds,
                         sleep_fn,
                     ),
                     dataset=dataset,
@@ -566,8 +595,13 @@ def _process_page_parallel(
 ) -> None:
     """Fan out detection fetches for all OIDs on one page and merge results."""
     _lock = threading.Lock()
+    # One global rate limiter staggers request *starts* so all workers don't
+    # hit ALeRCE simultaneously at the beginning of each page.
+    _rate_limiter = _RateLimiter(query_delay_seconds, sleep_fn)
 
     def _submit(oid: str) -> tuple[str, list[dict[str, Any]], int, str, dict[str, Any] | None]:
+        # Stagger this request start; blocks until the slot is available.
+        _rate_limiter.acquire()
         return _fetch_detections_for_oid(
             oid,
             client,
@@ -576,7 +610,6 @@ def _process_page_parallel(
             max_observations_per_object,
             min_observations,
             min_nights,
-            query_delay_seconds,
             sleep_fn,
         )
 

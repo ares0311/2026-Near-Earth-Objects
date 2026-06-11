@@ -147,6 +147,10 @@ def _apply_astrometric_correction(
     offsets_ra: list[float] = []
     offsets_dec: list[float] = []
     for g in gaia_sources:
+        # Skip catalog-only entries that lack the observed position from
+        # image cross-matching; only fully matched sources yield a valid offset.
+        if "obs_ra" not in g or "obs_dec" not in g:
+            continue
         offsets_ra.append(g["obs_ra"] - g["gaia_ra"])
         offsets_dec.append(g["obs_dec"] - g["gaia_dec"])
 

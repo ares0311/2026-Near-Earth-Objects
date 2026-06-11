@@ -141,6 +141,16 @@ class TestApplyAstrometricCorrection:
         assert result.ra_deg == pytest.approx(179.9, abs=1e-9)
         assert result.dec_deg == pytest.approx(9.9, abs=1e-9)
 
+    def test_catalog_only_sources_skipped(self):
+        # Sources from _query_gaia_sources have only gaia_ra/gaia_dec; obs_ra/obs_dec
+        # are populated only after image cross-matching.  Catalog-only entries must be
+        # skipped gracefully so no KeyError is raised and the obs is returned unchanged.
+        obs = make_obs(ra_deg=180.0, dec_deg=10.0)
+        gaia_sources = [{"gaia_ra": 180.0, "gaia_dec": 10.0}]
+        result = _apply_astrometric_correction(obs, gaia_sources=gaia_sources)
+        assert result.ra_deg == pytest.approx(180.0)
+        assert result.dec_deg == pytest.approx(10.0)
+
 
 class TestPreprocessObservation:
     def test_with_cutout_normalizes(self):
@@ -178,7 +188,12 @@ class TestPreprocessPipeline:
         result = preprocess((obs,), apply_astrometry=False)
         assert len(result.sources) == 1
 
-    def test_apply_astrometry_path(self):
+    def test_apply_astrometry_path(self, monkeypatch):
+        import preprocess as pp_mod
+        # Pin _query_gaia_sources to return empty so the test is deterministic
+        # across Python versions regardless of whether astroquery.gaia is
+        # available and functional on the runner.
+        monkeypatch.setattr(pp_mod, "_query_gaia_sources", lambda *a, **kw: [])
         obs = make_obs(mission="ZTF")
         result = preprocess((obs,), apply_astrometry=True)
         assert len(result.sources) == 1
@@ -228,6 +243,22 @@ class TestGaiaMock:
         monkeypatch.setitem(sys.modules, "astroquery.gaia", mock_astroquery_gaia)
         result = pp_mod._query_gaia_sources(180.0, 10.0)
         assert isinstance(result, list)
+
+    def test_gaia_query_returns_empty_on_error(self, monkeypatch):
+        import sys
+        from unittest.mock import MagicMock
+
+        import preprocess as pp_mod
+        # Force the except path (line 187) by making cone_search_async raise.
+        # On Python 3.14.5 the real astroquery.gaia import succeeds so this
+        # branch is never hit naturally — it must be covered explicitly.
+        mock_gaia = MagicMock()
+        mock_gaia.cone_search_async.side_effect = RuntimeError("simulated failure")
+        mock_astroquery_gaia = MagicMock()
+        mock_astroquery_gaia.Gaia = mock_gaia
+        monkeypatch.setitem(sys.modules, "astroquery.gaia", mock_astroquery_gaia)
+        result = pp_mod._query_gaia_sources(180.0, 10.0)
+        assert result == []
 
 
 class TestPreprocessQualityCuts:
@@ -887,6 +918,32 @@ class TestComputeImageQualityMetricsBranches:
         from .conftest import build_observation
         # Invalid base64 → line 510-511 (except continue) hit
         obs = build_observation(cutout_difference="!!!invalid_base64!!!")
+        result = compute_image_quality_metrics([obs])
+        assert result["background_rms"] is None
+
+    def test_tiny_array_skipped_for_background(self):
+        import base64
+
+        import numpy as np
+
+        from preprocess import compute_image_quality_metrics
+        # Array with fewer than 4 elements → arr.size < 4 branch (546→538)
+        tiny = np.array([1.0, 2.0], dtype=np.float32)
+        b64 = base64.b64encode(tiny.tobytes()).decode()
+        from types import SimpleNamespace
+        obs = SimpleNamespace(
+            cutout_difference=b64,
+            cutout_science=None,
+            cutout_reference=None,
+            ra_deg=180.0,
+            dec_deg=0.0,
+            jd=2460000.0,
+            mag=18.0,
+            mag_err=0.05,
+            filter_band="r",
+            mission="ZTF",
+            obs_id="tiny",
+        )
         result = compute_image_quality_metrics([obs])
         assert result["background_rms"] is None
 
@@ -2162,6 +2219,22 @@ class TestFlagCosmicRays:
         sys.path.insert(0, "src")
         from preprocess import flag_cosmic_rays
         assert flag_cosmic_rays([]) == []
+
+    def test_obs_id_none_not_appended(self):
+        # Obs with a cosmic-ray spike but obs_id=None → 1208→1193 branch
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        import numpy as np
+
+        from preprocess import flag_cosmic_rays
+        arr = np.zeros((63, 63), dtype=np.float32)
+        arr[31, 31] = 1000.0  # extreme outlier triggers the check
+        b64 = self._make_b64(arr)
+        obs = SimpleNamespace(obs_id=None, cutout_difference=b64)
+        flagged = flag_cosmic_rays([obs])
+        assert flagged == []
 
     def test_custom_sigma_threshold(self):
         import sys

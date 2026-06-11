@@ -11,19 +11,19 @@ Usage:
         --output data/sequences/mpc_raw_sequences.json \
         --max-objects 1000 \
         --resume \
-        --workers 8
+        --workers 4
 
 Exit 0 on success; exit 1 on error.
 
 Threading notes
 ---------------
---workers controls how many designations are fetched concurrently.  Each worker
-sleeps for --query-delay-seconds after its own request (independent of other
-workers), so with 8 workers and a 1 s delay the aggregate query rate is
-approximately 8 req/s.  MPC asks users to stay below ~2 req/s from a single
-host; keep --workers <= 2 with the default 1 s delay to be conservative, or
-reduce --query-delay-seconds proportionally for higher worker counts.  The
-default is --workers 1 (sequential), which preserves the original behaviour.
+--workers controls how many designations are fetched concurrently.  Request
+*starts* are staggered globally by --query-delay-seconds regardless of worker
+count: only one thread may start a new request per interval.  Workers still
+pipeline (multiple requests are in-flight simultaneously), so --workers 4 with
+a 1 s delay gives ~4× throughput while the aggregate request-start rate stays
+at 1/s — well within MPC's guidance of ~2 req/s.  The default is --workers 1
+(sequential), which preserves the original behaviour exactly.
 """
 from __future__ import annotations
 
@@ -316,11 +316,45 @@ def _update_summary(
     dataset["summary"] = summary
 
 
+class _RateLimiter:
+    """Stagger request starts across threads: one slot per min_interval seconds.
+
+    Each thread atomically reserves a time slot while holding the lock, then
+    releases the lock and sleeps only for its own slot's wait time.  This means
+    N threads are always pipelined (their requests overlap in flight) while the
+    aggregate request-start rate never exceeds 1 / min_interval per second.
+
+    With min_interval=0 the limiter is a no-op (used by tests with delay=0).
+    """
+
+    def __init__(self, min_interval: float, sleep_fn: Callable[[float], None]) -> None:
+        self._min_interval = min_interval
+        self._lock = threading.Lock()
+        self._next_slot = 0.0
+        self._sleep_fn = sleep_fn
+
+    def acquire(self) -> None:
+        """Block until this thread's reserved time slot arrives."""
+        if self._min_interval <= 0:
+            return
+        with self._lock:
+            now = time.monotonic()
+            if now >= self._next_slot:
+                # Take the slot immediately and set the next one.
+                self._next_slot = now + self._min_interval
+                return
+            # Reserve the next available slot before releasing the lock so
+            # other threads get their own distinct slots, not the same one.
+            wait = self._next_slot - now
+            self._next_slot += self._min_interval
+        self._sleep_fn(wait)
+
+
 def _fetch_designation_result(
     row: dict[str, str],
     fetcher: Callable[..., list[Any]],
     retries: int,
-    query_delay_seconds: float,
+    retry_delay_seconds: float,
     max_observations_per_object: int,
     min_observations: int,
     min_nights: int,
@@ -330,6 +364,7 @@ def _fetch_designation_result(
 
     Designed to be called from a worker thread: all inputs are immutable or
     thread-local, and the function never touches shared dataset state.
+    Pacing (inter-designation delay) is the caller's responsibility.
     """
     designation = row["designation"]
     class_name = row["neo_class"]
@@ -349,8 +384,8 @@ def _fetch_designation_result(
             observations = []
         if observations:
             break
-        if attempt < retries and query_delay_seconds:
-            sleep_fn(query_delay_seconds)
+        if attempt < retries and retry_delay_seconds:
+            sleep_fn(retry_delay_seconds)
 
     raw_observation_count = len(observations)
     observations = _select_observation_window(
@@ -402,10 +437,6 @@ def _fetch_designation_result(
             },
         }
 
-    # Per-thread inter-request delay keeps individual workers from hammering MPC.
-    if query_delay_seconds:
-        sleep_fn(query_delay_seconds)
-
     return log_item, entry_item
 
 
@@ -431,8 +462,9 @@ def collect_sequence_dataset(
     Args:
         workers: Number of parallel fetch threads.  Default 1 (sequential).
             Increase to speed up large runs; see module docstring for MPC
-            rate-limit guidance.  Each worker sleeps query_delay_seconds after
-            its own request, independently of other workers.
+            rate-limit guidance.  A global rate limiter staggers request starts
+            by query_delay_seconds regardless of worker count, so throughput
+            scales with workers while the request-start rate stays bounded.
     """
     if min_observations < 2:
         raise ValueError("min_observations must be at least 2")
@@ -577,6 +609,9 @@ def _collect_sequential(
             min_nights,
             sleep_fn,
         )
+        # Sequential mode: pace requests with an explicit post-fetch delay.
+        if query_delay_seconds:
+            sleep_fn(query_delay_seconds)
 
         dataset["query_log"].append(log_item)
         if entry_item is not None:
@@ -635,20 +670,28 @@ def _collect_parallel(
     _abort = threading.Event()
     consecutive_query_errors = 0
     circuit_break_error: RuntimeError | None = None
+    # One global rate limiter staggered request *starts* across all threads so
+    # they never pile up simultaneously.  Workers remain pipelined (their
+    # in-flight requests overlap) but each new request start waits its turn.
+    _rate_limiter = _RateLimiter(query_delay_seconds, sleep_fn)
 
     def _submit(row: dict[str, str]) -> tuple[dict[str, Any], dict[str, Any] | None] | None:
-        """Worker target: skip if aborted, otherwise call the pure fetch helper."""
+        """Worker target: acquire rate-limit slot, then fetch (skip if aborted)."""
+        if _abort.is_set():
+            return None
+        # Stagger this request start; blocks here until the slot is available.
+        _rate_limiter.acquire()
         if _abort.is_set():
             return None
         return _fetch_designation_result(
             row,
             fetcher,
             retries,
-            query_delay_seconds,
-            max_observations_per_object,
-            min_observations,
-            min_nights,
-            sleep_fn,
+            retry_delay_seconds=query_delay_seconds,
+            max_observations_per_object=max_observations_per_object,
+            min_observations=min_observations,
+            min_nights=min_nights,
+            sleep_fn=sleep_fn,
         )
 
     with ThreadPoolExecutor(max_workers=workers) as executor:
