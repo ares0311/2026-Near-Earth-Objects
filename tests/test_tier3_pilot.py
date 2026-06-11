@@ -461,3 +461,62 @@ def test_tier3_training_emits_held_out_evidence(tmp_path: Path) -> None:
     assert report["model_sha256"] == module._sha256_file(model_path)
     assert report["pilot_only"] is True
     assert report["production_promotion_allowed"] is False
+
+
+class _MultiFakeAlerce(_FakeAlerce):
+    """Return two OIDs so parallel workers have distinct tasks."""
+
+    def query_objects(self, **kwargs: Any) -> list[dict[str, Any]]:
+        """Return two objects only on page 1; empty thereafter."""
+        if kwargs.get("page", 1) == 1:
+            return [{"oid": "ZTF-obj-A"}, {"oid": "ZTF-obj-B"}]
+        return []
+
+    def query_detections(self, oid: str, **kwargs: Any) -> list[dict[str, Any]]:
+        """Return a valid multi-night history for any requested OID."""
+        return [
+            {
+                "candid": index,
+                "mjd": 60000.0 + index,
+                "ra": 30.0 + index,
+                "dec": -10.0,
+                "magpsf": 19.5,
+                "sigmapsf": 0.1,
+                "fid": 1,
+                "rb": 0.05,
+                "drb": 0.02,
+            }
+            for index in range(3)
+        ]
+
+
+def test_alerce_parallel_workers_produce_complete_dataset(tmp_path: Path) -> None:
+    """Multiple detection-fetch workers must accept all OIDs and checkpoint correctly."""
+    module = _load_skill("fetch_alerce_artifact_sequences.py")
+    output = tmp_path / "artifacts.json"
+
+    dataset = module.collect_artifact_sequences(
+        output,
+        2,
+        query_delay_seconds=0,
+        workers=2,
+        client_factory=_MultiFakeAlerce,
+    )
+
+    assert dataset["summary"]["accepted_objects"] == 2
+    accepted_oids = {entry["designation"] for entry in dataset["entries"]}
+    assert accepted_oids == {"ZTF-obj-A", "ZTF-obj-B"}
+    assert dataset["safety"]["external_submission_enabled"] is False
+    persisted = json.loads(output.read_text(encoding="utf-8"))
+    assert persisted["summary"]["accepted_objects"] == 2
+
+
+def test_alerce_workers_validation_rejects_zero(tmp_path: Path) -> None:
+    """workers=0 must be rejected before any network activity."""
+    module = _load_skill("fetch_alerce_artifact_sequences.py")
+    output = tmp_path / "artifacts.json"
+
+    with pytest.raises(ValueError, match="workers"):
+        module.collect_artifact_sequences(
+            output, 1, query_delay_seconds=0, workers=0, client_factory=_FakeAlerce
+        )

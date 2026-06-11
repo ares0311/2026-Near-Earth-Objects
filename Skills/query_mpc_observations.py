@@ -10,9 +10,20 @@ Usage:
         --labels-csv data/training_labels.csv \
         --output data/sequences/mpc_raw_sequences.json \
         --max-objects 1000 \
-        --resume
+        --resume \
+        --workers 8
 
 Exit 0 on success; exit 1 on error.
+
+Threading notes
+---------------
+--workers controls how many designations are fetched concurrently.  Each worker
+sleeps for --query-delay-seconds after its own request (independent of other
+workers), so with 8 workers and a 1 s delay the aggregate query rate is
+approximately 8 req/s.  MPC asks users to stay below ~2 req/s from a single
+host; keep --workers <= 2 with the default 1 s delay to be conservative, or
+reduce --query-delay-seconds proportionally for higher worker counts.  The
+default is --workers 1 (sequential), which preserves the original behaviour.
 """
 from __future__ import annotations
 
@@ -21,9 +32,11 @@ import csv
 import hashlib
 import json
 import sys
+import threading
 import time
 from collections import defaultdict
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -303,6 +316,99 @@ def _update_summary(
     dataset["summary"] = summary
 
 
+def _fetch_designation_result(
+    row: dict[str, str],
+    fetcher: Callable[..., list[Any]],
+    retries: int,
+    query_delay_seconds: float,
+    max_observations_per_object: int,
+    min_observations: int,
+    min_nights: int,
+    sleep_fn: Callable[[float], None],
+) -> tuple[dict[str, Any], dict[str, Any] | None]:
+    """Fetch and process one designation; return (log_item, entry_item | None).
+
+    Designed to be called from a worker thread: all inputs are immutable or
+    thread-local, and the function never touches shared dataset state.
+    """
+    designation = row["designation"]
+    class_name = row["neo_class"]
+    sequence_window = row.get("sequence_window", "full") or "full"
+
+    observations: list[Any] = []
+    attempts = 0
+    provider_error: Exception | None = None
+
+    for attempt in range(retries + 1):
+        attempts = attempt + 1
+        try:
+            observations = fetcher(designation, force_refresh=attempt > 0)
+            provider_error = None
+        except Exception as exc:
+            provider_error = exc
+            observations = []
+        if observations:
+            break
+        if attempt < retries and query_delay_seconds:
+            sleep_fn(query_delay_seconds)
+
+    raw_observation_count = len(observations)
+    observations = _select_observation_window(
+        observations,
+        sequence_window,
+        max_observations_per_object,
+        min_nights,
+    )
+    n_nights = _night_count(observations)
+
+    status = "accepted"
+    if provider_error is not None:
+        status = "query_error"
+    elif len(observations) < min_observations:
+        status = "insufficient_observations"
+    elif n_nights < min_nights:
+        status = "insufficient_nights"
+
+    log_item: dict[str, Any] = {
+        "designation": designation,
+        "class_name": class_name,
+        "status": status,
+        "attempts": attempts,
+        "raw_observation_count": raw_observation_count,
+        "observation_count": len(observations),
+        "night_count": n_nights,
+        "sequence_window": sequence_window,
+        "queried_at_utc": _utc_now(),
+        "error_type": type(provider_error).__name__ if provider_error else None,
+    }
+
+    entry_item: dict[str, Any] | None = None
+    if status == "accepted":
+        entry_item = {
+            "designation": designation,
+            "label": LABEL_MAP[class_name],
+            "class_name": class_name,
+            "h_mag": row.get("h_mag", ""),
+            "label_source": row.get("source", ""),
+            "label_basis": row.get("label_basis", ""),
+            "sequence_window": sequence_window,
+            "observation_count": len(observations),
+            "night_count": n_nights,
+            "observations": [_serialize_observation(obs) for obs in observations],
+            "provenance": {
+                "provider": "Minor Planet Center",
+                "retrieval_client": "astroquery.mpc.MPC.get_observations",
+                "retrieved_at_utc": _utc_now(),
+            },
+        }
+
+    # Per-thread inter-request delay keeps individual workers from hammering MPC.
+    if query_delay_seconds:
+        sleep_fn(query_delay_seconds)
+
+    return log_item, entry_item
+
+
 def collect_sequence_dataset(
     labels_csv: Path,
     output_json: Path,
@@ -316,10 +422,18 @@ def collect_sequence_dataset(
     max_consecutive_query_errors: int = 3,
     target_per_class: int | None = None,
     resume: bool = False,
+    workers: int = 1,
     fetcher: Callable[..., list[Any]] = _strict_fetcher,
     sleep_fn: Callable[[float], None] = time.sleep,
 ) -> dict[str, Any]:
-    """Collect a bounded, resumable MPC sequence dataset for Tier 3 training."""
+    """Collect a bounded, resumable MPC sequence dataset for Tier 3 training.
+
+    Args:
+        workers: Number of parallel fetch threads.  Default 1 (sequential).
+            Increase to speed up large runs; see module docstring for MPC
+            rate-limit guidance.  Each worker sleeps query_delay_seconds after
+            its own request, independently of other workers.
+    """
     if min_observations < 2:
         raise ValueError("min_observations must be at least 2")
     if min_nights < 1:
@@ -334,6 +448,8 @@ def collect_sequence_dataset(
         raise ValueError("max_consecutive_query_errors must be at least 1")
     if target_per_class is not None and target_per_class < 1:
         raise ValueError("target_per_class must be at least 1")
+    if workers < 1:
+        raise ValueError("workers must be at least 1")
 
     rows = _load_manifest_rows(labels_csv)
     selected = _balanced_selection(rows, max_objects)
@@ -348,123 +464,75 @@ def collect_sequence_dataset(
     else:
         dataset = _new_dataset(labels_csv, selected, target_per_class)
 
-    accepted = {entry["designation"] for entry in dataset["entries"]}
+    accepted: set[str] = {entry["designation"] for entry in dataset["entries"]}
     accepted_counts: dict[str, int] = defaultdict(int)
     for entry in dataset["entries"]:
         accepted_counts[entry["class_name"]] += 1
-    completed = {
+    completed: set[str] = {
         item["designation"]
         for item in dataset["query_log"]
         if item.get("status") != "query_error"
     }
-    consecutive_query_errors = 0
-    for index, row in enumerate(selected):
-        designation = row["designation"]
-        class_name = row["neo_class"]
-        if designation in completed or designation in accepted:
-            continue
-        if target_per_class is not None and accepted_counts[class_name] >= target_per_class:
-            continue
 
-        observations: list[Any] = []
-        attempts = 0
-        provider_error: Exception | None = None
-        for attempt in range(retries + 1):
-            attempts = attempt + 1
-            try:
-                observations = fetcher(designation, force_refresh=attempt > 0)
-                provider_error = None
-            except Exception as exc:
-                provider_error = exc
-                observations = []
-            if observations:
-                break
-            if attempt < retries and query_delay_seconds:
-                sleep_fn(query_delay_seconds)
-
-        raw_observation_count = len(observations)
-        sequence_window = row.get("sequence_window", "full") or "full"
-        observations = _select_observation_window(
-            observations,
-            sequence_window,
-            max_observations_per_object,
-            min_nights,
+    # Build the list of designations that still need fetching.
+    todo = [
+        row for row in selected
+        if row["designation"] not in completed and row["designation"] not in accepted
+        and (
+            target_per_class is None
+            or accepted_counts[row["neo_class"]] < target_per_class
         )
-        n_nights = _night_count(observations)
-        status = "accepted"
-        if provider_error is not None:
-            status = "query_error"
-        elif len(observations) < min_observations:
-            status = "insufficient_observations"
-        elif n_nights < min_nights:
-            status = "insufficient_nights"
+    ]
 
-        dataset["query_log"].append(
-            {
-                "designation": designation,
-                "class_name": row["neo_class"],
-                "status": status,
-                "attempts": attempts,
-                "raw_observation_count": raw_observation_count,
-                "observation_count": len(observations),
-                "night_count": n_nights,
-                "sequence_window": sequence_window,
-                "queried_at_utc": _utc_now(),
-                "error_type": type(provider_error).__name__ if provider_error else None,
-            }
+    if workers == 1:
+        _collect_sequential(
+            todo,
+            dataset,
+            output_json,
+            selected,
+            accepted,
+            accepted_counts,
+            fetcher=fetcher,
+            retries=retries,
+            query_delay_seconds=query_delay_seconds,
+            max_observations_per_object=max_observations_per_object,
+            min_observations=min_observations,
+            min_nights=min_nights,
+            max_consecutive_query_errors=max_consecutive_query_errors,
+            target_per_class=target_per_class,
+            sleep_fn=sleep_fn,
         )
-        if status == "accepted":
-            dataset["entries"].append(
-                {
-                    "designation": designation,
-                    "label": LABEL_MAP[row["neo_class"]],
-                    "class_name": row["neo_class"],
-                    "h_mag": row.get("h_mag", ""),
-                    "label_source": row.get("source", ""),
-                    "label_basis": row.get("label_basis", ""),
-                    "sequence_window": sequence_window,
-                    "observation_count": len(observations),
-                    "night_count": n_nights,
-                    "observations": [
-                        _serialize_observation(observation) for observation in observations
-                    ],
-                    "provenance": {
-                        "provider": "Minor Planet Center",
-                        "retrieval_client": "astroquery.mpc.MPC.get_observations",
-                        "retrieved_at_utc": _utc_now(),
-                    },
-                }
-            )
-            accepted.add(designation)
-            accepted_counts[class_name] += 1
-
-        _update_summary(dataset, len(selected), target_per_class)
-        _atomic_write_json(output_json, dataset)
-        if status == "query_error":
-            consecutive_query_errors += 1
-            if consecutive_query_errors >= max_consecutive_query_errors:
-                raise RuntimeError(
-                    "MPC acquisition stopped after "
-                    f"{consecutive_query_errors} consecutive provider errors; "
-                    f"inspect {output_json}"
-                ) from provider_error
-        else:
-            consecutive_query_errors = 0
-        if index < len(selected) - 1 and query_delay_seconds:
-            sleep_fn(query_delay_seconds)
-        if target_per_class is not None and all(
-            accepted_counts[class_name] >= target_per_class
-            for class_name in sorted({row["neo_class"] for row in selected})
-        ):
-            break
+    else:
+        _collect_parallel(
+            todo,
+            dataset,
+            output_json,
+            selected,
+            accepted,
+            accepted_counts,
+            fetcher=fetcher,
+            retries=retries,
+            query_delay_seconds=query_delay_seconds,
+            max_observations_per_object=max_observations_per_object,
+            min_observations=min_observations,
+            min_nights=min_nights,
+            max_consecutive_query_errors=max_consecutive_query_errors,
+            target_per_class=target_per_class,
+            sleep_fn=sleep_fn,
+            workers=workers,
+        )
 
     _update_summary(dataset, len(selected), target_per_class)
     _atomic_write_json(output_json, dataset)
+
     if target_per_class is not None:
+        class_counts: dict[str, int] = defaultdict(int)
+        for entry in dataset["entries"]:
+            class_counts[entry["class_name"]] += 1
         missing = {
-            class_name: accepted_counts[class_name]
+            class_name: class_counts[class_name]
             for class_name in sorted({row["neo_class"] for row in selected})
-            if accepted_counts[class_name] < target_per_class
+            if class_counts[class_name] < target_per_class
         }
         if missing:
             raise RuntimeError(
@@ -472,6 +540,160 @@ def collect_sequence_dataset(
                 f"{missing}; inspect {output_json}"
             )
     return dataset
+
+
+def _collect_sequential(
+    todo: list[dict[str, str]],
+    dataset: dict[str, Any],
+    output_json: Path,
+    selected: list[dict[str, str]],
+    accepted: set[str],
+    accepted_counts: dict[str, int],
+    *,
+    fetcher: Callable[..., list[Any]],
+    retries: int,
+    query_delay_seconds: float,
+    max_observations_per_object: int,
+    min_observations: int,
+    min_nights: int,
+    max_consecutive_query_errors: int,
+    target_per_class: int | None,
+    sleep_fn: Callable[[float], None],
+) -> None:
+    """Process designations one at a time (workers=1).  Exact original semantics."""
+    consecutive_query_errors = 0
+
+    for row in todo:
+        if target_per_class is not None and accepted_counts[row["neo_class"]] >= target_per_class:
+            continue
+
+        log_item, entry_item = _fetch_designation_result(
+            row,
+            fetcher,
+            retries,
+            query_delay_seconds,
+            max_observations_per_object,
+            min_observations,
+            min_nights,
+            sleep_fn,
+        )
+
+        dataset["query_log"].append(log_item)
+        if entry_item is not None:
+            dataset["entries"].append(entry_item)
+            accepted.add(entry_item["designation"])
+            accepted_counts[entry_item["class_name"]] += 1
+
+        _update_summary(dataset, len(selected), target_per_class)
+        _atomic_write_json(output_json, dataset)
+
+        if log_item["status"] == "query_error":
+            consecutive_query_errors += 1
+            if consecutive_query_errors >= max_consecutive_query_errors:
+                raise RuntimeError(
+                    "MPC acquisition stopped after "
+                    f"{consecutive_query_errors} consecutive provider errors; "
+                    f"inspect {output_json}"
+                ) from None
+        else:
+            consecutive_query_errors = 0
+
+        if target_per_class is not None and all(
+            accepted_counts[class_name] >= target_per_class
+            for class_name in sorted({row["neo_class"] for row in todo})
+        ):
+            break
+
+
+def _collect_parallel(
+    todo: list[dict[str, str]],
+    dataset: dict[str, Any],
+    output_json: Path,
+    selected: list[dict[str, str]],
+    accepted: set[str],
+    accepted_counts: dict[str, int],
+    *,
+    fetcher: Callable[..., list[Any]],
+    retries: int,
+    query_delay_seconds: float,
+    max_observations_per_object: int,
+    min_observations: int,
+    min_nights: int,
+    max_consecutive_query_errors: int,
+    target_per_class: int | None,
+    sleep_fn: Callable[[float], None],
+    workers: int,
+) -> None:
+    """Process designations in parallel using a thread pool.
+
+    Thread safety: all mutations to dataset, accepted, and accepted_counts are
+    serialised through _lock.  The circuit breaker counter is also lock-protected.
+    When the error threshold is exceeded, _abort is set so in-flight futures
+    drain without updating shared state.
+    """
+    _lock = threading.Lock()
+    _abort = threading.Event()
+    consecutive_query_errors = 0
+    circuit_break_error: RuntimeError | None = None
+
+    def _submit(row: dict[str, str]) -> tuple[dict[str, Any], dict[str, Any] | None] | None:
+        """Worker target: skip if aborted, otherwise call the pure fetch helper."""
+        if _abort.is_set():
+            return None
+        return _fetch_designation_result(
+            row,
+            fetcher,
+            retries,
+            query_delay_seconds,
+            max_observations_per_object,
+            min_observations,
+            min_nights,
+            sleep_fn,
+        )
+
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        future_to_row = {executor.submit(_submit, row): row for row in todo}
+
+        for future in as_completed(future_to_row):
+            result = future.result()
+            if result is None:
+                # Aborted before fetch started.
+                continue
+            log_item, entry_item = result
+
+            with _lock:
+                if _abort.is_set():
+                    continue  # discard result after abort
+
+                dataset["query_log"].append(log_item)
+
+                # Respect target_per_class even in parallel mode: extra accepted
+                # futures are discarded so counts never exceed the target.
+                if entry_item is not None and (
+                    target_per_class is None
+                    or accepted_counts[entry_item["class_name"]] < target_per_class
+                ):
+                    dataset["entries"].append(entry_item)
+                    accepted.add(entry_item["designation"])
+                    accepted_counts[entry_item["class_name"]] += 1
+
+                _update_summary(dataset, len(selected), target_per_class)
+                _atomic_write_json(output_json, dataset)
+
+                if log_item["status"] == "query_error":
+                    consecutive_query_errors += 1
+                    if consecutive_query_errors >= max_consecutive_query_errors:
+                        circuit_break_error = RuntimeError(
+                            "MPC acquisition stopped after "
+                            f"{consecutive_query_errors} consecutive provider errors; "
+                            f"inspect {output_json}"
+                        )
+                        _abort.set()
+                else:
+                    consecutive_query_errors = 0
+
+    if circuit_break_error is not None:
+        raise circuit_break_error
 
 
 def main() -> None:
@@ -506,6 +728,12 @@ def main() -> None:
         help="Stop only after this many accepted sequences per represented class",
     )
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="Parallel fetch threads (default 1).  See module docstring for rate-limit guidance.",
+    )
     args = parser.parse_args()
 
     # Batch collection is deliberately explicit and bounded.
@@ -524,6 +752,7 @@ def main() -> None:
             max_consecutive_query_errors=args.max_consecutive_query_errors,
             target_per_class=args.target_per_class,
             resume=args.resume,
+            workers=args.workers,
         )
         print(json.dumps(dataset["summary"], indent=2, sort_keys=True))
         return
