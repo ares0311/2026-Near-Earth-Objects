@@ -694,11 +694,27 @@ def fetch_mpc_observations(
                 pass
         return obs_list
 
+    # Exceptions that indicate a transient infrastructure failure and should be
+    # re-raised when raise_on_error=True so the caller's circuit breaker can
+    # detect a genuinely unavailable provider.
+    _INFRA_ERRORS = (
+        ConnectionError,
+        TimeoutError,
+        OSError,  # includes socket.timeout via inheritance on CPython
+    )
+
     try:
         from astroquery.mpc import MPC  # type: ignore[import]
 
         # astroquery exposes the authoritative MPC observation-history query.
         table = MPC.get_observations(designation, cache=not force_refresh)
+
+        # MPC returns None for unknown or malformed designations rather than
+        # raising; treat this as an empty result, not a provider failure.
+        if table is None:
+            _save_cache(cache_key, [])
+            return []
+
         obs_list = []
         for row_index, row in enumerate(table):
             try:
@@ -736,9 +752,17 @@ def fetch_mpc_observations(
                 pass
         _save_cache(cache_key, [o.model_dump() for o in obs_list])
         return obs_list
-    except Exception:
+    except _INFRA_ERRORS:
+        # Infrastructure failures (network down, timeout, socket error): re-raise
+        # when requested so the caller's circuit breaker can detect a provider outage.
         if raise_on_error:
             raise
+        return []
+    except Exception:
+        # Query-level failures (invalid designation format, API rejection,
+        # astroquery parse errors): not an infrastructure outage.  Never feed
+        # the circuit breaker — treat as an empty result regardless of
+        # raise_on_error so the caller records insufficient_observations instead.
         return []
 
 

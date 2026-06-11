@@ -1437,6 +1437,88 @@ class TestFetchMpcObservationsEdgeCases:
         assert isinstance(result, list)
         assert len(result) == 0
 
+    def test_none_table_returns_empty_list(self, tmp_path, monkeypatch):
+        """MPC.get_observations returning None must yield [] not raise TypeError."""
+        from unittest.mock import MagicMock, patch
+
+        import fetch as fetch_mod
+
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        mock_mpc_cls = MagicMock()
+        mock_mpc_cls.get_observations.return_value = None
+        mock_mpc_mod = MagicMock()
+        mock_mpc_mod.MPC = mock_mpc_cls
+
+        with patch.dict("sys.modules", {"astroquery.mpc": mock_mpc_mod}):
+            result = fetch_mod.fetch_mpc_observations("unknown_comet_xyz", force_refresh=True)
+        assert result == []
+
+    def test_none_table_does_not_raise_with_raise_on_error(self, tmp_path, monkeypatch):
+        """A None table is a query-level non-result, not an infrastructure failure.
+
+        raise_on_error=True must not propagate a TypeError from iterating None;
+        the circuit breaker in the acquisition layer must not fire.
+        """
+        from unittest.mock import MagicMock, patch
+
+        import fetch as fetch_mod
+
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        mock_mpc_cls = MagicMock()
+        mock_mpc_cls.get_observations.return_value = None
+        mock_mpc_mod = MagicMock()
+        mock_mpc_mod.MPC = mock_mpc_cls
+
+        with patch.dict("sys.modules", {"astroquery.mpc": mock_mpc_mod}):
+            result = fetch_mod.fetch_mpc_observations(
+                "comet_none_table_test", force_refresh=True, raise_on_error=True
+            )
+        assert result == []
+
+    def test_query_level_exception_not_raised_with_raise_on_error(self, tmp_path, monkeypatch):
+        """Query-level exceptions (e.g. ValueError from malformed response) must not
+        feed the circuit breaker even when raise_on_error=True.
+        """
+        from unittest.mock import MagicMock, patch
+
+        import fetch as fetch_mod
+
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        mock_mpc_cls = MagicMock()
+        mock_mpc_cls.get_observations.side_effect = ValueError("malformed response")
+        mock_mpc_mod = MagicMock()
+        mock_mpc_mod.MPC = mock_mpc_cls
+
+        with patch.dict("sys.modules", {"astroquery.mpc": mock_mpc_mod}):
+            result = fetch_mod.fetch_mpc_observations(
+                "bad_format_test", force_refresh=True, raise_on_error=True
+            )
+        assert result == []
+
+    def test_infra_error_raised_with_raise_on_error(self, tmp_path, monkeypatch):
+        """ConnectionError (infrastructure) must propagate when raise_on_error=True."""
+        from unittest.mock import MagicMock, patch
+
+        import fetch as fetch_mod
+
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        mock_mpc_cls = MagicMock()
+        mock_mpc_cls.get_observations.side_effect = ConnectionError("timeout")
+        mock_mpc_mod = MagicMock()
+        mock_mpc_mod.MPC = mock_mpc_cls
+
+        with (
+            patch.dict("sys.modules", {"astroquery.mpc": mock_mpc_mod}),
+            pytest.raises(ConnectionError, match="timeout"),
+        ):
+            fetch_mod.fetch_mpc_observations(
+                "infra_fail_test", force_refresh=True, raise_on_error=True
+            )
+
 
 class TestFetchAtlasForced:
     def test_returns_empty_without_token(self, tmp_path, monkeypatch):
