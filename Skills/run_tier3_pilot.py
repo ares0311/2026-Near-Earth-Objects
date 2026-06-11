@@ -272,6 +272,8 @@ def _default_stages(
     candidate_pool_per_class: int,
     target_per_class: int,
     workers: int = 1,
+    mpc_query_delay_seconds: float = 1.0,
+    alerce_query_delay_seconds: float = 0.5,
 ) -> dict[str, Callable[[], dict[str, Any]]]:
     """Build the four production pilot stages from modules loaded once."""
     labels = _load_skill("generate_training_labels.py")
@@ -307,7 +309,7 @@ def _default_stages(
             min_nights=2,
             max_observations_per_object=20,
             retries=2,
-            query_delay_seconds=1.0,
+            query_delay_seconds=mpc_query_delay_seconds,
             max_consecutive_query_errors=3,
             target_per_class=target_per_class,
             resume=True,
@@ -324,7 +326,7 @@ def _default_stages(
             min_observations=3,
             min_nights=2,
             max_observations_per_object=20,
-            query_delay_seconds=0.5,
+            query_delay_seconds=alerce_query_delay_seconds,
             request_timeout_seconds=30.0,
             request_attempts=4,
             retry_delay_seconds=5.0,
@@ -363,6 +365,8 @@ def run_pilot(
     candidate_pool_per_class: int = 100,
     target_per_class: int = 50,
     workers: int = 1,
+    mpc_query_delay_seconds: float = 1.0,
+    alerce_query_delay_seconds: float = 0.5,
     active_marker: Path = DEFAULT_ACTIVE_MARKER,
     preflight_fn: Callable[[], dict[str, str]] = _preflight,
     guard_fn: Callable[[dict[str, str]], None] = _assert_repo_unchanged,
@@ -388,6 +392,8 @@ def run_pilot(
                 candidate_pool_per_class=candidate_pool_per_class,
                 target_per_class=target_per_class,
                 workers=workers,
+                mpc_query_delay_seconds=mpc_query_delay_seconds,
+                alerce_query_delay_seconds=alerce_query_delay_seconds,
             )
             results: dict[str, Any] = {}
             for stage in STAGE_ORDER:
@@ -478,10 +484,21 @@ def main() -> int:
         "--workers",
         type=int,
         default=1,
-        help=(
-            "Parallel fetch threads for MPC and ALeRCE acquisition stages (default 1). "
-            "Recommended: --workers 4 with --query-delay-seconds 1.0 for MPC."
-        ),
+        help="Parallel fetch threads for MPC and ALeRCE acquisition stages (default 1).",
+    )
+    parser.add_argument(
+        "--mpc-query-delay",
+        type=float,
+        default=1.0,
+        dest="mpc_query_delay_seconds",
+        help="Seconds between MPC queries per worker (default 1.0; try 0.5 to double throughput).",
+    )
+    parser.add_argument(
+        "--alerce-query-delay",
+        type=float,
+        default=0.5,
+        dest="alerce_query_delay_seconds",
+        help="Seconds to wait between ALeRCE queries per worker (default 0.5).",
     )
     parser.add_argument("--status", action="store_true")
     args = parser.parse_args()
@@ -496,6 +513,8 @@ def main() -> int:
             candidate_pool_per_class=args.candidate_pool_per_class,
             target_per_class=args.target_per_class,
             workers=args.workers,
+            mpc_query_delay_seconds=args.mpc_query_delay_seconds,
+            alerce_query_delay_seconds=args.alerce_query_delay_seconds,
         )
     except Exception as exc:
         print(f"Tier 3 pilot stopped safely: {exc}", file=sys.stderr)
