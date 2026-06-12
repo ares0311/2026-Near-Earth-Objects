@@ -721,9 +721,15 @@ def fetch_mpc_observations(
                 # Current astroquery columns use ``epoch`` and ``DEC``.  The
                 # fallbacks preserve compatibility with older cached fixtures.
                 epoch_val = _mpc_row_value(row, "epoch", "JD")
-                # astroquery.mpc may return an astropy Time object (newer versions)
-                # or a float/Quantity.  Use .jd if available, otherwise cast directly.
-                jd = float(epoch_val.jd) if hasattr(epoch_val, "jd") else float(epoch_val)
+                # astroquery.mpc returns epoch as an astropy Quantity (unit='d') in
+                # newer versions.  float() rejects non-dimensionless Quantities; use
+                # .jd for Time objects, .value for Quantities, float() for plain numbers.
+                if hasattr(epoch_val, "jd"):
+                    jd = float(epoch_val.jd)
+                elif hasattr(epoch_val, "value"):
+                    jd = float(epoch_val.value)
+                else:
+                    jd = float(epoch_val)
                 dec = float(_mpc_row_value(row, "DEC", "Dec"))
                 ra = float(_mpc_row_value(row, "RA"))
                 mag_value = _mpc_row_value(row, "mag", default=99.0)
