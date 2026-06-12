@@ -1536,6 +1536,78 @@ class TestFetchMpcObservationsEdgeCases:
             result = fetch_mod.fetch_mpc_observations("infra_suppress_test", force_refresh=True)
         assert result == []
 
+    def test_epoch_as_astropy_quantity_value(self, tmp_path, monkeypatch):
+        """epoch column returned as astropy Quantity (unit='d') must be parsed via .value."""
+        from unittest.mock import MagicMock, patch
+
+        import fetch as fetch_mod
+
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        # Simulate an astropy Quantity: has .value but no .jd; float() would raise.
+        mock_epoch = MagicMock(spec=[])  # no .jd
+        mock_epoch.value = 2460001.0
+
+        mock_row = MagicMock()
+        mock_row.colnames = ["epoch", "RA", "DEC", "mag", "band", "observatory"]
+        mock_row.__getitem__ = MagicMock(side_effect=lambda k: {
+            "epoch": mock_epoch,
+            "RA": 90.0,
+            "DEC": 10.0,
+            "mag": 19.0,
+            "band": "r",
+            "observatory": "500",
+        }.get(k))
+
+        mock_table = MagicMock()
+        mock_table.__iter__ = MagicMock(return_value=iter([mock_row]))
+
+        mock_mpc_cls = MagicMock()
+        mock_mpc_cls.get_observations.return_value = mock_table
+        mock_mpc_mod = MagicMock()
+        mock_mpc_mod.MPC = mock_mpc_cls
+
+        with patch.dict("sys.modules", {"astroquery.mpc": mock_mpc_mod}):
+            result = fetch_mod.fetch_mpc_observations("quantity_epoch_test", force_refresh=True)
+        assert len(result) == 1
+        assert result[0].jd == 2460001.0
+
+    def test_epoch_as_astropy_time_jd(self, tmp_path, monkeypatch):
+        """epoch column returned as astropy Time object must be parsed via .jd."""
+        from unittest.mock import MagicMock, patch
+
+        import fetch as fetch_mod
+
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        # Simulate an astropy Time object: has .jd attribute.
+        mock_epoch = MagicMock(spec=["jd"])
+        mock_epoch.jd = 2460002.5
+
+        mock_row = MagicMock()
+        mock_row.colnames = ["epoch", "RA", "DEC", "mag", "band", "observatory"]
+        mock_row.__getitem__ = MagicMock(side_effect=lambda k: {
+            "epoch": mock_epoch,
+            "RA": 45.0,
+            "DEC": -5.0,
+            "mag": 20.0,
+            "band": "g",
+            "observatory": "695",
+        }.get(k))
+
+        mock_table = MagicMock()
+        mock_table.__iter__ = MagicMock(return_value=iter([mock_row]))
+
+        mock_mpc_cls = MagicMock()
+        mock_mpc_cls.get_observations.return_value = mock_table
+        mock_mpc_mod = MagicMock()
+        mock_mpc_mod.MPC = mock_mpc_cls
+
+        with patch.dict("sys.modules", {"astroquery.mpc": mock_mpc_mod}):
+            result = fetch_mod.fetch_mpc_observations("time_epoch_test", force_refresh=True)
+        assert len(result) == 1
+        assert result[0].jd == 2460002.5
+
 
 class TestFetchAtlasForced:
     def test_returns_empty_without_token(self, tmp_path, monkeypatch):
