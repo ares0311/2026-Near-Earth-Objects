@@ -758,11 +758,19 @@ def fetch_mpc_observations(
         if raise_on_error:
             raise
         return []
-    except Exception:
+    except Exception as _exc:
         # Query-level failures (invalid designation format, API rejection,
         # astroquery parse errors): not an infrastructure outage.  Never feed
         # the circuit breaker — treat as an empty result regardless of
         # raise_on_error so the caller records insufficient_observations instead.
+        # Emit a warning so silent failures are visible in operator console output.
+        import sys
+        print(
+            f"  [fetch_mpc_observations] query-level error for {designation!r}: "
+            f"{type(_exc).__name__}: {_exc}",
+            file=sys.stderr,
+            flush=True,
+        )
         return []
 
 
