@@ -400,6 +400,7 @@ def run_pilot(
                 current_stage = stage
                 guard_fn(preflight)
                 started_at = _utc_now()
+                print(f"\n[Tier 3 pilot] stage: {stage}  started {started_at}", flush=True)
                 try:
                     detail = stage_functions[stage]()
                     guard_fn(preflight)
@@ -422,6 +423,7 @@ def run_pilot(
                     detail=detail,
                 )
                 results[stage] = detail
+                print(f"[Tier 3 pilot] stage: {stage}  DONE  {_utc_now()}", flush=True)
             _update_run(db_path, run_id, status="completed", preflight=preflight)
             return {"run_id": run_id, "status": "completed", "stages": results}
     except Exception as exc:

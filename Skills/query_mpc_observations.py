@@ -574,6 +574,16 @@ def collect_sequence_dataset(
     return dataset
 
 
+def _fmt_eta(elapsed: float, done: int, total: int) -> str:
+    """Format a compact elapsed/ETA string for console progress lines."""
+    el_m, el_s = divmod(int(elapsed), 60)
+    if done > 0 and total > done:
+        remaining = elapsed / done * (total - done)
+        rem_m, rem_s = divmod(int(remaining), 60)
+        return f"elapsed {el_m}m{el_s:02d}s  ETA {rem_m}m{rem_s:02d}s"
+    return f"elapsed {el_m}m{el_s:02d}s"
+
+
 def _collect_sequential(
     todo: list[dict[str, str]],
     dataset: dict[str, Any],
@@ -595,6 +605,9 @@ def _collect_sequential(
     """Process designations one at a time (workers=1).  Exact original semantics."""
     consecutive_query_errors = 0
     recent_error_hints: list[str] = []
+    start_time = time.time()
+    processed = 0
+    total = len(todo)
 
     for row in todo:
         if target_per_class is not None and accepted_counts[row["neo_class"]] >= target_per_class:
@@ -620,8 +633,20 @@ def _collect_sequential(
             accepted.add(entry_item["designation"])
             accepted_counts[entry_item["class_name"]] += 1
 
+        processed += 1
         _update_summary(dataset, len(selected), target_per_class)
         _atomic_write_json(output_json, dataset)
+
+        # Print one progress line per designation so the operator can see
+        # the process is alive and estimate when it will finish.
+        acc_str = " ".join(f"{k}={v}" for k, v in sorted(accepted_counts.items()))
+        print(
+            f"[{processed}/{total}] {log_item['designation']}: {log_item['status']}"
+            f"  accepted({acc_str})"
+            f"  {_fmt_eta(time.time() - start_time, processed, total)}",
+            file=sys.stderr,
+            flush=True,
+        )
 
         if log_item["status"] == "query_error":
             consecutive_query_errors += 1
@@ -687,6 +712,9 @@ def _collect_parallel(
     _abort = threading.Event()
     consecutive_query_errors = 0
     circuit_break_error: RuntimeError | None = None
+    _start_time = time.time()
+    _processed = 0
+    _total = len(todo)
     # Effective threshold accounts for as_completed() ordering bias: with N
     # workers, errors complete before successes, so we need N-1 extra error
     # completions before the breaker trips.
@@ -742,8 +770,19 @@ def _collect_parallel(
                     accepted.add(entry_item["designation"])
                     accepted_counts[entry_item["class_name"]] += 1
 
+                _processed += 1
                 _update_summary(dataset, len(selected), target_per_class)
                 _atomic_write_json(output_json, dataset)
+
+                # Print progress so the operator can confirm liveness and ETA.
+                acc_str = " ".join(f"{k}={v}" for k, v in sorted(accepted_counts.items()))
+                print(
+                    f"[{_processed}/{_total}] {log_item['designation']}: {log_item['status']}"
+                    f"  accepted({acc_str})"
+                    f"  {_fmt_eta(time.time() - _start_time, _processed, _total)}",
+                    file=sys.stderr,
+                    flush=True,
+                )
 
                 if log_item["status"] == "query_error":
                     consecutive_query_errors += 1
