@@ -95,6 +95,18 @@ def test_unpack_designation_unpacks_provisional_large_subscript() -> None:
     assert module._unpack_designation("K10Ab5B") == "2010 AB115"
 
 
+def test_unpack_designation_unpacks_extended_packed_numbers() -> None:
+    """Asteroids >= 100000 use letter-prefix packed numbers: A0004 → 100004."""
+    module = _load_skill("generate_training_labels.py")
+    # A = 10th base-62 digit; A0004 = 10*10000 + 4 = 100004
+    assert module._unpack_designation("A0004") == "100004"
+    assert module._unpack_designation("A0000") == "100000"
+    # Z = 35th; Z9999 = 35*10000 + 9999 = 359999
+    assert module._unpack_designation("Z9999") == "359999"
+    # lowercase a = 36th; a0001 = 36*10000 + 1 = 360001
+    assert module._unpack_designation("a0001") == "360001"
+
+
 def test_unpack_designation_passes_through_comet_designations() -> None:
     """Comet designations already in unpacked form must not be altered."""
     module = _load_skill("generate_training_labels.py")

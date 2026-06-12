@@ -1054,7 +1054,7 @@ def validate_alert_package(package: dict) -> tuple[bool, list[str]]:
         obs = package["observations"]
         if obs is None:
             issues.append("'observations' is None")
-        elif hasattr(obs, "__len__") and len(obs) == 0:
+        if obs is not None and hasattr(obs, "__len__") and len(obs) == 0:
             issues.append("'observations' is empty")
 
     if "alert_pathway" in package:

@@ -59,12 +59,16 @@ _CENTURY_CODES: dict[str, int] = {"I": 1800, "J": 1900, "K": 2000}
 def _unpack_designation(packed: str) -> str:
     """Convert a packed MPCORB designation to the form MPC.get_observations accepts.
 
-    MPC.get_observations needs unpacked designations.  Two cases handled:
+    MPC.get_observations needs unpacked designations.  Three cases handled:
 
-    1. Numbered objects — zero-padded integers like '00433' → '433'.
+    1. Numbered objects ≤ 99999 — zero-padded integers like '00433' → '433'.
        MPC.get_observations('00433') returns None; '433' works correctly.
 
-    2. Packed provisional designations — 7-char form like 'K23A00A' → '2023 AA'.
+    2. Numbered objects ≥ 100000 — extended packed format like 'A0004' → '100004'.
+       First char is base-62: A-Z = 10-35, a-z = 36-61; last 4 chars are digits.
+       Value = base_char_value × 10000 + last_4_digits.
+
+    3. Packed provisional designations — 7-char form like 'K23A00A' → '2023 AA'.
        Format (per MPC): [century][YY][half-month][sub2][order]
          century : I=1800s  J=1900s  K=2000s
          YY      : 2-digit year within century
@@ -72,13 +76,19 @@ def _unpack_designation(packed: str) -> str:
          sub2    : 2-char subscript (digits 00-99; leading letter for 100+)
          order   : trailing order letter
 
-    Anything that does not match either pattern is returned unchanged (safe
+    Anything that does not match any pattern is returned unchanged (safe
     fallback for comet designations already in unpacked form from astroquery).
     """
     stripped = packed.strip()
-    # All-digit strings are packed numbered designations; strip leading zeros.
+    # All-digit strings are packed numbered designations ≤ 99999; strip leading zeros.
     if stripped.isdigit():
         return str(int(stripped))
+    # Extended packed number format for asteroids ≥ 100000: letter + 4 digits.
+    # e.g. 'A0004' → 100004, 'Z9999' → 359999, 'a0001' → 360001.
+    if len(stripped) == 5 and stripped[0].isalpha() and stripped[1:].isdigit():
+        c = stripped[0]
+        base = (ord(c) - ord("A") + 10) if c.isupper() else (ord(c) - ord("a") + 36)
+        return str(base * 10000 + int(stripped[1:]))
     # 7-char strings beginning with a century code are packed provisional designations.
     if len(stripped) == 7 and stripped[0] in _CENTURY_CODES:
         try:
