@@ -1,7 +1,7 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.87.2  
-**Last updated**: 2026-06-11
+**Current version**: v0.87.3  
+**Last updated**: 2026-06-12
 **Purpose**: Mandatory read at session start (per MANDATORY SESSION-START PROTOCOL).  
 Every planning cycle must name the highest-priority unresolved Tier 1 gap and show how proposed steps close or directly unblock it.
 
@@ -85,7 +85,13 @@ calibration and alert-gate qualification cannot be completed.
   circuit-breaker bias adjustment (threshold now `max_errors + workers - 1`),
   `None`-table guard in `fetch_mpc_observations`, and query-level exception
   classification (non-infrastructure errors no longer feed the circuit breaker).
-  Pilot rerun in progress with `--workers 4`.
+- v0.87.3 (2026-06-12): Extended packed designation unpacking for asteroids
+  ≥100000 (e.g. `A0004` → `100004`) fixed in `_unpack_designation()` in
+  `Skills/generate_training_labels.py` (PR #85). This was the root cause of all
+  400 pilot candidates returning zero MPC observations on the prior run. All
+  three MPCORB packed formats now handled: leading-zero numeric, 7-char
+  provisional, and base-62 extended numeric. Pilot rerun with `--workers 4`
+  pending operator execution.
 - **Still needed**: A five-class real sequence dataset, Tier 3 Transformer
   training, and the complete production calibration KPI evaluation.
 

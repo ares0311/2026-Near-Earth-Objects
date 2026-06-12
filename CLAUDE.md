@@ -532,9 +532,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.87.2)
+## Current State (v0.87.3)
 
-All 10 pipeline modules are complete. The offline suite passes 3500 tests, with
+All 10 pipeline modules are complete. The offline suite passes 3507 tests, with
 2 live/integration checks deselected. CI is expected to
 remain green on Python 3.14 with the 100% coverage target. Background
 automation uses one unified CLI with top-level SQLite audit logs, offline
@@ -556,6 +556,15 @@ training-report gates are merged. The MPC fetcher now correctly classifies
 None-table returns and query-level errors as insufficient_observations rather
 than provider failures, preventing false circuit-breaker trips on bad
 designations.
+
+A second pilot run (post-v0.87.2) fetched 0 observations for all 400
+candidates because the MPCORB NEA.txt catalog uses extended packed
+designations for numbered asteroids ≥100000 (e.g. `A0004` for asteroid 100004)
+which `_unpack_designation()` did not handle — all were passed literally to
+`MPC.get_observations()` which returned None. Fixed in v0.87.3 (PR #85). All
+three MPCORB packed formats are now handled: leading-zero numeric (`00433` →
+`433`), 7-char provisional (`K23A00A` → `2023 AA`), and base-62 extended
+numeric (`A0004` → `100004`).
 
 ### Skills
 
@@ -697,6 +706,20 @@ designations.
 - Run credentialed live-data dry runs for ZTF/ATLAS/Pan-STARRS only when tokens and review policy are explicitly configured.
 - Train and evaluate Tier 2/Tier 3 model weights on real labeled data.
 - Commit `models/tier1_xgb.json` after `.gitignore` update to allow `models/*.json` is merged.
+
+### Key Changes in v0.87.3 (designation unpacking)
+
+- `Skills/generate_training_labels.py`: `_unpack_designation()` — added branch
+  for extended packed numbers (asteroids ≥100000): 5-char strings with leading
+  letter and 4 digits (e.g. `A0004` → `100004`, `Z9999` → `359999`, `a0001`
+  → `360001`). This was the root cause of all 400 pilot candidates returning
+  zero MPC observations on the second pilot run.
+- `src/alert.py`: converted remaining `elif` to independent `if` in
+  `validate_alert_package` to fix Python 3.14.6 branch-coverage miss.
+- `tests/test_tier3_pilot.py`: 7 new regression tests covering all three packed
+  formats and end-to-end designation parse.
+- 3507 tests passing; 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.87.3.
 
 ### Key Changes in v0.87.2 (pilot robustness)
 
