@@ -51,6 +51,21 @@ TIER3_FIELDNAMES = [
 ]
 
 
+def _unpack_designation(packed: str) -> str:
+    """Convert a packed MPCORB designation to the form MPC.get_observations accepts.
+
+    Numbered objects are stored as zero-padded integers in the catalog (e.g. '00433'
+    for asteroid 433 Eros). MPC.get_observations rejects the padded form and needs
+    the plain integer string '433'. Provisional packed designations (e.g. 'K21P27H')
+    are passed through unchanged — astroquery handles their unpacking internally.
+    """
+    stripped = packed.strip()
+    # All-digit strings are packed numbered designations; strip leading zeros.
+    if stripped.isdigit():
+        return str(int(stripped))
+    return stripped
+
+
 def parse_mpc_80col_line(line: str) -> dict | None:
     """Parse a single MPC 80-column orbit record into a dict.
 
@@ -62,8 +77,9 @@ def parse_mpc_80col_line(line: str) -> dict | None:
     if len(line) < 80 or line.startswith("-") or line.startswith("Des'n"):
         return None
     try:
-        # Field offsets per MPC format specification
-        designation = line[0:7].strip()
+        # Field offsets per MPC format specification.
+        # Unpack the designation so MPC.get_observations can resolve it.
+        designation = _unpack_designation(line[0:7])
         h_mag_str = line[8:13].strip()
         h_mag = float(h_mag_str) if h_mag_str else 99.0
         # MPCORB extends past column 80 with eccentricity and semimajor axis.

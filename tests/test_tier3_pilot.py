@@ -65,6 +65,29 @@ def _entry(class_name: str, index: int) -> dict[str, Any]:
     }
 
 
+def test_unpack_designation_strips_leading_zeros() -> None:
+    """Numbered packed designations need leading zeros removed for MPC.get_observations."""
+    module = _load_skill("generate_training_labels.py")
+    assert module._unpack_designation("00433") == "433"
+    assert module._unpack_designation("00001") == "1"
+    assert module._unpack_designation("12345") == "12345"
+
+
+def test_unpack_designation_passes_through_provisional() -> None:
+    """Provisional packed designations (letters+digits) must reach astroquery unchanged."""
+    module = _load_skill("generate_training_labels.py")
+    assert module._unpack_designation("K23A00A") == "K23A00A"
+    assert module._unpack_designation("J99X99Y") == "J99X99Y"
+
+
+def test_parse_mpc_80col_line_emits_unpacked_designation() -> None:
+    """The parser must output the form MPC.get_observations accepts, not the packed form."""
+    module = _load_skill("generate_training_labels.py")
+    record = module.parse_mpc_80col_line(_mpc_line("00433"))
+    assert record is not None
+    assert record["designation"] == "433"
+
+
 def test_tier3_nea_policy_separates_temporal_classes() -> None:
     """Numbered NEOs must use late windows and provisional NEOs early windows."""
     module = _load_skill("generate_training_labels.py")
