@@ -51,18 +51,55 @@ TIER3_FIELDNAMES = [
 ]
 
 
+# Century prefix used in MPC 7-char packed provisional designations.
+# Per https://www.minorplanetcenter.net/iau/info/PackedDes.html
+_CENTURY_CODES: dict[str, int] = {"I": 1800, "J": 1900, "K": 2000}
+
+
 def _unpack_designation(packed: str) -> str:
     """Convert a packed MPCORB designation to the form MPC.get_observations accepts.
 
-    Numbered objects are stored as zero-padded integers in the catalog (e.g. '00433'
-    for asteroid 433 Eros). MPC.get_observations rejects the padded form and needs
-    the plain integer string '433'. Provisional packed designations (e.g. 'K21P27H')
-    are passed through unchanged — astroquery handles their unpacking internally.
+    MPC.get_observations needs unpacked designations.  Two cases handled:
+
+    1. Numbered objects — zero-padded integers like '00433' → '433'.
+       MPC.get_observations('00433') returns None; '433' works correctly.
+
+    2. Packed provisional designations — 7-char form like 'K23A00A' → '2023 AA'.
+       Format (per MPC): [century][YY][half-month][sub2][order]
+         century : I=1800s  J=1900s  K=2000s
+         YY      : 2-digit year within century
+         half-month : survey letter (A-Z, a-z)
+         sub2    : 2-char subscript (digits 00-99; leading letter for 100+)
+         order   : trailing order letter
+
+    Anything that does not match either pattern is returned unchanged (safe
+    fallback for comet designations already in unpacked form from astroquery).
     """
     stripped = packed.strip()
     # All-digit strings are packed numbered designations; strip leading zeros.
     if stripped.isdigit():
         return str(int(stripped))
+    # 7-char strings beginning with a century code are packed provisional designations.
+    if len(stripped) == 7 and stripped[0] in _CENTURY_CODES:
+        try:
+            year = _CENTURY_CODES[stripped[0]] + int(stripped[1:3])
+            half_month = stripped[3]
+            subscript_chars = stripped[4:6]
+            order_letter = stripped[6]
+            # Subscripts 0-99: plain digit pair.
+            # Subscripts 100+: letter + digit (a0=100, a1=101, ..., b0=110, ...).
+            if subscript_chars[0].isdigit():
+                subscript = int(subscript_chars)
+            else:
+                subscript = (
+                    (ord(subscript_chars[0].lower()) - ord("a") + 10) * 10
+                    + int(subscript_chars[1])
+                )
+            if subscript == 0:
+                return f"{year} {half_month}{order_letter}"
+            return f"{year} {half_month}{order_letter}{subscript}"
+        except (ValueError, IndexError):
+            pass
     return stripped
 
 

@@ -73,19 +73,46 @@ def test_unpack_designation_strips_leading_zeros() -> None:
     assert module._unpack_designation("12345") == "12345"
 
 
-def test_unpack_designation_passes_through_provisional() -> None:
-    """Provisional packed designations (letters+digits) must reach astroquery unchanged."""
+def test_unpack_designation_unpacks_provisional_no_subscript() -> None:
+    """Packed provisional with subscript 00 unpacks to 'YYYY XY' form."""
     module = _load_skill("generate_training_labels.py")
-    assert module._unpack_designation("K23A00A") == "K23A00A"
-    assert module._unpack_designation("J99X99Y") == "J99X99Y"
+    assert module._unpack_designation("K23A00A") == "2023 AA"
+    assert module._unpack_designation("K04F00H") == "2004 FH"
+    assert module._unpack_designation("J98S00W") == "1998 SW"
+
+
+def test_unpack_designation_unpacks_provisional_with_subscript() -> None:
+    """Packed provisional with nonzero subscript appends the number."""
+    module = _load_skill("generate_training_labels.py")
+    assert module._unpack_designation("K04F05H") == "2004 FH5"
+    assert module._unpack_designation("J98S11W") == "1998 SW11"
+
+
+def test_unpack_designation_unpacks_provisional_large_subscript() -> None:
+    """Subscripts >= 100 use a letter prefix: a0=100, b5=115."""
+    module = _load_skill("generate_training_labels.py")
+    assert module._unpack_designation("K10Aa0B") == "2010 AB100"
+    assert module._unpack_designation("K10Ab5B") == "2010 AB115"
+
+
+def test_unpack_designation_passes_through_comet_designations() -> None:
+    """Comet designations already in unpacked form must not be altered."""
+    module = _load_skill("generate_training_labels.py")
+    assert module._unpack_designation("1P") == "1P"
+    assert module._unpack_designation("C/2020 F3") == "C/2020 F3"
 
 
 def test_parse_mpc_80col_line_emits_unpacked_designation() -> None:
-    """The parser must output the form MPC.get_observations accepts, not the packed form."""
+    """Parser must output the unpacked form used by MPC.get_observations."""
     module = _load_skill("generate_training_labels.py")
+    # Numbered object
     record = module.parse_mpc_80col_line(_mpc_line("00433"))
     assert record is not None
     assert record["designation"] == "433"
+    # Provisional object
+    record = module.parse_mpc_80col_line(_mpc_line("K23A00A"))
+    assert record is not None
+    assert record["designation"] == "2023 AA"
 
 
 def test_tier3_nea_policy_separates_temporal_classes() -> None:
