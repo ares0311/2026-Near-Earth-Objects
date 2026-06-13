@@ -53,7 +53,7 @@ These gaps prevent the pipeline from being safely or usefully operated on real s
 **What is missing**: The three-tier ML classifier is not yet complete.
 - Tier 1 (XGBoost): **WEIGHTS TRAINED AND COMMITTED.** `models/tier1_xgb.json`; validation accuracy 99.95%, macro AUC 1.000.
 - Tier 2 (CNN): **WEIGHTS TRAINED AND COMMITTED.** `models/tier2_cnn.pt`; trained on 10,000 real ZTF Avro alerts (8,000 train / 2,000 validation); best validation loss 0.258 and validation accuracy 91.3% at 20 epochs. Needs calibration evaluation before alert-gate use.
-- Tier 3 (Transformer): `train_tier3_transformer.py` exists but no token CSV from real MPC tracklet sequences has been built. No `models/tier3_transformer.pt` file exists.  
+- Tier 3 (Transformer): **WEIGHTS TRAINED (pilot).** `models/tier3_transformer.pt`; best epoch 17/30, val_macro_f1=0.9400, val_loss=0.2492; trained on the 50-per-class five-class pilot dataset (train+calibration+test splits). Calibration KPI evaluation (T1-D) and ensemble stacking still needed before production.
 
 **Why it is Tier 1**: Without the real multi-night sequence dataset and trained
 Tier 3 weights, the intended production ensemble is incomplete. Downstream
@@ -98,10 +98,18 @@ calibration and alert-gate qualification cannot be completed.
   columns (epoch→d, RA→deg, DEC→deg, mag→mag). PR #86 fixed `epoch` only;
   RA, DEC, and mag still raised `TypeError` per-row, silently discarded,
   causing all 400 fourth-pilot candidates to return `insufficient_observations`.
-  Added `_mpc_to_float()` helper applied to all four columns (PR #87). Pilot
-  rerun with `--workers 4` pending operator execution.
-- **Still needed**: A five-class real sequence dataset, Tier 3 Transformer
-  training, and the complete production calibration KPI evaluation.
+  Added `_mpc_to_float()` helper applied to all four columns (PR #87).
+- Fifth pilot run (post-v0.87.5, 2026-06-13): **SUCCEEDED.** MPC acquisition
+  collected 50 sequences per class (known_object, main_belt_asteroid,
+  neo_candidate, other_solar_system) in 3m49s; ALeRCE collected 50
+  stellar_artifact sequences (329 observations, 150 queried). Splits built:
+  train.csv, calibration.csv, test.csv.
+- Tier 3 Transformer training (2026-06-13): **DONE.** Best epoch 17/30,
+  val_macro_f1=0.9400, val_loss=0.2492. Weights saved to
+  `models/tier3_transformer.pt`; held-out report at
+  `data/sequences/pilot/tier3_training_report.json`.
+- **Still needed**: Production calibration KPI evaluation (T1-D) and
+  ensemble stacking calibration on the trained weights.
 
 **What is needed to close it**:
 1. [DONE] Download 10,000 labeled ZTF Avro alerts via `Skills/download_ztf_training_alerts.py`.
@@ -118,8 +126,8 @@ calibration and alert-gate qualification cannot be completed.
    `Skills/run_tier3_pilot.py`.
 8. [DONE] Validate the raw-data contract, create designation-grouped
    train/calibration/test splits, and build the flat token CSVs.
-9. [HUMAN] Run the long Tier 3 training command under `caffeinate -i` to
-   produce `models/tier3_transformer.pt` and a held-out JSON training report.
+9. [DONE] Run the long Tier 3 training command under `caffeinate -i` —
+   `models/tier3_transformer.pt` saved; best epoch 17/30, val_macro_f1=0.9400.
 10. [DONE] Tier 1 XGBoost trained — val_acc=99.95%, macro AUC=1.000;
     `models/tier1_xgb.json` saved and committed at 13946ea.
 11. [CODE] Evaluate with `Skills/evaluate_calibration.py` and apply the
@@ -265,8 +273,8 @@ These items cannot be completed by code generation alone. They require real-worl
 
 Before the pipeline makes its first MPC submission, all of the following must be TRUE:
 
-- [~] T1-A resolved: Tier 2 CNN trained ✓ (val_acc=91.3%); Tier 1 XGBoost trained ✓ (val_acc=99.95%); Tier 3 Transformer weights still needed
-- [ ] T1-A resolved: Tier 3 Transformer trained on real multi-night sequences
+- [~] T1-A resolved: Tier 1 XGBoost ✓ (val_acc=99.95%); Tier 2 CNN ✓ (val_acc=91.3%); Tier 3 Transformer ✓ (val_macro_f1=0.9400, pilot weights); calibration KPI gate and ensemble stacking still needed
+- [ ] T1-A resolved: calibration KPI gate passed (T1-D) and ensemble stacker trained
 - [~] T1-B resolved: IRSA and ATLAS credentials configured ✓; live connection test passed ✓; automated live dry-run policy not yet signed off (pending human reviewer signature)
 - [ ] T1-C resolved: Full pipeline run completed on ≥1 real ZTF field; ≥90% known-object recovery verified
 - [ ] T1-D resolved: Machine-readable calibration report passes every required

@@ -533,17 +533,18 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.87.5)
+## Current State (v0.87.6)
 
 All 10 pipeline modules are complete. The offline suite passes 3511 tests, with
 2 live/integration checks deselected. CI is expected to
 remain green on Python 3.14 with the 100% coverage target. Background
 automation uses one unified CLI with top-level SQLite audit logs, offline
 readiness checks, live policy validation, no-secret credential inventories,
-approval bundles, operator handoffs, and fail-closed signoff readiness. Tier 1
-and Tier 2 weights are trained; production remains blocked on the Tier 3
-five-class sequence dataset, ensemble calibration, and a supervised real
-end-to-end run. Jerome W. Lindsey III approved the five-class label policy and
+approval bundles, operator handoffs, and fail-closed signoff readiness. All
+three ML tiers now have trained weights: Tier 1 XGBoost (val_acc=99.95%),
+Tier 2 CNN (val_acc=91.3%), and Tier 3 Transformer (val_macro_f1=0.9400,
+best epoch 17/30). Production remains blocked on production calibration KPI
+evaluation (T1-D) and ensemble stacking. Jerome W. Lindsey III approved the five-class label policy and
 a 50-sequence-per-class pilot on 2026-06-10. Acquisition and split tooling are
 implemented; the operator network run is pending and is not production
 approval.
@@ -723,6 +724,23 @@ applied it to all four numeric columns. Pilot rerun pending operator execution.
 - Run credentialed live-data dry runs for ZTF/ATLAS/Pan-STARRS only when tokens and review policy are explicitly configured.
 - Train and evaluate Tier 2/Tier 3 model weights on real labeled data.
 - Commit `models/tier1_xgb.json` after `.gitignore` update to allow `models/*.json` is merged.
+
+### Key Changes in v0.87.6 (ALeRCE progress output; Tier 3 training complete)
+
+- `Skills/fetch_alerce_artifact_sequences.py`: Added `_print_progress()` helper
+  with elapsed time and ETA emitted to stderr after every OID in both sequential
+  and parallel acquisition paths. The ALeRCE stage had zero print statements —
+  a violation of the standing rule requiring live progress on all long-running
+  scripts — making it appear frozen to operators.
+- Tier 3 Transformer (operator run, 2026-06-13): Fifth pilot run succeeded.
+  MPC collected 50 sequences per class in 3m49s (200 total); ALeRCE collected
+  50 stellar_artifact sequences (329 observations). Training on the five-class
+  pilot splits: best epoch 17/30, val_macro_f1=0.9400, val_loss=0.2492. Weights
+  saved at `models/tier3_transformer.pt` (operator Mac).
+- `docs/PRODUCTION_READINESS.md`: Tier 3 row updated to DONE; checklist items 7
+  and 9 marked done; T1-A progress block updated.
+- 3511 tests passing; 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.87.6.
 
 ### Key Changes in v0.87.5 (astropy Quantity all-columns fix)
 
