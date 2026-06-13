@@ -1,7 +1,7 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.87.3  
-**Last updated**: 2026-06-12
+**Current version**: v0.87.4  
+**Last updated**: 2026-06-13
 **Purpose**: Mandatory read at session start (per MANDATORY SESSION-START PROTOCOL).  
 Every planning cycle must name the highest-priority unresolved Tier 1 gap and show how proposed steps close or directly unblock it.
 
@@ -90,8 +90,16 @@ calibration and alert-gate qualification cannot be completed.
   `Skills/generate_training_labels.py` (PR #85). This was the root cause of all
   400 pilot candidates returning zero MPC observations on the prior run. All
   three MPCORB packed formats now handled: leading-zero numeric, 7-char
-  provisional, and base-62 extended numeric. Pilot rerun with `--workers 4`
-  pending operator execution.
+  provisional, and base-62 extended numeric.
+- v0.87.4 (2026-06-13): `MPC.get_observations()` now returns epoch as
+  `astropy.Quantity(value, unit='d')` in newer astroquery versions.
+  `float(dimensioned_Quantity)` raises `TypeError`, silently skipped inside
+  the row-parsing `try/except`, discarding every observation for every
+  designation. Fixed in `fetch_mpc_observations()` with `.value`/`.jd`
+  dispatch (PR #86). Also fixed Python 3.14.6 intermittent branch-coverage
+  miss in `validate_alert_package` by splitting compound `and` chain into
+  nested `if` statements. Pilot rerun with `--workers 4` pending operator
+  execution.
 - **Still needed**: A five-class real sequence dataset, Tier 3 Transformer
   training, and the complete production calibration KPI evaluation.
 

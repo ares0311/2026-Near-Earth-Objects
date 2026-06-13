@@ -533,9 +533,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.87.3)
+## Current State (v0.87.4)
 
-All 10 pipeline modules are complete. The offline suite passes 3507 tests, with
+All 10 pipeline modules are complete. The offline suite passes 3509 tests, with
 2 live/integration checks deselected. CI is expected to
 remain green on Python 3.14 with the 100% coverage target. Background
 automation uses one unified CLI with top-level SQLite audit logs, offline
@@ -566,6 +566,14 @@ which `_unpack_designation()` did not handle — all were passed literally to
 three MPCORB packed formats are now handled: leading-zero numeric (`00433` →
 `433`), 7-char provisional (`K23A00A` → `2023 AA`), and base-62 extended
 numeric (`A0004` → `100004`).
+
+A third pilot run (post-v0.87.3) returned `insufficient_observations` for all
+400 candidates because `MPC.get_observations()` now returns epoch as
+`astropy.Quantity(value, unit='d')` in newer astroquery versions. `float()` on
+a dimensioned Quantity raises `TypeError`, silently caught in the row-parsing
+`try/except`, discarding every row. Fixed in v0.87.4 (PR #86): epoch is
+extracted via `.jd` (for astropy Time objects), `.value` (for Quantities), or
+plain `float()` for legacy scalars. Pilot rerun pending operator execution.
 
 ### Skills
 
@@ -707,6 +715,24 @@ numeric (`A0004` → `100004`).
 - Run credentialed live-data dry runs for ZTF/ATLAS/Pan-STARRS only when tokens and review policy are explicitly configured.
 - Train and evaluate Tier 2/Tier 3 model weights on real labeled data.
 - Commit `models/tier1_xgb.json` after `.gitignore` update to allow `models/*.json` is merged.
+
+### Key Changes in v0.87.4 (astropy Quantity epoch fix)
+
+- `src/fetch.py`: `fetch_mpc_observations` — `MPC.get_observations()` now
+  returns epoch as `astropy.Quantity(value, unit='d')` in newer astroquery.
+  `float(dimensioned_Quantity)` raises `TypeError`; silently caught inside the
+  row-parsing `try/except`, discarding every observation for every designation.
+  This was the root cause of all 400 pilot candidates returning
+  `insufficient_observations` on the third pilot run. Fix: dispatch on
+  `hasattr(epoch_val, "jd")` → `.jd`, `hasattr(epoch_val, "value")` → `.value`,
+  else plain `float()`. (PR #86)
+- `src/alert.py`: split compound `if obs is not None and hasattr(...) and len(...)` into
+  nested `if` statements to eliminate Python 3.14.6 intermittent branch-coverage
+  miss in `validate_alert_package`.
+- `tests/test_fetch.py`: 2 new tests — `test_epoch_as_astropy_quantity_value`
+  and `test_epoch_as_astropy_time_jd` — covering both epoch dispatch branches.
+- 3509 tests passing; 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.87.4.
 
 ### Key Changes in v0.87.3 (designation unpacking)
 
