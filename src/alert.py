@@ -414,13 +414,7 @@ def process_alert(
     orbit_q = int(neo.hazard.orbital_elements.quality_code) if neo.hazard.orbital_elements else 0
     moid = neo.hazard.moid_au
 
-    # Split `or` conditions into independent ifs — compound `or` produces
-    # intermittent branch-coverage misses on Python 3.14.
-    if rb is None:
-        actions.append(f"Alert blocked: real/bogus score {rb} < 0.90 threshold")
-        _log_alert(neo, pathway, "blocked_rb")
-        return result
-    if rb < 0.90:
+    if rb is None or rb < 0.90:
         actions.append(f"Alert blocked: real/bogus score {rb} < 0.90 threshold")
         _log_alert(neo, pathway, "blocked_rb")
         return result
@@ -430,11 +424,7 @@ def process_alert(
         _log_alert(neo, pathway, "blocked_orbit_quality")
         return result
 
-    if moid is None:
-        actions.append(f"Alert blocked: MOID {moid} > 0.05 AU")
-        _log_alert(neo, pathway, "blocked_moid")
-        return result
-    if moid > 0.05:
+    if moid is None or moid > 0.05:
         actions.append(f"Alert blocked: MOID {moid} > 0.05 AU")
         _log_alert(neo, pathway, "blocked_moid")
         return result
@@ -453,24 +443,15 @@ def process_alert(
     # We NEVER compute or assert an impact probability ourselves.
     # This branch must be triggered externally after CNEOS Scout/Sentry assessment.
     cneos_impact_prob = (cneos_assessment or {}).get("cneos_impact_probability")
-    # Two separate ifs (not a compound and) so coverage.py on Python 3.14 reliably
-    # counts each branch; compound conditions produce intermittent missing-branch failures.
-    if cneos_impact_prob is not None:
-        if cneos_impact_prob >= 0.0001:
-            pdco_package = _generate_pdco_alert_package(neo)
-            pdco_path = _LOG_DIR / f"pdco_alert_{neo.tracklet.object_id}.json"
-            pdco_path.write_text(json.dumps(pdco_package, indent=2))
-            actions.append(f"NASA PDCO alert package written to {pdco_path}")
-            _log_alert(neo, "nasa_pdco_notify", "pdco_package_ready")
-            result["pdco_package"] = pdco_package
-        else:
-            actions.append(
-                "NASA PDCO notification deferred: awaiting CNEOS Scout/Sentry assessment"
-            )
+    if cneos_impact_prob is not None and cneos_impact_prob >= 0.0001:
+        pdco_package = _generate_pdco_alert_package(neo)
+        pdco_path = _LOG_DIR / f"pdco_alert_{neo.tracklet.object_id}.json"
+        pdco_path.write_text(json.dumps(pdco_package, indent=2))
+        actions.append(f"NASA PDCO alert package written to {pdco_path}")
+        _log_alert(neo, "nasa_pdco_notify", "pdco_package_ready")
+        result["pdco_package"] = pdco_package
     else:
-        actions.append(
-            "NASA PDCO notification deferred: awaiting CNEOS Scout/Sentry assessment"
-        )
+        actions.append("NASA PDCO notification deferred: awaiting CNEOS Scout/Sentry assessment")
 
     return result
 
@@ -675,12 +656,8 @@ def ready_for_submission(neo: ScoredNEO) -> tuple[bool, list[str]]:
     unmet: list[str] = []
 
     moid = neo.hazard.moid_au
-    # Split `or` into independent ifs for reliable branch coverage on Python 3.14.
-    if moid is None:
+    if moid is None or moid > 0.05:
         unmet.append(f"MOID not ≤ 0.05 AU (got {moid})")
-    if moid is not None:
-        if moid > 0.05:
-            unmet.append(f"MOID not ≤ 0.05 AU (got {moid})")
 
     quality = 0
     if neo.hazard.orbital_elements is not None:
@@ -689,12 +666,8 @@ def ready_for_submission(neo: ScoredNEO) -> tuple[bool, list[str]]:
         unmet.append(f"Orbit quality code < 2 (got {quality})")
 
     rb = neo.features.real_bogus_score
-    # Split `or` into independent ifs for reliable branch coverage on Python 3.14.
-    if rb is None:
+    if rb is None or rb < 0.90:
         unmet.append(f"real_bogus_score < 0.90 (got {rb})")
-    if rb is not None:
-        if rb < 0.90:
-            unmet.append(f"real_bogus_score < 0.90 (got {rb})")
 
     if neo.hazard.alert_pathway == "known_object":
         unmet.append("Alert pathway is 'known_object' — already in MPC catalog")
@@ -1082,7 +1055,8 @@ def validate_alert_package(package: dict) -> tuple[bool, list[str]]:
         if obs is None:
             issues.append("'observations' is None")
         if obs is not None:
-            # Split `and` into nested ifs for reliable branch coverage on Python 3.14.
+            # Nested ifs (not compound and) — Python 3.14 intermittently misses
+            # branches of compound conditions; see v0.87.3/v0.87.4 fixes.
             if hasattr(obs, "__len__"):
                 if len(obs) == 0:
                     issues.append("'observations' is empty")
@@ -1096,11 +1070,12 @@ def validate_alert_package(package: dict) -> tuple[bool, list[str]]:
         gs = package.get("guardrail_statement") or ""
         if not gs:
             issues.append("'guardrail_statement' is empty")
-        # Split `and` into nested ifs for reliable branch coverage on Python 3.14.
+        # Nested ifs (not compound and) for reliable branch coverage on Python 3.14.
         if gs:
             if "NOT" not in gs.upper():
                 issues.append(
-                    "'guardrail_statement' must contain 'NOT' (impact-claim guardrail)"
+                    "'guardrail_statement' should contain 'NOT' "
+                    "to comply with impact-claim guardrail"
                 )
 
     return (len(issues) == 0, issues)
@@ -1780,10 +1755,8 @@ def _compute_urgency(neo: Any) -> str:
     priority = float(getattr(metadata, "discovery_priority", 0.0) or 0.0)
     if hazard_flag == "pha_candidate":
         return "URGENT"
-    # Nested if (not compound and) for reliable branch coverage on Python 3.14.
-    if moid_au is not None:
-        if float(moid_au) <= 0.1:
-            return "HIGH"
+    if moid_au is not None and float(moid_au) <= 0.1:
+        return "HIGH"
     if priority >= 0.7:
         return "MEDIUM"
     return "ROUTINE"
