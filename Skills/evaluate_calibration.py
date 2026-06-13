@@ -132,9 +132,9 @@ def _heartbeat(label: str, interval: float = 5.0) -> Iterator[None]:
         while not stop.wait(interval):
             elapsed = int(time.monotonic() - t0)
             m, s = divmod(elapsed, 60)
+            # stdout so the operator always sees it regardless of stderr handling.
             print(
                 f"  {label} … still working ({m}m{s:02d}s elapsed)",
-                file=sys.stderr,
                 flush=True,
             )
 
@@ -524,7 +524,10 @@ def evaluate_cnn(
     with _heartbeat("Loading CNN weights"):
         state = torch.load(str(cnn_model_path), map_location="cpu", weights_only=False)
     print(f"  CNN weights loaded in {time.monotonic() - t_load:.1f}s.", flush=True)
-    model.load_state_dict(state)
+    print("  Applying state dict to model ...", flush=True)
+    with _heartbeat("Applying state dict"):
+        model.load_state_dict(state)
+    print("  Setting eval mode ...", flush=True)
     model.eval()
     n_batches = (len(val_rows) + batch_size - 1) // batch_size
     print(
@@ -554,10 +557,11 @@ def evaluate_cnn(
             # Announce the batch BEFORE loading its cutouts. The first batch in
             # particular can take a while to read 50 .npz files from Dropbox; a
             # heartbeat keeps that load visibly alive instead of silent.
+            # All progress goes to stdout so it is always visible regardless of
+            # how the operator's terminal handles stderr.
             print(
                 f"  [CNN inference] loading batch {done}/{n_batches}"
                 f" ({len(batch_rows)} cutouts) ...",
-                file=sys.stderr,
                 flush=True,
             )
             sci_b, ref_b, diff_b = [], [], []
@@ -583,7 +587,6 @@ def evaluate_cnn(
                 f"  [CNN inference] batch {done}/{n_batches}"
                 f"  samples {min(i + batch_size, len(val_rows))}/{len(val_rows)}"
                 f"  elapsed {em}m{es:02d}s  ETA {rm}m{rs:02d}s",
-                file=sys.stderr,
                 flush=True,
             )
 
