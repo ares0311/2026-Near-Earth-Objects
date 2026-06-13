@@ -32,7 +32,6 @@ import argparse
 import contextlib
 import hashlib
 import json
-import os
 import sys
 import threading
 import time
@@ -506,27 +505,64 @@ def evaluate_cnn(
     if model is None:
         print("  ERROR: torch not available — cannot evaluate CNN.")
         return {"tier": "tier2_cnn", "error": "torch unavailable"}
-    # Report the weight-file size up front so the operator knows how much must
-    # be read, and can spot a Dropbox online-only placeholder that has to be
-    # downloaded before torch can read it.
+    # Pre-read the .pt file into a BytesIO buffer in 64 KB chunks so we can
+    # show real ETA while Dropbox materialises the bytes from cloud storage.
+    # torch.load on a raw path uses mmap — it returns instantly (0 s) but
+    # load_state_dict then forces every tensor page, blocking silently for
+    # minutes.  Reading into BytesIO first guarantees all data is in RAM before
+    # either torch call, so both complete in milliseconds.
+    import io as _io
     try:
-        size_mb = os.path.getsize(cnn_model_path) / (1024 * 1024)
+        file_size = cnn_model_path.stat().st_size
+        size_mb = file_size / (1024 * 1024)
         print(
             f"  Loading CNN weights from: {cnn_model_path}  ({size_mb:.1f} MB) ...",
             flush=True,
         )
     except OSError:
+        file_size = 0
+        size_mb = 0.0
         print(f"  Loading CNN weights from: {cnn_model_path} ...", flush=True)
-    # torch.load can block for minutes while Dropbox materialises the file; the
-    # heartbeat thread prints an elapsed-time line every few seconds so the wait
-    # is never silent and a true hang is distinguishable from slow I/O.
+
+    _CHUNK = 65536  # 64 KB — fine-grained enough for ETA on slow Dropbox links
+    buf = _io.BytesIO()
+    bytes_read = 0
     t_load = time.monotonic()
-    with _heartbeat("Loading CNN weights"):
-        state = torch.load(str(cnn_model_path), map_location="cpu", weights_only=False)
-    print(f"  CNN weights loaded in {time.monotonic() - t_load:.1f}s.", flush=True)
+    with open(str(cnn_model_path), "rb") as _fh:
+        while True:
+            chunk = _fh.read(_CHUNK)
+            if not chunk:
+                break
+            buf.write(chunk)
+            bytes_read += len(chunk)
+            elapsed = time.monotonic() - t_load
+            # Print per-chunk progress with ETA derived from current read speed.
+            if file_size > 0 and elapsed > 0:
+                speed = bytes_read / elapsed  # bytes / sec
+                remaining_bytes = file_size - bytes_read
+                eta_s = remaining_bytes / speed if speed > 0 else 0
+                pct = bytes_read / file_size * 100
+                em, es = divmod(int(elapsed), 60)
+                rm, rs = divmod(int(eta_s), 60)
+                print(
+                    f"\r  Loading CNN weights: {bytes_read / 1048576:.1f}/{size_mb:.1f} MB"
+                    f"  ({pct:.0f}%)  elapsed {em}m{es:02d}s  ETA {rm}m{rs:02d}s   ",
+                    end="",
+                    flush=True,
+                )
+    print(flush=True)  # newline after the \r progress line
+    load_s = time.monotonic() - t_load
+    print(f"  CNN weights read in {load_s:.1f}s — deserialising from RAM ...", flush=True)
+
+    buf.seek(0)
+    # torch.load from BytesIO works purely from RAM — no disk I/O, no blocking.
+    state = torch.load(buf, map_location="cpu", weights_only=False)
+    del buf  # free the raw bytes; only the deserialized tensors are needed now
+
+    # load_state_dict copies tensors into the model — fast since everything is
+    # already in RAM.
     print("  Applying state dict to model ...", flush=True)
-    with _heartbeat("Applying state dict"):
-        model.load_state_dict(state)
+    model.load_state_dict(state)
     print("  Setting eval mode ...", flush=True)
     model.eval()
     n_batches = (len(val_rows) + batch_size - 1) // batch_size
