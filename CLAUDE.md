@@ -533,9 +533,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.87.4)
+## Current State (v0.87.5)
 
-All 10 pipeline modules are complete. The offline suite passes 3509 tests, with
+All 10 pipeline modules are complete. The offline suite passes 3511 tests, with
 2 live/integration checks deselected. CI is expected to
 remain green on Python 3.14 with the 100% coverage target. Background
 automation uses one unified CLI with top-level SQLite audit logs, offline
@@ -573,7 +573,15 @@ A third pilot run (post-v0.87.3) returned `insufficient_observations` for all
 a dimensioned Quantity raises `TypeError`, silently caught in the row-parsing
 `try/except`, discarding every row. Fixed in v0.87.4 (PR #86): epoch is
 extracted via `.jd` (for astropy Time objects), `.value` (for Quantities), or
-plain `float()` for legacy scalars. Pilot rerun pending operator execution.
+plain `float()` for legacy scalars.
+
+A fourth pilot run (post-v0.87.4) returned `insufficient_observations` for all
+400 candidates because PR #86 only fixed the `epoch` column. astroquery
+0.4.11+ assigns `u.deg` units to `RA` and `DEC` columns and `u.mag` to `mag`
+as well — `float(Quantity('90.0 deg'))` raises `TypeError` in the same
+per-row `except Exception: pass` block. Fixed in v0.87.5 (PR #87): added
+`_mpc_to_float()` helper dispatching `.jd` / `.value` / `float()` and
+applied it to all four numeric columns. Pilot rerun pending operator execution.
 
 ### Skills
 
@@ -715,6 +723,21 @@ plain `float()` for legacy scalars. Pilot rerun pending operator execution.
 - Run credentialed live-data dry runs for ZTF/ATLAS/Pan-STARRS only when tokens and review policy are explicitly configured.
 - Train and evaluate Tier 2/Tier 3 model weights on real labeled data.
 - Commit `models/tier1_xgb.json` after `.gitignore` update to allow `models/*.json` is merged.
+
+### Key Changes in v0.87.5 (astropy Quantity all-columns fix)
+
+- `src/fetch.py`: `fetch_mpc_observations` — astroquery 0.4.11+ assigns units
+  to ALL four numeric columns: `epoch→u.d`, `RA→u.deg`, `DEC→u.deg`,
+  `mag→u.mag`. PR #86 fixed `epoch` only; `float(Quantity('90.0 deg'))` still
+  raised `TypeError` for RA, DEC, and mag, silently discarded per-row, causing
+  all 400 fourth-pilot candidates to return `insufficient_observations`.
+  Fix: added `_mpc_to_float(val)` helper (dispatches `.jd` / `.value` /
+  `float()`) and replaced all four `float(...)` column extractions with it.
+- `tests/test_fetch.py`: 2 new tests — `test_all_columns_as_quantities`
+  (epoch, RA, DEC, mag all as Quantities — the exact astroquery 0.4.11+ case)
+  and `test_ra_dec_as_quantities` (RA/DEC as Quantities, plain float epoch).
+- 3511 tests passing; 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.87.5.
 
 ### Key Changes in v0.87.4 (astropy Quantity epoch fix)
 

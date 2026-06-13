@@ -1299,7 +1299,7 @@ wheels = [
 
 [[package]]
 name = "neo-detection"
-version = "0.87.4"
+version = "0.87.5"
 source = { editable = "." }
 dependencies = [
     { name = "astropy" },
