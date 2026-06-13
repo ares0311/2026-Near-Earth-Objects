@@ -648,6 +648,22 @@ def count_known_objects_in_field(
         return 0
 
 
+def _mpc_to_float(val: Any) -> float:
+    """Convert an MPC column value that may be an astropy Quantity or Time to float.
+
+    astroquery 0.4.11+ converts the observation table to a QTable and assigns
+    units to all numeric columns (epoch→d, RA→deg, DEC→deg, mag→mag).
+    Accessing a single row element then yields an astropy Quantity, and
+    float(dimensioned_Quantity) raises TypeError.  Extract the numeric value via
+    .jd (astropy Time), .value (astropy Quantity), or plain float().
+    """
+    if hasattr(val, "jd"):
+        return float(val.jd)
+    if hasattr(val, "value"):
+        return float(val.value)
+    return float(val)
+
+
 def _mpc_row_value(row: object, *names: str, default: Any = None) -> Any:
     """Read the first available MPC column from Astropy rows or test fixtures."""
     colnames = getattr(row, "colnames", None)
@@ -718,24 +734,19 @@ def fetch_mpc_observations(
         obs_list = []
         for row_index, row in enumerate(table):
             try:
-                # Current astroquery columns use ``epoch`` and ``DEC``.  The
-                # fallbacks preserve compatibility with older cached fixtures.
-                epoch_val = _mpc_row_value(row, "epoch", "JD")
-                # astroquery.mpc returns epoch as an astropy Quantity (unit='d') in
-                # newer versions.  float() rejects non-dimensionless Quantities; use
-                # .jd for Time objects, .value for Quantities, float() for plain numbers.
-                if hasattr(epoch_val, "jd"):
-                    jd = float(epoch_val.jd)
-                elif hasattr(epoch_val, "value"):
-                    jd = float(epoch_val.value)
-                else:
-                    jd = float(epoch_val)
-                dec = float(_mpc_row_value(row, "DEC", "Dec"))
-                ra = float(_mpc_row_value(row, "RA"))
+                # Current astroquery columns use ``epoch``, ``RA``, and ``DEC``.
+                # The fallbacks preserve compatibility with older cached fixtures.
+                # astroquery 0.4.11+ converts the table to QTable and assigns
+                # units to all numeric columns (epoch→d, RA→deg, DEC→deg, mag→mag).
+                # All scalar extractions use _mpc_to_float() so that dimensioned
+                # Quantities are handled without TypeError.
+                jd = _mpc_to_float(_mpc_row_value(row, "epoch", "JD"))
+                dec = _mpc_to_float(_mpc_row_value(row, "DEC", "Dec"))
+                ra = _mpc_to_float(_mpc_row_value(row, "RA"))
                 mag_value = _mpc_row_value(row, "mag", default=99.0)
                 band_value = _mpc_row_value(row, "band", default="?")
                 observatory = str(_mpc_row_value(row, "observatory", default="UNK"))
-                mag = float(mag_value) if not getattr(mag_value, "mask", False) else 99.0
+                mag = _mpc_to_float(mag_value) if not getattr(mag_value, "mask", False) else 99.0
                 band = str(band_value) if not getattr(band_value, "mask", False) else "?"
 
                 # Hash stable observation fields so every historical record has
