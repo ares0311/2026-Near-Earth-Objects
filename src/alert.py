@@ -443,15 +443,24 @@ def process_alert(
     # We NEVER compute or assert an impact probability ourselves.
     # This branch must be triggered externally after CNEOS Scout/Sentry assessment.
     cneos_impact_prob = (cneos_assessment or {}).get("cneos_impact_probability")
-    if cneos_impact_prob is not None and cneos_impact_prob >= 0.0001:
-        pdco_package = _generate_pdco_alert_package(neo)
-        pdco_path = _LOG_DIR / f"pdco_alert_{neo.tracklet.object_id}.json"
-        pdco_path.write_text(json.dumps(pdco_package, indent=2))
-        actions.append(f"NASA PDCO alert package written to {pdco_path}")
-        _log_alert(neo, "nasa_pdco_notify", "pdco_package_ready")
-        result["pdco_package"] = pdco_package
+    # Two separate ifs (not a compound and) so coverage.py on Python 3.14 reliably
+    # counts each branch; compound conditions produce intermittent missing-branch failures.
+    if cneos_impact_prob is not None:
+        if cneos_impact_prob >= 0.0001:
+            pdco_package = _generate_pdco_alert_package(neo)
+            pdco_path = _LOG_DIR / f"pdco_alert_{neo.tracklet.object_id}.json"
+            pdco_path.write_text(json.dumps(pdco_package, indent=2))
+            actions.append(f"NASA PDCO alert package written to {pdco_path}")
+            _log_alert(neo, "nasa_pdco_notify", "pdco_package_ready")
+            result["pdco_package"] = pdco_package
+        else:
+            actions.append(
+                "NASA PDCO notification deferred: awaiting CNEOS Scout/Sentry assessment"
+            )
     else:
-        actions.append("NASA PDCO notification deferred: awaiting CNEOS Scout/Sentry assessment")
+        actions.append(
+            "NASA PDCO notification deferred: awaiting CNEOS Scout/Sentry assessment"
+        )
 
     return result
 
@@ -1749,8 +1758,10 @@ def _compute_urgency(neo: Any) -> str:
     priority = float(getattr(metadata, "discovery_priority", 0.0) or 0.0)
     if hazard_flag == "pha_candidate":
         return "URGENT"
-    if moid_au is not None and float(moid_au) <= 0.1:
-        return "HIGH"
+    # Nested if (not compound and) for reliable branch coverage on Python 3.14.
+    if moid_au is not None:
+        if float(moid_au) <= 0.1:
+            return "HIGH"
     if priority >= 0.7:
         return "MEDIUM"
     return "ROUTINE"
