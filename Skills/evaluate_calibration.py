@@ -555,14 +555,29 @@ def evaluate_cnn(
     print(f"  CNN weights read in {load_s:.1f}s — deserialising from RAM ...", flush=True)
 
     buf.seek(0)
-    # torch.load from BytesIO works purely from RAM — no disk I/O, no blocking.
+    # Deserialise from BytesIO — pure RAM, no disk I/O.
+    t_tl = time.monotonic()
     state = torch.load(buf, map_location="cpu", weights_only=False)
+    print(f"  torch.load: {time.monotonic() - t_tl:.2f}s", flush=True)
     del buf  # free the raw bytes; only the deserialized tensors are needed now
 
-    # load_state_dict copies tensors into the model — fast since everything is
-    # already in RAM.
+    # Warm up PyTorch's Accelerate / BLAS / thread-pool lazy initialisation.
+    # On macOS (Apple Silicon + Accelerate), the first tensor compute call in a
+    # new process initialises the framework, taking 15-30 s.  If this happens
+    # inside load_state_dict the operator sees a silent hang.  A dummy matmul
+    # here absorbs the one-time cost with a named, timed print instead.
+    print("  Warming up PyTorch runtime (one-time ~20 s on macOS) ...", flush=True)
+    t_wu = time.monotonic()
+    _w = torch.zeros(256, 256)
+    _ = _w @ _w  # forces ATen dispatch / Accelerate / thread-pool init
+    del _w, _
+    print(f"  PyTorch warmup done in {time.monotonic() - t_wu:.1f}s.", flush=True)
+
+    # After warmup, load_state_dict is a simple memcpy — completes in <1 s.
+    t_lsd = time.monotonic()
     print("  Applying state dict to model ...", flush=True)
     model.load_state_dict(state)
+    print(f"  load_state_dict: {time.monotonic() - t_lsd:.2f}s", flush=True)
     print("  Setting eval mode ...", flush=True)
     model.eval()
     n_batches = (len(val_rows) + batch_size - 1) // batch_size
