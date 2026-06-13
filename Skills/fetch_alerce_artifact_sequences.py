@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 import threading
 import time
 from collections.abc import Callable
@@ -236,6 +237,32 @@ def _update_summary(dataset: dict[str, Any], max_objects: int) -> None:
     }
 
 
+def _print_progress(
+    n_queried: int,
+    n_accepted: int,
+    max_objects: int,
+    oid: str,
+    status: str,
+    t0: float,
+) -> None:
+    """Emit a per-item progress line to stderr with elapsed time and ETA."""
+    elapsed = time.monotonic() - t0
+    em, es = divmod(int(elapsed), 60)
+    if n_queried > 0 and n_accepted < max_objects:
+        rate = elapsed / n_queried
+        remaining = (max_objects - n_accepted) * rate
+        rm, rs = divmod(int(remaining), 60)
+        eta = f"  ETA {rm}m{rs:02d}s"
+    else:
+        eta = ""
+    print(
+        f"[artifact {n_accepted}/{max_objects}] {oid}: {status}"
+        f"  elapsed {em}m{es:02d}s{eta}",
+        file=sys.stderr,
+        flush=True,
+    )
+
+
 class _RateLimiter:
     """Stagger request starts across threads: one slot per min_interval seconds.
 
@@ -397,6 +424,7 @@ def collect_artifact_sequences(
 
     client = client_factory()
     _configure_client_network(client, request_timeout_seconds)
+    t0 = time.monotonic()
     completed: set[str] = {
         item["oid"]
         for item in dataset["query_log"]
@@ -473,23 +501,29 @@ def collect_artifact_sequences(
                 # Sequential mode: pace requests with an explicit post-fetch delay.
                 if query_delay_seconds:
                     sleep_fn(query_delay_seconds)
+                oid_r, obs, nc, st, err = _fetch_detections_for_oid(
+                    oid,
+                    client,
+                    request_attempts,
+                    retry_delay_seconds,
+                    max_observations_per_object,
+                    min_observations,
+                    min_nights,
+                    sleep_fn,
+                )
                 _process_oid_result(
-                    *_fetch_detections_for_oid(
-                        oid,
-                        client,
-                        request_attempts,
-                        retry_delay_seconds,
-                        max_observations_per_object,
-                        min_observations,
-                        min_nights,
-                        sleep_fn,
-                    ),
+                    oid_r,
+                    obs,
+                    nc,
+                    st,
+                    err,
                     dataset=dataset,
                     accepted=accepted,
                     completed=completed,
                     max_objects=max_objects,
                     output_json=output_json,
                 )
+                _print_progress(len(completed), len(accepted), max_objects, oid_r, st, t0)
         else:
             # Parallel: fan out detection fetches for all OIDs on the page.
             _process_page_parallel(
@@ -508,6 +542,7 @@ def collect_artifact_sequences(
                 query_delay_seconds=query_delay_seconds,
                 sleep_fn=sleep_fn,
                 workers=workers,
+                t0=t0,
             )
 
     _update_summary(dataset, max_objects)
@@ -592,6 +627,7 @@ def _process_page_parallel(
     query_delay_seconds: float,
     sleep_fn: Callable[[float], None],
     workers: int,
+    t0: float,
 ) -> None:
     """Fan out detection fetches for all OIDs on one page and merge results."""
     _lock = threading.Lock()
@@ -629,6 +665,9 @@ def _process_page_parallel(
                     completed=completed,
                     max_objects=max_objects,
                     output_json=output_json,
+                )
+                _print_progress(
+                    len(completed), len(accepted), max_objects, oid_r, st, t0
                 )
 
 
