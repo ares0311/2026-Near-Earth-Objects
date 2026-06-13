@@ -456,16 +456,24 @@ def evaluate_cnn(
     y_binary = (y_val_raw == 0).astype(float)
     n_real = int(y_binary.sum())
     n_bogus = int((y_binary == 0).sum())
-    print(f"  Val set: {len(val_rows)}  (real={n_real}  bogus={n_bogus})")
+    print(f"  Val set: {len(val_rows)}  (real={n_real}  bogus={n_bogus})", flush=True)
 
-    # Load model weights
+    # Build CNN architecture then load weights — both steps can be slow on network filesystems.
+    print("  Building CNN model architecture ...", flush=True)
     model = _build_cnn_model()
     if model is None:
         print("  ERROR: torch not available — cannot evaluate CNN.")
         return {"tier": "tier2_cnn", "error": "torch unavailable"}
+    print(f"  Loading CNN weights from: {cnn_model_path} ...", flush=True)
     state = torch.load(str(cnn_model_path), map_location="cpu", weights_only=False)
     model.load_state_dict(state)
     model.eval()
+    n_batches = (len(val_rows) + batch_size - 1) // batch_size
+    print(
+        f"  Model ready. Starting inference on {len(val_rows)} cutouts"
+        f" ({n_batches} batches of {batch_size}) ...",
+        flush=True,
+    )
 
     def _load_npz(path: str) -> tuple:
         """Load a single .npz cutout triplet as float32 tensors."""
@@ -480,7 +488,6 @@ def evaluate_cnn(
 
     # Run inference on val set in batches — print progress every batch.
     all_proba: list[float] = []
-    n_batches = (len(val_rows) + batch_size - 1) // batch_size
     t_infer = time.monotonic()
     with torch.no_grad():
         for batch_idx, i in enumerate(range(0, len(val_rows), batch_size)):
