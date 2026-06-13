@@ -120,10 +120,11 @@ calibration and alert-gate qualification cannot be completed.
 6. [DONE] Use the bounded, resumable
    `Skills/query_mpc_observations.py --labels-csv ...` collector to acquire
    versioned MPC histories with source hashes, query logs, and safety flags.
-7. [APPROVED + OPERATOR RERUN] Execute the corrected 50-per-class pilot using provisional
+7. [DONE] Execute the corrected 50-per-class pilot using provisional
    early-arc NEOs, numbered late-arc known NEOs, numbered MBAs, confirmed MPC
    comets, and ALeRCE high-confidence bogus ZTF histories through
-   `Skills/run_tier3_pilot.py`.
+   `Skills/run_tier3_pilot.py`. Fifth run (post-v0.87.5) succeeded: 50
+   sequences per class, splits built.
 8. [DONE] Validate the raw-data contract, create designation-grouped
    train/calibration/test splits, and build the flat token CSVs.
 9. [DONE] Run the long Tier 3 training command under `caffeinate -i` —
@@ -134,10 +135,9 @@ calibration and alert-gate qualification cannot be completed.
     production calibration KPI gate defined under T1-D. Promotion is automatic
     only when every required KPI passes.
 
-**Blocking outside step**: The label-policy decision is complete. Step 7 now
-requires the human operator to run the approved read-only network pilot on the
-Mac and return its JSON evidence. Step 9 requires an operator-run training job
-on the available compute hardware.
+**Status**: All three tiers trained. Tier 3 pilot acceptance gate passed
+(test_macro_f1=0.8994, val_accuracy=0.9429, pilot_acceptance_passed=True).
+T1-A is blocked only on the T1-D calibration KPI gate (step 11).
 Calibration promotion itself has no human-review dependency; it is controlled
 by the quantitative T1-D gate.
 
