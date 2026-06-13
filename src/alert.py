@@ -414,7 +414,13 @@ def process_alert(
     orbit_q = int(neo.hazard.orbital_elements.quality_code) if neo.hazard.orbital_elements else 0
     moid = neo.hazard.moid_au
 
-    if rb is None or rb < 0.90:
+    # Split `or` conditions into independent ifs — compound `or` produces
+    # intermittent branch-coverage misses on Python 3.14.
+    if rb is None:
+        actions.append(f"Alert blocked: real/bogus score {rb} < 0.90 threshold")
+        _log_alert(neo, pathway, "blocked_rb")
+        return result
+    if rb < 0.90:
         actions.append(f"Alert blocked: real/bogus score {rb} < 0.90 threshold")
         _log_alert(neo, pathway, "blocked_rb")
         return result
@@ -424,7 +430,11 @@ def process_alert(
         _log_alert(neo, pathway, "blocked_orbit_quality")
         return result
 
-    if moid is None or moid > 0.05:
+    if moid is None:
+        actions.append(f"Alert blocked: MOID {moid} > 0.05 AU")
+        _log_alert(neo, pathway, "blocked_moid")
+        return result
+    if moid > 0.05:
         actions.append(f"Alert blocked: MOID {moid} > 0.05 AU")
         _log_alert(neo, pathway, "blocked_moid")
         return result
@@ -665,8 +675,12 @@ def ready_for_submission(neo: ScoredNEO) -> tuple[bool, list[str]]:
     unmet: list[str] = []
 
     moid = neo.hazard.moid_au
-    if moid is None or moid > 0.05:
+    # Split `or` into independent ifs for reliable branch coverage on Python 3.14.
+    if moid is None:
         unmet.append(f"MOID not ≤ 0.05 AU (got {moid})")
+    if moid is not None:
+        if moid > 0.05:
+            unmet.append(f"MOID not ≤ 0.05 AU (got {moid})")
 
     quality = 0
     if neo.hazard.orbital_elements is not None:
@@ -675,8 +689,12 @@ def ready_for_submission(neo: ScoredNEO) -> tuple[bool, list[str]]:
         unmet.append(f"Orbit quality code < 2 (got {quality})")
 
     rb = neo.features.real_bogus_score
-    if rb is None or rb < 0.90:
+    # Split `or` into independent ifs for reliable branch coverage on Python 3.14.
+    if rb is None:
         unmet.append(f"real_bogus_score < 0.90 (got {rb})")
+    if rb is not None:
+        if rb < 0.90:
+            unmet.append(f"real_bogus_score < 0.90 (got {rb})")
 
     if neo.hazard.alert_pathway == "known_object":
         unmet.append("Alert pathway is 'known_object' — already in MPC catalog")
@@ -1064,8 +1082,10 @@ def validate_alert_package(package: dict) -> tuple[bool, list[str]]:
         if obs is None:
             issues.append("'observations' is None")
         if obs is not None:
-            if hasattr(obs, "__len__") and len(obs) == 0:
-                issues.append("'observations' is empty")
+            # Split `and` into nested ifs for reliable branch coverage on Python 3.14.
+            if hasattr(obs, "__len__"):
+                if len(obs) == 0:
+                    issues.append("'observations' is empty")
 
     if "alert_pathway" in package:
         pathway = package["alert_pathway"]
@@ -1076,10 +1096,12 @@ def validate_alert_package(package: dict) -> tuple[bool, list[str]]:
         gs = package.get("guardrail_statement") or ""
         if not gs:
             issues.append("'guardrail_statement' is empty")
-        if gs and "NOT" not in gs.upper():
-            issues.append(
-                "'guardrail_statement' should contain 'NOT' to comply with impact-claim guardrail"
-            )
+        # Split `and` into nested ifs for reliable branch coverage on Python 3.14.
+        if gs:
+            if "NOT" not in gs.upper():
+                issues.append(
+                    "'guardrail_statement' must contain 'NOT' (impact-claim guardrail)"
+                )
 
     return (len(issues) == 0, issues)
 
