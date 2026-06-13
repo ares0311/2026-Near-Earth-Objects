@@ -1609,6 +1609,97 @@ class TestFetchMpcObservationsEdgeCases:
         assert result[0].jd == 2460002.5
 
 
+    def test_all_columns_as_quantities(self, tmp_path, monkeypatch):
+        """astroquery 0.4.11+ returns epoch/RA/DEC/mag all as dimensioned Quantities.
+
+        When the table is converted to QTable, every numeric column gets a unit
+        assigned (epoch→d, RA→deg, DEC→deg, mag→mag).  Accessing a row element
+        returns a Quantity; float(dimensioned_Quantity) raises TypeError.
+        All columns must be extracted via _mpc_to_float().
+        """
+        from unittest.mock import MagicMock, patch
+
+        import fetch as fetch_mod
+
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        def _make_quantity(value: float) -> MagicMock:
+            """Simulate an astropy Quantity: has .value, no .jd; float() raises."""
+            q = MagicMock(spec=["value"])
+            q.value = value
+            return q
+
+        mock_epoch = _make_quantity(2460010.5)
+        mock_ra = _make_quantity(123.45)
+        mock_dec = _make_quantity(-22.5)
+        mock_mag = _make_quantity(18.3)
+
+        mock_row = MagicMock()
+        mock_row.colnames = ["epoch", "RA", "DEC", "mag", "band", "observatory"]
+        mock_row.__getitem__ = MagicMock(side_effect=lambda k: {
+            "epoch": mock_epoch,
+            "RA": mock_ra,
+            "DEC": mock_dec,
+            "mag": mock_mag,
+            "band": "V",
+            "observatory": "703",
+        }.get(k))
+
+        mock_table = MagicMock()
+        mock_table.__iter__ = MagicMock(return_value=iter([mock_row]))
+
+        mock_mpc_cls = MagicMock()
+        mock_mpc_cls.get_observations.return_value = mock_table
+        mock_mpc_mod = MagicMock()
+        mock_mpc_mod.MPC = mock_mpc_cls
+
+        with patch.dict("sys.modules", {"astroquery.mpc": mock_mpc_mod}):
+            result = fetch_mod.fetch_mpc_observations("all_quantity_test", force_refresh=True)
+        assert len(result) == 1
+        assert result[0].jd == pytest.approx(2460010.5)
+        assert result[0].ra_deg == pytest.approx(123.45)
+        assert result[0].dec_deg == pytest.approx(-22.5)
+        assert result[0].mag == pytest.approx(18.3)
+
+    def test_ra_dec_as_quantities(self, tmp_path, monkeypatch):
+        """RA and DEC returned as Quantities (unit='deg') must be extracted via .value."""
+        from unittest.mock import MagicMock, patch
+
+        import fetch as fetch_mod
+
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        mock_ra = MagicMock(spec=["value"])
+        mock_ra.value = 270.0
+        mock_dec = MagicMock(spec=["value"])
+        mock_dec.value = 45.0
+
+        mock_row = MagicMock()
+        mock_row.colnames = ["epoch", "RA", "DEC", "mag", "band", "observatory"]
+        mock_row.__getitem__ = MagicMock(side_effect=lambda k: {
+            "epoch": 2460020.0,
+            "RA": mock_ra,
+            "DEC": mock_dec,
+            "mag": 17.5,
+            "band": "r",
+            "observatory": "G96",
+        }.get(k))
+
+        mock_table = MagicMock()
+        mock_table.__iter__ = MagicMock(return_value=iter([mock_row]))
+
+        mock_mpc_cls = MagicMock()
+        mock_mpc_cls.get_observations.return_value = mock_table
+        mock_mpc_mod = MagicMock()
+        mock_mpc_mod.MPC = mock_mpc_cls
+
+        with patch.dict("sys.modules", {"astroquery.mpc": mock_mpc_mod}):
+            result = fetch_mod.fetch_mpc_observations("ra_dec_quantity_test", force_refresh=True)
+        assert len(result) == 1
+        assert result[0].ra_deg == pytest.approx(270.0)
+        assert result[0].dec_deg == pytest.approx(45.0)
+
+
 class TestFetchAtlasForced:
     def test_returns_empty_without_token(self, tmp_path, monkeypatch):
         import fetch as fetch_mod
