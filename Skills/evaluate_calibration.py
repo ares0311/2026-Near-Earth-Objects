@@ -32,6 +32,7 @@ import argparse
 import hashlib
 import json
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -477,10 +478,12 @@ def evaluate_cnn(
             ).unsqueeze(0)
         return _t("science"), _t("reference"), _t("difference")
 
-    # Run inference on val set in batches
+    # Run inference on val set in batches — print progress every batch.
     all_proba: list[float] = []
+    n_batches = (len(val_rows) + batch_size - 1) // batch_size
+    t_infer = time.monotonic()
     with torch.no_grad():
-        for i in range(0, len(val_rows), batch_size):
+        for batch_idx, i in enumerate(range(0, len(val_rows), batch_size)):
             batch_rows = val_rows[i : i + batch_size]
             sci_b, ref_b, diff_b = [], [], []
             for r in batch_rows:
@@ -495,6 +498,19 @@ def evaluate_cnn(
             # P(real) = 1 - P(stellar_artifact=class 3)
             p = 1.0 - out[:, 3].cpu().numpy()
             all_proba.extend(p.tolist())
+            elapsed = time.monotonic() - t_infer
+            em, es = divmod(int(elapsed), 60)
+            done = batch_idx + 1
+            rate = elapsed / done if done else 0
+            remaining = (n_batches - done) * rate
+            rm, rs = divmod(int(remaining), 60)
+            print(
+                f"  [CNN inference] batch {done}/{n_batches}"
+                f"  samples {min(i + batch_size, len(val_rows))}/{len(val_rows)}"
+                f"  elapsed {em}m{es:02d}s  ETA {rm}m{rs:02d}s",
+                file=sys.stderr,
+                flush=True,
+            )
 
     p_real = np.array(all_proba, dtype=np.float64)
 
