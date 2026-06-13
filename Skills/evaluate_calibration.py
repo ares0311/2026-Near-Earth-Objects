@@ -29,10 +29,14 @@ T1-D gate thresholds (ALL must pass for promotion_gate_passed=true):
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import json
+import os
 import sys
+import threading
 import time
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -104,6 +108,44 @@ def _print_row(name: str, brier: float, ece: float) -> None:
     b_str = _fmt(brier, BRIER_THRESHOLD)
     e_str = _fmt(ece, ECE_THRESHOLD)
     print(f"  {name:<20s}  Brier={b_str}   ECE={e_str}")
+
+
+@contextlib.contextmanager
+def _heartbeat(label: str, interval: float = 5.0) -> Iterator[None]:
+    """Emit '<label> … still working (Nm Ns elapsed)' every `interval` seconds.
+
+    A blocking call such as ``torch.load`` on a Dropbox-backed ``.pt`` file can
+    stall for minutes while the OS materialises the file from the cloud, with no
+    output at all — indistinguishable from a true hang. This context manager runs
+    a daemon thread that prints an elapsed-time line on a fixed cadence so the
+    operator can always tell the process is (1) alive, (2) still working, and
+    (3) how long it has been waiting. The thread exits as soon as the wrapped
+    block returns, so it adds no output once the slow call completes.
+    """
+    # Event used to stop the heartbeat thread the instant the block exits.
+    stop = threading.Event()
+    t0 = time.monotonic()
+
+    def _beat() -> None:
+        # Sleep in `interval` chunks; stop.wait returns True the moment we are
+        # signalled to stop, so the thread never lingers past the with-block.
+        while not stop.wait(interval):
+            elapsed = int(time.monotonic() - t0)
+            m, s = divmod(elapsed, 60)
+            print(
+                f"  {label} … still working ({m}m{s:02d}s elapsed)",
+                file=sys.stderr,
+                flush=True,
+            )
+
+    thread = threading.Thread(target=_beat, daemon=True)
+    thread.start()
+    try:
+        yield
+    finally:
+        # Signal the heartbeat to stop and wait briefly for it to drain.
+        stop.set()
+        thread.join(timeout=1.0)
 
 
 # ---------------------------------------------------------------------------
@@ -464,8 +506,24 @@ def evaluate_cnn(
     if model is None:
         print("  ERROR: torch not available — cannot evaluate CNN.")
         return {"tier": "tier2_cnn", "error": "torch unavailable"}
-    print(f"  Loading CNN weights from: {cnn_model_path} ...", flush=True)
-    state = torch.load(str(cnn_model_path), map_location="cpu", weights_only=False)
+    # Report the weight-file size up front so the operator knows how much must
+    # be read, and can spot a Dropbox online-only placeholder that has to be
+    # downloaded before torch can read it.
+    try:
+        size_mb = os.path.getsize(cnn_model_path) / (1024 * 1024)
+        print(
+            f"  Loading CNN weights from: {cnn_model_path}  ({size_mb:.1f} MB) ...",
+            flush=True,
+        )
+    except OSError:
+        print(f"  Loading CNN weights from: {cnn_model_path} ...", flush=True)
+    # torch.load can block for minutes while Dropbox materialises the file; the
+    # heartbeat thread prints an elapsed-time line every few seconds so the wait
+    # is never silent and a true hang is distinguishable from slow I/O.
+    t_load = time.monotonic()
+    with _heartbeat("Loading CNN weights"):
+        state = torch.load(str(cnn_model_path), map_location="cpu", weights_only=False)
+    print(f"  CNN weights loaded in {time.monotonic() - t_load:.1f}s.", flush=True)
     model.load_state_dict(state)
     model.eval()
     n_batches = (len(val_rows) + batch_size - 1) // batch_size
@@ -492,12 +550,23 @@ def evaluate_cnn(
     with torch.no_grad():
         for batch_idx, i in enumerate(range(0, len(val_rows), batch_size)):
             batch_rows = val_rows[i : i + batch_size]
+            done = batch_idx + 1
+            # Announce the batch BEFORE loading its cutouts. The first batch in
+            # particular can take a while to read 50 .npz files from Dropbox; a
+            # heartbeat keeps that load visibly alive instead of silent.
+            print(
+                f"  [CNN inference] loading batch {done}/{n_batches}"
+                f" ({len(batch_rows)} cutouts) ...",
+                file=sys.stderr,
+                flush=True,
+            )
             sci_b, ref_b, diff_b = [], [], []
-            for r in batch_rows:
-                s, re, d = _load_npz(r["cutout_path"])
-                sci_b.append(s)
-                ref_b.append(re)
-                diff_b.append(d)
+            with _heartbeat(f"batch {done}/{n_batches} cutout load"):
+                for r in batch_rows:
+                    s, re, d = _load_npz(r["cutout_path"])
+                    sci_b.append(s)
+                    ref_b.append(re)
+                    diff_b.append(d)
             sci_t = torch.stack(sci_b)
             ref_t = torch.stack(ref_b)
             diff_t = torch.stack(diff_b)
@@ -507,7 +576,6 @@ def evaluate_cnn(
             all_proba.extend(p.tolist())
             elapsed = time.monotonic() - t_infer
             em, es = divmod(int(elapsed), 60)
-            done = batch_idx + 1
             rate = elapsed / done if done else 0
             remaining = (n_batches - done) * rate
             rm, rs = divmod(int(remaining), 60)
