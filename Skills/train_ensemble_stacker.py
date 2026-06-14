@@ -275,13 +275,14 @@ def build_stacking_dataset(
     xgb_model: Any,
     cnn_model: Any | None,
     seed: int = 42,
-) -> tuple[list[dict[str, float]], list[dict[str, float]] | None, list[int]]:
+) -> tuple[list[dict[str, float]], list[dict[str, float]] | None, list[int], list[str]]:
     """Assemble [T1, T2] stacking features and integer class labels.
 
-    Returns (tier1_outputs, tier2_outputs, labels):
+    Returns (tier1_outputs, tier2_outputs, labels, sources):
       - tier1_outputs: one 5-class dict per sample
       - tier2_outputs: one 5-class dict per sample (None → T2 unavailable for that sample)
       - labels: integer class index per sample (0-4)
+      - sources: "ztf", "mpc", or "synthetic" per sample
 
     Strategy:
     1. Reproduce T2 CNN val split on the cutout index CSV (seed=42, 80/20).
@@ -318,6 +319,7 @@ def build_stacking_dataset(
     t1_outputs: list[dict[str, float]] = []
     t2_outputs: list[dict[str, float]] = []
     ys: list[int] = []
+    sources: list[str] = []  # "ztf", "mpc", or "synthetic" per sample
     cutout_paths: list[Path] = []
     val_rows_filtered: list[dict] = []
     val_alerts: list[dict] = []  # parallel to val_rows_filtered for feature reuse
@@ -385,6 +387,7 @@ def build_stacking_dataset(
             t1_outputs.append(t1_dict)
             t2_outputs.append(t2_dict)
             ys.append(label_val)
+            sources.append("ztf")
 
     # ---- Append MPC labels (T2 = uniform; no cutouts for MPC objects) ----
     if mpc_labels_path.exists():
@@ -405,6 +408,7 @@ def build_stacking_dataset(
                 t1_outputs.append(_proba_row_to_dict(t1_p))
                 t2_outputs.append(T2_UNIFORM.copy())
                 ys.append(lbl)
+                sources.append("mpc")
                 mpc_count += 1
         print(f"  Added {mpc_count} MPC samples (T2=uniform prior)", flush=True)
 
@@ -423,6 +427,7 @@ def build_stacking_dataset(
             t1_outputs.append(t1_syn)
             t2_outputs.append(T2_UNIFORM.copy())
             ys.append(cls_idx)
+            sources.append("synthetic")
             synthetic_added += 1
     if synthetic_added:
         print(f"  Added {synthetic_added} synthetic samples for missing classes "
@@ -430,8 +435,9 @@ def build_stacking_dataset(
 
     print(f"\nTotal stacking dataset: {len(ys)} samples", flush=True)
     print(f"  Class distribution: {dict(sorted(Counter(ys).items()))}", flush=True)
+    print(f"  Source distribution: {dict(sorted(Counter(sources).items()))}", flush=True)
 
-    return t1_outputs, t2_outputs, ys
+    return t1_outputs, t2_outputs, ys, sources
 
 
 # ---------------------------------------------------------------------------
@@ -443,11 +449,15 @@ def evaluate_stacker_kpis(
     t1_val: list[dict[str, float]],
     t2_val: list[dict[str, float]],
     y_val: list[int],
+    sources_val: list[str] | None = None,
     binary_class: int = ZTF_REAL,
 ) -> dict[str, Any]:
     """Evaluate the 7 T1-D gate KPIs on the stacker using the val set.
 
-    Uses isotonic calibration on the binary real/bogus probability (class 0 vs 3).
+    Filters to ZTF-origin samples (source=="ztf", label ∈ {ZTF_REAL, ZTF_BOGUS})
+    for binary KPI evaluation. MPC samples have T2=uniform which is non-
+    discriminative, so including them in binary real/bogus evaluation would
+    unfairly depress AUC by ~10pp relative to the true ZTF discrimination quality.
     Returns a report dict with all KPI values and pass/fail flags.
     """
     if len(y_val) == 0:
@@ -469,13 +479,32 @@ def evaluate_stacker_kpis(
     # For calibration KPIs, use the probability assigned to class 0 (neo_candidate/real)
     if ZTF_REAL in trained_classes:
         idx_real = trained_classes.index(ZTF_REAL)
-        probs_raw = proba_stacker[:, idx_real]
+        probs_raw_all = proba_stacker[:, idx_real]
     else:
-        # Fall back to first class if real is not in training set
-        probs_raw = proba_stacker[:, 0]
+        probs_raw_all = proba_stacker[:, 0]
 
+    # Filter to ZTF-origin samples only for binary KPI evaluation.
+    # MPC samples have T2=uniform for both class 0 (NEO) and class 2 (MBA),
+    # making them indistinguishable via T2 and artificially suppressing AUC.
+    # ZTF samples (class 0=real, class 3=bogus) have real T1+T2 features and
+    # represent the actual binary real/bogus discrimination task.
+    if sources_val is not None:
+        ztf_mask = np.array([s == "ztf" for s in sources_val])
+    else:
+        # Fall back: infer ZTF samples as those with label 0 or 3
+        ztf_mask = np.array([y in (ZTF_REAL, ZTF_BOGUS) for y in y_val])
+    n_ztf = int(ztf_mask.sum())
+    print(f"  KPI evaluation subset: {n_ztf}/{len(y_val)} ZTF-origin samples", flush=True)
+
+    if n_ztf < 20:
+        # Degenerate case: fall back to all samples
+        print("  WARNING: fewer than 20 ZTF samples; using full val set for KPI", flush=True)
+        ztf_mask = np.ones(len(y_val), dtype=bool)
+
+    probs_raw = probs_raw_all[ztf_mask]
+    y_ztf = [y_val[i] for i in range(len(y_val)) if ztf_mask[i]]
     # Binary labels: 1 = real (class 0), 0 = bogus/other
-    labels_binary = np.array([1 if y == ZTF_REAL else 0 for y in y_val], dtype=np.int32)
+    labels_binary = np.array([1 if y == ZTF_REAL else 0 for y in y_ztf], dtype=np.int32)
 
     # Fit isotonic calibrator on val set (same as T1-D gate in evaluate_calibration.py)
     # IsotonicCalibrator.fit() requires numpy arrays — not Python lists
@@ -511,6 +540,7 @@ def evaluate_stacker_kpis(
 
     return {
         "n_val": len(y_val),
+        "n_ztf_val": n_ztf,
         "n_features": int(stacker.coef_.shape[1]),
         "n_classes_trained": n_classes_trained,
         "brier": round(brier, 4),
@@ -617,7 +647,7 @@ def main() -> None:
 
     # Build stacking dataset
     t0 = time.time()
-    t1_all, t2_all, ys = build_stacking_dataset(
+    t1_all, t2_all, ys, srcs = build_stacking_dataset(
         alerts_path=args.alerts,
         cutouts_csv=args.cutouts_csv if args.cutouts_csv.exists() else Path("/dev/null"),
         mpc_labels_path=args.mpc_labels,
@@ -644,6 +674,7 @@ def main() -> None:
     t1_val = [t1_all[i] for i in idx_val]
     t2_val = [t2_all[i] for i in idx_val] if t2_all else [T2_UNIFORM.copy()] * len(idx_val)
     y_val = [ys[i] for i in idx_val]
+    sources_val = [srcs[i] for i in idx_val]
 
     print(f"\nStacker train: {len(y_tr)}  val: {len(y_val)}", flush=True)
 
@@ -677,7 +708,7 @@ def main() -> None:
 
     # Evaluate 7 T1-D KPIs on val set
     print("\nEvaluating stacker calibration KPIs on held-out val set ...", flush=True)
-    kpis = evaluate_stacker_kpis(stacker, t1_val, t2_val, y_val)
+    kpis = evaluate_stacker_kpis(stacker, t1_val, t2_val, y_val, sources_val=sources_val)
 
     print(f"\n{'=' * 50}", flush=True)
     print("Ensemble Stacker KPI Results:", flush=True)
