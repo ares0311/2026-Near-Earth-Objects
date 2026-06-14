@@ -187,7 +187,9 @@ class TestAlertProtocol:
 
     def test_none_moid_blocks_alert(self):
         # Covers `moid is None` left-hand True branch of `if moid is None or moid > 0.05:`
-        neo = make_scored_neo(rb=0.95, orbit_quality=2, moid_au=None, alert_pathway="mpc_submission")
+        neo = make_scored_neo(
+            rb=0.95, orbit_quality=2, moid_au=None, alert_pathway="mpc_submission"
+        )
         result = process_alert(neo, dry_run=True)
         assert any("blocked" in a for a in result["actions"])
 
