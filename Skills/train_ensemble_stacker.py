@@ -313,12 +313,6 @@ def build_stacking_dataset(
     with alerts_path.open() as f:
         alerts = json.load(f)
     print(f"  Loaded {len(alerts)} alerts in {time.time()-t0:.1f}s", flush=True)
-    # Index alerts by filename/id for fast lookup
-    alert_by_filename: dict[str, dict] = {}
-    for a in alerts:
-        fn = a.get("filename") or a.get("id") or a.get("candid")
-        if fn:
-            alert_by_filename[str(fn)] = a
 
     # ---- Extract val set features ----
     t1_outputs: list[dict[str, float]] = []
@@ -326,11 +320,17 @@ def build_stacking_dataset(
     ys: list[int] = []
     cutout_paths: list[Path] = []
     val_rows_filtered: list[dict] = []
+    val_alerts: list[dict] = []  # parallel to val_rows_filtered for feature reuse
 
     for idx in val_indices:
         row = rows[idx]
-        fn = row.get("filename", "")
-        alert = alert_by_filename.get(fn) or alert_by_filename.get(Path(fn).stem)
+        # cutout_path stem encodes entry index: cutout_000042_000.npz → alerts[42]
+        try:
+            cp_stem = Path(row.get("cutout_path", "")).stem  # e.g. "cutout_000042_000"
+            entry_idx = int(cp_stem.split("_")[1])
+            alert: dict | None = alerts[entry_idx] if 0 <= entry_idx < len(alerts) else None
+        except (ValueError, IndexError):
+            alert = None
         if alert is None:
             continue
         feats = _alert_to_features(alert)
@@ -347,6 +347,7 @@ def build_stacking_dataset(
             else:
                 continue  # skip ambiguous
         val_rows_filtered.append(row)
+        val_alerts.append(alert)
         cutout_paths.append(Path(row.get("cutout_path", "")))
 
     print(f"  Filtered val set: {len(val_rows_filtered)} samples with features", flush=True)
@@ -354,10 +355,8 @@ def build_stacking_dataset(
     # Run T1 XGBoost on all val features at once
     if val_rows_filtered:
         feature_matrix = np.array([
-            _alert_to_features(
-                alert_by_filename.get(r.get("filename", ""), {})  # type: ignore[arg-type]
-            ) or np.full(len(FEATURE_COLS), 0.5, dtype=np.float32)
-            for r in val_rows_filtered
+            _alert_to_features(a) or np.full(len(FEATURE_COLS), 0.5, dtype=np.float32)
+            for a in val_alerts
         ], dtype=np.float32)
         print(f"  Running T1 XGBoost on {len(feature_matrix)} val samples ...", flush=True)
         t1_start = time.time()
@@ -379,10 +378,8 @@ def build_stacking_dataset(
             t2_dict = t2_results[i] if t2_results[i] is not None else T2_UNIFORM.copy()
             label_val = int(row.get("label", -1))
             if label_val not in range(5):
-                rb = float(
-                    (alert_by_filename.get(row.get("filename", "")) or {}).get(
-                        "rb", 0.5) or 0.5
-                )
+                a = val_alerts[i]
+                rb = float(a.get("rb", a.get("real_bogus_score", 0.5)) or 0.5)
                 label_val = ZTF_REAL if rb >= 0.65 else ZTF_BOGUS
             t1_outputs.append(t1_dict)
             t2_outputs.append(t2_dict)
@@ -480,9 +477,10 @@ def evaluate_stacker_kpis(
     labels_binary = np.array([1 if y == ZTF_REAL else 0 for y in y_val], dtype=np.int32)
 
     # Fit isotonic calibrator on val set (same as T1-D gate in evaluate_calibration.py)
+    # IsotonicCalibrator.fit() requires numpy arrays — not Python lists
     calibrator = IsotonicCalibrator()
-    calibrator.fit(probs_raw.tolist(), labels_binary.tolist())
-    probs_cal = np.array(calibrator.predict(probs_raw.tolist()))
+    calibrator.fit(probs_raw, labels_binary)
+    probs_cal = calibrator.predict(probs_raw)
 
     # Compute all 7 KPIs
     brier = brier_score(probs_cal.tolist(), labels_binary.tolist())
