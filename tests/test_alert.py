@@ -169,6 +169,12 @@ class TestAlertProtocol:
         result = process_alert(neo, dry_run=True)
         assert any("blocked" in a for a in result["actions"])
 
+    def test_none_rb_blocks_alert(self):
+        # Covers `rb is None` left-hand True branch of `if rb is None or rb < 0.90:`
+        neo = make_scored_neo(rb=None, alert_pathway="mpc_submission")
+        result = process_alert(neo, dry_run=True)
+        assert any("blocked" in a for a in result["actions"])
+
     def test_low_orbit_quality_blocks_alert(self):
         neo = make_scored_neo(orbit_quality=1, alert_pathway="mpc_submission")
         result = process_alert(neo, dry_run=True)
@@ -176,6 +182,14 @@ class TestAlertProtocol:
 
     def test_high_moid_blocks_alert(self):
         neo = make_scored_neo(moid_au=0.1, alert_pathway="mpc_submission")
+        result = process_alert(neo, dry_run=True)
+        assert any("blocked" in a for a in result["actions"])
+
+    def test_none_moid_blocks_alert(self):
+        # Covers `moid is None` left-hand True branch of `if moid is None or moid > 0.05:`
+        neo = make_scored_neo(
+            rb=0.95, orbit_quality=2, moid_au=None, alert_pathway="mpc_submission"
+        )
         result = process_alert(neo, dry_run=True)
         assert any("blocked" in a for a in result["actions"])
 
@@ -739,6 +753,22 @@ class TestReadyForSubmission:
         ready, unmet = ready_for_submission(neo)
         assert ready is False
         assert any("known_object" in u for u in unmet)
+
+    def test_none_moid_fails(self):
+        # Covers the `moid is None` left-hand branch of `if moid is None or moid > 0.05:`
+        from alert import ready_for_submission
+        neo = self._make_neo(moid_au=None)
+        ready, unmet = ready_for_submission(neo)
+        assert ready is False
+        assert any("MOID" in u for u in unmet)
+
+    def test_none_rb_fails(self):
+        # Covers the `rb is None` left-hand branch of `if rb is None or rb < 0.90:`
+        from alert import ready_for_submission
+        neo = self._make_neo(rb=None)
+        ready, unmet = ready_for_submission(neo)
+        assert ready is False
+        assert any("real_bogus" in u for u in unmet)
 
     def test_returns_tuple(self):
         from alert import ready_for_submission

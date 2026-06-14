@@ -545,7 +545,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.87.6)
+## Current State (v0.87.7)
 
 All 10 pipeline modules are complete. The offline suite passes 3511 tests, with
 2 live/integration checks deselected. CI is expected to
@@ -555,11 +555,11 @@ readiness checks, live policy validation, no-secret credential inventories,
 approval bundles, operator handoffs, and fail-closed signoff readiness. All
 three ML tiers now have trained weights: Tier 1 XGBoost (val_acc=99.95%),
 Tier 2 CNN (val_acc=91.3%), and Tier 3 Transformer (val_macro_f1=0.9400,
-best epoch 17/30). Production remains blocked on production calibration KPI
-evaluation (T1-D) and ensemble stacking. Jerome W. Lindsey III approved the five-class label policy and
-a 50-sequence-per-class pilot on 2026-06-10. Acquisition and split tooling are
-implemented; the operator network run is pending and is not production
-approval.
+best epoch 17/30). **T1-D calibration KPI gate PASSED (2026-06-14)**: Tier 1
+XGBoost and Tier 2 CNN both passed all 7 KPIs; `promotion_gate_passed=true`.
+Production is now blocked only on ensemble stacking (logistic regression
+meta-learner over Tier 1 + Tier 2 + Tier 3). Jerome W. Lindsey III approved
+the five-class label policy and a 50-sequence-per-class pilot on 2026-06-10.
 
 The first operator pilot attempt was retained as diagnostic evidence. Its
 200-row manifest contained 28 duplicate comet rows, reducing collection to 172
@@ -736,6 +736,42 @@ applied it to all four numeric columns. Pilot rerun pending operator execution.
 - Run credentialed live-data dry runs for ZTF/ATLAS/Pan-STARRS only when tokens and review policy are explicitly configured.
 - Train and evaluate Tier 2/Tier 3 model weights on real labeled data.
 - Commit `models/tier1_xgb.json` after `.gitignore` update to allow `models/*.json` is merged.
+
+### Key Changes in v0.87.7 (T1-D calibration KPI gate passed)
+
+- `Skills/evaluate_calibration.py`: fixed series of macOS PyTorch deadlocks
+  that caused the CNN section to hang indefinitely (PRs #91–#95):
+  - **BytesIO pre-read** (PR #91): torch.load on a file path uses mmap and
+    returns 0.0s but defers byte reads to load_state_dict, blocking on
+    Dropbox-backed files. Fixed by reading into BytesIO in 64KB chunks with
+    per-chunk ETA before any torch call.
+  - **Matmul warmup** (PR #93): first ATen tensor compute in a new process
+    triggers Accelerate/BLAS lazy init (~20s). Fixed with dummy 256×256 matmul
+    warmup before load_state_dict.
+  - **Conv2d warmup** (PR #94): matmul warmup only activates BLAS paths;
+    conv2d dispatches through a separate route (FBGEMM/oneDNN) that lazy-
+    compiles on first call. Fixed with dummy 1×1×63×63 CNN forward pass.
+  - **Thread-pool deadlock** (PR #95): ATen thread-pool spawn deadlocks on
+    macOS when OMP_NUM_THREADS is unconstrained. Fixed by setting
+    OMP_NUM_THREADS=1 and MKL_NUM_THREADS=1 via os.environ before import
+    torch, and calling torch.set_num_threads(1) immediately after import.
+  - **Heartbeats** on all blocking calls (matmul warmup, conv warmup,
+    per-batch forward pass) so no call is ever silent.
+- T1-D calibration KPI gate results (2026-06-14, operator run, 24s total):
+  - Tier 1 XGBoost (Isotonic): Brier=0.0000, ECE=0.0000, Log-loss=0.0004,
+    ROC AUC=1.0000 — all 7 KPIs PASS.
+  - Tier 2 CNN (Isotonic): Brier=0.0462, ECE=0.0132, Log-loss=0.2398,
+    ROC AUC=0.9593 — all 7 KPIs PASS.
+  - `promotion_gate_passed=true`; report at `Logs/reports/calibration_report.json`.
+- `CLAUDE.md` Standing Rules hardened (PR #92): four new rules to prevent
+  symptom-loop debugging (diagnose root cause before writing code; physically
+  impossible output is a diagnostic signal; failed fix → re-diagnose; state
+  predicted output before submitting PR). ETA rule updated to require
+  measurable-quantity ETA; elapsed-only heartbeats explicitly prohibited.
+- `docs/PRODUCTION_READINESS.md`: T1-D marked CLOSED; checklist updated;
+  T1-A progress updated to reflect calibration gate passed.
+- 3511 tests passing; 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.87.7.
 
 ### Key Changes in v0.87.6 (ALeRCE progress output; Tier 3 training complete)
 
