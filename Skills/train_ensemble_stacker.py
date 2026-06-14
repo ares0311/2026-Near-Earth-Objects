@@ -483,17 +483,17 @@ def evaluate_stacker_kpis(
     calibrator.fit(probs_raw, labels_binary)
     probs_cal = calibrator.predict(probs_raw)
 
-    # Compute all 7 KPIs
-    brier = brier_score(probs_cal.tolist(), labels_binary.tolist())
-    ece = expected_calibration_error(probs_cal.tolist(), labels_binary.tolist())
-    log_loss = compute_log_loss(probs_cal.tolist(), labels_binary.tolist())
-    auc = compute_roc_auc(probs_cal.tolist(), labels_binary.tolist())
-    cv = cross_validate_calibration(probs_raw.tolist(), labels_binary.tolist(), n_folds=5)
+    # Compute all 7 KPIs — pass numpy arrays; calibration functions use numpy arithmetic
+    brier = brier_score(probs_cal, labels_binary)
+    ece = expected_calibration_error(probs_cal, labels_binary)
+    log_loss = compute_log_loss(probs_cal, labels_binary)
+    auc = compute_roc_auc(probs_cal, labels_binary)
+    cv = cross_validate_calibration(probs_raw, labels_binary, n_folds=5)
     bs_brier = bootstrap_confidence_interval(
-        probs_cal.tolist(), labels_binary.tolist(), n_bootstrap=N_BOOTSTRAP, metric="brier"
+        probs_cal, labels_binary, n_bootstrap=N_BOOTSTRAP, metric="brier"
     )
     bs_ece = bootstrap_confidence_interval(
-        probs_cal.tolist(), labels_binary.tolist(), n_bootstrap=N_BOOTSTRAP, metric="ece"
+        probs_cal, labels_binary, n_bootstrap=N_BOOTSTRAP, metric="ece"
     )
 
     # Gate checks
