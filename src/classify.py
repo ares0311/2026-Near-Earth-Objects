@@ -11,6 +11,7 @@ __all__ = [
     "get_tier1_feature_importances",
     "ensemble_predict",
     "_build_ensemble",
+    "_load_ensemble_stacker",
     "retrain_tier1",
     "retrain_stacker",
     "posterior_entropy",
@@ -516,11 +517,56 @@ _LABELS = [
 ]
 
 
-def _build_ensemble(tier1_outputs: list[dict[str, float]], labels: list[dict[str, float]]) -> Any:
+class _StackerProxy:
+    """Reconstruct stacker from JSON coefficients; provides predict_proba and coef_ attributes."""
+
+    def __init__(self, coef: list, intercept: list, classes: list) -> None:
+        import numpy as np
+        # coef shape: (n_classes, n_features); intercept shape: (n_classes,)
+        self.coef_ = np.array(coef, dtype=np.float64)
+        self.intercept_ = np.array(intercept, dtype=np.float64)
+        self.classes_ = np.array(classes)
+
+    def predict_proba(self, X: Any) -> Any:
+        """Apply softmax over linear decision function; matches sklearn LogReg output."""
+        import numpy as np
+        X_arr = np.asarray(X, dtype=np.float64)
+        # decision function: (n_samples, n_classes)
+        z = X_arr @ self.coef_.T + self.intercept_
+        # numerically stable softmax
+        z -= z.max(axis=1, keepdims=True)
+        e = np.exp(z)
+        return e / e.sum(axis=1, keepdims=True)
+
+
+def _load_ensemble_stacker(model_path: Path | str | None = None) -> Any:
+    """Load ensemble stacker coefficients from JSON; returns _StackerProxy or None."""
+    path = Path(model_path) if model_path else _MODEL_DIR / "stacker_coef.json"
+    if not path.exists():
+        return None
+    try:
+        with path.open() as f:
+            data = json.load(f)
+        return _StackerProxy(data["coef"], data["intercept"], data["classes"])
+    except Exception:
+        return None
+
+
+def _build_ensemble(
+    tier1_outputs: list[dict[str, float]],
+    labels: list[dict[str, float]],
+    tier2_outputs: list[dict[str, float]] | None = None,
+    tier3_outputs: list[dict[str, float]] | None = None,
+) -> Any:
     """Train a logistic regression meta-learner on stacked tier outputs.
 
-    tier1_outputs: list of tier1 probability dicts (one per training example)
-    labels: list of one-hot or integer label dicts with key 'label' (int 0-4)
+    Supports 5-feature (T1 only), 10-feature (T1+T2), or 15-feature (T1+T2+T3)
+    input depending on which tier outputs are supplied.
+
+    tier1_outputs: list of 5-class probability dicts (one per example)
+    labels: list of dicts with key 'label' (int 0-4)
+    tier2_outputs: optional list of 5-class T2 probability dicts (same length)
+    tier3_outputs: optional list of 5-class T3 probability dicts (same length)
 
     Returns a fitted sklearn LogisticRegression, or None on failure.
     """
@@ -528,11 +574,20 @@ def _build_ensemble(tier1_outputs: list[dict[str, float]], labels: list[dict[str
         import numpy as np
         from sklearn.linear_model import LogisticRegression  # type: ignore[import]
 
-        X = np.array([[d[lbl] for lbl in _LABELS] for d in tier1_outputs], dtype=np.float32)
+        rows = []
+        for i, t1 in enumerate(tier1_outputs):
+            row = [t1[lbl] for lbl in _LABELS]
+            if tier2_outputs is not None and i < len(tier2_outputs):
+                row += [tier2_outputs[i][lbl] for lbl in _LABELS]
+            if tier3_outputs is not None and i < len(tier3_outputs):
+                row += [tier3_outputs[i][lbl] for lbl in _LABELS]
+            rows.append(row)
+
+        X = np.array(rows, dtype=np.float32)
         y = np.array([int(d["label"]) for d in labels], dtype=np.int32)
         if len(np.unique(y)) < 2:
             return None
-        clf = LogisticRegression(max_iter=500, solver="lbfgs")
+        clf = LogisticRegression(max_iter=500, solver="lbfgs", C=1.0)
         clf.fit(X, y)
         return clf
     except Exception:
@@ -547,16 +602,60 @@ def ensemble_predict(
 ) -> dict[str, float]:
     """Produce final ensemble probabilities.
 
-    If meta_model is provided, it is used to re-weight tier1 outputs (logistic
-    regression meta-learner). Falls back to weighted average when no meta_model.
+    If meta_model is provided it is used as the stacking meta-learner.
+    Feature dimension is inferred from meta_model.coef_.shape[1]:
+      5  = T1 only
+      10 = T1 + T2 (tier2 must be non-None; otherwise falls back)
+      15 = T1 + T2 + T3 (both tier2 and tier3 must be non-None; otherwise falls back)
+
+    When the stacker was trained on a subset of the 5 classes, missing-class
+    probabilities are backfilled using T1 proportions and the output is
+    renormalized to sum to 1.
+
+    Falls back to weighted average when meta_model is absent, a required tier is
+    missing, or any exception occurs.
     """
     if meta_model is not None:
         try:
             import numpy as np
 
-            x = np.array([[tier1[lbl] for lbl in _LABELS]], dtype=np.float32)
+            n_features = int(meta_model.coef_.shape[1])
+            row: list[float] = [tier1[lbl] for lbl in _LABELS]
+            if n_features >= 10:
+                # 10-feature stacker needs T2; fall back gracefully if absent
+                if tier2 is None:
+                    return _stack_predictions(tier1, tier2, tier3)
+                row += [tier2[lbl] for lbl in _LABELS]
+            if n_features >= 15:
+                # 15-feature stacker needs T3; fall back gracefully if absent
+                if tier3 is None:
+                    return _stack_predictions(tier1, tier2, tier3)
+                row += [tier3[lbl] for lbl in _LABELS]
+
+            x = np.array([row[:n_features]], dtype=np.float32)
             proba = meta_model.predict_proba(x)[0]
-            meta_out = {lbl: float(p) for lbl, p in zip(_LABELS, proba)}
+
+            # Handle partial-class stackers (trained on subset of 5 classes)
+            trained_classes = list(meta_model.classes_)
+            if len(trained_classes) < len(_LABELS):
+                # Map stacker probas to their respective labels
+                meta_out: dict[str, float] = {lbl: 0.0 for lbl in _LABELS}
+                assigned = 0.0
+                for cls_idx, p in zip(trained_classes, proba):
+                    if 0 <= int(cls_idx) < len(_LABELS):
+                        meta_out[_LABELS[int(cls_idx)]] = float(p)
+                        assigned += float(p)
+                # Backfill missing classes using T1 relative proportions
+                gap = max(0.0, 1.0 - assigned)
+                t1_missing = sum(
+                    tier1.get(lbl, 0.0) for lbl in _LABELS if meta_out[lbl] == 0.0
+                )
+                for lbl in _LABELS:
+                    if meta_out[lbl] == 0.0 and t1_missing > 0:
+                        meta_out[lbl] = gap * tier1.get(lbl, 0.0) / t1_missing
+            else:
+                meta_out = {lbl: float(p) for lbl, p in zip(_LABELS, proba)}
+
             return _stack_predictions(meta_out, tier2, tier3)
         except Exception:
             pass
@@ -692,19 +791,24 @@ def retrain_stacker(
     tier1_outputs: list[dict[str, float]],
     labels: list[dict[str, float]],
     model_path: Path | str | None = None,
+    tier2_outputs: list[dict[str, float]] | None = None,
+    tier3_outputs: list[dict[str, float]] | None = None,
 ) -> dict[str, Any]:
-    """Retrain the stacking meta-learner from tier-1 probability outputs.
+    """Retrain the stacking meta-learner from tier probability outputs.
 
-    ``tier1_outputs`` is a list of probability dicts (one per training example).
+    ``tier1_outputs`` is a list of 5-class probability dicts (one per example).
     ``labels`` is a list of dicts each with key ``"label"`` (int 0–4).
+    ``tier2_outputs`` / ``tier3_outputs`` extend the feature vector to 10 / 15
+    features when provided.
 
     Serialises the fitted coefficients to a JSON sidecar at ``model_path``
-    (defaults to ``models/stacker_coef.json``).
+    (defaults to ``models/stacker_coef.json``).  ``n_features`` is stored in
+    the JSON so ``_load_ensemble_stacker`` can reconstruct the correct proxy.
 
     Returns a training report with keys ``n_samples``, ``n_classes``,
     ``auc``, ``model_path``, ``coef_path``.
     """
-    model = _build_ensemble(tier1_outputs, labels)
+    model = _build_ensemble(tier1_outputs, labels, tier2_outputs, tier3_outputs)
     n_samples = len(labels)
     n_classes = len({int(d["label"]) for d in labels})
 
@@ -720,7 +824,16 @@ def retrain_stacker(
             from sklearn.metrics import roc_auc_score  # type: ignore[import]
             from sklearn.preprocessing import label_binarize  # type: ignore[import]
 
-            X = np.array([[d[lbl] for lbl in _LABELS] for d in tier1_outputs], dtype=np.float32)
+            # Rebuild feature matrix matching the training input (T1 + optional T2 + T3)
+            rows_eval = []
+            for i_e, t1_e in enumerate(tier1_outputs):
+                row_e = [t1_e[lbl] for lbl in _LABELS]
+                if tier2_outputs is not None and i_e < len(tier2_outputs):
+                    row_e += [tier2_outputs[i_e][lbl] for lbl in _LABELS]
+                if tier3_outputs is not None and i_e < len(tier3_outputs):
+                    row_e += [tier3_outputs[i_e][lbl] for lbl in _LABELS]
+                rows_eval.append(row_e)
+            X = np.array(rows_eval, dtype=np.float32)
             y = np.array([int(d["label"]) for d in labels], dtype=np.int32)
             proba = model.predict_proba(X)
             classes = sorted(set(y))
@@ -735,6 +848,7 @@ def retrain_stacker(
                 "coef": model.coef_.tolist(),
                 "intercept": model.intercept_.tolist(),
                 "labels": _LABELS,
+                "n_features": int(model.coef_.shape[1]),
             }
             with out_path.open("w") as f:
                 json.dump(coef_data, f, indent=2)
