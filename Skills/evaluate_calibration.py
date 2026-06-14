@@ -580,6 +580,28 @@ def evaluate_cnn(
     print(f"  load_state_dict: {time.monotonic() - t_lsd:.2f}s", flush=True)
     print("  Setting eval mode ...", flush=True)
     model.eval()
+
+    # Force conv2d kernel initialisation with a dummy pass before the real loop.
+    # The matmul warmup above only activates ATen's BLAS paths; the first
+    # torch.nn.Conv2d call goes through a different dispatch route (FBGEMM /
+    # oneDNN / nnpack on macOS CPU) that can take many minutes to compile.
+    # A tiny 1×1×63×63 dummy forward pass here absorbs that one-time cost with a
+    # named, heartbeat-covered print so the operator sees it rather than silence.
+    print(
+        "  Warming up CNN conv layers (one-time; may take a few minutes on macOS) ...",
+        flush=True,
+    )
+    t_cnn_wu = time.monotonic()
+    with torch.no_grad():
+        _dummy = torch.zeros(1, 1, 63, 63)
+        with _heartbeat("CNN conv warmup"):
+            model(_dummy, _dummy, _dummy)
+        del _dummy
+    print(
+        f"  CNN conv warmup done in {time.monotonic() - t_cnn_wu:.1f}s.",
+        flush=True,
+    )
+
     n_batches = (len(val_rows) + batch_size - 1) // batch_size
     print(
         f"  Model ready. Starting inference on {len(val_rows)} cutouts"
@@ -625,7 +647,8 @@ def evaluate_cnn(
             sci_t = torch.stack(sci_b)
             ref_t = torch.stack(ref_b)
             diff_t = torch.stack(diff_b)
-            out = model(sci_t, ref_t, diff_t)  # shape (B, 5) softmax
+            with _heartbeat(f"batch {done}/{n_batches} forward pass"):
+                out = model(sci_t, ref_t, diff_t)  # shape (B, 5) softmax
             # P(real) = 1 - P(stellar_artifact=class 3)
             p = 1.0 - out[:, 3].cpu().numpy()
             all_proba.extend(p.tolist())
