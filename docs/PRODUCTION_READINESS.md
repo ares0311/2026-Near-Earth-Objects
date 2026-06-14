@@ -136,13 +136,18 @@ calibration and alert-gate qualification cannot be completed.
     `models/tier1_xgb.json` saved and committed at 13946ea.
 11. [DONE] Evaluate with `Skills/evaluate_calibration.py` — both Tier 1 XGBoost
     and Tier 2 CNN passed all 7 T1-D KPIs on 2026-06-14; `promotion_gate_passed=true`.
-12. [CODE] Train ensemble stacking meta-learner (logistic regression) over
-    Tier 1 + Tier 2 + Tier 3 outputs; evaluate stacker calibration on held-out data.
+12. [CODE DONE — OPERATOR RUN PENDING] Train ensemble stacking meta-learner
+    (logistic regression over Tier 1 + Tier 2 outputs) via
+    `Skills/train_ensemble_stacker.py`. Saves `models/stacker_coef.json`.
+    `classify.ensemble_predict` extended to support 5/10/15-feature stackers;
+    `_load_ensemble_stacker` added to reconstruct from JSON. 100% coverage.
+    Operator must run the training script on Mac to produce `stacker_coef.json`
+    and verify all 7 calibration KPIs pass.
 
 **Status**: All three tiers trained. T1-D calibration KPI gate passed for
-Tier 1 XGBoost and Tier 2 CNN. Tier 3 pilot acceptance gate passed
-(test_macro_f1=0.8994, val_accuracy=0.9429). T1-A is now blocked only on
-ensemble stacking (step 12).
+Tier 1 XGBoost and Tier 2 CNN (2026-06-14). Ensemble stacking code complete;
+awaiting operator run of `Skills/train_ensemble_stacker.py` to evaluate
+stacker KPIs and produce `models/stacker_coef.json`.
 
 ---
 

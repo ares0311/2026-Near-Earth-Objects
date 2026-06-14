@@ -803,6 +803,37 @@ class TestRetrainStacker:
         if report["auc"] is not None:
             assert 0.0 <= report["auc"] <= 1.0
 
+    def test_retrain_stacker_stores_n_features(self, tmp_path):
+        """retrain_stacker JSON must include n_features key (5 for T1-only)."""
+        t1, lbls = self._make_training_data()
+        report = retrain_stacker(t1, lbls, tmp_path / "coef5.json")
+        if report["coef_path"] is not None:
+            import json
+            data = json.loads((tmp_path / "coef5.json").read_text())
+            assert "n_features" in data
+            assert data["n_features"] == 5
+
+    def test_retrain_stacker_10_features_with_tier2(self, tmp_path):
+        """retrain_stacker with tier2_outputs produces 10-feature coefficients."""
+        t1, lbls = self._make_training_data()
+        # Make matching tier2 outputs (same length, same label distribution)
+        rng = np.random.default_rng(7)
+        t2 = [
+            dict(zip(
+                ["neo_candidate", "known_object", "main_belt_asteroid",
+                 "stellar_artifact", "other_solar_system"],
+                rng.dirichlet(np.ones(5)).tolist(),
+            ))
+            for _ in range(len(t1))
+        ]
+        report = retrain_stacker(t1, lbls, tmp_path / "coef10.json", tier2_outputs=t2)
+        assert "n_samples" in report
+        assert report["n_samples"] == 20
+        if report["coef_path"] is not None:
+            import json
+            data = json.loads((tmp_path / "coef10.json").read_text())
+            assert data["n_features"] == 10
+
     def test_retrain_stacker_exception_in_metrics(self, tmp_path, monkeypatch):
         import sys
 
@@ -818,6 +849,257 @@ class TestRetrainStacker:
         monkeypatch.setitem(sys.modules, "sklearn.metrics", None)
         report = retrain_stacker(t1, lbls, tmp_path / "coef_exc.json")
         assert "n_samples" in report
+
+
+class TestLoadEnsembleStacker:
+    """Tests for _load_ensemble_stacker and the _StackerProxy class."""
+
+    def _make_probs(self, neo: float = 0.5) -> dict[str, float]:
+        rest = (1.0 - neo) / 4
+        return {
+            "neo_candidate": neo, "known_object": rest,
+            "main_belt_asteroid": rest, "stellar_artifact": rest,
+            "other_solar_system": rest,
+        }
+
+    def test_returns_none_for_missing_file(self, tmp_path):
+        from classify import _load_ensemble_stacker
+        result = _load_ensemble_stacker(tmp_path / "nonexistent.json")
+        assert result is None
+
+    def test_returns_none_for_corrupt_file(self, tmp_path):
+        from classify import _load_ensemble_stacker
+        bad = tmp_path / "bad.json"
+        bad.write_text("not json {{{")
+        result = _load_ensemble_stacker(bad)
+        assert result is None
+
+    def test_round_trip_5_feature(self, tmp_path):
+        """Train 5-feature stacker, save, reload via _load_ensemble_stacker, run predict."""
+        from classify import _load_ensemble_stacker, retrain_stacker
+
+        t1s = [self._make_probs(0.8), self._make_probs(0.2)] * 5
+        lbls = [{"label": 0}, {"label": 3}] * 5
+        path = tmp_path / "coef_rt.json"
+        report = retrain_stacker(t1s, lbls, path)
+        if report["coef_path"] is None:
+            return  # sklearn not available; skip
+
+        proxy = _load_ensemble_stacker(path)
+        assert proxy is not None
+        # predict_proba must return (1, n_classes) shaped array
+        x = np.array([[self._make_probs(0.7)[lbl] for lbl in [
+            "neo_candidate", "known_object", "main_belt_asteroid",
+            "stellar_artifact", "other_solar_system"
+        ]]], dtype=np.float32)
+        proba = proxy.predict_proba(x)
+        assert proba.shape[0] == 1
+        assert abs(proba[0].sum() - 1.0) < 1e-5
+
+    def test_round_trip_10_feature(self, tmp_path):
+        """Train 10-feature stacker, save, reload, and run predict_proba."""
+        from classify import _load_ensemble_stacker, retrain_stacker
+
+        rng = np.random.default_rng(99)
+        labels_list = [
+            "neo_candidate", "known_object", "main_belt_asteroid",
+            "stellar_artifact", "other_solar_system",
+        ]
+        n = 20
+        t1s = [dict(zip(labels_list, rng.dirichlet(np.ones(5)).tolist())) for _ in range(n)]
+        t2s = [dict(zip(labels_list, rng.dirichlet(np.ones(5)).tolist())) for _ in range(n)]
+        lbls = [{"label": i % 5} for i in range(n)]
+        path = tmp_path / "coef10_rt.json"
+        report = retrain_stacker(t1s, lbls, path, tier2_outputs=t2s)
+        if report["coef_path"] is None:
+            return
+
+        proxy = _load_ensemble_stacker(path)
+        assert proxy is not None
+        assert proxy.coef_.shape[1] == 10  # 10-feature stacker
+        x = np.zeros((1, 10), dtype=np.float32)
+        proba = proxy.predict_proba(x)
+        assert abs(proba[0].sum() - 1.0) < 1e-5
+
+    def test_ensemble_predict_with_10_feature_stacker(self, tmp_path):
+        """ensemble_predict uses 10-feature stacker when T2 is provided."""
+        from classify import _load_ensemble_stacker, ensemble_predict, retrain_stacker
+
+        rng = np.random.default_rng(77)
+        labels_list = [
+            "neo_candidate", "known_object", "main_belt_asteroid",
+            "stellar_artifact", "other_solar_system",
+        ]
+        n = 20
+        t1s = [dict(zip(labels_list, rng.dirichlet(np.ones(5)).tolist())) for _ in range(n)]
+        t2s = [dict(zip(labels_list, rng.dirichlet(np.ones(5)).tolist())) for _ in range(n)]
+        lbls = [{"label": i % 5} for i in range(n)]
+        path = tmp_path / "coef10_ep.json"
+        report = retrain_stacker(t1s, lbls, path, tier2_outputs=t2s)
+        if report["coef_path"] is None:
+            return
+
+        stacker = _load_ensemble_stacker(path)
+        t1 = dict(zip(labels_list, rng.dirichlet(np.ones(5)).tolist()))
+        t2 = dict(zip(labels_list, rng.dirichlet(np.ones(5)).tolist()))
+
+        result = ensemble_predict(t1, tier2=t2, meta_model=stacker)
+        assert abs(sum(result.values()) - 1.0) < 1e-5
+
+    def test_ensemble_predict_10_feature_falls_back_when_t2_missing(self, tmp_path):
+        """ensemble_predict falls back to weighted avg when 10-feature stacker has no T2."""
+        from classify import _load_ensemble_stacker, ensemble_predict, retrain_stacker
+
+        rng = np.random.default_rng(55)
+        labels_list = [
+            "neo_candidate", "known_object", "main_belt_asteroid",
+            "stellar_artifact", "other_solar_system",
+        ]
+        n = 20
+        t1s = [dict(zip(labels_list, rng.dirichlet(np.ones(5)).tolist())) for _ in range(n)]
+        t2s = [dict(zip(labels_list, rng.dirichlet(np.ones(5)).tolist())) for _ in range(n)]
+        lbls = [{"label": i % 5} for i in range(n)]
+        path = tmp_path / "coef10_fb.json"
+        report = retrain_stacker(t1s, lbls, path, tier2_outputs=t2s)
+        if report["coef_path"] is None:
+            return
+
+        stacker = _load_ensemble_stacker(path)
+        t1 = dict(zip(labels_list, rng.dirichlet(np.ones(5)).tolist()))
+        # Pass T2=None — should fall back gracefully
+        result = ensemble_predict(t1, tier2=None, meta_model=stacker)
+        assert abs(sum(result.values()) - 1.0) < 1e-5
+
+    def test_partial_class_stacker_fills_missing_classes(self, tmp_path):
+        """ensemble_predict backfills missing-class probas when stacker < 5 classes."""
+        from classify import (
+            _load_ensemble_stacker,
+            ensemble_predict,
+            retrain_stacker,
+        )
+
+        labels_list = [
+            "neo_candidate", "known_object", "main_belt_asteroid",
+            "stellar_artifact", "other_solar_system",
+        ]
+        # Build stacker trained on only 2 classes (0 and 3)
+        rng = np.random.default_rng(11)
+        t1s = [dict(zip(labels_list, rng.dirichlet(np.ones(5)).tolist())) for _ in range(10)]
+        lbls_bin = [{"label": 0}] * 5 + [{"label": 3}] * 5
+        path = tmp_path / "coef_binary.json"
+        report = retrain_stacker(t1s, lbls_bin, path)
+        if report["coef_path"] is None:
+            return
+
+        stacker = _load_ensemble_stacker(path)
+        assert stacker is not None
+        t1 = dict(zip(labels_list, rng.dirichlet(np.ones(5)).tolist()))
+        result = ensemble_predict(t1, meta_model=stacker)
+        # Must sum to 1 and have all 5 labels present
+        assert abs(sum(result.values()) - 1.0) < 1e-5
+        assert set(result.keys()) == set(labels_list)
+
+    def test_full_5_class_stacker_meta_out(self, tmp_path):
+        """ensemble_predict uses the else branch (all 5 classes) for full stacker."""
+        from classify import _load_ensemble_stacker, ensemble_predict, retrain_stacker
+
+        labels_list = [
+            "neo_candidate", "known_object", "main_belt_asteroid",
+            "stellar_artifact", "other_solar_system",
+        ]
+        rng = np.random.default_rng(42)
+        t1s = [dict(zip(labels_list, rng.dirichlet(np.ones(5)).tolist())) for _ in range(20)]
+        lbls = [{"label": i % 5} for i in range(20)]
+        path = tmp_path / "coef5cls.json"
+        report = retrain_stacker(t1s, lbls, path)
+        if report["coef_path"] is None:
+            return
+
+        stacker = _load_ensemble_stacker(path)
+        assert stacker is not None
+        # stacker has 5 classes → full meta_out path (else branch at line 657)
+        t1 = dict(zip(labels_list, rng.dirichlet(np.ones(5)).tolist()))
+        result = ensemble_predict(t1, meta_model=stacker)
+        assert abs(sum(result.values()) - 1.0) < 1e-5
+
+    def test_build_ensemble_with_tier3_outputs(self):
+        """_build_ensemble with tier3_outputs builds 15-feature coefficient matrix."""
+        from classify import _build_ensemble
+
+        labels_list = [
+            "neo_candidate", "known_object", "main_belt_asteroid",
+            "stellar_artifact", "other_solar_system",
+        ]
+        rng = np.random.default_rng(33)
+        n = 20
+        t1s = [dict(zip(labels_list, rng.dirichlet(np.ones(5)).tolist())) for _ in range(n)]
+        t2s = [dict(zip(labels_list, rng.dirichlet(np.ones(5)).tolist())) for _ in range(n)]
+        t3s = [dict(zip(labels_list, rng.dirichlet(np.ones(5)).tolist())) for _ in range(n)]
+        lbls = [{"label": i % 5} for i in range(n)]
+        clf = _build_ensemble(t1s, lbls, tier2_outputs=t2s, tier3_outputs=t3s)
+        if clf is None:
+            return  # sklearn unavailable
+        # 5 (T1) + 5 (T2) + 5 (T3) = 15 features
+        assert clf.coef_.shape[1] == 15
+
+    def test_ensemble_predict_15_feature_falls_back_when_t3_missing(self, tmp_path):
+        """ensemble_predict falls back when 15-feature stacker is given no T3."""
+        from classify import _load_ensemble_stacker, ensemble_predict, retrain_stacker
+
+        labels_list = [
+            "neo_candidate", "known_object", "main_belt_asteroid",
+            "stellar_artifact", "other_solar_system",
+        ]
+        rng = np.random.default_rng(88)
+        n = 20
+        t1s = [dict(zip(labels_list, rng.dirichlet(np.ones(5)).tolist())) for _ in range(n)]
+        t2s = [dict(zip(labels_list, rng.dirichlet(np.ones(5)).tolist())) for _ in range(n)]
+        t3s = [dict(zip(labels_list, rng.dirichlet(np.ones(5)).tolist())) for _ in range(n)]
+        lbls = [{"label": i % 5} for i in range(n)]
+        path = tmp_path / "coef15_fb.json"
+        report = retrain_stacker(t1s, lbls, path, tier2_outputs=t2s, tier3_outputs=t3s)
+        if report["coef_path"] is None:
+            return
+
+        stacker = _load_ensemble_stacker(path)
+        assert stacker is not None
+        assert stacker.coef_.shape[1] == 15
+
+        t1 = dict(zip(labels_list, rng.dirichlet(np.ones(5)).tolist()))
+        t2 = dict(zip(labels_list, rng.dirichlet(np.ones(5)).tolist()))
+        # T3=None → falls back to weighted average (covers the T3-missing path)
+        result = ensemble_predict(t1, tier2=t2, tier3=None, meta_model=stacker)
+        assert abs(sum(result.values()) - 1.0) < 1e-5
+
+    def test_ensemble_predict_15_feature_with_all_tiers(self, tmp_path):
+        """ensemble_predict executes the T3 feature concat branch (line 633)."""
+        from classify import _load_ensemble_stacker, ensemble_predict, retrain_stacker
+
+        labels_list = [
+            "neo_candidate", "known_object", "main_belt_asteroid",
+            "stellar_artifact", "other_solar_system",
+        ]
+        rng = np.random.default_rng(66)
+        n = 20
+        t1s = [dict(zip(labels_list, rng.dirichlet(np.ones(5)).tolist())) for _ in range(n)]
+        t2s = [dict(zip(labels_list, rng.dirichlet(np.ones(5)).tolist())) for _ in range(n)]
+        t3s = [dict(zip(labels_list, rng.dirichlet(np.ones(5)).tolist())) for _ in range(n)]
+        lbls = [{"label": i % 5} for i in range(n)]
+        path = tmp_path / "coef15_all.json"
+        report = retrain_stacker(t1s, lbls, path, tier2_outputs=t2s, tier3_outputs=t3s)
+        if report["coef_path"] is None:
+            return
+
+        stacker = _load_ensemble_stacker(path)
+        assert stacker is not None
+        assert stacker.coef_.shape[1] == 15
+
+        t1 = dict(zip(labels_list, rng.dirichlet(np.ones(5)).tolist()))
+        t2 = dict(zip(labels_list, rng.dirichlet(np.ones(5)).tolist()))
+        t3 = dict(zip(labels_list, rng.dirichlet(np.ones(5)).tolist()))
+        # All tiers provided → uses 15-feature stacker (covers T3 concat branch)
+        result = ensemble_predict(t1, tier2=t2, tier3=t3, meta_model=stacker)
+        assert abs(sum(result.values()) - 1.0) < 1e-5
 
 
 class TestClassifyBatch:
