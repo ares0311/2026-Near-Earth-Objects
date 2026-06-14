@@ -355,7 +355,8 @@ def build_stacking_dataset(
     # Run T1 XGBoost on all val features at once
     if val_rows_filtered:
         feature_matrix = np.array([
-            _alert_to_features(a) or np.full(len(FEATURE_COLS), 0.5, dtype=np.float32)
+            f if (f := _alert_to_features(a)) is not None
+            else np.full(len(FEATURE_COLS), 0.5, dtype=np.float32)
             for a in val_alerts
         ], dtype=np.float32)
         print(f"  Running T1 XGBoost on {len(feature_matrix)} val samples ...", flush=True)
