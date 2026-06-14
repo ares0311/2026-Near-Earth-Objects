@@ -457,8 +457,18 @@ def evaluate_cnn(
     machine-readable JSON report.
     """
     import csv as _csv
+    import os as _os
+
+    # Set single-threaded mode BEFORE importing torch so ATen never spawns its
+    # parallel thread pool. On macOS (Apple Silicon + Accelerate), the first
+    # call that triggers thread-pool initialisation (matmul, conv2d) deadlocks
+    # indefinitely when the pool is multi-threaded. Forcing single-thread mode
+    # prevents the deadlock entirely; inference is slower but completes.
+    _os.environ.setdefault("OMP_NUM_THREADS", "1")
+    _os.environ.setdefault("MKL_NUM_THREADS", "1")
 
     import torch
+    torch.set_num_threads(1)  # enforce single-thread after import; belt-and-suspenders
     from torch.utils.data import Dataset, random_split
 
     from classify import _build_cnn_model  # type: ignore[import]
@@ -566,10 +576,11 @@ def evaluate_cnn(
     # new process initialises the framework, taking 15-30 s.  If this happens
     # inside load_state_dict the operator sees a silent hang.  A dummy matmul
     # here absorbs the one-time cost with a named, timed print instead.
-    print("  Warming up PyTorch runtime (one-time ~20 s on macOS) ...", flush=True)
+    print("  Warming up PyTorch runtime (single-threaded; should be <5 s) ...", flush=True)
     t_wu = time.monotonic()
     _w = torch.zeros(256, 256)
-    _ = _w @ _w  # forces ATen dispatch / Accelerate / thread-pool init
+    with _heartbeat("PyTorch matmul warmup"):
+        _ = _w @ _w  # forces ATen dispatch into Accelerate
     del _w, _
     print(f"  PyTorch warmup done in {time.monotonic() - t_wu:.1f}s.", flush=True)
 
