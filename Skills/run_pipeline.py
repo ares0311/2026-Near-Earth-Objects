@@ -1,21 +1,23 @@
 #!/usr/bin/env python3
 """Skills/run_pipeline.py — End-to-end NEO pipeline runner.
 
-After each run, raw cache files in .neo_cache/ are deleted and an audit log
-is written to Logs/pipeline_runs/<timestamp>/run_summary.json.  The summary
-records the searched sky position so Skills/select_survey_fields.py can use
-it for novelty scoring in future field selections.
+Checkpoint/resume: after each major stage the pipeline writes
+Logs/pipeline_runs/<param_key>/checkpoint.json.  Re-running the same
+command after a network drop, machine sleep, or process kill automatically
+resumes from the last completed stage — no data is re-fetched or
+re-processed.
 
 Usage:
-    python Skills/run_pipeline.py \
-        --ra 180.0 --dec 10.0 --radius 1.0 \
-        --start-jd 2460000.0 --end-jd 2460010.0 \
+    python Skills/run_pipeline.py \\
+        --ra 180.0 --dec 10.0 --radius 1.0 \\
+        --start-jd 2460000.0 --end-jd 2460010.0 \\
         [--surveys ZTF] [--dry-run]
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 import time
@@ -31,14 +33,107 @@ from fetch import fetch
 from link import link
 from orbit import fit_orbit
 from preprocess import preprocess
+from schemas import Observation, Tracklet
 from score import score
 
 # Cache directory used by fetch.py
 _CACHE_DIR = Path(".neo_cache")
 
-# Root directory for pipeline run audit logs
+# Root directory for pipeline run audit logs and checkpoints
 _LOG_ROOT = Path("Logs") / "pipeline_runs"
 
+# Network errors that warrant a retry
+_INFRA_ERRORS = (ConnectionError, TimeoutError, OSError)
+
+
+# ── Checkpoint helpers ────────────────────────────────────────────────────────
+
+def _param_key(
+    ra_deg: float,
+    dec_deg: float,
+    radius_deg: float,
+    start_jd: float,
+    end_jd: float,
+    surveys: tuple[str, ...],
+) -> str:
+    """Return a stable 12-char key derived from search parameters.
+
+    Same parameters always produce the same key so that re-running the same
+    command finds the existing checkpoint directory.
+    """
+    raw = (
+        f"{ra_deg:.3f}|{dec_deg:.3f}|{radius_deg:.3f}"
+        f"|{start_jd:.2f}|{end_jd:.2f}|{'|'.join(sorted(surveys))}"
+    )
+    return hashlib.md5(raw.encode()).hexdigest()[:12]
+
+
+def _tracklet_to_dict(t: Tracklet) -> dict:
+    """Serialize a Tracklet to a plain dict for JSON checkpoint storage."""
+    return {
+        "object_id": t.object_id,
+        "arc_days": t.arc_days,
+        "motion_rate_arcsec_per_hour": t.motion_rate_arcsec_per_hour,
+        "motion_pa_degrees": t.motion_pa_degrees,
+        "observations": [o.model_dump() for o in t.observations],
+    }
+
+
+def _tracklet_from_dict(d: dict) -> Tracklet:
+    """Reconstruct a Tracklet from a checkpoint dict."""
+    obs = tuple(Observation(**o) for o in d["observations"])
+    return Tracklet(
+        object_id=d["object_id"],
+        observations=obs,
+        arc_days=d["arc_days"],
+        motion_rate_arcsec_per_hour=d["motion_rate_arcsec_per_hour"],
+        motion_pa_degrees=d["motion_pa_degrees"],
+    )
+
+
+def _load_checkpoint(run_dir: Path) -> dict:
+    """Return the checkpoint dict from run_dir, or {} if none exists."""
+    cp_file = run_dir / "checkpoint.json"
+    return json.loads(cp_file.read_text()) if cp_file.exists() else {}
+
+
+def _save_checkpoint(run_dir: Path, data: dict) -> None:
+    """Write data to run_dir/checkpoint.json, creating directories as needed."""
+    run_dir.mkdir(parents=True, exist_ok=True)
+    (run_dir / "checkpoint.json").write_text(json.dumps(data, indent=2))
+
+
+# ── Fetch with retry ──────────────────────────────────────────────────────────
+
+def _fetch_with_retry(
+    max_attempts: int = 5,
+    _sleep_fn=time.sleep,  # injectable for tests
+    **kwargs,
+):
+    """Call fetch() retrying on network errors with exponential backoff.
+
+    Waits 2, 4, 8, 16, 32 seconds between attempts.  Raises the last
+    exception if all attempts fail.
+    """
+    last_exc: Exception | None = None
+    for attempt in range(max_attempts):
+        try:
+            return fetch(**kwargs)
+        except _INFRA_ERRORS as exc:
+            last_exc = exc
+            if attempt == max_attempts - 1:
+                break
+            wait = 2 ** (attempt + 1)
+            print(
+                f"[fetch] Network error: {exc}  "
+                f"(attempt {attempt + 1}/{max_attempts}; retry in {wait}s...)",
+                flush=True,
+            )
+            _sleep_fn(wait)
+    raise last_exc  # type: ignore[misc]
+
+
+# ── Cache / audit-log helpers ─────────────────────────────────────────────────
 
 def delete_cache_files(cache_dir: Path = _CACHE_DIR) -> list[str]:
     """Delete all .json files in cache_dir and return the list of deleted names."""
@@ -57,10 +152,10 @@ def delete_cache_files(cache_dir: Path = _CACHE_DIR) -> list[str]:
 def write_run_summary(log_dir: Path, summary: dict) -> None:
     """Create log_dir if needed and write summary as run_summary.json."""
     log_dir.mkdir(parents=True, exist_ok=True)
-    (log_dir / "run_summary.json").write_text(
-        json.dumps(summary, indent=2)
-    )
+    (log_dir / "run_summary.json").write_text(json.dumps(summary, indent=2))
 
+
+# ── Pipeline ──────────────────────────────────────────────────────────────────
 
 def run_pipeline(
     ra_deg: float,
@@ -74,63 +169,119 @@ def run_pipeline(
     force_refresh: bool = False,
     neocp_timeout_hours: float = 0.0,
     neocp_poll_interval_hours: float = 1.0,
+    run_dir: Path | None = None,
+    resume: bool = True,
 ) -> list[dict]:
-    print(f"[fetch] Querying {surveys} at RA={ra_deg}, Dec={dec_deg}, r={radius_deg}°")
-    fetch_result = fetch(
-        ra_deg=ra_deg,
-        dec_deg=dec_deg,
-        radius_deg=radius_deg,
-        start_jd=start_jd,
-        end_jd=end_jd,
-        surveys=surveys,  # type: ignore[arg-type]
-        atlas_token=atlas_token,
-        force_refresh=force_refresh,
-    )
-    print(f"[fetch] Retrieved {len(fetch_result.alerts)} alerts")
+    # Load any existing checkpoint for this parameter set
+    cp: dict = {}
+    if run_dir is not None and resume:
+        cp = _load_checkpoint(run_dir)
+        if cp:
+            print(
+                f"[resume] Checkpoint found (last stage: {cp.get('last_stage', '?')}); "
+                "resuming from last completed stage.",
+                flush=True,
+            )
 
-    print("[preprocess] Validating and normalising sources")
-    prep_result = preprocess(fetch_result.alerts, apply_astrometry=False)
-    n_out = prep_result.provenance.n_sources_out
-    n_in = prep_result.provenance.n_sources_in
-    print(f"[preprocess] {n_out}/{n_in} sources passed")
+    # ── Stage 1: Fetch → Preprocess → Detect → Link ──────────────────────────
+    if "tracklets" in cp:
+        # These stages already finished; reload tracklets from the checkpoint.
+        n_trk = len(cp["tracklets"])
+        print(
+            f"[resume] Reloading {n_trk} tracklets from checkpoint "
+            "(skipping fetch / preprocess / detect / link).",
+            flush=True,
+        )
+        tracklets: list[Tracklet] = [_tracklet_from_dict(d) for d in cp["tracklets"]]
+    else:
+        print(
+            f"[fetch] Querying {surveys} at RA={ra_deg}, Dec={dec_deg}, r={radius_deg}°",
+            flush=True,
+        )
+        fetch_result = _fetch_with_retry(
+            ra_deg=ra_deg,
+            dec_deg=dec_deg,
+            radius_deg=radius_deg,
+            start_jd=start_jd,
+            end_jd=end_jd,
+            surveys=surveys,  # type: ignore[arg-type]
+            atlas_token=atlas_token,
+            force_refresh=force_refresh,
+        )
+        print(f"[fetch] Retrieved {len(fetch_result.alerts)} alerts", flush=True)
 
-    print("[detect] Identifying moving object candidates")
-    det_result = detect(prep_result.sources)
-    n_cands = det_result.provenance.n_candidates
-    n_known = det_result.provenance.n_known_matches
-    print(f"[detect] {n_cands} candidates, {n_known} known matches")
+        print("[preprocess] Validating and normalising sources", flush=True)
+        prep_result = preprocess(fetch_result.alerts, apply_astrometry=False)
+        n_out = prep_result.provenance.n_sources_out
+        n_in = prep_result.provenance.n_sources_in
+        print(f"[preprocess] {n_out}/{n_in} sources passed", flush=True)
 
-    print("[link] Linking candidates across nights")
-    link_result = link(det_result.candidates)
-    print(f"[link] {link_result.provenance.n_tracklets} tracklets formed")
+        print("[detect] Identifying moving object candidates", flush=True)
+        det_result = detect(prep_result.sources)
+        n_cands = det_result.provenance.n_candidates
+        n_known = det_result.provenance.n_known_matches
+        print(f"[detect] {n_cands} candidates, {n_known} known matches", flush=True)
 
-    results: list[dict] = []
-    for tracklet in link_result.tracklets:
-        print(f"[classify] Classifying tracklet {tracklet.object_id}")
+        print("[link] Linking candidates across nights", flush=True)
+        link_result = link(det_result.candidates)
+        n_trk = link_result.provenance.n_tracklets
+        print(f"[link] {n_trk} tracklets formed", flush=True)
+
+        tracklets = list(link_result.tracklets)
+
+        # Checkpoint: expensive network + detection stages are done.
+        # A kill/sleep after this point will resume the per-tracklet loop.
+        if run_dir is not None:
+            _save_checkpoint(run_dir, {
+                "last_stage": "link",
+                "tracklets": [_tracklet_to_dict(t) for t in tracklets],
+                "partial_results": [],
+            })
+
+    # ── Stage 2: Per-tracklet classify → orbit → score → alert ───────────────
+    completed_ids = {r["object_id"] for r in cp.get("partial_results", [])}
+    results: list[dict] = list(cp.get("partial_results", []))
+
+    for tracklet in tracklets:
+        if tracklet.object_id in completed_ids:
+            # Already scored in a previous (interrupted) run; skip it.
+            print(
+                f"[resume] Skipping already-processed {tracklet.object_id}",
+                flush=True,
+            )
+            continue
+
+        print(f"[classify] Classifying tracklet {tracklet.object_id}", flush=True)
         features, posterior = classify(tracklet)
 
-        print(f"[orbit] Fitting orbit for {tracklet.object_id}")
+        print(f"[orbit] Fitting orbit for {tracklet.object_id}", flush=True)
         orbital = fit_orbit(tracklet)
 
-        print(f"[score] Scoring {tracklet.object_id}")
+        print(f"[score] Scoring {tracklet.object_id}", flush=True)
         scored = score(tracklet, features, posterior, orbital)
 
-        print(f"[alert] Processing alert for {tracklet.object_id}")
+        print(f"[alert] Processing alert for {tracklet.object_id}", flush=True)
         alert_result = process_alert(scored, dry_run=dry_run)
 
         if neocp_timeout_hours > 0:
-            print(f"[neocp] Monitoring NEOCP for {tracklet.object_id} "
-                  f"(timeout={neocp_timeout_hours}h)")
+            print(
+                f"[neocp] Monitoring NEOCP for {tracklet.object_id} "
+                f"(timeout={neocp_timeout_hours}h)",
+                flush=True,
+            )
             neocp_result = monitor_neocp(
                 tracklet.object_id,
                 max_wait_hr=neocp_timeout_hours,
                 poll_interval_hr=neocp_poll_interval_hours,
             )
             alert_result["neocp_monitor"] = neocp_result
-            print(f"[neocp] status={neocp_result['status']}, "
-                  f"confirmed={neocp_result.get('confirmed', False)}")
+            print(
+                f"[neocp] status={neocp_result['status']}, "
+                f"confirmed={neocp_result.get('confirmed', False)}",
+                flush=True,
+            )
 
-        print(summarise(scored))
+        print(summarise(scored), flush=True)
         results.append({
             "object_id": tracklet.object_id,
             "neo_probability": scored.posterior.neo_candidate,
@@ -141,9 +292,19 @@ def run_pipeline(
             "alert_actions": alert_result["actions"],
         })
 
-    print(f"\nPipeline complete. {len(results)} NEO candidate(s) processed.")
+        # Checkpoint after each tracklet: a kill here loses at most one item.
+        if run_dir is not None:
+            _save_checkpoint(run_dir, {
+                "last_stage": "partial",
+                "tracklets": [_tracklet_to_dict(t) for t in tracklets],
+                "partial_results": results,
+            })
+
+    print(f"\nPipeline complete. {len(results)} NEO candidate(s) processed.", flush=True)
     return results
 
+
+# ── CLI entry point ───────────────────────────────────────────────────────────
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="NEO detection pipeline")
@@ -154,14 +315,22 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--end-jd", type=float, required=True)
     parser.add_argument("--surveys", nargs="+", default=["ZTF"])
     parser.add_argument("--dry-run", action="store_true", default=True)
-    parser.add_argument("--atlas-token", type=str, default=None,
-                        help="ATLAS authentication token (or set ATLAS_TOKEN env var)")
-    parser.add_argument("--force-refresh", action="store_true", default=False,
-                        help="Bypass on-disk cache and re-fetch all survey data")
-    parser.add_argument("--neocp-timeout-hours", type=float, default=0.0,
-                        help="Hours to poll NEOCP for independent confirmation (0 = skip)")
-    parser.add_argument("--neocp-poll-interval", type=float, default=1.0,
-                        help="NEOCP poll interval in hours (default 1)")
+    parser.add_argument(
+        "--atlas-token", type=str, default=None,
+        help="ATLAS authentication token (or set ATLAS_TOKEN env var)",
+    )
+    parser.add_argument(
+        "--force-refresh", action="store_true", default=False,
+        help="Bypass on-disk cache and re-fetch all survey data",
+    )
+    parser.add_argument(
+        "--neocp-timeout-hours", type=float, default=0.0,
+        help="Hours to poll NEOCP for independent confirmation (0 = skip)",
+    )
+    parser.add_argument(
+        "--neocp-poll-interval", type=float, default=1.0,
+        help="NEOCP poll interval in hours (default 1)",
+    )
     parser.add_argument("--output", type=str, default=None)
     parser.add_argument(
         "--no-delete-cache", action="store_true", default=False,
@@ -171,10 +340,21 @@ def main(argv: list[str] | None = None) -> None:
         "--no-audit-log", action="store_true", default=False,
         help="Skip writing Logs/pipeline_runs audit log (default: write)",
     )
+    parser.add_argument(
+        "--no-resume", action="store_true", default=False,
+        help="Ignore any existing checkpoint and start the run from scratch",
+    )
     args = parser.parse_args(argv)
 
     t_start = time.monotonic()
     timestamp_utc = datetime.now(UTC).strftime("%Y%m%d_%H%M%S_UTC")
+
+    surveys = tuple(args.surveys)
+
+    # Derive a stable directory from the search parameters so that re-running
+    # the same command finds the same checkpoint and audit log.
+    key = _param_key(args.ra, args.dec, args.radius, args.start_jd, args.end_jd, surveys)
+    run_dir: Path | None = None if args.no_audit_log else (_LOG_ROOT / key)
 
     # Snapshot cache files present before the run (downloaded during fetch)
     cache_files_before: list[str] = []
@@ -187,12 +367,14 @@ def main(argv: list[str] | None = None) -> None:
         radius_deg=args.radius,
         start_jd=args.start_jd,
         end_jd=args.end_jd,
-        surveys=tuple(args.surveys),
+        surveys=surveys,
         dry_run=args.dry_run,
         atlas_token=args.atlas_token,
         force_refresh=args.force_refresh,
         neocp_timeout_hours=args.neocp_timeout_hours,
         neocp_poll_interval_hours=args.neocp_poll_interval,
+        run_dir=run_dir,
+        resume=not args.no_resume,
     )
 
     elapsed = round(time.monotonic() - t_start, 2)
@@ -202,33 +384,38 @@ def main(argv: list[str] | None = None) -> None:
     if not args.no_delete_cache:
         deleted = delete_cache_files(_CACHE_DIR)
         if deleted:
-            print(f"[cache] Deleted {len(deleted)} cache file(s) from {_CACHE_DIR}/")
+            print(
+                f"[cache] Deleted {len(deleted)} cache file(s) from {_CACHE_DIR}/",
+                flush=True,
+            )
 
-    # Write audit log so select_survey_fields.py can score field novelty
-    if not args.no_audit_log:
-        run_id = f"{timestamp_utc}"
+    # Write audit log; the same directory holds the checkpoint so it persists
+    # across runs until the operator explicitly removes it.
+    if run_dir is not None:
         summary = {
-            "run_id": run_id,
+            "run_id": key,
             "timestamp_utc": timestamp_utc,
             "ra_deg": args.ra,
             "dec_deg": args.dec,
             "radius_deg": args.radius,
             "start_jd": args.start_jd,
             "end_jd": args.end_jd,
-            "surveys": args.surveys,
+            "surveys": list(surveys),
             "dry_run": args.dry_run,
             "n_results": len(results),
             "elapsed_seconds": elapsed,
             "cache_files_downloaded": cache_files_before,
             "cache_files_deleted": deleted,
         }
-        log_dir = _LOG_ROOT / run_id
-        write_run_summary(log_dir, summary)
-        print(f"[audit] Run summary written to {log_dir}/run_summary.json")
+        write_run_summary(run_dir, summary)
+        print(
+            f"[audit] Run summary written to {run_dir}/run_summary.json",
+            flush=True,
+        )
 
     if args.output:
         Path(args.output).write_text(json.dumps(results, indent=2))
-        print(f"Results written to {args.output}")
+        print(f"Results written to {args.output}", flush=True)
     else:
         print(json.dumps(results, indent=2))
 

@@ -1830,3 +1830,319 @@ class TestRunPipelineAutoDelete:
             "elapsed_seconds", "cache_files_downloaded", "cache_files_deleted",
         }
         assert required.issubset(summary.keys())
+
+
+class TestRunPipelineCheckpointResume:
+    """Tests for checkpoint/resume and network-retry helpers."""
+
+    def _load_skill(self):
+        import importlib.util
+        import pathlib
+        spec = importlib.util.spec_from_file_location(
+            "run_pipeline",
+            str(pathlib.Path(__file__).resolve().parents[1]
+                / "Skills" / "run_pipeline.py"),
+        )
+        mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+        return mod
+
+    # --- _param_key ---
+
+    def test_param_key_same_params_same_key(self):
+        mod = self._load_skill()
+        k1 = mod._param_key(180.0, 10.0, 3.5, 2460000.0, 2460003.0, ("ZTF",))
+        k2 = mod._param_key(180.0, 10.0, 3.5, 2460000.0, 2460003.0, ("ZTF",))
+        assert k1 == k2
+
+    def test_param_key_different_ra_different_key(self):
+        mod = self._load_skill()
+        k1 = mod._param_key(180.0, 10.0, 3.5, 2460000.0, 2460003.0, ("ZTF",))
+        k2 = mod._param_key(181.0, 10.0, 3.5, 2460000.0, 2460003.0, ("ZTF",))
+        assert k1 != k2
+
+    def test_param_key_survey_order_independent(self):
+        mod = self._load_skill()
+        k1 = mod._param_key(0.0, 0.0, 1.0, 0.0, 1.0, ("ZTF", "ATLAS"))
+        k2 = mod._param_key(0.0, 0.0, 1.0, 0.0, 1.0, ("ATLAS", "ZTF"))
+        assert k1 == k2
+
+    def test_param_key_is_12_chars(self):
+        mod = self._load_skill()
+        k = mod._param_key(0.0, 0.0, 1.0, 0.0, 1.0, ("ZTF",))
+        assert len(k) == 12
+
+    # --- _tracklet_to_dict / _tracklet_from_dict ---
+
+    def _make_tracklet(self):
+        from schemas import Observation, Tracklet
+        obs = tuple(
+            Observation(
+                obs_id=f"o{i}", ra_deg=180.0 + i * 0.01, dec_deg=0.0,
+                jd=2460000.5 + i, mag=19.5, mag_err=0.05,
+                filter_band="r", mission="ZTF",
+            )
+            for i in range(3)
+        )
+        return Tracklet(
+            object_id="T001", observations=obs,
+            arc_days=2.0, motion_rate_arcsec_per_hour=1.0, motion_pa_degrees=90.0,
+        )
+
+    def test_tracklet_roundtrip(self):
+        mod = self._load_skill()
+        t = self._make_tracklet()
+        d = mod._tracklet_to_dict(t)
+        t2 = mod._tracklet_from_dict(d)
+        assert t2.object_id == t.object_id
+        assert t2.arc_days == t.arc_days
+        assert len(t2.observations) == len(t.observations)
+
+    def test_tracklet_to_dict_is_json_serialisable(self):
+        import json as _json
+        mod = self._load_skill()
+        d = mod._tracklet_to_dict(self._make_tracklet())
+        # Should not raise
+        _json.dumps(d)
+
+    def test_tracklet_from_dict_obs_count(self):
+        mod = self._load_skill()
+        t = self._make_tracklet()
+        d = mod._tracklet_to_dict(t)
+        t2 = mod._tracklet_from_dict(d)
+        assert len(t2.observations) == 3
+
+    # --- _load_checkpoint / _save_checkpoint ---
+
+    def test_load_checkpoint_missing_returns_empty(self, tmp_path):
+        mod = self._load_skill()
+        assert mod._load_checkpoint(tmp_path / "nodir") == {}
+
+    def test_save_then_load_roundtrip(self, tmp_path):
+        mod = self._load_skill()
+        data = {"last_stage": "link", "tracklets": [], "partial_results": []}
+        mod._save_checkpoint(tmp_path, data)
+        loaded = mod._load_checkpoint(tmp_path)
+        assert loaded == data
+
+    def test_save_checkpoint_creates_dirs(self, tmp_path):
+        mod = self._load_skill()
+        deep = tmp_path / "a" / "b"
+        mod._save_checkpoint(deep, {"x": 1})
+        assert (deep / "checkpoint.json").exists()
+
+    # --- _fetch_with_retry ---
+
+    def test_fetch_retry_succeeds_on_first_attempt(self):
+        from unittest.mock import MagicMock, patch
+        mod = self._load_skill()
+        mock_result = MagicMock()
+        with patch.object(mod, "fetch", return_value=mock_result):
+            result = mod._fetch_with_retry(ra_deg=0.0, dec_deg=0.0,
+                                           radius_deg=1.0, start_jd=0.0,
+                                           end_jd=1.0, surveys=("ZTF",))
+        assert result is mock_result
+
+    def test_fetch_retry_retries_on_connection_error(self):
+        from unittest.mock import MagicMock, patch
+        mod = self._load_skill()
+        mock_result = MagicMock()
+        calls = [ConnectionError("down"), mock_result]
+
+        def fake_fetch(**kwargs):
+            v = calls.pop(0)
+            if isinstance(v, Exception):
+                raise v
+            return v
+
+        slept: list[float] = []
+        with patch.object(mod, "fetch", side_effect=fake_fetch):
+            result = mod._fetch_with_retry(
+                _sleep_fn=slept.append,
+                ra_deg=0.0, dec_deg=0.0, radius_deg=1.0,
+                start_jd=0.0, end_jd=1.0, surveys=("ZTF",),
+            )
+        assert result is mock_result
+        assert slept == [2]  # first backoff is 2^1 = 2s
+
+    def test_fetch_retry_raises_after_max_attempts(self):
+        from unittest.mock import patch
+
+        import pytest
+        mod = self._load_skill()
+
+        with patch.object(mod, "fetch", side_effect=ConnectionError("no net")):
+            with pytest.raises(ConnectionError):
+                mod._fetch_with_retry(
+                    max_attempts=3,
+                    _sleep_fn=lambda _: None,
+                    ra_deg=0.0, dec_deg=0.0, radius_deg=1.0,
+                    start_jd=0.0, end_jd=1.0, surveys=("ZTF",),
+                )
+
+    def test_fetch_retry_backoff_sequence(self):
+        from unittest.mock import patch
+
+        import pytest
+        mod = self._load_skill()
+        slept: list[float] = []
+
+        with patch.object(mod, "fetch", side_effect=TimeoutError("slow")):
+            with pytest.raises(TimeoutError):
+                mod._fetch_with_retry(
+                    max_attempts=4,
+                    _sleep_fn=slept.append,
+                    ra_deg=0.0, dec_deg=0.0, radius_deg=1.0,
+                    start_jd=0.0, end_jd=1.0, surveys=("ZTF",),
+                )
+        # 3 sleeps before the 4th (final) attempt
+        assert slept == [2, 4, 8]
+
+    # --- run_pipeline checkpoint writing ---
+
+    def test_run_pipeline_writes_checkpoint_after_link(self, tmp_path):
+        """run_pipeline writes checkpoint.json once link stage completes."""
+        import json as _json
+        from unittest.mock import MagicMock, patch
+        mod = self._load_skill()
+
+        fake_fetch_result = MagicMock()
+        fake_fetch_result.alerts = []
+        fake_prep = MagicMock()
+        fake_prep.sources = ()
+        fake_prep.provenance.n_sources_out = 0
+        fake_prep.provenance.n_sources_in = 0
+        fake_det = MagicMock()
+        fake_det.candidates = ()
+        fake_det.provenance.n_candidates = 0
+        fake_det.provenance.n_known_matches = 0
+        fake_link = MagicMock()
+        fake_link.tracklets = ()
+        fake_link.provenance.n_tracklets = 0
+
+        run_dir = tmp_path / "run_abc"
+        with (
+            patch.object(mod, "_fetch_with_retry", return_value=fake_fetch_result),
+            patch.object(mod, "preprocess", return_value=fake_prep),
+            patch.object(mod, "detect", return_value=fake_det),
+            patch.object(mod, "link", return_value=fake_link),
+        ):
+            mod.run_pipeline(
+                ra_deg=0.0, dec_deg=0.0, radius_deg=1.0,
+                start_jd=0.0, end_jd=1.0, run_dir=run_dir,
+            )
+
+        cp = _json.loads((run_dir / "checkpoint.json").read_text())
+        assert cp["last_stage"] == "link"
+        assert "tracklets" in cp
+
+    # --- run_pipeline resume: skip fetch/link ---
+
+    def test_run_pipeline_resumes_from_checkpoint(self, tmp_path):
+        """run_pipeline skips fetch/link when checkpoint already has tracklets."""
+        from unittest.mock import MagicMock, patch
+        mod = self._load_skill()
+
+        # Pre-populate checkpoint with one tracklet
+        t = self._make_tracklet()
+        mod._save_checkpoint(tmp_path, {
+            "last_stage": "link",
+            "tracklets": [mod._tracklet_to_dict(t)],
+            "partial_results": [],
+        })
+
+        mock_classify = MagicMock(return_value=(MagicMock(), MagicMock()))
+        mock_orbit = MagicMock()
+        mock_score = MagicMock()
+        mock_score.return_value.posterior.neo_candidate = 0.5
+        mock_score.return_value.hazard.hazard_flag = "nominal"
+        mock_score.return_value.hazard.alert_pathway = "internal_candidate"
+        mock_score.return_value.hazard.moid_au = None
+        mock_score.return_value.metadata.discovery_priority = 0.3
+        mock_alert = MagicMock(return_value={"actions": []})
+
+        with (
+            patch.object(mod, "fetch") as mock_fetch,
+            patch.object(mod, "classify", mock_classify),
+            patch.object(mod, "fit_orbit", mock_orbit),
+            patch.object(mod, "score", mock_score),
+            patch.object(mod, "process_alert", mock_alert),
+            patch.object(mod, "summarise", return_value="summary"),
+        ):
+            results = mod.run_pipeline(
+                ra_deg=0.0, dec_deg=0.0, radius_deg=1.0,
+                start_jd=0.0, end_jd=1.0,
+                run_dir=tmp_path, resume=True,
+            )
+            # fetch must NOT have been called — we resumed from checkpoint
+            mock_fetch.assert_not_called()
+
+        assert len(results) == 1
+        assert results[0]["object_id"] == "T001"
+
+    # --- run_pipeline resume: skip completed tracklets ---
+
+    def test_run_pipeline_skips_completed_tracklets(self, tmp_path):
+        """Tracklets already in partial_results are not re-processed."""
+        from unittest.mock import patch
+        mod = self._load_skill()
+
+        t = self._make_tracklet()
+        already_done = {"object_id": "T001", "neo_probability": 0.5,
+                        "hazard_flag": "nominal", "alert_pathway": "internal_candidate",
+                        "moid_au": None, "discovery_priority": 0.3, "alert_actions": []}
+        mod._save_checkpoint(tmp_path, {
+            "last_stage": "partial",
+            "tracklets": [mod._tracklet_to_dict(t)],
+            "partial_results": [already_done],
+        })
+
+        with (
+            patch.object(mod, "fetch"),
+            patch.object(mod, "classify") as mock_classify,
+        ):
+            results = mod.run_pipeline(
+                ra_deg=0.0, dec_deg=0.0, radius_deg=1.0,
+                start_jd=0.0, end_jd=1.0,
+                run_dir=tmp_path, resume=True,
+            )
+            # classify must NOT have been called — T001 was already done
+            mock_classify.assert_not_called()
+
+        assert len(results) == 1
+
+    # --- main() uses param_key for run_dir ---
+
+    def test_main_run_dir_is_param_key_based(self, tmp_path, monkeypatch):
+        """main() creates run dir named by param_key, not timestamp."""
+        from unittest.mock import patch
+        mod = self._load_skill()
+        monkeypatch.setattr(mod, "_LOG_ROOT", tmp_path / "runs")
+        monkeypatch.setattr(mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        expected_key = mod._param_key(10.0, 5.0, 1.0, 2460000.0, 2460001.0, ("ZTF",))
+        with patch.object(mod, "run_pipeline", return_value=[]):
+            mod.main([
+                "--ra", "10.0", "--dec", "5.0",
+                "--start-jd", "2460000.0", "--end-jd", "2460001.0",
+                "--no-delete-cache",
+            ])
+
+        assert (tmp_path / "runs" / expected_key).is_dir()
+
+    def test_main_no_resume_flag(self, tmp_path, monkeypatch):
+        """--no-resume passes resume=False to run_pipeline."""
+        from unittest.mock import patch
+        mod = self._load_skill()
+        monkeypatch.setattr(mod, "_LOG_ROOT", tmp_path / "runs")
+        monkeypatch.setattr(mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        with patch.object(mod, "run_pipeline", return_value=[]) as mock_rp:
+            mod.main([
+                "--ra", "10.0", "--dec", "5.0",
+                "--start-jd", "2460000.0", "--end-jd", "2460001.0",
+                "--no-resume", "--no-delete-cache",
+            ])
+
+        _, kwargs = mock_rp.call_args
+        assert kwargs["resume"] is False
