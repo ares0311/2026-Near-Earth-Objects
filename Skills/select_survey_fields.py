@@ -316,7 +316,7 @@ def get_sun_position(jd: float) -> tuple[float, float]:
     Uses astropy.coordinates.get_sun (called once per run, not per field).
     """
     from astropy.coordinates import get_sun  # lazy import
-    from astropy.time import Time            # lazy import
+    from astropy.time import Time  # lazy import
     t = Time(jd, format="jd")
     sun = get_sun(t)
     return float(sun.ra.deg), float(sun.dec.deg)
@@ -382,8 +382,14 @@ def select_fields(jd: float,
     t_start = time.monotonic()
 
     ra_sun, dec_sun = get_sun_position(jd)
-    print(f"JD {jd:.2f}  |  Sun: RA={ra_sun:.1f}° Dec={dec_sun:.1f}°", file=sys.stderr, flush=True)
-    print(f"Mode: {mode}  |  Observer lat: {lat:.2f}°N  |  Top-N: {top_n}", file=sys.stderr, flush=True)
+    print(
+        f"JD {jd:.2f}  |  Sun: RA={ra_sun:.1f}° Dec={dec_sun:.1f}°",
+        file=sys.stderr, flush=True,
+    )
+    print(
+        f"Mode: {mode}  |  Observer lat: {lat:.2f}°N  |  Top-N: {top_n}",
+        file=sys.stderr, flush=True,
+    )
 
     # Build sky grid
     ra_arr, dec_arr = generate_sky_grid()
@@ -499,8 +505,9 @@ def main(argv: list[str] | None = None) -> None:
         epilog=(
             "Examples:\n"
             "  uv run python Skills/select_survey_fields.py --jd now --mode aten --top-n 20\n"
-            "  uv run python Skills/select_survey_fields.py --jd now --mode ieo  --top-n 10 --json\n"
-            "  uv run python Skills/select_survey_fields.py --jd now --history-dir Logs/pipeline_runs\n"
+            "  uv run python Skills/select_survey_fields.py --jd now --mode ieo --top-n 10 --json\n"
+            "  uv run python Skills/select_survey_fields.py --jd now "
+            "--history-dir Logs/pipeline_runs\n"
         ),
     )
     parser.add_argument(
