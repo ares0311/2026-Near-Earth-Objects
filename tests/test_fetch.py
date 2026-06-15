@@ -519,6 +519,71 @@ class TestFetchAtlasResultUrl:
         assert len(result) == 1
         assert result[0].filter_band == "o"
 
+    def test_poll_json_decode_error_continues(self, tmp_path, monkeypatch):
+        """poll.json() raising JSONDecodeError (line 261-262) should continue the loop."""
+        import json
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        monkeypatch.setattr(fetch_mod.time, "sleep", lambda _: None)
+
+        queue_resp = MagicMock()
+        queue_resp.json.return_value = {"url": "http://fake-task/1/"}
+        queue_resp.raise_for_status = MagicMock()
+
+        # First poll call raises JSONDecodeError; second returns valid data with no result_url
+        call_count = {"n": 0}
+
+        def poll_json():
+            call_count["n"] += 1
+            if call_count["n"] == 1:
+                raise json.JSONDecodeError("Expecting value", "", 0)
+            return {"finishtimestamp": "2024-01-01", "result_url": ""}
+
+        poll_resp = MagicMock()
+        poll_resp.json.side_effect = poll_json
+        poll_resp.raise_for_status = MagicMock()
+
+        with patch("requests.post", return_value=queue_resp):
+            with patch("requests.get", return_value=poll_resp):
+                from fetch import fetch_atlas
+                result = fetch_atlas(90.0, 0.0, 0.5, 2460000.0, 2460010.0)
+
+        # Loop continued past the bad poll and eventually returned [] (no result_url)
+        assert result == []
+        assert call_count["n"] >= 2
+
+    def test_final_poll_json_decode_error_returns_empty(self, tmp_path, monkeypatch):
+        """poll.json() raising JSONDecodeError after loop exit (line 268-269) returns []."""
+        import json
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        monkeypatch.setattr(fetch_mod.time, "sleep", lambda _: None)
+
+        queue_resp = MagicMock()
+        queue_resp.json.return_value = {"url": "http://fake-task/1/"}
+        queue_resp.raise_for_status = MagicMock()
+
+        # During the loop, finishtimestamp is set so the loop breaks.
+        # The *final* poll.json() call (line 267) then raises JSONDecodeError.
+        call_count = {"n": 0}
+
+        def poll_json():
+            call_count["n"] += 1
+            if call_count["n"] == 1:
+                # In-loop: break out of loop
+                return {"finishtimestamp": "2024-01-01"}
+            # Post-loop: simulate empty body on result query
+            raise json.JSONDecodeError("Expecting value", "", 0)
+
+        poll_resp = MagicMock()
+        poll_resp.json.side_effect = poll_json
+        poll_resp.raise_for_status = MagicMock()
+
+        with patch("requests.post", return_value=queue_resp):
+            with patch("requests.get", return_value=poll_resp):
+                from fetch import fetch_atlas
+                result = fetch_atlas(90.0, 0.0, 0.5, 2460000.0, 2460010.0)
+
+        assert result == []
+
 
 class TestFetchMpcKnownNetwork:
     """Cover lines 269-293 (astroquery.mpc path in fetch_mpc_known)."""
