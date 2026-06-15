@@ -136,18 +136,20 @@ calibration and alert-gate qualification cannot be completed.
     `models/tier1_xgb.json` saved and committed at 13946ea.
 11. [DONE] Evaluate with `Skills/evaluate_calibration.py` — both Tier 1 XGBoost
     and Tier 2 CNN passed all 7 T1-D KPIs on 2026-06-14; `promotion_gate_passed=true`.
-12. [CODE DONE — OPERATOR RUN PENDING] Train ensemble stacking meta-learner
+12. [DONE] Train ensemble stacking meta-learner
     (logistic regression over Tier 1 + Tier 2 outputs) via
     `Skills/train_ensemble_stacker.py`. Saves `models/stacker_coef.json`.
     `classify.ensemble_predict` extended to support 5/10/15-feature stackers;
     `_load_ensemble_stacker` added to reconstruct from JSON. 100% coverage.
-    Operator must run the training script on Mac to produce `stacker_coef.json`
-    and verify all 7 calibration KPIs pass.
+    Operator ran 2026-06-14: all 7 T1-D KPIs PASS on 394 ZTF-origin val
+    samples. AUC=0.9809, Brier=0.0211, ECE=0.0000, Log-loss=0.0761,
+    CV ECE mean=0.0247, Bootstrap Brier CI upper=0.0330,
+    Bootstrap ECE CI upper=0.0225. `promotion_gate_passed=true`.
 
 **Status**: All three tiers trained. T1-D calibration KPI gate passed for
-Tier 1 XGBoost and Tier 2 CNN (2026-06-14). Ensemble stacking code complete;
-awaiting operator run of `Skills/train_ensemble_stacker.py` to evaluate
-stacker KPIs and produce `models/stacker_coef.json`.
+Tier 1 XGBoost, Tier 2 CNN, and ensemble stacker (all 2026-06-14).
+`models/stacker_coef.json` produced by operator; all 7 KPIs pass;
+`promotion_gate_passed=true`. **T1-A is CLOSED.**
 
 ---
 
@@ -285,8 +287,8 @@ These items cannot be completed by code generation alone. They require real-worl
 
 Before the pipeline makes its first MPC submission, all of the following must be TRUE:
 
-- [~] T1-A resolved: Tier 1 XGBoost ✓ (val_acc=99.95%); Tier 2 CNN ✓ (val_acc=91.3%); Tier 3 Transformer ✓ (val_macro_f1=0.9400, pilot weights); ensemble stacking still needed
-- [~] T1-A resolved: calibration KPI gate passed ✓ (T1-D, 2026-06-14); ensemble stacker training still needed
+- [x] T1-A resolved: Tier 1 XGBoost ✓ (val_acc=99.95%); Tier 2 CNN ✓ (val_acc=91.3%); Tier 3 Transformer ✓ (val_macro_f1=0.9400); ensemble stacker ✓ (AUC=0.9809, all 7 KPIs pass, 2026-06-14)
+- [x] T1-A resolved: calibration KPI gate passed ✓ (T1-D, 2026-06-14); ensemble stacker KPIs passed ✓ (2026-06-14)
 - [~] T1-B resolved: IRSA and ATLAS credentials configured ✓; live connection test passed ✓; automated live dry-run policy not yet signed off (pending human reviewer signature)
 - [ ] T1-C resolved: Full pipeline run completed on ≥1 real ZTF field; ≥90% known-object recovery verified
 - [x] T1-D resolved: Machine-readable calibration report passes every required
