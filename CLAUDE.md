@@ -545,9 +545,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.87.7)
+## Current State (v0.87.9)
 
-All 10 pipeline modules are complete. The offline suite passes 3511 tests, with
+All 10 pipeline modules are complete. The offline suite passes 3528 tests, with
 2 live/integration checks deselected. CI is expected to
 remain green on Python 3.14 with the 100% coverage target. Background
 automation uses one unified CLI with top-level SQLite audit logs, offline
@@ -555,11 +555,15 @@ readiness checks, live policy validation, no-secret credential inventories,
 approval bundles, operator handoffs, and fail-closed signoff readiness. All
 three ML tiers now have trained weights: Tier 1 XGBoost (val_acc=99.95%),
 Tier 2 CNN (val_acc=91.3%), and Tier 3 Transformer (val_macro_f1=0.9400,
-best epoch 17/30). **T1-D calibration KPI gate PASSED (2026-06-14)**: Tier 1
-XGBoost and Tier 2 CNN both passed all 7 KPIs; `promotion_gate_passed=true`.
-Production is now blocked only on ensemble stacking (logistic regression
-meta-learner over Tier 1 + Tier 2 + Tier 3). Jerome W. Lindsey III approved
-the five-class label policy and a 50-sequence-per-class pilot on 2026-06-10.
+best epoch 17/30). **T1-D calibration KPI gate PASSED for all tiers
+(2026-06-14)**: Tier 1 XGBoost, Tier 2 CNN, and ensemble stacker all passed
+all 7 KPIs; `promotion_gate_passed=true`. **T1-A is now CLOSED.** Ensemble
+stacker (10-feature logistic regression meta-learner over Tier 1 + Tier 2):
+AUC=0.9809, Brier=0.0211, ECE=0.0000; `models/stacker_coef.json` produced.
+Production is now blocked only on T1-C (first real end-to-end pipeline run on
+live ZTF data) and T1-B live dry-run policy sign-off. Jerome W. Lindsey III
+approved the five-class label policy and a 50-sequence-per-class pilot on
+2026-06-10.
 
 The first operator pilot attempt was retained as diagnostic evidence. Its
 200-row manifest contained 28 duplicate comet rows, reducing collection to 172
@@ -736,6 +740,31 @@ applied it to all four numeric columns. Pilot rerun pending operator execution.
 - Run credentialed live-data dry runs for ZTF/ATLAS/Pan-STARRS only when tokens and review policy are explicitly configured.
 - Train and evaluate Tier 2/Tier 3 model weights on real labeled data.
 - Commit `models/tier1_xgb.json` after `.gitignore` update to allow `models/*.json` is merged.
+
+### Key Changes in v0.87.9 (T1-A CLOSED — ensemble stacker KPIs passed)
+
+- `Skills/train_ensemble_stacker.py`: implemented and debugged end-to-end
+  ensemble stacking training (PRs #97–#101). Five bugs fixed across four
+  operator runs: (1) alert lookup used wrong CSV column (`filename` vs
+  `cutout_path`) — fixed to use `entry_idx` from NPZ stem; (2) numpy array
+  truthiness `array or fallback` — fixed with walrus operator `is not None`
+  check; (3) `IsotonicCalibrator.fit()` requires numpy arrays not Python lists
+  — removed `.tolist()` from `calibrator.fit/predict`; (4) KPI functions
+  (`brier_score`, `compute_roc_auc`, etc.) use numpy arithmetic — removed
+  `.tolist()` from all KPI calls; (5) binary KPI evaluation included MPC
+  samples with T2=uniform, suppressing AUC — fixed to evaluate only on
+  ZTF-origin samples (source="ztf") where both T1 and T2 features are real.
+- `build_stacking_dataset` now returns a `sources` list ("ztf"/"mpc"/
+  "synthetic") per sample; `evaluate_stacker_kpis` accepts `sources_val` and
+  filters to ZTF-origin samples for binary calibration evaluation.
+- Ensemble stacker KPI results (2026-06-14, operator run, 10s total):
+  AUC=0.9809, Brier=0.0211, ECE=0.0000, Log-loss=0.0761, CV ECE
+  mean=0.0247, Bootstrap Brier CI upper=0.0330, Bootstrap ECE CI upper=0.0225
+  — all 7 KPIs PASS; `promotion_gate_passed=true` on 394 ZTF val samples.
+- `docs/PRODUCTION_READINESS.md`: T1-A step 12 marked DONE; T1-A status
+  updated to CLOSED; checklist rows updated to [x].
+- 3528 tests passing; 100% coverage maintained; ruff + mypy clean.
+- Version bumped to 0.87.9.
 
 ### Key Changes in v0.87.7 (T1-D calibration KPI gate passed)
 
