@@ -113,7 +113,10 @@ def fetch_ztf(
         )
         meta = zquery.metatable
         observations = _parse_ztf_metatable(meta)
-    except ImportError:
+    except Exception:
+        # ImportError: ztfquery not installed — use direct IRSA TAP fallback.
+        # Any other exception (auth failure, network error, empty metatable) —
+        # also fall back so ZTF_IRSA_USERNAME/PASSWORD from env can be tried.
         observations = _fetch_ztf_irsa_api(ra_deg, dec_deg, radius_deg, start_jd, end_jd)
 
     _save_cache(cache_key, [o.model_dump() for o in observations])
@@ -155,8 +158,18 @@ def _fetch_ztf_irsa_api(
     start_jd: float,
     end_jd: float,
 ) -> list[Observation]:
-    """Fallback: query IRSA TAP for ZTF source catalog."""
+    """Fallback: query IRSA TAP for ZTF source catalog.
+
+    Reads ZTF_IRSA_USERNAME and ZTF_IRSA_PASSWORD from environment variables
+    (loaded from Keychain via Skills/verify_live_credentials.sh) and passes
+    them as HTTP Basic Auth.  Returns [] if no credentials are set — the IRSA
+    TAP endpoint requires authentication for ZTF alert access.
+    """
     import requests
+
+    username = os.environ.get("ZTF_IRSA_USERNAME", "")
+    password = os.environ.get("ZTF_IRSA_PASSWORD", "")
+    auth = (username, password) if username and password else None
 
     tap_url = "https://irsa.ipac.caltech.edu/TAP/sync"
     adql = (
@@ -166,7 +179,12 @@ def _fetch_ztf_irsa_api(
         f"CIRCLE('ICRS', {ra_deg}, {dec_deg}, {radius_deg})) = 1 "
         f"AND jd >= {start_jd} AND jd <= {end_jd}"
     )
-    resp = requests.get(tap_url, params={"QUERY": adql, "FORMAT": "json"}, timeout=60)
+    resp = requests.get(
+        tap_url,
+        params={"QUERY": adql, "FORMAT": "json"},
+        auth=auth,
+        timeout=60,
+    )
     resp.raise_for_status()
     # Empty response body (no data for this sky region) must not propagate as
     # a retryable error — treat it as "no observations available" and return [].
