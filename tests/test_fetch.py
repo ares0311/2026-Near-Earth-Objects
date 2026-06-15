@@ -234,6 +234,75 @@ class TestFetchZtfIrsaFallback:
         assert len(result) == 1
         assert result[0].filter_band == "g"
 
+    def test_irsa_fallback_on_ztfquery_runtime_error(self, tmp_path, monkeypatch):
+        """fetch_ztf falls back to IRSA API on any ztfquery error (e.g. auth)."""
+        import sys
+
+        import fetch as fetch_mod
+
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "metadata": [{"name": "candid"}, {"name": "ra"}, {"name": "dec"},
+                          {"name": "jd"}, {"name": "magpsf"}, {"name": "sigmapsf"},
+                          {"name": "fid"}],
+            "data": [["999", 180.0, 10.0, 2460003.0, 20.1, 0.1, 2]],
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        # ztfquery is importable but raises RuntimeError (e.g. auth failure)
+        mock_zq = MagicMock()
+        mock_zq.ZTFQuery.return_value.load_metadata.side_effect = RuntimeError("auth failed")
+        monkeypatch.setitem(sys.modules, "ztfquery", mock_zq)
+        monkeypatch.setitem(sys.modules, "ztfquery.query", mock_zq)
+
+        with patch("requests.get", return_value=mock_response):
+            result = fetch_mod.fetch_ztf(180.0, 10.0, 1.0, 2460000.0, 2460010.0,
+                                          force_refresh=True)
+
+        # Should have fallen back to IRSA API and returned the mocked observation
+        assert len(result) == 1
+        assert result[0].filter_band == "r"
+
+
+class TestFetchZtfIrsaApiAuth:
+    """_fetch_ztf_irsa_api must pass Basic Auth from env vars to IRSA TAP."""
+
+    def test_basic_auth_sent_when_env_vars_set(self, monkeypatch):
+        """Verify auth=(username, password) is passed when env vars are present."""
+        monkeypatch.setenv("ZTF_IRSA_USERNAME", "myuser")
+        monkeypatch.setenv("ZTF_IRSA_PASSWORD", "mypass")
+
+        import fetch as fetch_mod
+
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status.return_value = None
+        mock_resp.json.return_value = {"metadata": [], "data": []}
+
+        with patch("requests.get", return_value=mock_resp) as mock_get:
+            fetch_mod._fetch_ztf_irsa_api(180.0, 10.0, 1.0, 2460000.0, 2460001.0)
+
+        call_kwargs = mock_get.call_args[1]
+        assert call_kwargs["auth"] == ("myuser", "mypass")
+
+    def test_no_auth_when_env_vars_missing(self, monkeypatch):
+        """auth is None when ZTF_IRSA_USERNAME or ZTF_IRSA_PASSWORD are absent."""
+        monkeypatch.delenv("ZTF_IRSA_USERNAME", raising=False)
+        monkeypatch.delenv("ZTF_IRSA_PASSWORD", raising=False)
+
+        import fetch as fetch_mod
+
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status.return_value = None
+        mock_resp.json.return_value = {"metadata": [], "data": []}
+
+        with patch("requests.get", return_value=mock_resp) as mock_get:
+            fetch_mod._fetch_ztf_irsa_api(180.0, 10.0, 1.0, 2460000.0, 2460001.0)
+
+        call_kwargs = mock_get.call_args[1]
+        assert call_kwargs["auth"] is None
+
 
 class TestParseAtlasPhotometryNoHeader:
     def test_no_header_uses_first_col_as_mjd(self):
