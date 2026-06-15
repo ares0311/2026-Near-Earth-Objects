@@ -1607,3 +1607,226 @@ class TestFetchRecentNeosSkill:
             mod.main(["--n-days", "30", "--json"])
         # Just verify it ran without crashing
         assert True
+
+
+class TestRunPipelineAutoDelete:
+    """Tests for delete_cache_files and write_run_summary helpers."""
+
+    def _load_skill(self):
+        import importlib.util
+        import pathlib
+        spec = importlib.util.spec_from_file_location(
+            "run_pipeline",
+            str(pathlib.Path(__file__).resolve().parents[1]
+                / "Skills" / "run_pipeline.py"),
+        )
+        mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+        return mod
+
+    # --- delete_cache_files ---
+
+    def test_delete_removes_json_files(self, tmp_path):
+        mod = self._load_skill()
+        (tmp_path / "abc123.json").write_text("{}")
+        (tmp_path / "def456.json").write_text("{}")
+        deleted = mod.delete_cache_files(tmp_path)
+        assert set(deleted) == {"abc123.json", "def456.json"}
+        assert list(tmp_path.glob("*.json")) == []
+
+    def test_delete_leaves_non_json_files(self, tmp_path):
+        mod = self._load_skill()
+        (tmp_path / "keep.txt").write_text("data")
+        (tmp_path / "remove.json").write_text("{}")
+        mod.delete_cache_files(tmp_path)
+        assert (tmp_path / "keep.txt").exists()
+
+    def test_delete_returns_empty_for_missing_dir(self, tmp_path):
+        mod = self._load_skill()
+        missing = tmp_path / "no_such_dir"
+        result = mod.delete_cache_files(missing)
+        assert result == []
+
+    def test_delete_returns_empty_when_no_json(self, tmp_path):
+        mod = self._load_skill()
+        (tmp_path / "data.csv").write_text("a,b")
+        result = mod.delete_cache_files(tmp_path)
+        assert result == []
+
+    def test_delete_returns_names_only(self, tmp_path):
+        mod = self._load_skill()
+        (tmp_path / "xyz.json").write_text("{}")
+        deleted = mod.delete_cache_files(tmp_path)
+        assert deleted == ["xyz.json"]
+
+    # --- write_run_summary ---
+
+    def test_write_creates_file(self, tmp_path):
+        mod = self._load_skill()
+        log_dir = tmp_path / "run_001"
+        summary = {"run_id": "run_001", "ra_deg": 180.0}
+        mod.write_run_summary(log_dir, summary)
+        assert (log_dir / "run_summary.json").exists()
+
+    def test_write_creates_parent_dirs(self, tmp_path):
+        mod = self._load_skill()
+        deep = tmp_path / "a" / "b" / "c"
+        mod.write_run_summary(deep, {"x": 1})
+        assert (deep / "run_summary.json").exists()
+
+    def test_write_content_roundtrips(self, tmp_path):
+        import json
+        mod = self._load_skill()
+        log_dir = tmp_path / "run_002"
+        summary = {
+            "run_id": "ts_001",
+            "ra_deg": 90.0,
+            "dec_deg": -30.0,
+            "n_results": 5,
+        }
+        mod.write_run_summary(log_dir, summary)
+        loaded = json.loads((log_dir / "run_summary.json").read_text())
+        assert loaded == summary
+
+    def test_write_overwrites_existing(self, tmp_path):
+        import json
+        mod = self._load_skill()
+        log_dir = tmp_path / "run_003"
+        mod.write_run_summary(log_dir, {"v": 1})
+        mod.write_run_summary(log_dir, {"v": 2})
+        loaded = json.loads((log_dir / "run_summary.json").read_text())
+        assert loaded["v"] == 2
+
+    # --- main() integration: --no-delete-cache and --no-audit-log flags ---
+
+    def test_main_writes_audit_log(self, tmp_path, monkeypatch):
+        """main() writes run_summary.json when --no-audit-log is not set."""
+        import json
+        from unittest.mock import patch
+
+        mod = self._load_skill()
+        # Point log root to tmp_path so we don't write to the real Logs/
+        monkeypatch.setattr(mod, "_LOG_ROOT", tmp_path / "pipeline_runs")
+        monkeypatch.setattr(mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        with patch.object(mod, "run_pipeline", return_value=[]):
+            mod.main([
+                "--ra", "10.0", "--dec", "5.0",
+                "--start-jd", "2460000.0", "--end-jd", "2460001.0",
+                "--no-delete-cache",
+            ])
+
+        run_dirs = list((tmp_path / "pipeline_runs").iterdir())
+        assert len(run_dirs) == 1
+        summary = json.loads((run_dirs[0] / "run_summary.json").read_text())
+        assert summary["ra_deg"] == 10.0
+        assert summary["dec_deg"] == 5.0
+        assert summary["n_results"] == 0
+
+    def test_main_no_audit_log_skips_write(self, tmp_path, monkeypatch):
+        """--no-audit-log prevents writing the audit log."""
+        from unittest.mock import patch
+
+        mod = self._load_skill()
+        log_root = tmp_path / "pipeline_runs"
+        monkeypatch.setattr(mod, "_LOG_ROOT", log_root)
+        monkeypatch.setattr(mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        with patch.object(mod, "run_pipeline", return_value=[]):
+            mod.main([
+                "--ra", "10.0", "--dec", "5.0",
+                "--start-jd", "2460000.0", "--end-jd", "2460001.0",
+                "--no-audit-log", "--no-delete-cache",
+            ])
+
+        assert not log_root.exists()
+
+    def test_main_deletes_cache_by_default(self, tmp_path, monkeypatch):
+        """main() deletes .neo_cache/*.json files unless --no-delete-cache."""
+        from unittest.mock import patch
+
+        mod = self._load_skill()
+        cache_dir = tmp_path / ".neo_cache"
+        cache_dir.mkdir()
+        (cache_dir / "abc.json").write_text("{}")
+
+        monkeypatch.setattr(mod, "_LOG_ROOT", tmp_path / "pipeline_runs")
+        monkeypatch.setattr(mod, "_CACHE_DIR", cache_dir)
+
+        with patch.object(mod, "run_pipeline", return_value=[]):
+            mod.main([
+                "--ra", "10.0", "--dec", "5.0",
+                "--start-jd", "2460000.0", "--end-jd", "2460001.0",
+                "--no-audit-log",
+            ])
+
+        assert not (cache_dir / "abc.json").exists()
+
+    def test_main_no_delete_cache_preserves_files(self, tmp_path, monkeypatch):
+        """--no-delete-cache leaves cache files in place."""
+        from unittest.mock import patch
+
+        mod = self._load_skill()
+        cache_dir = tmp_path / ".neo_cache"
+        cache_dir.mkdir()
+        (cache_dir / "keep.json").write_text("{}")
+
+        monkeypatch.setattr(mod, "_LOG_ROOT", tmp_path / "pipeline_runs")
+        monkeypatch.setattr(mod, "_CACHE_DIR", cache_dir)
+
+        with patch.object(mod, "run_pipeline", return_value=[]):
+            mod.main([
+                "--ra", "10.0", "--dec", "5.0",
+                "--start-jd", "2460000.0", "--end-jd", "2460001.0",
+                "--no-delete-cache", "--no-audit-log",
+            ])
+
+        assert (cache_dir / "keep.json").exists()
+
+    def test_audit_log_records_cache_files_deleted(self, tmp_path, monkeypatch):
+        """run_summary.json lists the cache files that were deleted."""
+        import json
+        from unittest.mock import patch
+
+        mod = self._load_skill()
+        cache_dir = tmp_path / ".neo_cache"
+        cache_dir.mkdir()
+        (cache_dir / "xyz.json").write_text("{}")
+
+        monkeypatch.setattr(mod, "_LOG_ROOT", tmp_path / "pipeline_runs")
+        monkeypatch.setattr(mod, "_CACHE_DIR", cache_dir)
+
+        with patch.object(mod, "run_pipeline", return_value=[]):
+            mod.main([
+                "--ra", "20.0", "--dec", "-10.0",
+                "--start-jd", "2460000.0", "--end-jd", "2460001.0",
+            ])
+
+        run_dirs = list((tmp_path / "pipeline_runs").iterdir())
+        summary = json.loads((run_dirs[0] / "run_summary.json").read_text())
+        assert "xyz.json" in summary["cache_files_deleted"]
+
+    def test_audit_log_has_required_keys(self, tmp_path, monkeypatch):
+        """run_summary.json contains all fields needed by select_survey_fields.py."""
+        import json
+        from unittest.mock import patch
+
+        mod = self._load_skill()
+        monkeypatch.setattr(mod, "_LOG_ROOT", tmp_path / "pipeline_runs")
+        monkeypatch.setattr(mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        with patch.object(mod, "run_pipeline", return_value=[]):
+            mod.main([
+                "--ra", "30.0", "--dec", "15.0",
+                "--start-jd", "2460000.0", "--end-jd", "2460001.0",
+                "--no-delete-cache",
+            ])
+
+        run_dirs = list((tmp_path / "pipeline_runs").iterdir())
+        summary = json.loads((run_dirs[0] / "run_summary.json").read_text())
+        required = {
+            "run_id", "timestamp_utc", "ra_deg", "dec_deg", "radius_deg",
+            "start_jd", "end_jd", "surveys", "dry_run", "n_results",
+            "elapsed_seconds", "cache_files_downloaded", "cache_files_deleted",
+        }
+        assert required.issubset(summary.keys())
