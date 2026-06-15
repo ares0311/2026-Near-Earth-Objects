@@ -120,6 +120,14 @@ def _fetch_with_retry(
         try:
             return fetch(**kwargs)
         except _INFRA_ERRORS as exc:
+            # json.JSONDecodeError inherits from ValueError and (via
+            # requests.exceptions.JSONDecodeError) from OSError, so it would
+            # otherwise be caught here.  An empty API response body is "no data
+            # for this region" — not a transient network failure — so we must
+            # not retry it.  Re-raise immediately so the pipeline sees 0 alerts
+            # rather than sleeping through 5 useless retries.
+            if isinstance(exc, (json.JSONDecodeError, ValueError)):
+                raise
             last_exc = exc
             if attempt == max_attempts - 1:
                 break

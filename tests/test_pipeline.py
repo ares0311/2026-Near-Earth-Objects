@@ -2146,3 +2146,161 @@ class TestRunPipelineCheckpointResume:
 
         _, kwargs = mock_rp.call_args
         assert kwargs["resume"] is False
+
+
+class TestFetchWithRetryJsonError:
+    """_fetch_with_retry must not retry json.JSONDecodeError — empty API responses
+    are 'no data for this region', not transient network failures."""
+
+    def _load_skill(self):
+        import importlib.util
+        import sys
+        from pathlib import Path
+        path = Path(__file__).parent.parent / "Skills" / "run_pipeline.py"
+        spec = importlib.util.spec_from_file_location("run_pipeline_mod", path)
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules.pop("run_pipeline_mod", None)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def test_json_decode_error_not_retried(self):
+        """JSONDecodeError from an API response must surface immediately, not retry."""
+        import json
+        mod = self._load_skill()
+        call_count = 0
+
+        def bad_fetch(**_kwargs):
+            nonlocal call_count
+            call_count += 1
+            raise json.JSONDecodeError("Expecting value", "", 0)
+
+        from unittest.mock import patch
+        with patch.object(mod, "fetch", side_effect=bad_fetch):
+            with pytest.raises(json.JSONDecodeError):
+                mod._fetch_with_retry(
+                    ra_deg=0.0, dec_deg=0.0, radius_deg=1.0,
+                    start_jd=0.0, end_jd=1.0,
+                    _sleep_fn=lambda _s: None,
+                )
+
+        # Must have failed on the first attempt with no retries
+        assert call_count == 1
+
+    def test_requests_json_decode_error_not_retried(self):
+        """requests.exceptions.JSONDecodeError (subclass of OSError) must also not retry."""
+        mod = self._load_skill()
+        call_count = 0
+
+        try:
+            import requests
+            exc_class = requests.exceptions.JSONDecodeError
+        except (ImportError, AttributeError):
+            pytest.skip("requests not available or no JSONDecodeError")
+
+        def bad_fetch(**_kwargs):
+            nonlocal call_count
+            call_count += 1
+            # Simulate the exact error raised by resp.json() on empty body
+            raise exc_class("Expecting value: line 1 column 1 (char 0)", b"", None)
+
+        from unittest.mock import patch
+        with patch.object(mod, "fetch", side_effect=bad_fetch):
+            with pytest.raises(Exception):
+                mod._fetch_with_retry(
+                    ra_deg=0.0, dec_deg=0.0, radius_deg=1.0,
+                    start_jd=0.0, end_jd=1.0,
+                    _sleep_fn=lambda _s: None,
+                )
+
+        assert call_count == 1
+
+    def test_connection_error_is_still_retried(self):
+        """Genuine network errors (ConnectionError) must still be retried."""
+        mod = self._load_skill()
+        call_count = 0
+
+        def flaky_fetch(**_kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count < 3:
+                raise ConnectionError("connection refused")
+            from unittest.mock import MagicMock
+            r = MagicMock()
+            r.alerts = []
+            return r
+
+        from unittest.mock import patch
+        with patch.object(mod, "fetch", side_effect=flaky_fetch):
+            result = mod._fetch_with_retry(
+                ra_deg=0.0, dec_deg=0.0, radius_deg=1.0,
+                start_jd=0.0, end_jd=1.0,
+                _sleep_fn=lambda _s: None,
+            )
+
+        assert call_count == 3
+        assert result is not None
+
+
+class TestFetchZtfIrsaApiJsonDecodeError:
+    """_fetch_ztf_irsa_api must return [] when the API returns an empty body."""
+
+    def test_empty_response_body_returns_empty_list(self, monkeypatch):
+        """Empty HTTP response body (JSONDecodeError) returns [] not an exception."""
+        import json
+        import sys
+        from pathlib import Path
+        from unittest.mock import MagicMock, patch
+
+        # Load fetch module
+        src = str(Path(__file__).parent.parent / "src")
+        if src not in sys.path:
+            sys.path.insert(0, src)
+        import fetch as fetch_mod
+
+        # Build a mock response that raises JSONDecodeError on .json()
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status.return_value = None
+        mock_resp.json.side_effect = json.JSONDecodeError("Expecting value", "", 0)
+
+        mock_requests = MagicMock()
+        mock_requests.get.return_value = mock_resp
+
+        with patch.dict("sys.modules", {"requests": mock_requests}):
+            result = fetch_mod._fetch_ztf_irsa_api(
+                ra_deg=0.0, dec_deg=0.0, radius_deg=1.0,
+                start_jd=2460000.0, end_jd=2460001.0,
+            )
+
+        assert result == []
+
+    def test_atlas_empty_response_body_returns_empty_list(self, monkeypatch):
+        """Empty ATLAS queue response (JSONDecodeError on POST) returns []."""
+        import json
+        import sys
+        from pathlib import Path
+        from unittest.mock import MagicMock, patch
+
+        src = str(Path(__file__).parent.parent / "src")
+        if src not in sys.path:
+            sys.path.insert(0, src)
+        import fetch as fetch_mod
+
+        # POST /queue/ returns empty body → json() raises JSONDecodeError
+        mock_post_resp = MagicMock()
+        mock_post_resp.raise_for_status.return_value = None
+        mock_post_resp.json.side_effect = json.JSONDecodeError("Expecting value", "", 0)
+
+        mock_requests = MagicMock()
+        mock_requests.post.return_value = mock_post_resp
+
+        import time as time_mod
+        with patch.dict("sys.modules", {"requests": mock_requests}):
+            with patch.object(time_mod, "sleep", return_value=None):
+                result = fetch_mod.fetch_atlas(
+                    ra_deg=0.0, dec_deg=0.0, radius_deg=1.0,
+                    start_jd=2460000.0, end_jd=2460001.0,
+                    atlas_token="test-token",
+                    force_refresh=True,
+                )
+
+        assert result == []

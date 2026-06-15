@@ -168,8 +168,14 @@ def _fetch_ztf_irsa_api(
     )
     resp = requests.get(tap_url, params={"QUERY": adql, "FORMAT": "json"}, timeout=60)
     resp.raise_for_status()
-    rows = resp.json().get("data", [])
-    cols = resp.json().get("metadata", [])
+    # Empty response body (no data for this sky region) must not propagate as
+    # a retryable error — treat it as "no observations available" and return [].
+    try:
+        payload = resp.json()
+    except (ValueError, Exception):
+        return []
+    rows = payload.get("data", [])
+    cols = payload.get("metadata", [])
     col_names = [c["name"] for c in cols]
     obs: list[Observation] = []
     for row in rows:
@@ -238,17 +244,29 @@ def fetch_atlas(
     }
     resp = requests.post(f"{base}/queue/", json=payload, headers=headers, timeout=30)
     resp.raise_for_status()
-    task_url = resp.json()["url"]
+    # Empty response body from the ATLAS queue endpoint means the request was
+    # not accepted; treat as no data rather than a retryable network error.
+    try:
+        task_url = resp.json()["url"]
+    except (KeyError, ValueError, Exception):
+        return []
 
     # Poll for completion
     for _ in range(60):
         time.sleep(5)
         poll = requests.get(task_url, headers=headers, timeout=30)
         poll.raise_for_status()
-        if poll.json().get("finishtimestamp"):
+        try:
+            poll_data = poll.json()
+        except (ValueError, Exception):
+            continue
+        if poll_data.get("finishtimestamp"):
             break
 
-    result_url = poll.json().get("result_url", "")
+    try:
+        result_url = poll.json().get("result_url", "")
+    except (ValueError, Exception):
+        return []
     if not result_url:
         return []
 
