@@ -330,6 +330,22 @@ class TestPDCOAlertPackage:
         assert "pdco_package" in result
         assert any("PDCO" in a for a in result["actions"])
 
+    def test_pdco_deferred_when_cneos_prob_below_threshold(self, tmp_path, monkeypatch):
+        # cneos_impact_prob is not None but < 0.0001 — covers the Python 3.14
+        # branch where the left side of the compound `and` is True but right is False.
+        import alert as alert_mod
+        monkeypatch.setattr(alert_mod, "_LOG_DIR", tmp_path)
+        neo = make_scored_neo(
+            alert_pathway="nasa_pdco_notify", rb=0.95, orbit_quality=2, moid_au=0.03
+        )
+        result = process_alert(
+            neo,
+            dry_run=True,
+            cneos_assessment={"cneos_impact_probability": 0.00001},
+        )
+        assert "pdco_package" not in result
+        assert any("deferred" in a.lower() for a in result["actions"])
+
 
 class TestMonitorNeocpPublic:
     def test_returns_timeout_when_no_confirmation(self):

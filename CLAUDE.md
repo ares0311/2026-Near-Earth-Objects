@@ -553,35 +553,83 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.87.9)
+## Current State (v0.88.0)
 
-All 10 pipeline modules are complete. The offline suite passes 3528 tests, with
-2 live/integration checks deselected. CI is expected to
-remain green on Python 3.14 with the 100% coverage target. Background
-automation uses one unified CLI with top-level SQLite audit logs, offline
-readiness checks, live policy validation, no-secret credential inventories,
-approval bundles, operator handoffs, and fail-closed signoff readiness. All
-three ML tiers now have trained weights: Tier 1 XGBoost (val_acc=99.95%),
-Tier 2 CNN (val_acc=91.3%), and Tier 3 Transformer (val_macro_f1=0.9400,
-best epoch 17/30). **T1-D calibration KPI gate PASSED for all tiers
-(2026-06-14)**: Tier 1 XGBoost, Tier 2 CNN, and ensemble stacker all passed
-all 7 KPIs; `promotion_gate_passed=true`. **T1-A is now CLOSED.** Ensemble
-stacker (10-feature logistic regression meta-learner over Tier 1 + Tier 2):
-AUC=0.9809, Brier=0.0211, ECE=0.0000; `models/stacker_coef.json` produced.
-Production is now blocked only on T1-C (first real end-to-end pipeline run on
-live ZTF data) and T1-B live dry-run policy sign-off. Jerome W. Lindsey III
-approved the five-class label policy and a 50-sequence-per-class pilot on
-2026-06-10.
+All 10 pipeline modules are complete. The offline suite passes 3622 tests, with
+2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
+coverage target. All three ML tiers have trained weights: Tier 1 XGBoost
+(val_acc=99.95%), Tier 2 CNN (val_acc=91.3%), and Tier 3 Transformer
+(val_macro_f1=0.9400, best epoch 17/30). **T1-A CLOSED. T1-B CLOSED. T1-D CLOSED.**
+Ensemble stacker KPIs passed 2026-06-14 (AUC=0.9809, Brier=0.0211, ECE=0.0000).
 
-The first operator pilot attempt was retained as diagnostic evidence. Its
-200-row manifest contained 28 duplicate comet rows, reducing collection to 172
-unique objects, and its MPC checkpoint recorded 103 zero-result queries without
-distinguishing provider errors. Corrected uniqueness, provider-error circuit
-breaker, parallel-mode circuit-breaker bias fix, and held-out Tier 3
-training-report gates are merged. The MPC fetcher now correctly classifies
-None-table returns and query-level errors as insufficient_observations rather
-than provider failures, preventing false circuit-breaker trips on bad
-designations.
+**Production is blocked only on T1-C** (first real end-to-end pipeline run on
+live ZTF data returning non-zero candidates).
+
+### Handoff state as of 2026-06-15
+
+`Skills/run_pipeline.py` is now production-ready for live runs:
+- **Checkpoint/resume** (PR #105): after network drops or machine sleep, re-running
+  the identical command resumes from the last completed stage. Checkpoints live at
+  `Logs/pipeline_runs/<param_key>/checkpoint.json`.
+- **Retry with backoff** (PR #105): genuine network errors retry up to 5 times
+  with 2/4/8/16/32 s waits. `json.JSONDecodeError` (empty API response = no data
+  for that region) is explicitly NOT retried (PR #106).
+- **Cache auto-delete + audit log** (PR #104): after each run, `.neo_cache/*.json`
+  is deleted and `Logs/pipeline_runs/<param_key>/run_summary.json` is written.
+- **Credentials wired** (PR #107): `_fetch_ztf_irsa_api` now reads
+  `ZTF_IRSA_USERNAME` and `ZTF_IRSA_PASSWORD` from env and passes Basic Auth to
+  IRSA TAP. `fetch_ztf` falls back to the IRSA path on any ztfquery exception
+  (not just ImportError). Load all three credentials from Keychain before running:
+  ```bash
+  source Skills/verify_live_credentials.sh
+  ```
+
+### Unresolved blocker: ZTF returns 0 alerts
+
+**Root cause (diagnosed, not yet fixed):** `_fetch_ztf_irsa_api` queries
+`ztf.ztf_current_meta_sci` — the science **image metadata** table (one row per
+CCD exposure), not the individual source/alert catalog. Columns like `magpsf`, `rb`,
+`drb` do not exist in this table, so `_parse_ztf_metatable` silently returns []
+for every row. The IRSA TAP table for individual detections is different.
+
+`fetch_ztf_alerts` (used by the live connection test) also returned 0. It uses
+the deprecated `astroquery.irsa` module with `catalog="ztf_alerts"`. Switching to
+the non-deprecated `astroquery.ipac.irsa` may fix this.
+
+**Pending diagnostic** — the operator was given this command but the result was
+not received before handoff:
+```bash
+PYTHONPATH=src uv run python - <<'EOF'
+from astroquery.ipac.irsa import Irsa
+from astropy.coordinates import SkyCoord
+import astropy.units as u
+coord = SkyCoord(ra=83.8221, dec=-5.3911, unit="deg")
+t = Irsa.query_region(coord, catalog="ztf_alerts", spatial="Cone", radius=0.1*u.deg)
+print(f"ztf_alerts rows: {len(t)}")
+print("Columns:", list(t.colnames[:10]) if len(t) > 0 else "(empty)")
+EOF
+```
+
+**The fix** (do NOT implement until the diagnostic result is in hand):
+- If the above returns >0 rows: update `_fetch_ztf_irsa_api` to use
+  `astroquery.ipac.irsa.Irsa.query_region(catalog="ztf_alerts")` instead of
+  the ADQL TAP path against `ztf.ztf_current_meta_sci`.
+- If it still returns 0: the `ztf_alerts` catalog requires additional access or
+  has a different name; investigate IRSA catalog inventory before coding.
+
+**Operator run command** (once the ZTF fix is merged):
+```bash
+git pull origin main
+source Skills/verify_live_credentials.sh
+export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export PYTHONPATH=src
+caffeinate -i uv run python Skills/run_pipeline.py \
+    --ra 83.8221 --dec -5.3911 --radius 1.0 \
+    --start-jd 2460700.5 --end-jd 2460703.5 \
+    --surveys ZTF ATLAS
+```
+(Orion field, same coordinates used for the T1-B live connection test.)
 
 A second pilot run (post-v0.87.2) fetched 0 observations for all 400
 candidates because the MPCORB NEA.txt catalog uses extended packed
