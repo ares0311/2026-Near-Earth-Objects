@@ -610,8 +610,9 @@ run is retained only as historical/debug evidence and must not be reused for the
 production recovery KPI.
 
 The next production run should target many recoverable known moving objects,
-preferably from `Skills/select_survey_fields.py --mode recovery`, then audit
-against a manifest containing MPC designations plus sky/time samples.
+preferably from `Skills/select_survey_fields.py --mode recovery`, then build an
+expected-known manifest with `Skills/build_recovery_manifest.py` containing MPC
+designations plus Horizons sky/time samples.
 `Skills/audit_real_run.py` is the fail-closed promotion gate: it must verify
 >=90% known-object recovery and require citizen-science operator review before
 internal production promotion is allowed. It never authorizes MPC submission,
@@ -666,6 +667,7 @@ succeeded and produced the trained Tier 3 weights now recorded under T1-A.
 | `Skills/run_pipeline.py` | Full end-to-end pipeline run |
 | `Skills/injection_recovery.py` | Injection-recovery test: injects synthetic NEOs, measures detection/link/score rates |
 | `Skills/check_mpc_known.py` | Cross-match candidate observations against MPC known object catalog |
+| `Skills/build_recovery_manifest.py` | Build checkpointed MPC+Horizons expected-known manifests for T1-C recovery audits |
 | `Skills/visualize_tracklets.py` | Plot sky positions and light curves for a tracklet JSON file |
 | `Skills/export_mpc_report.py` | Export MPC 80-column reports from a scored NEO JSON file |
 | `Skills/benchmark_pipeline.py` | Time classify + score on N synthetic tracklets; print throughput table |

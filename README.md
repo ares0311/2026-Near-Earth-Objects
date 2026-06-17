@@ -559,6 +559,7 @@ The diagram below shows how data and artifacts move between the repository's top
 │   ├── generate_training_labels.py # Download MPC NEO + MBA catalog as CSV
 │   ├── check_mpc_known.py        # Cross-match candidates against MPC catalog
 │   ├── audit_real_run.py         # Build fail-closed real-run audit packets
+│   ├── build_recovery_manifest.py # Build expected-known manifests for T1-C audits
 │   ├── visualize_tracklets.py    # Plot sky positions and light curves
 │   ├── export_mpc_report.py      # Export MPC 80-column reports from scored JSON
 │   ├── benchmark_pipeline.py     # Time classify + score on N synthetic tracklets
@@ -1212,7 +1213,7 @@ operation.
 | **M5d** | T1-A: Train Tier 1 XGBoost | `models/tier1_xgb.json`; validation accuracy 99.95%, macro AUC 1.000 | **Complete** |
 | **M6a** | T1-D: Quantitative production calibration gate | Held-out real labeled data; all Brier, ECE, log-loss, AUC, cross-validation, and bootstrap-confidence KPIs pass | **Complete** |
 | **M6b** | T1-C: Real-run audit packet | Build fail-closed review evidence from the first real ZTF pilot | **Complete for run `011dd53aa7f4`** |
-| **M6c** | T1-C: Known-object recovery audit | Verify ≥90% known-object recovery using an expected-known manifest with pipeline IDs or sky/time samples | **Blocked on non-Orion recovery manifest + operator review** |
+| **M6c** | T1-C: Known-object recovery audit | Verify ≥90% known-object recovery using a generated expected-known manifest with pipeline IDs or sky/time samples | **Blocked on live manifest generation, recovery run, and operator review** |
 | **M7** | All T1 gaps closed; internal no-submission production readiness | Requires M4–M6 complete plus no-submission citizen-science limitations | **Pending** |
 | **M8** | First MPC submission eligibility | Requires qualified external review or a separately approved externally supervised submission policy | **Blocked** |
 
@@ -1238,11 +1239,12 @@ operation.
 | **P31** | In progress | Staged known-object pilot | `Skills/select_survey_fields.py --mode recovery` selects known-object-rich non-Orion fields for the next recovery run |
 | **P32** | Pending | Automated live-run approval | Background live-review policy still needs signoff before unsupervised live automation |
 | **P33** | In progress | Real-run audit v2 | `Skills/audit_real_run.py` can match expected known objects by pipeline ID or sky/time samples and requires operator-review decisions |
+| **P34** | In progress | Expected-known manifest builder | `Skills/build_recovery_manifest.py` builds checkpointed MPC+Horizons sky/time manifests for T1-C audits; live manifest generation is pending |
 
 ### 15.5 Known Limitations
 
 - **Real-data evidence is bounded**: The first ALeRCE-backed ZTF pilot processed real detections and produced two internal candidates, but it was capped at 80 linked candidates.
-- **Known-object recovery is not yet proven**: The current real-run audit blocks because no expected-known manifest with pipeline IDs or sky/time samples has been supplied.
+- **Known-object recovery is not yet proven**: The current real-run audit blocks because no live expected-known manifest with pipeline IDs or sky/time samples has been supplied for a non-Orion recovery field.
 - **Citizen-science operator review remains open**: Recovered candidates need operator review before T1-C can close for internal, no-submission operation.
 - **External expert review is unavailable**: This is a citizen-science project. Internal production readiness does not authorize MPC submission or hazard notification.
 - **Automated live operation is not approved**: Manual supervised runs are possible; background live automation still needs policy signoff.

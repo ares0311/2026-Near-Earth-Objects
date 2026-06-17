@@ -573,6 +573,7 @@ PYTHONPATH=src uv run python Skills/select_survey_fields.py \
 | `Skills/run_pipeline.py` | Full end-to-end pipeline run |
 | `Skills/injection_recovery.py` | Injection-recovery test: injects synthetic NEOs, measures detection/link/score rates |
 | `Skills/check_mpc_known.py` | Cross-match candidate observations against MPC known object catalog |
+| `Skills/build_recovery_manifest.py` | Build checkpointed MPC+Horizons expected-known manifests for T1-C recovery audits |
 | `Skills/visualize_tracklets.py` | Plot sky positions and light curves for a tracklet JSON file |
 | `Skills/export_mpc_report.py` | Export MPC 80-column reports from a scored NEO JSON file |
 | `Skills/benchmark_pipeline.py` | Time classify + score on N synthetic tracklets; print throughput table |
@@ -719,8 +720,8 @@ PYTHONPATH=src uv run python Skills/select_survey_fields.py \
 **Priority 1 — Close T1-C recovery evidence**:
 1. Use `Skills/select_survey_fields.py --mode recovery` to choose a non-Orion,
    known-object-rich field.
-2. Build or supply an expected-known manifest with MPC designations and sky/time
-   samples for that field.
+2. Build the expected-known manifest with `Skills/build_recovery_manifest.py`
+   so the audit has MPC designations and sky/time samples for that field.
 3. Run a staged or uncapped supervised recovery pilot with credentials loaded
    from Keychain and no external submission.
 4. Audit the run with `Skills/audit_real_run.py --expected-known ...` and

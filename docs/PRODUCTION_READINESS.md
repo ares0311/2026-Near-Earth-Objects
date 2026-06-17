@@ -191,10 +191,10 @@ Credentials are stored in macOS Keychain under `neo-detection:ATLAS_TOKEN`, `neo
    CSV review evidence, preserved no-network/no-submission safety flags, and
    correctly blocked promotion because no expected-known manifest was
    supplied.
-4. [CODE + HUMAN] Provide or generate an expected-known manifest with MPC
-   designations and sky/time samples, then verify ≥90% known-object recovery
-   through `Skills/audit_real_run.py`. Pipeline object IDs may be used when
-   known, but they are no longer required.
+4. [CODE] Generate an expected-known manifest with MPC designations and
+   Horizons sky/time samples using `Skills/build_recovery_manifest.py`, then
+   verify ≥90% known-object recovery through `Skills/audit_real_run.py`.
+   Pipeline object IDs may be used when known, but they are no longer required.
 5. [CODE] Run an uncapped or staged recovery-audit pilot with link progress/ETA
    enabled, preserving `Logs/pipeline_runs/*/run_summary.json` evidence and
    evaluating it through `Skills/audit_real_run.py`.
@@ -205,11 +205,12 @@ Credentials are stored in macOS Keychain under `neo-detection:ATLAS_TOKEN`, `neo
    is retained only as historical/debug evidence and must not be reused for the
    production recovery KPI.
 
-**Current blocker**: T1-C is no longer blocked on zero ZTF fetches. The next
-blocker is a non-Orion expected-known recovery manifest plus citizen-science
-operator false-positive review. The automated live-review policy remains
-required before automated live runs; manual supervised pilot runs remain
-operator-controlled and non-submitting.
+**Current blocker**: T1-C is no longer blocked on zero ZTF fetches or missing
+manifest tooling. The next blocker is live generation of a non-Orion
+expected-known recovery manifest, a staged recovery run against that manifest,
+and citizen-science operator false-positive review. The automated live-review
+policy remains required before automated live runs; manual supervised pilot
+runs remain operator-controlled and non-submitting.
 
 ---
 
