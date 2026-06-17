@@ -30,6 +30,10 @@ The following work is done and must NOT be repeated:
 - Background automation CLI (`Skills/background.py`) with SQLite audit logs
 - 90+ Skills scripts for batch operations, export, diagnostics, visualization
 - 30+ documentation files covering all pipeline stages
+- Repository artifact policy: `git add .` is supported by ignore rules that
+  keep raw `Logs/**` local, allowlist only production model artifacts, and
+  require durable run evidence to be promoted into `docs/evidence/` or
+  `data/evidence/`.
 - MPC 80-column and ADES PSV format output
 - Alert protocol guardrails (MOID gate, quality code gate, real/bogus gate, confirmation gate)
 - Injection-recovery: 100% detection, 100% link, 100% score on synthetic data (n=200)
@@ -190,7 +194,8 @@ Credentials are stored in macOS Keychain under `neo-detection:ATLAS_TOKEN`, `neo
    `Skills/audit_real_run.py`. For run `011dd53aa7f4`, the tool wrote JSON and
    CSV review evidence, preserved no-network/no-submission safety flags, and
    correctly blocked promotion because no expected-known manifest was
-   supplied.
+   supplied. Durable GitHub-visible evidence is summarized under
+   `docs/evidence/t1c/`; raw `Logs/` outputs remain local operational artifacts.
 4. [CODE] Generate an expected-known manifest with MPC designations and
    Horizons sky/time samples using `Skills/build_recovery_manifest.py`, then
    verify ≥90% known-object recovery through `Skills/audit_real_run.py`.

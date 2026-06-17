@@ -63,6 +63,17 @@ If the highest-priority T1 gap cannot be resolved because a human blocker is unr
   evidence packets, explicit no-submission limitations, and operator review
   fields. External MPC submission remains blocked until qualified review or a
   separate externally supervised submission policy exists.
+- **Repository artifact policy supports `git add .`**: The standard operator
+  cadence may use `git add .`, so `.gitignore` must protect local/generated
+  outputs by default. Treat `Logs/**` as local operational output and never
+  commit it except `Logs/.gitkeep` and `Logs/reports/.gitkeep`. When run
+  evidence must be visible to future agents, promote a compact, sanitized
+  summary into `docs/evidence/` or `data/evidence/` instead of committing raw
+  `Logs/` files. Production model artifacts in `models/` must be explicitly
+  allowlisted by filename; do not use broad `!models/*.pt` or `!models/*.json`
+  rules. Before committing, inspect `git status --short`, the staged filename
+  list, and ignore behavior for generated outputs; if `git add .` would capture
+  local run debris, fix `.gitignore` and untrack it before committing.
 
 - **Always comment all code**: Every function, class, script, shell command, and non-trivial code block must include comments explaining what it does and why. This applies to all Python source files, all Skills scripts, all shell commands given to the operator, and all inline code snippets in documentation. No exceptions. This rule overrides any default behavior that would omit comments.
 - **caffeinate all long-running Mac commands**: Any operator command expected to run longer than ~30 seconds must be prefixed with `caffeinate -i` to prevent macOS from sleeping mid-run. This applies to all downloads, training runs, and pipeline executions. Example: `caffeinate -i uv run python Skills/download_ztf_training_alerts.py ...`

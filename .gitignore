@@ -5,8 +5,11 @@ __pycache__/
 .neo_cache/
 alert_logs/
 models/*
-!models/*.pt
-!models/*.json
+!models/.gitkeep
+!models/tier1_xgb.json
+!models/tier2_cnn.pt
+!models/tier3_transformer.pt
+!models/stacker_coef.json
 data/cutouts/
 data/ztf_labeled_alerts.json
 # Operator-generated Tier 3 acquisition, split, and training evidence.
@@ -18,18 +21,11 @@ dist/
 build/
 .coverage
 htmlcov/
-Logs/*.sqlite
-Logs/*.sqlite-*
-Logs/*.db
-Logs/*.db-*
-Logs/*.log
-Logs/*.lock
-Logs/*.json
-Logs/reports/*.md
-Logs/reports/*.json
+Logs/**
 !Logs/.gitkeep
 !Logs/reports/
 !Logs/reports/.gitkeep
 background/config.local.json
 background/live_review_policy.local.json
 coverage.json
+.DS_Store

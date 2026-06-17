@@ -32,6 +32,17 @@ It contains the facts a coding agent needs to work productively without re-readi
   evidence packets, explicit no-submission limitations, and operator review
   fields. External MPC submission remains blocked until qualified review or a
   separate externally supervised submission policy exists.
+- **Repository artifact policy supports `git add .`**: The standard operator
+  cadence may use `git add .`, so `.gitignore` must protect local/generated
+  outputs by default. Treat `Logs/**` as local operational output and never
+  commit it except `Logs/.gitkeep` and `Logs/reports/.gitkeep`. When run
+  evidence must be visible to future agents, promote a compact, sanitized
+  summary into `docs/evidence/` or `data/evidence/` instead of committing raw
+  `Logs/` files. Production model artifacts in `models/` must be explicitly
+  allowlisted by filename; do not use broad `!models/*.pt` or `!models/*.json`
+  rules. Before committing, inspect `git status --short`, the staged filename
+  list, and ignore behavior for generated outputs; if `git add .` would capture
+  local run debris, fix `.gitignore` and untrack it before committing.
 
 ---
 

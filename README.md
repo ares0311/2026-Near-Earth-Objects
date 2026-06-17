@@ -1179,6 +1179,7 @@ operation.
 | Core pipeline modules | **Complete** | All 10 modules: 3500+ tests passing, 100% coverage target, ruff + mypy clean |
 | Synthetic validation | **Complete** | 100% detection/link/score on n=200 synthetic tracklets. Not a substitute for real-data validation. |
 | Background automation CLI | **Complete** | `Skills/background.py` — offline scheduler, SQLite audit logs, signoff packets, readiness summaries |
+| Repository artifact hygiene | **Complete** | `git add .` is supported: raw `Logs/**` stay local, production models are filename-allowlisted, and durable evidence is promoted to `docs/evidence/` or `data/evidence/` |
 | ML model weights | **Complete** | T1-A closed. Tier 1 XGBoost, Tier 2 CNN, Tier 3 Transformer, and ensemble stacker are trained; calibration KPIs passed. |
 | Real survey credentials | **CONFIGURED** | T1-B credentials are stored in macOS Keychain and manual ZTF/ATLAS connection tests passed. Automated live policy approval remains pending. |
 | Real data processed | **BOUNDED PILOT COMPLETE** | T1-C open. 2026-06-16 Orion-field ZTF pilot fetched 4,059 real source detections, detected 520 raw candidates, linked the first 80, and processed 2 internal candidates. Orion is historical/debug evidence only; production recovery must use a new known-object-rich field. |
@@ -1240,6 +1241,7 @@ operation.
 | **P32** | Pending | Automated live-run approval | Background live-review policy still needs signoff before unsupervised live automation |
 | **P33** | In progress | Real-run audit v2 | `Skills/audit_real_run.py` can match expected known objects by pipeline ID or sky/time samples and requires operator-review decisions |
 | **P34** | In progress | Expected-known manifest builder | `Skills/build_recovery_manifest.py` builds checkpointed MPC+Horizons sky/time manifests for T1-C audits; live manifest generation is pending |
+| **P35** | Complete | Repository artifact hygiene | `.gitignore` protects `git add .`; raw `Logs/**` are local-only, production models are explicit allowlists, and T1-C evidence is summarized in `docs/evidence/t1c/` |
 
 ### 15.5 Known Limitations
 
