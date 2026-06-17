@@ -1302,6 +1302,7 @@ name = "neo-detection"
 version = "0.87.9"
 source = { editable = "." }
 dependencies = [
+    { name = "alerce" },
     { name = "astropy" },
     { name = "astroquery" },
     { name = "numpy" },
@@ -1326,6 +1327,7 @@ training = [
 
 [package.metadata]
 requires-dist = [
+    { name = "alerce", specifier = ">=2,<3" },
     { name = "alerce", marker = "extra == 'training'", specifier = ">=2,<3" },
     { name = "astropy", specifier = ">=7.2,<8" },
     { name = "astroquery", specifier = ">=0.4.6" },

@@ -8,8 +8,10 @@ import pytest
 
 import fetch as fetch_mod
 from fetch import (
+    _fetch_ztf_alerce_api,
     _fetch_ztf_irsa_api,
     _load_cache,
+    _parse_alerce_detection,
     _parse_atlas_photometry,
     _save_cache,
     _ztf_filter_id,
@@ -211,6 +213,7 @@ class TestFetchZtfIrsaFallback:
         import fetch as fetch_mod
 
         monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        monkeypatch.setattr(fetch_mod, "_fetch_ztf_alerce_api", lambda *_, **__: [])
 
         mock_response = MagicMock()
         mock_response.json.return_value = {
@@ -235,21 +238,23 @@ class TestFetchZtfIrsaFallback:
         assert result[0].filter_band == "g"
 
     def test_irsa_fallback_on_ztfquery_runtime_error(self, tmp_path, monkeypatch):
-        """fetch_ztf falls back to IRSA API on any ztfquery error (e.g. auth)."""
+        """fetch_ztf falls back to the ALeRCE source provider on ztfquery errors."""
         import sys
 
         import fetch as fetch_mod
 
         monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
-
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "metadata": [{"name": "candid"}, {"name": "ra"}, {"name": "dec"},
-                          {"name": "jd"}, {"name": "magpsf"}, {"name": "sigmapsf"},
-                          {"name": "fid"}],
-            "data": [["999", 180.0, 10.0, 2460003.0, 20.1, 0.1, 2]],
-        }
-        mock_response.raise_for_status = MagicMock()
+        fallback_obs = Observation(
+            obs_id="999",
+            ra_deg=180.0,
+            dec_deg=10.0,
+            jd=2460003.0,
+            mag=20.1,
+            mag_err=0.1,
+            filter_band="r",
+            mission="ZTF",
+        )
+        monkeypatch.setattr(fetch_mod, "_fetch_ztf_alerce_api", lambda *_, **__: [fallback_obs])
 
         # ztfquery is importable but raises RuntimeError (e.g. auth failure)
         mock_zq = MagicMock()
@@ -257,11 +262,9 @@ class TestFetchZtfIrsaFallback:
         monkeypatch.setitem(sys.modules, "ztfquery", mock_zq)
         monkeypatch.setitem(sys.modules, "ztfquery.query", mock_zq)
 
-        with patch("requests.get", return_value=mock_response):
-            result = fetch_mod.fetch_ztf(180.0, 10.0, 1.0, 2460000.0, 2460010.0,
-                                          force_refresh=True)
+        result = fetch_mod.fetch_ztf(180.0, 10.0, 1.0, 2460000.0, 2460010.0,
+                                     force_refresh=True)
 
-        # Should have fallen back to IRSA API and returned the mocked observation
         assert len(result) == 1
         assert result[0].filter_band == "r"
 
@@ -302,6 +305,103 @@ class TestFetchZtfIrsaApiAuth:
 
         call_kwargs = mock_get.call_args[1]
         assert call_kwargs["auth"] is None
+
+
+class TestFetchZtfAlerceApi:
+    def test_parse_alerce_detection(self):
+        row = {
+            "mjd": 61096.1744328998,
+            "candid": "3342174430915015006",
+            "fid": 1,
+            "magpsf": 15.672835,
+            "sigmapsf": 0.027415272,
+            "ra": 84.5919035,
+            "dec": -5.3348207,
+            "rb": 0.7557143,
+            "drb": 0.9999999,
+        }
+
+        obs = _parse_alerce_detection(row, "ZTF26aahyrwl", 2461096.0, 2461097.0)
+
+        assert obs is not None
+        assert obs.obs_id == "3342174430915015006"
+        assert obs.filter_band == "g"
+        assert obs.real_bogus == pytest.approx(0.7557143)
+        assert obs.deep_real_bogus == pytest.approx(0.9999999)
+
+    def test_parse_alerce_detection_filters_jd_window(self):
+        row = {
+            "mjd": 61096.1744328998,
+            "candid": "outside",
+            "fid": 1,
+            "magpsf": 15.6,
+            "ra": 84.5,
+            "dec": -5.3,
+        }
+
+        obs = _parse_alerce_detection(row, "ZTF26aahyrwl", 2460000.0, 2460001.0)
+
+        assert obs is None
+
+    def test_parse_alerce_detection_requires_source_photometry(self):
+        row = {
+            "mjd": 61096.1744328998,
+            "candid": "no_mag",
+            "fid": 1,
+            "ra": 84.5,
+            "dec": -5.3,
+        }
+
+        obs = _parse_alerce_detection(row, "ZTF26aahyrwl", 2461096.0, 2461097.0)
+
+        assert obs is None
+
+    def test_fetch_alerce_provider_parses_detections(self, monkeypatch):
+        import sys
+        import types
+
+        class FakeAlerce:
+            def query_objects(self, **kwargs):
+                assert kwargs["survey"] == "ztf"
+                assert kwargs["radius"] == pytest.approx(3600.0)
+                return {"items": [{"oid": "ZTF26aahyrwl"}]}
+
+            def query_detections(self, oid, **kwargs):
+                assert oid == "ZTF26aahyrwl"
+                assert kwargs["survey"] == "ztf"
+                return [
+                    {
+                        "mjd": 61096.1744328998,
+                        "candid": "3342174430915015006",
+                        "fid": 1,
+                        "magpsf": 15.672835,
+                        "sigmapsf": 0.027415272,
+                        "ra": 84.5919035,
+                        "dec": -5.3348207,
+                        "rb": 0.7557143,
+                    },
+                    {
+                        "mjd": 60000.0,
+                        "candid": "too_old",
+                        "fid": 2,
+                        "magpsf": 18.0,
+                        "ra": 84.0,
+                        "dec": -5.0,
+                    },
+                ]
+
+        monkeypatch.setitem(sys.modules, "alerce", types.SimpleNamespace(Alerce=FakeAlerce))
+
+        obs = _fetch_ztf_alerce_api(
+            83.8221,
+            -5.3911,
+            1.0,
+            2461096.0,
+            2461097.0,
+        )
+
+        assert len(obs) == 1
+        assert obs[0].obs_id == "3342174430915015006"
 
 
 class TestParseAtlasPhotometryNoHeader:
@@ -2021,13 +2121,17 @@ class TestFetchZtfAlerts:
     def test_returns_empty_on_import_error(self, tmp_path, monkeypatch):
         import fetch as fetch_mod
         monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
-        # astroquery.irsa not installed → returns []
+        monkeypatch.setattr(fetch_mod, "_fetch_ztf_alerce_api", lambda *_, **__: [])
+        monkeypatch.setattr(fetch_mod, "_fetch_ztf_irsa_api", lambda *_, **__: [])
+        # No live provider rows available -> returns []
         result = fetch_mod.fetch_ztf_alerts(180.0, 10.0, 0.5, 2460000.0, 2460010.0)
         assert isinstance(result, list)
 
     def test_returns_list_type(self, tmp_path, monkeypatch):
         import fetch as fetch_mod
         monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        monkeypatch.setattr(fetch_mod, "_fetch_ztf_alerce_api", lambda *_, **__: [])
+        monkeypatch.setattr(fetch_mod, "_fetch_ztf_irsa_api", lambda *_, **__: [])
         result = fetch_mod.fetch_ztf_alerts(180.0, 10.0, 1.0, 2460000.0, 2460010.0)
         assert isinstance(result, list)
 
@@ -2071,7 +2175,9 @@ class TestFetchZtfAlerts:
             mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF",
         )
         fetch_mod._save_cache(cache_key, [obs.model_dump()])
-        # force_refresh=True bypasses cache; irsa not available → returns []
+        monkeypatch.setattr(fetch_mod, "_fetch_ztf_alerce_api", lambda *_, **__: [])
+        monkeypatch.setattr(fetch_mod, "_fetch_ztf_irsa_api", lambda *_, **__: [])
+        # force_refresh=True bypasses cache; no live provider rows available -> returns []
         result = fetch_mod.fetch_ztf_alerts(ra, dec, radius, start_jd, end_jd, force_refresh=True)
         assert result == []
 
@@ -2092,108 +2198,56 @@ class TestFetchZtfAlerts:
         assert result == []
 
 
-class TestFetchZtfAlertsIrsaPath:
-    """Cover lines 812-835: the IRSA query + row parsing path."""
-
-    def test_successful_irsa_query(self, tmp_path, monkeypatch):
-        from unittest.mock import MagicMock, patch
-
+class TestFetchZtfAlertsAlercePath:
+    def test_successful_alerce_provider_cached(self, tmp_path, monkeypatch):
         import fetch as fetch_mod
 
         monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
 
-        # Build a fake Irsa result table row
-        mock_row = MagicMock()
-        mock_row.__getitem__ = MagicMock(side_effect=lambda k: {
-            "jd": 2460005.0,
-            "ra": 180.001,
-            "dec": 10.001,
-        }[k])
-        mock_row.get = MagicMock(side_effect=lambda k, d=None: {
-            "candid": "ztf_abc123",
-            "magpsf": 19.0,
-            "sigmapsf": 0.05,
-            "fid": "r",
-            "rb": 0.9,
-        }.get(k, d))
+        obs = Observation(
+            obs_id="ztf_abc123",
+            ra_deg=180.001,
+            dec_deg=10.001,
+            jd=2460005.0,
+            mag=19.0,
+            mag_err=0.05,
+            filter_band="r",
+            mission="ZTF",
+            real_bogus=0.9,
+        )
+        monkeypatch.setattr(fetch_mod, "_fetch_ztf_alerce_api", lambda *_, **__: [obs])
 
-        mock_table = MagicMock()
-        mock_table.__iter__ = MagicMock(return_value=iter([mock_row]))
-
-        mock_irsa_cls = MagicMock()
-        mock_irsa_cls.query_region.return_value = mock_table
-
-        mock_irsa_mod = MagicMock()
-        mock_irsa_mod.Irsa = mock_irsa_cls
-
-        mock_astropy_units = MagicMock()
-        mock_astropy_units.deg = "deg"
-
-        mock_skycoord = MagicMock()
-
-        with patch.dict("sys.modules", {
-            "astroquery.irsa": mock_irsa_mod,
-            "astropy.units": mock_astropy_units,
-            "astropy.coordinates": MagicMock(SkyCoord=mock_skycoord),
-        }):
-            result = fetch_mod.fetch_ztf_alerts(180.0, 10.0, 0.5, 2460000.0, 2460010.0)
+        result = fetch_mod.fetch_ztf_alerts(180.0, 10.0, 0.5, 2460000.0, 2460010.0)
 
         assert isinstance(result, list)
         assert len(result) == 1
         assert result[0].obs_id == "ztf_abc123"
 
-    def test_row_outside_jd_window_excluded(self, tmp_path, monkeypatch):
-        from unittest.mock import MagicMock, patch
+        cached = fetch_mod.fetch_ztf_alerts(180.0, 10.0, 0.5, 2460000.0, 2460010.0)
+        assert len(cached) == 1
+        assert cached[0].obs_id == "ztf_abc123"
 
+    def test_alerce_empty_uses_legacy_fallback(self, tmp_path, monkeypatch):
         import fetch as fetch_mod
 
         monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        fallback_obs = Observation(
+            obs_id="legacy",
+            ra_deg=180.0,
+            dec_deg=10.0,
+            jd=2460005.0,
+            mag=19.5,
+            mag_err=0.05,
+            filter_band="g",
+            mission="ZTF",
+        )
+        monkeypatch.setattr(fetch_mod, "_fetch_ztf_alerce_api", lambda *_, **__: [])
+        monkeypatch.setattr(fetch_mod, "_fetch_ztf_irsa_api", lambda *_, **__: [fallback_obs])
 
-        mock_row = MagicMock()
-        mock_row.__getitem__ = MagicMock(side_effect=lambda k: {
-            "jd": 2459000.0,  # outside [2460000, 2460010]
-        }[k] if k == "jd" else 0.0)
-        mock_row.get = MagicMock(return_value=None)
+        result = fetch_mod.fetch_ztf_alerts(180.0, 10.0, 0.5, 2460000.0, 2460010.0)
 
-        mock_table = MagicMock()
-        mock_table.__iter__ = MagicMock(return_value=iter([mock_row]))
-
-        mock_irsa_mod = MagicMock()
-        mock_irsa_mod.Irsa.query_region.return_value = mock_table
-
-        with patch.dict("sys.modules", {
-            "astroquery.irsa": mock_irsa_mod,
-            "astropy.units": MagicMock(deg="deg"),
-            "astropy.coordinates": MagicMock(SkyCoord=MagicMock()),
-        }):
-            result = fetch_mod.fetch_ztf_alerts(180.0, 10.0, 0.5, 2460000.0, 2460010.0)
-
-        assert result == []
-
-    def test_bad_row_skipped_with_exception(self, tmp_path, monkeypatch):
-        from unittest.mock import MagicMock, patch
-
-        import fetch as fetch_mod
-
-        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
-
-        mock_row = MagicMock()
-        mock_row.__getitem__ = MagicMock(side_effect=KeyError("jd"))
-
-        mock_table = MagicMock()
-        mock_table.__iter__ = MagicMock(return_value=iter([mock_row]))
-
-        mock_irsa_mod = MagicMock()
-        mock_irsa_mod.Irsa.query_region.return_value = mock_table
-
-        with patch.dict("sys.modules", {
-            "astroquery.irsa": mock_irsa_mod,
-            "astropy.units": MagicMock(deg="deg"),
-            "astropy.coordinates": MagicMock(SkyCoord=MagicMock()),
-        }):
-            result = fetch_mod.fetch_ztf_alerts(180.0, 10.0, 0.5, 2460000.0, 2460010.0)
-
-        assert result == []
+        assert len(result) == 1
+        assert result[0].obs_id == "legacy"
 
 
 class TestEstimateSurveyDepth:

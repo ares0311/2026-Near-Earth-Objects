@@ -1,7 +1,7 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.87.7  
-**Last updated**: 2026-06-14
+**Current version**: v0.87.9
+**Last updated**: 2026-06-16
 **Purpose**: Mandatory read at session start (per MANDATORY SESSION-START PROTOCOL).  
 Every planning cycle must name the highest-priority unresolved Tier 1 gap and show how proposed steps close or directly unblock it.
 
@@ -26,7 +26,7 @@ The following work is done and must NOT be repeated:
 | `calibration.py` | test_calibration.py | 100% |
 
 ### Infrastructure
-- 3500 offline tests pass; 2 live checks deselected; `ruff` clean; `mypy` clean
+- 3500+ offline tests pass; 2 live checks deselected; `ruff` clean; `mypy` clean
 - Background automation CLI (`Skills/background.py`) with SQLite audit logs
 - 90+ Skills scripts for batch operations, export, diagnostics, visualization
 - 30+ documentation files covering all pipeline stages
@@ -39,8 +39,9 @@ The following work is done and must NOT be repeated:
 ### What "complete" means here
 All modules compile, pass 100% branch coverage, and produce correct output
 **on synthetic/mocked pipeline data**. Real labeled ZTF alerts have been used
-to train Tier 1 and Tier 2, but no real survey field has completed the full
-pipeline and the Tier 3 production model is not trained.
+to train and calibrate the ML tiers. A first supervised, bounded real ZTF
+pilot has completed; production still requires the known-object recovery audit
+and human false-positive review described in T1-C.
 
 ---
 
@@ -171,21 +172,31 @@ Credentials are stored in macOS Keychain under `neo-detection:ATLAS_TOKEN`, `neo
 
 ### T1-C: No Real Data Has Ever Been Processed End-to-End
 
-**What is missing**: The full pipeline (`Fetch → Preprocess → Detect → Link → Classify → Score → Alert`) has never run on real photometric data from ZTF, ATLAS, or Pan-STARRS. All injection-recovery and smoke tests use synthetic observations built from `SimpleNamespace` objects.
+**What is missing**: The full pipeline (`Fetch → Preprocess → Detect → Link → Classify → Score → Alert`) has now completed one supervised, bounded real ZTF pilot through the public ALeRCE ZTF source-detection provider. Production closure still requires an uncapped or recovery-audit run, ≥90% known-object recovery verification, and human false-positive review.
 
 **Why it is Tier 1**: Synthetic data cannot expose real failure modes — coordinate edge cases, survey-specific format quirks, real noise distributions, real artifact morphologies, or real rate-limiting behavior. The pipeline's real-world correctness is unknown until it processes real data.
 
 **What is needed to close it**:
 1. [DEPENDS ON T1-B] Complete the automated live-review policy approval; the
    credentials and manual provider connection tests are already complete.
-2. [CODE] Run `Skills/run_pipeline.py` on a small real ZTF field (e.g., 1-degree cone, single night) in dry-run mode.
-3. [CODE + HUMAN] Manually inspect pipeline output against MPC known objects in that field; verify ≥90% known-object recovery rate.
-4. [CODE] Run `Skills/check_mpc_known.py` on pipeline output to audit cross-match completeness.
-5. [HUMAN] Human expert reviews candidate output for any false positives that passed all gates.
+2. [DONE] Run `Skills/run_pipeline.py` on a bounded real ZTF field in dry-run
+   mode. On 2026-06-16, the operator ran the Orion-field ALeRCE-backed pilot:
+   4,059 real ZTF source detections fetched, 4,059/4,059 preprocessed, 520
+   raw candidates detected, `--max-candidates 80` linked, 2 tracklets scored,
+   and 2 internal-candidate outputs written to
+   `Logs/reports/t1c_ztf_alerce_pilot.json`. Audit summary:
+   `Logs/pipeline_runs/011dd53aa7f4/run_summary.json`.
+3. [CODE] Run an uncapped or staged recovery-audit pilot with link progress/ETA
+   enabled, preserving `Logs/pipeline_runs/*/run_summary.json` evidence.
+4. [CODE + HUMAN] Manually inspect pipeline output against MPC known objects in
+   that field; verify ≥90% known-object recovery rate.
+5. [CODE] Run `Skills/check_mpc_known.py` on pipeline output to audit cross-match completeness.
+6. [HUMAN] Human expert reviews candidate output for any false positives that passed all gates.
 
-**Blocking outside step**: The automated live-review policy must be approved
-first. Step 5 requires human expert review of candidate false positives; this
-is separate from calibration promotion.
+**Current blocker**: T1-C is no longer blocked on zero ZTF fetches. The next
+blocker is the known-object recovery audit plus human false-positive review.
+The automated live-review policy remains required before automated live runs;
+manual supervised pilot runs remain operator-controlled and non-submitting.
 
 ---
 
@@ -276,10 +287,9 @@ These items cannot be completed by code generation alone. They require real-worl
 
 | Blocker | Owner | Unblocks |
 |---|---|---|
-| Approved five-class pilot data acquisition | Human operator (network/data access; policy approved 2026-06-10) | T1-A Tier 3 |
-| GPU or CPU training run for Tier 3 Transformer | Human operator (compute resource) | T1-A |
 | Expert review of ML architecture | NEO survey astronomer | T2-C |
 | Live review policy sign-off | Human reviewer | T1-B |
+| Known-object recovery audit and false-positive review | Human operator + domain reviewer | T1-C |
 
 ---
 
@@ -290,7 +300,9 @@ Before the pipeline makes its first MPC submission, all of the following must be
 - [x] T1-A resolved: Tier 1 XGBoost ✓ (val_acc=99.95%); Tier 2 CNN ✓ (val_acc=91.3%); Tier 3 Transformer ✓ (val_macro_f1=0.9400); ensemble stacker ✓ (AUC=0.9809, all 7 KPIs pass, 2026-06-14)
 - [x] T1-A resolved: calibration KPI gate passed ✓ (T1-D, 2026-06-14); ensemble stacker KPIs passed ✓ (2026-06-14)
 - [~] T1-B resolved: IRSA and ATLAS credentials configured ✓; live connection test passed ✓; automated live dry-run policy not yet signed off (pending human reviewer signature)
-- [ ] T1-C resolved: Full pipeline run completed on ≥1 real ZTF field; ≥90% known-object recovery verified
+- [~] T1-C progressed: Bounded supervised real-ZTF pilot completed on
+      2026-06-16; known-object recovery audit and human false-positive review
+      still required.
 - [x] T1-D resolved: Machine-readable calibration report passes every required
       KPI on held-out real labeled data and records
       `promotion_gate_passed=true` ✓ (2026-06-14; Tier 1 + Tier 2)

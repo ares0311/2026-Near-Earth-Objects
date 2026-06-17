@@ -45,6 +45,7 @@ __all__ = ["link", "merge_tracklets", "estimate_motion_uncertainty",
 import math
 import uuid
 from collections import defaultdict
+from collections.abc import Callable
 
 import numpy as np
 
@@ -236,6 +237,8 @@ def _link_candidates(
     chi2_threshold: float = _CHI2_DOF_THRESHOLD,
     min_nights: int = _MIN_NIGHTS,
     min_obs: int = _MIN_OBSERVATIONS,
+    progress_callback: Callable[[int, int, int], None] | None = None,
+    progress_every_pairs: int = 5000,
 ) -> list[Tracklet]:
     """Link single-night candidates into multi-night tracklets.
 
@@ -254,6 +257,14 @@ def _link_candidates(
 
     tracklets: list[Tracklet] = []
     used_obs_ids: set[str] = set()
+    total_pairs = 0
+    for ni, night_a in enumerate(sorted_nights[:-1]):
+        for night_b in sorted_nights[ni + 1 :]:
+            dt_days = night_b - night_a
+            if dt_days > 30:
+                break
+            total_pairs += len(nights[night_a]) * len(nights[night_b])
+    processed_pairs = 0
 
     for ni, night_a in enumerate(sorted_nights[:-1]):
         obs_a_list = nights[night_a]
@@ -269,6 +280,17 @@ def _link_candidates(
                     continue
 
                 for obs_b in obs_b_list:
+                    processed_pairs += 1
+                    if (
+                        progress_callback is not None
+                        and total_pairs > 0
+                        and (
+                            processed_pairs == total_pairs
+                            or processed_pairs % progress_every_pairs == 0
+                        )
+                    ):
+                        progress_callback(processed_pairs, total_pairs, len(tracklets))
+
                     if obs_b.obs_id in used_obs_ids:
                         continue
 
@@ -343,6 +365,7 @@ def link(
     min_observations: int = _MIN_OBSERVATIONS,
     position_tolerance_arcsec: float = _POSITION_TOLERANCE_ARCSEC,
     chi2_threshold: float = _CHI2_DOF_THRESHOLD,
+    progress_callback: Callable[[int, int, int], None] | None = None,
 ) -> LinkResult:
     """Link single-night moving object candidates into multi-night tracklets.
 
@@ -354,6 +377,7 @@ def link(
         chi2_threshold=chi2_threshold,
         min_nights=min_nights,
         min_obs=min_observations,
+        progress_callback=progress_callback,
     )
     provenance = LinkProvenance(
         n_tracklets=len(tracklets),

@@ -2036,6 +2036,41 @@ class TestRunPipelineCheckpointResume:
         assert cp["last_stage"] == "link"
         assert "tracklets" in cp
 
+    def test_run_pipeline_caps_candidates_before_link(self, tmp_path):
+        """max_candidates bounds the candidate set handed to the linker."""
+        from unittest.mock import MagicMock, patch
+        mod = self._load_skill()
+
+        fake_fetch_result = MagicMock()
+        fake_fetch_result.alerts = []
+        fake_prep = MagicMock()
+        fake_prep.sources = ()
+        fake_prep.provenance.n_sources_out = 0
+        fake_prep.provenance.n_sources_in = 0
+        fake_det = MagicMock()
+        fake_det.candidates = tuple(object() for _ in range(5))
+        fake_det.provenance.n_candidates = 5
+        fake_det.provenance.n_known_matches = 0
+        fake_link = MagicMock()
+        fake_link.tracklets = ()
+        fake_link.provenance.n_tracklets = 0
+
+        with (
+            patch.object(mod, "_fetch_with_retry", return_value=fake_fetch_result),
+            patch.object(mod, "preprocess", return_value=fake_prep),
+            patch.object(mod, "detect", return_value=fake_det),
+            patch.object(mod, "link", return_value=fake_link) as mock_link,
+        ):
+            mod.run_pipeline(
+                ra_deg=0.0, dec_deg=0.0, radius_deg=1.0,
+                start_jd=0.0, end_jd=1.0, run_dir=tmp_path,
+                max_candidates=2,
+            )
+
+        linked_candidates = mock_link.call_args.args[0]
+        assert len(linked_candidates) == 2
+        assert mock_link.call_args.kwargs["progress_callback"] is not None
+
     # --- run_pipeline resume: skip fetch/link ---
 
     def test_run_pipeline_resumes_from_checkpoint(self, tmp_path):
@@ -2146,6 +2181,24 @@ class TestRunPipelineCheckpointResume:
 
         _, kwargs = mock_rp.call_args
         assert kwargs["resume"] is False
+
+    def test_main_max_candidates_flag(self, tmp_path, monkeypatch):
+        """--max-candidates passes the bounded pilot cap to run_pipeline."""
+        from unittest.mock import patch
+        mod = self._load_skill()
+        monkeypatch.setattr(mod, "_LOG_ROOT", tmp_path / "runs")
+        monkeypatch.setattr(mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        with patch.object(mod, "run_pipeline", return_value=[]) as mock_rp:
+            mod.main([
+                "--ra", "10.0", "--dec", "5.0",
+                "--start-jd", "2460000.0", "--end-jd", "2460001.0",
+                "--max-candidates", "80",
+                "--no-delete-cache",
+            ])
+
+        _, kwargs = mock_rp.call_args
+        assert kwargs["max_candidates"] == 80
 
 
 class TestFetchWithRetryJsonError:

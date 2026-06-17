@@ -90,7 +90,7 @@ def fetch_ztf(
     end_jd: float,
     force_refresh: bool = False,
 ) -> list[Observation]:
-    """Query ZTF alert stream via IRSA.  Requires ``ztfquery`` or requests."""
+    """Query public ZTF source detections via ztfquery, ALeRCE, or legacy TAP."""
     import hashlib
 
     cache_key = hashlib.md5(
@@ -100,6 +100,7 @@ def fetch_ztf(
     if cached is not None:
         return [Observation(**row) for row in cached]
 
+    observations: list[Observation] = []
     try:
         import ztfquery.query as zq  # type: ignore[import]
 
@@ -114,10 +115,15 @@ def fetch_ztf(
         meta = zquery.metatable
         observations = _parse_ztf_metatable(meta)
     except Exception:
-        # ImportError: ztfquery not installed — use direct IRSA TAP fallback.
-        # Any other exception (auth failure, network error, empty metatable) —
-        # also fall back so ZTF_IRSA_USERNAME/PASSWORD from env can be tried.
-        observations = _fetch_ztf_irsa_api(ra_deg, dec_deg, radius_deg, start_jd, end_jd)
+        # ImportError: ztfquery not installed — use public broker/TAP fallbacks.
+        # Any other exception (auth failure, network error, empty metatable)
+        # also falls back so live operator runs can still use public ZTF data.
+        observations = []
+
+    if not observations:
+        observations = _fetch_ztf_alerce_api(ra_deg, dec_deg, radius_deg, start_jd, end_jd)
+        if not observations:
+            observations = _fetch_ztf_irsa_api(ra_deg, dec_deg, radius_deg, start_jd, end_jd)
 
     _save_cache(cache_key, [o.model_dump() for o in observations])
     return observations
@@ -151,6 +157,108 @@ def _ztf_filter_id(fid: int) -> str:
     return {1: "g", 2: "r", 3: "i"}.get(fid, "?")
 
 
+def _jd_to_mjd(jd: float) -> float:
+    return jd - 2_400_000.5
+
+
+def _fetch_ztf_alerce_api(
+    ra_deg: float,
+    dec_deg: float,
+    radius_deg: float,
+    start_jd: float,
+    end_jd: float,
+    *,
+    max_objects: int = 50,
+) -> list[Observation]:
+    """Fetch source-level public ZTF detections through the ALeRCE broker.
+
+    IRSA TAP exposes ZTF object summary and image metadata tables, but not the
+    per-alert/source table this pipeline needs. ALeRCE provides public ZTF
+    detections with ``magpsf``, ``sigmapsf``, ``rb``, and ``drb`` fields.
+    """
+    try:
+        from alerce import Alerce  # type: ignore[import]
+    except Exception:
+        return []
+
+    try:
+        client = Alerce()
+        objects_payload = client.query_objects(
+            format="json",
+            survey="ztf",
+            ra=ra_deg,
+            dec=dec_deg,
+            radius=max(radius_deg, 0.0) * 3600.0,
+            firstmjd=[_jd_to_mjd(start_jd), _jd_to_mjd(end_jd)],
+            lastmjd=[_jd_to_mjd(start_jd), _jd_to_mjd(end_jd)],
+            page=1,
+            page_size=max(1, min(max_objects, 100)),
+            order_by="ndet",
+            order_mode="DESC",
+        )
+    except Exception:
+        return []
+
+    if isinstance(objects_payload, dict):
+        object_rows = objects_payload.get("items", [])
+    else:
+        object_rows = objects_payload
+
+    observations: list[Observation] = []
+    seen: set[str] = set()
+    for obj in object_rows[:max_objects]:
+        if not isinstance(obj, dict):
+            continue
+        oid = obj.get("oid")
+        if not oid:
+            continue
+        try:
+            detections = client.query_detections(str(oid), format="json", survey="ztf")
+        except Exception:
+            continue
+        for det in detections:
+            obs = _parse_alerce_detection(det, str(oid), start_jd, end_jd)
+            if obs is None or obs.obs_id in seen:
+                continue
+            seen.add(obs.obs_id)
+            observations.append(obs)
+    return observations
+
+
+def _parse_alerce_detection(
+    row: Any,
+    oid: str,
+    start_jd: float,
+    end_jd: float,
+) -> Observation | None:
+    if not isinstance(row, dict):
+        return None
+    try:
+        jd = float(row["mjd"]) + 2_400_000.5
+        if not (start_jd <= jd <= end_jd):
+            return None
+        mag = row.get("magpsf")
+        if mag is None:
+            return None
+        candid = row.get("candid") or f"{oid}_{row['mjd']}_{row.get('fid', '')}"
+        rb = row.get("rb")
+        drb = row.get("drb")
+        return Observation(
+            obs_id=str(candid),
+            ra_deg=float(row["ra"]),
+            dec_deg=float(row["dec"]),
+            jd=jd,
+            mag=float(mag),
+            mag_err=float(row.get("sigmapsf", 0.1) or 0.1),
+            filter_band=_ztf_filter_id(int(row.get("fid", 1) or 1)),
+            mission="ZTF",
+            real_bogus=float(rb) if rb is not None else None,
+            deep_real_bogus=float(drb) if drb is not None else None,
+        )
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
 def _fetch_ztf_irsa_api(
     ra_deg: float,
     dec_deg: float,
@@ -158,12 +266,12 @@ def _fetch_ztf_irsa_api(
     start_jd: float,
     end_jd: float,
 ) -> list[Observation]:
-    """Fallback: query IRSA TAP for ZTF source catalog.
+    """Legacy fallback for source-level ZTF rows from a TAP-like JSON payload.
 
-    Reads ZTF_IRSA_USERNAME and ZTF_IRSA_PASSWORD from environment variables
-    (loaded from Keychain via Skills/verify_live_credentials.sh) and passes
-    them as HTTP Basic Auth.  Returns [] if no credentials are set — the IRSA
-    TAP endpoint requires authentication for ZTF alert access.
+    Current IRSA TAP exposes ZTF object summaries and image metadata, not the
+    per-alert/source table this parser expects. Keep this path fail-closed for
+    old deployments or tests, but never query ``ztf.ztf_current_meta_sci`` as if
+    it contained source detections.
     """
     import requests
 
@@ -174,18 +282,21 @@ def _fetch_ztf_irsa_api(
     tap_url = "https://irsa.ipac.caltech.edu/TAP/sync"
     adql = (
         f"SELECT candid, ra, dec, jd, magpsf, sigmapsf, fid, rb, drb "
-        f"FROM ztf.ztf_current_meta_sci "
+        f"FROM ztf_alerts "
         f"WHERE CONTAINS(POINT('ICRS', ra, dec), "
         f"CIRCLE('ICRS', {ra_deg}, {dec_deg}, {radius_deg})) = 1 "
         f"AND jd >= {start_jd} AND jd <= {end_jd}"
     )
-    resp = requests.get(
-        tap_url,
-        params={"QUERY": adql, "FORMAT": "json"},
-        auth=auth,
-        timeout=60,
-    )
-    resp.raise_for_status()
+    try:
+        resp = requests.get(
+            tap_url,
+            params={"QUERY": adql, "FORMAT": "json"},
+            auth=auth,
+            timeout=60,
+        )
+        resp.raise_for_status()
+    except requests.RequestException:
+        return []
     # Empty response body (no data for this sky region) must not propagate as
     # a retryable error — treat it as "no observations available" and return [].
     try:
@@ -930,9 +1041,9 @@ def fetch_ztf_alerts(
     end_jd: float,
     force_refresh: bool = False,
 ) -> list:
-    """Fetch ZTF difference-image alerts from the IRSA TAP service.
+    """Fetch public ZTF source detections.
 
-    Queries the IRSA ZTF alert archive for all alerts within ``radius_deg``
+    Queries the public ALeRCE ZTF broker for detections within ``radius_deg``
     of (``ra_deg``, ``dec_deg``) in the time window [``start_jd``, ``end_jd``].
     Results are disk-cached; subsequent calls with the same parameters return
     immediately from cache unless ``force_refresh=True``.
@@ -966,48 +1077,11 @@ def fetch_ztf_alerts(
                 pass
         return obs_list
 
-    try:
-        import astropy.units as u
-        from astropy.coordinates import SkyCoord
-        from astroquery.irsa import Irsa  # type: ignore[import]
-
-        coord = SkyCoord(ra=ra_deg, dec=dec_deg, unit="deg")
-        radius = radius_deg * u.deg
-
-        table = Irsa.query_region(
-            coord,
-            catalog="ztf_alerts",
-            spatial="Cone",
-            radius=radius,
-        )
-
-        ztf_obs: list[Observation] = []
-        for row in table:
-            try:
-                jd = float(row["jd"])
-                if not (start_jd <= jd <= end_jd):
-                    continue
-                ztf_obs.append(
-                    Observation(
-                        obs_id=str(row.get("candid", f"ztf_{jd}")),
-                        ra_deg=float(row["ra"]),
-                        dec_deg=float(row["dec"]),
-                        jd=jd,
-                        mag=float(row.get("magpsf", 99.0)),
-                        mag_err=float(row.get("sigmapsf", 0.1)),
-                        filter_band=str(row.get("fid", "r")),
-                        mission="ZTF",
-                        real_bogus=float(row.get("rb", 0.0)) if row.get("rb") is not None else None,
-                    )
-                )
-            except Exception:
-                continue
-
-        _save_cache(cache_key, [o.model_dump() for o in ztf_obs])
-        return ztf_obs
-
-    except Exception:
-        return []
+    ztf_obs = _fetch_ztf_alerce_api(ra_deg, dec_deg, radius_deg, start_jd, end_jd)
+    if not ztf_obs:
+        ztf_obs = _fetch_ztf_irsa_api(ra_deg, dec_deg, radius_deg, start_jd, end_jd)
+    _save_cache(cache_key, [o.model_dump() for o in ztf_obs])
+    return ztf_obs
 
 
 def estimate_survey_depth(fetch_result: FetchResult) -> float | None:

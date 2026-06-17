@@ -20,23 +20,28 @@ No downstream stage should call external APIs directly — all network access is
 
 ### ZTF (Primary)
 
-ZTF provides public difference-image alerts via the IRSA TAP service.  Two access methods are supported:
+ZTF source detections are fetched through the public ALeRCE broker when
+`ztfquery` is unavailable or returns no usable rows. IRSA TAP currently exposes
+ZTF object summaries and image metadata, not the per-source alert table needed
+for `magpsf`, `rb`, and `drb` parsing.
 
-**Method 1 — ztfquery (preferred)**
+**Method 1 — ztfquery**
 ```python
 from fetch import fetch_ztf
 obs = fetch_ztf(ra_deg=180.0, dec_deg=10.0, radius_deg=0.5,
                 start_jd=2460000.5, end_jd=2460003.5)
 ```
 
-**Method 2 — IRSA cone search (fetch_ztf_alerts)**
+**Method 2 — ALeRCE-backed public ZTF source detections**
 ```python
 from fetch import fetch_ztf_alerts
 obs = fetch_ztf_alerts(ra_deg=180.0, dec_deg=10.0, radius_deg=0.5,
                        start_jd=2460000.5, end_jd=2460003.5)
 ```
 
-Key fields available per ZTF alert: `ra`, `dec`, `jd`, `magpsf` (→ `mag`), `sigmapsf` (→ `mag_err`), `fid` (filter: 1=g, 2=r, 3=i), `rb` (real/bogus), `drb` (deep real/bogus).
+Key fields available per ZTF source detection: `ra`, `dec`, `mjd`/`jd`,
+`magpsf` (→ `mag`), `sigmapsf` (→ `mag_err`), `fid` (filter: 1=g, 2=r, 3=i),
+`rb` (real/bogus), `drb` (deep real/bogus).
 
 ### ATLAS (Confirmation)
 

@@ -1,18 +1,18 @@
 # 2026 Near-Earth Object Detection & Ranking Pipeline
 
 ![Status](https://img.shields.io/badge/status-active%20development-blue)
-![Version](https://img.shields.io/badge/version-0.76.0-informational)
+![Version](https://img.shields.io/badge/version-0.87.9-informational)
 ![License](https://img.shields.io/badge/license-Apache%202.0-green)
-![Tests](https://img.shields.io/badge/tests-3475%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-3500%2B%20passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
-![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)
+![Python](https://img.shields.io/badge/python-3.14.3-blue)
 ![CI](https://img.shields.io/badge/CI-passing-brightgreen)
 
 ---
 
 ## Abstract
 
-Near-Earth Objects (NEOs) — small solar system bodies with perihelion distances $q < 1.3$ AU — represent both a premier target for planetary science and the only known category of natural disaster that is, in principle, preventable. Despite three decades of systematic survey effort, population completeness models estimate that the majority of NEOs larger than 140 meters remain undetected, sustaining the need for automated, high-throughput discovery pipelines capable of operating at the cadence and scale of modern wide-field photometric surveys. This work presents a research pipeline for the detection, multi-night linking, orbital characterization, and hazard ranking of NEO candidates derived from the Zwicky Transient Facility (ZTF) alert stream, ATLAS forced photometry, and the Minor Planet Center (MPC) catalog. The system implements a seven-stage directed acyclic processing graph — fetch, preprocess, detect, link, classify, orbit, score — followed by a mandatory three-step alert protocol governing all external communications. Classification employs a three-tier ensemble architecture: a gradient-boosted tree classifier on tabular features (Tier 1), a convolutional neural network operating on 63×63-pixel ZTF image triplets following the architecture of Duev et al. (2019) (Tier 2), and a BERT-style Transformer trained on multi-night observation sequences following Lin et al. (2022) (Tier 3), with outputs combined by a logistic regression meta-learner and calibrated via Platt scaling or isotonic regression. Hazard assessment follows a Bayesian log-score model over five competing hypotheses with deliberately pessimistic priors for new NEO candidates. Preliminary orbit determination uses Gauss's method with differential correction, and Potentially Hazardous Asteroid (PHA) flags are gated on orbit quality code ≥ 2 and independently confirmed MOID ≤ 0.05 AU. As of version 0.87.0, all ten pipeline modules are implemented, 3,475 offline tests pass, Tier 1 and Tier 2 weights are trained, and production remains blocked on real five-class Tier 3 sequences, ensemble calibration, and a supervised real end-to-end run. Background automation provides top-level SQLite audit logs and fail-closed readiness controls. Injection-recovery validation on $n = 200$ synthetic NEO tracklets reports 100% detection, link, and score rates, but synthetic results are not treated as evidence of live-sky performance. The pipeline produces MPC-compatible 80-column, ADES PSV, and JSON observation reports and implements a non-negotiable three-step pathway — MPC submission, independent observatory confirmation, and conditional NASA PDCO notification — ensuring that no autonomous impact claim is ever issued.
+Near-Earth Objects (NEOs) — small solar system bodies with perihelion distances $q < 1.3$ AU — represent both a premier target for planetary science and the only known category of natural disaster that is, in principle, preventable. Despite three decades of systematic survey effort, population completeness models estimate that the majority of NEOs larger than 140 meters remain undetected, sustaining the need for automated, high-throughput discovery pipelines capable of operating at the cadence and scale of modern wide-field photometric surveys. This work presents a research pipeline for the detection, multi-night linking, orbital characterization, and hazard ranking of NEO candidates derived from public ZTF source detections, ATLAS forced photometry, and the Minor Planet Center (MPC) catalog. The system implements a seven-stage directed acyclic processing graph — fetch, preprocess, detect, link, classify, orbit, score — followed by a mandatory three-step alert protocol governing all external communications. Classification employs a three-tier ensemble architecture: a gradient-boosted tree classifier on tabular features (Tier 1), a convolutional neural network operating on 63×63-pixel ZTF image triplets following the architecture of Duev et al. (2019) (Tier 2), and a BERT-style Transformer trained on multi-night observation sequences following Lin et al. (2022) (Tier 3), with outputs combined by a logistic regression meta-learner and calibrated via Platt scaling or isotonic regression. Hazard assessment follows a Bayesian log-score model over five competing hypotheses with deliberately pessimistic priors for new NEO candidates. Preliminary orbit determination uses Gauss's method with differential correction, and Potentially Hazardous Asteroid (PHA) flags are gated on orbit quality code ≥ 2 and independently confirmed MOID ≤ 0.05 AU. As of version 0.87.9, all ten pipeline modules are implemented, all three ML tiers and the ensemble stacker have passed quantitative calibration KPIs, and a first bounded supervised real-ZTF pilot has completed through the public ALeRCE source-detection provider. Production remains blocked on T1-C recovery/audit work: known-object recovery verification, human false-positive review, and automated live-policy approval before unsupervised operation. Background automation provides top-level SQLite audit logs and fail-closed readiness controls. Injection-recovery validation on $n = 200$ synthetic NEO tracklets reports 100% detection, link, and score rates, but synthetic results are not treated as evidence of live-sky performance. The pipeline produces MPC-compatible 80-column, ADES PSV, and JSON observation reports and implements a non-negotiable three-step pathway — MPC submission, independent observatory confirmation, and conditional NASA PDCO notification — ensuring that no autonomous impact claim is ever issued.
 
 **Keywords:** near-Earth objects, planetary defense, asteroid detection, automated pipeline, machine learning, real/bogus classification, orbit determination, Bayesian scoring, ZTF, Minor Planet Center
 
@@ -57,7 +57,7 @@ This repository implements a complete, research-grade automated detection and ra
 4. **Independent confirmation before alert** — the NASA PDCO notification pathway is gated on MPC submission *and* independent observatory confirmation, not on pipeline confidence alone.
 5. **No autonomous impact claims** — the system produces ranked candidates and hazard flags; it defers all authoritative impact probability statements to CNEOS Scout and Sentry.
 
-The pipeline follows the build order: `schemas` → `fetch` → `preprocess` → `detect` → `link` → `classify` → `orbit` → `score` → `alert` → `calibration`. Each stage consumes the immutable, typed output of all prior stages. As of v0.87.0, all ten pipeline modules plus background automation are complete, and the offline suite passes 3,475 tests with 2 live checks deselected. Real labeled ZTF data has trained Tier 1 and Tier 2, but no real survey field has completed the full pipeline; see `docs/PRODUCTION_READINESS.md` for the production gap register.
+The pipeline follows the build order: `schemas` → `fetch` → `preprocess` → `detect` → `link` → `classify` → `orbit` → `score` → `alert` → `calibration`. Each stage consumes the immutable, typed output of all prior stages. As of v0.87.9, all ten pipeline modules plus background automation are complete, all three ML tiers have trained weights, calibration KPIs have passed, and a first bounded supervised real-ZTF pilot has completed. See `docs/PRODUCTION_READINESS.md` for the remaining production gap register.
 
 ---
 
@@ -1161,22 +1161,23 @@ The older n=50 baseline remains in `data/injection_recovery_baseline.json` for h
 
 **Primary directive: all work must advance the project to production. See `docs/PRODUCTION_READINESS.md` for the authoritative gap register.**
 
-**Highest-priority gap: T1-A — Incomplete Trained ML Model Set.** Tier 1
-XGBoost and Tier 2 CNN weights are trained and committed. The remaining blocker
-is a real multi-night MPC/ZTF sequence dataset for Tier 3 Transformer training,
-followed by the quantitative production calibration gate.
+**Highest-priority gap: T1-C — Real End-to-End Production Validation.** The
+basic zero-fetch blocker is resolved by the public ALeRCE ZTF source-detection
+provider and a bounded supervised pilot. The remaining blocker is recovery and
+review evidence: known-object recovery audit, human false-positive review, and
+automated live-policy approval before unsupervised operation.
 
-### 15.1 Current State Snapshot (v0.87.0)
+### 15.1 Current State Snapshot (v0.87.9)
 
 | Area | Status | Notes |
 |---|---|---|
-| Core pipeline modules | **Complete** | All 10 modules: 3475 tests passing, 100% coverage target, ruff + mypy clean |
+| Core pipeline modules | **Complete** | All 10 modules: 3500+ tests passing, 100% coverage target, ruff + mypy clean |
 | Synthetic validation | **Complete** | 100% detection/link/score on n=200 synthetic tracklets. Not a substitute for real-data validation. |
 | Background automation CLI | **Complete** | `Skills/background.py` — offline scheduler, SQLite audit logs, signoff packets, readiness summaries |
-| ML model weights | **PARTIAL** | T1-A gap. Tier 1 XGBoost and Tier 2 CNN weights are trained and committed; Tier 3 Transformer sequence data and weights are missing. |
+| ML model weights | **Complete** | T1-A closed. Tier 1 XGBoost, Tier 2 CNN, Tier 3 Transformer, and ensemble stacker are trained; calibration KPIs passed. |
 | Real survey credentials | **CONFIGURED** | T1-B credentials are stored in macOS Keychain and manual ZTF/ATLAS connection tests passed. Automated live policy approval remains pending. |
-| Real data processed | **NEVER** | T1-C gap. No real ZTF/ATLAS/MPC data has ever passed through the pipeline. |
-| Production calibration | **NOT DONE** | T1-D gap. Calibration not validated on real model outputs. |
+| Real data processed | **BOUNDED PILOT COMPLETE** | T1-C open. 2026-06-16 Orion-field ZTF pilot fetched 4,059 real source detections, detected 520 raw candidates, linked the first 80, and processed 2 internal candidates. |
+| Production calibration | **Complete** | T1-D closed. Quantitative Brier, ECE, log-loss, ROC AUC, CV ECE, and bootstrap CI gates passed. |
 | External reporting | **Disabled** | No MPC, NEOCP, NASA, or CNEOS submission path is active. Alert protocol requires MPC submission + independent confirmation before any NASA pathway. |
 
 ### 15.2 Completed Milestones
@@ -1200,13 +1201,13 @@ followed by the quantitative production calibration gate.
 | **M4a** | T1-B: IRSA account + credentials | None | **Complete** |
 | **M4b** | T1-B: ATLAS token | None | **Complete** |
 | **M4c** | T1-B: Live review policy approved | Reviewer sign-off on `background/live_review_policy.example.json` | **Pending human action** |
-| **M4d** | T1-C: First credentialed live dry-run (ZTF, 1 field) | Requires M4c | **Blocked on M4c** |
+| **M4d** | T1-C: First supervised live ZTF pilot | Manual operator run; no external submission | **Complete (bounded, 2026-06-16)** |
 | **M5a** | T1-A: Download labeled ZTF real/bogus dataset | 10,000 real alerts downloaded | **Complete** |
 | **M5b** | T1-A: Build cutout dataset + train Tier 2 CNN | `models/tier2_cnn.pt`; validation accuracy 91.3% | **Complete** |
-| **M5c** | T1-A: Acquire real multi-night sequences, build dataset, and train Tier 3 Transformer | Five-class policy and 50/class pilot approved; operator acquisition and training runs required | **In progress** |
+| **M5c** | T1-A: Acquire real multi-night sequences, build dataset, and train Tier 3 Transformer | Five-class policy and 50/class pilot approved; pilot trained | **Complete** |
 | **M5d** | T1-A: Train Tier 1 XGBoost | `models/tier1_xgb.json`; validation accuracy 99.95%, macro AUC 1.000 | **Complete** |
-| **M6a** | T1-D: Quantitative production calibration gate | Held-out real labeled data; all Brier, ECE, log-loss, AUC, cross-validation, and bootstrap-confidence KPIs pass | **Blocked on M5b/M5c** |
-| **M6b** | T1-C: Known-object recovery audit | Verify ≥90% known-object recovery on the first bounded real-data run | **Blocked on M4d** |
+| **M6a** | T1-D: Quantitative production calibration gate | Held-out real labeled data; all Brier, ECE, log-loss, AUC, cross-validation, and bootstrap-confidence KPIs pass | **Complete** |
+| **M6b** | T1-C: Known-object recovery audit | Verify ≥90% known-object recovery on bounded/uncapped real-data runs | **Next human+code blocker** |
 | **M7** | All T1 gaps closed; first MPC submission | Requires M4–M6 complete + T2-C peer review | **Pending** |
 
 ### 15.4 Progress Tracker
@@ -1221,8 +1222,11 @@ followed by the quantitative production calibration gate.
 | **P21** | Complete | ATLAS token obtained | macOS Keychain; live connection test passed |
 | **P22** | Complete | Labeled ZTF dataset downloaded | 10,000 real ZTF Avro alerts |
 | **P23** | Complete | Tier 2 CNN trained (`models/tier2_cnn.pt`) | Validation accuracy 91.3%; weights committed |
-| **P24** | **Pending** | Tier 3 Transformer trained (`models/tier3_transformer.pt`) | Requires real multi-night MPC/ZTF sequence data, dataset build, and operator training run |
-| **P25** | **Pending** | Calibration KPI report passes; gates eligible to be armed | Automated fail-closed gate; requires P23/P24 and held-out real labels |
+| **P24** | Complete | Tier 3 Transformer trained (`models/tier3_transformer.pt`) | 50/class five-class pilot; val_macro_f1=0.9400 |
+| **P25** | Complete | Calibration KPI report passes; gates eligible to be armed | T1-D quantitative KPI gate passed |
+| **P26** | Complete | Public ALeRCE ZTF source-detection provider added | Replaces bad IRSA metadata-table assumption for source detections |
+| **P27** | Complete | First bounded supervised real-ZTF pilot completed | 4,059 real ZTF detections fetched; 2 internal candidates processed; run summary `011dd53aa7f4` |
+| **P28** | **Next** | T1-C recovery audit | Run staged/uncapped real-data pilot, cross-match against MPC known objects, verify ≥90% known-object recovery |
 | **P26** | **Pending** | First real-data pipeline run; ≥90% known-object recovery | Code + human audit; requires P20 + P21 |
 | **P27** | Complete | Bounded Tier 3 MPC sequence acquisition path | Resumable collection, atomic checkpoints, source-manifest hash, query log, provenance, and safety flags |
 | **P28** | Complete | Five-class Tier 3 policy and pilot approved | Jerome W. Lindsey III approved policy and 50/class pilot on 2026-06-10; not production approval |

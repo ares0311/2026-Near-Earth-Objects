@@ -68,6 +68,12 @@ def _param_key(
     return hashlib.md5(raw.encode()).hexdigest()[:12]
 
 
+def _format_duration(seconds: float) -> str:
+    seconds_int = max(0, int(seconds))
+    minutes, secs = divmod(seconds_int, 60)
+    return f"{minutes}m{secs:02d}s"
+
+
 def _tracklet_to_dict(t: Tracklet) -> dict:
     """Serialize a Tracklet to a plain dict for JSON checkpoint storage."""
     return {
@@ -172,6 +178,7 @@ def run_pipeline(
     start_jd: float,
     end_jd: float,
     surveys: tuple[str, ...] = ("ZTF",),
+    max_candidates: int | None = None,
     dry_run: bool = True,
     atlas_token: str | None = None,
     force_refresh: bool = False,
@@ -229,9 +236,29 @@ def run_pipeline(
         n_cands = det_result.provenance.n_candidates
         n_known = det_result.provenance.n_known_matches
         print(f"[detect] {n_cands} candidates, {n_known} known matches", flush=True)
+        link_candidates = det_result.candidates
+        if max_candidates is not None and len(link_candidates) > max_candidates:
+            print(
+                f"[detect] Pilot cap active: linking first {max_candidates}/"
+                f"{len(link_candidates)} candidates",
+                flush=True,
+            )
+            link_candidates = link_candidates[:max_candidates]
 
         print("[link] Linking candidates across nights", flush=True)
-        link_result = link(det_result.candidates)
+        link_start = time.monotonic()
+
+        def _link_progress(done: int, total: int, n_tracklets: int) -> None:
+            elapsed = time.monotonic() - link_start
+            eta = 0.0 if done <= 0 else (elapsed / done) * max(0, total - done)
+            print(
+                f"[link] progress {done}/{total} seed pairs; "
+                f"tracklets={n_tracklets}; elapsed {_format_duration(elapsed)} "
+                f"ETA {_format_duration(eta)}",
+                flush=True,
+            )
+
+        link_result = link(link_candidates, progress_callback=_link_progress)
         n_trk = link_result.provenance.n_tracklets
         print(f"[link] {n_trk} tracklets formed", flush=True)
 
@@ -332,6 +359,10 @@ def main(argv: list[str] | None = None) -> None:
         help="Bypass on-disk cache and re-fetch all survey data",
     )
     parser.add_argument(
+        "--max-candidates", type=int, default=None,
+        help="Optional bounded pilot cap for the number of detected candidates sent to linking",
+    )
+    parser.add_argument(
         "--neocp-timeout-hours", type=float, default=0.0,
         help="Hours to poll NEOCP for independent confirmation (0 = skip)",
     )
@@ -376,6 +407,7 @@ def main(argv: list[str] | None = None) -> None:
         start_jd=args.start_jd,
         end_jd=args.end_jd,
         surveys=surveys,
+        max_candidates=args.max_candidates,
         dry_run=args.dry_run,
         atlas_token=args.atlas_token,
         force_refresh=args.force_refresh,
@@ -409,6 +441,7 @@ def main(argv: list[str] | None = None) -> None:
             "start_jd": args.start_jd,
             "end_jd": args.end_jd,
             "surveys": list(surveys),
+            "max_candidates": args.max_candidates,
             "dry_run": args.dry_run,
             "n_results": len(results),
             "elapsed_seconds": elapsed,
