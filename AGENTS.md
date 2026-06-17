@@ -20,6 +20,12 @@ It contains the facts a coding agent needs to work productively without re-readi
   correct interpreter and locked dependencies are used. CI enforces the same
   via `astral-sh/setup-uv@v5` with `python-version: "3.14"`.
   Example: `PYTHONPATH=src uv run python -m pytest`
+- **Local system profile governs optimization defaults**: `docs/SYSTEM_PROFILE.md`
+  is a committed directive for local resource sizing. Optimize project code,
+  tests, and operator commands for that profile unless portability or a task
+  requirement says otherwise. Do not hardcode machine-specific assumptions into
+  scientific logic; expose performance-sensitive behavior through configuration
+  or documented runtime defaults.
 
 ---
 

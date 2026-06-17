@@ -12,8 +12,11 @@ It contains the facts a coding agent needs to work productively without re-readi
 1. Call `Read` on `CLAUDE.md` — do not rely on memory or prior context. (This file; re-read to reactivate all standing rules.)
 2. Call `Read` on `AGENTS.md` — do not rely on memory or prior context.
 3. Call `Read` on `docs/PRODUCTION_READINESS.md` — do not rely on memory or prior context.
+4. Call `Read` on `docs/SYSTEM_PROFILE.md` — this committed file governs local
+   optimization defaults for project code, tests, notebooks, and operator
+   commands.
 
-These steps are non-negotiable. No planning or code changes may happen before all four are complete.
+These steps are non-negotiable. No planning or code changes may happen before all five are complete.
 
 ---
 
@@ -48,6 +51,12 @@ If the highest-priority T1 gap cannot be resolved because a human blocker is unr
   correct interpreter and locked dependencies are used. CI enforces the same
   via `astral-sh/setup-uv@v5` with `python-version: "3.14"`.
   Example: `PYTHONPATH=src uv run python -m pytest`
+- **Local system profile governs optimization defaults**: `docs/SYSTEM_PROFILE.md`
+  is a committed directive for local resource sizing. Optimize project code,
+  tests, notebooks, and operator commands for that profile unless portability or
+  a task requirement says otherwise. Do not hardcode machine-specific assumptions
+  into scientific logic; expose performance-sensitive behavior through
+  configuration or documented runtime defaults.
 
 - **Always comment all code**: Every function, class, script, shell command, and non-trivial code block must include comments explaining what it does and why. This applies to all Python source files, all Skills scripts, all shell commands given to the operator, and all inline code snippets in documentation. No exceptions. This rule overrides any default behavior that would omit comments.
 - **caffeinate all long-running Mac commands**: Any operator command expected to run longer than ~30 seconds must be prefixed with `caffeinate -i` to prevent macOS from sleeping mid-run. This applies to all downloads, training runs, and pipeline executions. Example: `caffeinate -i uv run python Skills/download_ztf_training_alerts.py ...`
