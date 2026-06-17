@@ -289,9 +289,13 @@ class TestTier2And3NullModel:
         # No model and no model file → returns None
         assert _tier2_predict(t, model=None) is None
 
-    def test_tier3_returns_none_when_no_model(self):
+    def test_tier3_returns_none_when_no_model(self, tmp_path, monkeypatch):
+        import classify as cls_mod
         from classify import _tier3_predict
+
         t = make_tracklet()
+        # Isolate the loader from any operator-generated local model artifacts.
+        monkeypatch.setattr(cls_mod, "_MODEL_DIR", tmp_path)
         assert _tier3_predict(t, model=None) is None
 
 

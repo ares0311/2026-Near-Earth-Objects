@@ -48,7 +48,7 @@ Usage::
 
     uv run python Skills/select_survey_fields.py --jd now --mode aten --top-n 20
     uv run python Skills/select_survey_fields.py --jd now --mode ieo  --top-n 10
-    uv run python Skills/select_survey_fields.py --jd now --mode all  --top-n 15 --json
+    uv run python Skills/select_survey_fields.py --jd now --mode recovery --top-n 15 --json
     uv run python Skills/select_survey_fields.py --jd 2461000.5 --history-dir Logs/pipeline_runs
 """
 
@@ -92,6 +92,7 @@ _ELONG_WINDOWS: dict[str, tuple[float, float, float]] = {
     "aten": (60.0, 100.0, 80.0),   # dawn/dusk quadrature sector
     "ieo":  (20.0,  45.0, 32.5),   # twilight zone (civil to nautical twilight)
     "all":  (60.0, 160.0, 110.0),  # general NEO (broad anti-helion sector)
+    "recovery": (120.0, 180.0, 165.0),  # opposition-side fields rich in known objects
 }
 
 # Approximate catalog completeness fraction at the optimal elongation per mode.
@@ -101,6 +102,7 @@ _COMPLETENESS: dict[str, float] = {
     "aten": 0.15,  # ~85% of Atens H<20 still undiscovered
     "ieo":  0.03,  # ~97% of IEOs undiscovered (fewest known of any NEO class)
     "all":  0.45,  # mixed population; ~55% of H<20 NEOs still undiscovered
+    "recovery": 0.95,  # known-object recovery wants catalog-rich fields, not discovery gap
 }
 
 # Overlap radius for deduplication of selected fields
@@ -202,6 +204,19 @@ def population_score_batch(ecl_lat: np.ndarray, elong: np.ndarray, mode: str) ->
                  + 0.4 * np.exp(-np.abs(ecl_lat) / 60.0))
     undiscovered_fraction = 1.0 - _COMPLETENESS.get(mode, 0.45)
     return np.clip(lat_score * undiscovered_fraction, 0.0, 1.0)
+
+
+def known_object_density_score_batch(ecl_lat: np.ndarray, elong: np.ndarray) -> np.ndarray:
+    """Known-moving-object density proxy for production recovery tests.
+
+    Known minor planets concentrate near the ecliptic and are easiest to
+    recover near opposition, where sky-plane density is high and observing
+    geometry is favorable. This score intentionally differs from the discovery
+    population score: it seeks many expected recoveries, not rare new objects.
+    """
+    lat_score = np.exp(-np.abs(ecl_lat) / 12.0)
+    opposition_score = np.exp(-((180.0 - elong) ** 2) / (45.0 ** 2))
+    return np.clip(0.70 * lat_score + 0.30 * opposition_score, 0.0, 1.0)
 
 
 def geometry_score_batch(elong: np.ndarray, hours: np.ndarray, mode: str) -> np.ndarray:
@@ -363,8 +378,8 @@ def select_fields(jd: float,
     Parameters
     ----------
     jd:           Julian Date of the observation window to score.
-    mode:         "aten" | "ieo" | "all" — controls elongation window and
-                  population completeness fraction used in scoring.
+    mode:         "aten" | "ieo" | "all" | "recovery" — controls elongation
+                  window and the population score used in scoring.
     top_n:        Number of top fields to return after deduplication.
     history_dir:  Path to Logs/pipeline_runs/ directory; if given, fields
                   already processed are penalised via the Novelty score.
@@ -403,7 +418,11 @@ def select_fields(jd: float,
 
     # Vectorised scoring components
     gap_s   = gap_score_batch(elong, mode)
-    pop_s   = population_score_batch(ecl_lat, elong, mode)
+    pop_s   = (
+        known_object_density_score_batch(ecl_lat, elong)
+        if mode == "recovery"
+        else population_score_batch(ecl_lat, elong, mode)
+    )
     geom_s  = geometry_score_batch(elong, hours, mode)
     history = load_run_history(history_dir) if history_dir else []
     novel_s = novelty_scores_batch(ra_arr, dec_arr, history)
@@ -417,8 +436,11 @@ def select_fields(jd: float,
         print(f"Using ML model: {model_path}", file=sys.stderr, flush=True)
     else:
         w = _WEIGHTS
-        total = (w["gap"] * gap_s + w["population"] * pop_s
-                 + w["geometry"] * geom_s + w["novelty"] * novel_s)
+        if mode == "recovery":
+            total = 0.45 * pop_s + 0.35 * geom_s + 0.20 * novel_s
+        else:
+            total = (w["gap"] * gap_s + w["population"] * pop_s
+                     + w["geometry"] * geom_s + w["novelty"] * novel_s)
 
     # Mask non-observable fields (below horizon or outside elongation window)
     observable = (geom_s > 0.01) & (hours > 0.5)
@@ -460,7 +482,8 @@ def select_fields(jd: float,
         if gap_s[idx] > 0.7:
             parts.append(f"coverage gap {gap_s[idx]:.2f}")
         if pop_s[idx] > 0.4:
-            parts.append(f"pop density {pop_s[idx]:.2f}")
+            label = "known-object density" if mode == "recovery" else "pop density"
+            parts.append(f"{label} {pop_s[idx]:.2f}")
         if geom_s[idx] > 0.4:
             parts.append(f"geometry {geom_s[idx]:.2f} ({hours[idx]:.1f}h vis)")
         if novel_s[idx] == 0.0:
@@ -497,7 +520,7 @@ def select_fields(jd: float,
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         description=(
-            "Select optimal sky fields for Aten/IEO NEO discovery. "
+            "Select optimal sky fields for NEO discovery or recovery tests. "
             "Scores the entire observable sky tonight and returns a ranked list "
             "of (RA, Dec) cones to feed into Skills/run_pipeline.py."
         ),
@@ -506,6 +529,7 @@ def main(argv: list[str] | None = None) -> None:
             "Examples:\n"
             "  uv run python Skills/select_survey_fields.py --jd now --mode aten --top-n 20\n"
             "  uv run python Skills/select_survey_fields.py --jd now --mode ieo --top-n 10 --json\n"
+            "  uv run python Skills/select_survey_fields.py --jd now --mode recovery --top-n 10\n"
             "  uv run python Skills/select_survey_fields.py --jd now "
             "--history-dir Logs/pipeline_runs\n"
         ),
@@ -515,11 +539,12 @@ def main(argv: list[str] | None = None) -> None:
         help="Julian Date for scoring (e.g. 2461000.5) or 'now'. Default: now.",
     )
     parser.add_argument(
-        "--mode", choices=["aten", "ieo", "all"], default="aten",
+        "--mode", choices=["aten", "ieo", "all", "recovery"], default="aten",
         help=(
             "Discovery mode. 'aten': quadrature/dawn-dusk (elong 60-100°, ~85%% undiscovered). "
             "'ieo': twilight Atira (elong 20-45°, ~97%% undiscovered). "
-            "'all': general NEO. Default: aten."
+            "'all': general NEO. 'recovery': opposition-side known-object-rich "
+            "fields for the T1-C recovery benchmark. Default: aten."
         ),
     )
     parser.add_argument(

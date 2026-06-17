@@ -103,6 +103,8 @@ def test_build_audit_packet_evaluates_expected_manifest(tmp_path):
     assert gate["expected"] == 1
     assert gate["recovery_rate"] == 1.0
     assert gate["passed"] is True
+    assert packet["production_promotion_allowed"] is False
+    assert packet["human_false_positive_review"]["status"] == "blocked_no_operator_review"
 
 
 def test_build_audit_packet_blocks_designation_only_manifest(tmp_path):
@@ -114,11 +116,199 @@ def test_build_audit_packet_blocks_designation_only_manifest(tmp_path):
     packet = module.build_audit_packet(run_dir, expected)
 
     gate = packet["known_object_recovery_gate"]
-    assert gate["status"] == "blocked_expected_manifest_missing_pipeline_ids"
+    assert gate["status"] == "blocked_invalid_expected_manifest"
     assert gate["expected"] == 1
-    assert gate["designation_only"] == 1
+    assert gate["invalid"] == 1
     assert gate["recovery_rate"] is None
     assert gate["passed"] is False
+
+
+def test_build_audit_packet_matches_expected_by_sky_time(tmp_path):
+    module = _load_module()
+    run_dir = _write_run_dir(tmp_path)
+    expected = tmp_path / "expected.json"
+    expected.write_text(
+        json.dumps([
+            {
+                "designation": "Known-1",
+                "ra_deg": 10.0,
+                "dec_deg": 5.0,
+                "jd": 2460000.5,
+                "tolerance_arcsec": 2.0,
+                "tolerance_days": 0.001,
+            }
+        ]),
+        encoding="utf-8",
+    )
+
+    packet = module.build_audit_packet(run_dir, expected)
+
+    gate = packet["known_object_recovery_gate"]
+    match = packet["expected_known_matches"][0]
+    assert gate["status"] == "evaluated"
+    assert gate["recovered"] == 1
+    assert gate["expected"] == 1
+    assert gate["passed"] is True
+    assert match["status"] == "matched"
+    assert match["matched_object_id"] == "T001"
+    assert match["matched_by"] == "sky_time"
+    assert match["best_separation_arcsec"] == 0.0
+
+
+def test_build_audit_packet_reports_unmatched_expected_object(tmp_path):
+    module = _load_module()
+    run_dir = _write_run_dir(tmp_path)
+    expected = tmp_path / "expected.json"
+    expected.write_text(
+        json.dumps([
+            {
+                "designation": "Known-2",
+                "ra_deg": 100.0,
+                "dec_deg": -20.0,
+                "jd": 2460000.5,
+                "tolerance_arcsec": 2.0,
+                "tolerance_days": 0.001,
+            }
+        ]),
+        encoding="utf-8",
+    )
+
+    packet = module.build_audit_packet(run_dir, expected)
+
+    gate = packet["known_object_recovery_gate"]
+    match = packet["expected_known_matches"][0]
+    assert gate["status"] == "evaluated"
+    assert gate["recovered"] == 0
+    assert gate["unmatched"] == 1
+    assert gate["passed"] is False
+    assert match["status"] == "unmatched"
+
+
+def test_build_audit_packet_fails_closed_on_ambiguous_match(tmp_path):
+    module = _load_module()
+    run_dir = _write_run_dir(tmp_path)
+    checkpoint_path = run_dir / "checkpoint.json"
+    checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+    duplicate = dict(checkpoint["tracklets"][0])
+    duplicate["object_id"] = "T002"
+    checkpoint["tracklets"].append(duplicate)
+    checkpoint_path.write_text(json.dumps(checkpoint), encoding="utf-8")
+    expected = tmp_path / "expected.json"
+    expected.write_text(
+        json.dumps([
+            {
+                "designation": "Known-1",
+                "ra_deg": 10.0,
+                "dec_deg": 5.0,
+                "jd": 2460000.5,
+                "tolerance_arcsec": 2.0,
+                "tolerance_days": 0.001,
+            }
+        ]),
+        encoding="utf-8",
+    )
+
+    packet = module.build_audit_packet(run_dir, expected)
+
+    gate = packet["known_object_recovery_gate"]
+    match = packet["expected_known_matches"][0]
+    assert gate["status"] == "evaluated_with_ambiguous_matches"
+    assert gate["ambiguous"] == 1
+    assert gate["passed"] is False
+    assert match["status"] == "ambiguous_match"
+    assert match["candidate_object_ids"] == ["T001", "T002"]
+
+
+def test_build_audit_packet_requires_sample_tolerance(tmp_path):
+    module = _load_module()
+    run_dir = _write_run_dir(tmp_path)
+    expected = tmp_path / "expected.json"
+    expected.write_text(
+        json.dumps([
+            {
+                "designation": "Known-1",
+                "ra_deg": 10.0,
+                "dec_deg": 5.0,
+                "jd": 2460000.5,
+                "tolerance_arcsec": 0.001,
+                "tolerance_days": 0.001,
+            }
+        ]),
+        encoding="utf-8",
+    )
+
+    packet = module.build_audit_packet(run_dir, expected)
+
+    assert packet["expected_known_matches"][0]["status"] == "matched"
+    expected.write_text(
+        json.dumps([
+            {
+                "designation": "Known-1",
+                "ra_deg": 10.001,
+                "dec_deg": 5.001,
+                "jd": 2460000.5,
+                "tolerance_arcsec": 0.001,
+                "tolerance_days": 0.001,
+            }
+        ]),
+        encoding="utf-8",
+    )
+    packet = module.build_audit_packet(run_dir, expected)
+    assert packet["expected_known_matches"][0]["status"] == "unmatched"
+
+
+def test_build_audit_packet_allows_promotion_after_recovery_and_review(tmp_path):
+    module = _load_module()
+    run_dir = _write_run_dir(tmp_path)
+    expected = tmp_path / "expected.json"
+    expected.write_text(json.dumps([{"object_id": "T001"}]), encoding="utf-8")
+    review = tmp_path / "review.json"
+    review.write_text(
+        json.dumps([{"object_id": "T001", "decision": "acceptable"}]),
+        encoding="utf-8",
+    )
+
+    packet = module.build_audit_packet(run_dir, expected, review)
+
+    assert packet["known_object_recovery_gate"]["passed"] is True
+    assert packet["human_false_positive_review"]["gate"]["passed"] is True
+    assert packet["production_promotion_allowed"] is True
+    assert packet["production_promotion_blockers"] == []
+
+
+def test_build_audit_packet_blocks_incomplete_operator_review(tmp_path):
+    module = _load_module()
+    run_dir = _write_run_dir(tmp_path)
+    expected = tmp_path / "expected.json"
+    expected.write_text(json.dumps([{"object_id": "T001"}]), encoding="utf-8")
+    review = tmp_path / "review.json"
+    review.write_text(json.dumps([]), encoding="utf-8")
+
+    packet = module.build_audit_packet(run_dir, expected, review)
+
+    gate = packet["human_false_positive_review"]["gate"]
+    assert gate["status"] == "blocked_no_operator_review"
+    assert gate["missing_object_ids"] == ["T001"]
+    assert packet["production_promotion_allowed"] is False
+
+
+def test_build_audit_packet_blocks_operator_findings(tmp_path):
+    module = _load_module()
+    run_dir = _write_run_dir(tmp_path)
+    expected = tmp_path / "expected.json"
+    expected.write_text(json.dumps([{"object_id": "T001"}]), encoding="utf-8")
+    review = tmp_path / "review.json"
+    review.write_text(
+        json.dumps([{"object_id": "T001", "decision": "false_positive"}]),
+        encoding="utf-8",
+    )
+
+    packet = module.build_audit_packet(run_dir, expected, review)
+
+    gate = packet["human_false_positive_review"]["gate"]
+    assert gate["status"] == "blocked_operator_review_findings"
+    assert gate["blocking_decisions"] == {"T001": "false_positive"}
+    assert packet["production_promotion_allowed"] is False
 
 
 def test_tracklet_review_flags_suspicious_near_stationary_long_arc(tmp_path):

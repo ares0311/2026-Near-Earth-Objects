@@ -5,7 +5,7 @@ This tool reads the checkpoint and run summary emitted by ``Skills/run_pipeline.
 and writes the observation-level evidence needed for T1-C human review. It does
 not contact external services, submit observations, or assert impact probability.
 The known-object recovery KPI remains blocked unless an expected-known-object
-manifest is supplied by a domain reviewer.
+manifest with pipeline IDs or sky/time samples is supplied.
 """
 
 from __future__ import annotations
@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import statistics
 import sys
 from collections import Counter
@@ -26,6 +27,10 @@ from schemas import Observation, Tracklet
 _KNOWN_RECOVERY_THRESHOLD = 0.90
 _MIN_SOLAR_SYSTEM_MOTION_ARCSEC_PER_HOUR = 0.01
 _LONG_ARC_DAYS = 30.0
+_DEFAULT_MATCH_TOLERANCE_ARCSEC = 5.0
+_DEFAULT_MATCH_TOLERANCE_DAYS = 0.02
+_PASSING_OPERATOR_DECISIONS = {"acceptable"}
+_BLOCKING_OPERATOR_DECISIONS = {"false_positive", "suspicious", "needs_followup"}
 
 
 def _load_json(path: Path) -> Any:
@@ -123,9 +128,248 @@ def _load_expected_known(path: Path | None) -> list[dict[str, Any]]:
         return list(csv.DictReader(handle))
 
 
+def _load_table(path: Path | None) -> list[dict[str, Any]]:
+    """Load a JSON-list or CSV table; return an empty list when omitted."""
+    if path is None:
+        return []
+    if path.suffix.lower() == ".json":
+        data = _load_json(path)
+        if not isinstance(data, list):
+            raise ValueError(f"{path} JSON must contain a list")
+        return [row for row in data if isinstance(row, dict)]
+    with path.open(newline="", encoding="utf-8") as handle:
+        return list(csv.DictReader(handle))
+
+
+def _angular_sep_arcsec(ra1: float, dec1: float, ra2: float, dec2: float) -> float:
+    """Return great-circle separation in arcseconds for two sky positions."""
+    ra1_rad = math.radians(ra1)
+    ra2_rad = math.radians(ra2)
+    dec1_rad = math.radians(dec1)
+    dec2_rad = math.radians(dec2)
+    sin_d_dec = math.sin((dec2_rad - dec1_rad) / 2.0)
+    sin_d_ra = math.sin((ra2_rad - ra1_rad) / 2.0)
+    hav = sin_d_dec**2 + math.cos(dec1_rad) * math.cos(dec2_rad) * sin_d_ra**2
+    return math.degrees(2.0 * math.asin(min(1.0, math.sqrt(max(0.0, hav))))) * 3600.0
+
+
+def _coerce_float(value: Any) -> float | None:
+    """Convert manifest values to float while treating blanks as missing."""
+    if value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _normalise_expected_samples(row: dict[str, Any]) -> list[dict[str, float]]:
+    """Return validated RA/Dec/JD samples from a JSON or CSV manifest row."""
+    raw_samples = row.get("samples")
+    if isinstance(raw_samples, str) and raw_samples.strip():
+        try:
+            raw_samples = json.loads(raw_samples)
+        except json.JSONDecodeError:
+            raw_samples = None
+    if not raw_samples:
+        raw_samples = [row]
+
+    samples: list[dict[str, float]] = []
+    if not isinstance(raw_samples, list):
+        return samples
+    for sample in raw_samples:
+        if not isinstance(sample, dict):
+            continue
+        ra_value = sample.get("ra_deg") if "ra_deg" in sample else sample.get("ra")
+        dec_value = sample.get("dec_deg") if "dec_deg" in sample else sample.get("dec")
+        jd_value = sample.get("jd") if "jd" in sample else sample.get("expected_jd")
+        ra = _coerce_float(ra_value)
+        dec = _coerce_float(dec_value)
+        jd = _coerce_float(jd_value)
+        if ra is None or dec is None or jd is None:
+            continue
+        samples.append({"ra_deg": ra, "dec_deg": dec, "jd": jd})
+    return samples
+
+
+def _expected_key(row: dict[str, Any], index: int) -> str:
+    """Return a stable expected-object key for audit output."""
+    return str(
+        row.get("designation")
+        or row.get("object_id")
+        or row.get("candidate_id")
+        or f"expected_{index + 1}"
+    )
+
+
+def _match_expected_row(
+    row: dict[str, Any],
+    index: int,
+    tracklets: list[Tracklet],
+    review_rows: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Match one expected known object to recovered tracklets by ID or sky/time."""
+    expected_id = row.get("object_id") or row.get("candidate_id")
+    key = _expected_key(row, index)
+    base: dict[str, Any] = {
+        "expected_key": key,
+        "designation": row.get("designation"),
+        "status": "unmatched",
+        "matched_object_id": None,
+        "candidate_object_ids": [],
+        "best_separation_arcsec": None,
+        "best_time_delta_days": None,
+        "matched_samples": 0,
+        "required_samples": 1,
+    }
+
+    review_ids = {str(review["object_id"]) for review in review_rows}
+    if expected_id:
+        expected_id_str = str(expected_id)
+        base["candidate_object_ids"] = [expected_id_str]
+        if expected_id_str in review_ids:
+            base["status"] = "matched"
+            base["matched_object_id"] = expected_id_str
+            base["matched_by"] = "pipeline_id"
+        return base
+
+    samples = _normalise_expected_samples(row)
+    if not samples:
+        base["status"] = "invalid_expected_row"
+        base["error"] = "missing sky/time samples"
+        return base
+
+    tolerance_arcsec = (
+        _coerce_float(row.get("tolerance_arcsec"))
+        or _DEFAULT_MATCH_TOLERANCE_ARCSEC
+    )
+    tolerance_days = (
+        _coerce_float(row.get("tolerance_days"))
+        or _DEFAULT_MATCH_TOLERANCE_DAYS
+    )
+    required_samples = int(_coerce_float(row.get("min_samples")) or 1)
+    base["required_samples"] = required_samples
+    candidates: dict[str, dict[str, Any]] = {}
+
+    for tracklet in tracklets:
+        sample_matches = 0
+        best_sep: float | None = None
+        best_dt: float | None = None
+        for sample in samples:
+            sample_matched = False
+            for obs in tracklet.observations:
+                dt = abs(obs.jd - sample["jd"])
+                if dt > tolerance_days:
+                    continue
+                sep = _angular_sep_arcsec(
+                    sample["ra_deg"], sample["dec_deg"], obs.ra_deg, obs.dec_deg
+                )
+                if sep <= tolerance_arcsec:
+                    sample_matched = True
+                    best_sep = sep if best_sep is None else min(best_sep, sep)
+                    best_dt = dt if best_dt is None else min(best_dt, dt)
+            if sample_matched:
+                sample_matches += 1
+        if sample_matches >= required_samples:
+            candidates[tracklet.object_id] = {
+                "matched_samples": sample_matches,
+                "best_separation_arcsec": best_sep,
+                "best_time_delta_days": best_dt,
+            }
+
+    if not candidates:
+        base["status"] = "unmatched"
+        return base
+    base["candidate_object_ids"] = sorted(candidates)
+    if len(candidates) > 1:
+        base["status"] = "ambiguous_match"
+        return base
+
+    matched_id, details = next(iter(candidates.items()))
+    base["status"] = "matched"
+    base["matched_object_id"] = matched_id
+    base["matched_by"] = "sky_time"
+    base.update(details)
+    return base
+
+
+def _expected_known_matches(
+    expected_known: list[dict[str, Any]],
+    tracklets: list[Tracklet],
+    review_rows: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Match all expected known objects against recovered tracklets."""
+    return [
+        _match_expected_row(row, index, tracklets, review_rows)
+        for index, row in enumerate(expected_known)
+    ]
+
+
+def _operator_review_gate(
+    review_rows: list[dict[str, Any]],
+    operator_review: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Evaluate citizen-science operator review rows for recovered candidates."""
+    expected_ids = {str(row["object_id"]) for row in review_rows}
+    if not review_rows:
+        return {
+            "status": "blocked_no_candidates_for_review",
+            "reviewed": 0,
+            "required": 0,
+            "passed": False,
+        }
+    if not operator_review:
+        return {
+            "status": "blocked_no_operator_review",
+            "reviewed": 0,
+            "required": len(expected_ids),
+            "missing_object_ids": sorted(expected_ids),
+            "passed": False,
+        }
+
+    decisions: dict[str, str] = {}
+    invalid_rows: list[dict[str, Any]] = []
+    for row in operator_review:
+        object_id = row.get("object_id")
+        decision = str(row.get("decision", "")).strip().lower()
+        if not object_id or decision not in (
+            _PASSING_OPERATOR_DECISIONS | _BLOCKING_OPERATOR_DECISIONS
+        ):
+            invalid_rows.append(row)
+            continue
+        decisions[str(object_id)] = decision
+
+    missing = sorted(expected_ids - set(decisions))
+    blocking = {
+        object_id: decision
+        for object_id, decision in decisions.items()
+        if object_id in expected_ids and decision in _BLOCKING_OPERATOR_DECISIONS
+    }
+    if invalid_rows:
+        status = "blocked_invalid_operator_review"
+    elif missing:
+        status = "blocked_incomplete_operator_review"
+    elif blocking:
+        status = "blocked_operator_review_findings"
+    else:
+        status = "passed"
+    return {
+        "status": status,
+        "reviewed": len(expected_ids - set(missing)),
+        "required": len(expected_ids),
+        "missing_object_ids": missing,
+        "blocking_decisions": blocking,
+        "allowed_decisions": sorted(
+            _PASSING_OPERATOR_DECISIONS | _BLOCKING_OPERATOR_DECISIONS
+        ),
+        "passed": status == "passed",
+    }
+
+
 def _recovery_gate(
     expected_known: list[dict[str, Any]],
     review_rows: list[dict[str, Any]],
+    expected_matches: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     if not expected_known:
         return {
@@ -137,42 +381,72 @@ def _recovery_gate(
             "passed": False,
         }
 
-    recovered_ids = {str(row["object_id"]) for row in review_rows}
-    expected_ids = set()
-    designation_only = 0
-    for row in expected_known:
-        expected_id = row.get("object_id") or row.get("candidate_id")
-        if expected_id:
-            expected_ids.add(str(expected_id))
-        elif row.get("designation"):
-            designation_only += 1
-    if not expected_ids:
+    if expected_matches is None:
+        recovered_ids = {str(row["object_id"]) for row in review_rows}
+        expected_ids = set()
+        designation_only = 0
+        for row in expected_known:
+            expected_id = row.get("object_id") or row.get("candidate_id")
+            if expected_id:
+                expected_ids.add(str(expected_id))
+            elif row.get("designation"):
+                designation_only += 1
+        if not expected_ids:
+            return {
+                "status": "blocked_expected_manifest_missing_sky_time_samples",
+                "threshold": _KNOWN_RECOVERY_THRESHOLD,
+                "recovered": 0,
+                "expected": len(expected_known),
+                "recovery_rate": None,
+                "designation_only": designation_only,
+                "passed": False,
+            }
+        recovered = len(recovered_ids & expected_ids)
+        expected = len(expected_ids)
+        rate = recovered / expected if expected else 0.0
         return {
-            "status": "blocked_expected_manifest_missing_pipeline_ids",
+            "status": "evaluated",
             "threshold": _KNOWN_RECOVERY_THRESHOLD,
-            "recovered": 0,
-            "expected": len(expected_known),
-            "recovery_rate": None,
+            "recovered": recovered,
+            "expected": expected,
+            "recovery_rate": rate,
             "designation_only": designation_only,
-            "passed": False,
+            "passed": expected > 0 and rate >= _KNOWN_RECOVERY_THRESHOLD,
         }
-    recovered = len(recovered_ids & expected_ids)
-    expected = len(expected_ids)
+
+    expected = len(expected_matches)
+    recovered = sum(1 for match in expected_matches if match["status"] == "matched")
+    ambiguous = sum(1 for match in expected_matches if match["status"] == "ambiguous_match")
+    invalid = sum(1 for match in expected_matches if match["status"] == "invalid_expected_row")
     rate = recovered / expected if expected else 0.0
+    status = "evaluated"
+    if invalid:
+        status = "blocked_invalid_expected_manifest"
+    elif ambiguous:
+        status = "evaluated_with_ambiguous_matches"
+    reported_rate = None if invalid else rate
     return {
-        "status": "evaluated",
+        "status": status,
         "threshold": _KNOWN_RECOVERY_THRESHOLD,
         "recovered": recovered,
         "expected": expected,
-        "recovery_rate": rate,
-        "designation_only": designation_only,
-        "passed": expected > 0 and rate >= _KNOWN_RECOVERY_THRESHOLD,
+        "recovery_rate": reported_rate,
+        "ambiguous": ambiguous,
+        "invalid": invalid,
+        "unmatched": sum(1 for match in expected_matches if match["status"] == "unmatched"),
+        "passed": (
+            expected > 0
+            and invalid == 0
+            and ambiguous == 0
+            and rate >= _KNOWN_RECOVERY_THRESHOLD
+        ),
     }
 
 
 def build_audit_packet(
     run_dir: Path,
     expected_known_path: Path | None = None,
+    operator_review_path: Path | None = None,
 ) -> dict[str, Any]:
     checkpoint_path = run_dir / "checkpoint.json"
     summary_path = run_dir / "run_summary.json"
@@ -186,10 +460,18 @@ def build_audit_packet(
     review_rows = [_tracklet_review_row(tracklet, results.get(tracklet.object_id))
                    for tracklet in tracklets]
     expected_known = _load_expected_known(expected_known_path)
-    recovery_gate = _recovery_gate(expected_known, review_rows)
+    expected_matches = _expected_known_matches(expected_known, tracklets, review_rows)
+    recovery_gate = _recovery_gate(expected_known, review_rows, expected_matches)
+    operator_review = _load_table(operator_review_path)
+    operator_review_gate = _operator_review_gate(review_rows, operator_review)
+    promotion_blockers: list[str] = []
+    if not recovery_gate["passed"]:
+        promotion_blockers.append("known_object_recovery_gate_not_passed")
+    if not operator_review_gate["passed"]:
+        promotion_blockers.append("citizen_science_operator_review_not_passed")
 
     return {
-        "schema_version": "real-run-audit-v1",
+        "schema_version": "real-run-audit-v2",
         "run_dir": str(run_dir),
         "run_id": run_summary.get("run_id", run_dir.name),
         "run_summary": run_summary,
@@ -197,22 +479,32 @@ def build_audit_packet(
         "n_tracklets": len(tracklets),
         "n_review_rows": len(review_rows),
         "review_rows": review_rows,
+        "expected_known_matches": expected_matches,
         "known_object_recovery_gate": recovery_gate,
         "human_false_positive_review": {
-            "status": "required",
+            "status": operator_review_gate["status"],
             "n_candidates_for_review": len(review_rows),
-            "reviewer": None,
+            "reviewer": "Jerome W. Lindsey III, citizen-science project operator",
             "decision": None,
+            "limitations": (
+                "Operator review is citizen-science QA, not professional "
+                "planetary-defense validation."
+            ),
+            "gate": operator_review_gate,
         },
+        "citizen_science_limitations": [
+            "No professional domain-expert validation is recorded.",
+            "This packet does not authorize MPC submission or hazard notification.",
+            "All impact-probability statements remain deferred to MPC/CNEOS.",
+        ],
         "safety": {
             "no_external_submission": True,
             "no_mpc_submission": True,
             "no_nasa_pdco_notification": True,
             "no_impact_probability_asserted": True,
         },
-        "production_promotion_allowed": bool(
-            recovery_gate["passed"] and len(review_rows) > 0
-        ),
+        "production_promotion_allowed": not promotion_blockers,
+        "production_promotion_blockers": promotion_blockers,
     }
 
 
@@ -263,9 +555,11 @@ def main() -> None:
                         help="Optional human-review CSV output path")
     parser.add_argument("--expected-known", type=Path, default=None,
                         help="Optional expected-known manifest JSON/CSV for recovery KPI")
+    parser.add_argument("--operator-review", type=Path, default=None,
+                        help="Optional operator review JSON/CSV for candidate QA")
     args = parser.parse_args()
 
-    packet = build_audit_packet(args.run_dir, args.expected_known)
+    packet = build_audit_packet(args.run_dir, args.expected_known, args.operator_review)
     args.report_out.parent.mkdir(parents=True, exist_ok=True)
     args.report_out.write_text(json.dumps(packet, indent=2), encoding="utf-8")
     if args.review_csv is not None:

@@ -26,6 +26,12 @@ It contains the facts a coding agent needs to work productively without re-readi
   requirement says otherwise. Do not hardcode machine-specific assumptions into
   scientific logic; expose performance-sensitive behavior through configuration
   or documented runtime defaults.
+- **Citizen-science production framing**: Jerome W. Lindsey III is the project
+  operator and reviewer, but no NEO domain expert is currently available. Do not
+  invent a domain-expert approval gate. Use quantitative KPIs, fail-closed
+  evidence packets, explicit no-submission limitations, and operator review
+  fields. External MPC submission remains blocked until qualified review or a
+  separate externally supervised submission policy exists.
 
 ---
 
@@ -496,13 +502,14 @@ and excluded from CI.
 
 ## Current State (v0.88.0)
 
-All 10 pipeline modules are complete. The offline suite passes 3622 tests, with
+All 10 pipeline modules are complete. The offline suite passes 3600+ tests, with
 2 live/integration checks deselected. CI remains green on Python 3.14 with the
 100% coverage target. All three ML tiers have trained weights and all calibration
-KPIs have passed. **Production is blocked only on T1-C** (first real end-to-end
-pipeline run on live ZTF data returning non-zero candidates).
+KPIs have passed. **Production is blocked only on T1-C**: known-object recovery
+evidence, citizen-science operator false-positive review, and automated
+live-policy approval before unsupervised operation.
 
-**Production gap status (as of 2026-06-15)**:
+**Production gap status (as of 2026-06-17)**:
 - T1-A (Incomplete Trained ML Model Set): **CLOSED.** All Tier 1/2/3 weights
   trained; ensemble stacker KPIs passed (AUC=0.9809, Brier=0.0211, ECE=0.0000);
   `promotion_gate_passed=true`.
@@ -511,36 +518,30 @@ pipeline run on live ZTF data returning non-zero candidates).
   connection test OK. Credentials stored in macOS Keychain under service names
   `neo-detection:ATLAS_TOKEN`, `neo-detection:ZTF_IRSA_USERNAME`,
   `neo-detection:ZTF_IRSA_PASSWORD` — never stored in repo.
-- T1-C (No Real End-to-End Run): **OPEN.** Pipeline runs without crashing but
-  ZTF returns 0 alerts. **Root cause identified**: `_fetch_ztf_irsa_api` in
-  `src/fetch.py` queries `ztf.ztf_current_meta_sci` (science IMAGE METADATA,
-  one row per CCD exposure, no `magpsf`/`rb` columns) instead of the ZTF source
-  detection catalog. `_parse_ztf_metatable` silently returns [] for every row.
-  Fix pending: determine correct IRSA catalog name for ZTF source detections
-  (likely `ztf.ztf_source` or via `astroquery.ipac.irsa` with
-  `catalog="ztf_alerts"`), update `_fetch_ztf_irsa_api` and `_parse_ztf_metatable`
-  accordingly, add tests for the new path, push, wait for CI, merge, then re-run.
+- T1-C (Real-Data Recovery And Citizen-Science Review Evidence): **OPEN.**
+  A bounded supervised real-ZTF pilot completed on 2026-06-16 through the public
+  ALeRCE source-detection provider: 4,059 real source detections fetched, 520
+  raw moving candidates detected, first 80 candidates linked, and 2 internal
+  candidates scored. The remaining blocker is not zero alerts; it is a
+  non-Orion recovery run with an expected-known manifest, >=90% known-object
+  recovery, and operator false-positive review.
 - T1-D (No Ensemble Calibration): **CLOSED.** All KPIs passed 2026-06-14.
 See `docs/PRODUCTION_READINESS.md` for the full gap register.
 
-### Handoff notes (2026-06-15) — for the next agent picking this up
+### Handoff notes (2026-06-17) — for the next agent picking this up
 
-**What was fixed in PRs #104–#107 (all merged to main)**:
-- PR #104: `run_pipeline.py` auto-deletes stale cache on run, writes audit log
-- PR #105: `run_pipeline.py` checkpoint/resume (stable `_param_key()` from search params; `[resume]` printed for skipped stages)
-- PR #106: `_fetch_with_retry` and `fetch_atlas` in `src/fetch.py` — `json.JSONDecodeError` inherits from `OSError` via `requests.exceptions.JSONDecodeError` and was being retried 5× with backoff as a "network error"; fix adds `isinstance(exc, (json.JSONDecodeError, ValueError))` guard in `_fetch_with_retry`, and try/except guards around all `.json()` calls in `fetch_atlas`
-- PR #107: `_fetch_ztf_irsa_api` now reads `ZTF_IRSA_USERNAME`/`ZTF_IRSA_PASSWORD` from env and passes as `auth=`; `fetch_ztf` changed from `except ImportError:` to `except Exception:` so any ztfquery failure falls through to IRSA path
-
-**What is still broken (unresolved, T1-C blocked)**:
-- `_fetch_ztf_irsa_api` queries `ztf.ztf_current_meta_sci` — this is the WRONG table.
-  It returns science image metadata (one row per CCD chip per exposure); it has no
-  `magpsf`, `rb`, `ra`, `dec` per-source columns. `_parse_ztf_metatable` calls
-  `float(row.get("magpsf", 99.9))` which always gets 99.9 → observations below
-  mag threshold skipped → returns [].
-- `astroquery.irsa.Irsa.query_region(catalog="ztf_alerts")` also returned 0 in
-  testing (deprecated module may behave differently in newer astroquery).
-- The correct path is likely `astroquery.ipac.irsa.Irsa.query_region(...)` with
-  the correct catalog name (check IRSA catalog list: `Irsa.list_catalogs()`).
+**What is now true for T1-C**:
+- The original zero-alert diagnosis has been superseded. Public ALeRCE-backed
+  ZTF source detection is working and has produced non-zero real data.
+- The Orion pilot run `011dd53aa7f4` is retained only as historical/debug
+  evidence. Do not reuse Orion for the production recovery KPI.
+- The next production run should target many recoverable known moving objects,
+  preferably from `Skills/select_survey_fields.py --mode recovery`, then audit
+  against a manifest containing MPC designations plus sky/time samples.
+- `Skills/audit_real_run.py` is the fail-closed promotion gate. It must verify
+  >=90% known-object recovery and require citizen-science operator review before
+  internal production promotion is allowed. It never authorizes MPC submission,
+  NASA notification, or any impact-probability statement.
 
 **How to load credentials on operator Mac (NEVER use bare env vars)**:
 ```bash
@@ -549,15 +550,15 @@ source Skills/verify_live_credentials.sh   # loads ATLAS_TOKEN, ZTF_IRSA_USERNAM
 The script uses `security find-generic-password -s "neo-detection:ATLAS_TOKEN" -w`
 (full string as service name, no `-a` flag). Do NOT use `-s neo-detection -a ATLAS_TOKEN`.
 
-**Operator run command (after fix is merged)**:
+**Operator recovery-field selection command**:
 ```bash
 git pull origin main
-source Skills/verify_live_credentials.sh
-caffeinate -i uv run python Skills/run_pipeline.py \
-  --ra 83.82 --dec 25.13 --radius 3.0 \
-  --start-jd 2460500.0 --end-jd 2460503.0 \
-  --surveys ZTF ATLAS \
-  --output Logs/reports/t1c_pilot_run.json
+PYTHONPATH=src uv run python Skills/select_survey_fields.py \
+  --jd now \
+  --mode recovery \
+  --top-n 10 \
+  --history-dir Logs/pipeline_runs \
+  --json
 ```
 
 ### Skills
@@ -715,19 +716,24 @@ caffeinate -i uv run python Skills/run_pipeline.py \
 
 ### Immediate Next Steps
 
-**Priority 1 — Fix T1-C (ZTF returns 0 alerts)**:
-1. Determine correct IRSA catalog for ZTF source detections: run
-   `from astroquery.ipac.irsa import Irsa; print(Irsa.list_catalogs())` or
-   check https://irsa.ipac.caltech.edu/TAP/sync to find catalog with `magpsf`/`rb`.
-   Candidate: `ztf_source` or `ztf_alerts` via `astroquery.ipac.irsa`.
-2. Update `_fetch_ztf_irsa_api` in `src/fetch.py` to query the correct table.
-3. Update `_parse_ztf_metatable` to use the correct column names.
-4. Add/update tests to maintain 100% coverage.
-5. Push, wait for CI, merge, then give operator the run command from the Handoff notes.
+**Priority 1 — Close T1-C recovery evidence**:
+1. Use `Skills/select_survey_fields.py --mode recovery` to choose a non-Orion,
+   known-object-rich field.
+2. Build or supply an expected-known manifest with MPC designations and sky/time
+   samples for that field.
+3. Run a staged or uncapped supervised recovery pilot with credentials loaded
+   from Keychain and no external submission.
+4. Audit the run with `Skills/audit_real_run.py --expected-known ...` and
+   require >=90% known-object recovery.
+5. Record citizen-science operator review with `--operator-review ...`; only
+   `acceptable` rows pass. `false_positive`, `suspicious`, and
+   `needs_followup` all block internal promotion.
 
-**Priority 2 — After T1-C succeeds**:
-- T1-B dry-run policy sign-off via `Skills/background.py live-dry-run-plan`
-- Production scheduler setup (Milestone 4)
+**Priority 2 — After T1-C internal promotion evidence passes**:
+- T1-B dry-run policy sign-off via `Skills/background.py live-dry-run-plan`.
+- T2-C citizen-science architecture evidence packet with explicit no-submission
+  limitation.
+- Production scheduler setup remains blocked until live policy approval exists.
 
 **Background automation (lower priority)**:
 - Sync docs and changelog after each version bump so `AGENTS.md`, `CLAUDE.md`, `README.md`, and `CHANGELOG.md` stay aligned.

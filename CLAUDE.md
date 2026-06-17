@@ -57,6 +57,12 @@ If the highest-priority T1 gap cannot be resolved because a human blocker is unr
   a task requirement says otherwise. Do not hardcode machine-specific assumptions
   into scientific logic; expose performance-sensitive behavior through
   configuration or documented runtime defaults.
+- **Citizen-science production framing**: Jerome W. Lindsey III is the project
+  operator and reviewer, but no NEO domain expert is currently available. Do not
+  invent a domain-expert approval gate. Use quantitative KPIs, fail-closed
+  evidence packets, explicit no-submission limitations, and operator review
+  fields. External MPC submission remains blocked until qualified review or a
+  separate externally supervised submission policy exists.
 
 - **Always comment all code**: Every function, class, script, shell command, and non-trivial code block must include comments explaining what it does and why. This applies to all Python source files, all Skills scripts, all shell commands given to the operator, and all inline code snippets in documentation. No exceptions. This rule overrides any default behavior that would omit comments.
 - **caffeinate all long-running Mac commands**: Any operator command expected to run longer than ~30 seconds must be prefixed with `caffeinate -i` to prevent macOS from sleeping mid-run. This applies to all downloads, training runs, and pipeline executions. Example: `caffeinate -i uv run python Skills/download_ztf_training_alerts.py ...`
@@ -564,17 +570,18 @@ and excluded from CI.
 
 ## Current State (v0.88.0)
 
-All 10 pipeline modules are complete. The offline suite passes 3622 tests, with
+All 10 pipeline modules are complete. The offline suite passes 3600+ tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
 coverage target. All three ML tiers have trained weights: Tier 1 XGBoost
 (val_acc=99.95%), Tier 2 CNN (val_acc=91.3%), and Tier 3 Transformer
 (val_macro_f1=0.9400, best epoch 17/30). **T1-A CLOSED. T1-B CLOSED. T1-D CLOSED.**
 Ensemble stacker KPIs passed 2026-06-14 (AUC=0.9809, Brier=0.0211, ECE=0.0000).
 
-**Production is blocked only on T1-C** (first real end-to-end pipeline run on
-live ZTF data returning non-zero candidates).
+**Production is blocked only on T1-C**: known-object recovery evidence,
+citizen-science operator false-positive review, and automated live-policy
+approval before unsupervised operation.
 
-### Handoff state as of 2026-06-15
+### Handoff state as of 2026-06-17
 
 `Skills/run_pipeline.py` is now production-ready for live runs:
 - **Checkpoint/resume** (PR #105): after network drops or machine sleep, re-running
@@ -593,52 +600,34 @@ live ZTF data returning non-zero candidates).
   source Skills/verify_live_credentials.sh
   ```
 
-### Unresolved blocker: ZTF returns 0 alerts
+### Current T1-C blocker: recovery evidence
 
-**Root cause (diagnosed, not yet fixed):** `_fetch_ztf_irsa_api` queries
-`ztf.ztf_current_meta_sci` — the science **image metadata** table (one row per
-CCD exposure), not the individual source/alert catalog. Columns like `magpsf`, `rb`,
-`drb` do not exist in this table, so `_parse_ztf_metatable` silently returns []
-for every row. The IRSA TAP table for individual detections is different.
+The original zero-alert blocker has been superseded. Public ALeRCE-backed ZTF
+source detection is working and has produced non-zero real data. On 2026-06-16
+the Orion-field pilot fetched 4,059 real source detections, detected 520 raw
+moving candidates, linked the first 80, and scored 2 internal candidates. That
+run is retained only as historical/debug evidence and must not be reused for the
+production recovery KPI.
 
-`fetch_ztf_alerts` (used by the live connection test) also returned 0. It uses
-the deprecated `astroquery.irsa` module with `catalog="ztf_alerts"`. Switching to
-the non-deprecated `astroquery.ipac.irsa` may fix this.
+The next production run should target many recoverable known moving objects,
+preferably from `Skills/select_survey_fields.py --mode recovery`, then audit
+against a manifest containing MPC designations plus sky/time samples.
+`Skills/audit_real_run.py` is the fail-closed promotion gate: it must verify
+>=90% known-object recovery and require citizen-science operator review before
+internal production promotion is allowed. It never authorizes MPC submission,
+NASA notification, or any impact-probability statement.
 
-**Pending diagnostic** — the operator was given this command but the result was
-not received before handoff:
-```bash
-PYTHONPATH=src uv run python - <<'EOF'
-from astroquery.ipac.irsa import Irsa
-from astropy.coordinates import SkyCoord
-import astropy.units as u
-coord = SkyCoord(ra=83.8221, dec=-5.3911, unit="deg")
-t = Irsa.query_region(coord, catalog="ztf_alerts", spatial="Cone", radius=0.1*u.deg)
-print(f"ztf_alerts rows: {len(t)}")
-print("Columns:", list(t.colnames[:10]) if len(t) > 0 else "(empty)")
-EOF
-```
-
-**The fix** (do NOT implement until the diagnostic result is in hand):
-- If the above returns >0 rows: update `_fetch_ztf_irsa_api` to use
-  `astroquery.ipac.irsa.Irsa.query_region(catalog="ztf_alerts")` instead of
-  the ADQL TAP path against `ztf.ztf_current_meta_sci`.
-- If it still returns 0: the `ztf_alerts` catalog requires additional access or
-  has a different name; investigate IRSA catalog inventory before coding.
-
-**Operator run command** (once the ZTF fix is merged):
+**Operator recovery-field selection command**:
 ```bash
 git pull origin main
-source Skills/verify_live_credentials.sh
-export OMP_NUM_THREADS=1
-export MKL_NUM_THREADS=1
 export PYTHONPATH=src
-caffeinate -i uv run python Skills/run_pipeline.py \
-    --ra 83.8221 --dec -5.3911 --radius 1.0 \
-    --start-jd 2460700.5 --end-jd 2460703.5 \
-    --surveys ZTF ATLAS
+uv run python Skills/select_survey_fields.py \
+    --jd now \
+    --mode recovery \
+    --top-n 10 \
+    --history-dir Logs/pipeline_runs \
+    --json
 ```
-(Orion field, same coordinates used for the T1-B live connection test.)
 
 A second pilot run (post-v0.87.2) fetched 0 observations for all 400
 candidates because the MPCORB NEA.txt catalog uses extended packed
@@ -663,7 +652,8 @@ A fourth pilot run (post-v0.87.4) returned `insufficient_observations` for all
 as well — `float(Quantity('90.0 deg'))` raises `TypeError` in the same
 per-row `except Exception: pass` block. Fixed in v0.87.5 (PR #87): added
 `_mpc_to_float()` helper dispatching `.jd` / `.value` / `float()` and
-applied it to all four numeric columns. Pilot rerun pending operator execution.
+applied it to all four numeric columns. The subsequent fifth Tier 3 pilot
+succeeded and produced the trained Tier 3 weights now recorded under T1-A.
 
 ### Skills
 

@@ -156,6 +156,27 @@ class TestPopulationScoreBatch:
         assert np.all(scores <= 1.0)
 
 
+class TestKnownObjectDensityScoreBatch:
+    def test_ecliptic_opposition_is_highest(self):
+        ecl_lat = np.array([0.0, 60.0])
+        elong = np.array([180.0, 180.0])
+        scores = ssf.known_object_density_score_batch(ecl_lat, elong)
+        assert scores[0] > scores[1]
+
+    def test_opposition_higher_than_quadrature(self):
+        ecl_lat = np.array([0.0, 0.0])
+        elong = np.array([180.0, 90.0])
+        scores = ssf.known_object_density_score_batch(ecl_lat, elong)
+        assert scores[0] > scores[1]
+
+    def test_output_in_range(self):
+        ecl_lat = np.linspace(-90, 90, 181)
+        elong = np.linspace(0, 180, 181)
+        scores = ssf.known_object_density_score_batch(ecl_lat, elong)
+        assert np.all(scores >= 0.0)
+        assert np.all(scores <= 1.0)
+
+
 class TestGeometryScoreBatch:
     def test_aten_peak_at_80_degrees(self):
         elong = np.array([80.0])
@@ -350,6 +371,14 @@ class TestSelectFields:
         fields = ssf.select_fields(jd=2461000.5, mode="all", top_n=10)
         assert len(fields) >= 1
 
+    def test_recovery_mode_prefers_opposition_ecliptic_fields(self):
+        fields = ssf.select_fields(jd=2461000.5, mode="recovery", top_n=5)
+        assert len(fields) >= 1
+        for field in fields:
+            assert field["elongation_deg"] >= 120.0
+            assert abs(field["ecl_lat_deg"]) < 35.0
+            assert "known-object density" in field["reason"]
+
     def test_novelty_penalises_processed_field(self, tmp_path):
         # Write a run_summary.json for a field that will appear in the grid
         run_dir = tmp_path / "run_001"
@@ -413,3 +442,10 @@ class TestCLI:
         out = capsys.readouterr().out
         data = json.loads(out)
         assert isinstance(data, list)
+
+    def test_recovery_mode_cli(self, capsys):
+        ssf.main(["--jd", "2461000.5", "--mode", "recovery", "--top-n", "3", "--json"])
+        out = capsys.readouterr().out
+        data = json.loads(out)
+        assert isinstance(data, list)
+        assert len(data) <= 3

@@ -41,7 +41,7 @@ All modules compile, pass 100% branch coverage, and produce correct output
 **on synthetic/mocked pipeline data**. Real labeled ZTF alerts have been used
 to train and calibrate the ML tiers. A first supervised, bounded real ZTF
 pilot has completed; production still requires the known-object recovery audit
-and human false-positive review described in T1-C.
+and citizen-science operator false-positive review described in T1-C.
 
 ---
 
@@ -170,9 +170,9 @@ Credentials are stored in macOS Keychain under `neo-detection:ATLAS_TOKEN`, `neo
 
 ---
 
-### T1-C: No Real Data Has Ever Been Processed End-to-End
+### T1-C: Real-Data Recovery And Citizen-Science Review Evidence
 
-**What is missing**: The full pipeline (`Fetch → Preprocess → Detect → Link → Classify → Score → Alert`) has now completed one supervised, bounded real ZTF pilot through the public ALeRCE ZTF source-detection provider. Production closure still requires an uncapped or recovery-audit run, ≥90% known-object recovery verification, and human false-positive review.
+**What is missing**: The full pipeline (`Fetch → Preprocess → Detect → Link → Classify → Score → Alert`) has now completed one supervised, bounded real ZTF pilot through the public ALeRCE ZTF source-detection provider. Production closure still requires an uncapped or recovery-audit run, ≥90% known-object recovery verification, and citizen-science operator false-positive review.
 
 **Why it is Tier 1**: Synthetic data cannot expose real failure modes — coordinate edge cases, survey-specific format quirks, real noise distributions, real artifact morphologies, or real rate-limiting behavior. The pipeline's real-world correctness is unknown until it processes real data.
 
@@ -189,24 +189,27 @@ Credentials are stored in macOS Keychain under `neo-detection:ATLAS_TOKEN`, `neo
 3. [DONE] Build a fail-closed real-run audit packet with
    `Skills/audit_real_run.py`. For run `011dd53aa7f4`, the tool wrote JSON and
    CSV review evidence, preserved no-network/no-submission safety flags, and
-   correctly blocked promotion because no mapped expected-known manifest was
+   correctly blocked promotion because no expected-known manifest was
    supplied.
-4. [CODE + HUMAN] Provide or generate an expected-known manifest mapped to
-   pipeline candidate IDs, then verify ≥90% known-object recovery. A manifest
-   containing only MPC designations is not sufficient evidence because the audit
-   cannot prove which pipeline candidate recovered which expected object.
+4. [CODE + HUMAN] Provide or generate an expected-known manifest with MPC
+   designations and sky/time samples, then verify ≥90% known-object recovery
+   through `Skills/audit_real_run.py`. Pipeline object IDs may be used when
+   known, but they are no longer required.
 5. [CODE] Run an uncapped or staged recovery-audit pilot with link progress/ETA
    enabled, preserving `Logs/pipeline_runs/*/run_summary.json` evidence and
    evaluating it through `Skills/audit_real_run.py`.
-6. [HUMAN] Human expert reviews the audit CSV for false positives, with high
-   priority on long-arc near-stationary tracklets and any candidate that reaches
-   an external alert pathway.
+6. [HUMAN] The project operator performs citizen-science false-positive review
+   of the audit CSV. This is not professional planetary-defense validation and
+   does not authorize external submission.
+7. [CODE] Select a new known-object-rich recovery field. The Orion pilot field
+   is retained only as historical/debug evidence and must not be reused for the
+   production recovery KPI.
 
 **Current blocker**: T1-C is no longer blocked on zero ZTF fetches. The next
-blocker is a mapped expected-known recovery manifest plus human false-positive
-review. The automated live-review policy remains required before automated live
-runs; manual supervised pilot runs remain operator-controlled and
-non-submitting.
+blocker is a non-Orion expected-known recovery manifest plus citizen-science
+operator false-positive review. The automated live-review policy remains
+required before automated live runs; manual supervised pilot runs remain
+operator-controlled and non-submitting.
 
 ---
 
@@ -268,11 +271,19 @@ The pipeline has not been tested against:
 
 **Needed**: Run `Skills/diagnose_pipeline.py` on real ZTF alert data; audit false-positive rate against known-artifact catalog. Requires T1-C resolution.
 
-### T2-C: No Peer Review of ML Architecture
+### T2-C: No External Expert Review Of ML Architecture
 
 The Tier 1–3 architecture (XGBoost → CNN → Transformer → stacking) was designed per CLAUDE.md DECISION-002 and literature references (Duev et al. 2019, Lin et al. 2022). The implementation has not been reviewed by an astronomer or ML practitioner with NEO survey experience.
 
-**Needed**: External code/architecture review before the pipeline is used to generate MPC submissions.
+**Citizen-science constraint**: No domain expert is currently available. The
+project may continue as an internal, no-submission citizen-science pipeline
+using conservative evidence packets and explicit limitations. External MPC
+submission remains blocked until qualified review is available or the project
+adopts a separate submission policy with appropriate external oversight.
+
+**Needed**: Prepare a citizen-science architecture evidence packet that records
+model assumptions, calibration KPIs, known limitations, and no-submission
+guardrails. This packet does not replace expert validation.
 
 ### T2-D: No CI for Integration or End-to-End Tests
 
@@ -297,9 +308,9 @@ These items cannot be completed by code generation alone. They require real-worl
 
 | Blocker | Owner | Unblocks |
 |---|---|---|
-| Expert review of ML architecture | NEO survey astronomer | T2-C |
+| External expert review of ML architecture | Not currently available | External MPC submission |
 | Live review policy sign-off | Human reviewer | T1-B |
-| Known-object recovery audit and false-positive review | Human operator + domain reviewer | T1-C |
+| Known-object recovery audit and false-positive review | Citizen-science project operator | T1-C |
 
 ---
 
@@ -311,14 +322,16 @@ Before the pipeline makes its first MPC submission, all of the following must be
 - [x] T1-A resolved: calibration KPI gate passed ✓ (T1-D, 2026-06-14); ensemble stacker KPIs passed ✓ (2026-06-14)
 - [~] T1-B resolved: IRSA and ATLAS credentials configured ✓; live connection test passed ✓; automated live dry-run policy not yet signed off (pending human reviewer signature)
 - [~] T1-C progressed: Bounded supervised real-ZTF pilot completed on
-      2026-06-16; known-object recovery audit and human false-positive review
+      2026-06-16; known-object recovery audit and operator false-positive review
       still required.
 - [x] T1-D resolved: Machine-readable calibration report passes every required
       KPI on held-out real labeled data and records
       `promotion_gate_passed=true` ✓ (2026-06-14; Tier 1 + Tier 2)
 - [ ] T2-A resolved: At least one integration test suite passed against real APIs
 - [ ] T2-B resolved: False-positive rate on real artifact data < 5%
-- [ ] T2-C resolved: ML architecture reviewed by domain expert
+- [ ] T2-C resolved: citizen-science architecture evidence packet complete;
+      external expert validation remains unavailable and no-submission
+      limitation is explicit
 - [ ] Alert protocol compliance: `ready_for_submission()` gate tested on ≥10 real candidate outputs
 - [ ] Guardrail compliance: zero "confirmed NEO" or impact probability assertions in any output
 - [ ] AGENTS.md and CLAUDE.md synchronized to current version
