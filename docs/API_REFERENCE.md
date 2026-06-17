@@ -819,6 +819,7 @@ Lightweight summary of a `ScoredNEO` for display or export.
 | `Skills/filter_candidates.py` | Filter scored NEO JSON by hazard flag, pathway, or minimum priority |
 | `Skills/summarise_run.py` | Print/JSON summary of a pipeline run from scored NEO JSON |
 | `Skills/plot_sky_coverage.py` | RA/Dec scatter plot of tracklet positions colour-coded by hazard flag |
+| `Skills/audit_real_run.py` | Build fail-closed JSON/CSV audit packets for real pipeline runs |
 
 ---
 

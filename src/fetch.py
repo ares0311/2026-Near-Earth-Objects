@@ -254,6 +254,7 @@ def _parse_alerce_detection(
             mission="ZTF",
             real_bogus=float(rb) if rb is not None else None,
             deep_real_bogus=float(drb) if drb is not None else None,
+            field_id=oid,
         )
     except (KeyError, TypeError, ValueError):
         return None

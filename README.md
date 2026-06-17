@@ -558,6 +558,7 @@ The diagram below shows how data and artifacts move between the repository's top
 │   ├── evaluate_calibration.py   # Brier score + ECE for Platt and isotonic
 │   ├── generate_training_labels.py # Download MPC NEO + MBA catalog as CSV
 │   ├── check_mpc_known.py        # Cross-match candidates against MPC catalog
+│   ├── audit_real_run.py         # Build fail-closed real-run audit packets
 │   ├── visualize_tracklets.py    # Plot sky positions and light curves
 │   ├── export_mpc_report.py      # Export MPC 80-column reports from scored JSON
 │   ├── benchmark_pipeline.py     # Time classify + score on N synthetic tracklets
@@ -648,7 +649,7 @@ You need three things:
 
 | Item | Where to get it | Notes |
 |---|---|---|
-| **Python 3.11 or 3.12** | python.org/downloads | Free; install the version for your operating system |
+| **Python 3.14.3 via uv** | `uv.lock` | Use `uv run`; do not invoke bare `python`, `pytest`, `mypy`, or `ruff` |
 | **A ZTF IRSA account** | irsa.ipac.caltech.edu (free registration) | Needed for live sky data; not needed for the sample data bundled with the repo |
 | **This repository** | See §11 Installation | ~50 MB including test suite |
 
@@ -660,13 +661,13 @@ After installing (see §11), run the following two commands from the repository 
 
 ```bash
 # Step 1 — confirm every module is working correctly
-PYTHONPATH=src python Skills/smoke_test.py
+PYTHONPATH=src uv run python Skills/smoke_test.py
 ```
 *This takes about 10 seconds. If you see "All modules OK — smoke test passed." the installation is healthy.*
 
 ```bash
 # Step 2 — score the two bundled example tracklets
-PYTHONPATH=src python Skills/batch_score.py data/sample_tracklets.json
+PYTHONPATH=src uv run python Skills/batch_score.py data/sample_tracklets.json
 ```
 *This runs the classification and scoring pipeline on two synthetic NEO candidates that are included with the repository. It prints a ranked table showing the posterior probability that each candidate is a genuine NEO, its hazard flag, and its estimated size.*
 
@@ -688,12 +689,14 @@ IRSA username/password, while ATLAS uses `ATLAS_TOKEN`.
 
 ```bash
 # Run the pipeline on a 5-degree radius around RA=180°, Dec=0° for one week
-PYTHONPATH=src python Skills/run_pipeline.py \
+PYTHONPATH=src uv run python Skills/run_pipeline.py \
     --ra 180.0 \
     --dec 0.0 \
     --radius 5.0 \
-    --start 2026-05-01 \
-    --end 2026-05-07
+    --start-jd 2460796.5 \
+    --end-jd 2460802.5 \
+    --surveys ZTF \
+    --max-candidates 80
 ```
 
 **Parameters you can change:**
@@ -1207,7 +1210,8 @@ automated live-policy approval before unsupervised operation.
 | **M5c** | T1-A: Acquire real multi-night sequences, build dataset, and train Tier 3 Transformer | Five-class policy and 50/class pilot approved; pilot trained | **Complete** |
 | **M5d** | T1-A: Train Tier 1 XGBoost | `models/tier1_xgb.json`; validation accuracy 99.95%, macro AUC 1.000 | **Complete** |
 | **M6a** | T1-D: Quantitative production calibration gate | Held-out real labeled data; all Brier, ECE, log-loss, AUC, cross-validation, and bootstrap-confidence KPIs pass | **Complete** |
-| **M6b** | T1-C: Known-object recovery audit | Verify ≥90% known-object recovery on bounded/uncapped real-data runs | **Next human+code blocker** |
+| **M6b** | T1-C: Real-run audit packet | Build fail-closed review evidence from the first real ZTF pilot | **Complete for run `011dd53aa7f4`** |
+| **M6c** | T1-C: Known-object recovery audit | Verify ≥90% known-object recovery on a mapped expected-known manifest | **Blocked on expected-known manifest + review** |
 | **M7** | All T1 gaps closed; first MPC submission | Requires M4–M6 complete + T2-C peer review | **Pending** |
 
 ### 15.4 Progress Tracker
@@ -1226,20 +1230,18 @@ automated live-policy approval before unsupervised operation.
 | **P25** | Complete | Calibration KPI report passes; gates eligible to be armed | T1-D quantitative KPI gate passed |
 | **P26** | Complete | Public ALeRCE ZTF source-detection provider added | Replaces bad IRSA metadata-table assumption for source detections |
 | **P27** | Complete | First bounded supervised real-ZTF pilot completed | 4,059 real ZTF detections fetched; 2 internal candidates processed; run summary `011dd53aa7f4` |
-| **P28** | **Next** | T1-C recovery audit | Run staged/uncapped real-data pilot, cross-match against MPC known objects, verify ≥90% known-object recovery |
-| **P26** | **Pending** | First real-data pipeline run; ≥90% known-object recovery | Code + human audit; requires P20 + P21 |
-| **P27** | Complete | Bounded Tier 3 MPC sequence acquisition path | Resumable collection, atomic checkpoints, source-manifest hash, query log, provenance, and safety flags |
-| **P28** | Complete | Five-class Tier 3 policy and pilot approved | Jerome W. Lindsey III approved policy and 50/class pilot on 2026-06-10; not production approval |
-| **P29** | Complete | Five-class acquisition and split tooling | MPC early/late windows, ALeRCE bogus histories, fail-closed validation, source hashes, grouped splits |
-| **P30** | **Pending operator run** | Five-class Tier 3 pilot accepted | Run 50/class read-only acquisition on Mac and review `data/sequences/pilot/preparation_report.json` |
-| **P31** | **In progress** | First Tier 3 pilot evidence audited | Initial manifest had 28 duplicate comet rows and the MPC checkpoint recorded 103 zero-result queries without provider-error detail; fail-closed uniqueness, provider-error, and training-evidence gates are being applied before rerun |
-| **P32** | **In progress** | Atomic Tier 3 operator workflow | One command pins Python and git state, blocks checkout changes, uses reserve pools, stops after the first failed contract, resumes checkpoints, and writes top-level SQLite stage evidence |
+| **P28** | Complete | Real-run audit packet tool added | `Skills/audit_real_run.py` writes JSON + CSV review evidence without network access or external submission |
+| **P29** | Blocked | Known-object recovery KPI | Audit packet for run `011dd53aa7f4` blocks on missing mapped expected-known manifest; ≥90% recovery not yet established |
+| **P30** | Blocked | Human false-positive review | Review CSV required for the two real-run internal candidates; long-arc near-stationary candidates are high-priority review items |
+| **P31** | Next | Staged known-object pilot | Select/approve a field or manifest with expected recoverable known objects, run bounded/uncapped pilot, and evaluate recovery gate |
+| **P32** | Pending | Automated live-run approval | Background live-review policy still needs signoff before unsupervised live automation |
 
 ### 15.5 Known Limitations
 
-- **No real data ever processed**: The pipeline has only ever run on synthetic data. Real-world failure modes are unknown until M4d.
-- **Incomplete production ensemble**: Tier 1 and Tier 2 weights exist, but Tier 3 still requires real multi-night sequence data and training.
-- **Model calibration is survey-dependent**: Synthetic baselines do not replace real-survey holdout validation.
+- **Real-data evidence is bounded**: The first ALeRCE-backed ZTF pilot processed real detections and produced two internal candidates, but it was capped at 80 linked candidates.
+- **Known-object recovery is not yet proven**: The current real-run audit blocks because no mapped expected-known manifest has been supplied.
+- **Human false-positive review remains open**: Real-run internal candidates need domain review before T1-C can close.
+- **Automated live operation is not approved**: Manual supervised runs are possible; background live automation still needs policy signoff.
 - **MOID accuracy on short arcs**: Arcs < 24 hours produce unreliable MOID; quality-code gate (≥2) mitigates but does not eliminate this.
 
 ---

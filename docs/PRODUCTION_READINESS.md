@@ -113,7 +113,7 @@ calibration and alert-gate qualification cannot be completed.
   - Tier 1 XGBoost (Isotonic): Brier=0.0000, ECE=0.0000, ROC AUC=1.0000 — all 7 KPIs PASS.
   - Tier 2 CNN (Isotonic): Brier=0.0462, ECE=0.0132, ROC AUC=0.9593 — all 7 KPIs PASS.
   - `promotion_gate_passed=true`; report at `Logs/reports/calibration_report.json` (local only, gitignored).
-- **Still needed**: Ensemble stacking calibration (logistic regression meta-learner over Tier 1 + Tier 2 + Tier 3 outputs).
+- Ensemble stacking calibration is complete and passed the quantitative KPI gate.
 
 **What is needed to close it**:
 1. [DONE] Download 10,000 labeled ZTF Avro alerts via `Skills/download_ztf_training_alerts.py`.
@@ -186,17 +186,27 @@ Credentials are stored in macOS Keychain under `neo-detection:ATLAS_TOKEN`, `neo
    and 2 internal-candidate outputs written to
    `Logs/reports/t1c_ztf_alerce_pilot.json`. Audit summary:
    `Logs/pipeline_runs/011dd53aa7f4/run_summary.json`.
-3. [CODE] Run an uncapped or staged recovery-audit pilot with link progress/ETA
-   enabled, preserving `Logs/pipeline_runs/*/run_summary.json` evidence.
-4. [CODE + HUMAN] Manually inspect pipeline output against MPC known objects in
-   that field; verify ≥90% known-object recovery rate.
-5. [CODE] Run `Skills/check_mpc_known.py` on pipeline output to audit cross-match completeness.
-6. [HUMAN] Human expert reviews candidate output for any false positives that passed all gates.
+3. [DONE] Build a fail-closed real-run audit packet with
+   `Skills/audit_real_run.py`. For run `011dd53aa7f4`, the tool wrote JSON and
+   CSV review evidence, preserved no-network/no-submission safety flags, and
+   correctly blocked promotion because no mapped expected-known manifest was
+   supplied.
+4. [CODE + HUMAN] Provide or generate an expected-known manifest mapped to
+   pipeline candidate IDs, then verify ≥90% known-object recovery. A manifest
+   containing only MPC designations is not sufficient evidence because the audit
+   cannot prove which pipeline candidate recovered which expected object.
+5. [CODE] Run an uncapped or staged recovery-audit pilot with link progress/ETA
+   enabled, preserving `Logs/pipeline_runs/*/run_summary.json` evidence and
+   evaluating it through `Skills/audit_real_run.py`.
+6. [HUMAN] Human expert reviews the audit CSV for false positives, with high
+   priority on long-arc near-stationary tracklets and any candidate that reaches
+   an external alert pathway.
 
 **Current blocker**: T1-C is no longer blocked on zero ZTF fetches. The next
-blocker is the known-object recovery audit plus human false-positive review.
-The automated live-review policy remains required before automated live runs;
-manual supervised pilot runs remain operator-controlled and non-submitting.
+blocker is a mapped expected-known recovery manifest plus human false-positive
+review. The automated live-review policy remains required before automated live
+runs; manual supervised pilot runs remain operator-controlled and
+non-submitting.
 
 ---
 
