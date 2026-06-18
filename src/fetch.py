@@ -183,6 +183,45 @@ def _fetch_ztf_alerce_api(
 
     try:
         client = Alerce()
+    except Exception:
+        return []
+
+    # Recovery runs need moving objects, so query ALeRCE's asteroid stamp class
+    # first. Generic cone-search objects remain a fallback for older brokers or
+    # fields where the classifier returns no asteroid detections.
+    query_modes: tuple[dict[str, str], ...] = (
+        {"classifier": "stamp_classifier", "class_name": "asteroid"},
+        {},
+    )
+    for query_filter in query_modes:
+        observations = _fetch_alerce_objects_for_filter(
+            client,
+            ra_deg,
+            dec_deg,
+            radius_deg,
+            start_jd,
+            end_jd,
+            max_objects=max_objects,
+            query_filter=query_filter,
+        )
+        if observations:
+            return observations
+    return []
+
+
+def _fetch_alerce_objects_for_filter(
+    client: Any,
+    ra_deg: float,
+    dec_deg: float,
+    radius_deg: float,
+    start_jd: float,
+    end_jd: float,
+    *,
+    max_objects: int,
+    query_filter: dict[str, str],
+) -> list[Observation]:
+    """Fetch ALeRCE object detections for one object-query filter."""
+    try:
         objects_payload = client.query_objects(
             format="json",
             survey="ztf",
@@ -195,6 +234,7 @@ def _fetch_ztf_alerce_api(
             page_size=max(1, min(max_objects, 100)),
             order_by="ndet",
             order_mode="DESC",
+            **query_filter,
         )
     except Exception:
         return []

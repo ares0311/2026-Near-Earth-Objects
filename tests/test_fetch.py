@@ -361,7 +361,10 @@ class TestFetchZtfAlerceApi:
         import types
 
         class FakeAlerce:
+            calls: list[dict] = []
+
             def query_objects(self, **kwargs):
+                self.calls.append(kwargs)
                 assert kwargs["survey"] == "ztf"
                 assert kwargs["radius"] == pytest.approx(3600.0)
                 return {"items": [{"oid": "ZTF26aahyrwl"}]}
@@ -402,6 +405,50 @@ class TestFetchZtfAlerceApi:
 
         assert len(obs) == 1
         assert obs[0].obs_id == "3342174430915015006"
+        assert FakeAlerce.calls[0]["classifier"] == "stamp_classifier"
+        assert FakeAlerce.calls[0]["class_name"] == "asteroid"
+
+    def test_fetch_alerce_falls_back_to_generic_objects(self, monkeypatch):
+        import sys
+        import types
+
+        class FakeAlerce:
+            calls: list[dict] = []
+
+            def query_objects(self, **kwargs):
+                self.calls.append(kwargs)
+                if kwargs.get("class_name") == "asteroid":
+                    return {"items": []}
+                return {"items": [{"oid": "ZTF26generic"}]}
+
+            def query_detections(self, oid, **kwargs):
+                assert oid == "ZTF26generic"
+                assert kwargs["survey"] == "ztf"
+                return [
+                    {
+                        "mjd": 61096.1744328998,
+                        "candid": "generic_detection",
+                        "fid": 1,
+                        "magpsf": 15.7,
+                        "ra": 84.59,
+                        "dec": -5.33,
+                    },
+                ]
+
+        monkeypatch.setitem(sys.modules, "alerce", types.SimpleNamespace(Alerce=FakeAlerce))
+
+        obs = _fetch_ztf_alerce_api(
+            83.8221,
+            -5.3911,
+            1.0,
+            2461096.0,
+            2461097.0,
+        )
+
+        assert len(obs) == 1
+        assert obs[0].obs_id == "generic_detection"
+        assert FakeAlerce.calls[0]["class_name"] == "asteroid"
+        assert "class_name" not in FakeAlerce.calls[1]
 
 
 class TestParseAtlasPhotometryNoHeader:

@@ -251,6 +251,36 @@ def _find_moving_sources(
     return candidates
 
 
+def _find_object_history_sources(
+    observations: tuple[Observation, ...],
+    motion_min: float = _MOTION_MIN_ARCSEC_PER_HR,
+    motion_max: float = _MOTION_MAX_ARCSEC_PER_HR,
+) -> list[RawCandidate]:
+    """Preserve broker-provided same-object histories as moving candidates."""
+    grouped: dict[str, list[Observation]] = defaultdict(list)
+    for obs in observations:
+        if obs.field_id:
+            grouped[str(obs.field_id)].append(obs)
+
+    candidates: list[RawCandidate] = []
+    for oid, history in grouped.items():
+        obs_sorted = sorted(history, key=lambda obs: obs.jd)
+        if len(obs_sorted) < 2:
+            continue
+        rate, pa = _motion_rate_and_pa(obs_sorted[0], obs_sorted[-1])
+        if motion_min <= rate <= motion_max:
+            candidates.append(
+                RawCandidate(
+                    candidate_id=oid,
+                    observations=tuple(obs_sorted),
+                    apparent_motion_arcsec_per_hr=rate,
+                    motion_pa_deg=pa,
+                    is_streak=any(_is_streak(o) for o in obs_sorted),
+                )
+            )
+    return candidates
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
@@ -272,9 +302,17 @@ def detect(
     # Step 1: real/bogus filter
     passing = [obs for obs in sources if _passes_real_bogus(obs, real_bogus_threshold)]
 
-    # Step 2 & 3: find moving sources night by night
-    all_candidates: list[RawCandidate] = []
-    nights = _group_by_night(tuple(passing))
+    # Step 2 & 3: preserve same-object broker histories first, then fall back
+    # to night-level pairing for sources that do not carry a stable object id.
+    passing_tuple = tuple(passing)
+    all_candidates: list[RawCandidate] = _find_object_history_sources(passing_tuple)
+    object_history_obs = {
+        obs.obs_id
+        for cand in all_candidates
+        for obs in cand.observations
+    }
+    ungrouped = tuple(obs for obs in passing_tuple if obs.obs_id not in object_history_obs)
+    nights = _group_by_night(ungrouped)
     for night_obs in nights.values():
         all_candidates.extend(_find_moving_sources(night_obs))
 

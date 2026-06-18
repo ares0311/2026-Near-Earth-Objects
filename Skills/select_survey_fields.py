@@ -515,6 +515,85 @@ def select_fields(jd: float,
     return results
 
 
+def probe_ztf_object_count(
+    ra_deg: float,
+    dec_deg: float,
+    radius_deg: float,
+    start_jd: float,
+    end_jd: float,
+    *,
+    page_size: int = 100,
+) -> int:
+    """Return a bounded live ALeRCE/ZTF object count for one candidate field."""
+    try:
+        from alerce import Alerce  # type: ignore[import]
+    except Exception:
+        return 0
+
+    try:
+        client = Alerce()
+        payload = client.query_objects(
+            format="json",
+            survey="ztf",
+            ra=ra_deg,
+            dec=dec_deg,
+            radius=max(radius_deg, 0.0) * 3600.0,
+            firstmjd=[start_jd - 2_400_000.5, end_jd - 2_400_000.5],
+            lastmjd=[start_jd - 2_400_000.5, end_jd - 2_400_000.5],
+            page=1,
+            page_size=max(1, min(page_size, 100)),
+            order_by="ndet",
+            order_mode="DESC",
+        )
+    except Exception:
+        return 0
+    rows = payload.get("items", []) if isinstance(payload, dict) else payload
+    return len(rows) if isinstance(rows, list) else 0
+
+
+def filter_fields_by_ztf_availability(
+    fields: list[dict],
+    *,
+    start_jd: float,
+    end_jd: float,
+    min_objects: int,
+    top_n: int,
+    probe_fn=probe_ztf_object_count,
+) -> list[dict]:
+    """Keep only candidate fields with live ZTF/ALeRCE objects in the window."""
+    accepted: list[dict] = []
+    total = len(fields)
+    t_start = time.monotonic()
+    for idx, field in enumerate(fields, start=1):
+        count = int(
+            probe_fn(
+                float(field["ra_deg"]),
+                float(field["dec_deg"]),
+                float(field["field_radius_deg"]),
+                start_jd,
+                end_jd,
+            )
+        )
+        elapsed = time.monotonic() - t_start
+        eta = (elapsed / idx) * (total - idx) if idx else 0.0
+        print(
+            f"[ztf-probe] {idx}/{total} RA={field['ra_deg']:.2f} "
+            f"Dec={field['dec_deg']:.2f} objects={count} "
+            f"elapsed {elapsed:.0f}s ETA {eta:.0f}s",
+            file=sys.stderr,
+            flush=True,
+        )
+        enriched = dict(field)
+        enriched["ztf_object_count"] = count
+        if count >= min_objects:
+            enriched["rank"] = len(accepted) + 1
+            enriched["reason"] = f"{enriched['reason']}; ZTF objects {count}"
+            accepted.append(enriched)
+        if len(accepted) >= top_n:
+            break
+    return accepted
+
+
 # ── CLI ────────────────────────────────────────────────────────────────────────
 
 def main(argv: list[str] | None = None) -> None:
@@ -568,6 +647,35 @@ def main(argv: list[str] | None = None) -> None:
         "--json", action="store_true", dest="json_out",
         help="Output JSON list instead of ASCII table.",
     )
+    parser.add_argument(
+        "--require-ztf-alerts",
+        action="store_true",
+        help="Probe live ALeRCE/ZTF availability and keep only fields with objects.",
+    )
+    parser.add_argument(
+        "--ztf-start-jd",
+        type=float,
+        default=None,
+        help="Start JD for the live ZTF availability probe. Default: jd - 4.",
+    )
+    parser.add_argument(
+        "--ztf-end-jd",
+        type=float,
+        default=None,
+        help="End JD for the live ZTF availability probe. Default: jd.",
+    )
+    parser.add_argument(
+        "--ztf-min-objects",
+        type=int,
+        default=1,
+        help="Minimum ALeRCE/ZTF objects required for a selected field.",
+    )
+    parser.add_argument(
+        "--ztf-probe-top-k",
+        type=int,
+        default=40,
+        help="Number of analytically ranked fields to live-probe before filtering.",
+    )
     args = parser.parse_args(argv)
 
     if args.jd == "now":
@@ -576,14 +684,23 @@ def main(argv: list[str] | None = None) -> None:
     else:
         jd = float(args.jd)
 
+    initial_top_n = max(args.top_n, args.ztf_probe_top_k) if args.require_ztf_alerts else args.top_n
     fields = select_fields(
         jd=jd,
         mode=args.mode,
-        top_n=args.top_n,
+        top_n=initial_top_n,
         history_dir=args.history_dir,
         lat=args.obs_lat,
         model_path=args.model,
     )
+    if args.require_ztf_alerts:
+        fields = filter_fields_by_ztf_availability(
+            fields,
+            start_jd=args.ztf_start_jd if args.ztf_start_jd is not None else jd - 4.0,
+            end_jd=args.ztf_end_jd if args.ztf_end_jd is not None else jd,
+            min_objects=args.ztf_min_objects,
+            top_n=args.top_n,
+        )
 
     if args.json_out:
         print(json.dumps(fields, indent=2))

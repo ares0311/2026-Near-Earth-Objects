@@ -217,6 +217,19 @@ and citizen-science operator false-positive review. The automated live-review
 policy remains required before automated live runs; manual supervised pilot
 runs remain operator-controlled and non-submitting.
 
+**2026-06-18 diagnostic update**: Recovery field selection now supports live
+ZTF availability probing and broader MPC asteroid-list manifest preselection.
+A ZTF-available fixed field at RA `251.66`, Dec `-22.50`, radius `3.5` produced
+valid expected-known manifests and live asteroid-class ALeRCE detections.
+However, ALeRCE asteroid-class objects in that field were same-night
+three-detection tracklets, not multi-night histories; the 30-day asteroid-class
+pipeline fetched `119` alerts, detected `48` candidates, linked `0` multi-night
+tracklets, and therefore failed the existing known-object recovery KPI. T1-C
+remains open until a multi-night known-object provider/path is used or a
+separate same-night diagnostic subgate is explicitly added without replacing
+the multi-night production gate. Durable summary:
+`docs/evidence/t1c/2026-06-18-recovery-selector-and-provider-diagnostic.md`.
+
 ---
 
 ### T1-D: No Production Ensemble Calibration — **CLOSED 2026-06-14**

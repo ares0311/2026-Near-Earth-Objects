@@ -9,6 +9,7 @@ from detect import (
     _angular_sep_arcsec,
     _cross_match_mpc,
     _find_moving_sources,
+    _find_object_history_sources,
     _group_by_night,
     _is_streak,
     _motion_rate_and_pa,
@@ -146,6 +147,32 @@ class TestDetectPipeline:
         obs2 = make_obs(obs_id="b", jd=2460000.5 + 1 / 24, ra_deg=181.0, real_bogus=0.9)
         result = detect((obs1, obs2), mpc_cross_match=False)
         assert len(result.candidates) == 0
+
+    def test_preserves_broker_object_history_candidate(self):
+        obs1 = make_obs(
+            obs_id="a",
+            field_id="ZTF-object-1",
+            jd=2460000.5,
+            ra_deg=180.0,
+            real_bogus=0.9,
+        )
+        obs2 = make_obs(
+            obs_id="b",
+            field_id="ZTF-object-1",
+            jd=2460001.5,
+            ra_deg=180.1,
+            real_bogus=0.9,
+        )
+        result = detect((obs1, obs2), mpc_cross_match=False)
+        assert len(result.candidates) == 1
+        assert result.candidates[0].candidate_id == "ZTF-object-1"
+        assert result.candidates[0].observations == (obs1, obs2)
+
+    def test_stationary_broker_object_history_rejected(self):
+        obs1 = make_obs(obs_id="a", field_id="ZTF-object-1", jd=2460000.5, real_bogus=0.9)
+        obs2 = make_obs(obs_id="b", field_id="ZTF-object-1", jd=2460001.5, real_bogus=0.9)
+        result = _find_object_history_sources((obs1, obs2))
+        assert result == []
 
 
 class TestIsStreak:

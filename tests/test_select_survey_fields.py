@@ -417,6 +417,31 @@ class TestSelectFields:
             assert 0.0 <= f["score"] <= 1.0
 
 
+class TestZtfAvailabilityProbe:
+    def test_filter_fields_by_ztf_availability_keeps_only_populated_fields(self):
+        fields = [
+            {"rank": 1, "ra_deg": 10.0, "dec_deg": 0.0, "field_radius_deg": 3.5, "reason": "a"},
+            {"rank": 2, "ra_deg": 20.0, "dec_deg": 0.0, "field_radius_deg": 3.5, "reason": "b"},
+        ]
+
+        def fake_probe(ra_deg, _dec_deg, _radius_deg, _start_jd, _end_jd):
+            return 7 if ra_deg == 20.0 else 0
+
+        filtered = ssf.filter_fields_by_ztf_availability(
+            fields,
+            start_jd=2461206.5,
+            end_jd=2461209.9,
+            min_objects=1,
+            top_n=2,
+            probe_fn=fake_probe,
+        )
+
+        assert len(filtered) == 1
+        assert filtered[0]["ra_deg"] == 20.0
+        assert filtered[0]["ztf_object_count"] == 7
+        assert filtered[0]["rank"] == 1
+
+
 # ── CLI smoke tests ────────────────────────────────────────────────────────────
 
 class TestCLI:
@@ -449,3 +474,22 @@ class TestCLI:
         data = json.loads(out)
         assert isinstance(data, list)
         assert len(data) <= 3
+
+    def test_require_ztf_alerts_cli_json(self, capsys, monkeypatch):
+        monkeypatch.setattr(
+            ssf,
+            "probe_ztf_object_count",
+            lambda ra_deg, *_args, **_kwargs: 5 if ra_deg > 0 else 0,
+        )
+        ssf.main([
+            "--jd", "2461000.5",
+            "--mode", "recovery",
+            "--top-n", "2",
+            "--require-ztf-alerts",
+            "--ztf-probe-top-k", "4",
+            "--json",
+        ])
+        out = capsys.readouterr().out
+        data = json.loads(out)
+        assert len(data) <= 2
+        assert all(row["ztf_object_count"] >= 1 for row in data)

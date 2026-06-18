@@ -10,6 +10,7 @@ external alert pathways, or asserts impact probability.
 from __future__ import annotations
 
 import argparse
+import csv
 import hashlib
 import json
 import math
@@ -27,6 +28,8 @@ _DEFAULT_RUN_ROOT = Path("Logs/pipeline_runs")
 _DEFAULT_TOLERANCE_ARCSEC = 5.0
 _DEFAULT_TOLERANCE_DAYS = 0.02
 _DEFAULT_MAX_MAG = 21.5
+_DEFAULT_LABEL_POOL = Path("data/training_labels.csv")
+_OBLIQUITY_DEG = 23.439291
 
 
 def _param_key(params: dict[str, Any]) -> str:
@@ -101,12 +104,292 @@ def _angular_sep_deg(ra1: float, dec1: float, ra2: float, dec2: float) -> float:
     return math.degrees(2.0 * math.asin(min(1.0, math.sqrt(max(0.0, hav)))))
 
 
+def _row_float(row: dict[str, Any], key: str) -> float | None:
+    """Return a finite float from one MPC orbital row when available."""
+    try:
+        value = float(row[key])
+    except (KeyError, TypeError, ValueError):
+        return None
+    return value if math.isfinite(value) else None
+
+
+def _mpc_row_designation(row: dict[str, Any]) -> str | None:
+    """Return the stable MPC number or provisional designation for a row."""
+    number = row.get("number")
+    if number not in (None, ""):
+        try:
+            return str(int(number))
+        except (TypeError, ValueError):
+            return str(number).strip() or None
+    designation = str(row.get("designation") or "").strip()
+    return designation or None
+
+
+def _solve_kepler(mean_anomaly_rad: float, eccentricity: float) -> float:
+    """Solve Kepler's equation with a fixed small Newton iteration budget."""
+    anomaly = mean_anomaly_rad
+    for _ in range(12):
+        delta = (
+            anomaly
+            - eccentricity * math.sin(anomaly)
+            - mean_anomaly_rad
+        ) / max(1e-12, 1.0 - eccentricity * math.cos(anomaly))
+        anomaly -= delta
+        if abs(delta) < 1e-10:
+            break
+    return anomaly
+
+
+def _earth_heliocentric_ecliptic_au(jd: float) -> tuple[float, float, float]:
+    """Approximate Earth's heliocentric ecliptic vector in AU for preselection."""
+    days = jd - 2451545.0
+    mean_long = math.radians((280.460 + 0.9856474 * days) % 360.0)
+    anomaly = math.radians((357.528 + 0.9856003 * days) % 360.0)
+    sun_lon = (
+        mean_long
+        + math.radians(1.915) * math.sin(anomaly)
+        + math.radians(0.020) * math.sin(2.0 * anomaly)
+    )
+    earth_lon = sun_lon + math.pi
+    radius = (
+        1.00014
+        - 0.01671 * math.cos(anomaly)
+        - 0.00014 * math.cos(2.0 * anomaly)
+    )
+    return (
+        radius * math.cos(earth_lon),
+        radius * math.sin(earth_lon),
+        0.0,
+    )
+
+
+def _rough_ra_dec_from_mpc_orbit(
+    row: dict[str, Any],
+    target_jd: float,
+) -> tuple[float, float] | None:
+    """Approximate geocentric RA/Dec from MPC elements for field preselection."""
+    a = _row_float(row, "semimajor_axis")
+    e = _row_float(row, "eccentricity")
+    inc = _row_float(row, "inclination")
+    node = _row_float(row, "ascending_node")
+    argp = _row_float(row, "argument_of_perihelion")
+    mean_anomaly = _row_float(row, "mean_anomaly")
+    daily_motion = _row_float(row, "mean_daily_motion")
+    epoch_jd = _row_float(row, "epoch_jd")
+    if None in (a, e, inc, node, argp, mean_anomaly, daily_motion, epoch_jd):
+        return None
+    assert a is not None and e is not None and inc is not None
+    assert node is not None and argp is not None and mean_anomaly is not None
+    assert daily_motion is not None and epoch_jd is not None
+    if a <= 0.0 or not 0.0 <= e < 1.0:
+        return None
+
+    mean_rad = math.radians((mean_anomaly + daily_motion * (target_jd - epoch_jd)) % 360.0)
+    ecc_anomaly = _solve_kepler(mean_rad, e)
+    x_orb = a * (math.cos(ecc_anomaly) - e)
+    y_orb = a * math.sqrt(max(0.0, 1.0 - e * e)) * math.sin(ecc_anomaly)
+
+    cos_o, sin_o = math.cos(math.radians(node)), math.sin(math.radians(node))
+    cos_i, sin_i = math.cos(math.radians(inc)), math.sin(math.radians(inc))
+    cos_w, sin_w = math.cos(math.radians(argp)), math.sin(math.radians(argp))
+    x_ecl = (
+        (cos_o * cos_w - sin_o * sin_w * cos_i) * x_orb
+        + (-cos_o * sin_w - sin_o * cos_w * cos_i) * y_orb
+    )
+    y_ecl = (
+        (sin_o * cos_w + cos_o * sin_w * cos_i) * x_orb
+        + (-sin_o * sin_w + cos_o * cos_w * cos_i) * y_orb
+    )
+    z_ecl = (sin_w * sin_i) * x_orb + (cos_w * sin_i) * y_orb
+
+    earth_x, earth_y, earth_z = _earth_heliocentric_ecliptic_au(target_jd)
+    geo_x = x_ecl - earth_x
+    geo_y = y_ecl - earth_y
+    geo_z = z_ecl - earth_z
+    obliquity = math.radians(_OBLIQUITY_DEG)
+    equ_x = geo_x
+    equ_y = geo_y * math.cos(obliquity) - geo_z * math.sin(obliquity)
+    equ_z = geo_y * math.sin(obliquity) + geo_z * math.cos(obliquity)
+    distance = math.sqrt(equ_x * equ_x + equ_y * equ_y + equ_z * equ_z)
+    if distance <= 0.0:
+        return None
+    ra = math.degrees(math.atan2(equ_y, equ_x)) % 360.0
+    dec = math.degrees(math.asin(max(-1.0, min(1.0, equ_z / distance))))
+    return ra, dec
+
+
 def _designation_from_known_obs(obs: Any) -> str | None:
     """Extract the MPC designation stored by ``fetch_mpc_known`` in ``obs_id``."""
     obs_id = str(getattr(obs, "obs_id", ""))
     if obs_id.startswith("mpc_") and len(obs_id) > 4:
         return obs_id[4:]
     return None
+
+
+def _designation_from_label_row(row: dict[str, str]) -> str | None:
+    """Return a Horizons-compatible designation from one committed label row."""
+    designation = str(row.get("designation", "")).strip()
+    if not designation:
+        return None
+    if designation.isdigit():
+        return str(int(designation))
+    return designation
+
+
+def _designations_from_label_pool(path: Path, limit: int) -> list[str]:
+    """Load a bounded fallback designation pool from committed MPC labels."""
+    if limit <= 0 or not path.exists():
+        return []
+    designations: list[str] = []
+    with path.open(newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        for row in reader:
+            designation = _designation_from_label_row(row)
+            if designation and designation not in designations:
+                designations.append(designation)
+            if len(designations) >= limit:
+                break
+    return designations
+
+
+def _designations_from_mpc_region(
+    ra_deg: float,
+    dec_deg: float,
+    radius_deg: float,
+    max_objects: int,
+) -> list[str]:
+    """Return designations from MPC region search when the provider supports it."""
+    known_obs = _with_retry(
+        "mpc-region",
+        lambda: fetch_mpc_known(ra_deg, dec_deg, radius_deg),
+    )
+    designations: list[str] = []
+    for obs in known_obs:
+        designation = _designation_from_known_obs(obs)
+        if designation and designation not in designations:
+            designations.append(designation)
+        if len(designations) >= max_objects:
+            break
+    return designations
+
+
+def _candidate_designations(
+    *,
+    ra_deg: float,
+    dec_deg: float,
+    radius_deg: float,
+    max_objects: int,
+    label_pool: Path,
+    fallback_scan_limit: int,
+) -> tuple[list[str], str]:
+    """Get candidate designations, falling back when live MPC lacks region search."""
+    try:
+        designations = _designations_from_mpc_region(
+            ra_deg,
+            dec_deg,
+            radius_deg,
+            max_objects,
+        )
+    except AttributeError as exc:
+        print(
+            f"[manifest] MPC region search unavailable ({exc}); "
+            f"falling back to {label_pool}",
+            flush=True,
+        )
+        return (
+            _designations_from_label_pool(label_pool, fallback_scan_limit),
+            "committed_training_labels_plus_jpl_horizons",
+        )
+    if designations:
+        return designations, "mpc_region_plus_jpl_horizons"
+    fallback = _designations_from_label_pool(label_pool, fallback_scan_limit)
+    return fallback, "committed_training_labels_plus_jpl_horizons"
+
+
+def _fetch_mpc_orbit_rows(limit: int, neo_only: bool = True) -> list[dict[str, Any]]:
+    """Fetch a bounded MPC orbit list for local field preselection."""
+    if limit <= 0:
+        return []
+    from astroquery.mpc import MPC  # type: ignore[import]
+
+    # T1-C recovery is a known-object recovery gate, not a new-NEO discovery gate.
+    # Keep NEO-only as the conservative default, but allow all asteroid rows when
+    # the operator needs a denser known-moving-object recovery field.
+    query_kwargs: dict[str, Any] = {"limit": limit}
+    if neo_only:
+        query_kwargs["neo"] = 1
+    rows = MPC.query_objects("asteroid", **query_kwargs)
+    return [dict(row) for row in rows]
+
+
+def _auto_center_designations_from_mpc_list(
+    *,
+    target_jd: float,
+    radius_deg: float,
+    list_limit: int,
+    max_objects: int,
+    neo_only: bool = True,
+) -> tuple[float, float, list[str]]:
+    """Choose a dense recovery field from approximate MPC orbit projections."""
+    projected: list[tuple[str, float, float]] = []
+    for row in _fetch_mpc_orbit_rows(list_limit, neo_only=neo_only):
+        designation = _mpc_row_designation(row)
+        position = _rough_ra_dec_from_mpc_orbit(row, target_jd)
+        if designation is not None and position is not None:
+            projected.append((designation, position[0], position[1]))
+    if not projected:
+        raise RuntimeError("MPC orbit list did not yield any projectable designations")
+
+    best_center = projected[0]
+    best_members: list[tuple[str, float, float]] = []
+    for candidate in projected:
+        _, cand_ra, cand_dec = candidate
+        members = [
+            row for row in projected
+            if _angular_sep_deg(cand_ra, cand_dec, row[1], row[2]) <= radius_deg
+        ]
+        if len(members) > len(best_members):
+            best_center = candidate
+            best_members = members
+
+    center_ra = best_center[1]
+    center_dec = best_center[2]
+    designations = [row[0] for row in best_members[:max_objects]]
+    print(
+        f"[manifest] auto-centered on RA={center_ra:.4f}, Dec={center_dec:.4f}; "
+        f"{len(best_members)} projected object(s) within {radius_deg:.2f} deg",
+        flush=True,
+    )
+    return center_ra, center_dec, designations
+
+
+def _designations_from_mpc_list_field(
+    *,
+    ra_deg: float,
+    dec_deg: float,
+    radius_deg: float,
+    target_jd: float,
+    list_limit: int,
+    max_objects: int,
+    neo_only: bool = True,
+) -> list[str]:
+    """Preselect MPC orbit-list designations projected into a fixed field."""
+    designations: list[str] = []
+    for row in _fetch_mpc_orbit_rows(list_limit, neo_only=neo_only):
+        designation = _mpc_row_designation(row)
+        position = _rough_ra_dec_from_mpc_orbit(row, target_jd)
+        if designation is None or position is None:
+            continue
+        if _angular_sep_deg(ra_deg, dec_deg, position[0], position[1]) <= radius_deg:
+            designations.append(designation)
+        if len(designations) >= max_objects:
+            break
+    print(
+        f"[manifest] fixed-field MPC orbit preselection found "
+        f"{len(designations)} projected object(s)",
+        flush=True,
+    )
+    return designations
 
 
 def _format_eta(elapsed: float, done: int, total: int) -> str:
@@ -170,9 +453,51 @@ def build_recovery_manifest(
     max_mag: float = _DEFAULT_MAX_MAG,
     force_refresh: bool = False,
     run_root: Path = _DEFAULT_RUN_ROOT,
+    label_pool: Path = _DEFAULT_LABEL_POOL,
+    fallback_scan_limit: int = 250,
+    auto_center_from_mpc_list: bool = False,
+    mpc_list_limit: int = 1000,
+    auto_center_neo_only: bool = True,
+    preselect_from_mpc_list: bool = False,
 ) -> dict[str, Any]:
     """Build and write the expected-known manifest for one recovery field."""
+    sample_jds = _sample_jds(start_jd, end_jd, n_samples)
+    requested_ra_deg = ra_deg
+    requested_dec_deg = dec_deg
+    preselected_designations: list[str] | None = None
+    preselection_source: str | None = None
+    if auto_center_from_mpc_list:
+        ra_deg, dec_deg, preselected_designations = _auto_center_designations_from_mpc_list(
+            target_jd=sample_jds[len(sample_jds) // 2],
+            radius_deg=radius_deg,
+            list_limit=mpc_list_limit,
+            max_objects=max_objects,
+            neo_only=auto_center_neo_only,
+        )
+        preselection_source = (
+            "mpc_neo_orbit_projection_plus_jpl_horizons"
+            if auto_center_neo_only
+            else "mpc_asteroid_orbit_projection_plus_jpl_horizons"
+        )
+    elif preselect_from_mpc_list:
+        preselected_designations = _designations_from_mpc_list_field(
+            ra_deg=ra_deg,
+            dec_deg=dec_deg,
+            radius_deg=radius_deg,
+            target_jd=sample_jds[len(sample_jds) // 2],
+            list_limit=mpc_list_limit,
+            max_objects=max_objects,
+            neo_only=auto_center_neo_only,
+        )
+        preselection_source = (
+            "mpc_neo_orbit_projection_fixed_field_plus_jpl_horizons"
+            if auto_center_neo_only
+            else "mpc_asteroid_orbit_projection_fixed_field_plus_jpl_horizons"
+        )
+
     params = {
+        "requested_ra_deg": round(requested_ra_deg, 8),
+        "requested_dec_deg": round(requested_dec_deg, 8),
         "ra_deg": round(ra_deg, 8),
         "dec_deg": round(dec_deg, 8),
         "radius_deg": round(radius_deg, 8),
@@ -184,6 +509,12 @@ def build_recovery_manifest(
         "tolerance_arcsec": tolerance_arcsec,
         "tolerance_days": tolerance_days,
         "max_mag": max_mag,
+        "label_pool": str(label_pool),
+        "fallback_scan_limit": fallback_scan_limit,
+        "auto_center_from_mpc_list": auto_center_from_mpc_list,
+        "mpc_list_limit": mpc_list_limit,
+        "auto_center_neo_only": auto_center_neo_only,
+        "preselect_from_mpc_list": preselect_from_mpc_list,
     }
     checkpoint = _checkpoint_path(params, run_root)
     state = (
@@ -191,24 +522,23 @@ def build_recovery_manifest(
         if force_refresh
         else _load_checkpoint(checkpoint, params)
     )
-    sample_jds = _sample_jds(start_jd, end_jd, n_samples)
-
     print(
         f"[manifest] Querying MPC known objects at RA={ra_deg:.4f}, "
         f"Dec={dec_deg:.4f}, r={radius_deg:.2f} deg",
         flush=True,
     )
-    known_obs = _with_retry(
-        "mpc-region",
-        lambda: fetch_mpc_known(ra_deg, dec_deg, radius_deg),
-    )
-    designations = []
-    for obs in known_obs:
-        designation = _designation_from_known_obs(obs)
-        if designation and designation not in designations:
-            designations.append(designation)
-        if len(designations) >= max_objects:
-            break
+    if preselected_designations is None:
+        designations, source = _candidate_designations(
+            ra_deg=ra_deg,
+            dec_deg=dec_deg,
+            radius_deg=radius_deg,
+            max_objects=max_objects,
+            label_pool=label_pool,
+            fallback_scan_limit=fallback_scan_limit,
+        )
+    else:
+        designations = preselected_designations
+        source = str(preselection_source)
 
     total = len(designations)
     print(
@@ -266,7 +596,7 @@ def build_recovery_manifest(
                 "tolerance_arcsec": tolerance_arcsec,
                 "tolerance_days": tolerance_days,
                 "min_samples": min_samples,
-                "source": "mpc_region_plus_jpl_horizons",
+                "source": source,
             }
         processed[designation] = "done"
         state = {
@@ -282,8 +612,19 @@ def build_recovery_manifest(
     summary = {
         "output": str(output),
         "checkpoint": str(checkpoint),
+        "requested_field": {
+            "ra_deg": requested_ra_deg,
+            "dec_deg": requested_dec_deg,
+            "radius_deg": radius_deg,
+        },
+        "effective_field": {
+            "ra_deg": ra_deg,
+            "dec_deg": dec_deg,
+            "radius_deg": radius_deg,
+        },
         "n_region_candidates": total,
         "n_manifest_rows": len(rows),
+        "candidate_source": source,
         "sample_jds": sample_jds,
         "safety": {
             "no_external_submission": True,
@@ -318,6 +659,46 @@ def main() -> None:
     parser.add_argument("--tolerance-days", type=float, default=_DEFAULT_TOLERANCE_DAYS)
     parser.add_argument("--max-mag", type=float, default=_DEFAULT_MAX_MAG)
     parser.add_argument("--force-refresh", action="store_true", help="Ignore cached provider data")
+    parser.add_argument(
+        "--label-pool",
+        type=Path,
+        default=_DEFAULT_LABEL_POOL,
+        help="Committed MPC label CSV used if live MPC region search is unavailable",
+    )
+    parser.add_argument(
+        "--fallback-scan-limit",
+        type=int,
+        default=250,
+        help="Maximum label-pool designations to test with Horizons fallback",
+    )
+    parser.add_argument(
+        "--auto-center-from-mpc-list",
+        action="store_true",
+        help="Preselect a dense field from a bounded MPC NEO orbit list",
+    )
+    parser.add_argument(
+        "--mpc-list-limit",
+        type=int,
+        default=1000,
+        help="Maximum MPC NEO orbit rows to use for auto-centering",
+    )
+    parser.add_argument(
+        "--auto-center-all-asteroids",
+        action="store_false",
+        dest="auto_center_neo_only",
+        help=(
+            "Use the broader MPC asteroid orbit list, not only NEO rows, "
+            "when selecting a dense known-object recovery field"
+        ),
+    )
+    parser.add_argument(
+        "--preselect-from-mpc-list",
+        action="store_true",
+        help=(
+            "Keep the requested RA/Dec field and preselect projected MPC orbit "
+            "rows inside it before authoritative Horizons validation"
+        ),
+    )
     args = parser.parse_args()
 
     summary = build_recovery_manifest(
@@ -334,6 +715,12 @@ def main() -> None:
         tolerance_days=args.tolerance_days,
         max_mag=args.max_mag,
         force_refresh=args.force_refresh,
+        label_pool=args.label_pool,
+        fallback_scan_limit=args.fallback_scan_limit,
+        auto_center_from_mpc_list=args.auto_center_from_mpc_list,
+        mpc_list_limit=args.mpc_list_limit,
+        auto_center_neo_only=args.auto_center_neo_only,
+        preselect_from_mpc_list=args.preselect_from_mpc_list,
     )
     print(json.dumps(summary, indent=2), flush=True)
 
