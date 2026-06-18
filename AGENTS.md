@@ -26,6 +26,16 @@ It contains the facts a coding agent needs to work productively without re-readi
   requirement says otherwise. Do not hardcode machine-specific assumptions into
   scientific logic; expose performance-sensitive behavior through configuration
   or documented runtime defaults.
+- **Use local compute deliberately**: When implementing or running AI training,
+  first target the local Apple GPU/Metal acceleration described in
+  `docs/SYSTEM_PROFILE.md` (for example PyTorch MPS) when the framework supports
+  it, and report any CPU fallback explicitly. Other CPU-heavy local code should
+  use bounded multithreading or multiprocessing by default, sized from
+  `docs/SYSTEM_PROFILE.md`, while avoiding native-library oversubscription and
+  keeping live external-service concurrency conservative. Performance-sensitive
+  worker counts, device selection, batch sizes, and thread limits must be
+  configurable or documented runtime defaults, not hidden machine-specific
+  constants.
 - **Citizen-science production framing**: Jerome W. Lindsey III is the project
   operator and reviewer, but no NEO domain expert is currently available. Do not
   invent a domain-expert approval gate. Use quantitative KPIs, fail-closed

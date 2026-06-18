@@ -41,7 +41,14 @@ Prefer these defaults when running project code on this machine:
 - Chunk large target or sector sweeps by target, sector, or candidate batch rather than loading all mission data into memory at once.
 - Prefer memory-mapped arrays, columnar files, or streaming reads for large intermediate products.
 - Cache downloaded raw data and expensive intermediate products locally, but do not commit large mission data or generated cache directories.
-- Use the 40-core GPU or Metal acceleration only as an optional optimization path. CPU implementations should remain the default baseline until GPU behavior is tested and reproducible.
+- For AI training and other accelerator-friendly numerical workloads, prefer
+  the 40-core Apple GPU through Metal/MPS when the framework supports it and the
+  result is reproducible. Report device selection in training logs and make any
+  CPU fallback explicit.
+- For CPU-heavy local batch jobs, prefer bounded multithreading or
+  multiprocessing with configurable worker counts. Start from the worker and
+  native-thread limits below rather than serial implementations, unless the task
+  is too small or determinism requires serial execution.
 
 ---
 
@@ -59,6 +66,11 @@ export NUMEXPR_MAX_THREADS=1
 ```
 
 For a single large numerical job, allow native libraries to use more threads, commonly `8` to `12`, then benchmark before raising the limit.
+
+For PyTorch training on this Mac, prefer `mps`/Metal when
+`torch.backends.mps.is_available()` is true. Training scripts should record the
+selected device, batch size, worker count, and relevant thread settings in their
+stdout logs and any training report artifact.
 
 ---
 
