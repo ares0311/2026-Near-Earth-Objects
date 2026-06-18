@@ -1,8 +1,8 @@
 {
   "schema_version": "live-review-policy-v1",
-  "policy_name": "example-local-live-dry-run-policy",
-  "reviewer": "REPLACE_WITH_REVIEWER_NAME",
-  "approved_for_live_network": false,
+  "policy_name": "jerome-w-lindsey-iii-live-dry-run-policy-2026-06-18",
+  "reviewer": "Jerome W. Lindsey III",
+  "approved_for_live_network": true,
   "allowed_surveys": [
     "ZTF",
     "ATLAS",
@@ -11,13 +11,13 @@
   "max_queries_per_run": 3,
   "min_seconds_between_queries": 10,
   "dry_run_scope": {
-    "ra_deg": 180.0,
-    "dec_deg": 0.0,
-    "radius_deg": 0.1,
-    "start_jd": 2460000.5,
-    "end_jd": 2460001.5
+    "ra_deg": 251.66,
+    "dec_deg": -22.50,
+    "radius_deg": 3.5,
+    "start_jd": 2460480.0,
+    "end_jd": 2460510.0
   },
   "no_external_submission_confirmed": true,
   "no_impact_probability_claims": true,
-  "notes": "Example policy only. Leave approved_for_live_network=false until a human reviewer approves a real credentialed dry run."
+  "notes": "Citizen-science live dry-run policy. Approved by Jerome W. Lindsey III on 2026-06-18. Operator-supervised only. No external submission. No impact-probability claims. No MPC report authorized."
 }

@@ -4,7 +4,7 @@
   "report_dir": "Logs/reports",
   "follow_up_threshold": 0.45,
   "run_mode": "automated",
-  "live_network_enabled": false,
+  "live_network_enabled": true,
   "require_human_signoff": true,
   "required_approval_count": 1,
   "scheduler_enabled": true,
