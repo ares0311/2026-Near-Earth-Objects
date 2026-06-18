@@ -1242,7 +1242,7 @@ operation.
 | **P33** | In progress | Real-run audit v2 | `Skills/audit_real_run.py` can match expected known objects by pipeline ID or sky/time samples and requires operator-review decisions |
 | **P34** | Complete | Expected-known manifest builder | `Skills/build_recovery_manifest.py` builds checkpointed MPC+Horizons sky/time manifests for T1-C audits |
 | **P35** | Complete | Repository artifact hygiene | `.gitignore` protects `git add .`; raw `Logs/**` are local-only, production models are explicit allowlists, and T1-C evidence is summarized in `docs/evidence/t1c/` |
-| **P36** | In progress | ATLAS forced-photometry fallback | `Skills/fetch_atlas_data.py --expected-known ...` writes audit-compatible recovery packets; provider request format and polling fixed; longer operator-supervised run still required |
+| **P36** | In progress | ATLAS forced-photometry fallback | `Skills/fetch_atlas_data.py --expected-known ...` writes audit-compatible recovery packets; provider request format, polling, in-flight checkpointing, and task-URL resume are fixed; longer operator-supervised run still required |
 
 ### 15.5 Known Limitations
 

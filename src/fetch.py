@@ -993,6 +993,7 @@ def fetch_atlas_forced(
     max_polls: int = 60,
     poll_interval_seconds: float = 0.0,
     progress_callback: Callable[[dict[str, Any]], None] | None = None,
+    task_url: str | None = None,
 ) -> list:
     """Fetch ATLAS forced photometry at a given sky position.
 
@@ -1013,6 +1014,8 @@ def fetch_atlas_forced(
             positive value for live ATLAS jobs.
         progress_callback: Optional callable receiving each task-status JSON
             payload after a successful poll.
+        task_url: Existing ATLAS queue task URL to resume polling. When set,
+            no new ATLAS queue request is submitted.
 
     Returns:
         List of :class:`~schemas.Observation` objects.  Returns an empty list
@@ -1046,23 +1049,29 @@ def fetch_atlas_forced(
         start_mjd = start_jd - 2400000.5
         end_mjd = end_jd - 2400000.5
 
-        resp = requests.post(
-            "https://fallingstar-data.com/forcedphot/queue/",
-            headers={
-                "Authorization": f"Token {token}",
-                "Accept": "application/json",
-            },
-            data={
-                "ra": ra_deg,
-                "dec": dec_deg,
-                "mjd_min": start_mjd,
-                "mjd_max": end_mjd,
-                "send_email": False,
-            },
-            timeout=30,
-        )
-        resp.raise_for_status()
-        task_url = resp.json().get("url", "")
+        if task_url is None:
+            resp = requests.post(
+                "https://fallingstar-data.com/forcedphot/queue/",
+                headers={
+                    "Authorization": f"Token {token}",
+                    "Accept": "application/json",
+                },
+                data={
+                    "ra": ra_deg,
+                    "dec": dec_deg,
+                    "mjd_min": start_mjd,
+                    "mjd_max": end_mjd,
+                    "send_email": False,
+                },
+                timeout=30,
+            )
+            resp.raise_for_status()
+            queued = resp.json()
+            task_url = queued.get("url", "")
+            if progress_callback is not None:
+                progress_callback({"event": "queued", **queued})
+        elif progress_callback is not None:
+            progress_callback({"event": "resume_existing_task", "url": task_url})
         if not task_url:
             return []
 

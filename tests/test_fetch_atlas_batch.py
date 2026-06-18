@@ -418,3 +418,191 @@ def test_run_atlas_recovery_fails_closed_on_sparse_samples(tmp_path: Path) -> No
     assert summary["n_recovered_samples"] == 1
     assert summary["n_tracklets"] == 0
     assert checkpoint["tracklets"] == []
+
+
+def test_run_atlas_recovery_checkpoints_polling_task_before_interrupt(tmp_path: Path) -> None:
+    """A killed ATLAS queue wait must leave a resumable task URL in the checkpoint."""
+    module = _load_skill()
+    expected = tmp_path / "expected_known.json"
+    _write_expected_manifest(expected)
+
+    def interrupted_fetcher(
+        ra_deg: float,
+        dec_deg: float,
+        start_jd: float,
+        end_jd: float,
+        **kwargs: Any,
+    ) -> list[SimpleNamespace]:
+        kwargs["progress_callback"](
+            {
+                "event": "queued",
+                "url": "https://fake-atlas/task/queued/",
+                "queuepos": 42,
+            }
+        )
+        raise KeyboardInterrupt
+
+    with pytest.raises(KeyboardInterrupt):
+        module.run_atlas_recovery(
+            expected_known=expected,
+            run_root=tmp_path / "runs",
+            atlas_token=None,
+            force_refresh=True,
+            resume=True,
+            workers=1,
+            window_days=0.05,
+            min_recovered_samples=3,
+            min_nights=2,
+            max_mag=21.5,
+            max_objects=None,
+            max_polls=2,
+            poll_interval_seconds=0.0,
+            fetcher=interrupted_fetcher,
+            print_fn=lambda *a, **kw: None,
+        )
+
+    checkpoints = list((tmp_path / "runs").glob("atlas_recovery_*/checkpoint.json"))
+    assert len(checkpoints) == 1
+    checkpoint = json.loads(checkpoints[0].read_text(encoding="utf-8"))
+    sample_state = next(iter(checkpoint["samples"].values()))
+    assert sample_state["status"] == "polling"
+    assert sample_state["task_url"] == "https://fake-atlas/task/queued/"
+    assert sample_state["queuepos"] == 42
+
+
+def test_run_atlas_recovery_resumes_existing_task_url_with_force_refresh(tmp_path: Path) -> None:
+    """resume + force_refresh must reuse queued ATLAS tasks instead of starting over."""
+    module = _load_skill()
+    expected = tmp_path / "expected_known.json"
+    _write_expected_manifest(expected)
+    rows = module._load_expected_known_manifest(expected)
+    samples = [sample for row in rows for sample in module._manifest_samples(row)]
+    params = {
+        "expected_known": str(expected),
+        "n_manifest_rows": 1,
+        "n_samples": 3,
+        "window_days": 0.05,
+        "min_recovered_samples": 3,
+        "min_nights": 2,
+        "max_mag": 21.5,
+        "max_polls": 2,
+        "poll_interval_seconds": 0.0,
+        "max_objects": None,
+    }
+    run_dir = tmp_path / "runs" / f"atlas_recovery_{module._param_key(params)}"
+    first_key = module._recovery_sample_key(samples[0])
+    run_dir.mkdir(parents=True)
+    (run_dir / "checkpoint.json").write_text(
+        json.dumps(
+            {
+                "params": params,
+                "last_stage": "atlas_forced_recovery_polling",
+                "tracklets": [],
+                "partial_results": [],
+                "samples": {
+                    first_key: {
+                        "designation": "100001",
+                        "sample_index": 0,
+                        "requested_ra_deg": 10.0,
+                        "requested_dec_deg": 5.0,
+                        "requested_jd": 2460000.0,
+                        "window_days": 0.05,
+                        "status": "polling",
+                        "task_url": "https://fake-atlas/task/existing/",
+                        "queuepos": 9,
+                        "n_raw_observations": 0,
+                        "n_usable_observations": 0,
+                        "observations": [],
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    task_urls: list[str | None] = []
+
+    def recovery_fetcher(
+        ra_deg: float,
+        dec_deg: float,
+        start_jd: float,
+        end_jd: float,
+        **kwargs: Any,
+    ) -> list[SimpleNamespace]:
+        task_urls.append(kwargs.get("task_url"))
+        center_jd = (start_jd + end_jd) / 2.0
+        return [_fake_observation_at(ra_deg, dec_deg, center_jd)]
+
+    messages: list[str] = []
+    summary = module.run_atlas_recovery(
+        expected_known=expected,
+        run_root=tmp_path / "runs",
+        atlas_token=None,
+        force_refresh=True,
+        resume=True,
+        workers=1,
+        window_days=0.05,
+        min_recovered_samples=3,
+        min_nights=2,
+        max_mag=21.5,
+        max_objects=None,
+        max_polls=2,
+        poll_interval_seconds=0.0,
+        fetcher=recovery_fetcher,
+        print_fn=messages.append,
+    )
+
+    assert task_urls[0] == "https://fake-atlas/task/existing/"
+    assert task_urls[1:] == [None, None]
+    assert summary["n_tracklets"] == 1
+    assert any("polling existing ATLAS task" in message for message in messages)
+
+
+def test_run_atlas_recovery_marks_poll_exhaustion_as_pending(tmp_path: Path) -> None:
+    """A queued task that outlives max_polls must stay resumable, not unrecovered."""
+    module = _load_skill()
+    expected = tmp_path / "expected_known.json"
+    _write_expected_manifest(expected)
+
+    def queued_fetcher(
+        ra_deg: float,
+        dec_deg: float,
+        start_jd: float,
+        end_jd: float,
+        **kwargs: Any,
+    ) -> list[SimpleNamespace]:
+        kwargs["progress_callback"](
+            {
+                "url": "https://fake-atlas/task/still-queued/",
+                "queuepos": 123,
+                "finished": False,
+                "result_url": None,
+            }
+        )
+        return []
+
+    summary = module.run_atlas_recovery(
+        expected_known=expected,
+        run_root=tmp_path / "runs",
+        atlas_token=None,
+        force_refresh=False,
+        resume=False,
+        workers=1,
+        window_days=0.05,
+        min_recovered_samples=3,
+        min_nights=2,
+        max_mag=21.5,
+        max_objects=1,
+        max_polls=1,
+        poll_interval_seconds=0.0,
+        fetcher=queued_fetcher,
+        print_fn=lambda *a, **kw: None,
+    )
+
+    checkpoint = json.loads((Path(summary["run_dir"]) / "checkpoint.json").read_text())
+    sample_states = list(checkpoint["samples"].values())
+    assert summary["n_pending_samples"] == 3
+    assert sample_states[0]["status"] == "poll_exhausted"
+    assert sample_states[0]["task_url"] == "https://fake-atlas/task/still-queued/"
+    assert sample_states[0]["queuepos"] == 123
+    assert sample_states[0]["poll_count"] == 1

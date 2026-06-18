@@ -56,6 +56,9 @@ guide uses form `data` for `/queue/` and sets `Accept: application/json`.
   `poll_interval_seconds`;
 - exposes an optional progress callback so operator runs show ATLAS queue
   position and completion state.
+- persists in-flight ATLAS task URLs in the recovery checkpoint so an
+  interrupted operator run can resume polling the same queued tasks instead of
+  creating duplicate queue jobs.
 
 ## Live Result
 
@@ -83,6 +86,18 @@ The next T1-C run should use the fixed recovery mode with `caffeinate -i`, a
 longer poll budget, and conservative worker count. The result must still pass
 the existing `audit_real_run.py` known-object recovery KPI and operator review
 before internal production promotion.
+
+Follow-up hardening after the first long queue wait: the recovery checkpoint now
+survives `--resume --force-refresh`, records `polling` sample states during
+ATLAS queue waits, and reuses stored task URLs on resume. This means a killed or
+sleep-interrupted queue wait should be restarted with the same command after
+pulling latest `main`; the tool will print `[resume] ... polling existing ATLAS
+task` for samples with stored task URLs.
+
+If `max_polls` is exhausted while ATLAS still reports no `finished` or
+`result_url` state, the sample is recorded as `poll_exhausted`, not
+`not_recovered`. That state remains pending and resumable because it reflects
+provider queue latency rather than a completed no-data result.
 
 No external submission was performed.
 No impact probability was asserted.

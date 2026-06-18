@@ -58,6 +58,7 @@ _DEFAULT_MIN_NIGHTS = 2
 _DEFAULT_MAX_MAG = 21.5
 _DEFAULT_MAX_POLLS = 60
 _DEFAULT_POLL_INTERVAL_SECONDS = 5.0
+_TERMINAL_SAMPLE_STATUSES = {"recovered", "not_recovered", "failed"}
 
 
 def _param_key(params: dict[str, Any]) -> str:
@@ -391,17 +392,23 @@ def _fetch_recovery_sample(
     max_polls: int,
     poll_interval_seconds: float,
     print_fn: Callable[[str], None],
+    task_progress_callback: Callable[[dict[str, Any], dict[str, Any]], None] | None,
     fetcher: Callable[..., list[Any]],
 ) -> dict[str, Any]:
     """Fetch one manifest sample from ATLAS and normalize the result."""
     sample = dict(sample)
     sample["window_days"] = window_days
+    last_task: dict[str, Any] = {}
 
     def _progress(task: dict[str, Any]) -> None:
+        nonlocal last_task
+        last_task = task
         queuepos = task.get("queuepos")
         started = bool(task.get("starttimestamp"))
         finished = bool(task.get("finishtimestamp") or task.get("finished"))
         result_ready = bool(task.get("result_url"))
+        if task_progress_callback is not None:
+            task_progress_callback(sample, task)
         print_fn(
             f"[atlas-recovery] poll {sample['designation']} "
             f"sample={sample['sample_index']} queuepos={queuepos} "
@@ -418,12 +425,22 @@ def _fetch_recovery_sample(
         max_polls=max_polls,
         poll_interval_seconds=poll_interval_seconds,
         progress_callback=_progress,
+        task_url=sample.get("task_url"),
     )
     usable = [
         _atlas_obs_to_audit_dict(obs, sample)
         for obs in observations
         if _is_usable_atlas_observation(obs, sample=sample, max_mag=max_mag)
     ]
+    task_url_value = last_task.get("url") or sample.get("task_url")
+    task_unfinished = bool(task_url_value) and not bool(
+        last_task.get("result_url")
+        or last_task.get("finishtimestamp")
+        or last_task.get("finished")
+    )
+    status = "recovered" if usable else "not_recovered"
+    if not usable and task_unfinished:
+        status = "poll_exhausted"
     return {
         "designation": sample["designation"],
         "sample_index": sample["sample_index"],
@@ -431,7 +448,10 @@ def _fetch_recovery_sample(
         "requested_dec_deg": sample["dec_deg"],
         "requested_jd": sample["jd"],
         "window_days": window_days,
-        "status": "recovered" if usable else "not_recovered",
+        "status": status,
+        "task_url": task_url_value,
+        "queuepos": last_task.get("queuepos"),
+        "poll_count": last_task.get("poll_count"),
         "n_raw_observations": len(observations),
         "n_usable_observations": len(usable),
         "observations": usable,
@@ -493,12 +513,28 @@ def run_atlas_recovery(
     run_dir = run_root / run_id
     checkpoint_path = run_dir / "checkpoint.json"
     state = (
-        {"params": params, "samples": {}}
-        if force_refresh or not resume
-        else _load_recovery_checkpoint(checkpoint_path, params)
+        _load_recovery_checkpoint(checkpoint_path, params)
+        if resume
+        else {"params": params, "samples": {}}
     )
-    completed = set(state.get("samples", {}))
-    todo = [sample for sample in samples if _recovery_sample_key(sample) not in completed]
+    todo = []
+    for sample in samples:
+        key = _recovery_sample_key(sample)
+        existing = state.get("samples", {}).get(key)
+        if isinstance(existing, dict) and existing.get("status") in _TERMINAL_SAMPLE_STATUSES:
+            print_fn(
+                f"[resume] {sample['designation']} sample={sample['sample_index']} "
+                f"already {existing.get('status')}"
+            )
+            continue
+        sample_for_run = dict(sample)
+        if isinstance(existing, dict) and existing.get("task_url"):
+            sample_for_run["task_url"] = existing["task_url"]
+            print_fn(
+                f"[resume] {sample['designation']} sample={sample['sample_index']} "
+                "polling existing ATLAS task"
+            )
+        todo.append(sample_for_run)
     start_time = time.monotonic()
     print_fn(
         f"[atlas-recovery] run_id={run_id} objects={len(manifest_rows)} "
@@ -506,6 +542,52 @@ def run_atlas_recovery(
     )
 
     lock = threading.Lock()
+
+    def _checkpoint_payload(last_stage: str, tracklets: list[dict[str, Any]]) -> dict[str, Any]:
+        """Build the audit-compatible checkpoint payload from current state."""
+        return {
+            "params": params,
+            "last_stage": last_stage,
+            "tracklets": tracklets,
+            "partial_results": _recovery_partial_results(tracklets),
+            "samples": state["samples"],
+        }
+
+    def _record_pending(sample: dict[str, Any], task: dict[str, Any]) -> None:
+        """Persist in-flight ATLAS task status so interrupted runs can resume polling."""
+        key = _recovery_sample_key(sample)
+        with lock:
+            previous = state["samples"].get(key, {})
+            poll_count = int(previous.get("poll_count", 0)) + 1 if isinstance(previous, dict) else 1
+            task["poll_count"] = poll_count
+            task_url_value = task.get("url") or sample.get("task_url")
+            state["samples"][key] = {
+                "designation": sample["designation"],
+                "sample_index": sample["sample_index"],
+                "requested_ra_deg": sample["ra_deg"],
+                "requested_dec_deg": sample["dec_deg"],
+                "requested_jd": sample["jd"],
+                "window_days": window_days,
+                "status": "polling",
+                "task_url": task_url_value,
+                "queuepos": task.get("queuepos"),
+                "started": bool(task.get("starttimestamp")),
+                "finished": bool(task.get("finishtimestamp") or task.get("finished")),
+                "result_ready": bool(task.get("result_url")),
+                "poll_count": poll_count,
+                "n_raw_observations": 0,
+                "n_usable_observations": 0,
+                "observations": [],
+            }
+            tracklets = _tracklets_from_recovery_state(
+                state,
+                min_recovered_samples=min_recovered_samples,
+                min_nights=min_nights,
+            )
+            _write_json(
+                checkpoint_path,
+                _checkpoint_payload("atlas_forced_recovery_polling", tracklets),
+            )
 
     def _record(sample: dict[str, Any], result: dict[str, Any], done_count: int) -> None:
         key = _recovery_sample_key(sample)
@@ -516,14 +598,10 @@ def run_atlas_recovery(
                 min_recovered_samples=min_recovered_samples,
                 min_nights=min_nights,
             )
-            checkpoint = {
-                "params": params,
-                "last_stage": "atlas_forced_recovery",
-                "tracklets": tracklets,
-                "partial_results": _recovery_partial_results(tracklets),
-                "samples": state["samples"],
-            }
-            _write_json(checkpoint_path, checkpoint)
+            _write_json(
+                checkpoint_path,
+                _checkpoint_payload("atlas_forced_recovery", tracklets),
+            )
             elapsed = time.monotonic() - start_time
             print_fn(
                 f"[atlas-recovery] {done_count}/{len(todo)} "
@@ -543,6 +621,7 @@ def run_atlas_recovery(
                 max_polls=max_polls,
                 poll_interval_seconds=poll_interval_seconds,
                 print_fn=print_fn,
+                task_progress_callback=_record_pending,
                 fetcher=fetcher,
             ), None
         except Exception as exc:
@@ -613,6 +692,11 @@ def run_atlas_recovery(
         ),
         "n_tracklets": len(tracklets),
         "n_failures": len(failures),
+        "n_pending_samples": sum(
+            1 for result in state["samples"].values()
+            if isinstance(result, dict)
+            and result.get("status") not in _TERMINAL_SAMPLE_STATUSES
+        ),
         "fallback_type": "atlas_forced_photometry_targeted_known_object_recovery",
         "limitations": [
             "Targeted forced photometry is supporting recovery evidence, not blind discovery.",

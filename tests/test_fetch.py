@@ -2162,6 +2162,43 @@ class TestFetchAtlasForcedPollingLoop:
         assert len(result) == 1
         assert mock_requests.get.call_count == 3
 
+    def test_existing_task_url_skips_queue_post(self, tmp_path, monkeypatch):
+        from unittest.mock import MagicMock, patch
+
+        import fetch as fetch_mod
+
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        atlas_data = "#MJD RA Dec m dm F\n60000.5 180.001 10.001 18.5 0.05 o\n"
+
+        mock_task_resp = MagicMock()
+        mock_task_resp.raise_for_status = MagicMock()
+        mock_task_resp.json.return_value = {"result_url": "https://fake-atlas/result/1/"}
+
+        mock_result_resp = MagicMock()
+        mock_result_resp.raise_for_status = MagicMock()
+        mock_result_resp.text = atlas_data
+
+        mock_requests = MagicMock()
+        mock_requests.get.side_effect = [mock_task_resp, mock_result_resp]
+
+        progress_events = []
+        with patch.dict("sys.modules", {"requests": mock_requests}):
+            result = fetch_mod.fetch_atlas_forced(
+                180.0,
+                10.0,
+                2459600.0,
+                2459610.0,
+                atlas_token="valid_token",
+                task_url="https://fake-atlas/task/existing/",
+                progress_callback=progress_events.append,
+            )
+
+        assert len(result) == 1
+        assert not mock_requests.post.called
+        assert progress_events[0]["event"] == "resume_existing_task"
+        assert progress_events[0]["url"] == "https://fake-atlas/task/existing/"
+
     def test_empty_task_url_returns_empty(self, tmp_path, monkeypatch):
         from unittest.mock import MagicMock, patch
 

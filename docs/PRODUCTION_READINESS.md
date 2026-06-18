@@ -244,7 +244,12 @@ task responses, and exposing bounded live polling with progress callbacks. A
 bounded pre-fix live pilot produced `0/10` recovered samples and correctly
 failed the recovery gate. A post-fix redacted diagnostic confirmed JSON task
 creation, but the ATLAS queue was deep (`queuepos=164`), so a longer
-operator-supervised run is still required. Durable summary:
+operator-supervised run is still required. Follow-up hardening records polling
+sample state and queued ATLAS task URLs in the checkpoint, preserves checkpoint
+resume even with `--force-refresh`, and reuses existing task URLs on resume so
+interrupted queue waits do not create duplicate ATLAS jobs. If polling is
+exhausted while ATLAS has not finished the task, the sample remains pending as
+`poll_exhausted` rather than being counted as unrecovered. Durable summary:
 `docs/evidence/t1c/2026-06-18-atlas-forced-fallback-diagnostic.md`.
 
 ---
