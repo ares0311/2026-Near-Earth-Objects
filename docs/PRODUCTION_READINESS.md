@@ -1,7 +1,7 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
 **Current version**: v0.87.9
-**Last updated**: 2026-06-16
+**Last updated**: 2026-06-18
 **Purpose**: Mandatory read at session start (per MANDATORY SESSION-START PROTOCOL).  
 Every planning cycle must name the highest-priority unresolved Tier 1 gap and show how proposed steps close or directly unblock it.
 
@@ -196,10 +196,12 @@ Credentials are stored in macOS Keychain under `neo-detection:ATLAS_TOKEN`, `neo
    correctly blocked promotion because no expected-known manifest was
    supplied. Durable GitHub-visible evidence is summarized under
    `docs/evidence/t1c/`; raw `Logs/` outputs remain local operational artifacts.
-4. [CODE] Generate an expected-known manifest with MPC designations and
+4. [DONE] Generate an expected-known manifest with MPC designations and
    Horizons sky/time samples using `Skills/build_recovery_manifest.py`, then
    verify ≥90% known-object recovery through `Skills/audit_real_run.py`.
    Pipeline object IDs may be used when known, but they are no longer required.
+   Manifest generation has produced valid non-Orion MPC/Horizons sky/time
+   manifests; the recovery KPI itself remains open.
 5. [CODE] Run an uncapped or staged recovery-audit pilot with link progress/ETA
    enabled, preserving `Logs/pipeline_runs/*/run_summary.json` evidence and
    evaluating it through `Skills/audit_real_run.py`.
@@ -229,6 +231,21 @@ remains open until a multi-night known-object provider/path is used or a
 separate same-night diagnostic subgate is explicitly added without replacing
 the multi-night production gate. Durable summary:
 `docs/evidence/t1c/2026-06-18-recovery-selector-and-provider-diagnostic.md`.
+
+**2026-06-18 ATLAS fallback update**: `Skills/fetch_atlas_data.py` now has an
+expected-known ATLAS forced-photometry recovery mode that writes
+`audit_real_run.py`-compatible packets and fails closed unless enough usable
+samples are recovered across enough nights. The fallback also records explicit
+limitations: targeted forced photometry is supporting recovery evidence, not
+blind discovery evidence, and it performs no submission or impact claim.
+`src/fetch.py::fetch_atlas_forced` was corrected to match the official ATLAS
+API contract by submitting form data to `/forcedphot/queue/`, requesting JSON
+task responses, and exposing bounded live polling with progress callbacks. A
+bounded pre-fix live pilot produced `0/10` recovered samples and correctly
+failed the recovery gate. A post-fix redacted diagnostic confirmed JSON task
+creation, but the ATLAS queue was deep (`queuepos=164`), so a longer
+operator-supervised run is still required. Durable summary:
+`docs/evidence/t1c/2026-06-18-atlas-forced-fallback-diagnostic.md`.
 
 ---
 

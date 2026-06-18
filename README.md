@@ -1182,7 +1182,7 @@ operation.
 | Repository artifact hygiene | **Complete** | `git add .` is supported: raw `Logs/**` stay local, production models are filename-allowlisted, and durable evidence is promoted to `docs/evidence/` or `data/evidence/` |
 | ML model weights | **Complete** | T1-A closed. Tier 1 XGBoost, Tier 2 CNN, Tier 3 Transformer, and ensemble stacker are trained; calibration KPIs passed. |
 | Real survey credentials | **CONFIGURED** | T1-B credentials are stored in macOS Keychain and manual ZTF/ATLAS connection tests passed. Automated live policy approval remains pending. |
-| Real data processed | **BOUNDED PILOT COMPLETE** | T1-C open. 2026-06-16 Orion-field ZTF pilot fetched 4,059 real source detections, detected 520 raw candidates, linked the first 80, and processed 2 internal candidates. Orion is historical/debug evidence only; production recovery must use a new known-object-rich field. |
+| Real data processed | **BOUNDED PILOT + RECOVERY DIAGNOSTICS COMPLETE** | T1-C open. The Orion ZTF pilot is historical/debug evidence only. Non-Orion recovery manifests now exist, ALeRCE same-night asteroid histories were diagnosed, and an ATLAS forced-photometry fallback path is implemented; production recovery still needs a passing multi-night known-object audit and operator review. |
 | Production calibration | **Complete** | T1-D closed. Quantitative Brier, ECE, log-loss, ROC AUC, CV ECE, and bootstrap CI gates passed. |
 | External reporting | **Disabled** | No MPC, NEOCP, NASA, or CNEOS submission path is active. Alert protocol requires MPC submission + independent confirmation before any NASA pathway. |
 
@@ -1214,7 +1214,7 @@ operation.
 | **M5d** | T1-A: Train Tier 1 XGBoost | `models/tier1_xgb.json`; validation accuracy 99.95%, macro AUC 1.000 | **Complete** |
 | **M6a** | T1-D: Quantitative production calibration gate | Held-out real labeled data; all Brier, ECE, log-loss, AUC, cross-validation, and bootstrap-confidence KPIs pass | **Complete** |
 | **M6b** | T1-C: Real-run audit packet | Build fail-closed review evidence from the first real ZTF pilot | **Complete for run `011dd53aa7f4`** |
-| **M6c** | T1-C: Known-object recovery audit | Verify ≥90% known-object recovery using a generated expected-known manifest with pipeline IDs or sky/time samples | **Blocked on live manifest generation, recovery run, and operator review** |
+| **M6c** | T1-C: Known-object recovery audit | Verify ≥90% known-object recovery using a generated expected-known manifest with pipeline IDs or sky/time samples | **Blocked on passing multi-night recovery run and operator review** |
 | **M7** | All T1 gaps closed; internal no-submission production readiness | Requires M4–M6 complete plus no-submission citizen-science limitations | **Pending** |
 | **M8** | First MPC submission eligibility | Requires qualified external review or a separately approved externally supervised submission policy | **Blocked** |
 
@@ -1235,18 +1235,19 @@ operation.
 | **P26** | Complete | Public ALeRCE ZTF source-detection provider added | Replaces bad IRSA metadata-table assumption for source detections |
 | **P27** | Complete | First bounded supervised real-ZTF pilot completed | 4,059 real ZTF detections fetched; 2 internal candidates processed; run summary `011dd53aa7f4` |
 | **P28** | Complete | Real-run audit packet tool added | `Skills/audit_real_run.py` writes JSON + CSV review evidence without network access or external submission |
-| **P29** | Blocked | Known-object recovery KPI | Audit packet for run `011dd53aa7f4` blocks on missing expected-known manifest; ≥90% recovery not yet established |
+| **P29** | Blocked | Known-object recovery KPI | Expected-known manifests and ATLAS fallback tooling exist; ≥90% multi-night recovery is not yet established |
 | **P30** | Blocked | Citizen-science operator false-positive review | Review CSV required for recovered candidates; long-arc near-stationary candidates are high-priority review items |
 | **P31** | In progress | Staged known-object pilot | `Skills/select_survey_fields.py --mode recovery` selects known-object-rich non-Orion fields for the next recovery run |
 | **P32** | Pending | Automated live-run approval | Background live-review policy still needs signoff before unsupervised live automation |
 | **P33** | In progress | Real-run audit v2 | `Skills/audit_real_run.py` can match expected known objects by pipeline ID or sky/time samples and requires operator-review decisions |
-| **P34** | In progress | Expected-known manifest builder | `Skills/build_recovery_manifest.py` builds checkpointed MPC+Horizons sky/time manifests for T1-C audits; live manifest generation is pending |
+| **P34** | Complete | Expected-known manifest builder | `Skills/build_recovery_manifest.py` builds checkpointed MPC+Horizons sky/time manifests for T1-C audits |
 | **P35** | Complete | Repository artifact hygiene | `.gitignore` protects `git add .`; raw `Logs/**` are local-only, production models are explicit allowlists, and T1-C evidence is summarized in `docs/evidence/t1c/` |
+| **P36** | In progress | ATLAS forced-photometry fallback | `Skills/fetch_atlas_data.py --expected-known ...` writes audit-compatible recovery packets; provider request format and polling fixed; longer operator-supervised run still required |
 
 ### 15.5 Known Limitations
 
 - **Real-data evidence is bounded**: The first ALeRCE-backed ZTF pilot processed real detections and produced two internal candidates, but it was capped at 80 linked candidates.
-- **Known-object recovery is not yet proven**: The current real-run audit blocks because no live expected-known manifest with pipeline IDs or sky/time samples has been supplied for a non-Orion recovery field.
+- **Known-object recovery is not yet proven**: Expected-known manifests now exist, but no non-Orion multi-night recovery run has passed the ≥90% audit KPI.
 - **Citizen-science operator review remains open**: Recovered candidates need operator review before T1-C can close for internal, no-submission operation.
 - **External expert review is unavailable**: This is a citizen-science project. Internal production readiness does not authorize MPC submission or hazard notification.
 - **Automated live operation is not approved**: Manual supervised runs are possible; background live automation still needs policy signoff.

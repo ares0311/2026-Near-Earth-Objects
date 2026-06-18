@@ -44,6 +44,7 @@ __all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fet
 import json
 import os
 import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -989,6 +990,9 @@ def fetch_atlas_forced(
     end_jd: float,
     atlas_token: str | None = None,
     force_refresh: bool = False,
+    max_polls: int = 60,
+    poll_interval_seconds: float = 0.0,
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
 ) -> list:
     """Fetch ATLAS forced photometry at a given sky position.
 
@@ -1003,6 +1007,12 @@ def fetch_atlas_forced(
         end_jd: End of the search window as Julian Date.
         atlas_token: ATLAS API token.  Falls back to ``ATLAS_TOKEN`` env var.
         force_refresh: If True, bypass the on-disk cache.
+        max_polls: Maximum task-status polls before returning no data.
+        poll_interval_seconds: Delay between unfinished task polls. The default
+            is zero for fast unit tests; operator scripts should pass a
+            positive value for live ATLAS jobs.
+        progress_callback: Optional callable receiving each task-status JSON
+            payload after a successful poll.
 
     Returns:
         List of :class:`~schemas.Observation` objects.  Returns an empty list
@@ -1038,8 +1048,11 @@ def fetch_atlas_forced(
 
         resp = requests.post(
             "https://fallingstar-data.com/forcedphot/queue/",
-            headers={"Authorization": f"Token {token}"},
-            json={
+            headers={
+                "Authorization": f"Token {token}",
+                "Accept": "application/json",
+            },
+            data={
                 "ra": ra_deg,
                 "dec": dec_deg,
                 "mjd_min": start_mjd,
@@ -1053,22 +1066,37 @@ def fetch_atlas_forced(
         if not task_url:
             return []
 
-        # Poll for result (simplified; real impl uses exponential backoff)
-        for _ in range(10):
+        for poll_index in range(max(1, max_polls)):
             result_resp = requests.get(
                 task_url,
-                headers={"Authorization": f"Token {token}"},
+                headers={
+                    "Authorization": f"Token {token}",
+                    "Accept": "application/json",
+                },
                 timeout=30,
             )
             result_resp.raise_for_status()
             data = result_resp.json()
+            if progress_callback is not None:
+                progress_callback(data)
             if data.get("result_url"):
-                text_resp = requests.get(data["result_url"], timeout=30)
+                text_resp = requests.get(
+                    data["result_url"],
+                    headers={
+                        "Authorization": f"Token {token}",
+                        "Accept": "text/plain, */*",
+                    },
+                    timeout=30,
+                )
                 text_resp.raise_for_status()
                 lines = text_resp.text.splitlines()
                 obs_list = _parse_atlas_photometry(lines)
                 _save_cache(cache_key, [o.model_dump() for o in obs_list])
                 return obs_list
+            if data.get("finishtimestamp"):
+                return []
+            if poll_interval_seconds > 0 and poll_index < max_polls - 1:
+                time.sleep(poll_interval_seconds)
         return []
     except Exception:
         return []

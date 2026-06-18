@@ -2114,6 +2114,53 @@ class TestFetchAtlasForcedPollingLoop:
             )
 
         assert isinstance(result, list)
+        post_kwargs = mock_requests.post.call_args.kwargs
+        assert "data" in post_kwargs
+        assert "json" not in post_kwargs
+        assert post_kwargs["headers"]["Accept"] == "application/json"
+
+    def test_pending_task_is_polled_until_result_url(self, tmp_path, monkeypatch):
+        from unittest.mock import MagicMock, patch
+
+        import fetch as fetch_mod
+
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        atlas_data = "#MJD RA Dec m dm F\n60000.5 180.001 10.001 18.5 0.05 o\n"
+
+        mock_post_resp = MagicMock()
+        mock_post_resp.raise_for_status = MagicMock()
+        mock_post_resp.json.return_value = {"url": "https://fake-atlas/task/1/"}
+
+        mock_pending_resp = MagicMock()
+        mock_pending_resp.raise_for_status = MagicMock()
+        mock_pending_resp.json.return_value = {}
+
+        mock_task_resp = MagicMock()
+        mock_task_resp.raise_for_status = MagicMock()
+        mock_task_resp.json.return_value = {"result_url": "https://fake-atlas/result/1/"}
+
+        mock_result_resp = MagicMock()
+        mock_result_resp.raise_for_status = MagicMock()
+        mock_result_resp.text = atlas_data
+
+        mock_requests = MagicMock()
+        mock_requests.post.return_value = mock_post_resp
+        mock_requests.get.side_effect = [mock_pending_resp, mock_task_resp, mock_result_resp]
+
+        with patch.dict("sys.modules", {"requests": mock_requests}):
+            result = fetch_mod.fetch_atlas_forced(
+                180.0,
+                10.0,
+                2459600.0,
+                2459610.0,
+                atlas_token="valid_token",
+                max_polls=2,
+                poll_interval_seconds=0.0,
+            )
+
+        assert len(result) == 1
+        assert mock_requests.get.call_count == 3
 
     def test_empty_task_url_returns_empty(self, tmp_path, monkeypatch):
         from unittest.mock import MagicMock, patch
