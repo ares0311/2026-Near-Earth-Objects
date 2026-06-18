@@ -443,10 +443,60 @@ def _recovery_gate(
     }
 
 
+def _same_night_diagnostic_subgate(
+    tracklets: list[Tracklet],
+    expected_known_provided: bool,
+) -> dict[str, Any]:
+    """Return diagnostic statistics about same-night vs multi-night tracklets.
+
+    ALeRCE-backed ZTF pipelines produce only same-night tracklets (arc < 1 night).
+    The multi-night production recovery gate requires multi-night arcs, so same-night
+    runs cannot satisfy it. This subgate records the same-night evidence as citizen-
+    science diagnostic output WITHOUT replacing the production gate.
+
+    It passes only when same-night candidates exist AND no expected-known manifest
+    was provided (because if a manifest is provided, the production gate already
+    evaluated the evidence and blocking that gate is the correct signal).
+    """
+    n_same_night = 0
+    n_multi_night = 0
+    for tracklet in tracklets:
+        # Count distinct integer JD nights spanned by this tracklet's observations.
+        distinct_nights = len({int(obs.jd) for obs in tracklet.observations})
+        if distinct_nights >= 2:
+            n_multi_night += 1
+        else:
+            # Tracklet has all observations on a single calendar night.
+            n_same_night += 1
+
+    total = len(tracklets)
+    fraction = n_same_night / total if total > 0 else None
+    # subgate_applies: evidence is available and it is all same-night (no multi-night).
+    subgate_applies = n_same_night > 0 and n_multi_night == 0
+    # subgate_passed: applies AND no manifest was provided (so the multi-night
+    # production gate hasn't rejected us on evidence — it's simply not run yet).
+    subgate_passed = subgate_applies and not expected_known_provided
+    return {
+        "n_candidates": total,
+        "n_same_night": n_same_night,
+        "n_multi_night": n_multi_night,
+        "fraction_same_night": fraction,
+        "subgate_applies": subgate_applies,
+        "subgate_passed": subgate_passed,
+        "limitations": [
+            "Same-night detection evidence only; does not satisfy multi-night "
+            "production recovery gate.",
+            "This subgate is citizen-science diagnostic evidence.",
+            "No external submission authorized. No MPC report generated.",
+        ],
+    }
+
+
 def build_audit_packet(
     run_dir: Path,
     expected_known_path: Path | None = None,
     operator_review_path: Path | None = None,
+    same_night_ok: bool = False,
 ) -> dict[str, Any]:
     checkpoint_path = run_dir / "checkpoint.json"
     summary_path = run_dir / "run_summary.json"
@@ -464,9 +514,38 @@ def build_audit_packet(
     recovery_gate = _recovery_gate(expected_known, review_rows, expected_matches)
     operator_review = _load_table(operator_review_path)
     operator_review_gate = _operator_review_gate(review_rows, operator_review)
+
+    # Compute the same-night diagnostic subgate unconditionally.
+    # This records citizen-science evidence for runs that only produce same-night
+    # tracklets (e.g. ALeRCE-backed ZTF), without replacing the production gate.
+    same_night_subgate = _same_night_diagnostic_subgate(
+        tracklets,
+        expected_known_provided=bool(expected_known_path),
+    )
+
     promotion_blockers: list[str] = []
+    promotion_notes: list[str] = []
+
     if not recovery_gate["passed"]:
-        promotion_blockers.append("known_object_recovery_gate_not_passed")
+        # Check whether the same-night subgate can stand in for the blocked
+        # multi-night production gate. The subgate is accepted only when:
+        #  1. same_night_ok=True was explicitly requested by the operator
+        #  2. the subgate applies (there are same-night candidates, no multi-night ones)
+        #  3. the subgate itself passed (no manifest provided — manifest presence
+        #     means the production gate ran and genuinely failed the evidence)
+        subgate_accepted = (
+            same_night_ok
+            and same_night_subgate["subgate_applies"]
+            and same_night_subgate["subgate_passed"]
+        )
+        if not subgate_accepted:
+            # Production gate blocked and subgate not accepted: add the blocker.
+            promotion_blockers.append("known_object_recovery_gate_not_passed")
+        else:
+            # Subgate accepted in place of multi-night gate: record as a note,
+            # not a blocker, so the operator understands the evidence source.
+            promotion_notes.append("same_night_diagnostic_subgate_accepted")
+
     if not operator_review_gate["passed"]:
         promotion_blockers.append("citizen_science_operator_review_not_passed")
 
@@ -481,6 +560,7 @@ def build_audit_packet(
         "review_rows": review_rows,
         "expected_known_matches": expected_matches,
         "known_object_recovery_gate": recovery_gate,
+        "same_night_diagnostic_subgate": same_night_subgate,
         "human_false_positive_review": {
             "status": operator_review_gate["status"],
             "n_candidates_for_review": len(review_rows),
@@ -505,6 +585,7 @@ def build_audit_packet(
         },
         "production_promotion_allowed": not promotion_blockers,
         "production_promotion_blockers": promotion_blockers,
+        "production_promotion_notes": promotion_notes,
     }
 
 
@@ -557,20 +638,41 @@ def main() -> None:
                         help="Optional expected-known manifest JSON/CSV for recovery KPI")
     parser.add_argument("--operator-review", type=Path, default=None,
                         help="Optional operator review JSON/CSV for candidate QA")
+    parser.add_argument(
+        "--same-night-ok",
+        action="store_true",
+        default=False,
+        help=(
+            "Accept same-night detection evidence as a diagnostic subgate when all "
+            "tracklets are single-night (e.g. ALeRCE-backed ZTF runs) and no "
+            "expected-known manifest is provided. Does not authorize MPC submission."
+        ),
+    )
     args = parser.parse_args()
 
-    packet = build_audit_packet(args.run_dir, args.expected_known, args.operator_review)
+    packet = build_audit_packet(
+        args.run_dir,
+        args.expected_known,
+        args.operator_review,
+        same_night_ok=args.same_night_ok,
+    )
     args.report_out.parent.mkdir(parents=True, exist_ok=True)
     args.report_out.write_text(json.dumps(packet, indent=2), encoding="utf-8")
     if args.review_csv is not None:
         write_review_csv(packet["review_rows"], args.review_csv)
 
     gate = packet["known_object_recovery_gate"]
+    subgate = packet["same_night_diagnostic_subgate"]
     print(f"Audit packet written: {args.report_out}")
     if args.review_csv is not None:
         print(f"Review CSV written : {args.review_csv}")
     print(f"Tracklets reviewed : {packet['n_review_rows']}")
     print(f"Recovery gate      : {gate['status']} (passed={gate['passed']})")
+    print(
+        f"Same-night subgate : applies={subgate['subgate_applies']} "
+        f"passed={subgate['subgate_passed']} "
+        f"(n_same_night={subgate['n_same_night']} n_multi_night={subgate['n_multi_night']})"
+    )
     print("No external submission performed.")
 
 

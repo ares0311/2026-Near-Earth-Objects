@@ -342,3 +342,211 @@ def test_write_review_csv(tmp_path):
     assert "object_id,review_priority,review_flags,n_observations" in text
     assert "T001" in text
     assert "ZTF_TEST" in text
+
+
+# ---------------------------------------------------------------------------
+# Tests for _same_night_diagnostic_subgate and --same-night-ok behaviour
+# ---------------------------------------------------------------------------
+
+
+def _write_same_night_run_dir(tmp_path: Path) -> Path:
+    """Write a run dir whose single tracklet has both obs on the same JD night."""
+    run_dir = tmp_path / "run_same_night"
+    run_dir.mkdir()
+    checkpoint = {
+        "last_stage": "partial",
+        "tracklets": [
+            {
+                "object_id": "SN001",
+                "arc_days": 0.2,
+                "motion_rate_arcsec_per_hour": 1.5,
+                "motion_pa_degrees": 90.0,
+                # Both observations share JD integer floor 2460000 — same night.
+                "observations": [
+                    {
+                        "obs_id": "sn1",
+                        "ra_deg": 10.0,
+                        "dec_deg": 5.0,
+                        "jd": 2460000.3,
+                        "mag": 19.0,
+                        "mag_err": 0.1,
+                        "filter_band": "g",
+                        "mission": "ZTF",
+                        "real_bogus": 0.85,
+                        "field_id": "ZTF_F001",
+                    },
+                    {
+                        "obs_id": "sn2",
+                        "ra_deg": 10.002,
+                        "dec_deg": 5.002,
+                        "jd": 2460000.5,  # same integer JD floor as sn1
+                        "mag": 19.2,
+                        "mag_err": 0.1,
+                        "filter_band": "r",
+                        "mission": "ZTF",
+                        "real_bogus": 0.82,
+                        "field_id": "ZTF_F001",
+                    },
+                ],
+            }
+        ],
+        "partial_results": [
+            {
+                "object_id": "SN001",
+                "neo_probability": 0.1,
+                "hazard_flag": "unknown",
+                "alert_pathway": "internal_candidate",
+                "moid_au": None,
+                "discovery_priority": 0.1,
+            }
+        ],
+    }
+    summary = {"run_id": "run_same_night", "n_results": 1}
+    (run_dir / "checkpoint.json").write_text(json.dumps(checkpoint), encoding="utf-8")
+    (run_dir / "run_summary.json").write_text(json.dumps(summary), encoding="utf-8")
+    return run_dir
+
+
+def _write_multi_night_run_dir(tmp_path: Path) -> Path:
+    """Write a run dir whose single tracklet spans two distinct JD nights."""
+    run_dir = tmp_path / "run_multi_night"
+    run_dir.mkdir()
+    checkpoint = {
+        "last_stage": "partial",
+        "tracklets": [
+            {
+                "object_id": "MN001",
+                "arc_days": 1.5,
+                "motion_rate_arcsec_per_hour": 2.0,
+                "motion_pa_degrees": 88.0,
+                "observations": [
+                    {
+                        "obs_id": "mn1",
+                        "ra_deg": 20.0,
+                        "dec_deg": -5.0,
+                        "jd": 2460000.3,  # night 2460000
+                        "mag": 18.5,
+                        "mag_err": 0.1,
+                        "filter_band": "g",
+                        "mission": "ZTF",
+                        "real_bogus": 0.9,
+                        "field_id": "ZTF_F002",
+                    },
+                    {
+                        "obs_id": "mn2",
+                        "ra_deg": 20.1,
+                        "dec_deg": -5.01,
+                        "jd": 2460001.4,  # night 2460001 — different night
+                        "mag": 18.7,
+                        "mag_err": 0.1,
+                        "filter_band": "r",
+                        "mission": "ZTF",
+                        "real_bogus": 0.88,
+                        "field_id": "ZTF_F002",
+                    },
+                ],
+            }
+        ],
+        "partial_results": [],
+    }
+    summary = {"run_id": "run_multi_night", "n_results": 1}
+    (run_dir / "checkpoint.json").write_text(json.dumps(checkpoint), encoding="utf-8")
+    (run_dir / "run_summary.json").write_text(json.dumps(summary), encoding="utf-8")
+    return run_dir
+
+
+def test_same_night_diagnostic_subgate_counts_same_night_tracklets(tmp_path):
+    """_same_night_diagnostic_subgate must correctly classify same-night tracklets."""
+    module = _load_module()
+    run_dir = _write_same_night_run_dir(tmp_path)
+    checkpoint = json.loads((run_dir / "checkpoint.json").read_text(encoding="utf-8"))
+    # Reconstruct Tracklet objects the same way build_audit_packet does.
+    from schemas import Observation, Tracklet
+    tracklets = [
+        Tracklet(
+            object_id=str(raw["object_id"]),
+            observations=tuple(Observation(**obs) for obs in raw.get("observations", [])),
+            arc_days=float(raw.get("arc_days", 0.0)),
+            motion_rate_arcsec_per_hour=float(raw.get("motion_rate_arcsec_per_hour", 0.0)),
+            motion_pa_degrees=float(raw.get("motion_pa_degrees", 0.0)),
+        )
+        for raw in checkpoint["tracklets"]
+    ]
+
+    result = module._same_night_diagnostic_subgate(tracklets, expected_known_provided=False)
+
+    # One tracklet, both observations on JD night 2460000 → same-night.
+    assert result["n_candidates"] == 1
+    assert result["n_same_night"] == 1
+    assert result["n_multi_night"] == 0
+    assert result["fraction_same_night"] == 1.0
+    assert result["subgate_applies"] is True
+    # No manifest provided → subgate passes.
+    assert result["subgate_passed"] is True
+    assert len(result["limitations"]) == 3
+
+
+def test_same_night_diagnostic_subgate_recognises_multi_night_tracklet(tmp_path):
+    """_same_night_diagnostic_subgate must count multi-night tracklets correctly."""
+    module = _load_module()
+    run_dir = _write_multi_night_run_dir(tmp_path)
+    checkpoint = json.loads((run_dir / "checkpoint.json").read_text(encoding="utf-8"))
+    from schemas import Observation, Tracklet
+    tracklets = [
+        Tracklet(
+            object_id=str(raw["object_id"]),
+            observations=tuple(Observation(**obs) for obs in raw.get("observations", [])),
+            arc_days=float(raw.get("arc_days", 0.0)),
+            motion_rate_arcsec_per_hour=float(raw.get("motion_rate_arcsec_per_hour", 0.0)),
+            motion_pa_degrees=float(raw.get("motion_pa_degrees", 0.0)),
+        )
+        for raw in checkpoint["tracklets"]
+    ]
+
+    result = module._same_night_diagnostic_subgate(tracklets, expected_known_provided=False)
+
+    # The tracklet spans two distinct integer-JD nights.
+    assert result["n_same_night"] == 0
+    assert result["n_multi_night"] == 1
+    # subgate_applies requires n_same_night > 0 AND n_multi_night == 0.
+    assert result["subgate_applies"] is False
+    assert result["subgate_passed"] is False
+
+
+def test_build_audit_packet_includes_same_night_diagnostic_subgate_key(tmp_path):
+    """build_audit_packet must always include same_night_diagnostic_subgate in the packet."""
+    module = _load_module()
+    run_dir = _write_run_dir(tmp_path)
+
+    packet = module.build_audit_packet(run_dir)
+
+    assert "same_night_diagnostic_subgate" in packet
+    subgate = packet["same_night_diagnostic_subgate"]
+    assert "n_candidates" in subgate
+    assert "n_same_night" in subgate
+    assert "n_multi_night" in subgate
+    assert "subgate_applies" in subgate
+    assert "subgate_passed" in subgate
+    assert "limitations" in subgate
+
+
+def test_build_audit_packet_same_night_ok_removes_blocker_when_applicable(tmp_path):
+    """--same-night-ok must remove the recovery-gate blocker for pure same-night runs."""
+    module = _load_module()
+    # Use the same-night run dir (no expected-known manifest → production gate blocked).
+    run_dir = _write_same_night_run_dir(tmp_path)
+
+    # Without --same-night-ok: recovery gate is blocked, so blocker is present.
+    packet_default = module.build_audit_packet(run_dir, same_night_ok=False)
+    default_blockers = packet_default["production_promotion_blockers"]
+    assert "known_object_recovery_gate_not_passed" in default_blockers
+
+    # With --same-night-ok: subgate is accepted, blocker removed, note added.
+    packet_ok = module.build_audit_packet(run_dir, same_night_ok=True)
+    ok_blockers = packet_ok["production_promotion_blockers"]
+    assert "known_object_recovery_gate_not_passed" not in ok_blockers
+    assert "same_night_diagnostic_subgate_accepted" in packet_ok["production_promotion_notes"]
+    # Operator-review blocker still present because no review was provided.
+    assert "citizen_science_operator_review_not_passed" in ok_blockers
+    # The packet must never authorize external submission.
+    assert packet_ok["safety"]["no_external_submission"] is True

@@ -52,7 +52,9 @@ if str(PYTHONPATH_SRC) not in sys.path:
     sys.path.insert(0, str(PYTHONPATH_SRC))
 
 _DEFAULT_RUN_ROOT = Path("Logs/pipeline_runs")
-_DEFAULT_WINDOW_DAYS = 0.05
+_DEFAULT_WINDOW_DAYS = 1.0  # Widened from 0.05: ATLAS has ~2-day cadence; a ±72-minute
+# window (0.05 d) misses ~95% of observations. 1.0 d ensures at least one
+# cadence cycle is always included in the search window.
 _DEFAULT_MIN_RECOVERED_SAMPLES = 3
 _DEFAULT_MIN_NIGHTS = 2
 _DEFAULT_MAX_MAG = 21.5
@@ -427,6 +429,14 @@ def _fetch_recovery_sample(
         progress_callback=_progress,
         task_url=sample.get("task_url"),
     )
+    # Emit a diagnostic message when ATLAS returns zero raw observations so the
+    # operator can distinguish genuine non-detection from a network or window problem.
+    if len(observations) == 0:
+        print_fn(
+            f"[atlas-recovery] {sample['designation']} sample={sample['sample_index']}: "
+            f"ATLAS returned 0 raw observations "
+            f"(object may be too faint or outside ATLAS footprint at this JD)"
+        )
     usable = [
         _atlas_obs_to_audit_dict(obs, sample)
         for obs in observations

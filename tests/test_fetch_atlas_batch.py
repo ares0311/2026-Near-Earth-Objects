@@ -606,3 +606,60 @@ def test_run_atlas_recovery_marks_poll_exhaustion_as_pending(tmp_path: Path) -> 
     assert sample_states[0]["task_url"] == "https://fake-atlas/task/still-queued/"
     assert sample_states[0]["queuepos"] == 123
     assert sample_states[0]["poll_count"] == 1
+
+
+# ---------------------------------------------------------------------------
+# Tests for Change 1: _DEFAULT_WINDOW_DAYS value and zero-obs diagnostic print
+# ---------------------------------------------------------------------------
+
+
+def test_default_window_days_is_one_day() -> None:
+    """_DEFAULT_WINDOW_DAYS must be 1.0 to cover at least one ATLAS cadence cycle."""
+    module = _load_skill()
+    # ATLAS cadence is ~2 days; 0.05 d (72 min) was too narrow to catch observations.
+    # The widened default of 1.0 d ensures a ±1 day window around each expected JD.
+    assert module._DEFAULT_WINDOW_DAYS == 1.0, (
+        f"_DEFAULT_WINDOW_DAYS is {module._DEFAULT_WINDOW_DAYS!r}; "
+        "expected 1.0 to cover ATLAS 2-day cadence"
+    )
+
+
+def test_fetch_recovery_sample_prints_diagnostic_when_zero_observations(tmp_path: Path) -> None:
+    """_fetch_recovery_sample must emit a diagnostic line when ATLAS returns 0 observations."""
+    module = _load_skill()
+    # Build the minimal sample dict that _fetch_recovery_sample expects.
+    sample: dict[str, Any] = {
+        "designation": "Ceres",
+        "sample_index": 0,
+        "ra_deg": 10.0,
+        "dec_deg": 5.0,
+        "jd": 2460000.0,
+    }
+
+    # Fetcher that always returns an empty list — simulates object outside footprint.
+    def empty_fetcher(**kwargs: Any) -> list[Any]:
+        return []
+
+    printed: list[str] = []
+
+    module._fetch_recovery_sample(
+        sample=sample,
+        atlas_token=None,
+        force_refresh=False,
+        window_days=1.0,
+        max_mag=21.5,
+        max_polls=1,
+        poll_interval_seconds=0.0,
+        fetcher=empty_fetcher,
+        print_fn=printed.append,
+        task_progress_callback=None,
+    )
+
+    # At least one message must contain the diagnostic text.
+    diagnostic_msgs = [
+        m for m in printed
+        if "ATLAS returned 0 raw observations" in m and "Ceres" in m and "sample=0" in m
+    ]
+    assert diagnostic_msgs, (
+        f"Expected diagnostic message about 0 raw observations but got: {printed}"
+    )
