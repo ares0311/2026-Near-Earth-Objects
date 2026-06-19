@@ -603,6 +603,43 @@ citizen-science operator false-positive review. Bounded live dry-run policy
 approval is complete, but live execution remains credential/provider gated and
 non-submitting.
 
+### Handoff state as of 2026-06-19
+
+T1-C is still open. The live ATLAS forced-photometry fallback is technically
+working, but the recovery KPI has not passed.
+
+Completed live evidence:
+- `atlas_recovery_4eaf93e87f6c`: bounded 38-sample screening run,
+  19/38 samples recovered, 4 multi-night audit tracklets, recovery gate
+  4/11 expected objects (`36.36%`) — failed.
+- `atlas_recovery_175ef40ac577`: prequalified 15-sample follow-up,
+  10/15 samples recovered, 3 multi-night audit tracklets, recovery gate
+  3/4 expected objects (`75.00%`) — failed.
+
+`Skills/build_recovery_manifest.py` now has
+`--prequalify-from-atlas-run`, which builds a predeclared ATLAS-recoverable
+expected-known manifest from a completed screening run. The approved rule is:
+include only objects with at least 3 recovered ATLAS samples across at least 2
+distinct nights in screening run `atlas_recovery_4eaf93e87f6c`. The resulting
+ignored local manifest is
+`Logs/reports/t1c_expected_known_atlas_prequalified_4eaf93e87f6c.json` with
+designations `481`, `1950`, `2172`, and `2973`.
+
+**Current blocker**: the prequalified denominator still failed at 75%, below
+the 90% KPI. Do not narrow the denominator again or create a
+repeat-stable-only pass rule without explicit operator approval and a durable
+pre-run policy note. The next planning decision is whether to approve a larger
+independent ATLAS-prequalified sample or a stricter predeclared
+repeat-stability rule, with limitations documented before any more live
+queries.
+
+Durable evidence is in:
+- `docs/evidence/t1c/2026-06-19-atlas-recovery-40-query-pilot.md`
+- `docs/PRODUCTION_READINESS.md`
+
+No external submission was performed or authorized. No impact-probability claim
+was made or authorized. Raw run outputs remain local under ignored `Logs/`.
+
 ### Handoff state as of 2026-06-17
 
 `Skills/run_pipeline.py` is now production-ready for live runs:

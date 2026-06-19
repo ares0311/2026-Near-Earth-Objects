@@ -553,7 +553,42 @@ credential/provider gated and non-submitting.
 - T1-D (No Ensemble Calibration): **CLOSED.** All KPIs passed 2026-06-14.
 See `docs/PRODUCTION_READINESS.md` for the full gap register.
 
-### Handoff notes (2026-06-17) — for the next agent picking this up
+### Handoff notes (2026-06-19) — current T1-C state
+
+**Do not treat T1-C as closed.** Two live ATLAS recovery runs have now proved
+the provider plumbing works, but neither passed the `>=90%` known-object
+recovery KPI:
+
+- `atlas_recovery_4eaf93e87f6c`: bounded 38-sample ATLAS screening run,
+  19/38 samples recovered, 4 multi-night audit tracklets, recovery gate
+  4/11 expected objects (`36.36%`) — failed.
+- `atlas_recovery_175ef40ac577`: prequalified 15-sample ATLAS follow-up,
+  10/15 samples recovered, 3 multi-night audit tracklets, recovery gate
+  3/4 expected objects (`75.00%`) — failed.
+
+`Skills/build_recovery_manifest.py --prequalify-from-atlas-run` now implements
+the approved ATLAS-recoverable manifest rule. The rule keeps only objects with
+at least 3 recovered ATLAS samples across at least 2 distinct nights in the
+screening run. The local ignored manifest
+`Logs/reports/t1c_expected_known_atlas_prequalified_4eaf93e87f6c.json`
+contains `481`, `1950`, `2172`, and `2973`.
+
+**Current blocker**: T1-C remains open because the prequalified run still failed
+the recovery KPI. Do not narrow the denominator again or create a
+repeat-stable-only KPI without explicit operator approval; that would change
+the scientific policy after seeing results. The next useful planning decision
+is whether to approve a larger independent ATLAS-prequalified sample or a
+stricter predeclared repeat-stability rule, with limitations documented before
+any more live queries.
+
+Durable evidence:
+- `docs/evidence/t1c/2026-06-19-atlas-recovery-40-query-pilot.md`
+- `docs/PRODUCTION_READINESS.md`
+
+No external submission was performed or authorized. No impact-probability claim
+was made or authorized. Raw operational outputs remain under ignored `Logs/`.
+
+### Handoff notes (2026-06-17) — historical T1-C context
 
 **What is now true for T1-C**:
 - The original zero-alert diagnosis has been superseded. Public ALeRCE-backed
