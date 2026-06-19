@@ -283,6 +283,15 @@ samples (`481`, `1950`, `2172`, `2973`). The next blocker is running the
 prequalified manifest through the existing non-submitting T1-C audit path and
 then completing citizen-science operator review if the KPI passes.
 
+**2026-06-19 prequalified ATLAS recovery run**: The prequalified live run
+`atlas_recovery_175ef40ac577` completed 15 sample queries with no
+provider/tool failures, recovered 10 samples, emitted 3 multi-night audit
+tracklets, and failed the recovery KPI at 3/4 expected objects (`75.00%`;
+threshold `90%`). The failed object was `2973`; repeat-recovered objects were
+`481`, `1950`, and `2172`. T1-C remains open. Further narrowing of the
+denominator, such as a repeat-stable object rule, requires explicit operator
+approval before more live queries.
+
 ---
 
 ### T1-D: No Production Ensemble Calibration — **CLOSED 2026-06-14**

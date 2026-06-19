@@ -106,3 +106,43 @@ with `4` rows and `15` expected samples:
 Raw generated manifests remain under `Logs/` and are intentionally ignored.
 The next live run should use this predeclared prequalified manifest and remain
 inside the existing `40`-query policy envelope.
+
+## Prequalified Live Run Result
+
+The next live run used the predeclared local manifest
+`Logs/reports/t1c_expected_known_atlas_prequalified_4eaf93e87f6c.json`.
+
+- run id: `atlas_recovery_175ef40ac577`
+- manifest rows attempted: `4`
+- ATLAS sample queries: `15`
+- recovered samples: `10`
+- emitted audit tracklets: `3`
+- failures: `0`
+- pending samples: `0`
+- external submission: `false`
+- impact-probability claim: `false`
+
+`Skills/audit_real_run.py` evaluated the prequalified recovery packet:
+
+- expected known objects: `4`
+- recovered expected objects: `3`
+- unmatched expected objects: `1`
+- recovery rate: `75.00%`
+- KPI threshold: `90.00%`
+- recovery gate passed: `false`
+- production promotion allowed: `false`
+
+Recovered object designations:
+
+- `481`
+- `1950`
+- `2172`
+
+Unmatched object designation:
+
+- `2973`
+
+The prequalification strategy improved recovery from `36.36%` to `75.00%` and
+confirmed repeat recovery for three known objects, but it still does not close
+T1-C. A further denominator change or repeat-stability rule would be a
+scientific policy decision and must be approved before another live run.
