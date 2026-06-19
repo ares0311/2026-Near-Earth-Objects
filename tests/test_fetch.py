@@ -5368,3 +5368,232 @@ class TestComputeObservationTimeSpan:
                                filter_band="r", real_bogus=0.9)
         fr = SimpleNamespace(alerts=[obs1, obs2])
         assert compute_observation_time_span(fr) == pytest.approx(3.5)
+
+
+class TestFetchAlerceApiCoverageBranches:
+    """Branch coverage for _fetch_ztf_alerce_api and _fetch_alerce_objects_for_filter."""
+
+    def test_import_error_returns_empty(self, monkeypatch):
+        # When `alerce` cannot be imported the outer try/except returns [].
+        import sys
+        monkeypatch.setitem(sys.modules, "alerce", None)
+        result = _fetch_ztf_alerce_api(83.0, -5.0, 1.0, 2461096.0, 2461097.0)
+        assert result == []
+
+    def test_constructor_error_returns_empty(self, monkeypatch):
+        # When Alerce() raises the inner try/except returns [].
+        import sys
+        import types
+
+        class BrokenAlerce:
+            def __init__(self):
+                raise RuntimeError("connection refused")
+
+        monkeypatch.setitem(
+            sys.modules, "alerce", types.SimpleNamespace(Alerce=BrokenAlerce)
+        )
+        result = _fetch_ztf_alerce_api(83.0, -5.0, 1.0, 2461096.0, 2461097.0)
+        assert result == []
+
+    def test_query_objects_exception_returns_empty(self, monkeypatch):
+        # When query_objects raises, _fetch_alerce_objects_for_filter returns [].
+        import sys
+        import types
+
+        class FakeAlerce:
+            def query_objects(self, **kwargs):
+                raise OSError("network error")
+
+        monkeypatch.setitem(
+            sys.modules, "alerce", types.SimpleNamespace(Alerce=FakeAlerce)
+        )
+        result = _fetch_ztf_alerce_api(83.0, -5.0, 1.0, 2461096.0, 2461097.0)
+        assert result == []
+
+    def test_list_payload_used_directly(self, monkeypatch):
+        # When query_objects returns a plain list (not a dict) the else branch
+        # assigns it to object_rows directly.
+        import sys
+        import types
+
+        start_jd = 2461096.0
+        end_jd = 2461097.0
+
+        class FakeAlerce:
+            def query_objects(self, **kwargs):
+                return [{"oid": "ZTF26listobj"}]
+
+            def query_detections(self, oid, **kwargs):
+                return [
+                    {
+                        "mjd": 61096.5,
+                        "candid": "det_list",
+                        "fid": 1,
+                        "magpsf": 18.0,
+                        "sigmapsf": 0.1,
+                        "ra": 83.0,
+                        "dec": -5.0,
+                        "rb": 0.8,
+                    }
+                ]
+
+        monkeypatch.setitem(
+            sys.modules, "alerce", types.SimpleNamespace(Alerce=FakeAlerce)
+        )
+        result = _fetch_ztf_alerce_api(83.0, -5.0, 1.0, start_jd, end_jd)
+        assert len(result) == 1
+        assert result[0].obs_id == "det_list"
+
+    def test_non_dict_item_in_list_skipped(self, monkeypatch):
+        # Non-dict entries in object_rows are skipped via `if not isinstance(obj, dict)`.
+        import sys
+        import types
+
+        start_jd = 2461096.0
+        end_jd = 2461097.0
+
+        class FakeAlerce:
+            def query_objects(self, **kwargs):
+                return [
+                    "not_a_dict",
+                    42,
+                    {"oid": "ZTF26real"},
+                ]
+
+            def query_detections(self, oid, **kwargs):
+                return [
+                    {
+                        "mjd": 61096.5,
+                        "candid": "real_det",
+                        "fid": 1,
+                        "magpsf": 18.0,
+                        "sigmapsf": 0.1,
+                        "ra": 83.0,
+                        "dec": -5.0,
+                    }
+                ]
+
+        monkeypatch.setitem(
+            sys.modules, "alerce", types.SimpleNamespace(Alerce=FakeAlerce)
+        )
+        result = _fetch_ztf_alerce_api(83.0, -5.0, 1.0, start_jd, end_jd)
+        assert len(result) == 1
+        assert result[0].obs_id == "real_det"
+
+    def test_missing_oid_skipped(self, monkeypatch):
+        # Objects missing the 'oid' key or with oid=None are skipped.
+        import sys
+        import types
+
+        start_jd = 2461096.0
+        end_jd = 2461097.0
+
+        class FakeAlerce:
+            def query_objects(self, **kwargs):
+                return [
+                    {},
+                    {"oid": None},
+                    {"oid": "ZTF26good"},
+                ]
+
+            def query_detections(self, oid, **kwargs):
+                return [
+                    {
+                        "mjd": 61096.5,
+                        "candid": "good_det",
+                        "fid": 1,
+                        "magpsf": 18.0,
+                        "sigmapsf": 0.1,
+                        "ra": 83.0,
+                        "dec": -5.0,
+                    }
+                ]
+
+        monkeypatch.setitem(
+            sys.modules, "alerce", types.SimpleNamespace(Alerce=FakeAlerce)
+        )
+        result = _fetch_ztf_alerce_api(83.0, -5.0, 1.0, start_jd, end_jd)
+        assert len(result) == 1
+        assert result[0].obs_id == "good_det"
+
+    def test_query_detections_exception_skipped(self, monkeypatch):
+        # When query_detections raises, that object is skipped via `except Exception: continue`.
+        import sys
+        import types
+
+        start_jd = 2461096.0
+        end_jd = 2461097.0
+        call_count = {"n": 0}
+
+        class FakeAlerce:
+            def query_objects(self, **kwargs):
+                return [{"oid": "ZTF26bad"}, {"oid": "ZTF26good"}]
+
+            def query_detections(self, oid, **kwargs):
+                call_count["n"] += 1
+                if oid == "ZTF26bad":
+                    raise RuntimeError("timeout")
+                return [
+                    {
+                        "mjd": 61096.5,
+                        "candid": "good_det2",
+                        "fid": 1,
+                        "magpsf": 18.0,
+                        "sigmapsf": 0.1,
+                        "ra": 83.0,
+                        "dec": -5.0,
+                    }
+                ]
+
+        monkeypatch.setitem(
+            sys.modules, "alerce", types.SimpleNamespace(Alerce=FakeAlerce)
+        )
+        result = _fetch_ztf_alerce_api(83.0, -5.0, 1.0, start_jd, end_jd)
+        assert len(result) == 1
+        assert result[0].obs_id == "good_det2"
+        assert call_count["n"] == 2
+
+    def test_both_query_modes_empty_returns_empty(self, monkeypatch):
+        # When both asteroid and generic query_objects return no objects, return [].
+        import sys
+        import types
+
+        class FakeAlerce:
+            def query_objects(self, **kwargs):
+                return []
+
+        monkeypatch.setitem(
+            sys.modules, "alerce", types.SimpleNamespace(Alerce=FakeAlerce)
+        )
+        result = _fetch_ztf_alerce_api(83.0, -5.0, 1.0, 2461096.0, 2461097.0)
+        assert result == []
+
+    def test_duplicate_obs_id_deduplicated(self, monkeypatch):
+        # Observations with the same obs_id are deduplicated via the `seen` set.
+        import sys
+        import types
+
+        start_jd = 2461096.0
+        end_jd = 2461097.0
+
+        class FakeAlerce:
+            def query_objects(self, **kwargs):
+                return [{"oid": "ZTF26dup"}]
+
+            def query_detections(self, oid, **kwargs):
+                det = {
+                    "mjd": 61096.5,
+                    "candid": "dup_candid",
+                    "fid": 1,
+                    "magpsf": 18.0,
+                    "sigmapsf": 0.1,
+                    "ra": 83.0,
+                    "dec": -5.0,
+                }
+                return [det, det]
+
+        monkeypatch.setitem(
+            sys.modules, "alerce", types.SimpleNamespace(Alerce=FakeAlerce)
+        )
+        result = _fetch_ztf_alerce_api(83.0, -5.0, 1.0, start_jd, end_jd)
+        assert len(result) == 1

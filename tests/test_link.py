@@ -3496,3 +3496,37 @@ class TestComputeInterNightMotion:
         result = compute_inter_night_motion(t)
         assert result is not None
         assert result > 0.0
+
+
+class TestLinkProgressCallback:
+    """Branch coverage for the progress_callback invocation inside _link_candidates."""
+
+    def test_progress_callback_invoked(self):
+        # Build candidates on 3 nights so there are enough pairs to trigger the callback.
+        # The callback fires when processed_pairs % progress_every_pairs == 0 or
+        # when processed_pairs == total_pairs. With a very small progress_every_pairs
+        # override we guarantee the callback fires before all pairs are exhausted.
+        dra_per_day = 1.0 * 24 / 3600  # 1 arcsec/hr in deg/day
+        cands = tuple(
+            make_candidate(
+                (make_obs(obs_id=f"p{i}", jd=float(2460000 + i),
+                          ra_deg=180.0 + i * dra_per_day, dec_deg=0.0),),
+                rate=1.0,
+            )
+            for i in range(3)
+        )
+        calls: list[tuple[int, int, int]] = []
+
+        from link import _link_candidates
+        _link_candidates(
+            cands,
+            progress_every_pairs=1,  # fire on every pair
+            progress_callback=lambda processed, total, n_tracklets: calls.append(
+                (processed, total, n_tracklets)
+            ),
+        )
+        # At least one callback invocation must have occurred.
+        assert len(calls) >= 1
+        # Each call must satisfy processed <= total.
+        for processed, total, _ in calls:
+            assert processed <= total

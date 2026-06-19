@@ -174,6 +174,13 @@ class TestDetectPipeline:
         result = _find_object_history_sources((obs1, obs2))
         assert result == []
 
+    def test_single_observation_history_skipped(self):
+        # A group with only one observation cannot form a candidate; the
+        # `len(obs_sorted) < 2` branch must be covered to reach 100%.
+        obs = make_obs(obs_id="a", field_id="ZTF-solo", jd=2460000.5, real_bogus=0.9)
+        result = _find_object_history_sources((obs,))
+        assert result == []
+
 
 class TestIsStreak:
     def _make_streak_cutout(self) -> str:

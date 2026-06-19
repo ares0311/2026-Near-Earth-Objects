@@ -1,8 +1,11 @@
 """Policy tests for the macOS Keychain credential bridge script."""
 
 import os
+import shutil
 import subprocess
 from pathlib import Path
+
+import pytest
 
 SCRIPT = Path("Skills/verify_live_credentials.sh")
 
@@ -24,6 +27,7 @@ def test_credential_bridge_uses_uv_python_runtime():
     assert "PYTHONPATH=src python Skills/_live_connection_test.py" not in text
 
 
+@pytest.mark.skipif(shutil.which("zsh") is None, reason="zsh not available on this platform")
 def test_credential_bridge_does_not_kill_calling_zsh(tmp_path, monkeypatch):
     """Even a failed sourced live test must not exit the operator's shell."""
     fake_bin = tmp_path / "bin"

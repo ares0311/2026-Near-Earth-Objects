@@ -153,11 +153,27 @@ def test_background_run_once_writes_one_ledger_and_followup(monkeypatch, tmp_pat
     report_dir = tmp_path / "Logs" / "reports"
     write_fixture(fixture)
 
+    # Use an offline-only config so live-network credential checks don't block
+    # the run before any target can be scored.
+    config_path = tmp_path / "config.json"
+    config_path.write_text(json.dumps({
+        "input_path": str(fixture),
+        "db_path": str(db_path),
+        "report_dir": str(report_dir),
+        "follow_up_threshold": 0.45,
+        "run_mode": "automated",
+        "live_network_enabled": False,
+        "require_human_signoff": True,
+        "required_approval_count": 1,
+        "scheduler_enabled": True,
+        "scheduler_interval_minutes": 60,
+    }))
+
     def fake_score(tracklet, run_id):
         return make_scored(tracklet.object_id)
 
     monkeypatch.setattr(background, "score_tracklet", fake_score)
-    result = background.background_run_once(fixture, db_path, report_dir)
+    result = background.background_run_once(fixture, db_path, report_dir, config_path=config_path)
 
     assert result.ledger.outcome == "needs_follow_up"
     assert result.needs_follow_up is not None
@@ -546,10 +562,9 @@ def test_gitignore_excludes_generated_background_artifacts():
     text = Path(".gitignore").read_text()
 
     assert ".venv/" in text
-    assert "Logs/*.sqlite" in text
-    assert "Logs/*.sqlite-*" in text
-    assert "Logs/*.log" in text
-    assert "Logs/reports/*.md" in text
+    # Logs/** excludes all generated logs recursively (sqlite, wal, log, reports).
+    assert "Logs/**" in text
+    assert "!Logs/.gitkeep" in text
 
 
 def test_background_run_once_empty_fixture_is_reviewed(tmp_path):
@@ -587,7 +602,21 @@ def test_summaries_return_latest_entries(monkeypatch, tmp_path):
     write_fixture(fixture)
     monkeypatch.setattr(background, "score_tracklet", lambda tracklet, run_id: make_scored())
 
-    background.background_run_once(fixture, db_path, tmp_path / "reports")
+    # Offline config so live-network credential checks don't divert to 'reviewed'.
+    config_path = tmp_path / "config.json"
+    config_path.write_text(json.dumps({
+        "input_path": str(fixture),
+        "db_path": str(db_path),
+        "report_dir": str(tmp_path / "reports"),
+        "follow_up_threshold": 0.45,
+        "run_mode": "automated",
+        "live_network_enabled": False,
+        "require_human_signoff": True,
+        "required_approval_count": 1,
+        "scheduler_enabled": True,
+        "scheduler_interval_minutes": 60,
+    }))
+    background.background_run_once(fixture, db_path, tmp_path / "reports", config_path=config_path)
 
     ledger = background.ledger_summary(db_path)
     followup = background.needs_follow_up_summary(db_path)
@@ -2131,7 +2160,8 @@ def test_background_cli_automation_commands(tmp_path):
     assert bundle_payload["approved_to_attempt_live_dry_run"] is False
     assert bundle_payload["network_access_performed"] is False
     assert bundle_payload["external_submission_enabled"] is False
-    assert "LIVE_NETWORK_DISABLED" in bundle_payload["blockers"]
+    assert "LIVE_NETWORK_DISABLED" not in bundle_payload["blockers"]
+    assert "PROVIDER_CREDENTIAL_MISSING" in bundle_payload["blockers"]
     assert json.loads(recorded.stdout)["live_mode_ready"] is False
     assert json.loads(summary.stdout)["total_readiness_checks"] == 1
     assert json.loads(plan.stdout)["network_access_performed"] is False
