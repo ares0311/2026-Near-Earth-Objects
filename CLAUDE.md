@@ -598,9 +598,10 @@ coverage target. All three ML tiers have trained weights: Tier 1 XGBoost
 (val_macro_f1=0.9400, best epoch 17/30). **T1-A CLOSED. T1-B CLOSED. T1-D CLOSED.**
 Ensemble stacker KPIs passed 2026-06-14 (AUC=0.9809, Brier=0.0211, ECE=0.0000).
 
-**Production is blocked only on T1-C**: known-object recovery evidence,
-citizen-science operator false-positive review, and automated live-policy
-approval before unsupervised operation.
+**Production is blocked only on T1-C**: known-object recovery evidence and
+citizen-science operator false-positive review. Bounded live dry-run policy
+approval is complete, but live execution remains credential/provider gated and
+non-submitting.
 
 ### Handoff state as of 2026-06-17
 

@@ -208,8 +208,10 @@ Do not configure MCP tools that allow:
 - NEOCP follow-up escalation;
 - NASA PDCO notification;
 - public impact-probability statements;
-- changing live-policy files to approved;
-- editing `background/live_review_policy.example.json` to bypass human approval;
+- changing live-policy files to approved without explicit human approval;
+- editing `background/live_review_policy.example.json` to bypass or dilute
+  human approval, rate limits, no-submission guardrails, or no-impact-claim
+  guardrails;
 - external submission enablement;
 - bypassing failing tests;
 - editing hazard thresholds without a documented decision;

@@ -1,7 +1,7 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.87.9
-**Last updated**: 2026-06-18
+**Current version**: v0.88.0
+**Last updated**: 2026-06-19
 **Purpose**: Mandatory read at session start (per MANDATORY SESSION-START PROTOCOL).  
 Every planning cycle must name the highest-priority unresolved Tier 1 gap and show how proposed steps close or directly unblock it.
 
@@ -168,9 +168,16 @@ Credentials are stored in macOS Keychain under `neo-detection:ATLAS_TOKEN`, `neo
 2. [DONE] ATLAS forced-photometry token obtained.
 3. [DONE] Credentials stored in macOS Keychain; loaded via `source Skills/verify_live_credentials.sh`.
 4. [DONE] Live connection test (`Skills/_live_connection_test.py`) passed: `{"atlas": {"status": "OK"}, "ztf": {"status": "OK"}}`.
-5. [PENDING] Formal background CLI live dry-run approval (`live-dry-run-plan` / `live-dry-run-approval-bundle`) not yet signed off. This gate is required before any automated live fetch outside of manual operator sessions.
+5. [DONE] Formal bounded live dry-run policy signed by Jerome W. Lindsey III in
+   `background/live_review_policy.example.json`. `background/config.json` now
+   enables bounded live dry-run attempts, while readiness remains fail-closed on
+   credential/provider blockers and never permits external submission or impact
+   probability claims.
 
-**Remaining step before automated live runs**: Run `Skills/background.py live-dry-run-approval-bundle` and obtain a human reviewer signature on `background/live_review_policy.example.json`.
+**Remaining step before automated live runs**: Validate provider credential
+readiness through the background CLI and keep every run inside the signed
+bounded policy. This approval does not authorize MPC submission, NEOCP
+follow-up escalation, NASA notification, or public hazard claims.
 
 ---
 
@@ -181,8 +188,10 @@ Credentials are stored in macOS Keychain under `neo-detection:ATLAS_TOKEN`, `neo
 **Why it is Tier 1**: Synthetic data cannot expose real failure modes — coordinate edge cases, survey-specific format quirks, real noise distributions, real artifact morphologies, or real rate-limiting behavior. The pipeline's real-world correctness is unknown until it processes real data.
 
 **What is needed to close it**:
-1. [DEPENDS ON T1-B] Complete the automated live-review policy approval; the
-   credentials and manual provider connection tests are already complete.
+1. [DONE] Complete the automated live-review policy approval; credentials,
+   manual provider connection tests, and the signed bounded dry-run policy are
+   now present. Provider readiness can still fail closed when required
+   credentials are absent from the active shell.
 2. [DONE] Run `Skills/run_pipeline.py` on a bounded real ZTF field in dry-run
    mode. On 2026-06-16, the operator ran the Orion-field ALeRCE-backed pilot:
    4,059 real ZTF source detections fetched, 4,059/4,059 preprocessed, 520
@@ -212,12 +221,11 @@ Credentials are stored in macOS Keychain under `neo-detection:ATLAS_TOKEN`, `neo
    is retained only as historical/debug evidence and must not be reused for the
    production recovery KPI.
 
-**Current blocker**: T1-C is no longer blocked on zero ZTF fetches or missing
-manifest tooling. The next blocker is live generation of a non-Orion
-expected-known recovery manifest, a staged recovery run against that manifest,
-and citizen-science operator false-positive review. The automated live-review
-policy remains required before automated live runs; manual supervised pilot
-runs remain operator-controlled and non-submitting.
+**Current blocker**: T1-C is no longer blocked on zero ZTF fetches, missing
+manifest tooling, or live-review policy sign-off. The next blocker is live
+generation of a non-Orion expected-known recovery manifest, a staged recovery
+run against that manifest, and citizen-science operator false-positive review.
+All runs remain operator-controlled and non-submitting.
 
 **2026-06-18 diagnostic update**: Recovery field selection now supports live
 ZTF availability probing and broader MPC asteroid-list manifest preselection.
@@ -350,7 +358,7 @@ These items cannot be completed by code generation alone. They require real-worl
 | Blocker | Owner | Unblocks |
 |---|---|---|
 | External expert review of ML architecture | Not currently available | External MPC submission |
-| Live review policy sign-off | Human reviewer | T1-B |
+| Live review policy sign-off | CLOSED 2026-06-18 by Jerome W. Lindsey III | T1-B |
 | Known-object recovery audit and false-positive review | Citizen-science project operator | T1-C |
 
 ---
@@ -361,7 +369,7 @@ Before the pipeline makes its first MPC submission, all of the following must be
 
 - [x] T1-A resolved: Tier 1 XGBoost ✓ (val_acc=99.95%); Tier 2 CNN ✓ (val_acc=91.3%); Tier 3 Transformer ✓ (val_macro_f1=0.9400); ensemble stacker ✓ (AUC=0.9809, all 7 KPIs pass, 2026-06-14)
 - [x] T1-A resolved: calibration KPI gate passed ✓ (T1-D, 2026-06-14); ensemble stacker KPIs passed ✓ (2026-06-14)
-- [~] T1-B resolved: IRSA and ATLAS credentials configured ✓; live connection test passed ✓; automated live dry-run policy not yet signed off (pending human reviewer signature)
+- [x] T1-B resolved: IRSA and ATLAS credentials configured ✓; live connection test passed ✓; bounded live dry-run policy signed ✓; execution remains credential/provider gated and non-submitting
 - [~] T1-C progressed: Bounded supervised real-ZTF pilot completed on
       2026-06-16; known-object recovery audit and operator false-positive review
       still required.

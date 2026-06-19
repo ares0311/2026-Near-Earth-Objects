@@ -527,8 +527,9 @@ All 10 pipeline modules are complete. The offline suite passes 3600+ tests, with
 2 live/integration checks deselected. CI remains green on Python 3.14 with the
 100% coverage target. All three ML tiers have trained weights and all calibration
 KPIs have passed. **Production is blocked only on T1-C**: known-object recovery
-evidence, citizen-science operator false-positive review, and automated
-live-policy approval before unsupervised operation.
+evidence and citizen-science operator false-positive review. Bounded live
+dry-run policy approval is complete, but live execution remains
+credential/provider gated and non-submitting.
 
 **Production gap status (as of 2026-06-17)**:
 - T1-A (Incomplete Trained ML Model Set): **CLOSED.** All Tier 1/2/3 weights
@@ -538,7 +539,10 @@ live-policy approval before unsupervised operation.
   confirmed PRESENT via `source Skills/verify_live_credentials.sh`; live
   connection test OK. Credentials stored in macOS Keychain under service names
   `neo-detection:ATLAS_TOKEN`, `neo-detection:ZTF_IRSA_USERNAME`,
-  `neo-detection:ZTF_IRSA_PASSWORD` — never stored in repo.
+  `neo-detection:ZTF_IRSA_PASSWORD` — never stored in repo. Bounded live
+  dry-run policy is signed in `background/live_review_policy.example.json`;
+  execution still fails closed on missing provider credentials and never
+  authorizes external submission or impact-probability claims.
 - T1-C (Real-Data Recovery And Citizen-Science Review Evidence): **OPEN.**
   A bounded supervised real-ZTF pilot completed on 2026-06-16 through the public
   ALeRCE source-detection provider: 4,059 real source detections fetched, 520
@@ -752,10 +756,12 @@ PYTHONPATH=src uv run python Skills/select_survey_fields.py \
    `needs_followup` all block internal promotion.
 
 **Priority 2 — After T1-C internal promotion evidence passes**:
-- T1-B dry-run policy sign-off via `Skills/background.py live-dry-run-plan`.
+- Re-check signed live dry-run policy readiness via `Skills/background.py live-dry-run-plan`
+  before any scheduled live dry-run attempt.
 - T2-C citizen-science architecture evidence packet with explicit no-submission
   limitation.
-- Production scheduler setup remains blocked until live policy approval exists.
+- Production scheduler setup remains credential/provider gated under the signed
+  bounded live dry-run policy.
 
 **Background automation (lower priority)**:
 - Sync docs and changelog after each version bump so `AGENTS.md`, `CLAUDE.md`, `README.md`, and `CHANGELOG.md` stay aligned.

@@ -162,9 +162,10 @@ PYTHONPATH=src python Skills/background.py record-live-dry-run-plan
 PYTHONPATH=src python Skills/background.py live-dry-run-plan-log-summary
 ```
 
-The plan is derived from `background/live_review_policy.example.json` until a
-reviewer replaces it with an approved policy. The example policy deliberately
-sets `approved_for_live_network` to `false`.
+The plan is derived from `background/live_review_policy.example.json`. As of
+2026-06-18 this file records Jerome W. Lindsey III's bounded live dry-run
+approval, but execution still fails closed on missing credentials, provider
+readiness blockers, external-submission claims, or impact-probability claims.
 
 Record a mock-only live dry-run execution attempt:
 

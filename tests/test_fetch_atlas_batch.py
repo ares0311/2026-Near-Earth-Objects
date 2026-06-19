@@ -558,6 +558,181 @@ def test_run_atlas_recovery_resumes_existing_task_url_with_force_refresh(tmp_pat
     assert any("polling existing ATLAS task" in message for message in messages)
 
 
+def test_run_atlas_recovery_resume_skips_prior_not_recovered_without_refresh(
+    tmp_path: Path,
+) -> None:
+    """resume without force_refresh must preserve prior negative sample evidence."""
+    module = _load_skill()
+    expected = tmp_path / "expected_known.json"
+    _write_expected_manifest(expected)
+    rows = module._load_expected_known_manifest(expected)
+    samples = [sample for row in rows for sample in module._manifest_samples(row)]
+    params = {
+        "expected_known": str(expected),
+        "n_manifest_rows": 1,
+        "n_samples": 3,
+        "window_days": 1.0,
+        "min_recovered_samples": 3,
+        "min_nights": 2,
+        "max_mag": 21.5,
+        "max_polls": 2,
+        "poll_interval_seconds": 0.0,
+        "max_objects": None,
+    }
+    run_dir = tmp_path / "runs" / f"atlas_recovery_{module._param_key(params)}"
+    first_key = module._recovery_sample_key(samples[0])
+    run_dir.mkdir(parents=True)
+    (run_dir / "checkpoint.json").write_text(
+        json.dumps(
+            {
+                "params": params,
+                "last_stage": "atlas_forced_recovery",
+                "tracklets": [],
+                "partial_results": [],
+                "samples": {
+                    first_key: {
+                        "designation": "100001",
+                        "sample_index": 0,
+                        "requested_ra_deg": 10.0,
+                        "requested_dec_deg": 5.0,
+                        "requested_jd": 2460000.0,
+                        "window_days": 1.0,
+                        "status": "not_recovered",
+                        "n_raw_observations": 0,
+                        "n_usable_observations": 0,
+                        "observations": [],
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    calls: list[float] = []
+
+    def recovery_fetcher(
+        ra_deg: float,
+        dec_deg: float,
+        start_jd: float,
+        end_jd: float,
+        **kwargs: Any,
+    ) -> list[SimpleNamespace]:
+        calls.append(ra_deg)
+        center_jd = (start_jd + end_jd) / 2.0
+        return [_fake_observation_at(ra_deg, dec_deg, center_jd)]
+
+    messages: list[str] = []
+    summary = module.run_atlas_recovery(
+        expected_known=expected,
+        run_root=tmp_path / "runs",
+        atlas_token=None,
+        force_refresh=False,
+        resume=True,
+        workers=1,
+        window_days=1.0,
+        min_recovered_samples=3,
+        min_nights=2,
+        max_mag=21.5,
+        max_objects=None,
+        max_polls=2,
+        poll_interval_seconds=0.0,
+        fetcher=recovery_fetcher,
+        print_fn=messages.append,
+    )
+
+    assert len(calls) == 2
+    assert summary["n_recovered_samples"] == 2
+    assert any("already not_recovered" in message for message in messages)
+
+
+def test_run_atlas_recovery_force_refresh_retries_prior_not_recovered(
+    tmp_path: Path,
+) -> None:
+    """force_refresh must re-query stale negative rows from older recovery windows."""
+    module = _load_skill()
+    expected = tmp_path / "expected_known.json"
+    _write_expected_manifest(expected)
+    rows = module._load_expected_known_manifest(expected)
+    samples = [sample for row in rows for sample in module._manifest_samples(row)]
+    params = {
+        "expected_known": str(expected),
+        "n_manifest_rows": 1,
+        "n_samples": 3,
+        "window_days": 1.0,
+        "min_recovered_samples": 3,
+        "min_nights": 2,
+        "max_mag": 21.5,
+        "max_polls": 2,
+        "poll_interval_seconds": 0.0,
+        "max_objects": None,
+    }
+    run_dir = tmp_path / "runs" / f"atlas_recovery_{module._param_key(params)}"
+    first_key = module._recovery_sample_key(samples[0])
+    run_dir.mkdir(parents=True)
+    (run_dir / "checkpoint.json").write_text(
+        json.dumps(
+            {
+                "params": params,
+                "last_stage": "atlas_forced_recovery",
+                "tracklets": [],
+                "partial_results": [],
+                "samples": {
+                    first_key: {
+                        "designation": "100001",
+                        "sample_index": 0,
+                        "requested_ra_deg": 10.0,
+                        "requested_dec_deg": 5.0,
+                        "requested_jd": 2460000.0,
+                        "window_days": 1.0,
+                        "status": "not_recovered",
+                        "n_raw_observations": 0,
+                        "n_usable_observations": 0,
+                        "observations": [],
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    calls: list[float] = []
+
+    def recovery_fetcher(
+        ra_deg: float,
+        dec_deg: float,
+        start_jd: float,
+        end_jd: float,
+        **kwargs: Any,
+    ) -> list[SimpleNamespace]:
+        calls.append(ra_deg)
+        center_jd = (start_jd + end_jd) / 2.0
+        return [_fake_observation_at(ra_deg, dec_deg, center_jd)]
+
+    messages: list[str] = []
+    summary = module.run_atlas_recovery(
+        expected_known=expected,
+        run_root=tmp_path / "runs",
+        atlas_token=None,
+        force_refresh=True,
+        resume=True,
+        workers=1,
+        window_days=1.0,
+        min_recovered_samples=3,
+        min_nights=2,
+        max_mag=21.5,
+        max_objects=None,
+        max_polls=2,
+        poll_interval_seconds=0.0,
+        fetcher=recovery_fetcher,
+        print_fn=messages.append,
+    )
+
+    assert len(calls) == 3
+    assert summary["n_recovered_samples"] == 3
+    assert summary["n_tracklets"] == 1
+    assert any("refreshing prior not_recovered" in message for message in messages)
+
+
 def test_run_atlas_recovery_marks_poll_exhaustion_as_pending(tmp_path: Path) -> None:
     """A queued task that outlives max_polls must stay resumable, not unrecovered."""
     module = _load_skill()

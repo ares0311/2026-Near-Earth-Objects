@@ -531,10 +531,21 @@ def run_atlas_recovery(
     for sample in samples:
         key = _recovery_sample_key(sample)
         existing = state.get("samples", {}).get(key)
-        if isinstance(existing, dict) and existing.get("status") in _TERMINAL_SAMPLE_STATUSES:
+        existing_status = existing.get("status") if isinstance(existing, dict) else None
+        if existing_status == "recovered":
             print_fn(
                 f"[resume] {sample['designation']} sample={sample['sample_index']} "
-                f"already {existing.get('status')}"
+                "already recovered"
+            )
+            continue
+        if (
+            isinstance(existing, dict)
+            and existing_status in {"not_recovered", "failed"}
+            and not force_refresh
+        ):
+            print_fn(
+                f"[resume] {sample['designation']} sample={sample['sample_index']} "
+                f"already {existing_status}"
             )
             continue
         sample_for_run = dict(sample)
@@ -543,6 +554,11 @@ def run_atlas_recovery(
             print_fn(
                 f"[resume] {sample['designation']} sample={sample['sample_index']} "
                 "polling existing ATLAS task"
+            )
+        elif isinstance(existing, dict) and existing_status in {"not_recovered", "failed"}:
+            print_fn(
+                f"[resume] {sample['designation']} sample={sample['sample_index']} "
+                f"refreshing prior {existing_status}"
             )
         todo.append(sample_for_run)
     start_time = time.monotonic()

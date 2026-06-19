@@ -12,7 +12,7 @@
 
 ## Abstract
 
-Near-Earth Objects (NEOs) — small solar system bodies with perihelion distances $q < 1.3$ AU — represent both a premier target for planetary science and the only known category of natural disaster that is, in principle, preventable. Despite three decades of systematic survey effort, population completeness models estimate that the majority of NEOs larger than 140 meters remain undetected, sustaining the need for automated, high-throughput discovery pipelines capable of operating at the cadence and scale of modern wide-field photometric surveys. This work presents a research pipeline for the detection, multi-night linking, orbital characterization, and hazard ranking of NEO candidates derived from public ZTF source detections, ATLAS forced photometry, and the Minor Planet Center (MPC) catalog. The system implements a seven-stage directed acyclic processing graph — fetch, preprocess, detect, link, classify, orbit, score — followed by a mandatory three-step alert protocol governing all external communications. Classification employs a three-tier ensemble architecture: a gradient-boosted tree classifier on tabular features (Tier 1), a convolutional neural network operating on 63×63-pixel ZTF image triplets following the architecture of Duev et al. (2019) (Tier 2), and a BERT-style Transformer trained on multi-night observation sequences following Lin et al. (2022) (Tier 3), with outputs combined by a logistic regression meta-learner and calibrated via Platt scaling or isotonic regression. Hazard assessment follows a Bayesian log-score model over five competing hypotheses with deliberately pessimistic priors for new NEO candidates. Preliminary orbit determination uses Gauss's method with differential correction, and Potentially Hazardous Asteroid (PHA) flags are gated on orbit quality code ≥ 2 and independently confirmed MOID ≤ 0.05 AU. As of version 0.87.9, all ten pipeline modules are implemented, all three ML tiers and the ensemble stacker have passed quantitative calibration KPIs, and a first bounded supervised real-ZTF pilot has completed through the public ALeRCE source-detection provider. Production remains blocked on T1-C recovery/audit work: known-object recovery verification, citizen-science operator false-positive review, and automated live-policy approval before unsupervised operation. Background automation provides top-level SQLite audit logs and fail-closed readiness controls. Injection-recovery validation on $n = 200$ synthetic NEO tracklets reports 100% detection, link, and score rates, but synthetic results are not treated as evidence of live-sky performance. The pipeline produces MPC-compatible 80-column, ADES PSV, and JSON observation reports and implements a non-negotiable three-step pathway — MPC submission, independent observatory confirmation, and conditional NASA PDCO notification — ensuring that no autonomous impact claim is ever issued.
+Near-Earth Objects (NEOs) — small solar system bodies with perihelion distances $q < 1.3$ AU — represent both a premier target for planetary science and the only known category of natural disaster that is, in principle, preventable. Despite three decades of systematic survey effort, population completeness models estimate that the majority of NEOs larger than 140 meters remain undetected, sustaining the need for automated, high-throughput discovery pipelines capable of operating at the cadence and scale of modern wide-field photometric surveys. This work presents a research pipeline for the detection, multi-night linking, orbital characterization, and hazard ranking of NEO candidates derived from public ZTF source detections, ATLAS forced photometry, and the Minor Planet Center (MPC) catalog. The system implements a seven-stage directed acyclic processing graph — fetch, preprocess, detect, link, classify, orbit, score — followed by a mandatory three-step alert protocol governing all external communications. Classification employs a three-tier ensemble architecture: a gradient-boosted tree classifier on tabular features (Tier 1), a convolutional neural network operating on 63×63-pixel ZTF image triplets following the architecture of Duev et al. (2019) (Tier 2), and a BERT-style Transformer trained on multi-night observation sequences following Lin et al. (2022) (Tier 3), with outputs combined by a logistic regression meta-learner and calibrated via Platt scaling or isotonic regression. Hazard assessment follows a Bayesian log-score model over five competing hypotheses with deliberately pessimistic priors for new NEO candidates. Preliminary orbit determination uses Gauss's method with differential correction, and Potentially Hazardous Asteroid (PHA) flags are gated on orbit quality code ≥ 2 and independently confirmed MOID ≤ 0.05 AU. As of version 0.88.0, all ten pipeline modules are implemented, all three ML tiers and the ensemble stacker have passed quantitative calibration KPIs, a bounded live dry-run policy has been signed, and a first bounded supervised real-ZTF pilot has completed through the public ALeRCE source-detection provider. Production remains blocked on T1-C recovery/audit work: known-object recovery verification and citizen-science operator false-positive review. Background automation provides top-level SQLite audit logs and fail-closed readiness controls. Injection-recovery validation on $n = 200$ synthetic NEO tracklets reports 100% detection, link, and score rates, but synthetic results are not treated as evidence of live-sky performance. The pipeline produces MPC-compatible 80-column, ADES PSV, and JSON observation reports and implements a non-negotiable three-step pathway — MPC submission, independent observatory confirmation, and conditional NASA PDCO notification — ensuring that no autonomous impact claim is ever issued.
 
 **Keywords:** near-Earth objects, planetary defense, asteroid detection, automated pipeline, machine learning, real/bogus classification, orbit determination, Bayesian scoring, ZTF, Minor Planet Center
 
@@ -57,7 +57,7 @@ This repository implements a complete, research-grade automated detection and ra
 4. **Independent confirmation before alert** — the NASA PDCO notification pathway is gated on MPC submission *and* independent observatory confirmation, not on pipeline confidence alone.
 5. **No autonomous impact claims** — the system produces ranked candidates and hazard flags; it defers all authoritative impact probability statements to CNEOS Scout and Sentry.
 
-The pipeline follows the build order: `schemas` → `fetch` → `preprocess` → `detect` → `link` → `classify` → `orbit` → `score` → `alert` → `calibration`. Each stage consumes the immutable, typed output of all prior stages. As of v0.87.9, all ten pipeline modules plus background automation are complete, all three ML tiers have trained weights, calibration KPIs have passed, and a first bounded supervised real-ZTF pilot has completed. See `docs/PRODUCTION_READINESS.md` for the remaining production gap register.
+The pipeline follows the build order: `schemas` → `fetch` → `preprocess` → `detect` → `link` → `classify` → `orbit` → `score` → `alert` → `calibration`. Each stage consumes the immutable, typed output of all prior stages. As of v0.88.0, all ten pipeline modules plus background automation are complete, all three ML tiers have trained weights, calibration KPIs have passed, a bounded live dry-run policy is signed, and a first bounded supervised real-ZTF pilot has completed. See `docs/PRODUCTION_READINESS.md` for the remaining production gap register.
 
 ---
 
@@ -1169,10 +1169,10 @@ The older n=50 baseline remains in `data/injection_recovery_baseline.json` for h
 basic zero-fetch blocker is resolved by the public ALeRCE ZTF source-detection
 provider and a bounded supervised pilot. The remaining blocker is recovery and
 review evidence: known-object recovery audit, citizen-science operator
-false-positive review, and automated live-policy approval before unsupervised
-operation.
+false-positive review. Bounded live dry-run policy approval is complete, but
+execution remains credential/provider gated and non-submitting.
 
-### 15.1 Current State Snapshot (v0.87.9)
+### 15.1 Current State Snapshot (v0.88.0)
 
 | Area | Status | Notes |
 |---|---|---|
@@ -1181,7 +1181,7 @@ operation.
 | Background automation CLI | **Complete** | `Skills/background.py` — offline scheduler, SQLite audit logs, signoff packets, readiness summaries |
 | Repository artifact hygiene | **Complete** | `git add .` is supported: raw `Logs/**` stay local, production models are filename-allowlisted, and durable evidence is promoted to `docs/evidence/` or `data/evidence/` |
 | ML model weights | **Complete** | T1-A closed. Tier 1 XGBoost, Tier 2 CNN, Tier 3 Transformer, and ensemble stacker are trained; calibration KPIs passed. |
-| Real survey credentials | **CONFIGURED** | T1-B credentials are stored in macOS Keychain and manual ZTF/ATLAS connection tests passed. Automated live policy approval remains pending. |
+| Real survey credentials and live policy | **CONFIGURED + SIGNED** | T1-B credentials are stored in macOS Keychain, manual ZTF/ATLAS connection tests passed, and the bounded live dry-run policy is signed. Execution remains credential/provider gated and non-submitting. |
 | Real data processed | **BOUNDED PILOT + RECOVERY DIAGNOSTICS COMPLETE** | T1-C open. The Orion ZTF pilot is historical/debug evidence only. Non-Orion recovery manifests now exist, ALeRCE same-night asteroid histories were diagnosed, and an ATLAS forced-photometry fallback path is implemented; production recovery still needs a passing multi-night known-object audit and operator review. |
 | Production calibration | **Complete** | T1-D closed. Quantitative Brier, ECE, log-loss, ROC AUC, CV ECE, and bootstrap CI gates passed. |
 | External reporting | **Disabled** | No MPC, NEOCP, NASA, or CNEOS submission path is active. Alert protocol requires MPC submission + independent confirmation before any NASA pathway. |
@@ -1206,7 +1206,7 @@ operation.
 |---|---|---|---|
 | **M4a** | T1-B: IRSA account + credentials | None | **Complete** |
 | **M4b** | T1-B: ATLAS token | None | **Complete** |
-| **M4c** | T1-B: Live review policy approved | Reviewer sign-off on `background/live_review_policy.example.json` | **Pending human action** |
+| **M4c** | T1-B: Live review policy approved | Reviewer sign-off on `background/live_review_policy.example.json` | **Complete (signed 2026-06-18)** |
 | **M4d** | T1-C: First supervised live ZTF pilot | Manual operator run; no external submission | **Complete (bounded, 2026-06-16)** |
 | **M5a** | T1-A: Download labeled ZTF real/bogus dataset | 10,000 real alerts downloaded | **Complete** |
 | **M5b** | T1-A: Build cutout dataset + train Tier 2 CNN | `models/tier2_cnn.pt`; validation accuracy 91.3% | **Complete** |
@@ -1238,11 +1238,11 @@ operation.
 | **P29** | Blocked | Known-object recovery KPI | Expected-known manifests and ATLAS fallback tooling exist; ≥90% multi-night recovery is not yet established |
 | **P30** | Blocked | Citizen-science operator false-positive review | Review CSV required for recovered candidates; long-arc near-stationary candidates are high-priority review items |
 | **P31** | In progress | Staged known-object pilot | `Skills/select_survey_fields.py --mode recovery` selects known-object-rich non-Orion fields for the next recovery run |
-| **P32** | Pending | Automated live-run approval | Background live-review policy still needs signoff before unsupervised live automation |
+| **P32** | Complete | Automated live-run approval | Bounded live dry-run policy signed; execution remains credential/provider gated and non-submitting |
 | **P33** | In progress | Real-run audit v2 | `Skills/audit_real_run.py` can match expected known objects by pipeline ID or sky/time samples and requires operator-review decisions |
 | **P34** | Complete | Expected-known manifest builder | `Skills/build_recovery_manifest.py` builds checkpointed MPC+Horizons sky/time manifests for T1-C audits |
 | **P35** | Complete | Repository artifact hygiene | `.gitignore` protects `git add .`; raw `Logs/**` are local-only, production models are explicit allowlists, and T1-C evidence is summarized in `docs/evidence/t1c/` |
-| **P36** | In progress | ATLAS forced-photometry fallback | `Skills/fetch_atlas_data.py --expected-known ...` writes audit-compatible recovery packets; provider request format, polling, in-flight checkpointing, and task-URL resume are fixed; longer operator-supervised run still required |
+| **P36** | In progress | ATLAS forced-photometry fallback | `Skills/fetch_atlas_data.py --expected-known ...` writes audit-compatible recovery packets; provider request format, polling, in-flight checkpointing, task-URL resume, and force-refresh stale negative replay are fixed; longer operator-supervised run still required |
 
 ### 15.5 Known Limitations
 
@@ -1250,7 +1250,7 @@ operation.
 - **Known-object recovery is not yet proven**: Expected-known manifests now exist, but no non-Orion multi-night recovery run has passed the ≥90% audit KPI.
 - **Citizen-science operator review remains open**: Recovered candidates need operator review before T1-C can close for internal, no-submission operation.
 - **External expert review is unavailable**: This is a citizen-science project. Internal production readiness does not authorize MPC submission or hazard notification.
-- **Automated live operation is not approved**: Manual supervised runs are possible; background live automation still needs policy signoff.
+- **Automated live execution remains gated**: The bounded live dry-run policy is signed, but runs still require provider credential readiness and remain non-submitting.
 - **MOID accuracy on short arcs**: Arcs < 24 hours produce unreliable MOID; quality-code gate (≥2) mitigates but does not eliminate this.
 
 ---
