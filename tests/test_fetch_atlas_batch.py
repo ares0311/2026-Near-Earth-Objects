@@ -799,6 +799,35 @@ def test_default_window_days_is_one_day() -> None:
     )
 
 
+def test_run_atlas_recovery_warns_on_narrow_window_days(tmp_path: Path) -> None:
+    """Operator runs should not silently use the old narrow recovery window."""
+    module = _load_skill()
+    expected = tmp_path / "expected_known.json"
+    _write_expected_manifest(expected)
+    messages: list[str] = []
+
+    summary = module.run_atlas_recovery(
+        expected_known=expected,
+        run_root=tmp_path / "runs",
+        atlas_token=None,
+        force_refresh=False,
+        resume=False,
+        workers=1,
+        window_days=0.05,
+        min_recovered_samples=3,
+        min_nights=2,
+        max_mag=21.5,
+        max_objects=1,
+        max_polls=1,
+        poll_interval_seconds=0.0,
+        fetcher=lambda *a, **kw: [],
+        print_fn=messages.append,
+    )
+
+    assert summary["n_tracklets"] == 0
+    assert any("WARNING" in message and "T1-C recovery KPI" in message for message in messages)
+
+
 def test_fetch_recovery_sample_prints_diagnostic_when_zero_observations(tmp_path: Path) -> None:
     """_fetch_recovery_sample must emit a diagnostic line when ATLAS returns 0 observations."""
     module = _load_skill()

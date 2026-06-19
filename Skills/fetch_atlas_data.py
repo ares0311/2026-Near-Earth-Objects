@@ -491,6 +491,13 @@ def run_atlas_recovery(
         raise ValueError("workers must be at least 1")
     if window_days <= 0.0:
         raise ValueError("window_days must be positive")
+    if window_days < _DEFAULT_WINDOW_DAYS:
+        print_fn(
+            "[atlas-recovery] WARNING: --window-days is narrower than the "
+            f"{_DEFAULT_WINDOW_DAYS:.1f} day default. ATLAS has an approximately "
+            "2-day cadence, so narrow windows can fail the T1-C recovery KPI "
+            "even when the target is recoverable."
+        )
     if min_recovered_samples < 1 or min_nights < 1:
         raise ValueError("minimum recovery thresholds must be positive")
     if max_polls < 1 or poll_interval_seconds < 0.0:
@@ -893,7 +900,11 @@ def main() -> None:
         "--window-days",
         type=float,
         default=_DEFAULT_WINDOW_DAYS,
-        help="Half-window around each expected sample JD for forced photometry",
+        help=(
+            "Half-window around each expected sample JD for forced photometry "
+            f"(default {_DEFAULT_WINDOW_DAYS:.1f}; keep the default for T1-C "
+            "because ATLAS cadence is approximately 2 days)"
+        ),
     )
     parser.add_argument(
         "--min-recovered-samples",

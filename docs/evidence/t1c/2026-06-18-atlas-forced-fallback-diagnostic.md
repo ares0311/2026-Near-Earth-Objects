@@ -24,13 +24,17 @@ notification, or any impact-probability statement.
 uv run --python 3.14 python Skills/fetch_atlas_data.py \
   --expected-known Logs/reports/t1c_expected_known_ztf_available_251p66_m22p5_30d.json \
   --run-root Logs/pipeline_runs \
-  --window-days 0.05 \
   --min-recovered-samples 3 \
   --min-nights 2 \
   --workers 2 \
   --resume \
   --force-refresh
 ```
+
+The command intentionally uses the `1.0` day default search half-window. ATLAS
+cadence is approximately two days, so the earlier diagnostic value
+`--window-days 0.05` was too narrow for production recovery evidence and should
+not be reused for T1-C.
 
 The recovery mode writes an audit-compatible packet:
 
