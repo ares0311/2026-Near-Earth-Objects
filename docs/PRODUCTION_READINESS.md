@@ -173,6 +173,10 @@ Credentials are stored in macOS Keychain under `neo-detection:ATLAS_TOKEN`, `neo
    enables bounded live dry-run attempts, while readiness remains fail-closed on
    credential/provider blockers and never permits external submission or impact
    probability claims.
+6. [DONE] T1-C recovery query envelope expanded by Jerome W. Lindsey III on
+   2026-06-19 to permit up to 40 ATLAS forced-photometry sample queries for
+   recovery evidence only. No external submission or impact-probability claims
+   are authorized.
 
 **Remaining step before automated live runs**: Validate provider credential
 readiness through the background CLI and keep every run inside the signed

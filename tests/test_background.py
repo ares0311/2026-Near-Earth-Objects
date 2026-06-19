@@ -403,7 +403,8 @@ def test_live_dry_run_plan_is_no_network_and_persisted(tmp_path):
     assert plan["planned_surveys"] == ("ZTF", "ATLAS", "PanSTARRS")
     assert plan["query_count"] == 3
     assert all(query["network_action"] == "not_executed" for query in plan["queries"])
-    assert "LIVE_REVIEW_POLICY_NOT_APPROVED" in plan["blockers"]
+    assert "MISSING_REQUIRED_CREDENTIALS" in plan["blockers"]
+    assert "LIVE_PROVIDER_NOT_READY" in plan["blockers"]
     assert table_count(db_path, "live_dry_run_plan_log") == 1
     assert summary["total_live_dry_run_plans"] == 1
     assert summary["latest"]["plan_id"] == entry["plan_id"]
@@ -418,7 +419,7 @@ def test_live_dry_run_execute_blocked_by_default(monkeypatch, tmp_path):
         def execute(self, query):
             raise AssertionError("provider should not run for blocked config")
 
-    monkeypatch.setenv("ATLAS_TOKEN", "atlas-token")
+    monkeypatch.delenv("ATLAS_TOKEN", raising=False)
     entry = background.record_live_execution_attempt(
         Path("background/config.json"),
         db_path,
@@ -430,7 +431,7 @@ def test_live_dry_run_execute_blocked_by_default(monkeypatch, tmp_path):
     assert entry["executable"] is False
     assert entry["network_access_performed"] is False
     assert entry["external_submission_enabled"] is False
-    assert "LIVE_NETWORK_DISABLED" in entry["blockers"]
+    assert "MISSING_REQUIRED_CREDENTIALS" in entry["blockers"]
     assert table_count(db_path, "live_execution_log") == 1
     assert summary["by_outcome"] == {"blocked": 1}
 
@@ -2477,7 +2478,8 @@ def test_record_live_dry_run_approval_bundle_default_config_is_blocked(tmp_path)
     assert entry["approved_to_attempt_live_dry_run"] is False
     assert entry["network_access_performed"] is False
     assert entry["external_submission_enabled"] is False
-    assert "LIVE_NETWORK_DISABLED" in entry["blockers"]
+    assert "MISSING_REQUIRED_CREDENTIALS" in entry["blockers"]
+    assert "LIVE_PROVIDER_NOT_READY" in entry["blockers"]
     assert summary["total_live_approval_bundles"] == 1
     assert summary["approval_ready_count"] == 0
     assert summary["blocked_count"] == 1
@@ -2566,7 +2568,7 @@ def test_live_dry_run_operator_handoff_default_config_is_blocked():
     assert handoff["approved_to_attempt_live_dry_run"] is False
     assert handoff["network_access_performed"] is False
     assert handoff["external_submission_enabled"] is False
-    assert "LIVE_NETWORK_DISABLED" in text
+    assert "MISSING_REQUIRED_CREDENTIALS" in text
     assert "ATLAS_TOKEN" in text
     assert "Internal review only" in text
     _assert_no_forbidden_handoff_language(text)
@@ -2667,7 +2669,7 @@ def test_record_live_dry_run_operator_handoff_default_config_is_blocked(tmp_path
     assert entry["approved_to_attempt_live_dry_run"] is False
     assert entry["network_access_performed"] is False
     assert entry["external_submission_enabled"] is False
-    assert "LIVE_NETWORK_DISABLED" in entry["handoff_text"]
+    assert "MISSING_REQUIRED_CREDENTIALS" in entry["handoff_text"]
     assert report_path.exists()
     _assert_no_forbidden_handoff_language(entry["handoff_text"])
     assert summary["total_live_operator_handoffs"] == 1

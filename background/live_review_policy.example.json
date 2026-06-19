@@ -1,6 +1,6 @@
 {
   "schema_version": "live-review-policy-v1",
-  "policy_name": "jerome-w-lindsey-iii-live-dry-run-policy-2026-06-18",
+  "policy_name": "jerome-w-lindsey-iii-live-dry-run-policy-2026-06-19",
   "reviewer": "Jerome W. Lindsey III",
   "approved_for_live_network": true,
   "allowed_surveys": [
@@ -8,7 +8,7 @@
     "ATLAS",
     "PanSTARRS"
   ],
-  "max_queries_per_run": 3,
+  "max_queries_per_run": 40,
   "min_seconds_between_queries": 10,
   "dry_run_scope": {
     "ra_deg": 251.66,
@@ -19,5 +19,5 @@
   },
   "no_external_submission_confirmed": true,
   "no_impact_probability_claims": true,
-  "notes": "Citizen-science live dry-run policy. Approved by Jerome W. Lindsey III on 2026-06-18. Operator-supervised only. No external submission. No impact-probability claims. No MPC report authorized."
+  "notes": "Citizen-science live dry-run policy. Approved by Jerome W. Lindsey III on 2026-06-18 and expanded on 2026-06-19 for up to 40 ATLAS forced-photometry sample queries for T1-C recovery evidence. Operator-supervised only. No external submission. No impact-probability claims. No MPC report authorized."
 }
