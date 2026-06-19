@@ -189,12 +189,14 @@ def test_project_config_is_automated_offline():
 
     assert cfg.run_mode == "automated"
     assert cfg.scheduler_enabled is True
-    assert cfg.live_network_enabled is False
+    # The signed default policy permits bounded live dry-run attempts, while
+    # provider credentials and guardrails still decide whether a run can start.
+    assert cfg.live_network_enabled is True
     assert cfg.required_credential_env == ("ATLAS_TOKEN",)
     assert cfg.live_review_policy == "background/live_review_policy.example.json"
 
 
-def test_automation_readiness_is_scheduler_ready_but_live_blocked(monkeypatch):
+def test_automation_readiness_is_scheduler_ready_but_credential_blocked(monkeypatch):
     monkeypatch.delenv("ATLAS_TOKEN", raising=False)
 
     readiness = background.automation_readiness_summary(Path("background/config.json"))
@@ -202,10 +204,10 @@ def test_automation_readiness_is_scheduler_ready_but_live_blocked(monkeypatch):
     assert readiness["scheduler_ready"] is True
     assert readiness["scheduler_blockers"] == []
     assert readiness["live_mode_ready"] is False
-    assert "LIVE_NETWORK_DISABLED" in readiness["live_mode_blockers"]
     assert "MISSING_REQUIRED_CREDENTIALS" in readiness["live_mode_blockers"]
     assert "LIVE_PROVIDER_NOT_READY" in readiness["live_mode_blockers"]
-    assert "LIVE_REVIEW_POLICY_NOT_APPROVED" in readiness["live_mode_blockers"]
+    assert "LIVE_NETWORK_DISABLED" not in readiness["live_mode_blockers"]
+    assert "LIVE_REVIEW_POLICY_NOT_APPROVED" not in readiness["live_mode_blockers"]
     assert readiness["missing_credential_env"] == ("ATLAS_TOKEN",)
     assert readiness["live_review_policy_summary"]["allowed_surveys"] == (
         "ZTF",
@@ -2392,7 +2394,7 @@ def test_background_cli_scoring_metrics_kpi_report_write_report(tmp_path):
     assert "pending_labeled_data" in report_path.read_text()
 
 
-def test_live_dry_run_approval_bundle_default_config_is_blocked():
+def test_live_dry_run_approval_bundle_default_config_is_credential_blocked():
     bundle = background.live_dry_run_approval_bundle(Path("background/config.json"))
 
     assert bundle["approved_to_attempt_live_dry_run"] is False
@@ -2402,8 +2404,8 @@ def test_live_dry_run_approval_bundle_default_config_is_blocked():
     assert bundle["policy_contract_valid"] is True
     assert bundle["network_access_performed"] is False
     assert bundle["external_submission_enabled"] is False
-    assert "LIVE_NETWORK_DISABLED" in bundle["blockers"]
-    assert "LIVE_REVIEW_POLICY_NOT_APPROVED" in bundle["blockers"]
+    assert "LIVE_NETWORK_DISABLED" not in bundle["blockers"]
+    assert "LIVE_REVIEW_POLICY_NOT_APPROVED" not in bundle["blockers"]
     assert "PROVIDER_CREDENTIAL_MISSING" in bundle["blockers"]
 
 
