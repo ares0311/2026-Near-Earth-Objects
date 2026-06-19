@@ -264,6 +264,15 @@ exhausted while ATLAS has not finished the task, the sample remains pending as
 `poll_exhausted` rather than being counted as unrecovered. Durable summary:
 `docs/evidence/t1c/2026-06-18-atlas-forced-fallback-diagnostic.md`.
 
+**2026-06-19 bounded ATLAS recovery pilot**: Jerome W. Lindsey III approved up
+to 40 ATLAS forced-photometry sample queries for T1-C recovery evidence only.
+The run `atlas_recovery_4eaf93e87f6c` completed 38 sample queries with no
+provider/tool failures, recovered 19 samples, emitted 4 multi-night audit
+tracklets, and failed the recovery KPI at 4/11 expected objects (`36.36%`;
+threshold `90%`). This confirms the live ATLAS fallback plumbing works, but
+T1-C remains open. Durable summary:
+`docs/evidence/t1c/2026-06-19-atlas-recovery-40-query-pilot.md`.
+
 ---
 
 ### T1-D: No Production Ensemble Calibration — **CLOSED 2026-06-14**

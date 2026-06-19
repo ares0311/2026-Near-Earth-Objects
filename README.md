@@ -1182,7 +1182,7 @@ execution remains credential/provider gated and non-submitting.
 | Repository artifact hygiene | **Complete** | `git add .` is supported: raw `Logs/**` stay local, production models are filename-allowlisted, and durable evidence is promoted to `docs/evidence/` or `data/evidence/` |
 | ML model weights | **Complete** | T1-A closed. Tier 1 XGBoost, Tier 2 CNN, Tier 3 Transformer, and ensemble stacker are trained; calibration KPIs passed. |
 | Real survey credentials and live policy | **CONFIGURED + SIGNED** | T1-B credentials are stored in macOS Keychain, manual ZTF/ATLAS connection tests passed, and the bounded live dry-run policy is signed. The T1-C ATLAS recovery envelope now permits up to 40 forced-photometry sample queries for evidence only. Execution remains credential/provider gated and non-submitting. |
-| Real data processed | **BOUNDED PILOT + RECOVERY DIAGNOSTICS COMPLETE** | T1-C open. The Orion ZTF pilot is historical/debug evidence only. Non-Orion recovery manifests now exist, ALeRCE same-night asteroid histories were diagnosed, and an ATLAS forced-photometry fallback path is implemented; production recovery still needs a passing multi-night known-object audit and operator review. |
+| Real data processed | **BOUNDED PILOT + RECOVERY DIAGNOSTICS COMPLETE** | T1-C open. The Orion ZTF pilot is historical/debug evidence only. Non-Orion recovery manifests now exist, ALeRCE same-night asteroid histories were diagnosed, and an ATLAS forced-photometry fallback path is implemented. The 2026-06-19 bounded ATLAS pilot worked technically but failed the 90% recovery KPI at 4/11 expected objects. |
 | Production calibration | **Complete** | T1-D closed. Quantitative Brier, ECE, log-loss, ROC AUC, CV ECE, and bootstrap CI gates passed. |
 | External reporting | **Disabled** | No MPC, NEOCP, NASA, or CNEOS submission path is active. Alert protocol requires MPC submission + independent confirmation before any NASA pathway. |
 
@@ -1242,7 +1242,7 @@ execution remains credential/provider gated and non-submitting.
 | **P33** | In progress | Real-run audit v2 | `Skills/audit_real_run.py` can match expected known objects by pipeline ID or sky/time samples and requires operator-review decisions |
 | **P34** | Complete | Expected-known manifest builder | `Skills/build_recovery_manifest.py` builds checkpointed MPC+Horizons sky/time manifests for T1-C audits |
 | **P35** | Complete | Repository artifact hygiene | `.gitignore` protects `git add .`; raw `Logs/**` are local-only, production models are explicit allowlists, and T1-C evidence is summarized in `docs/evidence/t1c/` |
-| **P36** | In progress | ATLAS forced-photometry fallback | `Skills/fetch_atlas_data.py --expected-known ...` writes audit-compatible recovery packets; provider request format, polling, in-flight checkpointing, task-URL resume, and force-refresh stale negative replay are fixed; longer operator-supervised run still required |
+| **P36** | In progress | ATLAS forced-photometry fallback | `Skills/fetch_atlas_data.py --expected-known ...` writes audit-compatible recovery packets; provider request format, polling, in-flight checkpointing, task-URL resume, and force-refresh stale negative replay are fixed; the 2026-06-19 bounded 38-sample ATLAS pilot worked technically but failed the 90% recovery KPI at 4/11 expected objects |
 
 ### 15.5 Known Limitations
 
