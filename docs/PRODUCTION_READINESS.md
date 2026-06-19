@@ -273,6 +273,16 @@ threshold `90%`). This confirms the live ATLAS fallback plumbing works, but
 T1-C remains open. Durable summary:
 `docs/evidence/t1c/2026-06-19-atlas-recovery-40-query-pilot.md`.
 
+**2026-06-19 ATLAS prequalification approval**: Jerome W. Lindsey III approved
+building a prequalified ATLAS-recoverable expected-known manifest before the
+next live run. The documented rule keeps only objects from the screening run
+with at least 3 recovered ATLAS samples across at least 2 distinct nights.
+`Skills/build_recovery_manifest.py --prequalify-from-atlas-run` now implements
+that rule and produced a local ignored manifest with 4 rows and 15 expected
+samples (`481`, `1950`, `2172`, `2973`). The next blocker is running the
+prequalified manifest through the existing non-submitting T1-C audit path and
+then completing citizen-science operator review if the KPI passes.
+
 ---
 
 ### T1-D: No Production Ensemble Calibration — **CLOSED 2026-06-14**

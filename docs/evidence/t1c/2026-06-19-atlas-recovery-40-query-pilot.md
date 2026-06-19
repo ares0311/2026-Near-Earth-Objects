@@ -73,3 +73,36 @@ strategy before spending more live provider queries. Options include:
 
 None of these options authorizes MPC submission, NEOCP escalation, NASA
 notification, or any impact-probability statement.
+
+## Approved Prequalification Rule
+
+On June 19, 2026, Jerome W. Lindsey III approved building a prequalified
+ATLAS-recoverable expected-known manifest for T1-C, with the selection rule
+documented before the next live run. No external submission was authorized. No
+impact-probability claims were authorized.
+
+Prequalification rule for the next live run:
+
+- start from the source expected-known manifest used by the screening run;
+- include only known objects with at least `3` recovered ATLAS samples in the
+  screening run `atlas_recovery_4eaf93e87f6c`;
+- require those recovered observations to span at least `2` distinct nights;
+- preserve the original expected-known sky/time samples for the selected
+  objects;
+- annotate every selected row with the screening run id and recovery counts;
+- treat this prequalified manifest as the denominator for the next T1-C recovery
+  audit.
+
+`Skills/build_recovery_manifest.py` now implements this as
+`--prequalify-from-atlas-run`. Running it against the screening run wrote local
+manifest `Logs/reports/t1c_expected_known_atlas_prequalified_4eaf93e87f6c.json`
+with `4` rows and `15` expected samples:
+
+- `481`
+- `1950`
+- `2172`
+- `2973`
+
+Raw generated manifests remain under `Logs/` and are intentionally ignored.
+The next live run should use this predeclared prequalified manifest and remain
+inside the existing `40`-query policy envelope.

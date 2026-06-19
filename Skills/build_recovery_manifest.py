@@ -437,6 +437,145 @@ def _filter_samples(
     return kept
 
 
+def _load_manifest_rows(path: Path) -> list[dict[str, Any]]:
+    """Load an expected-known manifest JSON list from disk."""
+    rows = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(rows, list):
+        raise ValueError("expected-known manifest must contain a JSON list")
+    if not all(isinstance(row, dict) for row in rows):
+        raise ValueError("expected-known manifest rows must be JSON objects")
+    return rows
+
+
+def _night_key(jd: float) -> int:
+    """Return a stable integer night key from a Julian date."""
+    return int(math.floor(float(jd) - 0.5))
+
+
+def _atlas_prequalification_stats(
+    atlas_run_dir: Path,
+    *,
+    min_recovered_samples: int,
+    min_nights: int,
+) -> dict[str, dict[str, Any]]:
+    """Return designations that passed the predeclared ATLAS recovery screen."""
+    checkpoint_path = atlas_run_dir / "checkpoint.json"
+    checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+    sample_rows = checkpoint.get("samples")
+    if not isinstance(sample_rows, dict):
+        raise ValueError("ATLAS recovery checkpoint has no sample state map")
+
+    by_designation: dict[str, dict[str, Any]] = {}
+    for sample in sample_rows.values():
+        if not isinstance(sample, dict) or sample.get("status") != "recovered":
+            continue
+        designation = str(sample.get("designation") or "").strip()
+        if not designation:
+            continue
+        observations = [
+            obs for obs in sample.get("observations", [])
+            if isinstance(obs, dict)
+        ]
+        if not observations:
+            continue
+        stats = by_designation.setdefault(
+            designation,
+            {
+                "designation": designation,
+                "recovered_sample_count": 0,
+                "recovered_observation_count": 0,
+                "nights": set(),
+            },
+        )
+        stats["recovered_sample_count"] += 1
+        stats["recovered_observation_count"] += len(observations)
+        stats["nights"].update(_night_key(float(obs["jd"])) for obs in observations if "jd" in obs)
+
+    qualified: dict[str, dict[str, Any]] = {}
+    for designation, stats in by_designation.items():
+        nights = sorted(stats["nights"])
+        if stats["recovered_sample_count"] >= min_recovered_samples and len(nights) >= min_nights:
+            qualified[designation] = {
+                "designation": designation,
+                "recovered_sample_count": stats["recovered_sample_count"],
+                "recovered_observation_count": stats["recovered_observation_count"],
+                "recovered_night_count": len(nights),
+                "recovered_night_keys": nights,
+            }
+    return qualified
+
+
+def build_atlas_prequalified_manifest(
+    *,
+    source_manifest: Path,
+    atlas_run_dir: Path,
+    output: Path,
+    min_recovered_samples: int = 3,
+    min_nights: int = 2,
+    max_objects: int | None = None,
+) -> dict[str, Any]:
+    """Build a predeclared ATLAS-recoverable expected-known manifest."""
+    if min_recovered_samples < 1 or min_nights < 1:
+        raise ValueError("prequalification thresholds must be positive")
+    source_rows = _load_manifest_rows(source_manifest)
+    qualified = _atlas_prequalification_stats(
+        atlas_run_dir,
+        min_recovered_samples=min_recovered_samples,
+        min_nights=min_nights,
+    )
+    prequalified_rows: list[dict[str, Any]] = []
+    for row in source_rows:
+        designation = str(row.get("designation") or "").strip()
+        if designation not in qualified:
+            continue
+        new_row = dict(row)
+        new_row["source"] = f"{row.get('source', 'unknown')}_atlas_prequalified"
+        new_row["prequalification"] = {
+            "rule": (
+                "include only expected-known objects with at least "
+                f"{min_recovered_samples} recovered ATLAS samples across at least "
+                f"{min_nights} distinct nights in screening run {atlas_run_dir.name}"
+            ),
+            "screening_run_id": atlas_run_dir.name,
+            "screening_run_dir": str(atlas_run_dir),
+            "min_recovered_samples": min_recovered_samples,
+            "min_nights": min_nights,
+            **qualified[designation],
+        }
+        prequalified_rows.append(new_row)
+        if max_objects is not None and len(prequalified_rows) >= max_objects:
+            break
+
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(prequalified_rows, indent=2), encoding="utf-8")
+    summary = {
+        "output": str(output),
+        "source_manifest": str(source_manifest),
+        "atlas_run_dir": str(atlas_run_dir),
+        "selection_rule": (
+            "expected-known object must have at least "
+            f"{min_recovered_samples} recovered ATLAS samples across at least "
+            f"{min_nights} distinct nights in the screening run"
+        ),
+        "n_source_rows": len(source_rows),
+        "n_qualified_designations": len(qualified),
+        "n_manifest_rows": len(prequalified_rows),
+        "qualified_designations": [row["designation"] for row in prequalified_rows],
+        "safety": {
+            "no_external_submission": True,
+            "no_mpc_submission": True,
+            "no_nasa_pdco_notification": True,
+            "no_impact_probability_asserted": True,
+        },
+    }
+    print(
+        f"[manifest] wrote {len(prequalified_rows)} ATLAS-prequalified row(s) to {output}",
+        flush=True,
+    )
+    print("[manifest] no external submission performed", flush=True)
+    return summary
+
+
 def build_recovery_manifest(
     *,
     ra_deg: float,
@@ -646,11 +785,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Build a T1-C expected-known recovery manifest",
     )
-    parser.add_argument("--ra", type=float, required=True, help="Field center RA in degrees")
-    parser.add_argument("--dec", type=float, required=True, help="Field center Dec in degrees")
+    parser.add_argument("--ra", type=float, default=None, help="Field center RA in degrees")
+    parser.add_argument("--dec", type=float, default=None, help="Field center Dec in degrees")
     parser.add_argument("--radius", type=float, default=3.5, help="Field radius in degrees")
-    parser.add_argument("--start-jd", type=float, required=True, help="Recovery run start JD")
-    parser.add_argument("--end-jd", type=float, required=True, help="Recovery run end JD")
+    parser.add_argument("--start-jd", type=float, default=None, help="Recovery run start JD")
+    parser.add_argument("--end-jd", type=float, default=None, help="Recovery run end JD")
     parser.add_argument("--output", type=Path, required=True, help="Output JSON manifest path")
     parser.add_argument("--max-objects", type=int, default=50, help="Maximum regional objects")
     parser.add_argument("--samples", type=int, default=3, help="Ephemeris samples per object")
@@ -699,7 +838,54 @@ def main() -> None:
             "rows inside it before authoritative Horizons validation"
         ),
     )
+    parser.add_argument(
+        "--prequalify-from-atlas-run",
+        type=Path,
+        default=None,
+        help=(
+            "Build an ATLAS-recoverable manifest from a completed screening run "
+            "directory instead of querying MPC/Horizons"
+        ),
+    )
+    parser.add_argument(
+        "--prequalified-source-manifest",
+        type=Path,
+        default=None,
+        help="Original expected-known manifest used by the ATLAS screening run",
+    )
+    parser.add_argument(
+        "--prequalified-min-recovered-samples",
+        type=int,
+        default=3,
+        help="Minimum recovered ATLAS samples required for prequalification",
+    )
+    parser.add_argument(
+        "--prequalified-min-nights",
+        type=int,
+        default=2,
+        help="Minimum distinct recovered ATLAS nights required for prequalification",
+    )
     args = parser.parse_args()
+
+    if args.prequalify_from_atlas_run is not None:
+        if args.prequalified_source_manifest is None:
+            raise SystemExit("--prequalified-source-manifest is required in prequalification mode")
+        summary = build_atlas_prequalified_manifest(
+            source_manifest=args.prequalified_source_manifest,
+            atlas_run_dir=args.prequalify_from_atlas_run,
+            output=args.output,
+            min_recovered_samples=args.prequalified_min_recovered_samples,
+            min_nights=args.prequalified_min_nights,
+            max_objects=args.max_objects,
+        )
+        print(json.dumps(summary, indent=2), flush=True)
+        return
+
+    if args.ra is None or args.dec is None or args.start_jd is None or args.end_jd is None:
+        raise SystemExit(
+            "--ra, --dec, --start-jd, and --end-jd are required "
+            "outside prequalification mode"
+        )
 
     summary = build_recovery_manifest(
         ra_deg=args.ra,

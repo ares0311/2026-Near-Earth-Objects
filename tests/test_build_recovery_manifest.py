@@ -274,3 +274,82 @@ def test_fixed_field_mpc_list_preselection_filters_by_radius(monkeypatch):
 
     assert seen == [False]
     assert designations == ["1", "2"]
+
+
+def test_atlas_prequalified_manifest_keeps_only_multi_night_recoveries(tmp_path):
+    """Prequalification should create a declared denominator from ATLAS evidence."""
+    module = _load_module()
+    source = tmp_path / "expected_known.json"
+    output = tmp_path / "prequalified.json"
+    run_dir = tmp_path / "atlas_recovery_screen"
+    run_dir.mkdir()
+    source.write_text(
+        json.dumps([
+            {"designation": "A", "samples": [{"jd": 1.0}], "source": "test"},
+            {"designation": "B", "samples": [{"jd": 1.0}], "source": "test"},
+            {"designation": "C", "samples": [{"jd": 1.0}], "source": "test"},
+        ]),
+        encoding="utf-8",
+    )
+    checkpoint = {
+        "samples": {
+            "A:0": {
+                "designation": "A",
+                "status": "recovered",
+                "observations": [{"jd": 10.0}, {"jd": 10.1}],
+            },
+            "A:1": {
+                "designation": "A",
+                "status": "recovered",
+                "observations": [{"jd": 11.0}],
+            },
+            "A:2": {
+                "designation": "A",
+                "status": "recovered",
+                "observations": [{"jd": 12.0}],
+            },
+            "B:0": {
+                "designation": "B",
+                "status": "recovered",
+                "observations": [{"jd": 10.0}],
+            },
+            "B:1": {
+                "designation": "B",
+                "status": "not_recovered",
+                "observations": [],
+            },
+            "C:0": {
+                "designation": "C",
+                "status": "recovered",
+                "observations": [{"jd": 10.0}],
+            },
+            "C:1": {
+                "designation": "C",
+                "status": "recovered",
+                "observations": [{"jd": 10.1}],
+            },
+            "C:2": {
+                "designation": "C",
+                "status": "recovered",
+                "observations": [{"jd": 10.2}],
+            },
+        }
+    }
+    (run_dir / "checkpoint.json").write_text(json.dumps(checkpoint), encoding="utf-8")
+
+    summary = module.build_atlas_prequalified_manifest(
+        source_manifest=source,
+        atlas_run_dir=run_dir,
+        output=output,
+        min_recovered_samples=3,
+        min_nights=2,
+    )
+
+    rows = json.loads(output.read_text(encoding="utf-8"))
+    assert summary["n_manifest_rows"] == 1
+    assert summary["qualified_designations"] == ["A"]
+    assert rows[0]["designation"] == "A"
+    assert rows[0]["source"] == "test_atlas_prequalified"
+    assert rows[0]["prequalification"]["recovered_sample_count"] == 3
+    assert rows[0]["prequalification"]["recovered_night_count"] >= 2
+    assert summary["safety"]["no_external_submission"] is True
