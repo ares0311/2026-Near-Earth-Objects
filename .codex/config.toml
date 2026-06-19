@@ -1,3 +1,4 @@
+sandbox_mode = "workspace-write"
 [mcp_servers.neo_project_files]
 command = ".venv/bin/python"
 args = ["Skills/neo_mcp_server.py", "--server", "project_files"]
