@@ -383,6 +383,12 @@ CI currently runs only unit tests. There is no CI job for:
 
 **Needed**: Add CI job definitions (`.github/workflows/`) for integration and end-to-end test stages, gated on secret availability.
 
+**Progress (2026-06-20)**: `.github/workflows/e2e.yml` added with three synthetic-data
+jobs — `smoke` (module happy-path), `diagnose` (stage-by-stage pipeline run), and
+`injection` (n=20 injection-recovery with regression check vs committed baseline).
+Runs on every push and PR with no credentials required. Integration tests against real
+APIs already covered by `.github/workflows/integration.yml`.
+
 ### T2-E: Session-Start Documents Synchronized — **CLOSED 2026-06-09**
 
 `AGENTS.md`, `CLAUDE.md`, `README.md`, and this gap register now agree on the
@@ -418,9 +424,10 @@ Before the pipeline makes its first MPC submission, all of the following must be
       `promotion_gate_passed=true` ✓ (2026-06-14; Tier 1 + Tier 2)
 - [ ] T2-A resolved: At least one integration test suite passed against real APIs
 - [ ] T2-B resolved: False-positive rate on real artifact data < 5%
-- [ ] T2-C resolved: citizen-science architecture evidence packet complete;
-      external expert validation remains unavailable and no-submission
-      limitation is explicit
+- [~] T2-C resolved: citizen-science architecture evidence packet created
+      2026-06-20; operator review checklist (Section 6) awaits Jerome W. Lindsey III
+- [~] T2-D resolved: e2e.yml added 2026-06-20 with smoke/diagnose/injection jobs;
+      model weight validation CI still pending
 - [ ] Alert protocol compliance: `ready_for_submission()` gate tested on ≥10 real candidate outputs
 - [ ] Guardrail compliance: zero "confirmed NEO" or impact probability assertions in any output
 - [ ] AGENTS.md and CLAUDE.md synchronized to current version
