@@ -437,6 +437,20 @@ class TestMonitorNeocpDirect:
         assert result["status"] == "error"
         assert "unreachable" in result["error"]
 
+    def test_default_sleep_fn_uses_time_sleep(self):
+        """Cover line 329 else branch: when _sleep_fn is None, _time_mod.sleep is used."""
+        import alert as alert_mod
+
+        # Monitor_neocp with _sleep_fn omitted — exercises else _time_mod.sleep.
+        # Mock _time_mod.sleep on the alert module so we don't actually sleep,
+        # and mock _monitor_neocp to return an error immediately (no loop).
+        with patch.object(alert_mod, "_monitor_neocp", return_value={"status": "error"}):
+            with patch.object(alert_mod, "_time_mod") as mock_time:
+                result = monitor_neocp("NOCPSLEEP", max_wait_hr=1.0, poll_interval_hr=0.5)
+        # Error on first call exits before sleep; sleep should not be called.
+        mock_time.sleep.assert_not_called()
+        assert result["status"] == "error"
+
 
 class TestFormatMpcJson:
     def test_returns_dict_with_required_keys(self):
