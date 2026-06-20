@@ -5625,8 +5625,9 @@ class TestFetchZtfIrsaApiMissingBranches:
 
     def test_request_exception_returns_empty(self):
         # Covers line 341: `except requests.RequestException: return []`
-        import requests
         from unittest.mock import patch
+
+        import requests
 
         with patch("requests.get", side_effect=requests.RequestException("timeout")):
             result = _fetch_ztf_irsa_api(180.0, 10.0, 1.0, 2460000.0, 2460010.0)
@@ -5767,7 +5768,7 @@ class TestFetchAtlasForcedRemainingBranches:
         mock_requests.get.side_effect = [mock_pending, mock_result_task, mock_result_data]
 
         with patch.dict("sys.modules", {"requests": mock_requests}):
-            result = fetch_mod.fetch_atlas_forced(
+            fetch_mod.fetch_atlas_forced(
                 180.0, 10.0, 2459600.0, 2459610.0,
                 atlas_token="valid_token",
                 max_polls=2,
