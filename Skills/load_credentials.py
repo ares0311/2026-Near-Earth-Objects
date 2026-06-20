@@ -23,7 +23,6 @@ import os
 import subprocess
 import sys
 
-
 # Mapping of env-var name → Keychain service name
 _CREDENTIALS: dict[str, str] = {
     "ATLAS_TOKEN": "neo-detection:ATLAS_TOKEN",
