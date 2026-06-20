@@ -113,9 +113,8 @@ sky/time matches failed. Output: `Recovery gate: evaluated (passed=False)`.
 with `tolerance_days=1.0`. The audit must use THAT file, not the prequalified
 manifest directly.
 
-**Correct audit command (NOT YET RUN)**:
+**Correct audit command result (2026-06-20) — PASSED**:
 ```bash
-git pull origin main && \
 caffeinate -i uv run python Skills/audit_real_run.py \
     --run-dir Logs/pipeline_runs/atlas_recovery_c1712df0f32c \
     --expected-known Logs/pipeline_runs/atlas_recovery_c1712df0f32c/expected_known_atlas_forced.json \
@@ -123,7 +122,31 @@ caffeinate -i uv run python Skills/audit_real_run.py \
     --review-csv Logs/reports/t1c_option_a_review.csv
 ```
 
-KPI gate: ≥90% of prequalified objects recovered. Expected: PASS (5/5 = 100%).
+Terminal output:
+```
+Audit packet written: Logs/reports/t1c_option_a_audit_report.json
+Review CSV written : Logs/reports/t1c_option_a_review.csv
+Tracklets reviewed : 5
+Recovery gate      : evaluated (passed=True)
+Same-night subgate : applies=False passed=False (n_same_night=0 n_multi_night=5)
+No external submission performed.
+```
+
+**Recovery KPI: PASSED.** 5/5 multi-night tracklets, recovery gate True.
+
+---
+
+## Next Step: Citizen-Science Operator Review (HUMAN BLOCKER)
+
+The automated recovery gate has passed. T1-C closure now requires citizen-science
+operator review of the 5 tracklets in `Logs/reports/t1c_option_a_review.csv`.
+
+Jerome W. Lindsey III must review each of the 5 tracklet rows and confirm:
+- No false positives that would require blocking promotion
+- Findings noted (this is citizen-science review, not professional validation)
+- No external submission, MPC report, or NASA notification is authorized
+
+After review, record the decision and close T1-C in `docs/PRODUCTION_READINESS.md`.
 
 ---
 

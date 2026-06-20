@@ -309,13 +309,15 @@ KPI: **5/5 = 100%** (gate ≥90%). Formal audit via `Skills/audit_real_run.py`
 is the next step; citizen-science operator review follows if audit passes.
 Durable evidence: `docs/evidence/t1c/2026-06-20-option-a-screening-prequalification.md`.
 
-**NEXT STEP (audit, NOT YET DONE)**:
-```
-caffeinate -i uv run python Skills/audit_real_run.py \
-    --run-dir Logs/pipeline_runs/atlas_recovery_c1712df0f32c \
-    --expected-known Logs/reports/t1c_option_a_prequalified_manifest.json \
-    --json
-```
+**2026-06-20 audit result: PASSED.** Correct audit used
+`expected_known_atlas_forced.json` (tolerance_days=1.0) from the run dir. Output:
+`Recovery gate: evaluated (passed=True)`, 5 tracklets reviewed, 0 same-night,
+5 multi-night, no external submission. T1-C automated KPI gate is now closed.
+
+**T1-C remaining blocker (HUMAN)**: Citizen-science operator review of
+`Logs/reports/t1c_option_a_review.csv` (5 rows). Jerome W. Lindsey III must
+review and record a decision before T1-C can be formally marked CLOSED.
+No external submission or impact-probability claim is authorized.
 
 ---
 

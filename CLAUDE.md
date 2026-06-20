@@ -652,21 +652,15 @@ After the follow-up, audit using the run-dir's `expected_known_atlas_forced.json
 - Prequalified manifest: `Logs/reports/t1c_option_a_prequalified_manifest.json` (local)
 - Follow-up ATLAS run: **DONE** — `atlas_recovery_c1712df0f32c`, 16/23 recovered, 5/5 objects → 5 tracklets
 - First audit attempt: **FAILED (wrong manifest)** — used prequalified manifest, tolerance_days defaulted to 0.02 days, all sky/time matches failed
-- Audit KPI check: **NOT YET DONE (correct command below)**
+- Audit KPI check: **DONE — passed=True** (2026-06-20). 5/5 multi-night tracklets. Recovery gate evaluated and passed.
 
-**DO NOT ask the operator to re-run the follow-up. It is done. Run the corrected audit next.**
+**T1-C automated KPI gate: PASSED.** Only remaining step is human citizen-science review.
 
-```bash
-git pull origin main && \
-caffeinate -i uv run python Skills/audit_real_run.py \
-    --run-dir Logs/pipeline_runs/atlas_recovery_c1712df0f32c \
-    --expected-known Logs/pipeline_runs/atlas_recovery_c1712df0f32c/expected_known_atlas_forced.json \
-    --report-out Logs/reports/t1c_option_a_audit_report.json \
-    --review-csv Logs/reports/t1c_option_a_review.csv
-```
+**NEXT STEP (HUMAN)**: Jerome W. Lindsey III reviews `Logs/reports/t1c_option_a_review.csv`
+(5 tracklet rows). Confirm no false positives requiring promotion block. Record decision,
+then update `docs/PRODUCTION_READINESS.md` to mark T1-C CLOSED.
 
-Preliminary KPI result: 5/5 objects recovered = 100% (gate ≥90%). Expected: PASS.
-T1-C closure pending formal audit confirmation and citizen-science operator review.
+No external submission, MPC report, or NASA notification is authorized at any point.
 Durable evidence: `docs/evidence/t1c/2026-06-20-option-a-screening-prequalification.md`.
 
 Completed live evidence:
