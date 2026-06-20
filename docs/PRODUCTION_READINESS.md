@@ -1,7 +1,7 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.88.0
-**Last updated**: 2026-06-19
+**Current version**: v0.89.0
+**Last updated**: 2026-06-20
 **Purpose**: Mandatory read at session start (per MANDATORY SESSION-START PROTOCOL).  
 Every planning cycle must name the highest-priority unresolved Tier 1 gap and show how proposed steps close or directly unblock it.
 
@@ -365,6 +365,14 @@ adopts a separate submission policy with appropriate external oversight.
 **Needed**: Prepare a citizen-science architecture evidence packet that records
 model assumptions, calibration KPIs, known limitations, and no-submission
 guardrails. This packet does not replace expert validation.
+
+**Progress (2026-06-20)**: Evidence packet created at
+`docs/evidence/t2c/2026-06-20-citizen-science-architecture-evidence-packet.md`.
+Records all five architecture decisions, calibration KPI results for all three
+tiers and the ensemble stacker, known limitations (data, orbital coverage,
+pipeline coverage), no-submission guardrails, and citizen-science framing.
+Section 6 operator review checklist awaits completion by Jerome W. Lindsey III.
+This packet does not authorize any external submission.
 
 ### T2-D: No CI for Integration or End-to-End Tests
 

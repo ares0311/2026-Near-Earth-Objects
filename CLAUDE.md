@@ -589,14 +589,16 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.88.0)
+## Current State (v0.89.0)
 
 All 10 pipeline modules are complete. The offline suite passes 3600+ tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
-coverage target. All three ML tiers have trained weights: Tier 1 XGBoost
-(val_acc=99.95%), Tier 2 CNN (val_acc=91.3%), and Tier 3 Transformer
-(val_macro_f1=0.9400, best epoch 17/30). **T1-A CLOSED. T1-B CLOSED. T1-D CLOSED.**
+coverage target (statement-level regressions from Python 3.14.6 fixed in v0.89.0).
+All three ML tiers have trained weights: Tier 1 XGBoost (val_acc=99.95%), Tier 2
+CNN (val_acc=91.3%), and Tier 3 Transformer (val_macro_f1=0.9400, best epoch
+17/30). **T1-A CLOSED. T1-B CLOSED. T1-D CLOSED.**
 Ensemble stacker KPIs passed 2026-06-14 (AUC=0.9809, Brier=0.0211, ECE=0.0000).
+T2-C evidence packet created 2026-06-20 (operator review pending).
 
 **Production is blocked only on T1-C**: known-object recovery evidence and
 citizen-science operator false-positive review. Bounded live dry-run policy

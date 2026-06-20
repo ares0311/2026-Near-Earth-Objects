@@ -3,6 +3,29 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.89.0 — Python 3.14.6 coverage fixes + T2-C evidence packet (2026-06-20)
+
+### Fixed
+- 10 statement-coverage misses exposed by Python 3.14.6's finer-grained tracking
+  of `or`/`and` operands and ternary branches (CI was failing with 99.99% coverage):
+  - `fetch.py`: `_parse_alerce_detection` non-dict and KeyError paths;
+    `_fetch_ztf_irsa_api` RequestException and JSON decode error paths;
+    `fetch_atlas` queue-response-missing-url path;
+    `fetch_atlas_forced` progress callback, finishtimestamp-no-result, and sleep paths.
+  - `alert.py`: `_compute_urgency` high-MOID AND branch.
+  - `background.py`: `_kpi_entry` "fail" ternary branch;
+    `automation_readiness_summary` LIVE_NETWORK_DISABLED path.
+- `.python-version` pinned to `"3.14"` so local `uv sync` works with cpython-3.14.0rc2.
+
+### Added
+- `docs/evidence/t2c/2026-06-20-citizen-science-architecture-evidence-packet.md`:
+  T2-C evidence packet with ML architecture decisions, calibration KPI results,
+  known limitations, and no-submission guardrails. Operator review checklist included.
+
+### Changed
+- 3706 tests passing; 100% coverage on Python 3.14.6; ruff + mypy clean.
+- Version bumped to 0.89.0.
+
 ## [Unreleased]
 
 - Replaced the obsolete human calibration-review requirement with a
