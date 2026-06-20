@@ -153,11 +153,27 @@ def test_background_run_once_writes_one_ledger_and_followup(monkeypatch, tmp_pat
     report_dir = tmp_path / "Logs" / "reports"
     write_fixture(fixture)
 
+    # Use an offline-only config so live-network credential checks don't block
+    # the run before any target can be scored.
+    config_path = tmp_path / "config.json"
+    config_path.write_text(json.dumps({
+        "input_path": str(fixture),
+        "db_path": str(db_path),
+        "report_dir": str(report_dir),
+        "follow_up_threshold": 0.45,
+        "run_mode": "automated",
+        "live_network_enabled": False,
+        "require_human_signoff": True,
+        "required_approval_count": 1,
+        "scheduler_enabled": True,
+        "scheduler_interval_minutes": 60,
+    }))
+
     def fake_score(tracklet, run_id):
         return make_scored(tracklet.object_id)
 
     monkeypatch.setattr(background, "score_tracklet", fake_score)
-    result = background.background_run_once(fixture, db_path, report_dir)
+    result = background.background_run_once(fixture, db_path, report_dir, config_path=config_path)
 
     assert result.ledger.outcome == "needs_follow_up"
     assert result.needs_follow_up is not None
@@ -546,10 +562,9 @@ def test_gitignore_excludes_generated_background_artifacts():
     text = Path(".gitignore").read_text()
 
     assert ".venv/" in text
-    assert "Logs/*.sqlite" in text
-    assert "Logs/*.sqlite-*" in text
-    assert "Logs/*.log" in text
-    assert "Logs/reports/*.md" in text
+    # Logs/** excludes all generated logs recursively (sqlite, wal, log, reports).
+    assert "Logs/**" in text
+    assert "!Logs/.gitkeep" in text
 
 
 def test_background_run_once_empty_fixture_is_reviewed(tmp_path):
@@ -587,7 +602,21 @@ def test_summaries_return_latest_entries(monkeypatch, tmp_path):
     write_fixture(fixture)
     monkeypatch.setattr(background, "score_tracklet", lambda tracklet, run_id: make_scored())
 
-    background.background_run_once(fixture, db_path, tmp_path / "reports")
+    # Offline config so live-network credential checks don't divert to 'reviewed'.
+    config_path = tmp_path / "config.json"
+    config_path.write_text(json.dumps({
+        "input_path": str(fixture),
+        "db_path": str(db_path),
+        "report_dir": str(tmp_path / "reports"),
+        "follow_up_threshold": 0.45,
+        "run_mode": "automated",
+        "live_network_enabled": False,
+        "require_human_signoff": True,
+        "required_approval_count": 1,
+        "scheduler_enabled": True,
+        "scheduler_interval_minutes": 60,
+    }))
+    background.background_run_once(fixture, db_path, tmp_path / "reports", config_path=config_path)
 
     ledger = background.ledger_summary(db_path)
     followup = background.needs_follow_up_summary(db_path)
@@ -2131,7 +2160,8 @@ def test_background_cli_automation_commands(tmp_path):
     assert bundle_payload["approved_to_attempt_live_dry_run"] is False
     assert bundle_payload["network_access_performed"] is False
     assert bundle_payload["external_submission_enabled"] is False
-    assert "LIVE_NETWORK_DISABLED" in bundle_payload["blockers"]
+    assert "LIVE_NETWORK_DISABLED" not in bundle_payload["blockers"]
+    assert "PROVIDER_CREDENTIAL_MISSING" in bundle_payload["blockers"]
     assert json.loads(recorded.stdout)["live_mode_ready"] is False
     assert json.loads(summary.stdout)["total_readiness_checks"] == 1
     assert json.loads(plan.stdout)["network_access_performed"] is False
@@ -4288,3 +4318,47 @@ class TestWriteScoringMetricsKpiReport:
         assert result["network_access_performed"] is False
         assert result["external_submission_enabled"] is False
         assert "report" in result
+
+
+
+class TestKpiEntryFailStatus:
+    """Cover the `else "fail"` branch of the ternary in _kpi_entry (line 3530).
+
+    Python 3.14.6 tracks `"pass" if passed else "fail"` as two reachable
+    statement targets.  All existing tests pass only fixtures that produce
+    passed=True when status=None, so `"fail"` was never returned.
+    """
+
+    def test_kpi_entry_passed_false_returns_fail_status(self):
+        import sys
+        sys.path.insert(0, "src")
+        import background
+
+        entry = background._kpi_entry(
+            kpi_id="test_gate",
+            observed=0.99,
+            threshold=1.0,
+            passed=False,
+            rationale="Test expects failure path.",
+        )
+        assert entry["status"] == "fail"
+        assert entry["id"] == "test_gate"
+
+
+class TestAutomationReadinessSummaryLiveNetworkDisabled:
+    """Cover line 3760: live_blockers.append("LIVE_NETWORK_DISABLED").
+
+    All existing tests pass live_network_enabled=True so the `if not
+    config.live_network_enabled:` branch body is never executed.  This test
+    calls automation_readiness_summary with live_network_enabled=False to
+    exercise that append.
+    """
+
+    def test_live_network_disabled_adds_blocker(self, tmp_path):
+        policy_path = Path("background/live_review_policy.example.json")
+        config_path = tmp_path / "config_disabled.json"
+        write_live_config(config_path, policy_path, live_network_enabled=False)
+
+        summary = background.automation_readiness_summary(config_path)
+
+        assert "LIVE_NETWORK_DISABLED" in summary["live_mode_blockers"]

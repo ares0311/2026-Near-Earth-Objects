@@ -521,17 +521,18 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.88.0)
+## Current State (v0.89.0)
 
 All 10 pipeline modules are complete. The offline suite passes 3600+ tests, with
-2 live/integration checks deselected. CI remains green on Python 3.14 with the
-100% coverage target. All three ML tiers have trained weights and all calibration
-KPIs have passed. **Production is blocked only on T1-C**: known-object recovery
-evidence and citizen-science operator false-positive review. Bounded live
-dry-run policy approval is complete, but live execution remains
-credential/provider gated and non-submitting.
+2 live/integration checks deselected. CI is green on Python 3.14 with the
+100% coverage target (statement-level regressions from Python 3.14.6 fixed in
+v0.89.0). All three ML tiers have trained weights and all calibration KPIs have
+passed. **Production is blocked only on T1-C**: known-object recovery evidence
+and citizen-science operator false-positive review. Bounded live dry-run policy
+approval is complete, but live execution remains credential/provider gated and
+non-submitting. T2-C evidence packet created 2026-06-20.
 
-**Production gap status (as of 2026-06-17)**:
+**Production gap status (as of 2026-06-20)**:
 - T1-A (Incomplete Trained ML Model Set): **CLOSED.** All Tier 1/2/3 weights
   trained; ensemble stacker KPIs passed (AUC=0.9809, Brier=0.0211, ECE=0.0000);
   `promotion_gate_passed=true`.
@@ -551,7 +552,30 @@ credential/provider gated and non-submitting.
   non-Orion recovery run with an expected-known manifest, >=90% known-object
   recovery, and operator false-positive review.
 - T1-D (No Ensemble Calibration): **CLOSED.** All KPIs passed 2026-06-14.
+- T2-C (No External Expert Review): **IN PROGRESS.** Evidence packet created
+  at `docs/evidence/t2c/2026-06-20-citizen-science-architecture-evidence-packet.md`.
+  Section 6 operator review checklist awaits Jerome W. Lindsey III.
 See `docs/PRODUCTION_READINESS.md` for the full gap register.
+
+### Handoff notes (2026-06-20) — v0.89.0
+
+**Python 3.14.6 coverage fixes**: Python 3.14.6 instruments each operand of
+`A and B` / `A or B` and each branch of ternaries as separate statement-coverage
+entries. Ten previously-covered lines in `src/background.py` and `src/fetch.py`
+became misses. Fixed in PR #110 by adding targeted tests covering:
+- `_kpi_entry` `passed=False` branch (background.py)
+- `automation_readiness_summary` `LIVE_NETWORK_DISABLED` path (background.py)
+- Eight `fetch.py` statement misses (request exception, slow poll, positive
+  poll interval, ATLAS response paths, and ZTF IRSA paths)
+
+**T2-C progress**: Citizen-science architecture evidence packet created at
+`docs/evidence/t2c/2026-06-20-citizen-science-architecture-evidence-packet.md`.
+Operator review checklist (Section 6) awaits Jerome W. Lindsey III.
+
+**T1-C status unchanged**: Two ATLAS recovery runs failed the ≥90% KPI:
+`36.36%` (run `atlas_recovery_4eaf93e87f6c`) and `75.00%` (run
+`atlas_recovery_175ef40ac577`). Next decision requires explicit operator
+approval before more live queries.
 
 ### Handoff notes (2026-06-19) — current T1-C state
 
