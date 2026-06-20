@@ -1,0 +1,110 @@
+name: End-to-End Pipeline Smoke Tests
+
+# Runs synthetic end-to-end pipeline checks on every push and PR.
+# No credentials, no network access — all synthetic/mocked data.
+#
+# Jobs:
+#   smoke      — import + minimal happy-path for every module (Skills/smoke_test.py)
+#   diagnose   — full stage-by-stage synthetic run (Skills/diagnose_pipeline.py)
+#   injection  — small injection-recovery run, n=20, expected 100% rates
+#
+# These complement the unit-test suite in ci.yml by exercising the full
+# Fetch → Score → Alert call chain rather than individual functions.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  smoke:
+    name: Module smoke test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv with Python 3.14
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.14"
+
+      # Sync dev extras so all pipeline dependencies are present.
+      - name: Install dependencies (from uv.lock)
+        run: uv sync --extra dev
+
+      # Run the happy-path smoke test; exits 0 only when all modules pass.
+      - name: Smoke test (all modules)
+        run: uv run python Skills/smoke_test.py
+        env:
+          PYTHONPATH: src
+          # Suppress PyTorch thread-pool warnings on single-core runners.
+          OMP_NUM_THREADS: "1"
+          MKL_NUM_THREADS: "1"
+
+  diagnose:
+    name: Stage-by-stage pipeline diagnostic
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv with Python 3.14
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install dependencies (from uv.lock)
+        run: uv sync --extra dev
+
+      # diagnose_pipeline.py runs each stage (preprocess → detect → link →
+      # classify → orbit → score → alert) on synthetic data and exits 1 if
+      # any stage raises an exception.
+      - name: Diagnose pipeline (synthetic data, all stages)
+        run: uv run python Skills/diagnose_pipeline.py --json
+        env:
+          PYTHONPATH: src
+          OMP_NUM_THREADS: "1"
+          MKL_NUM_THREADS: "1"
+
+  injection:
+    name: Injection-recovery (n=20, synthetic)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv with Python 3.14
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install dependencies (from uv.lock)
+        run: uv sync --extra dev
+
+      # Run a small injection-recovery test and save results to disk.
+      # n=20 keeps the job fast (<30 s); seed=42 makes it deterministic.
+      # The compare_baselines check below validates regression against the
+      # committed n=200 baseline — detection and link rates must not fall.
+      - name: Injection-recovery run (n=20, seed=42)
+        run: |
+          uv run python Skills/injection_recovery.py \
+            --n-inject 20 \
+            --seed 42 \
+            --json /tmp/e2e_injection_result.json
+        env:
+          PYTHONPATH: src
+          OMP_NUM_THREADS: "1"
+          MKL_NUM_THREADS: "1"
+
+      # Verify no regression against the committed n=200 baseline.
+      # compare_baselines.py exits 1 if any rate in the new result is lower
+      # than the baseline rate, so CI fails on any pipeline regression.
+      - name: Check no regression vs committed baseline
+        run: |
+          uv run python Skills/compare_baselines.py \
+            data/injection_recovery_n200.json \
+            /tmp/e2e_injection_result.json
+        env:
+          PYTHONPATH: src

@@ -773,6 +773,7 @@ succeeded and produced the trained Tier 3 weights now recorded under T1-A.
 | `Skills/analyze_field_detections.py` | Field-level detection statistics and mission/filter breakdowns; `--json` flag |
 | `Skills/export_candidate_dossiers.py` | Export conservative per-candidate dossier files; `--out-dir`, `--json` flags |
 | `Skills/fetch_recent_neos.py` | Fetch recent MPC NEO observations; `--days`, `--force-refresh`, `--json` flags |
+| `Skills/diagnose_atlas_recovery.py` | Diagnose a completed ATLAS recovery run checkpoint; per-designation/per-sample breakdown with `--check-horizons` to compare manifest positions against JPL Horizons ephemeris; `--designation`, `--json` flags |
 | `Skills/export_ades_report.py` | Export MPC ADES PSV reports for scored candidates |
 | `Skills/fetch_known_phas.py` | Fetch known PHA records with cache support; `--force-refresh`, `--json` flags |
 | `Skills/get_top_candidates.py` | Top-N candidates by discovery priority from scored NEO JSON; `--n`, `--json` flags |
