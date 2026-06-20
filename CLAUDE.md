@@ -643,25 +643,26 @@ caffeinate -i uv run python Skills/fetch_atlas_data.py \
     --workers 4
 ```
 
-After the follow-up, audit with `Skills/audit_real_run.py --expected-known Logs/reports/t1c_option_a_prequalified_manifest.json`.
+After the follow-up, audit using the run-dir's `expected_known_atlas_forced.json`
+(NOT the prequalified manifest — it lacks `tolerance_days` and causes false failures).
 
 **State summary**:
 - Screening run `atlas_recovery_25f3a800a1a2`: DONE (42/101 recovered, 5 tracklets)
 - Prequalification: DONE — 5 objects: 121, 954, 2140, 2172, 5650
 - Prequalified manifest: `Logs/reports/t1c_option_a_prequalified_manifest.json` (local)
 - Follow-up ATLAS run: **DONE** — `atlas_recovery_c1712df0f32c`, 16/23 recovered, 5/5 objects → 5 tracklets
-- Audit KPI check: **NOT YET DONE**
+- First audit attempt: **FAILED (wrong manifest)** — used prequalified manifest, tolerance_days defaulted to 0.02 days, all sky/time matches failed
+- Audit KPI check: **NOT YET DONE (correct command below)**
 
-**DO NOT ask the operator to re-run the follow-up. It is done. Run the audit next.**
-
-The next required operator command is the audit:
+**DO NOT ask the operator to re-run the follow-up. It is done. Run the corrected audit next.**
 
 ```bash
 git pull origin main && \
 caffeinate -i uv run python Skills/audit_real_run.py \
     --run-dir Logs/pipeline_runs/atlas_recovery_c1712df0f32c \
-    --expected-known Logs/reports/t1c_option_a_prequalified_manifest.json \
-    --json
+    --expected-known Logs/pipeline_runs/atlas_recovery_c1712df0f32c/expected_known_atlas_forced.json \
+    --report-out Logs/reports/t1c_option_a_audit_report.json \
+    --review-csv Logs/reports/t1c_option_a_review.csv
 ```
 
 Preliminary KPI result: 5/5 objects recovered = 100% (gate ≥90%). Expected: PASS.

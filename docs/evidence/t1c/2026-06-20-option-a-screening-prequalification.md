@@ -100,13 +100,27 @@ KPI gate is ≥90%. **PASSES** — pending formal `audit_real_run.py` confirmati
 
 ---
 
-## Audit Step — NOT YET DONE
+## Audit Step
 
+**First attempt (FAILED — wrong expected-known file)**:
+Used `Logs/reports/t1c_option_a_prequalified_manifest.json` which has no
+`tolerance_days` field, so the audit defaulted to 0.02 days (29 min). ATLAS
+observations can be up to 1.0 day from the predicted Horizons JD, so all
+sky/time matches failed. Output: `Recovery gate: evaluated (passed=False)`.
+
+**Root cause**: `fetch_atlas_data.py` writes a purpose-built audit manifest at
+`Logs/pipeline_runs/atlas_recovery_c1712df0f32c/expected_known_atlas_forced.json`
+with `tolerance_days=1.0`. The audit must use THAT file, not the prequalified
+manifest directly.
+
+**Correct audit command (NOT YET RUN)**:
 ```bash
+git pull origin main && \
 caffeinate -i uv run python Skills/audit_real_run.py \
     --run-dir Logs/pipeline_runs/atlas_recovery_c1712df0f32c \
-    --expected-known Logs/reports/t1c_option_a_prequalified_manifest.json \
-    --json
+    --expected-known Logs/pipeline_runs/atlas_recovery_c1712df0f32c/expected_known_atlas_forced.json \
+    --report-out Logs/reports/t1c_option_a_audit_report.json \
+    --review-csv Logs/reports/t1c_option_a_review.csv
 ```
 
 KPI gate: ≥90% of prequalified objects recovered. Expected: PASS (5/5 = 100%).
