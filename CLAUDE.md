@@ -96,6 +96,31 @@ If the highest-priority T1 gap cannot be resolved because a human blocker is unr
   4. **Wrap all network fetch calls in a retry loop** with exponential backoff: 2 s, 4 s, 8 s, 16 s, 32 s (max 5 attempts). Catch `(ConnectionError, TimeoutError, OSError)`. Print the error and retry count on each failure. Raise after the final attempt.
   5. **The operator must never need to edit the command** to resume — re-running the identical command is the only required action after a sleep/wake or network interruption.
   This is the System Directive standard. Scripts that do not meet it are incomplete.
+- **Persist operator command results immediately — no re-run loops**:
+  Every time the operator runs a command at your direction and pastes the output,
+  you MUST, in the same turn, commit a durable record before replying with the
+  next step. Never proceed to the next step without first writing the result to a
+  committed file. Failure to do this creates a death loop: conversation context
+  compacts → result is lost → you ask the operator to run the same command again.
+
+  Rules:
+  1. **Write the result first.** As soon as you receive operator terminal output,
+     write a sanitized summary to `docs/evidence/<subsystem>/YYYY-MM-DD-<slug>.md`
+     (or update the active evidence file for the current milestone).
+  2. **Update the handoff state in `CLAUDE.md`.** Mark the completed step DONE
+     and write the exact next command with a "NOT YET DONE" marker. The handoff
+     block is the first thing future sessions read.
+  3. **Update `docs/PRODUCTION_READINESS.md`.** Add or update the dated paragraph
+     for the current T1/T2 gap so the state is visible without reading conversation
+     history.
+  4. **Commit and push before giving the next operator command.** Never queue up
+     the next shell command without first pushing the durable record. The commit
+     message must name the specific milestone (run ID, KPI result, object count).
+  5. **At session start, read the committed evidence files before planning.**
+     Never rely on conversation memory or summaries for run results. If a
+     `docs/evidence/` file says a step is DONE, treat it as done — do not ask
+     the operator to re-run it.
+
 - **Diagnose root cause before writing any fix (symptom-loop prevention)**:
   Before writing code to fix a hang, missing output, wrong output, or performance problem, you MUST first state the root cause in one sentence from first principles. If you cannot state the root cause, do NOT write code — re-read the diagnostic output and reason about it until you can. Applying a workaround (e.g., a heartbeat, a retry, a timeout) without identifying the root cause is prohibited.
 
