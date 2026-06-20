@@ -4361,4 +4361,4 @@ class TestAutomationReadinessSummaryLiveNetworkDisabled:
 
         summary = background.automation_readiness_summary(config_path)
 
-        assert "LIVE_NETWORK_DISABLED" in summary["live_blockers"]
+        assert "LIVE_NETWORK_DISABLED" in summary["live_mode_blockers"]
