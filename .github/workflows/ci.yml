@@ -47,7 +47,6 @@ jobs:
             -m "not integration_live" \
             -q \
             --cov=src \
-            --cov-report=term-missing \
             --cov-fail-under=100
         env:
           PYTHONPATH: src

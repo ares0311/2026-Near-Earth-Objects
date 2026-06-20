@@ -4343,3 +4343,22 @@ class TestKpiEntryFailStatus:
         )
         assert entry["status"] == "fail"
         assert entry["id"] == "test_gate"
+
+
+class TestAutomationReadinessSummaryLiveNetworkDisabled:
+    """Cover line 3760: live_blockers.append("LIVE_NETWORK_DISABLED").
+
+    All existing tests pass live_network_enabled=True so the `if not
+    config.live_network_enabled:` branch body is never executed.  This test
+    calls automation_readiness_summary with live_network_enabled=False to
+    exercise that append.
+    """
+
+    def test_live_network_disabled_adds_blocker(self, tmp_path):
+        policy_path = Path("background/live_review_policy.example.json")
+        config_path = tmp_path / "config_disabled.json"
+        write_live_config(config_path, policy_path, live_network_enabled=False)
+
+        summary = background.automation_readiness_summary(config_path)
+
+        assert "LIVE_NETWORK_DISABLED" in summary["live_blockers"]
