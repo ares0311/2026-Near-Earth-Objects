@@ -605,7 +605,27 @@ citizen-science operator false-positive review. Bounded live dry-run policy
 approval is complete, but live execution remains credential/provider gated and
 non-submitting.
 
-### Handoff state as of 2026-06-19
+### Handoff state as of 2026-06-20 (CURRENT)
+
+**DO NOT ask the operator to re-run the ATLAS screening or prequalification — both are done.**
+Read `docs/evidence/t1c/2026-06-20-option-a-screening-prequalification.md` for full results.
+The next required operator command is the ATLAS **follow-up run** (30 queries, ~5–15 min):
+
+```bash
+git pull origin main && \
+caffeinate -i uv run python Skills/fetch_atlas_data.py \
+    --expected-known Logs/reports/t1c_option_a_prequalified_manifest.json \
+    --workers 4
+```
+
+After the follow-up, audit with `Skills/audit_real_run.py --expected-known Logs/reports/t1c_option_a_prequalified_manifest.json`.
+
+**State summary**:
+- Screening run `atlas_recovery_25f3a800a1a2`: DONE (42/101 recovered, 5 tracklets)
+- Prequalification: DONE — 5 objects: 121, 954, 2140, 2172, 5650
+- Prequalified manifest: `Logs/reports/t1c_option_a_prequalified_manifest.json` (local)
+- Follow-up ATLAS run: **NOT YET DONE**
+- Audit KPI check: **NOT YET DONE**
 
 T1-C is still open. The live ATLAS forced-photometry fallback is technically
 working, but the recovery KPI has not passed.

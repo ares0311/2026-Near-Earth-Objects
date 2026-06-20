@@ -292,6 +292,27 @@ threshold `90%`). The failed object was `2973`; repeat-recovered objects were
 denominator, such as a repeat-stable object rule, requires explicit operator
 approval before more live queries.
 
+**2026-06-20 Option A screening run**: Jerome W. Lindsey III approved a new
+predeclared screening approach (25 objects, 6 samples/object, 101 total
+samples) documented in `docs/evidence/t1c/2026-06-20-option-a-predeclared-policy.md`.
+`Skills/load_credentials.py` was created (PR #113, merged) and wired into
+`Skills/fetch_atlas_data.py` so credentials are auto-loaded from macOS Keychain
+without a separate shell source step. The screening run `atlas_recovery_25f3a800a1a2`
+completed: 42/101 samples recovered, 5 tracklets, 0 failures, 0 pending.
+Prequalification (≥3 recovered samples, ≥2 distinct nights) yielded **5 objects:
+121, 954, 2140, 2172, 5650**. Prequalified manifest written to
+`Logs/reports/t1c_option_a_prequalified_manifest.json` (local, ignored).
+
+**NEXT STEP (follow-up run, NOT YET DONE)**: Run ATLAS forced photometry against
+the 5 prequalified objects with:
+```
+caffeinate -i uv run python Skills/fetch_atlas_data.py \
+    --expected-known Logs/reports/t1c_option_a_prequalified_manifest.json \
+    --workers 4
+```
+Then audit with `Skills/audit_real_run.py`. Durable evidence:
+`docs/evidence/t1c/2026-06-20-option-a-screening-prequalification.md`.
+
 ---
 
 ### T1-D: No Production Ensemble Calibration — **CLOSED 2026-06-14**
