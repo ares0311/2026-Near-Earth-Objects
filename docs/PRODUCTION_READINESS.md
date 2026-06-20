@@ -303,15 +303,19 @@ Prequalification (≥3 recovered samples, ≥2 distinct nights) yielded **5 obje
 121, 954, 2140, 2172, 5650**. Prequalified manifest written to
 `Logs/reports/t1c_option_a_prequalified_manifest.json` (local, ignored).
 
-**NEXT STEP (follow-up run, NOT YET DONE)**: Run ATLAS forced photometry against
-the 5 prequalified objects with:
+**2026-06-20 Option A follow-up run**: `atlas_recovery_c1712df0f32c` completed —
+23 samples, 16/23 recovered, 5/5 objects emitted audit tracklets. Preliminary
+KPI: **5/5 = 100%** (gate ≥90%). Formal audit via `Skills/audit_real_run.py`
+is the next step; citizen-science operator review follows if audit passes.
+Durable evidence: `docs/evidence/t1c/2026-06-20-option-a-screening-prequalification.md`.
+
+**NEXT STEP (audit, NOT YET DONE)**:
 ```
-caffeinate -i uv run python Skills/fetch_atlas_data.py \
+caffeinate -i uv run python Skills/audit_real_run.py \
+    --run-dir Logs/pipeline_runs/atlas_recovery_c1712df0f32c \
     --expected-known Logs/reports/t1c_option_a_prequalified_manifest.json \
-    --workers 4
+    --json
 ```
-Then audit with `Skills/audit_real_run.py`. Durable evidence:
-`docs/evidence/t1c/2026-06-20-option-a-screening-prequalification.md`.
 
 ---
 

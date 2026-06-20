@@ -66,10 +66,10 @@ caffeinate -i uv run python Skills/build_recovery_manifest.py \
 
 ---
 
-## Next Required Step: Follow-Up Run (NOT YET DONE)
+## Follow-Up Run Results — DONE 2026-06-20
 
-Run ATLAS forced photometry against the 5 prequalified objects:
-
+**Run ID**: `atlas_recovery_c1712df0f32c`  
+**Command used**:
 ```bash
 git pull origin main && \
 caffeinate -i uv run python Skills/fetch_atlas_data.py \
@@ -77,26 +77,39 @@ caffeinate -i uv run python Skills/fetch_atlas_data.py \
     --workers 4
 ```
 
-Note: Do NOT use `--force-refresh` here — the prequalified manifest is new,
-so there is no stale cache to bypass. Using `--force-refresh` would force the
-operator to repeat all 5-object queries if the command is re-run.
+**Results** (from operator terminal output, 2026-06-20):
+- Objects in manifest: **5**
+- Samples queried: **23**
+- Recovered samples: **16/23**
+- Tracklets emitted: **5** (one per object = 5/5 objects recovered)
+- Failures: **0**
+- Pending: **0**
+- Runtime: ~19s (most samples served from `.neo_cache/` populated during screening)
 
-Approximate query count: 5 objects × 6 samples = ~30 ATLAS queries.
-Expected runtime: 5–15 minutes.
+**Per-object sample recovery**:
+| Object | Recovered samples | Total samples |
+|--------|-------------------|---------------|
+| 121    | 3 (samples 0,3,4) | 5             |
+| 954    | 3 (samples 1,3,4) | 5             |
+| 2140   | 3 (samples 0,1,2) | 3             |
+| 2172   | 3 (samples 0,1,3) | 5             |
+| 5650   | 4 (samples 0,2,3,4)| 5            |
+
+**Preliminary KPI result**: 5/5 objects produced audit tracklets = **100% recovery**.
+KPI gate is ≥90%. **PASSES** — pending formal `audit_real_run.py` confirmation.
 
 ---
 
-## After Follow-Up: Audit Step (NOT YET DONE)
+## Audit Step — NOT YET DONE
 
 ```bash
 caffeinate -i uv run python Skills/audit_real_run.py \
-    --run-dir Logs/pipeline_runs/<new_run_id> \
+    --run-dir Logs/pipeline_runs/atlas_recovery_c1712df0f32c \
     --expected-known Logs/reports/t1c_option_a_prequalified_manifest.json \
     --json
 ```
 
-Replace `<new_run_id>` with the `run_id` printed by the follow-up run.
-KPI gate: ≥90% of prequalified objects recovered.
+KPI gate: ≥90% of prequalified objects recovered. Expected: PASS (5/5 = 100%).
 
 ---
 

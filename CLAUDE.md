@@ -649,11 +649,24 @@ After the follow-up, audit with `Skills/audit_real_run.py --expected-known Logs/
 - Screening run `atlas_recovery_25f3a800a1a2`: DONE (42/101 recovered, 5 tracklets)
 - Prequalification: DONE — 5 objects: 121, 954, 2140, 2172, 5650
 - Prequalified manifest: `Logs/reports/t1c_option_a_prequalified_manifest.json` (local)
-- Follow-up ATLAS run: **NOT YET DONE**
+- Follow-up ATLAS run: **DONE** — `atlas_recovery_c1712df0f32c`, 16/23 recovered, 5/5 objects → 5 tracklets
 - Audit KPI check: **NOT YET DONE**
 
-T1-C is still open. The live ATLAS forced-photometry fallback is technically
-working, but the recovery KPI has not passed.
+**DO NOT ask the operator to re-run the follow-up. It is done. Run the audit next.**
+
+The next required operator command is the audit:
+
+```bash
+git pull origin main && \
+caffeinate -i uv run python Skills/audit_real_run.py \
+    --run-dir Logs/pipeline_runs/atlas_recovery_c1712df0f32c \
+    --expected-known Logs/reports/t1c_option_a_prequalified_manifest.json \
+    --json
+```
+
+Preliminary KPI result: 5/5 objects recovered = 100% (gate ≥90%). Expected: PASS.
+T1-C closure pending formal audit confirmation and citizen-science operator review.
+Durable evidence: `docs/evidence/t1c/2026-06-20-option-a-screening-prequalification.md`.
 
 Completed live evidence:
 - `atlas_recovery_4eaf93e87f6c`: bounded 38-sample screening run,
