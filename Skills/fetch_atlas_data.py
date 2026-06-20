@@ -51,6 +51,15 @@ PYTHONPATH_SRC = Path(__file__).resolve().parents[1] / "src"
 if str(PYTHONPATH_SRC) not in sys.path:
     sys.path.insert(0, str(PYTHONPATH_SRC))
 
+# Load ATLAS_TOKEN and ZTF credentials from macOS Keychain before any network
+# calls.  Must happen before fetch_atlas_forced reads os.environ["ATLAS_TOKEN"].
+_SKILLS_DIR = Path(__file__).resolve().parent
+if str(_SKILLS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SKILLS_DIR))
+from load_credentials import load_credentials as _load_credentials  # noqa: E402
+
+_load_credentials()
+
 _DEFAULT_RUN_ROOT = Path("Logs/pipeline_runs")
 _DEFAULT_WINDOW_DAYS = 1.0  # Widened from 0.05: ATLAS has ~2-day cadence; a ±72-minute
 # window (0.05 d) misses ~95% of observations. 1.0 d ensures at least one
