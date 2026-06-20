@@ -5597,3 +5597,181 @@ class TestFetchAlerceApiCoverageBranches:
         )
         result = _fetch_ztf_alerce_api(83.0, -5.0, 1.0, start_jd, end_jd)
         assert len(result) == 1
+
+
+
+# ---------------------------------------------------------------------------
+# Coverage: remaining missed statements after 57ba802
+# ---------------------------------------------------------------------------
+
+
+class TestParseAlerceDetectionMissingBranches:
+    """Cover line 276 (non-dict) and line 301 (exception) in _parse_alerce_detection."""
+
+    def test_non_dict_row_returns_none(self):
+        # Covers line 276: `if not isinstance(row, dict): return None`
+        result = _parse_alerce_detection("not_a_dict", "ZTF01", 2461096.0, 2461097.0)
+        assert result is None
+
+    def test_missing_mjd_key_raises_caught_returns_none(self):
+        # Covers line 301: `except (KeyError, TypeError, ValueError): return None`
+        # Empty dict is missing "mjd" -> float(row["mjd"]) raises KeyError.
+        result = _parse_alerce_detection({}, "ZTF01", 2461096.0, 2461097.0)
+        assert result is None
+
+
+class TestFetchZtfIrsaApiMissingBranches:
+    """Cover line 341 (RequestException) and line 347 (JSON error) in _fetch_ztf_irsa_api."""
+
+    def test_request_exception_returns_empty(self):
+        # Covers line 341: `except requests.RequestException: return []`
+        import requests
+        from unittest.mock import patch
+
+        with patch("requests.get", side_effect=requests.RequestException("timeout")):
+            result = _fetch_ztf_irsa_api(180.0, 10.0, 1.0, 2460000.0, 2460010.0)
+        assert result == []
+
+    def test_json_decode_error_returns_empty(self):
+        # Covers line 347: `except (ValueError, Exception): return []` when resp.json() fails
+        import json
+        from unittest.mock import MagicMock, patch
+
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status = MagicMock()
+        mock_resp.json.side_effect = json.JSONDecodeError("Expecting value", "", 0)
+        with patch("requests.get", return_value=mock_resp):
+            result = _fetch_ztf_irsa_api(180.0, 10.0, 1.0, 2460000.0, 2460010.0)
+        assert result == []
+
+
+class TestFetchAtlasQueueMissingUrl:
+    """Cover line 423 in fetch_atlas: queue response missing 'url' key."""
+
+    def test_queue_response_no_url_key_returns_empty(self, tmp_path, monkeypatch):
+        # Covers line 423: `except (KeyError, ValueError, Exception): return []`
+        # when resp.json() returns a dict without the "url" key -> KeyError on ["url"].
+        from unittest.mock import MagicMock, patch
+
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        monkeypatch.setattr(fetch_mod.time, "sleep", lambda _: None)
+
+        queue_resp = MagicMock()
+        queue_resp.raise_for_status = MagicMock()
+        queue_resp.json.return_value = {}  # missing "url" key
+
+        with patch("requests.post", return_value=queue_resp):
+            from fetch import fetch_atlas
+            result = fetch_atlas(180.0, 10.0, 1.0, 2460000.0, 2460010.0, atlas_token="tok")
+        assert result == []
+
+
+class TestFetchAtlasForcedRemainingBranches:
+    """Cover lines 1072, 1106, 1108 in fetch_atlas_forced."""
+
+    def test_progress_callback_fires_on_initial_queue(self, tmp_path, monkeypatch):
+        # Covers line 1072: progress_callback({"event": "queued", ...}) when task_url=None.
+        from unittest.mock import MagicMock, patch
+
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        mock_post_resp = MagicMock()
+        mock_post_resp.raise_for_status = MagicMock()
+        mock_post_resp.json.return_value = {
+            "url": "https://fake-atlas/task/cb/",
+            "status": "queued",
+        }
+
+        mock_task_resp = MagicMock()
+        mock_task_resp.raise_for_status = MagicMock()
+        mock_task_resp.json.return_value = {"result_url": "https://fake-atlas/result/cb/"}
+
+        mock_result_resp = MagicMock()
+        mock_result_resp.raise_for_status = MagicMock()
+        mock_result_resp.text = "#MJD RA Dec m dm F\n60001.0 180.0 10.0 18.5 0.05 o\n"
+
+        mock_requests = MagicMock()
+        mock_requests.post.return_value = mock_post_resp
+        mock_requests.get.side_effect = [mock_task_resp, mock_result_resp]
+
+        events = []
+        with patch.dict("sys.modules", {"requests": mock_requests}):
+            result = fetch_mod.fetch_atlas_forced(
+                180.0, 10.0, 2459600.0, 2459610.0,
+                atlas_token="valid_token",
+                task_url=None,
+                progress_callback=events.append,
+            )
+
+        assert len(result) >= 0
+        assert any(e.get("event") == "queued" for e in events)
+
+    def test_finishtimestamp_without_result_url_returns_empty(self, tmp_path, monkeypatch):
+        # Covers line 1106: `if data.get("finishtimestamp"): return []`
+        # Task finished but produced no result_url.
+        from unittest.mock import MagicMock, patch
+
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        mock_post_resp = MagicMock()
+        mock_post_resp.raise_for_status = MagicMock()
+        mock_post_resp.json.return_value = {"url": "https://fake-atlas/task/ft/"}
+
+        mock_poll_resp = MagicMock()
+        mock_poll_resp.raise_for_status = MagicMock()
+        mock_poll_resp.json.return_value = {"finishtimestamp": "2024-06-01T12:00:00"}
+
+        mock_requests = MagicMock()
+        mock_requests.post.return_value = mock_post_resp
+        mock_requests.get.return_value = mock_poll_resp
+
+        with patch.dict("sys.modules", {"requests": mock_requests}):
+            result = fetch_mod.fetch_atlas_forced(
+                180.0, 10.0, 2459600.0, 2459610.0,
+                atlas_token="valid_token",
+                max_polls=1,
+                poll_interval_seconds=0.0,
+            )
+        assert result == []
+
+    def test_positive_poll_interval_calls_sleep(self, tmp_path, monkeypatch):
+        # Covers line 1108: `time.sleep(poll_interval_seconds)` when > 0 and loop continues.
+        from unittest.mock import MagicMock, patch
+
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        sleep_calls = []
+        monkeypatch.setattr(fetch_mod.time, "sleep", sleep_calls.append)
+
+        mock_post_resp = MagicMock()
+        mock_post_resp.raise_for_status = MagicMock()
+        mock_post_resp.json.return_value = {"url": "https://fake-atlas/task/sleep/"}
+
+        # First poll: no result yet -> sleep triggered before next poll
+        mock_pending = MagicMock()
+        mock_pending.raise_for_status = MagicMock()
+        mock_pending.json.return_value = {}
+
+        # Second poll: result available
+        atlas_data = "#MJD RA Dec m dm F\n60002.0 180.0 10.0 19.0 0.05 o\n"
+        mock_result_task = MagicMock()
+        mock_result_task.raise_for_status = MagicMock()
+        mock_result_task.json.return_value = {"result_url": "https://fake-atlas/result/sleep/"}
+
+        mock_result_data = MagicMock()
+        mock_result_data.raise_for_status = MagicMock()
+        mock_result_data.text = atlas_data
+
+        mock_requests = MagicMock()
+        mock_requests.post.return_value = mock_post_resp
+        mock_requests.get.side_effect = [mock_pending, mock_result_task, mock_result_data]
+
+        with patch.dict("sys.modules", {"requests": mock_requests}):
+            result = fetch_mod.fetch_atlas_forced(
+                180.0, 10.0, 2459600.0, 2459610.0,
+                atlas_token="valid_token",
+                max_polls=2,
+                poll_interval_seconds=0.1,
+            )
+
+        assert 0.1 in sleep_calls

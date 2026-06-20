@@ -3196,3 +3196,34 @@ class TestFormatAlertPathwaySummary:
         neo = SimpleNamespace(hazard=None)
         result = format_alert_pathway_summary([neo])
         assert "unknown" in result
+
+
+
+class TestComputeUrgencyHighMoidFalse:
+    """Cover line 1758 second operand of compound-and in _compute_urgency.
+
+    Python 3.14.6 tracks each operand of `A and B` separately.  The existing
+    tests only exercise moid_au <= 0.1 (True AND True) or moid_au=None
+    (short-circuit, second operand never evaluated).  This test exercises
+    moid_au=0.2 so `moid_au is not None` is True but `float(moid_au) <= 0.1`
+    is False, causing the condition to be False overall.
+    """
+
+    def test_high_moid_low_priority_gives_routine(self):
+        """moid_au=0.2 (> 0.1) and priority=0.3 (< 0.7) -> ROUTINE."""
+        import sys
+        sys.path.insert(0, "src")
+        from types import SimpleNamespace
+
+        from alert import generate_followup_priority_list
+
+        neo = make_scored_neo()
+        hazard = SimpleNamespace(
+            hazard_flag="nominal",
+            moid_au=0.2,
+            alert_pathway="internal_candidate",
+        )
+        meta = SimpleNamespace(discovery_priority=0.3)
+        neo_ns = SimpleNamespace(tracklet=neo.tracklet, hazard=hazard, metadata=meta)
+        result = generate_followup_priority_list([neo_ns])
+        assert result[0]["urgency"] == "ROUTINE"

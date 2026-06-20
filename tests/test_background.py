@@ -4318,3 +4318,28 @@ class TestWriteScoringMetricsKpiReport:
         assert result["network_access_performed"] is False
         assert result["external_submission_enabled"] is False
         assert "report" in result
+
+
+
+class TestKpiEntryFailStatus:
+    """Cover the `else "fail"` branch of the ternary in _kpi_entry (line 3530).
+
+    Python 3.14.6 tracks `"pass" if passed else "fail"` as two reachable
+    statement targets.  All existing tests pass only fixtures that produce
+    passed=True when status=None, so `"fail"` was never returned.
+    """
+
+    def test_kpi_entry_passed_false_returns_fail_status(self):
+        import sys
+        sys.path.insert(0, "src")
+        import background
+
+        entry = background._kpi_entry(
+            kpi_id="test_gate",
+            observed=0.99,
+            threshold=1.0,
+            passed=False,
+            rationale="Test expects failure path.",
+        )
+        assert entry["status"] == "fail"
+        assert entry["id"] == "test_gate"
