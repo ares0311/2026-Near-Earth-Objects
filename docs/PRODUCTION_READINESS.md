@@ -292,6 +292,34 @@ threshold `90%`). The failed object was `2973`; repeat-recovered objects were
 denominator, such as a repeat-stable object rule, requires explicit operator
 approval before more live queries.
 
+**2026-06-20 Option A screening run**: Jerome W. Lindsey III approved a new
+predeclared screening approach (25 objects, 6 samples/object, 101 total
+samples) documented in `docs/evidence/t1c/2026-06-20-option-a-predeclared-policy.md`.
+`Skills/load_credentials.py` was created (PR #113, merged) and wired into
+`Skills/fetch_atlas_data.py` so credentials are auto-loaded from macOS Keychain
+without a separate shell source step. The screening run `atlas_recovery_25f3a800a1a2`
+completed: 42/101 samples recovered, 5 tracklets, 0 failures, 0 pending.
+Prequalification (≥3 recovered samples, ≥2 distinct nights) yielded **5 objects:
+121, 954, 2140, 2172, 5650**. Prequalified manifest written to
+`Logs/reports/t1c_option_a_prequalified_manifest.json` (local, ignored).
+
+**2026-06-20 Option A follow-up run**: `atlas_recovery_c1712df0f32c` completed —
+23 samples, 16/23 recovered, 5/5 objects emitted audit tracklets. Preliminary
+KPI: **5/5 = 100%** (gate ≥90%). Formal audit via `Skills/audit_real_run.py`
+is the next step; citizen-science operator review follows if audit passes.
+Durable evidence: `docs/evidence/t1c/2026-06-20-option-a-screening-prequalification.md`.
+
+**2026-06-20 audit result: PASSED.** Correct audit used
+`expected_known_atlas_forced.json` (tolerance_days=1.0) from the run dir. Output:
+`Recovery gate: evaluated (passed=True)`, 5 tracklets reviewed, 0 same-night,
+5 multi-night, no external submission. T1-C automated KPI gate is now closed.
+
+**2026-06-20 T1-C CLOSED**: Citizen-science operator review completed by Jerome
+W. Lindsey III. All 5 tracklets showed physically plausible motion rates
+(26–36 arcsec/hr) and multi-night arcs (12–25 days). No flags, no blocking
+findings. Full evidence: `docs/evidence/t1c/2026-06-20-option-a-screening-prequalification.md`.
+No external submission or impact-probability claim authorized.
+
 ---
 
 ### T1-D: No Production Ensemble Calibration — **CLOSED 2026-06-14**

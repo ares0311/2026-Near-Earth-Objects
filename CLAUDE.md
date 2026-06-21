@@ -96,6 +96,31 @@ If the highest-priority T1 gap cannot be resolved because a human blocker is unr
   4. **Wrap all network fetch calls in a retry loop** with exponential backoff: 2 s, 4 s, 8 s, 16 s, 32 s (max 5 attempts). Catch `(ConnectionError, TimeoutError, OSError)`. Print the error and retry count on each failure. Raise after the final attempt.
   5. **The operator must never need to edit the command** to resume — re-running the identical command is the only required action after a sleep/wake or network interruption.
   This is the System Directive standard. Scripts that do not meet it are incomplete.
+- **Persist operator command results immediately — no re-run loops**:
+  Every time the operator runs a command at your direction and pastes the output,
+  you MUST, in the same turn, commit a durable record before replying with the
+  next step. Never proceed to the next step without first writing the result to a
+  committed file. Failure to do this creates a death loop: conversation context
+  compacts → result is lost → you ask the operator to run the same command again.
+
+  Rules:
+  1. **Write the result first.** As soon as you receive operator terminal output,
+     write a sanitized summary to `docs/evidence/<subsystem>/YYYY-MM-DD-<slug>.md`
+     (or update the active evidence file for the current milestone).
+  2. **Update the handoff state in `CLAUDE.md`.** Mark the completed step DONE
+     and write the exact next command with a "NOT YET DONE" marker. The handoff
+     block is the first thing future sessions read.
+  3. **Update `docs/PRODUCTION_READINESS.md`.** Add or update the dated paragraph
+     for the current T1/T2 gap so the state is visible without reading conversation
+     history.
+  4. **Commit and push before giving the next operator command.** Never queue up
+     the next shell command without first pushing the durable record. The commit
+     message must name the specific milestone (run ID, KPI result, object count).
+  5. **At session start, read the committed evidence files before planning.**
+     Never rely on conversation memory or summaries for run results. If a
+     `docs/evidence/` file says a step is DONE, treat it as done — do not ask
+     the operator to re-run it.
+
 - **Diagnose root cause before writing any fix (symptom-loop prevention)**:
   Before writing code to fix a hang, missing output, wrong output, or performance problem, you MUST first state the root cause in one sentence from first principles. If you cannot state the root cause, do NOT write code — re-read the diagnostic output and reason about it until you can. Applying a workaround (e.g., a heartbeat, a retry, a timeout) without identifying the root cause is prohibited.
 
@@ -605,12 +630,38 @@ citizen-science operator false-positive review. Bounded live dry-run policy
 approval is complete, but live execution remains credential/provider gated and
 non-submitting.
 
-### Handoff state as of 2026-06-19
+### Handoff state as of 2026-06-20 (CURRENT)
 
-T1-C is still open. The live ATLAS forced-photometry fallback is technically
-working, but the recovery KPI has not passed.
+**DO NOT ask the operator to re-run the ATLAS screening or prequalification — both are done.**
+Read `docs/evidence/t1c/2026-06-20-option-a-screening-prequalification.md` for full results.
+The next required operator command is the ATLAS **follow-up run** (30 queries, ~5–15 min):
+
+```bash
+git pull origin main && \
+caffeinate -i uv run python Skills/fetch_atlas_data.py \
+    --expected-known Logs/reports/t1c_option_a_prequalified_manifest.json \
+    --workers 4
+```
+
+After the follow-up, audit using the run-dir's `expected_known_atlas_forced.json`
+(NOT the prequalified manifest — it lacks `tolerance_days` and causes false failures).
+
+**State summary**:
+- Screening run `atlas_recovery_25f3a800a1a2`: DONE (42/101 recovered, 5 tracklets)
+- Prequalification: DONE — 5 objects: 121, 954, 2140, 2172, 5650
+- Prequalified manifest: `Logs/reports/t1c_option_a_prequalified_manifest.json` (local)
+- Follow-up ATLAS run: **DONE** — `atlas_recovery_c1712df0f32c`, 16/23 recovered, 5/5 objects → 5 tracklets
+- First audit attempt: **FAILED (wrong manifest)** — used prequalified manifest, tolerance_days defaulted to 0.02 days, all sky/time matches failed
+- Audit KPI check: **DONE — passed=True** (2026-06-20). 5/5 multi-night tracklets. Recovery gate evaluated and passed.
+
+**T1-C CLOSED 2026-06-20.** Automated KPI passed AND citizen-science review complete.
+Jerome W. Lindsey III reviewed `Logs/reports/t1c_option_a_review.csv` on 2026-06-20.
+All 5 tracklets: motion 26–36 arcsec/hr, arcs 12–25 days, no flags. No blocking findings.
+Full evidence: `docs/evidence/t1c/2026-06-20-option-a-screening-prequalification.md`.
+No external submission, MPC report, or NASA notification is authorized.
 
 Completed live evidence:
+- `atlas_recovery_4eaf93e87f6c`: bounded 38-sample screening run,
 - `atlas_recovery_4eaf93e87f6c`: bounded 38-sample screening run,
   19/38 samples recovered, 4 multi-night audit tracklets, recovery gate
   4/11 expected objects (`36.36%`) — failed.
