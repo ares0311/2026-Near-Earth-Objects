@@ -403,8 +403,11 @@ guardrails. This packet does not replace expert validation.
 Records all five architecture decisions, calibration KPI results for all three
 tiers and the ensemble stacker, known limitations (data, orbital coverage,
 pipeline coverage), no-submission guardrails, and citizen-science framing.
-Section 6 operator review checklist awaits completion by Jerome W. Lindsey III.
 This packet does not authorize any external submission.
+
+**T2-C CLOSED (2026-06-21)**: Section 6 operator review completed by Jerome W.
+Lindsey III. All five attestation checkboxes signed. No external submission
+authorized. Expert validation gap explicitly acknowledged.
 
 ### T2-D: No CI for Integration or End-to-End Tests
 
@@ -460,9 +463,8 @@ Before the pipeline makes its first MPC submission, all of the following must be
       in GitHub → Settings → Secrets → Actions so live tests execute in CI
 - [~] T2-B resolved: 10 synthetic adversarial tests added (test_adversarial.py, 2026-06-21);
       real-data false-positive audit vs known-artifact catalog is a future operator-run step
-- [~] T2-C resolved: citizen-science architecture evidence packet created 2026-06-20
-      (stale T1-C reference corrected 2026-06-21); operator review checklist (Section 6)
-      awaits Jerome W. Lindsey III
+- [x] T2-C resolved: citizen-science architecture evidence packet signed ✓ (Jerome W. Lindsey III, 2026-06-21);
+      all five attestation items checked; no external submission authorized
 - [x] T2-D resolved: e2e.yml has smoke/diagnose/injection/model-weights jobs ✓ (2026-06-21);
       Skills/validate_model_weights.py validates all four committed model files
 - [ ] Alert protocol compliance: `ready_for_submission()` gate tested on ≥10 real candidate outputs

@@ -202,14 +202,14 @@ explicit constraints:
 ## 6. Operator Review
 
 **Operator**: Jerome W. Lindsey III  
-**Review date**: (to be completed by operator)  
+**Review date**: 2026-06-21  
 **Operator attestation**:
 
-- [ ] I have read the architecture decisions and calibration KPIs above.
-- [ ] I understand the known limitations section.
-- [ ] I confirm that no external submission has been authorized.
-- [ ] I confirm that this packet does not replace expert validation.
-- [ ] I accept the citizen-science framing as accurate.
+- [x] I have read the architecture decisions and calibration KPIs above.
+- [x] I understand the known limitations section.
+- [x] I confirm that no external submission has been authorized.
+- [x] I confirm that this packet does not replace expert validation.
+- [x] I accept the citizen-science framing as accurate.
 
 **Operator notes** (optional free text):
 
