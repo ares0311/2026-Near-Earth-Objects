@@ -370,7 +370,14 @@ All tests marked `@pytest.mark.integration_live` are excluded from CI. The live 
 
 **Needed**: Run integration tests in a sandboxed environment with real credentials. Requires T1-B resolution.
 
-**Progress (2026-06-21)**: `.github/workflows/integration.yml` is in place. It triggers on pushes to `main` and on manual dispatch. It auto-detects whether `ATLAS_TOKEN`, `ZTF_IRSA_USERNAME`, and `ZTF_IRSA_PASSWORD` are present in GitHub Actions secrets and skips gracefully if absent. Infrastructure is complete; the remaining step is configuring those three secrets in GitHub → Settings → Secrets → Actions so the live tests actually execute in CI.
+**Progress (2026-06-21)**: Credentials are kept off GitHub by operator policy. `.github/workflows/integration.yml` is in place but always emits a skip notice — it will never run in CI. Integration tests must be run on the operator Mac:
+
+```bash
+source Skills/verify_live_credentials.sh
+PYTHONPATH=src uv run python -m pytest -m integration_live -v --timeout=120
+```
+
+T2-A is satisfied when the operator runs this command and all `integration_live` tests pass.
 
 ### T2-B: No Adversarial/Robustness Testing
 
@@ -458,9 +465,9 @@ Before the pipeline makes its first MPC submission, all of the following must be
 - [x] T1-D resolved: Machine-readable calibration report passes every required
       KPI on held-out real labeled data and records
       `promotion_gate_passed=true` ✓ (2026-06-14; Tier 1 + Tier 2)
-- [~] T2-A resolved: integration.yml CI job in place; skips gracefully without secrets;
-      remaining step: configure ATLAS_TOKEN, ZTF_IRSA_USERNAME, ZTF_IRSA_PASSWORD
-      in GitHub → Settings → Secrets → Actions so live tests execute in CI
+- [~] T2-A resolved: credentials kept off GitHub by operator policy (2026-06-21);
+      integration.yml always skips in CI; run locally:
+      `source Skills/verify_live_credentials.sh && PYTHONPATH=src uv run python -m pytest -m integration_live -v`
 - [~] T2-B resolved: 10 synthetic adversarial tests added (test_adversarial.py, 2026-06-21);
       real-data false-positive audit vs known-artifact catalog is a future operator-run step
 - [x] T2-C resolved: citizen-science architecture evidence packet signed ✓ (Jerome W. Lindsey III, 2026-06-21);

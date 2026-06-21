@@ -555,9 +555,9 @@ until qualified expert review or a separate supervised submission policy.
 - T2-D (No CI for E2E/Integration/Model-Weight Tests): **CLOSED 2026-06-21.**
   `e2e.yml` has smoke/diagnose/injection/model-weights jobs; `integration.yml`
   gated on secrets.
-- T2-A (Integration Tests vs Real APIs): **IN PROGRESS.** `integration.yml` CI
-  job in place. Remaining step: configure GitHub Actions secrets
-  (ATLAS_TOKEN, ZTF_IRSA_USERNAME, ZTF_IRSA_PASSWORD) in GitHub Settings.
+- T2-A (Integration Tests vs Real APIs): **IN PROGRESS.** Credentials kept off
+  GitHub by operator policy; `integration.yml` always skips in CI. Run locally:
+  `source Skills/verify_live_credentials.sh && PYTHONPATH=src uv run python -m pytest -m integration_live -v`
 - T2-B (Adversarial/Robustness Testing): **IN PROGRESS.** 10 synthetic
   adversarial tests in `tests/test_adversarial.py`. Real-data false-positive
   audit vs known-artifact catalog is a future operator-run step.
@@ -814,13 +814,14 @@ PYTHONPATH=src uv run python Skills/select_survey_fields.py \
 
 **All T1 gaps are closed. The two remaining open items both require operator action:**
 
-**Priority 1 — T2-A: Configure GitHub Actions secrets**:
-- In GitHub → Settings → Secrets → Actions, add:
-  - `ATLAS_TOKEN`
-  - `ZTF_IRSA_USERNAME`
-  - `ZTF_IRSA_PASSWORD`
-- The `integration.yml` CI workflow is already in place and will run automatically.
-- These are the same credentials stored in macOS Keychain; copy them from there.
+**Priority 1 — T2-A: Run integration tests locally on Mac**:
+- Credentials are kept off GitHub by operator policy; `integration.yml` always skips in CI.
+- Run on your Mac:
+  ```bash
+  source Skills/verify_live_credentials.sh
+  PYTHONPATH=src uv run python -m pytest -m integration_live -v --timeout=120
+  ```
+- T2-A closes when all `integration_live` tests pass.
 
 **Priority 2 — T2-B: Live false-positive audit**:
 - Load credentials: `source Skills/verify_live_credentials.sh`

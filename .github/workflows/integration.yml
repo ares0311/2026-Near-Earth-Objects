@@ -1,18 +1,14 @@
 name: Integration Tests
 
-# Run live API integration tests against ZTF/ATLAS/MPC endpoints.
-# Only triggers on pushes to main and manual dispatch — never on PRs —
-# so credentials are never exposed to fork-originated code.
+# Live API integration tests for ZTF/ATLAS/MPC endpoints.
 #
-# The job detects whether the required secrets are configured and skips
-# the test step (with a clear status message) if they are absent.
-# This means the workflow always appears in the Actions tab but never
-# blocks merges when credentials are not yet wired in.
+# POLICY: Credentials are kept off GitHub by operator decision (2026-06-21).
+# This workflow always skips the live test step. It exists as a reference
+# so the CI tab shows a clear skip notice rather than a missing job.
 #
-# Required GitHub Actions secrets (Settings → Secrets → Actions):
-#   ATLAS_TOKEN           — ATLAS forced-photometry API token
-#   ZTF_IRSA_USERNAME     — IRSA account username for ZTF alert stream
-#   ZTF_IRSA_PASSWORD     — IRSA account password
+# To run integration tests, use the local Mac command:
+#   source Skills/verify_live_credentials.sh
+#   PYTHONPATH=src uv run python -m pytest -m integration_live -v --timeout=120
 #
 # Tests covered: all @pytest.mark.integration_live tests in tests/
 # Primary file: tests/test_fetch.py (ZTF IRSA, ATLAS, MPC, Horizons)
@@ -24,61 +20,22 @@ on:
 
 jobs:
   integration-live:
-    name: Integration tests (live APIs)
+    name: Integration tests (live APIs — local Mac only)
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      # Same Python version and lockfile as the main CI job.
       - name: Set up uv with Python 3.14
         uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.14"
 
-      # Sync dev extras so pytest and all survey-client libraries are present.
       - name: Install dependencies (from uv.lock)
         run: uv sync --extra dev
 
-      # Probe secret availability without printing values.
-      # Sets CREDS_AVAILABLE=true only when all three secrets are non-empty.
-      - name: Check credential availability
-        id: check-creds
+      # Credentials are kept off GitHub by operator policy.
+      # This step always emits a skip notice; live tests run on the operator Mac.
+      - name: Skip notice (credentials kept off GitHub by policy)
         run: |
-          if [[ -n "$ATLAS_TOKEN" && -n "$ZTF_IRSA_USERNAME" && -n "$ZTF_IRSA_PASSWORD" ]]; then
-            echo "available=true"  >> "$GITHUB_OUTPUT"
-            echo "Credentials present — integration tests will run."
-          else
-            echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "One or more secrets are absent; integration tests will be skipped."
-            echo "Configure ATLAS_TOKEN, ZTF_IRSA_USERNAME, ZTF_IRSA_PASSWORD in"
-            echo "Settings → Secrets → Actions to enable live API tests."
-          fi
-        env:
-          ATLAS_TOKEN:         ${{ secrets.ATLAS_TOKEN }}
-          ZTF_IRSA_USERNAME:   ${{ secrets.ZTF_IRSA_USERNAME }}
-          ZTF_IRSA_PASSWORD:   ${{ secrets.ZTF_IRSA_PASSWORD }}
-
-      # Run only the integration_live-marked tests.
-      # No coverage gate — these are live API smoke tests, not unit tests.
-      # Timeout per test is 120 s; the full suite should finish in under 10 min.
-      - name: Run integration tests
-        if: steps.check-creds.outputs.available == 'true'
-        run: |
-          uv run python -m pytest \
-            -m "integration_live" \
-            -v \
-            --timeout=120 \
-            --tb=short
-        env:
-          PYTHONPATH:          src
-          ATLAS_TOKEN:         ${{ secrets.ATLAS_TOKEN }}
-          ZTF_IRSA_USERNAME:   ${{ secrets.ZTF_IRSA_USERNAME }}
-          ZTF_IRSA_PASSWORD:   ${{ secrets.ZTF_IRSA_PASSWORD }}
-
-      # Emit a clear skip notice when credentials are absent so the job
-      # appears as "skipped" rather than "passed" in the Actions summary.
-      - name: Skip notice (no credentials)
-        if: steps.check-creds.outputs.available != 'true'
-        run: |
-          echo "::notice title=Integration tests skipped::Configure ATLAS_TOKEN, ZTF_IRSA_USERNAME, and ZTF_IRSA_PASSWORD in GitHub Actions secrets to enable live API tests."
+          echo "::notice title=Integration tests skipped::Credentials are kept off GitHub by operator policy. Run locally: source Skills/verify_live_credentials.sh && PYTHONPATH=src uv run python -m pytest -m integration_live -v --timeout=120"

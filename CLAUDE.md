@@ -637,10 +637,13 @@ re-run any ATLAS screening, prequalification, or audit commands.
 
 **Remaining open checklist items (from `docs/PRODUCTION_READINESS.md`)**:
 
-- **T2-A** (GitHub Actions secrets): Configure `ATLAS_TOKEN`, `ZTF_IRSA_USERNAME`,
-  `ZTF_IRSA_PASSWORD` in GitHub → Settings → Secrets → Actions. The
-  `integration.yml` CI job is already in place and will run automatically once
-  secrets are present. This is a GitHub UI action — no code change needed.
+- **T2-A** (local integration tests): Credentials are kept off GitHub by operator
+  policy. Run on Mac:
+  ```bash
+  source Skills/verify_live_credentials.sh
+  PYTHONPATH=src uv run python -m pytest -m integration_live -v --timeout=120
+  ```
+  T2-A closes when all `integration_live` tests pass locally.
 
 - **T2-B** (live false-positive audit): Run `Skills/diagnose_pipeline.py` on
   real ZTF alert data with credentials loaded. This is an operator-run step
