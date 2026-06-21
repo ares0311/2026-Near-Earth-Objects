@@ -648,6 +648,17 @@ no in-house expert is required or expected.
 All T1 gaps are closed. All operator commands for T1-C are complete — do NOT
 re-run any ATLAS screening, prequalification, or audit commands.
 
+**LIVE PIPELINE OPERATIONAL (2026-06-21)**: First live run completed successfully.
+- Run ID: `6c1b387e0763`, field RA=83.8221 Dec=-5.3911, ZTF, 7-day window
+- Console output conforms to `docs/CONSOLE_OUTPUT_SPEC.md` ✓
+- `--no-dry-run` flag working ✓
+- 0 alerts (Orion field not in ZTF footprint for that epoch — expected)
+- Evidence: `docs/evidence/live/2026-06-21-first-live-run.md`
+- DO NOT re-run this specific command — zero-alert result was expected and confirmed
+
+**Next live run**: Use `Skills/select_survey_fields.py --mode recovery --top-n 5`
+to find a ZTF-observed field with recoverable known objects, then run with `--no-dry-run`.
+
 **T2-A CLOSED (2026-06-21)**: Both integration_live tests passed on operator Mac.
 - `test_fetch_ztf_live_small_region` PASSED
 - `test_fetch_atlas_live_small_region` PASSED (13s run time)
