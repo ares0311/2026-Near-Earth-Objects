@@ -773,6 +773,7 @@ PYTHONPATH=src uv run python Skills/select_survey_fields.py \
 | `docs/DATA_PIPELINE_OVERVIEW.md` | End-to-end data pipeline overview |
 | `docs/ALERT_PATHWAY_GUIDE.md` | Alert pathway helper and guardrail guide |
 | `docs/SCHEMA_REFERENCE.md` | Schema model reference |
+| `docs/CONSOLE_OUTPUT_SPEC.md` | **Console output standard for all pipeline runners.** Stage prefixes, ETA format, run header/footer, candidate escalation notice. `Skills/run_pipeline.py` is compliant as of 2026-06-21. |
 
 ### Data
 

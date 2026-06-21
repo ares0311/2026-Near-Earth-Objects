@@ -7,11 +7,13 @@ command after a network drop, machine sleep, or process kill automatically
 resumes from the last completed stage — no data is re-fetched or
 re-processed.
 
+Console output conforms to docs/CONSOLE_OUTPUT_SPEC.md.
+
 Usage:
     python Skills/run_pipeline.py \\
         --ra 180.0 --dec 10.0 --radius 1.0 \\
         --start-jd 2460000.0 --end-jd 2460010.0 \\
-        [--surveys ZTF] [--dry-run]
+        [--surveys ZTF] [--no-dry-run]
 """
 
 from __future__ import annotations
@@ -26,7 +28,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from alert import monitor_neocp, process_alert, summarise
+from alert import monitor_neocp, process_alert, ready_for_submission, summarise
 from classify import classify
 from detect import detect
 from fetch import fetch
@@ -44,6 +46,77 @@ _LOG_ROOT = Path("Logs") / "pipeline_runs"
 
 # Network errors that warrant a retry
 _INFRA_ERRORS = (ConnectionError, TimeoutError, OSError)
+
+# ── Console output helpers ────────────────────────────────────────────────────
+
+_LINE = "═" * 65
+_DASH = "─" * 65
+
+
+def _print_run_header(
+    run_id: str,
+    ra: float,
+    dec: float,
+    radius: float,
+    start_jd: float,
+    end_jd: float,
+    surveys: tuple[str, ...],
+    dry_run: bool,
+) -> None:
+    """Print the CONSOLE_OUTPUT_SPEC.md run header block."""
+    mode = (
+        "DRY RUN  (no external submissions will be made)"
+        if dry_run
+        else "LIVE RUN  ⚠  alerts enabled"
+    )
+    timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
+    n_days = round(end_jd - start_jd, 2)
+    surveys_str = " ".join(surveys)
+    print(_LINE, flush=True)
+    print(f"  NEO Detection Pipeline — {mode}", flush=True)
+    print(f"  Run ID  : {run_id}", flush=True)
+    print(f"  Field   : RA={ra}°  Dec={dec}°  r={radius}°", flush=True)
+    print(
+        f"  Window  : JD {start_jd} – {end_jd}  ({n_days} days)",
+        flush=True,
+    )
+    print(f"  Surveys : {surveys_str}", flush=True)
+    print(f"  Started : {timestamp}", flush=True)
+    print(_LINE, flush=True)
+
+
+def _print_run_footer(n_processed: int, n_ready: int, elapsed_s: float) -> None:
+    """Print the CONSOLE_OUTPUT_SPEC.md run footer block."""
+    print(_DASH, flush=True)
+    print("  Pipeline complete.", flush=True)
+    print(f"  Candidates processed : {n_processed}", flush=True)
+    print(f"  Submission-ready     : {n_ready}", flush=True)
+    print(f"  Elapsed              : {_format_duration(elapsed_s)}", flush=True)
+    print(_DASH, flush=True)
+
+
+def _print_escalation_notice(
+    object_id: str,
+    moid_au: float | None,
+    rb: float | None,
+    pathway: str,
+    priority: float,
+    dry_run: bool,
+) -> None:
+    """Print the candidate escalation notice per CONSOLE_OUTPUT_SPEC.md."""
+    moid_str = f"{moid_au:.4f}" if moid_au is not None else "N/A"
+    rb_str = f"{rb:.3f}" if rb is not None else "N/A"
+    print("┌─────────────────────────────────────────────────────────────────┐", flush=True)
+    print(f"│  ⚠  SUBMISSION CANDIDATE: {object_id}", flush=True)
+    print(f"│     MOID    : {moid_str} AU", flush=True)
+    print(f"│     RB score: {rb_str}", flush=True)
+    print(f"│     Pathway : {pathway}", flush=True)
+    print(f"│     Priority: {priority:.4f}", flush=True)
+    print("│     TODO: Escalation path not yet implemented — see", flush=True)
+    print("│           docs/MPC_SUBMISSION_POLICY.md §TODO for future agents", flush=True)
+    print("└─────────────────────────────────────────────────────────────────┘", flush=True)
+    if dry_run:
+        print("[alert] DRY RUN — no external submission performed.", flush=True)
 
 
 # ── Checkpoint helpers ────────────────────────────────────────────────────────
@@ -186,7 +259,28 @@ def run_pipeline(
     neocp_poll_interval_hours: float = 1.0,
     run_dir: Path | None = None,
     resume: bool = True,
+    run_id: str = "unknown",
 ) -> list[dict]:
+    _t_pipeline_start = time.monotonic()
+
+    # Print the spec-compliant run header
+    _print_run_header(
+        run_id=run_id,
+        ra=ra_deg,
+        dec=dec_deg,
+        radius=radius_deg,
+        start_jd=start_jd,
+        end_jd=end_jd,
+        surveys=surveys,
+        dry_run=dry_run,
+    )
+
+    # Warn the operator that live submissions are enabled
+    if not dry_run:
+        print("[alert] ⚠  LIVE MODE — external submissions are ENABLED.", flush=True)
+        print("[alert]    Guardrails: no impact-probability claims; no direct PDCO contact.", flush=True)
+        print("[alert]    All submissions require quality gates to pass (see alert.py).", flush=True)
+
     # Load any existing checkpoint for this parameter set
     cp: dict = {}
     if run_dir is not None and resume:
@@ -298,6 +392,18 @@ def run_pipeline(
         print(f"[alert] Processing alert for {tracklet.object_id}", flush=True)
         alert_result = process_alert(scored, dry_run=dry_run)
 
+        # Check submission readiness and print escalation notice if gates pass
+        ready, _ = ready_for_submission(scored)
+        if ready:
+            _print_escalation_notice(
+                object_id=tracklet.object_id,
+                moid_au=scored.hazard.moid_au,
+                rb=scored.features.real_bogus_score,
+                pathway=scored.hazard.alert_pathway,
+                priority=scored.metadata.discovery_priority,
+                dry_run=dry_run,
+            )
+
         if neocp_timeout_hours > 0:
             print(
                 f"[neocp] Monitoring NEOCP for {tracklet.object_id} "
@@ -325,6 +431,7 @@ def run_pipeline(
             "moid_au": scored.hazard.moid_au,
             "discovery_priority": scored.metadata.discovery_priority,
             "alert_actions": alert_result["actions"],
+            "_submission_ready": ready,
         })
 
         # Checkpoint after each tracklet: a kill here loses at most one item.
@@ -335,7 +442,12 @@ def run_pipeline(
                 "partial_results": results,
             })
 
-    print(f"\nPipeline complete. {len(results)} NEO candidate(s) processed.", flush=True)
+    n_ready = sum(1 for r in results if r.get("_submission_ready", False))
+    _print_run_footer(
+        n_processed=len(results),
+        n_ready=n_ready,
+        elapsed_s=time.monotonic() - _t_pipeline_start,
+    )
     return results
 
 
@@ -349,7 +461,16 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--start-jd", type=float, required=True)
     parser.add_argument("--end-jd", type=float, required=True)
     parser.add_argument("--surveys", nargs="+", default=["ZTF"])
-    parser.add_argument("--dry-run", action="store_true", default=True)
+    # BooleanOptionalAction gives both --dry-run and --no-dry-run flags.
+    # Default is True (safe: no external submissions) so operators must
+    # explicitly pass --no-dry-run to enable live alert submission.
+    parser.add_argument(
+        "--dry-run",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Simulate alert actions without external submission (default: True). "
+             "Pass --no-dry-run for live operation.",
+    )
     parser.add_argument(
         "--atlas-token", type=str, default=None,
         help="ATLAS authentication token (or set ATLAS_TOKEN env var)",
@@ -415,6 +536,7 @@ def main(argv: list[str] | None = None) -> None:
         neocp_poll_interval_hours=args.neocp_poll_interval,
         run_dir=run_dir,
         resume=not args.no_resume,
+        run_id=key,
     )
 
     elapsed = round(time.monotonic() - t_start, 2)

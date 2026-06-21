@@ -142,3 +142,44 @@ all pipeline quality gates. It does not authorize:
 
 This policy was established by operator decision on 2026-06-21 based on research into
 MPC submission best practices for citizen-science programs.
+
+---
+
+## TODO for Future Agents — Escalation Path (Unresolved)
+
+**Status**: Open as of 2026-06-21. Operator-approved direction: implement a
+viable escalation path so that when the pipeline detects a high-quality
+candidate, there is a concrete, executable submission mechanism.
+
+**The unresolved question**: This pipeline processes *public survey data*
+(ZTF/ATLAS photometric alerts) — it does not make original telescope
+observations. MPC observation reports normally require the submitting
+observatory to be the original observer and to hold a registered observatory
+code tied to a specific observing site.
+
+**Known constraints**:
+- This project has no telescope and makes no original observations.
+- An observatory code (3-char MPC identifier) is normally issued to a specific
+  instrument/site, not to a data-analysis pipeline.
+- The existing `ready_for_submission()` gates and ADES PSV export
+  (`Skills/export_ades_report.py`) are implemented; the missing piece is
+  authorization to submit.
+
+**Research needed** (for the agent that picks this up):
+1. Determine whether a pure data-analysis pipeline processing *licensed public
+   alert data* from ZTF/ATLAS can submit MPC reports under those surveys'
+   observatory codes, or whether a separate code is required.
+2. Contact MPC to ask specifically: "We re-reduce public ZTF/ATLAS alerts
+   using our own pipeline; can we submit candidate reports, and if so, what
+   observatory code should we use?"
+3. Investigate whether ZTF/ATLAS have policies on downstream pipelines
+   submitting to MPC from their data.
+4. Document the answer in this file and update `Skills/export_ades_report.py`
+   and `alert.py` accordingly.
+
+**Until this is resolved**:
+- `run_pipeline.py` will print an escalation notice for every candidate that
+  passes `ready_for_submission()`, directing the operator to this TODO.
+- No actual MPC submission should be made.
+- The operator (Jerome W. Lindsey III) retains the decision on when to
+  contact MPC and how to characterize the data source.

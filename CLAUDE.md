@@ -841,6 +841,7 @@ succeeded and produced the trained Tier 3 weights now recorded under T1-A.
 | `docs/CALIBRATION_GUIDE.md` | Technical reference for calibration helpers and metrics |
 | `docs/ALERT_PATHWAY_GUIDE.md` | Alert pathway helper and guardrail guide |
 | `docs/SCHEMA_REFERENCE.md` | Schema model reference |
+| `docs/CONSOLE_OUTPUT_SPEC.md` | **Console output standard for all pipeline runners** (stage prefixes, ETA format, run header/footer, escalation notice). `Skills/run_pipeline.py` is compliant as of 2026-06-21. |
 
 ### Data
 
@@ -882,6 +883,16 @@ succeeded and produced the trained Tier 3 weights now recorded under T1-A.
 | 7 | Production ensemble calibration on fresh labeled survey data |
 
 ### Immediate Next Steps
+
+- **TODO (open): MPC escalation path** — How a pipeline processing *public ZTF/ATLAS survey
+  data* (not original observations) submits to MPC without a telescope/observatory code is
+  unresolved. See `docs/MPC_SUBMISSION_POLICY.md §TODO for Future Agents` for the full
+  problem statement. Until resolved, `run_pipeline.py` prints an escalation notice for every
+  submission-ready candidate but makes no actual submission.
+
+- **Console output spec**: All pipeline runner scripts must conform to
+  `docs/CONSOLE_OUTPUT_SPEC.md`. `Skills/run_pipeline.py` is compliant as of 2026-06-21.
+  Use `--no-dry-run` flag for live runs (default is dry_run=True).
 
 - Sync docs and changelog after each version bump so `AGENTS.md`, `CLAUDE.md`, `README.md`, and `CHANGELOG.md` stay aligned.
 - Inspect background SQLite schema status with `Skills/background.py schema-status-summary` before running operators against older logs.
