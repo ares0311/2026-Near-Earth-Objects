@@ -443,16 +443,19 @@ def process_alert(
     # We NEVER compute or assert an impact probability ourselves.
     # This branch must be triggered externally after CNEOS Scout/Sentry assessment.
     cneos_impact_prob = (cneos_assessment or {}).get("cneos_impact_probability")
-    # Nested ifs (not compound and) — Python 3.14 intermittently misses the
-    # short-circuit branch of compound conditions; see v0.87.3/v0.87.4 fixes.
+    # Use a flag to avoid compound `and` — Python 3.14 intermittently misses
+    # short-circuit branches of compound conditions; see v0.87.3/v0.87.4 fixes.
+    _pdco_triggered = False
     if cneos_impact_prob is not None:
         if cneos_impact_prob >= 0.0001:
-            pdco_package = _generate_pdco_alert_package(neo)
-            pdco_path = _LOG_DIR / f"pdco_alert_{neo.tracklet.object_id}.json"
-            pdco_path.write_text(json.dumps(pdco_package, indent=2))
-            actions.append(f"NASA PDCO alert package written to {pdco_path}")
-            _log_alert(neo, "nasa_pdco_notify", "pdco_package_ready")
-            result["pdco_package"] = pdco_package
+            _pdco_triggered = True
+    if _pdco_triggered:
+        pdco_package = _generate_pdco_alert_package(neo)
+        pdco_path = _LOG_DIR / f"pdco_alert_{neo.tracklet.object_id}.json"
+        pdco_path.write_text(json.dumps(pdco_package, indent=2))
+        actions.append(f"NASA PDCO alert package written to {pdco_path}")
+        _log_alert(neo, "nasa_pdco_notify", "pdco_package_ready")
+        result["pdco_package"] = pdco_package
     else:
         actions.append("NASA PDCO notification deferred: awaiting CNEOS Scout/Sentry assessment")
 
