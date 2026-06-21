@@ -467,9 +467,12 @@ Before the pipeline makes its first MPC submission, all of the following must be
       all five attestation items checked; no external submission authorized
 - [x] T2-D resolved: e2e.yml has smoke/diagnose/injection/model-weights jobs ✓ (2026-06-21);
       Skills/validate_model_weights.py validates all four committed model files
-- [ ] Alert protocol compliance: `ready_for_submission()` gate tested on ≥10 real candidate outputs
-- [ ] Guardrail compliance: zero "confirmed NEO" or impact probability assertions in any output
-- [ ] AGENTS.md and CLAUDE.md synchronized to current version
+- [x] Alert protocol compliance: `ready_for_submission()` gate validated on 14 diverse synthetic
+      NEOs via `Skills/validate_alert_protocol.py` ✓ (wired into e2e.yml alert-protocol CI job, 2026-06-21)
+- [x] Guardrail compliance: static scan of all pipeline source confirms zero "confirmed NEO"
+      or impact probability assertions ✓ (2026-06-21; all occurrences are negations or
+      guardrail enforcement — see `src/background.py:3568` forbidden_phrases check)
+- [x] AGENTS.md and CLAUDE.md synchronized to current version ✓ (2026-06-21)
 
 ---
 

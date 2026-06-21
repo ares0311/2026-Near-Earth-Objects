@@ -523,16 +523,15 @@ and excluded from CI.
 
 ## Current State (v0.89.0)
 
-All 10 pipeline modules are complete. The offline suite passes 3600+ tests, with
-2 live/integration checks deselected. CI is green on Python 3.14 with the
-100% coverage target (statement-level regressions from Python 3.14.6 fixed in
-v0.89.0). All three ML tiers have trained weights and all calibration KPIs have
-passed. **Production is blocked only on T1-C**: known-object recovery evidence
-and citizen-science operator false-positive review. Bounded live dry-run policy
-approval is complete, but live execution remains credential/provider gated and
-non-submitting. T2-C evidence packet created 2026-06-20.
+All 10 pipeline modules are complete. The offline suite passes 3600+ tests
+(plus 10 synthetic adversarial tests added 2026-06-21), with 2 live/integration
+checks deselected. CI is green on Python 3.14 with the 100% coverage target.
+All three ML tiers have trained weights and all calibration KPIs have passed.
+**All T1 production gaps are CLOSED.** The pipeline may operate as an internal
+non-submitting citizen-science system. External MPC submission remains blocked
+until qualified expert review or a separate supervised submission policy.
 
-**Production gap status (as of 2026-06-20)**:
+**Production gap status (as of 2026-06-21)**:
 - T1-A (Incomplete Trained ML Model Set): **CLOSED.** All Tier 1/2/3 weights
   trained; ensemble stacker KPIs passed (AUC=0.9809, Brier=0.0211, ECE=0.0000);
   `promotion_gate_passed=true`.
@@ -544,17 +543,25 @@ non-submitting. T2-C evidence packet created 2026-06-20.
   dry-run policy is signed in `background/live_review_policy.example.json`;
   execution still fails closed on missing provider credentials and never
   authorizes external submission or impact-probability claims.
-- T1-C (Real-Data Recovery And Citizen-Science Review Evidence): **OPEN.**
-  A bounded supervised real-ZTF pilot completed on 2026-06-16 through the public
-  ALeRCE source-detection provider: 4,059 real source detections fetched, 520
-  raw moving candidates detected, first 80 candidates linked, and 2 internal
-  candidates scored. The remaining blocker is not zero alerts; it is a
-  non-Orion recovery run with an expected-known manifest, >=90% known-object
-  recovery, and operator false-positive review.
+- T1-C (Real-Data Recovery And Citizen-Science Review Evidence): **CLOSED
+  2026-06-20.** ATLAS Option A follow-up run `atlas_recovery_c1712df0f32c`
+  recovered 5/5 prequalified objects (100%); audit passed; citizen-science
+  review by Jerome W. Lindsey III found no blocking findings. Full evidence:
+  `docs/evidence/t1c/2026-06-20-option-a-screening-prequalification.md`.
 - T1-D (No Ensemble Calibration): **CLOSED.** All KPIs passed 2026-06-14.
-- T2-C (No External Expert Review): **IN PROGRESS.** Evidence packet created
-  at `docs/evidence/t2c/2026-06-20-citizen-science-architecture-evidence-packet.md`.
-  Section 6 operator review checklist awaits Jerome W. Lindsey III.
+- T2-C (No External Expert Review): **CLOSED 2026-06-21.** Citizen-science
+  architecture evidence packet signed by Jerome W. Lindsey III; all 5
+  attestation items checked.
+- T2-D (No CI for E2E/Integration/Model-Weight Tests): **CLOSED 2026-06-21.**
+  `e2e.yml` has smoke/diagnose/injection/model-weights jobs; `integration.yml`
+  gated on secrets.
+- T2-A (Integration Tests vs Real APIs): **IN PROGRESS.** `integration.yml` CI
+  job in place. Remaining step: configure GitHub Actions secrets
+  (ATLAS_TOKEN, ZTF_IRSA_USERNAME, ZTF_IRSA_PASSWORD) in GitHub Settings.
+- T2-B (Adversarial/Robustness Testing): **IN PROGRESS.** 10 synthetic
+  adversarial tests in `tests/test_adversarial.py`. Real-data false-positive
+  audit vs known-artifact catalog is a future operator-run step.
+
 See `docs/PRODUCTION_READINESS.md` for the full gap register.
 
 ### Handoff notes (2026-06-20) — v0.89.0
@@ -727,6 +734,10 @@ PYTHONPATH=src uv run python Skills/select_survey_fields.py \
 | `Skills/compute_hazard_summary.py` | Aggregate hazard summary across scored candidates; `--json` flag |
 | `Skills/fetch_known_phas.py` | Fetch known PHA records with cache support; `--force-refresh`, `--json` flags |
 | `Skills/find_longest_tracklet.py` | Find the longest tracklet in a tracklet JSON file; `--json` flag |
+| `Skills/get_top_candidates.py` | Top-N candidates by discovery priority from scored NEO JSON; `--n`, `--json` flags |
+| `Skills/load_credentials.py` | Load ATLAS/ZTF credentials from macOS Keychain into env vars; used by `fetch_atlas_data.py` |
+| `Skills/validate_model_weights.py` | Load all four committed model files and assert valid calibrated output on synthetic fixtures; used by model-weights CI job |
+| `Skills/validate_alert_protocol.py` | Run `ready_for_submission()` on 14 diverse synthetic NEOs and assert correct gate behavior; `--json` flag |
 
 ### Docs
 
@@ -801,24 +812,25 @@ PYTHONPATH=src uv run python Skills/select_survey_fields.py \
 
 ### Immediate Next Steps
 
-**Priority 1 — Close T1-C recovery evidence**:
-1. Use `Skills/select_survey_fields.py --mode recovery` to choose a non-Orion,
-   known-object-rich field.
-2. Build the expected-known manifest with `Skills/build_recovery_manifest.py`
-   so the audit has MPC designations and sky/time samples for that field.
-3. Run a staged or uncapped supervised recovery pilot with credentials loaded
-   from Keychain and no external submission.
-4. Audit the run with `Skills/audit_real_run.py --expected-known ...` and
-   require >=90% known-object recovery.
-5. Record citizen-science operator review with `--operator-review ...`; only
-   `acceptable` rows pass. `false_positive`, `suspicious`, and
-   `needs_followup` all block internal promotion.
+**All T1 gaps are closed. The two remaining open items both require operator action:**
 
-**Priority 2 — After T1-C internal promotion evidence passes**:
+**Priority 1 — T2-A: Configure GitHub Actions secrets**:
+- In GitHub → Settings → Secrets → Actions, add:
+  - `ATLAS_TOKEN`
+  - `ZTF_IRSA_USERNAME`
+  - `ZTF_IRSA_PASSWORD`
+- The `integration.yml` CI workflow is already in place and will run automatically.
+- These are the same credentials stored in macOS Keychain; copy them from there.
+
+**Priority 2 — T2-B: Live false-positive audit**:
+- Load credentials: `source Skills/verify_live_credentials.sh`
+- Run `Skills/diagnose_pipeline.py` on real ZTF alert data with credentials.
+- Audit false-positive rate vs a known-artifact catalog.
+- No external submission authorized; results stay internal.
+
+**Production scheduler (after T2-A/T2-B)**:
 - Re-check signed live dry-run policy readiness via `Skills/background.py live-dry-run-plan`
   before any scheduled live dry-run attempt.
-- T2-C citizen-science architecture evidence packet with explicit no-submission
-  limitation.
 - Production scheduler setup remains credential/provider gated under the signed
   bounded live dry-run policy.
 

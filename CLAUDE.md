@@ -616,82 +616,54 @@ and excluded from CI.
 
 ## Current State (v0.89.0)
 
-All 10 pipeline modules are complete. The offline suite passes 3600+ tests, with
-2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
-coverage target (statement-level regressions from Python 3.14.6 fixed in v0.89.0).
+All 10 pipeline modules are complete. The offline suite passes 3600+ tests (plus
+10 synthetic adversarial tests added 2026-06-21), with 2 live/integration checks
+deselected. CI is green on Python 3.14 with the 100% coverage target.
 All three ML tiers have trained weights: Tier 1 XGBoost (val_acc=99.95%), Tier 2
 CNN (val_acc=91.3%), and Tier 3 Transformer (val_macro_f1=0.9400, best epoch
-17/30). **T1-A CLOSED. T1-B CLOSED. T1-D CLOSED.**
+17/30). **T1-A CLOSED. T1-B CLOSED. T1-C CLOSED. T1-D CLOSED.**
 Ensemble stacker KPIs passed 2026-06-14 (AUC=0.9809, Brier=0.0211, ECE=0.0000).
-T2-C evidence packet created 2026-06-20 (operator review pending).
+T2-C CLOSED 2026-06-21 (operator sign-off by Jerome W. Lindsey III).
+T2-D CLOSED 2026-06-21 (model-weight CI job + `Skills/validate_model_weights.py`).
 
-**Production is blocked only on T1-C**: known-object recovery evidence and
-citizen-science operator false-positive review. Bounded live dry-run policy
-approval is complete, but live execution remains credential/provider gated and
-non-submitting.
+**No T1 production blockers remain.** The pipeline may operate as an internal
+non-submitting citizen-science system. External MPC submission remains blocked
+until qualified expert review or a separate supervised submission policy.
 
-### Handoff state as of 2026-06-20 (CURRENT)
+### Handoff state as of 2026-06-21 (CURRENT)
 
-**DO NOT ask the operator to re-run the ATLAS screening or prequalification — both are done.**
-Read `docs/evidence/t1c/2026-06-20-option-a-screening-prequalification.md` for full results.
-The next required operator command is the ATLAS **follow-up run** (30 queries, ~5–15 min):
+All T1 gaps are closed. All operator commands for T1-C are complete — do NOT
+re-run any ATLAS screening, prequalification, or audit commands.
 
-```bash
-git pull origin main && \
-caffeinate -i uv run python Skills/fetch_atlas_data.py \
-    --expected-known Logs/reports/t1c_option_a_prequalified_manifest.json \
-    --workers 4
-```
+**Remaining open checklist items (from `docs/PRODUCTION_READINESS.md`)**:
 
-After the follow-up, audit using the run-dir's `expected_known_atlas_forced.json`
-(NOT the prequalified manifest — it lacks `tolerance_days` and causes false failures).
+- **T2-A** (GitHub Actions secrets): Configure `ATLAS_TOKEN`, `ZTF_IRSA_USERNAME`,
+  `ZTF_IRSA_PASSWORD` in GitHub → Settings → Secrets → Actions. The
+  `integration.yml` CI job is already in place and will run automatically once
+  secrets are present. This is a GitHub UI action — no code change needed.
 
-**State summary**:
-- Screening run `atlas_recovery_25f3a800a1a2`: DONE (42/101 recovered, 5 tracklets)
-- Prequalification: DONE — 5 objects: 121, 954, 2140, 2172, 5650
-- Prequalified manifest: `Logs/reports/t1c_option_a_prequalified_manifest.json` (local)
-- Follow-up ATLAS run: **DONE** — `atlas_recovery_c1712df0f32c`, 16/23 recovered, 5/5 objects → 5 tracklets
-- First audit attempt: **FAILED (wrong manifest)** — used prequalified manifest, tolerance_days defaulted to 0.02 days, all sky/time matches failed
-- Audit KPI check: **DONE — passed=True** (2026-06-20). 5/5 multi-night tracklets. Recovery gate evaluated and passed.
+- **T2-B** (live false-positive audit): Run `Skills/diagnose_pipeline.py` on
+  real ZTF alert data with credentials loaded. This is an operator-run step
+  that requires live credentials; no CI alternative exists for real artifact data.
 
-**T1-C CLOSED 2026-06-20.** Automated KPI passed AND citizen-science review complete.
-Jerome W. Lindsey III reviewed `Logs/reports/t1c_option_a_review.csv` on 2026-06-20.
-All 5 tracklets: motion 26–36 arcsec/hr, arcs 12–25 days, no flags. No blocking findings.
-Full evidence: `docs/evidence/t1c/2026-06-20-option-a-screening-prequalification.md`.
-No external submission, MPC report, or NASA notification is authorized.
+- **Alert protocol compliance**: `ready_for_submission()` gate validated on
+  ≥10 diverse synthetic scored NEOs via `Skills/validate_alert_protocol.py`.
 
-Completed live evidence:
-- `atlas_recovery_4eaf93e87f6c`: bounded 38-sample screening run,
-- `atlas_recovery_4eaf93e87f6c`: bounded 38-sample screening run,
-  19/38 samples recovered, 4 multi-night audit tracklets, recovery gate
-  4/11 expected objects (`36.36%`) — failed.
-- `atlas_recovery_175ef40ac577`: prequalified 15-sample follow-up,
-  10/15 samples recovered, 3 multi-night audit tracklets, recovery gate
-  3/4 expected objects (`75.00%`) — failed.
+- **Guardrail compliance**: Static scan of all pipeline outputs for "confirmed NEO"
+  or impact probability assertions.
 
-`Skills/build_recovery_manifest.py` now has
-`--prequalify-from-atlas-run`, which builds a predeclared ATLAS-recoverable
-expected-known manifest from a completed screening run. The approved rule is:
-include only objects with at least 3 recovered ATLAS samples across at least 2
-distinct nights in screening run `atlas_recovery_4eaf93e87f6c`. The resulting
-ignored local manifest is
-`Logs/reports/t1c_expected_known_atlas_prequalified_4eaf93e87f6c.json` with
-designations `481`, `1950`, `2172`, and `2973`.
+- **Docs sync**: `AGENTS.md` and `CLAUDE.md` synchronized to current state.
 
-**Current blocker**: the prequalified denominator still failed at 75%, below
-the 90% KPI. Do not narrow the denominator again or create a
-repeat-stable-only pass rule without explicit operator approval and a durable
-pre-run policy note. The next planning decision is whether to approve a larger
-independent ATLAS-prequalified sample or a stricter predeclared
-repeat-stability rule, with limitations documented before any more live
-queries.
-
-Durable evidence is in:
-- `docs/evidence/t1c/2026-06-19-atlas-recovery-40-query-pilot.md`
-- `docs/PRODUCTION_READINESS.md`
+**Completed T1-C evidence (DO NOT RE-RUN)**:
+- Screening run `atlas_recovery_25f3a800a1a2`: DONE (42/101, 5 tracklets)
+- Prequalification: DONE — objects 121, 954, 2140, 2172, 5650
+- Follow-up run `atlas_recovery_c1712df0f32c`: DONE (16/23, 5/5 objects)
+- Audit: DONE — passed=True, 5 multi-night tracklets, 2026-06-20
+- Operator review: DONE — Jerome W. Lindsey III, no blocking findings, 2026-06-20
+- Full evidence: `docs/evidence/t1c/2026-06-20-option-a-screening-prequalification.md`
 
 No external submission was performed or authorized. No impact-probability claim
-was made or authorized. Raw run outputs remain local under ignored `Logs/`.
+was made or authorized.
 
 ### Handoff state as of 2026-06-17
 
@@ -828,6 +800,8 @@ succeeded and produced the trained Tier 3 weights now recorded under T1-A.
 | `Skills/export_ades_report.py` | Export MPC ADES PSV reports for scored candidates |
 | `Skills/fetch_known_phas.py` | Fetch known PHA records with cache support; `--force-refresh`, `--json` flags |
 | `Skills/get_top_candidates.py` | Top-N candidates by discovery priority from scored NEO JSON; `--n`, `--json` flags |
+| `Skills/validate_model_weights.py` | Load all four committed model files and assert valid calibrated output on synthetic fixtures; `--json` flag; used by `e2e.yml` model-weight CI job |
+| `Skills/validate_alert_protocol.py` | Run `ready_for_submission()` on 14 diverse synthetic NEOs and assert correct gate behavior; `--json` flag; used by `e2e.yml` alert-protocol CI job |
 
 ### Docs
 

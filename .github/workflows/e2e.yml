@@ -126,3 +126,23 @@ jobs:
           PYTHONPATH: src
           OMP_NUM_THREADS: "1"
           MKL_NUM_THREADS: "1"
+
+  alert-protocol:
+    name: Alert protocol compliance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up uv with Python 3.14
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.14"
+      - name: Install dependencies (from uv.lock)
+        run: uv sync --extra dev
+      # Runs ready_for_submission() on 14 diverse synthetic NEOs and asserts
+      # the gate is conservative: no false admits, no false blocks.
+      - name: Validate alert protocol gates (14 scenarios)
+        run: uv run python Skills/validate_alert_protocol.py --json
+        env:
+          PYTHONPATH: src
+          OMP_NUM_THREADS: "1"
+          MKL_NUM_THREADS: "1"
