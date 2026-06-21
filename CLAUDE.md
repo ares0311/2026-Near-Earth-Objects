@@ -654,16 +654,14 @@ After the follow-up, audit using the run-dir's `expected_known_atlas_forced.json
 - First audit attempt: **FAILED (wrong manifest)** — used prequalified manifest, tolerance_days defaulted to 0.02 days, all sky/time matches failed
 - Audit KPI check: **DONE — passed=True** (2026-06-20). 5/5 multi-night tracklets. Recovery gate evaluated and passed.
 
-**T1-C automated KPI gate: PASSED.** Only remaining step is human citizen-science review.
-
-**NEXT STEP (HUMAN)**: Jerome W. Lindsey III reviews `Logs/reports/t1c_option_a_review.csv`
-(5 tracklet rows). Confirm no false positives requiring promotion block. Record decision,
-then update `docs/PRODUCTION_READINESS.md` to mark T1-C CLOSED.
-
-No external submission, MPC report, or NASA notification is authorized at any point.
-Durable evidence: `docs/evidence/t1c/2026-06-20-option-a-screening-prequalification.md`.
+**T1-C CLOSED 2026-06-20.** Automated KPI passed AND citizen-science review complete.
+Jerome W. Lindsey III reviewed `Logs/reports/t1c_option_a_review.csv` on 2026-06-20.
+All 5 tracklets: motion 26–36 arcsec/hr, arcs 12–25 days, no flags. No blocking findings.
+Full evidence: `docs/evidence/t1c/2026-06-20-option-a-screening-prequalification.md`.
+No external submission, MPC report, or NASA notification is authorized.
 
 Completed live evidence:
+- `atlas_recovery_4eaf93e87f6c`: bounded 38-sample screening run,
 - `atlas_recovery_4eaf93e87f6c`: bounded 38-sample screening run,
   19/38 samples recovered, 4 multi-night audit tracklets, recovery gate
   4/11 expected objects (`36.36%`) — failed.

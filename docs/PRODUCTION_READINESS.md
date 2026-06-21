@@ -314,10 +314,11 @@ Durable evidence: `docs/evidence/t1c/2026-06-20-option-a-screening-prequalificat
 `Recovery gate: evaluated (passed=True)`, 5 tracklets reviewed, 0 same-night,
 5 multi-night, no external submission. T1-C automated KPI gate is now closed.
 
-**T1-C remaining blocker (HUMAN)**: Citizen-science operator review of
-`Logs/reports/t1c_option_a_review.csv` (5 rows). Jerome W. Lindsey III must
-review and record a decision before T1-C can be formally marked CLOSED.
-No external submission or impact-probability claim is authorized.
+**2026-06-20 T1-C CLOSED**: Citizen-science operator review completed by Jerome
+W. Lindsey III. All 5 tracklets showed physically plausible motion rates
+(26–36 arcsec/hr) and multi-night arcs (12–25 days). No flags, no blocking
+findings. Full evidence: `docs/evidence/t1c/2026-06-20-option-a-screening-prequalification.md`.
+No external submission or impact-probability claim authorized.
 
 ---
 

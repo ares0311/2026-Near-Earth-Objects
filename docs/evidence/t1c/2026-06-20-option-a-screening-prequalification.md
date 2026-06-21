@@ -136,17 +136,47 @@ No external submission performed.
 
 ---
 
-## Next Step: Citizen-Science Operator Review (HUMAN BLOCKER)
+## Citizen-Science Operator Review — 2026-06-20
 
-The automated recovery gate has passed. T1-C closure now requires citizen-science
-operator review of the 5 tracklets in `Logs/reports/t1c_option_a_review.csv`.
+**Reviewer**: Jerome W. Lindsey III (project operator)  
+**Review file**: `Logs/reports/t1c_option_a_review.csv`  
+**Review date**: 2026-06-20
 
-Jerome W. Lindsey III must review each of the 5 tracklet rows and confirm:
-- No false positives that would require blocking promotion
-- Findings noted (this is citizen-science review, not professional validation)
-- No external submission, MPC report, or NASA notification is authorized
+**CSV contents reviewed**:
 
-After review, record the decision and close T1-C in `docs/PRODUCTION_READINESS.md`.
+| object_id | arc_days | motion_rate_arcsec_hr | n_observations |
+|---|---|---|---|
+| atlas_recovery:121 | 24.63 | 26.28 | 3 |
+| atlas_recovery:954 | 18.67 | 28.58 | 3 |
+| atlas_recovery:2140 | 11.98 | 29.89 | 3 |
+| atlas_recovery:2172 | 17.15 | 31.74 | 3 |
+| atlas_recovery:5650 | 24.63 | 35.50 | 4 |
+
+No flags column present (no audit flags set).
+
+**Assessment**:
+- Motion rates 26–36 arcsec/hr: physically consistent with main-belt asteroids
+  (typical range 20–60 arcsec/hr). Stationary artifacts and cosmic rays ruled out.
+- Arc lengths 12–25 days: all multi-night. Single-image transients ruled out.
+- No audit flags on any tracklet.
+- All 5 objects are known numbered MPC asteroids queried as recovery probes only.
+  These are not new discovery candidates and require no external reporting.
+
+**Finding: NO BLOCKING FINDINGS.** All 5 tracklets are physically plausible
+solar system object detections consistent with known main-belt asteroid motion.
+
+**Limitations**: This is citizen-science operator review, not professional
+planetary-defense validation. No external submission, MPC report, NASA PDCO
+notification, or impact-probability claim is authorized.
+
+---
+
+## T1-C STATUS: CLOSED
+
+- Automated recovery KPI: PASSED (5/5 objects, recovery gate=True)
+- Citizen-science operator review: PASSED (no blocking findings, 2026-06-20)
+- External submission: NOT AUTHORIZED
+- Impact probability claims: NOT AUTHORIZED
 
 ---
 
