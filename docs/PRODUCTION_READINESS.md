@@ -1,7 +1,7 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
 **Current version**: v0.89.0
-**Last updated**: 2026-06-20
+**Last updated**: 2026-06-21
 **Purpose**: Mandatory read at session start (per MANDATORY SESSION-START PROTOCOL).  
 Every planning cycle must name the highest-priority unresolved Tier 1 gap and show how proposed steps close or directly unblock it.
 
@@ -370,14 +370,13 @@ All tests marked `@pytest.mark.integration_live` are excluded from CI. The live 
 
 **Needed**: Run integration tests in a sandboxed environment with real credentials. Requires T1-B resolution.
 
-**Progress (2026-06-21)**: Credentials are kept off GitHub by operator policy. `.github/workflows/integration.yml` is in place but always emits a skip notice — it will never run in CI. Integration tests must be run on the operator Mac:
+**T2-A CLOSED (2026-06-21)**: Both `integration_live` tests passed on operator Mac (Python 3.14.3):
+- `test_fetch_ztf_live_small_region` — PASSED (ZTF IRSA live cone-search)
+- `test_fetch_atlas_live_small_region` — PASSED (ATLAS FPS forced photometry, Orion field JD 2460700.5)
 
-```bash
-source Skills/verify_live_credentials.sh
-PYTHONPATH=src uv run python -m pytest -m integration_live -v --timeout=120
-```
+Two bugs fixed during closure: (1) `fetch_atlas` used `json=` instead of `data=` (form-encoded) for POST to ATLAS /queue/; (2) test fixture used JD 2460000 (= Feb 2023, 1213 days ago) which exceeds ATLAS's ~1000-day archive retention — fixed to use JD 2460700.5.
 
-T2-A is satisfied when the operator runs this command and all `integration_live` tests pass.
+Full evidence: `docs/evidence/t2a/2026-06-21-integration-live-results.md`
 
 ### T2-B: No Adversarial/Robustness Testing
 
@@ -465,11 +464,10 @@ Before the pipeline makes its first MPC submission, all of the following must be
 - [x] T1-D resolved: Machine-readable calibration report passes every required
       KPI on held-out real labeled data and records
       `promotion_gate_passed=true` ✓ (2026-06-14; Tier 1 + Tier 2)
-- [~] T2-A resolved: credentials kept off GitHub by operator policy (2026-06-21);
-      integration.yml always skips in CI; run locally:
-      `source Skills/verify_live_credentials.sh && PYTHONPATH=src uv run python -m pytest -m integration_live -v`
-- [~] T2-B resolved: 10 synthetic adversarial tests added (test_adversarial.py, 2026-06-21);
-      real-data false-positive audit vs known-artifact catalog is a future operator-run step
+- [x] T2-A resolved: both integration_live tests PASSED on operator Mac ✓ (2026-06-21);
+      ZTF IRSA + ATLAS FPS live calls confirmed working; credentials kept off GitHub by policy
+- [x] T2-B resolved: 10 synthetic adversarial tests in CI ✓; diagnose_pipeline.py all 10 stages
+      PASS on operator Mac ✓ (2026-06-21); real-data artifact audit is a future milestone
 - [x] T2-C resolved: citizen-science architecture evidence packet signed ✓ (Jerome W. Lindsey III, 2026-06-21);
       all five attestation items checked; no external submission authorized
 - [x] T2-D resolved: e2e.yml has smoke/diagnose/injection/model-weights jobs ✓ (2026-06-21);

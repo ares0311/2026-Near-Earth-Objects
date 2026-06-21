@@ -36,6 +36,15 @@ All credentials PRESENT (ATLAS_TOKEN, ZTF_IRSA_USERNAME, ZTF_IRSA_PASSWORD).
 
 Pattern matches the working `fetch_atlas_forced` implementation.
 
+## Test Results (Run 2 — after fix, commit 4f372d6)
+
+| Test | Result |
+|------|--------|
+| `test_fetch_ztf_live_small_region` | PASS |
+| `test_fetch_atlas_live_small_region` | PASS |
+
+Run time: 13.04s. 2 passed, 3744 deselected.
+
 ## Status
 
-T2-A partial — ZTF live PASSED; ATLAS fix applied; re-run required to close T2-A.
+**T2-A CLOSED (2026-06-21)** — all integration_live tests pass on operator Mac.
