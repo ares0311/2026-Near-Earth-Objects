@@ -1,0 +1,144 @@
+# MPC Submission Policy — NEO Detection Pipeline
+
+**Established**: 2026-06-21  
+**Operator**: Jerome W. Lindsey III  
+**Supersedes**: The prior "blocked until qualified expert review" guardrail in CLAUDE.md and AGENTS.md.
+
+---
+
+## Background
+
+The pipeline was previously configured with a guardrail stating that MPC submission was
+"blocked until qualified expert review." Research into how the global NEO discovery
+infrastructure actually works (2026-06-21) revealed this guardrail was based on a
+misunderstanding. The MPC, NEOCP, and CNEOS Scout chain *is* the expert review system.
+No observatory — amateur or professional — arranges its own expert reviewer before
+submitting to MPC. Submitting to MPC and letting the global infrastructure handle
+confirmation and hazard assessment is the correct and established citizen-science pathway.
+
+Reference programs that operate this way without in-house astronomers:
+- **IASC** (International Astronomical Search Collaboration): 50,000 citizen scientists,
+  ~12,000 asteroid detections, ~5 NEOs confirmed, operating since ~2010.
+- Amateur observatories worldwide hold MPC observatory codes and submit regularly.
+
+---
+
+## How the Global Infrastructure Works (and Why No In-House Expert Is Needed)
+
+```
+Pipeline quality gates pass
+(MOID ≤ 0.05 AU, quality ≥ 2, rb ≥ 0.90, not known object)
+         │
+         ▼
+Step 1: Submit observations to MPC  ←── YOU DO THIS
+        ADES PSV format (preferred) or MPC 80-column
+        Observatory code required (see §Getting an Observatory Code)
+         │
+         ▼
+Step 2: MPC calculates digest2 score (automated, ~minutes)
+        digest2 > 65 → object posted to NEOCP automatically
+        digest2 ≤ 65 → object linked to known catalog or archived
+         │
+         ▼ (if digest2 > 65)
+Step 3: NEOCP = global expert confirmation (automatic, ~hours)
+        Professional follow-up observatories worldwide monitor NEOCP
+        continuously and take confirmation images without being asked.
+        This IS the independent expert confirmation step.
+         │
+         ▼ (simultaneous with Step 3)
+Step 4: Scout (CNEOS/JPL) monitors NEOCP around the clock
+        Computes short-term impact probability for every NEOCP object
+        within minutes of posting. No action required from this pipeline.
+         │
+         ▼ (if Scout detects impact risk)
+Step 5: Scout automatically alerts NASA PDCO
+        Do NOT contact PDCO directly. Scout handles this.
+        Do NOT publicly state impact probabilities. Defer to Scout/Sentry/PDCO.
+         │
+         ▼ (if object confirmed as new NEO)
+Step 6: MPC assigns provisional designation, publishes MPEC
+        Sentry takes over for long-term (100-year) impact monitoring.
+```
+
+---
+
+## Getting an Observatory Code (One-Time Operator Action)
+
+Before submitting any observations to MPC, the project needs a permanent 3-character
+observatory code. This is a one-time setup step.
+
+**Process**:
+1. Prepare a batch of astrometric observations in ADES PSV format.
+2. Submit using observatory code `XXX` (the standard placeholder for new observers).
+3. Include a header with: longitude, latitude, altitude, and observer contact.
+4. Use the same email address for the submission and for the MPC code request form at
+   `https://minorplanetcenter.net/new_obscode_request`.
+5. MPC assigns a permanent code within ~1 week.
+
+**Notes**:
+- No professional affiliation required.
+- Astrometric accuracy must be ≤ 2 arcsec vs. Gaia-based ephemeris.
+- Use `PYTHONPATH=src uv run python Skills/export_mpc_report.py` to generate
+  ADES PSV output from a scored NEO JSON file.
+
+---
+
+## Submission Gates (What the Pipeline Already Enforces)
+
+`ready_for_submission()` in `alert.py` enforces all required pre-submission checks:
+
+| Gate | Threshold | Rationale |
+|------|-----------|-----------|
+| MOID | ≤ 0.05 AU | NEO/PHA zone — worth reporting |
+| Orbit quality code | ≥ 2 | Multi-night arc; MOID is reliable |
+| real_bogus score | ≥ 0.90 | High-confidence real detection |
+| Alert pathway | ≠ `known_object` | Must not be an already-catalogued object |
+
+These gates are correct as-is. No additional pre-submission gating is needed.
+
+---
+
+## Permanent Guardrails (Never Removed)
+
+These guardrails are not affected by this policy change:
+
+- **Never assert impact probability**: Never state or imply a probability of Earth
+  impact in any pipeline output. Defer to Scout/Sentry/CNEOS for all hazard statements.
+- **Never contact NASA PDCO directly**: Scout does this automatically when warranted.
+  Direct contact is neither required nor appropriate for citizen-science submissions.
+- **Never publicly announce a candidate before MPC confirmation**: Submit to MPC and
+  wait for MPEC publication before any public statement.
+- **Never output "confirmed NEO"** for any internally detected object. All objects
+  are "candidates" until MPC assigns a provisional designation.
+- **Never skip the quality gates**: The gates in `ready_for_submission()` are the
+  minimum bar. Do not lower them.
+
+---
+
+## Format Reference
+
+**Preferred**: ADES PSV (pipe-separated values), adopted by MPC as preferred format
+since 2018, mandatory for new observatory code requests since 2024.
+
+**Accepted**: MPC 80-column (MPC1992 / obs80 format) — still accepted but superseded.
+
+**Subject line for NEO candidates**: Include `NEO CANDIDATE` in submission email subject.
+
+**Pipeline output tools**:
+- `Skills/export_mpc_report.py` — MPC 80-column format
+- `Skills/export_ades_report.py` — ADES PSV format (preferred for new submissions)
+
+---
+
+## Scope of This Policy
+
+This policy authorizes MPC submission of **observation reports** for candidates passing
+all pipeline quality gates. It does not authorize:
+
+- Any claim of a new NEO discovery until MPC assigns a provisional designation.
+- Any statement of impact probability.
+- Any direct contact with NASA PDCO or IAU CBAT.
+- Any submission on behalf of another observer's data.
+
+This policy was established by operator decision on 2026-06-21 based on research into
+MPC submission best practices for citizen-science programs.

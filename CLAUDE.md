@@ -68,11 +68,12 @@ If the highest-priority T1 gap cannot be resolved because a human blocker is unr
   configurable or documented runtime defaults, not hidden machine-specific
   constants.
 - **Citizen-science production framing**: Jerome W. Lindsey III is the project
-  operator and reviewer, but no NEO domain expert is currently available. Do not
-  invent a domain-expert approval gate. Use quantitative KPIs, fail-closed
-  evidence packets, explicit no-submission limitations, and operator review
-  fields. External MPC submission remains blocked until qualified review or a
-  separate externally supervised submission policy exists.
+  operator and reviewer. No in-house NEO domain expert is available or required.
+  The MPC/NEOCP/Scout chain is the expert review system — submitting quality
+  observations to MPC is the correct and established citizen-science pathway.
+  See `docs/MPC_SUBMISSION_POLICY.md` for the full operator-approved submission
+  policy (established 2026-06-21). Do NOT reinstate a "blocked until expert
+  review" guardrail; that block was removed by operator decision.
 - **Repository artifact policy supports `git add .`**: The standard operator
   cadence may use `git add .`, so `.gitignore` must protect local/generated
   outputs by default. Treat `Logs/**` as local operational output and never
@@ -468,35 +469,45 @@ class ScoredNEO(BaseModel):
 ## Alert Protocol
 
 This section defines the mandatory decision tree for external reporting. **No step may be skipped.**
+Full policy: `docs/MPC_SUBMISSION_POLICY.md` (operator-approved 2026-06-21).
 
 ```
-Computed MOID ≤ 0.05 AU
-AND orbit quality code ≥ 2
-AND Tier 1 real_bogus_score ≥ 0.90
-AND NOT matched to MPC known object
+ready_for_submission() returns True:
+  MOID ≤ 0.05 AU
+  AND orbit quality code ≥ 2
+  AND real_bogus_score ≥ 0.90
+  AND alert_pathway ≠ known_object
          │
          ▼
-Step 1: Submit to MPC via standard report format
-        (astroquery.mpc or direct HTTP POST to minorplanetcenter.net)
+Step 1: Submit observations to MPC in ADES PSV format  ←── pipeline does this
+        Requires a registered MPC observatory code (one-time operator setup;
+        use code XXX for first submission to obtain a permanent code).
+        Use Skills/export_ades_report.py to generate the submission file.
          │
          ▼
-Step 2: Monitor NEOCP for independent confirmation
-        (wait ≥ 24 hours or ≥ 2 independent observatory confirmations)
+Step 2: MPC calculates digest2 score automatically (~minutes)
+        digest2 > 65 → MPC posts object to NEOCP automatically
+        No pipeline action required for this step.
          │
-         ▼
-Step 3: If CNEOS Scout/Sentry assigns impact probability ≥ 0.01%:
-        → Open GitHub Issue tagged [HAZARD-ALERT]
-        → Generate report to:
-            NASA PDCO: https://www.nasa.gov/planetarydefense/contact
-            IAU CBAT:  https://www.cbat.eps.harvard.edu/
-        → Do NOT publicly announce impact probability;
-          defer all public communication to NASA/CNEOS
+         ▼ (if on NEOCP)
+Step 3: Global follow-up observatories confirm independently (~hours)
+        NEOCP is monitored 24/7 by professional observatories worldwide.
+        Scout (CNEOS/JPL) simultaneously assesses impact probability.
+        No pipeline action required — this IS the expert review step.
+         │
+         ▼ (if Scout detects impact risk)
+Step 4: Scout automatically alerts NASA PDCO.
+        Do NOT contact PDCO directly.
+        Do NOT publicly state impact probabilities.
+        Open a GitHub Issue tagged [HAZARD-ALERT] for operator awareness only.
 ```
 
-**Guardrails**:
-- Never skip MPC submission and independent confirmation before Step 3
-- Never quote an impact probability in any public output
-- Never suppress a genuine alert out of uncertainty — report and let authorities assess
+**Permanent guardrails** (not affected by the 2026-06-21 policy change):
+- Never assert impact probability in any pipeline output — defer to Scout/Sentry/CNEOS
+- Never contact NASA PDCO directly — Scout handles this automatically
+- Never publicly announce a candidate before MPC assigns a provisional designation
+- Never output "confirmed NEO" — all objects are candidates until MPEC publication
+- Never lower the quality gates in `ready_for_submission()`
 - Store full provenance (observations, orbit fit, MOID computation) with every alert
 
 ---
@@ -626,9 +637,11 @@ Ensemble stacker KPIs passed 2026-06-14 (AUC=0.9809, Brier=0.0211, ECE=0.0000).
 T2-C CLOSED 2026-06-21 (operator sign-off by Jerome W. Lindsey III).
 T2-D CLOSED 2026-06-21 (model-weight CI job + `Skills/validate_model_weights.py`).
 
-**No T1 production blockers remain.** The pipeline may operate as an internal
-non-submitting citizen-science system. External MPC submission remains blocked
-until qualified expert review or a separate supervised submission policy.
+**No T1 production blockers remain.** The pipeline may operate as a citizen-science
+system with MPC submission enabled when quality gates pass. The prior "blocked until
+expert review" guardrail was removed by operator decision on 2026-06-21 — see
+`docs/MPC_SUBMISSION_POLICY.md`. MPC/NEOCP/Scout is the expert review system;
+no in-house expert is required or expected.
 
 ### Handoff state as of 2026-06-21 (CURRENT)
 
@@ -817,6 +830,7 @@ succeeded and produced the trained Tier 3 weights now recorded under T1-A.
 | `docs/BACKGROUND_SEARCH_AUTOMATION.md` | Implemented one-run background automation, SQLite logs, and scheduler notes |
 | `docs/ORBIT_FITTING.md` | Technical reference for orbit fitting: Gauss's method, differential correction, MOID, Tisserand parameter |
 | `docs/ALERT_PROTOCOL.md` | Technical reference for alert-pathway decision tree, gate conditions, MPC submission, NEOCP monitoring, NASA PDCO notification |
+| `docs/MPC_SUBMISSION_POLICY.md` | **Operator-approved submission policy (2026-06-21).** MPC/NEOCP/Scout is the expert review system; no in-house expert required; submission gates are `ready_for_submission()` thresholds. Read before modifying alert.py or submission logic. |
 | `docs/CLASSIFICATION_GUIDE.md` | Technical reference for three-tier ML classification, morphology, ensemble stacking, calibration, and conservative classification policy |
 | `docs/QUALITY_METRICS.md` | Reference for all pipeline quality metrics: detection, astrometric, photometric, orbital, calibration, and hazard scoring |
 | `docs/THREAT_ASSESSMENT.md` | Technical reference for threat score formula, components, interpretation guidelines, and CLI usage |

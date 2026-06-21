@@ -37,11 +37,13 @@ It contains the facts a coding agent needs to work productively without re-readi
   configurable or documented runtime defaults, not hidden machine-specific
   constants.
 - **Citizen-science production framing**: Jerome W. Lindsey III is the project
-  operator and reviewer, but no NEO domain expert is currently available. Do not
-  invent a domain-expert approval gate. Use quantitative KPIs, fail-closed
-  evidence packets, explicit no-submission limitations, and operator review
-  fields. External MPC submission remains blocked until qualified review or a
-  separate externally supervised submission policy exists.
+  operator and reviewer. No in-house NEO domain expert is available or required.
+  The MPC/NEOCP/Scout chain is the expert review system — submitting quality
+  observations to MPC and letting that global infrastructure handle confirmation
+  and hazard assessment is the correct citizen-science pathway. See
+  `docs/MPC_SUBMISSION_POLICY.md` for the full submission policy and escalation
+  pathway. Do NOT reinstate an "expert review required" gate; that block has been
+  removed by operator decision on 2026-06-21.
 - **Repository artifact policy supports `git add .`**: The standard operator
   cadence may use `git add .`, so `.gitignore` must protect local/generated
   outputs by default. Treat `Logs/**` as local operational output and never
@@ -751,6 +753,7 @@ PYTHONPATH=src uv run python Skills/select_survey_fields.py \
 | `docs/BACKGROUND_SEARCH_AUTOMATION.md` | Implemented one-run background automation, SQLite logs, and scheduler notes |
 | `docs/ORBIT_FITTING.md` | Technical reference for orbit fitting: Gauss's method, differential correction, MOID, Tisserand parameter |
 | `docs/ALERT_PROTOCOL.md` | Technical reference for alert-pathway decision tree, gate conditions, MPC submission, NEOCP monitoring, NASA PDCO notification |
+| `docs/MPC_SUBMISSION_POLICY.md` | **MANDATORY READ before touching alert.py or submission logic.** Operator-approved policy (2026-06-21): MPC/NEOCP/Scout is the expert review system; submission gates in `ready_for_submission()` are the correct bar; no in-house expert required. |
 | `docs/CLASSIFICATION_GUIDE.md` | Technical reference for three-tier ML classification, morphology, ensemble stacking, calibration, and conservative classification policy |
 | `docs/QUALITY_METRICS.md` | Reference for all pipeline quality metrics: detection, astrometric, photometric, orbital, calibration, and hazard scoring |
 | `docs/THREAT_ASSESSMENT.md` | Technical reference for threat score formula, components, interpretation guidelines, and CLI usage |
