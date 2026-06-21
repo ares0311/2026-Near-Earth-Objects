@@ -24,6 +24,7 @@ dependencies = [
 dev = [
     "pytest>=7.4",
     "pytest-cov>=4.1",
+    "pytest-timeout>=2.1",
     "ruff>=0.1",
     "mypy>=1.6",
 ]
@@ -57,3 +58,8 @@ markers = [
     "integration_live: marks tests requiring live network access (deselect with '-m not integration_live')",
 ]
 addopts = "-m 'not integration_live'"
+
+[dependency-groups]
+dev = [
+    "pytest-timeout>=2.4.0",
+]
