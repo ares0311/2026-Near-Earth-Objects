@@ -401,7 +401,11 @@ def fetch_atlas(
         return [Observation(**row) for row in cached]
 
     base = "https://fallingstar-data.com/forcedphot"
-    headers: dict[str, str] = {}
+    # ATLAS API requires form-encoded data (not JSON) and only recognises the
+    # standard fields: ra, dec, mjd_min, mjd_max, send_email.
+    # Using json= sends Content-Type:application/json which the server rejects
+    # with HTTP 400.  Match the working fetch_atlas_forced implementation.
+    headers: dict[str, str] = {"Accept": "application/json"}
     if resolved_token:
         headers["Authorization"] = f"Token {resolved_token}"
 
@@ -410,10 +414,9 @@ def fetch_atlas(
         "dec": dec_deg,
         "mjd_min": start_jd - 2400000.5,
         "mjd_max": end_jd - 2400000.5,
-        "radius": radius_deg * 3600,  # arcsec
-        "use_reduced": False,
+        "send_email": False,
     }
-    resp = requests.post(f"{base}/queue/", json=payload, headers=headers, timeout=30)
+    resp = requests.post(f"{base}/queue/", data=payload, headers=headers, timeout=30)
     resp.raise_for_status()
     # Empty response body from the ATLAS queue endpoint means the request was
     # not accepted; treat as no data rather than a retryable network error.
