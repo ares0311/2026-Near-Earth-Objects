@@ -444,9 +444,9 @@ Before the pipeline makes its first MPC submission, all of the following must be
 - [x] T1-A resolved: Tier 1 XGBoost ✓ (val_acc=99.95%); Tier 2 CNN ✓ (val_acc=91.3%); Tier 3 Transformer ✓ (val_macro_f1=0.9400); ensemble stacker ✓ (AUC=0.9809, all 7 KPIs pass, 2026-06-14)
 - [x] T1-A resolved: calibration KPI gate passed ✓ (T1-D, 2026-06-14); ensemble stacker KPIs passed ✓ (2026-06-14)
 - [x] T1-B resolved: IRSA and ATLAS credentials configured ✓; live connection test passed ✓; bounded live dry-run policy signed ✓; execution remains credential/provider gated and non-submitting
-- [~] T1-C progressed: Bounded supervised real-ZTF pilot completed on
-      2026-06-16; known-object recovery audit and operator false-positive review
-      still required.
+- [x] T1-C resolved: ATLAS known-object recovery KPI passed ✓ (5/5 objects, 100%, 2026-06-20);
+      citizen-science operator review completed ✓ (Jerome W. Lindsey III, no blocking findings, 2026-06-20);
+      full evidence: `docs/evidence/t1c/2026-06-20-option-a-screening-prequalification.md`
 - [x] T1-D resolved: Machine-readable calibration report passes every required
       KPI on held-out real labeled data and records
       `promotion_gate_passed=true` ✓ (2026-06-14; Tier 1 + Tier 2)
