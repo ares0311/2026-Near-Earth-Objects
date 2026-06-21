@@ -322,12 +322,35 @@ def _load_cnn_model() -> Any:
     if not model_path.exists():
         return None
     try:
+        import io
+        import os
+
+        # Set thread limits before importing torch to prevent ATen thread-pool
+        # deadlock on macOS (same fix as evaluate_calibration.py v0.87.7).
+        os.environ.setdefault("OMP_NUM_THREADS", "1")
+        os.environ.setdefault("MKL_NUM_THREADS", "1")
+
         import torch
+
+        torch.set_num_threads(1)
+
+        # Pre-read the model file into BytesIO in 64 KB chunks.
+        # torch.load on a file-path string uses mmap, which defers byte reads
+        # until load_state_dict — that deferred I/O triggers the ATen
+        # thread-pool deadlock on Dropbox-backed paths on macOS.
+        buf = io.BytesIO()
+        with open(model_path, "rb") as fh:
+            while True:
+                chunk = fh.read(65536)
+                if not chunk:
+                    break
+                buf.write(chunk)
+        buf.seek(0)
 
         model = _build_cnn_model()
         if model is None:
             return None
-        model.load_state_dict(torch.load(str(model_path), map_location="cpu"))
+        model.load_state_dict(torch.load(buf, map_location="cpu"))
         model.eval()
         return model
     except Exception:
