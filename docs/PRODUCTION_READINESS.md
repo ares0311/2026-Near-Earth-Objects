@@ -370,6 +370,8 @@ All tests marked `@pytest.mark.integration_live` are excluded from CI. The live 
 
 **Needed**: Run integration tests in a sandboxed environment with real credentials. Requires T1-B resolution.
 
+**Progress (2026-06-21)**: `.github/workflows/integration.yml` is in place. It triggers on pushes to `main` and on manual dispatch. It auto-detects whether `ATLAS_TOKEN`, `ZTF_IRSA_USERNAME`, and `ZTF_IRSA_PASSWORD` are present in GitHub Actions secrets and skips gracefully if absent. Infrastructure is complete; the remaining step is configuring those three secrets in GitHub → Settings → Secrets → Actions so the live tests actually execute in CI.
+
 ### T2-B: No Adversarial/Robustness Testing
 
 The pipeline has not been tested against:
@@ -379,6 +381,8 @@ The pipeline has not been tested against:
 - Rate limiting and network timeout behavior in `fetch.py`
 
 **Needed**: Run `Skills/diagnose_pipeline.py` on real ZTF alert data; audit false-positive rate against known-artifact catalog. Requires T1-C resolution.
+
+**Progress (2026-06-21)**: `tests/test_adversarial.py` added with 10 synthetic adversarial test cases covering all four scenario categories (satellite trail rejection, missing/corrupted cutouts, extreme motion, network timeout simulation, survey edge coordinates, duplicate obs IDs, missing orbital elements, alert guardrail on short arc). These run in CI without credentials. Real-data false-positive audit against a known-artifact catalog remains a future operator-run step.
 
 ### T2-C: No External Expert Review Of ML Architecture
 
@@ -411,11 +415,12 @@ CI currently runs only unit tests. There is no CI job for:
 
 **Needed**: Add CI job definitions (`.github/workflows/`) for integration and end-to-end test stages, gated on secret availability.
 
-**Progress (2026-06-20)**: `.github/workflows/e2e.yml` added with three synthetic-data
-jobs — `smoke` (module happy-path), `diagnose` (stage-by-stage pipeline run), and
-`injection` (n=20 injection-recovery with regression check vs committed baseline).
-Runs on every push and PR with no credentials required. Integration tests against real
-APIs already covered by `.github/workflows/integration.yml`.
+**Progress (2026-06-21)**: `.github/workflows/e2e.yml` has four synthetic-data
+jobs — `smoke` (module happy-path), `diagnose` (stage-by-stage pipeline run),
+`injection` (n=20 injection-recovery with regression check vs committed baseline),
+and `model-weights` (loads all four committed model files and asserts valid
+calibrated output on synthetic fixtures via `Skills/validate_model_weights.py`).
+Integration tests against real APIs covered by `.github/workflows/integration.yml`.
 
 ### T2-E: Session-Start Documents Synchronized — **CLOSED 2026-06-09**
 
@@ -450,12 +455,16 @@ Before the pipeline makes its first MPC submission, all of the following must be
 - [x] T1-D resolved: Machine-readable calibration report passes every required
       KPI on held-out real labeled data and records
       `promotion_gate_passed=true` ✓ (2026-06-14; Tier 1 + Tier 2)
-- [ ] T2-A resolved: At least one integration test suite passed against real APIs
-- [ ] T2-B resolved: False-positive rate on real artifact data < 5%
-- [~] T2-C resolved: citizen-science architecture evidence packet created
-      2026-06-20; operator review checklist (Section 6) awaits Jerome W. Lindsey III
-- [~] T2-D resolved: e2e.yml added 2026-06-20 with smoke/diagnose/injection jobs;
-      model weight validation CI still pending
+- [~] T2-A resolved: integration.yml CI job in place; skips gracefully without secrets;
+      remaining step: configure ATLAS_TOKEN, ZTF_IRSA_USERNAME, ZTF_IRSA_PASSWORD
+      in GitHub → Settings → Secrets → Actions so live tests execute in CI
+- [~] T2-B resolved: 10 synthetic adversarial tests added (test_adversarial.py, 2026-06-21);
+      real-data false-positive audit vs known-artifact catalog is a future operator-run step
+- [~] T2-C resolved: citizen-science architecture evidence packet created 2026-06-20
+      (stale T1-C reference corrected 2026-06-21); operator review checklist (Section 6)
+      awaits Jerome W. Lindsey III
+- [x] T2-D resolved: e2e.yml has smoke/diagnose/injection/model-weights jobs ✓ (2026-06-21);
+      Skills/validate_model_weights.py validates all four committed model files
 - [ ] Alert protocol compliance: `ready_for_submission()` gate tested on ≥10 real candidate outputs
 - [ ] Guardrail compliance: zero "confirmed NEO" or impact probability assertions in any output
 - [ ] AGENTS.md and CLAUDE.md synchronized to current version

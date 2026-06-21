@@ -133,9 +133,9 @@ been performed. The T1-D gate covers Tier 1 and Tier 2 only.
   due to the small pilot size (designation-grouped splits were used as a proxy).
 - Tier 2 CNN trained on 10,000 ZTF Avro alerts from 2019–2020. Distribution
   shift from newer ZTF operations is uncharacterized.
-- Known-object recovery has been tested only on ATLAS forced-photometry mode
-  with small samples (up to 38 queries). ZTF multi-night recovery has not
-  been validated.
+- Known-object recovery has been validated via ATLAS forced-photometry mode:
+  5/5 objects recovered (100%) in the Option A follow-up run (2026-06-20),
+  passing the ≥90% T1-C gate. ZTF multi-night recovery has not been validated.
 
 ### Orbital coverage limitations
 - IEO (Atira) and unusual-inclination objects are rare in training data.
@@ -145,11 +145,12 @@ been performed. The T1-D gate covers Tier 1 and Tier 2 only.
   evaluated.
 
 ### Pipeline coverage limitations
-- The full pipeline has completed one bounded ZTF pilot (2026-06-16) and two
-  ATLAS recovery pilots (2026-06-19). No multi-night ZTF tracklet linking
+- The full pipeline has completed one bounded ZTF pilot (2026-06-16) and
+  multiple ATLAS recovery pilots. No multi-night ZTF tracklet linking
   against a known-object manifest has been validated.
-- The T1-C known-object recovery KPI (≥90%) has not been passed. Recovery
-  results to date: 36.36% (run 1) and 75.00% (run 2).
+- The T1-C known-object recovery KPI (≥90%) **has been passed** as of
+  2026-06-20: 5/5 ATLAS-forced objects recovered (100%) in the Option A
+  follow-up run. Earlier runs: 36.36% (run 1), 75.00% (run 2).
 
 ### Scoring model limitations
 - The Bayesian log-score priors (5% neo_candidate, 35% MBA) reflect broad
@@ -188,7 +189,7 @@ explicit constraints:
   available for validation.
 - **Internal promotion only**: The pipeline may be promoted to internal
   production use (running scheduled background searches, generating candidate
-  lists, auditing recovery) once T1-C and T2-C are closed.
+  lists, auditing recovery) once T2-C is closed. T1-C is now closed (2026-06-20).
 - **External submission blocked**: MPC submission, NEOCP follow-up escalation,
   NASA PDCO notification, and all public hazard claims remain blocked until
   qualified external review or a separate externally supervised submission
