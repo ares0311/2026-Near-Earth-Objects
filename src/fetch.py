@@ -187,27 +187,40 @@ def _fetch_ztf_alerce_api(
     except Exception:
         return []
 
-    # Recovery runs need moving objects, so query ALeRCE's asteroid stamp class
-    # first. Generic cone-search objects remain a fallback for older brokers or
-    # fields where the classifier returns no asteroid detections.
-    query_modes: tuple[dict[str, str], ...] = (
-        {"classifier": "stamp_classifier", "class_name": "asteroid"},
-        {},
+    # Mode 1: asteroid-classified objects (any ndet, highest confidence first).
+    # ALeRCE's stamp classifier labels single-night moving-object detections as
+    # "asteroid"; this is the highest-signal path.
+    asteroid_obs = _fetch_alerce_objects_for_filter(
+        client,
+        ra_deg,
+        dec_deg,
+        radius_deg,
+        start_jd,
+        end_jd,
+        max_objects=max_objects,
+        query_filter={"classifier": "stamp_classifier", "class_name": "asteroid"},
+        order_mode="DESC",  # ndet DESC for classifier-filtered results is fine
+        ndet_max=None,      # no cap — get all classified asteroids
     )
-    for query_filter in query_modes:
-        observations = _fetch_alerce_objects_for_filter(
-            client,
-            ra_deg,
-            dec_deg,
-            radius_deg,
-            start_jd,
-            end_jd,
-            max_objects=max_objects,
-            query_filter=query_filter,
-        )
-        if observations:
-            return observations
-    return []
+    if asteroid_obs:
+        return asteroid_obs
+
+    # Mode 2: generic low-ndet objects (ndet 1–20, least detected first).
+    # Moving objects appear as one new OID per night at each sky position, so
+    # ndet=1 per OID is their signature.  Ordering ASC surfaces them before
+    # persistent stars/AGN that dominate an ndet DESC query.
+    return _fetch_alerce_objects_for_filter(
+        client,
+        ra_deg,
+        dec_deg,
+        radius_deg,
+        start_jd,
+        end_jd,
+        max_objects=max_objects,
+        query_filter={},
+        order_mode="ASC",
+        ndet_max=20,
+    )
 
 
 def _fetch_alerce_objects_for_filter(
@@ -220,8 +233,21 @@ def _fetch_alerce_objects_for_filter(
     *,
     max_objects: int,
     query_filter: dict[str, str],
+    order_mode: str = "ASC",
+    ndet_max: int | None = 20,
 ) -> list[Observation]:
-    """Fetch ALeRCE object detections for one object-query filter."""
+    """Fetch ALeRCE object detections for one object-query filter.
+
+    Moving solar system objects appear as new OIDs at each night's position
+    (ndet=1 per OID).  Ordering by ndet ASC and capping at ndet_max ensures
+    these low-detection-count objects are returned first instead of persistent
+    stars/AGN that dominate an ndet DESC query.  The asteroid-classifier path
+    passes order_mode="DESC" (any ndet) since it is already filtered to the
+    asteroid class.
+    """
+    extra: dict[str, Any] = {}
+    if ndet_max is not None:
+        extra["ndet"] = [1, ndet_max]
     try:
         objects_payload = client.query_objects(
             format="json",
@@ -234,7 +260,8 @@ def _fetch_alerce_objects_for_filter(
             page=1,
             page_size=max(1, min(max_objects, 100)),
             order_by="ndet",
-            order_mode="DESC",
+            order_mode=order_mode,
+            **extra,
             **query_filter,
         )
     except Exception:
