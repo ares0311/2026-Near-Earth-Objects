@@ -1047,7 +1047,9 @@ class TestFetchZtfLive:
 
     def test_fetch_atlas_live_small_region(self):
         from fetch import fetch_atlas
-        result = fetch_atlas(180.0, 0.0, 0.1, 2460000.0, 2460001.0)
+        # Use a recent date (JD 2460700.5 ≈ Jan 2025) — ATLAS FPS returns 400
+        # for requests older than ~1000 days (JD 2460000 = Feb 2023 is too old).
+        result = fetch_atlas(83.8221, -5.3911, 0.1, 2460700.5, 2460701.5)
         assert isinstance(result, list)
 
 
