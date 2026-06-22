@@ -169,13 +169,21 @@ def _fetch_ztf_alerce_api(
     start_jd: float,
     end_jd: float,
     *,
-    max_objects: int = 50,
+    max_objects: int = 200,
 ) -> list[Observation]:
     """Fetch source-level public ZTF detections through the ALeRCE broker.
 
     IRSA TAP exposes ZTF object summary and image metadata tables, but not the
-    per-alert/source table this pipeline needs. ALeRCE provides public ZTF
+    per-alert/source table this pipeline needs.  ALeRCE provides public ZTF
     detections with ``magpsf``, ``sigmapsf``, ``rb``, and ``drb`` fields.
+
+    Key design principle: moving solar system objects appear as a NEW OID each
+    night because they move faster than ALeRCE's ~1 arcsec OID-association
+    radius (MBAs at opposition move ~700 arcsec/night; NEOs move faster).
+    Each nightly detection of the same moving object therefore has its own OID
+    with ``ndet=1``.  Persistent sources (stars, AGN) accumulate hundreds of
+    detections under one OID.  The ndet cap is what separates transient
+    single-sky-position events from stationary background sources.
     """
     try:
         from alerce import Alerce  # type: ignore[import]
@@ -187,9 +195,13 @@ def _fetch_ztf_alerce_api(
     except Exception:
         return []
 
-    # Mode 1: asteroid-classified objects (any ndet, highest confidence first).
-    # ALeRCE's stamp classifier labels single-night moving-object detections as
-    # "asteroid"; this is the highest-signal path.
+    # Mode 1: asteroid-classified transients (ndet ≤ 3, single-detection first).
+    # The stamp classifier labels detections as "asteroid" when the difference-
+    # image cutout looks like a point source appearing at a previously empty sky
+    # position — exactly the signature of a moving solar system object.
+    # Capping ndet ≤ 3 excludes persistent background sources that happen to
+    # have one cutout classified as "asteroid" due to image artifacts.  Ordering
+    # ASC surfaces ndet=1 OIDs (the true single-night transients) first.
     asteroid_obs = _fetch_alerce_objects_for_filter(
         client,
         ra_deg,
@@ -199,16 +211,17 @@ def _fetch_ztf_alerce_api(
         end_jd,
         max_objects=max_objects,
         query_filter={"classifier": "stamp_classifier", "class_name": "asteroid"},
-        order_mode="DESC",  # ndet DESC for classifier-filtered results is fine
-        ndet_max=None,      # no cap — get all classified asteroids
+        order_mode="ASC",   # ndet=1 OIDs first (true single-night transients)
+        ndet_max=3,         # exclude persistent sources; moving objects have ndet=1
     )
     if asteroid_obs:
         return asteroid_obs
 
-    # Mode 2: generic low-ndet objects (ndet 1–20, least detected first).
-    # Moving objects appear as one new OID per night at each sky position, so
-    # ndet=1 per OID is their signature.  Ordering ASC surfaces them before
-    # persistent stars/AGN that dominate an ndet DESC query.
+    # Mode 2: any low-ndet transients (ndet 1–3, generic fallback).
+    # When the asteroid classifier returns nothing, fall back to all OIDs that
+    # appeared ≤3 times.  Real moving objects are ndet=1 per night; astrometric
+    # noise between nights is ~1 arcsec, far smaller than the nightly position
+    # shift (~700 arcsec for an MBA), so same-object nightly OIDs never merge.
     return _fetch_alerce_objects_for_filter(
         client,
         ra_deg,
@@ -219,7 +232,7 @@ def _fetch_ztf_alerce_api(
         max_objects=max_objects,
         query_filter={},
         order_mode="ASC",
-        ndet_max=20,
+        ndet_max=3,
     )
 
 
