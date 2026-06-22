@@ -51,15 +51,15 @@ def _make_synthetic_observation(
     obs_id: str,
     jd_offset: float,
     with_cutouts: bool = False,
-) -> "Observation":  # type: ignore[name-defined]
+) -> Observation:  # type: ignore[name-defined]  # noqa: F821
     """Build a minimal synthetic Observation for testing model inference.
 
     When with_cutouts=True, generates a random 63×63 float32 base64 image
     triplet so the CNN path can be exercised.
     """
-    from schemas import Observation  # imported here after sys.path is set
-
     import numpy as np
+
+    from schemas import Observation  # imported here after sys.path is set
 
     kwargs: dict = {
         "obs_id": obs_id,
@@ -88,7 +88,7 @@ def _make_synthetic_observation(
     return Observation(**kwargs)
 
 
-def _make_synthetic_tracklet(with_cutouts: bool = False) -> "Tracklet":  # type: ignore[name-defined]
+def _make_synthetic_tracklet(with_cutouts: bool = False) -> Tracklet:  # type: ignore[name-defined]  # noqa: F821
     """Build a minimal synthetic Tracklet with 3 observations across 3 nights."""
     from schemas import Tracklet  # imported here after sys.path is set
 
@@ -105,7 +105,7 @@ def _make_synthetic_tracklet(with_cutouts: bool = False) -> "Tracklet":  # type:
     )
 
 
-def _make_synthetic_features() -> "CandidateFeatures":  # type: ignore[name-defined]
+def _make_synthetic_features() -> CandidateFeatures:  # type: ignore[name-defined]  # noqa: F821
     """Build a CandidateFeatures object with plausible non-None values."""
     from schemas import CandidateFeatures  # imported here after sys.path is set
 
@@ -262,7 +262,9 @@ def validate_stacker(model_dir: Path) -> dict:
         from schemas import NEOPosterior  # type: ignore[import]
 
         meta_model = _load_ensemble_stacker(model_path)
-        assert meta_model is not None, "stacker: _load_ensemble_stacker() returned None despite file existing"
+        assert meta_model is not None, (
+            "stacker: _load_ensemble_stacker() returned None despite file existing"
+        )
 
         # Build a uniform synthetic tier1 dict to feed ensemble_predict
         tier1 = {lbl: 1.0 / len(_LABELS) for lbl in _LABELS}
@@ -270,7 +272,9 @@ def validate_stacker(model_dir: Path) -> dict:
         # Call ensemble_predict; it returns a plain dict[str, float]
         result = ensemble_predict(tier1, meta_model=meta_model)
 
-        assert isinstance(result, dict), f"stacker: ensemble_predict returned {type(result)}, expected dict"
+        assert isinstance(result, dict), (
+            f"stacker: ensemble_predict returned {type(result)}, expected dict"
+        )
 
         # Verify all five fields are present and in [0, 1]
         for label in _LABELS:
@@ -297,7 +301,10 @@ def validate_stacker(model_dir: Path) -> dict:
         return {
             "passed": True,
             "skipped": False,
-            "message": "PASS stacker_coef.json loaded and ensemble_predict produced valid NEOPosterior",
+            "message": (
+                "PASS stacker_coef.json loaded and ensemble_predict"
+                " produced valid NEOPosterior"
+            ),
             "output": result,
         }
     except Exception as exc:
@@ -333,7 +340,9 @@ def validate_tier3(model_dir: Path) -> dict:
         tracklet = _make_synthetic_tracklet(with_cutouts=False)
 
         model = _load_transformer_model()
-        assert model is not None, "tier3: _load_transformer_model() returned None despite file existing"
+        assert model is not None, (
+            "tier3: _load_transformer_model() returned None despite file existing"
+        )
 
         result = _tier3_predict(tracklet, model=model)
 

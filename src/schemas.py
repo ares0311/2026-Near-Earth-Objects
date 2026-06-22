@@ -83,8 +83,8 @@ AlertPathway = Literal[
     "known_object",
 ]
 
-OrbitQualityCode = Literal[1, 2, 3, 4]
-# 1=arc<1day, 2=multi-night, 3=multi-week, 4=opposition
+OrbitQualityCode = Literal[0, 1, 2, 3, 4]
+# 0=no orbit, 1=arc<1day, 2=multi-night, 3=multi-week, 4=opposition
 
 BackgroundOutcome = Literal["reviewed", "needs_follow_up"]
 

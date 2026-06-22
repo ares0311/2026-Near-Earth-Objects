@@ -450,6 +450,79 @@ class TestFetchZtfAlerceApi:
         assert FakeAlerce.calls[0]["class_name"] == "asteroid"
         assert "class_name" not in FakeAlerce.calls[1]
 
+    def test_mode1_uses_ndet_cap_not_persistent_sources(self, monkeypatch):
+        # Regression test: Mode 1 must use ndet=[1,3] (not ndet_max=None).
+        # ndet_max=None previously caused Mode 1 to return persistent stationary
+        # sources (stars/AGN with many detections) instead of single-night
+        # transients (ndet=1) that are the signature of moving objects.
+        import sys
+        import types
+
+        class FakeAlerce:
+            calls: list[dict] = []
+
+            def query_objects(self, **kwargs):
+                self.calls.append(kwargs)
+                return {"items": [{"oid": "ZTF26ndet1"}]}
+
+            def query_detections(self, oid, **kwargs):
+                return [
+                    {
+                        "mjd": 61096.1744328998,
+                        "candid": "ndet1_det",
+                        "fid": 1,
+                        "magpsf": 18.5,
+                        "ra": 84.5,
+                        "dec": -5.3,
+                        "rb": 0.85,
+                    },
+                ]
+
+        monkeypatch.setitem(sys.modules, "alerce", types.SimpleNamespace(Alerce=FakeAlerce))
+
+        _fetch_ztf_alerce_api(83.8221, -5.3911, 1.0, 2461096.0, 2461097.0)
+
+        # Mode 1 must cap ndet at 3 to exclude persistent background sources.
+        assert "ndet" in FakeAlerce.calls[0], "Mode 1 must send ndet filter"
+        assert FakeAlerce.calls[0]["ndet"][1] <= 3, "Mode 1 ndet cap must be ≤ 3"
+
+    def test_mode2_fallback_also_uses_ndet_cap(self, monkeypatch):
+        # Regression test: Mode 2 fallback must also use ndet=[1,3].
+        # Previously ndet_max=20 was used, which still admits persistent sources.
+        import sys
+        import types
+
+        class FakeAlerce:
+            calls: list[dict] = []
+
+            def query_objects(self, **kwargs):
+                self.calls.append(kwargs)
+                # Mode 1 (asteroid classifier) returns nothing; Mode 2 runs.
+                if kwargs.get("class_name") == "asteroid":
+                    return {"items": []}
+                return {"items": [{"oid": "ZTF26fallback"}]}
+
+            def query_detections(self, oid, **kwargs):
+                return [
+                    {
+                        "mjd": 61096.1744328998,
+                        "candid": "fallback_det",
+                        "fid": 2,
+                        "magpsf": 19.0,
+                        "ra": 84.6,
+                        "dec": -5.4,
+                    },
+                ]
+
+        monkeypatch.setitem(sys.modules, "alerce", types.SimpleNamespace(Alerce=FakeAlerce))
+
+        _fetch_ztf_alerce_api(83.8221, -5.3911, 1.0, 2461096.0, 2461097.0)
+
+        # FakeAlerce.calls[1] is the Mode 2 query (no class_name filter).
+        assert len(FakeAlerce.calls) >= 2, "Mode 2 fallback must be called"
+        assert "ndet" in FakeAlerce.calls[1], "Mode 2 must send ndet filter"
+        assert FakeAlerce.calls[1]["ndet"][1] <= 3, "Mode 2 ndet cap must be ≤ 3"
+
 
 class TestParseAtlasPhotometryNoHeader:
     def test_no_header_uses_first_col_as_mjd(self):

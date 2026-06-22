@@ -25,7 +25,6 @@ import link
 import orbit
 from schemas import (
     CandidateFeatures,
-    HazardAssessment,
     Observation,
     OrbitalElements,
     RawCandidate,
@@ -173,12 +172,22 @@ class TestAdversarial:
             15.0 + ddec_deg * 24.0,
             jd=2460001.0,
         )
+        # Night 3: fourth observation, extrapolated 2 days — required so the
+        # linker has a third night to propagate to (seed pair consumes nights 1
+        # and 2; the propagation loop only visits OTHER nights).
+        obs4 = _make_obs(
+            "fast_004",
+            180.0 + dra_deg * 48.0,
+            15.0 + ddec_deg * 48.0,
+            jd=2460002.0,
+        )
 
         cand_night1 = _make_candidate("FAST_N1", [obs1, obs2], rate=target_rate_arcsec_hr)
         cand_night2 = _make_candidate("FAST_N2", [obs3], rate=target_rate_arcsec_hr)
+        cand_night3 = _make_candidate("FAST_N3", [obs4], rate=target_rate_arcsec_hr)
 
         result = link.link(
-            (cand_night1, cand_night2),
+            (cand_night1, cand_night2, cand_night3),
             min_nights=2,
             min_observations=3,
         )
@@ -191,7 +200,7 @@ class TestAdversarial:
     # ------------------------------------------------------------------
 
     def test_zero_rb_score_classified_as_artifact(self) -> None:
-        """CandidateFeatures with rb=0.0 and stellar_artifact_score=1.0 must yield artifact_prob > 0.5."""
+        """CandidateFeatures with rb=0.0 and stellar_artifact_score=1.0 must yield artifact_prob > 0.5."""  # noqa: E501
         # Simulates a ZTF alert that scored 0 on the real/bogus classifier
         # and was flagged as a stellar artifact (e.g. a ghost reflection).
         features = CandidateFeatures(
@@ -225,7 +234,7 @@ class TestAdversarial:
     # ------------------------------------------------------------------
 
     def test_fetch_atlas_timeout_handled(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """fetch_atlas_forced must return [] (not raise) when requests.post raises ConnectionError."""
+        """fetch_atlas_forced must return [] (not raise) when requests.post raises ConnectionError."""  # noqa: E501
         # The ATLAS fetch function wraps all network calls in a broad
         # except Exception block and returns [] on failure.  This test
         # verifies that a simulated network timeout results in an empty
@@ -340,6 +349,8 @@ class TestAdversarial:
         # A single-night arc (quality_code=1) is below the alert-protocol
         # gate of ≥2.  The submission check must block it with a non-empty
         # unmet-conditions list.
+        import pathlib
+        sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
         from conftest import build_scored_neo
 
         # orbit_quality=1 mimics a sub-24-hour arc — should block MPC submission.

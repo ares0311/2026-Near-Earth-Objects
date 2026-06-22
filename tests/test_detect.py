@@ -525,10 +525,10 @@ class TestComputeStreakMetric:
             cutout_difference=cutout,
         )
 
-    def test_no_cutout_returns_zero(self):
+    def test_no_cutout_returns_none(self):
         from detect import compute_streak_metric
         obs = self._make_obs(None)
-        assert compute_streak_metric(obs) == 0.0
+        assert compute_streak_metric(obs) is None
 
     def test_returns_float_in_range(self):
         import base64
@@ -2801,7 +2801,7 @@ class TestFilterByStreakScore:
         from detect import filter_by_streak_score
 
         result = self._make_result([0.0])
-        # cutout is None so compute_streak_metric returns 0.0 < 0.5
+        # cutout is None so compute_streak_metric returns None → treated as 0.0 < 0.5
         filtered = filter_by_streak_score(result, min_streak_score=0.5)
         assert len(filtered.candidates) == 0
 

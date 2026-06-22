@@ -643,7 +643,7 @@ expert review" guardrail was removed by operator decision on 2026-06-21 — see
 `docs/MPC_SUBMISSION_POLICY.md`. MPC/NEOCP/Scout is the expert review system;
 no in-house expert is required or expected.
 
-### Handoff state as of 2026-06-21 (CURRENT)
+### Handoff state as of 2026-06-22 (CURRENT)
 
 All T1 gaps are closed. All operator commands for T1-C are complete — do NOT
 re-run any ATLAS screening, prequalification, or audit commands.
@@ -656,8 +656,31 @@ re-run any ATLAS screening, prequalification, or audit commands.
 - Evidence: `docs/evidence/live/2026-06-21-first-live-run.md`
 - DO NOT re-run this specific command — zero-alert result was expected and confirmed
 
-**Next live run**: Use `Skills/select_survey_fields.py --mode recovery --top-n 5`
-to find a ZTF-observed field with recoverable known objects, then run with `--no-dry-run`.
+**ZTF fetch ndet cap fix applied (2026-06-22, PR #115 pending)**:
+- Root cause of 0 tracklets (Runs 3–5): `_fetch_ztf_alerce_api` Mode 1 used
+  `ndet_max=None`, returning persistent stationary sources at fixed sky positions.
+  The linker correctly rejected all 3134 seed pairs (rate ≈ 0 arcsec/hr for same
+  sky-position repeated detections). Previous fix (ndet ASC in Mode 2 only) was
+  irrelevant because Mode 1 always succeeds and Mode 2 is never called.
+- True fix: Mode 1 now uses `ndet_max=3` + `order_mode="ASC"`. Moving objects
+  appear as ndet=1 OIDs (each night's position is a new OID, since objects move
+  ~700 arcsec/night vs the ~1 arcsec OID association radius). This surfaces
+  single-detection transients instead of persistent background sources.
+- `max_objects` increased 50 → 200 for broader field coverage.
+- Evidence: `docs/evidence/live/2026-06-22-ndet-cap-root-cause.md`
+- 2 regression tests added to prevent re-introduction of ndet_max=None bug.
+
+**Next live run** (after PR #115 merges to main):
+```bash
+git pull origin main
+export PYTHONPATH=src
+caffeinate -i uv run python Skills/run_pipeline.py \
+    --ra 284.13 --dec -22.5 --radius 3.5 \
+    --start-jd 2461183.0 --end-jd 2461213.0 \
+    --surveys ZTF --no-dry-run --force-refresh --no-resume
+```
+Expected: ndet≤3 asteroid-classified OIDs → single-night transients at unique
+sky positions → linker can form seed pairs with real solar system motion rates.
 
 **T2-A CLOSED (2026-06-21)**: Both integration_live tests passed on operator Mac.
 - `test_fetch_ztf_live_small_region` PASSED

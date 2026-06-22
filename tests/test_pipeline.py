@@ -2103,6 +2103,7 @@ class TestRunPipelineCheckpointResume:
             patch.object(mod, "score", mock_score),
             patch.object(mod, "process_alert", mock_alert),
             patch.object(mod, "summarise", return_value="summary"),
+            patch.object(mod, "ready_for_submission", return_value=(False, [])),
         ):
             results = mod.run_pipeline(
                 ra_deg=0.0, dec_deg=0.0, radius_deg=1.0,

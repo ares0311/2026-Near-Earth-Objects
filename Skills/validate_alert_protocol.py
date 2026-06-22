@@ -182,7 +182,10 @@ def run_validation(json_output: bool = False) -> int:
         if failures:
             print(f"FAILURES: {failures} scenario(s) failed.", flush=True)
         else:
-            print("All gate assertions correct. ready_for_submission() is conservative.", flush=True)
+            print(
+                "All gate assertions correct. ready_for_submission() is conservative.",
+                flush=True,
+            )
 
     return 1 if failures else 0
 
