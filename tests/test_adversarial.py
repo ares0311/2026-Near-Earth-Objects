@@ -25,7 +25,6 @@ import link
 import orbit
 from schemas import (
     CandidateFeatures,
-    HazardAssessment,
     Observation,
     OrbitalElements,
     RawCandidate,
@@ -191,7 +190,7 @@ class TestAdversarial:
     # ------------------------------------------------------------------
 
     def test_zero_rb_score_classified_as_artifact(self) -> None:
-        """CandidateFeatures with rb=0.0 and stellar_artifact_score=1.0 must yield artifact_prob > 0.5."""
+        """CandidateFeatures with rb=0.0 and stellar_artifact_score=1.0 must yield artifact_prob > 0.5."""  # noqa: E501
         # Simulates a ZTF alert that scored 0 on the real/bogus classifier
         # and was flagged as a stellar artifact (e.g. a ghost reflection).
         features = CandidateFeatures(
@@ -225,7 +224,7 @@ class TestAdversarial:
     # ------------------------------------------------------------------
 
     def test_fetch_atlas_timeout_handled(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """fetch_atlas_forced must return [] (not raise) when requests.post raises ConnectionError."""
+        """fetch_atlas_forced must return [] (not raise) when requests.post raises ConnectionError."""  # noqa: E501
         # The ATLAS fetch function wraps all network calls in a broad
         # except Exception block and returns [] on failure.  This test
         # verifies that a simulated network timeout results in an empty

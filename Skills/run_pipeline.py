@@ -278,8 +278,10 @@ def run_pipeline(
     # Warn the operator that live submissions are enabled
     if not dry_run:
         print("[alert] ⚠  LIVE MODE — external submissions are ENABLED.", flush=True)
-        print("[alert]    Guardrails: no impact-probability claims; no direct PDCO contact.", flush=True)
-        print("[alert]    All submissions require quality gates to pass (see alert.py).", flush=True)
+        print("[alert]    Guardrails: no impact-probability claims; no direct PDCO contact.",
+              flush=True)
+        print("[alert]    All submissions require quality gates to pass (see alert.py).",
+              flush=True)
 
     # Load any existing checkpoint for this parameter set
     cp: dict = {}
