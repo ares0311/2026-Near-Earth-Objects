@@ -410,7 +410,7 @@ def filter_by_real_bogus(result: DetectResult, threshold: float = 0.65) -> Detec
     )
 
 
-def compute_streak_metric(obs: Observation) -> float:
+def compute_streak_metric(obs: Observation) -> float | None:
     """Quantify streak severity for a single observation using PSF elongation.
 
     Decodes the difference-image cutout, computes second-order image moments,
@@ -419,11 +419,11 @@ def compute_streak_metric(obs: Observation) -> float:
     - 0.0 → perfectly round (no streak)
     - 1.0 → maximally elongated
 
-    Falls back to 0.0 when no cutout is available or the image cannot be
-    decoded.
+    Returns None when no cutout is available (cannot determine streak status).
+    Falls back to 0.0 when the image cannot be decoded or has degenerate content.
     """
     if obs.cutout_difference is None:
-        return 0.0
+        return None
     try:
         import base64
         import math
@@ -1446,7 +1446,8 @@ def filter_by_streak_score(
     for cand in result.candidates:
         if not cand.observations:
             continue
-        max_streak = max(compute_streak_metric(o) for o in cand.observations)
+        streaks = [compute_streak_metric(o) for o in cand.observations]
+        max_streak = max((s for s in streaks if s is not None), default=0.0)
         if max_streak >= min_streak_score:
             kept.append(cand)
     prov = DetectProvenance(
