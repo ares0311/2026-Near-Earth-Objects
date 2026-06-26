@@ -18,17 +18,13 @@ import pytest
 sys.path.insert(0, "src")
 
 import alert
-import classify
-import detect
 import fetch
 import link
 import orbit
 from schemas import (
-    CandidateFeatures,
     Observation,
     OrbitalElements,
     RawCandidate,
-    Tracklet,
 )
 
 # ---------------------------------------------------------------------------
