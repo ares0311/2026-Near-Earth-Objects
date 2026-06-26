@@ -3,6 +3,33 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.89.3 — Adversarial review + discovery paper pathway (2026-06-26)
+
+### Added
+- `Skills/adversarial_review.py`: adversarial challenge battery that tries to REJECT
+  scored NEO candidates before any operator review or external submission. Runs 11
+  offline challenges (orbit quality, arc length, multi-night, real/bogus gate,
+  known-object posterior, artifact posterior, NEO dominance, MBA confusion, motion
+  rate plausibility, MOID-arc consistency, motion consistency) plus 2 optional live
+  challenges (MPC field scan, ATLAS cross-survey confirmation). Verdicts: SURVIVE /
+  BORDERLINE / REJECT. Exit codes 0/1/2 for automation. `--offline` and `--json` flags.
+- `tests/test_adversarial_review_skill.py`: 50+ test cases covering every offline
+  challenge PASS/WARNING/FAIL branch, live challenges via monkeypatch, aggregate verdict
+  logic, and CLI entry point.
+- `docs/MPC_SUBMISSION_POLICY.md §Two-Stage Review Process`: documents the new discovery
+  paper pathway — Pipeline → Adversarial Review → Operator Review → MPC → paper.
+
+### Changed
+- `CLAUDE.md`: handoff state updated to reflect discovery paper goal (operator-confirmed
+  2026-06-26 by Jerome W. Lindsey III), two-stage review workflow, and adversarial review
+  implementation status.
+- `docs/MPC_SUBMISSION_POLICY.md §Submission Gates`: added note that pipeline gates are
+  necessary but not sufficient — adversarial review and operator review are also required.
+- `docs/evidence/prod-loop/LOOP_PROGRESS.md`: goal updated from citizen-science reporting
+  to defensible discovery paper; outstanding work items H–K added.
+
+---
+
 ## v0.89.2 — Console output elapsed+ETA compliance + adversarial test fixes (2026-06-26)
 
 ### Fixed

@@ -83,6 +83,62 @@ observatory code. This is a one-time setup step.
 
 ---
 
+## Two-Stage Review Process (Updated 2026-06-26)
+
+The operator (Jerome W. Lindsey III) has established that the project goal is a
+**defensible discovery paper**, not a citizen-science reporting tool. The pipeline
+generates candidates; they must pass two review stages before any external submission:
+
+```
+Pipeline scores candidates
+          │
+          ▼
+Stage 1: Adversarial Review (Skills/adversarial_review.py)
+         Automated agent tries to REJECT each candidate by finding fatal flaws.
+         Verdicts: SURVIVE / BORDERLINE / REJECT
+         Only SURVIVE/BORDERLINE candidates advance.
+          │
+          ▼
+Stage 2: Operator Review (Jerome)
+         Jerome reviews survivors manually and decides which to submit.
+          │
+          ▼
+Stage 3: MPC Submission (once observatory code resolved — see §TODO)
+         Submit ADES PSV observations → MPC assigns provisional designation
+          │
+          ▼
+Stage 4: Independent Confirmation
+         NEOCP follow-up observatories confirm or refute the candidate.
+          │
+          ▼
+Stage 5: Discovery Paper
+         Journal paper documents the discovery with MPC designation as proof.
+```
+
+**Adversarial review challenges** (offline, always run):
+1. Orbit quality (quality_code ≥ 2 required; 1 = WARNING; 0 = FAIL)
+2. Arc length (< 0.5 days = FAIL; < 1.0 days = WARNING)
+3. Multi-night requirement (< 2 distinct nights = FAIL; exactly 2 = WARNING)
+4. Real/bogus gate (< 0.90 = FAIL; 0.90–0.92 borderline = WARNING)
+5. Known-object posterior (> 0.50 = FAIL; > 0.20 = WARNING)
+6. Artifact posterior (> 0.30 = FAIL; > 0.15 = WARNING)
+7. NEO dominance (neo_candidate posterior < 0.30 = FAIL; < 0.50 = WARNING)
+8. MBA confusion (main_belt_asteroid posterior > 0.40 = FAIL; > 0.25 = WARNING)
+9. Motion rate plausibility (< 0.05 or > 200 arcsec/hr = FAIL)
+10. MOID-arc consistency (MOID ≤ 0.10 AU claimed from sub-day arc = WARNING)
+11. Motion consistency (score < 0.40 = FAIL; < 0.60 = WARNING)
+
+**Adversarial review challenges** (live, run when not --offline):
+12. MPC field scan (> 10 known objects in 0.5° cone = FAIL; > 0 = WARNING)
+13. Cross-survey confirmation (ATLAS cross-check if ZTF-found; no detection = WARNING)
+
+**Verdict rules**:
+- REJECT: any FAIL → do not advance
+- BORDERLINE: no FAIL, ≥2 WARNINGs → operator scrutiny required
+- SURVIVE: no FAIL, 0–1 WARNINGs → advance to operator review
+
+---
+
 ## Submission Gates (What the Pipeline Already Enforces)
 
 `ready_for_submission()` in `alert.py` enforces all required pre-submission checks:
@@ -94,7 +150,8 @@ observatory code. This is a one-time setup step.
 | real_bogus score | ≥ 0.90 | High-confidence real detection |
 | Alert pathway | ≠ `known_object` | Must not be an already-catalogued object |
 
-These gates are correct as-is. No additional pre-submission gating is needed.
+These gates are necessary but not sufficient.  A candidate must also pass
+adversarial review and operator review before any external submission.
 
 ---
 
