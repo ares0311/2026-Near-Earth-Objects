@@ -943,26 +943,34 @@ succeeded and produced the trained Tier 3 weights now recorded under T1-A.
 | `classify.py` | 100% |
 | `fetch.py` | 100% (ztfquery, ATLAS, astroquery.mpc, jplhorizons all mocked) |
 
-### Remaining Operational Milestones
+### Completed Operational Milestones
 
-| Milestone | Description |
-|---|---|
-| 4 | Production live ZTF/ATLAS/Pan-STARRS runs with real credentials and scheduler policy |
-| 5 | Trained Tier 2 CNN weights from labeled ZTF cutouts |
-| 6 | Trained Tier 3 Transformer weights from multi-night MPC/ZTF sequences |
-| 7 | Production ensemble calibration on fresh labeled survey data |
+| Milestone | Status | Description |
+|---|---|---|
+| 4 (partial) | LIVE ✓ | Production live ZTF runs working; first live run 2026-06-21; scheduler policy in `background/config.json` |
+| 5 | DONE ✓ | Tier 2 CNN trained (`models/tier2_cnn.pt`; val_acc=91.3%) |
+| 6 | DONE ✓ | Tier 3 Transformer trained (`models/tier3_transformer.pt`; val_macro_f1=0.9400) |
+| 7 | DONE ✓ | Ensemble calibration: AUC=0.9809, Brier=0.0211, ECE=0.0000, all 7 KPIs pass |
+
+### One Remaining Human-Gated Blocker
+
+- **MPC escalation path (HUMAN DECISION REQUIRED)** — The pipeline processes *public
+  ZTF/ATLAS survey data* (not original telescope observations). Whether this pipeline can
+  submit MPC reports and under what observatory code is an unresolved administrative/policy
+  question. `run_pipeline.py` prints an escalation notice for every submission-ready
+  candidate but makes no actual submission. Jerome must contact MPC or decide on observatory
+  code strategy before any submission can be made.
+  See `docs/MPC_SUBMISSION_POLICY.md §TODO for Future Agents` for full problem statement.
 
 ### Immediate Next Steps
 
-- **TODO (open): MPC escalation path** — How a pipeline processing *public ZTF/ATLAS survey
-  data* (not original observations) submits to MPC without a telescope/observatory code is
-  unresolved. See `docs/MPC_SUBMISSION_POLICY.md §TODO for Future Agents` for the full
-  problem statement. Until resolved, `run_pipeline.py` prints an escalation notice for every
-  submission-ready candidate but makes no actual submission.
-
-- **Console output spec**: All pipeline runner scripts must conform to
-  `docs/CONSOLE_OUTPUT_SPEC.md`. `Skills/run_pipeline.py` is compliant as of 2026-06-21.
-  Use `--no-dry-run` flag for live runs (default is dry_run=True).
+- **No autonomous code work remains.** All T1/T2 production gaps are closed. The pipeline
+  is citizen-science production-ready. The only remaining item is the human-gated MPC
+  observatory code decision above.
+- When Jerome resolves the observatory code strategy, update `docs/MPC_SUBMISSION_POLICY.md`
+  and `alert.py` to implement the actual submission step.
+- Console output is fully compliant with `docs/CONSOLE_OUTPUT_SPEC.md` as of v0.89.2.
+  Use `--no-dry-run` flag for live runs (default is dry_run=True — safe).
 
 - Sync docs and changelog after each version bump so `AGENTS.md`, `CLAUDE.md`, `README.md`, and `CHANGELOG.md` stay aligned.
 - Inspect background SQLite schema status with `Skills/background.py schema-status-summary` before running operators against older logs.
