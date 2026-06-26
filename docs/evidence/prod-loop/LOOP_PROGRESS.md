@@ -20,7 +20,7 @@ rigorous two-stage review process before any external submission.
 - PR #115: adversarial test fixes + ndet cap fix → merged 2026-06-22
 - PR #116: docs update + console output ETA fix (run_pipeline.py) → OPEN, CI pending
 - Console output: ALL stage prints now have elapsed + ETA (committed d69ed77)
-- All session-start docs synced to v0.89.2
+- All session-start docs synced to v0.89.3 (originally done at v0.89.2, version bumped since)
 - obs-code defaults standardized to `XXX` in all export Skills
 - LOOP_PROGRESS.md created as persistent tracker
 - **Adversarial review skill**: `Skills/adversarial_review.py` + `tests/test_adversarial_review_skill.py` ✓
