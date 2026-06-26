@@ -625,7 +625,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.89.2)
+## Current State (v0.89.3)
 
 All 10 pipeline modules are complete. The offline suite passes 3600+ tests (plus
 10 synthetic adversarial tests), with 2 live/integration checks deselected. CI is
@@ -982,7 +982,7 @@ succeeded and produced the trained Tier 3 weights now recorded under T1-A.
 Pipeline generates candidates → adversarial review filters → operator reviews survivors →
 MPC submission → provisional designation → independent confirmation → journal paper.
 
-1. **Merge PR #116** (write rate limit must clear): console output + doc sync to v0.89.2.
+1. **Merge PR #116** (write rate limit must clear): console output + doc sync to v0.89.3.
 2. **Open PR #117**: commit `Skills/adversarial_review.py` +
    `tests/test_adversarial_review_skill.py` + version bump to v0.89.3.
 3. **Update `docs/MPC_SUBMISSION_POLICY.md`**: add §Adversarial Review section describing
@@ -993,7 +993,7 @@ MPC submission → provisional designation → independent confirmation → jour
 7. **Jerome resolves MPC observatory code** (human-gated; no code can help here).
 8. Submit survivors to MPC → await provisional designation.
 
-- Console output is fully compliant with `docs/CONSOLE_OUTPUT_SPEC.md` as of v0.89.2.
+- Console output is fully compliant with `docs/CONSOLE_OUTPUT_SPEC.md` as of v0.89.3.
 - ALWAYS run from `main` — operator never checks out feature branches.
 - All commands must begin with `git pull origin main`.
 - Never give operator any command before the relevant PR merges.

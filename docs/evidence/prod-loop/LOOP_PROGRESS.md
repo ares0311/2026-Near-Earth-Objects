@@ -45,15 +45,17 @@ rigorous two-stage review process before any external submission.
   PYTHONPATH=src uv run python Skills/adversarial_review.py /tmp/candidates.json --json
   ```
 
-### I. Version bump to v0.89.3 after adversarial review merges
-- [ ] Bump `src/__init__.py`, `pyproject.toml`, and all doc version headers
-- [ ] Add CHANGELOG.md entry for v0.89.3 (adversarial review)
-- [ ] Open new PR for adversarial review + version bump
+### I. Version bump to v0.89.3 ✓ DONE (2026-06-26)
+- [x] `src/__init__.py`, `pyproject.toml` → 0.89.3
+- [x] `CHANGELOG.md` v0.89.3 entry added
+- [x] `README.md`, `AGENTS.md`, `CLAUDE.md`, `docs/PRODUCTION_READINESS.md` → v0.89.3
+- All in PR #116 (same branch)
 
-### J. Update docs to reflect discovery paper pathway
-- [ ] `docs/MPC_SUBMISSION_POLICY.md`: add §Adversarial Review section describing two-stage process
-- [ ] `CLAUDE.md` + `AGENTS.md`: update "Immediate Next Steps" to reflect discovery paper goal
-- [ ] `docs/PRODUCTION_READINESS.md`: add adversarial review as a new production gate
+### J. Update docs to reflect discovery paper pathway ✓ DONE (2026-06-26)
+- [x] `docs/MPC_SUBMISSION_POLICY.md`: §Two-Stage Review Process added with full challenge list
+- [x] `CLAUDE.md` §Immediate Next Steps: discovery paper goal + 8-step roadmap
+- [x] `AGENTS.md` §Handoff notes: discovery paper goal + two-step operator workflow
+- [ ] `docs/PRODUCTION_READINESS.md`: adversarial review not yet added as production gate (future)
 
 ### K. Discovery paper prerequisite work (no code, human decisions needed)
 - [ ] Jerome must resolve MPC observatory code strategy (still pending — see §TODO in MPC_SUBMISSION_POLICY.md)
