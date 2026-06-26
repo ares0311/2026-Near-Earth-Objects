@@ -55,7 +55,7 @@ rigorous two-stage review process before any external submission.
 - [x] `docs/MPC_SUBMISSION_POLICY.md`: §Two-Stage Review Process added with full challenge list
 - [x] `CLAUDE.md` §Immediate Next Steps: discovery paper goal + 8-step roadmap
 - [x] `AGENTS.md` §Handoff notes: discovery paper goal + two-step operator workflow
-- [ ] `docs/PRODUCTION_READINESS.md`: adversarial review not yet added as production gate (future)
+- [x] `docs/PRODUCTION_READINESS.md`: Discovery Paper Gates D1–D7 added as post-T1/T2 section
 
 ### K. Discovery paper prerequisite work (no code, human decisions needed)
 - [ ] Jerome must resolve MPC observatory code strategy (still pending — see §TODO in MPC_SUBMISSION_POLICY.md)
@@ -81,3 +81,4 @@ rigorous two-stage review process before any external submission.
 | 2 | 2026-06-26 | CHANGELOG v0.89.2 + CONSOLE_OUTPUT_SPEC updated; committed | Merge PR #116; sync CLAUDE.md/AGENTS.md/PRODUCTION_READINESS.md |
 | 3 | 2026-06-26 | All doc sync complete; obs-code defaults fixed; versions bumped | Merge PR #116 (waiting for GitHub write rate limit to clear) |
 | 4 | 2026-06-26 | Adversarial review skill implemented; discovery paper goal established | Merge PR #116, then open PR #117 for adversarial review; update docs |
+| 5 | 2026-06-26 | Discovery Paper Gates D1–D7 added to PRODUCTION_READINESS.md; all J items complete | Merge PR #116 (waiting for GitHub write rate limit to clear) |

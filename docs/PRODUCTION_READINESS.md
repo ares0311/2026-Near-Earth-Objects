@@ -482,6 +482,64 @@ Before the pipeline makes its first MPC submission, all of the following must be
       `elapsed {M}m{S:02d}s`; fetch ETA computed from time-per-survey; per-tracklet
       ETA computed from time-per-tracklet ✓ (2026-06-26, PR #116; satisfies CLAUDE.md
       standing rule: "elapsed-only heartbeats are not acceptable as a substitute for ETA")
+- [x] Adversarial review skill: `Skills/adversarial_review.py` implemented with 11 offline
+      challenges + 2 live challenges (MPC field scan, ATLAS cross-survey); 50+ tests in
+      `tests/test_adversarial_review_skill.py`; all offline tests pass in CI; live challenges
+      degrade gracefully to SKIP on network failure ✓ (2026-06-26, PR #116)
+
+---
+
+## Discovery Paper Gates (post-T1/T2; currently OPEN)
+
+All T1 and T2 gaps are closed. The next milestone is a defensible discovery paper
+requiring independent confirmation and an MPC provisional designation. These gates
+are sequential — each blocks the next.
+
+### Gate D1: Candidate Survival (pipeline + adversarial review)
+- [ ] At least one `ScoredNEO` passes `ready_for_submission()` gate from pipeline
+- [ ] That candidate survives `Skills/adversarial_review.py` with verdict = SURVIVE
+      (no FAILs; ≤1 WARNING across all 13 challenges)
+- Post-PR-#116-merge operator workflow:
+  ```bash
+  git pull origin main && export PYTHONPATH=src
+  caffeinate -i uv run python Skills/run_pipeline.py \
+      --ra 284.13 --dec -22.5 --radius 3.5 \
+      --start-jd 2461183.0 --end-jd 2461213.0 \
+      --surveys ZTF --no-dry-run --force-refresh --no-resume \
+      > /tmp/candidates.json
+  PYTHONPATH=src uv run python Skills/adversarial_review.py /tmp/candidates.json
+  ```
+
+### Gate D2: Operator Review
+- [ ] Jerome W. Lindsey III reviews SURVIVE/BORDERLINE candidates
+- [ ] Jerome approves at least one candidate for MPC submission
+- Blocked by: Gate D1
+
+### Gate D3: MPC Observatory Code (HUMAN DECISION REQUIRED)
+- [ ] Jerome contacts MPC to establish how a data-analysis pipeline (not an observing
+      telescope) can submit observation reports; or adopts a citizen-science observatory
+      code strategy
+- See `docs/MPC_SUBMISSION_POLICY.md §TODO for Future Agents` for full problem statement
+- Blocked by: human administrative decision; no code can unblock this
+
+### Gate D4: MPC Submission
+- [ ] ADES PSV report generated via `Skills/export_ades_report.py`
+- [ ] Submitted to MPC with verified observatory code
+- Blocked by: Gates D2 and D3
+
+### Gate D5: Provisional Designation
+- [ ] MPC assigns a provisional designation (digest2 > 65 → object posted to NEOCP)
+- Blocked by: Gate D4; MPC processes this automatically (~minutes after submission)
+
+### Gate D6: Independent Confirmation
+- [ ] Global follow-up observatories confirm independently via NEOCP
+- [ ] NEOCP monitoring period complete (hours to days)
+- Blocked by: Gate D5
+
+### Gate D7: Discovery Paper
+- [ ] MPEC publication by MPC (or equivalent) names the object
+- [ ] Paper written documenting discovery with MPC designation as proof
+- Blocked by: Gate D6
 
 ---
 
