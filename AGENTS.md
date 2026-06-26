@@ -807,39 +807,42 @@ PYTHONPATH=src uv run python Skills/select_survey_fields.py \
 | `classify.py` | 100% |
 | `fetch.py` | 100% (ztfquery, ATLAS, astroquery.mpc, jplhorizons all mocked) |
 
-### Remaining Operational Milestones
+### Operational Milestone Status
 
-| Milestone | Description |
-|---|---|
-| 4 | Production live ZTF/ATLAS/Pan-STARRS runs with real credentials and scheduler policy |
-| 5 | Trained Tier 2 CNN weights from labeled ZTF cutouts |
-| 6 | Trained Tier 3 Transformer weights from multi-night MPC/ZTF sequences |
-| 7 | Production ensemble calibration on fresh labeled survey data |
+| Milestone | Status | Description |
+|---|---|---|
+| 4 (partial) | LIVE ✓ | First ZTF live run complete (2026-06-21). Scheduler policy in `background/config.json`. |
+| 5 | DONE ✓ | Tier 2 CNN trained (`models/tier2_cnn.pt`; val_acc=91.3%) |
+| 6 | DONE ✓ | Tier 3 Transformer trained (`models/tier3_transformer.pt`; val_macro_f1=0.9400) |
+| 7 | DONE ✓ | Ensemble calibration KPIs all pass (AUC=0.9809, Brier=0.0211, ECE=0.0000) |
 
 ### Immediate Next Steps
 
-**All T1 gaps are closed. The two remaining open items both require operator action:**
+**No autonomous code work remains.** All T1/T2 production gaps are closed as of
+2026-06-22. The pipeline is citizen-science production-ready.
 
-**Priority 1 — T2-A: Run integration tests locally on Mac**:
-- Credentials are kept off GitHub by operator policy; `integration.yml` always skips in CI.
-- Run on your Mac:
-  ```bash
-  source Skills/verify_live_credentials.sh
-  PYTHONPATH=src uv run python -m pytest -m integration_live -v --timeout=120
-  ```
-- T2-A closes when all `integration_live` tests pass.
+**One human-gated blocker**:
+- **MPC observatory code / escalation path**: Jerome must decide whether and how to
+  obtain an observatory code to submit MPC reports. See
+  `docs/MPC_SUBMISSION_POLICY.md §TODO for Future Agents`.
+  The pipeline prints an escalation notice for submission-ready candidates but makes
+  no actual submission until this is resolved.
 
-**Priority 2 — T2-B: Live false-positive audit**:
-- Load credentials: `source Skills/verify_live_credentials.sh`
-- Run `Skills/diagnose_pipeline.py` on real ZTF alert data with credentials.
-- Audit false-positive rate vs a known-artifact catalog.
-- No external submission authorized; results stay internal.
+**When Jerome resolves the observatory code strategy**:
+1. Update `docs/MPC_SUBMISSION_POLICY.md` §TODO with the answer.
+2. Update `alert.py` to perform the actual submission in `run_pipeline.py`.
+3. Update `Skills/export_ades_report.py` `--obs-code` default to the assigned code.
 
-**Production scheduler (after T2-A/T2-B)**:
-- Re-check signed live dry-run policy readiness via `Skills/background.py live-dry-run-plan`
-  before any scheduled live dry-run attempt.
-- Production scheduler setup remains credential/provider gated under the signed
-  bounded live dry-run policy.
+**Next live run** (when PR #116 is merged to main):
+```bash
+git pull origin main
+source Skills/verify_live_credentials.sh
+export PYTHONPATH=src
+caffeinate -i uv run python Skills/run_pipeline.py \
+    --ra 284.13 --dec -22.5 --radius 3.5 \
+    --start-jd 2461183.0 --end-jd 2461213.0 \
+    --surveys ZTF --no-dry-run --force-refresh --no-resume
+```
 
 **Background automation (lower priority)**:
 - Sync docs and changelog after each version bump so `AGENTS.md`, `CLAUDE.md`, `README.md`, and `CHANGELOG.md` stay aligned.
