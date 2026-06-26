@@ -521,7 +521,7 @@ The diagram below shows how data and artifacts move between the repository's top
 2026-Near-Earth-Objects/
 │
 ├── src/                          # Core pipeline modules (Python 3.11+)
-│   ├── __init__.py               # Package version (0.76.0)
+│   ├── __init__.py               # Package version (0.89.2)
 │   ├── schemas.py                # All Pydantic data models (frozen=True)
 │   ├── fetch.py                  # ZTF/ATLAS/MPC/Horizons data retrieval
 │   ├── preprocess.py             # Difference image handling; Gaia astrometry
