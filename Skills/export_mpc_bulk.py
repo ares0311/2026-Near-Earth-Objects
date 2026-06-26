@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from alert import format_mpc_report  # noqa: E402
 from schemas import ScoredNEO  # noqa: E402
 
-_DEFAULT_OBS_CODE = "500"  # geocentric placeholder; override with real observatory code
+_DEFAULT_OBS_CODE = "XXX"  # MPC placeholder for new observers; override with real observatory code
 _DEFAULT_PATHWAYS = {"mpc_submission", "neocp_followup", "nasa_pdco_notify"}
 _MIN_PRIORITY_DEFAULT = 0.3
 
@@ -116,7 +116,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--out-dir", default="mpc_reports",
                         help="Output directory for report files (default: mpc_reports)")
     parser.add_argument("--obs-code", default=_DEFAULT_OBS_CODE,
-                        help="MPC observatory code (default: 500)")
+                        help="MPC observatory code (default: XXX; replace with assigned code)")
     parser.add_argument("--min-priority", type=float, default=_MIN_PRIORITY_DEFAULT,
                         help="Minimum discovery priority to export")
     parser.add_argument("--pathways", nargs="+",

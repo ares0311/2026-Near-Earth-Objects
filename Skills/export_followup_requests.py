@@ -101,7 +101,7 @@ def export_followup_requests(
     neos: list,
     min_priority: float = 0.0,
     out_dir: Path | None = None,
-    obs_code: str = "Xnn",
+    obs_code: str = "XXX",
 ) -> list[dict]:
     """Generate NEOCP follow-up request strings for candidates above min_priority.
 
@@ -139,8 +139,8 @@ def main() -> None:
     )
     parser.add_argument("--out-dir", default=None,
                         help="directory for output .txt files")
-    parser.add_argument("--obs-code", default="Xnn",
-                        help="MPC observatory code (default Xnn)")
+    parser.add_argument("--obs-code", default="XXX",
+                        help="MPC observatory code (default: XXX; replace with assigned code)")
     parser.add_argument("--summary", action="store_true",
                         help="print only a summary table, not full reports")
     args = parser.parse_args()
