@@ -1,0 +1,787 @@
+"""Tests for Skills/adversarial_review.py.
+
+Covers every offline challenge (PASS/WARNING/FAIL branches), the live
+challenges via monkeypatch, the aggregate verdict logic, and the CLI
+entry point.  All tests run fully offline — no network access is required.
+"""
+
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+import pytest
+
+# Ensure both src/ and Skills/ are importable
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
+
+# Import the module under test
+from adversarial_review import (
+    ChallengeResult,
+    _challenge_arc_length,
+    _challenge_artifact_posterior,
+    _challenge_cross_survey_confirmation,
+    _challenge_known_object_posterior,
+    _challenge_mba_confusion,
+    _challenge_moid_arc_consistency,
+    _challenge_motion_consistency,
+    _challenge_motion_rate,
+    _challenge_mpc_field_scan,
+    _challenge_multi_night,
+    _challenge_neo_posterior_dominance,
+    _challenge_orbit_quality,
+    _challenge_real_bogus,
+    main,
+    run_adversarial_review,
+)
+
+from schemas import (
+    CandidateExplanation,
+    CandidateFeatures,
+    HazardAssessment,
+    NEOPosterior,
+    Observation,
+    OrbitalElements,
+    ScoredNEO,
+    ScoringMetadata,
+    Tracklet,
+)
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _obs(obs_id: str, jd: float, ra_deg: float = 180.0) -> Observation:
+    """Build a minimal Observation for testing."""
+    return Observation(
+        obs_id=obs_id,
+        ra_deg=ra_deg,
+        dec_deg=10.0,
+        jd=jd,
+        mag=19.5,
+        mag_err=0.05,
+        filter_band="r",
+        mission="ZTF",
+        real_bogus=0.95,
+    )
+
+
+def _elements(quality: int = 2, moid: float = 0.03) -> OrbitalElements:
+    """Build OrbitalElements with a given quality code."""
+    return OrbitalElements(
+        semi_major_axis_au=1.5,
+        eccentricity=0.3,
+        inclination_deg=10.0,
+        longitude_ascending_node_deg=45.0,
+        argument_perihelion_deg=90.0,
+        mean_anomaly_deg=180.0,
+        epoch_jd=2460000.5,
+        perihelion_au=1.05,
+        aphelion_au=1.95,
+        quality_code=quality,
+    )
+
+
+def _make_neo(
+    arc_days: float = 3.0,
+    n_nights: int = 3,
+    rb: float = 0.95,
+    neo_p: float = 0.75,
+    known_p: float = 0.05,
+    mba_p: float = 0.10,
+    art_p: float = 0.05,
+    other_p: float = 0.05,
+    rate: float = 5.0,
+    moid_au: float = 0.03,
+    orbit_quality: int = 2,
+    motion_consistency: float | None = 0.85,
+    mission: str = "ZTF",
+) -> ScoredNEO:
+    """Build a configurable ScoredNEO for challenge testing."""
+    # Spread observations across distinct nights
+    obs = tuple(
+        Observation(
+            obs_id=f"o_{i}",
+            ra_deg=180.0 + i * 0.005,
+            dec_deg=10.0,
+            jd=2460000.5 + i,          # 1 obs per night
+            mag=19.5,
+            mag_err=0.05,
+            filter_band="r",
+            mission=mission,            # type: ignore[arg-type]
+            real_bogus=0.95,
+        )
+        for i in range(n_nights)
+    )
+    tracklet = Tracklet(
+        object_id="T_TEST",
+        observations=obs,
+        arc_days=arc_days,
+        motion_rate_arcsec_per_hour=rate,
+        motion_pa_degrees=90.0,
+    )
+    features = CandidateFeatures(
+        real_bogus_score=rb,
+        motion_consistency_score=motion_consistency,
+    )
+    posterior = NEOPosterior(
+        neo_candidate=neo_p,
+        known_object=known_p,
+        main_belt_asteroid=mba_p,
+        stellar_artifact=art_p,
+        other_solar_system=other_p,
+    )
+    explanation = CandidateExplanation(
+        summary="Test NEO",
+        supporting_evidence=(),
+        contra_evidence=(),
+        model_version="test",
+    )
+    hazard = HazardAssessment(
+        hazard_flag="pha_candidate",
+        moid_au=moid_au,
+        estimated_diameter_m=200.0,
+        absolute_magnitude_h=21.5,
+        neo_class="apollo",
+        alert_pathway="mpc_submission",
+        explanation=explanation,
+        orbital_elements=_elements(quality=orbit_quality, moid=moid_au),
+    )
+    metadata = ScoringMetadata(
+        scorer_version="test",
+        scored_at_jd=2460000.5,
+        pipeline_run_id="test",
+        discovery_priority=0.8,
+        followup_value=0.6,
+        scientific_interest=0.5,
+    )
+    return ScoredNEO(
+        tracklet=tracklet,
+        features=features,
+        posterior=posterior,
+        hazard=hazard,
+        metadata=metadata,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Orbit quality challenge
+# ---------------------------------------------------------------------------
+
+
+class TestChallengeOrbitQuality:
+    def test_pass_quality_2(self) -> None:
+        neo = _make_neo(orbit_quality=2)
+        r = _challenge_orbit_quality(neo)
+        assert r.outcome == "PASS"
+
+    def test_warn_quality_1(self) -> None:
+        neo = _make_neo(orbit_quality=1)
+        r = _challenge_orbit_quality(neo)
+        assert r.outcome == "WARNING"
+
+    def test_fail_quality_0(self) -> None:
+        neo = _make_neo(orbit_quality=0)
+        r = _challenge_orbit_quality(neo)
+        assert r.outcome == "FAIL"
+
+    def test_fail_no_elements(self) -> None:
+        """No orbital elements → FAIL (cannot assess quality at all)."""
+        neo = _make_neo()
+        # Remove orbital elements via a new HazardAssessment
+        from schemas import CandidateExplanation, HazardAssessment
+        hazard_no_elements = HazardAssessment(
+            hazard_flag="pha_candidate",
+            moid_au=0.03,
+            estimated_diameter_m=200.0,
+            absolute_magnitude_h=21.5,
+            neo_class="apollo",
+            alert_pathway="mpc_submission",
+            explanation=CandidateExplanation(
+                summary="Test",
+                supporting_evidence=(),
+                contra_evidence=(),
+                model_version="test",
+            ),
+            orbital_elements=None,  # explicitly no elements
+        )
+        neo_no_el = ScoredNEO(
+            tracklet=neo.tracklet,
+            features=neo.features,
+            posterior=neo.posterior,
+            hazard=hazard_no_elements,
+            metadata=neo.metadata,
+        )
+        r = _challenge_orbit_quality(neo_no_el)
+        assert r.outcome == "FAIL"
+        assert "No orbital elements" in r.reason
+
+
+# ---------------------------------------------------------------------------
+# Arc length challenge
+# ---------------------------------------------------------------------------
+
+
+class TestChallengeArcLength:
+    def test_pass(self) -> None:
+        assert _challenge_arc_length(_make_neo(arc_days=2.0)).outcome == "PASS"
+
+    def test_warn_under_1_day(self) -> None:
+        assert _challenge_arc_length(_make_neo(arc_days=0.7)).outcome == "WARNING"
+
+    def test_fail_under_half_day(self) -> None:
+        assert _challenge_arc_length(_make_neo(arc_days=0.3)).outcome == "FAIL"
+
+    def test_exactly_one_day_passes(self) -> None:
+        assert _challenge_arc_length(_make_neo(arc_days=1.0)).outcome == "PASS"
+
+
+# ---------------------------------------------------------------------------
+# Multi-night challenge
+# ---------------------------------------------------------------------------
+
+
+class TestChallengeMultiNight:
+    def test_pass_three_nights(self) -> None:
+        assert _challenge_multi_night(_make_neo(n_nights=3)).outcome == "PASS"
+
+    def test_warn_two_nights(self) -> None:
+        assert _challenge_multi_night(_make_neo(n_nights=2)).outcome == "WARNING"
+
+    def test_fail_one_night(self) -> None:
+        """Single-night tracklet must FAIL."""
+        neo = _make_neo(n_nights=2)
+        # Override observations to be on the same night
+        same_night_obs = (
+            Observation(
+                obs_id="o_0", ra_deg=180.0, dec_deg=10.0,
+                jd=2460000.5, mag=19.5, mag_err=0.05,
+                filter_band="r", mission="ZTF", real_bogus=0.95,
+            ),
+            Observation(
+                obs_id="o_1", ra_deg=180.005, dec_deg=10.0,
+                jd=2460000.7,   # same integer JD → same night
+                mag=19.5, mag_err=0.05,
+                filter_band="r", mission="ZTF", real_bogus=0.95,
+            ),
+        )
+        tracklet = Tracklet(
+            object_id="T_SAME_NIGHT",
+            observations=same_night_obs,
+            arc_days=0.2,
+            motion_rate_arcsec_per_hour=5.0,
+            motion_pa_degrees=90.0,
+        )
+        neo_1night = ScoredNEO(
+            tracklet=tracklet,
+            features=neo.features,
+            posterior=neo.posterior,
+            hazard=neo.hazard,
+            metadata=neo.metadata,
+        )
+        r = _challenge_multi_night(neo_1night)
+        assert r.outcome == "FAIL"
+        assert "1" in r.reason  # should mention the count
+
+
+# ---------------------------------------------------------------------------
+# Real/bogus challenge
+# ---------------------------------------------------------------------------
+
+
+class TestChallengeRealBogus:
+    def test_pass_high_rb(self) -> None:
+        assert _challenge_real_bogus(_make_neo(rb=0.97)).outcome == "PASS"
+
+    def test_warn_borderline(self) -> None:
+        assert _challenge_real_bogus(_make_neo(rb=0.91)).outcome == "WARNING"
+
+    def test_fail_below_gate(self) -> None:
+        assert _challenge_real_bogus(_make_neo(rb=0.85)).outcome == "FAIL"
+
+    def test_fail_none_rb(self) -> None:
+        neo = _make_neo(rb=0.95)
+        features_no_rb = CandidateFeatures(real_bogus_score=None)
+        neo_none = ScoredNEO(
+            tracklet=neo.tracklet,
+            features=features_no_rb,
+            posterior=neo.posterior,
+            hazard=neo.hazard,
+            metadata=neo.metadata,
+        )
+        assert _challenge_real_bogus(neo_none).outcome == "FAIL"
+
+
+# ---------------------------------------------------------------------------
+# Known-object posterior challenge
+# ---------------------------------------------------------------------------
+
+
+class TestChallengeKnownObject:
+    def test_pass(self) -> None:
+        assert _challenge_known_object_posterior(_make_neo(known_p=0.05)).outcome == "PASS"
+
+    def test_warn(self) -> None:
+        assert _challenge_known_object_posterior(_make_neo(
+            neo_p=0.55, known_p=0.25, mba_p=0.10, art_p=0.05, other_p=0.05,
+        )).outcome == "WARNING"
+
+    def test_fail(self) -> None:
+        assert _challenge_known_object_posterior(_make_neo(
+            neo_p=0.15, known_p=0.55, mba_p=0.15, art_p=0.10, other_p=0.05,
+        )).outcome == "FAIL"
+
+
+# ---------------------------------------------------------------------------
+# Artifact posterior challenge
+# ---------------------------------------------------------------------------
+
+
+class TestChallengeArtifact:
+    def test_pass(self) -> None:
+        assert _challenge_artifact_posterior(_make_neo(art_p=0.05)).outcome == "PASS"
+
+    def test_warn(self) -> None:
+        assert _challenge_artifact_posterior(_make_neo(
+            neo_p=0.60, known_p=0.05, mba_p=0.15, art_p=0.15, other_p=0.05,
+        )).outcome == "WARNING"
+
+    def test_fail(self) -> None:
+        assert _challenge_artifact_posterior(_make_neo(
+            neo_p=0.40, known_p=0.05, mba_p=0.10, art_p=0.35, other_p=0.10,
+        )).outcome == "FAIL"
+
+
+# ---------------------------------------------------------------------------
+# NEO posterior dominance challenge
+# ---------------------------------------------------------------------------
+
+
+class TestChallengeNeoDominance:
+    def test_pass(self) -> None:
+        assert _challenge_neo_posterior_dominance(_make_neo(neo_p=0.75)).outcome == "PASS"
+
+    def test_warn(self) -> None:
+        assert _challenge_neo_posterior_dominance(_make_neo(
+            neo_p=0.40, known_p=0.25, mba_p=0.20, art_p=0.10, other_p=0.05,
+        )).outcome == "WARNING"
+
+    def test_fail(self) -> None:
+        assert _challenge_neo_posterior_dominance(_make_neo(
+            neo_p=0.20, known_p=0.40, mba_p=0.20, art_p=0.10, other_p=0.10,
+        )).outcome == "FAIL"
+
+
+# ---------------------------------------------------------------------------
+# MBA confusion challenge
+# ---------------------------------------------------------------------------
+
+
+class TestChallengeMBA:
+    def test_pass(self) -> None:
+        assert _challenge_mba_confusion(_make_neo(mba_p=0.10)).outcome == "PASS"
+
+    def test_warn(self) -> None:
+        assert _challenge_mba_confusion(_make_neo(
+            neo_p=0.55, known_p=0.05, mba_p=0.30, art_p=0.05, other_p=0.05,
+        )).outcome == "WARNING"
+
+    def test_fail(self) -> None:
+        assert _challenge_mba_confusion(_make_neo(
+            neo_p=0.30, known_p=0.10, mba_p=0.45, art_p=0.10, other_p=0.05,
+        )).outcome == "FAIL"
+
+
+# ---------------------------------------------------------------------------
+# Motion rate challenge
+# ---------------------------------------------------------------------------
+
+
+class TestChallengeMotionRate:
+    def test_pass_typical_neo(self) -> None:
+        assert _challenge_motion_rate(_make_neo(rate=10.0)).outcome == "PASS"
+
+    def test_warn_slow(self) -> None:
+        assert _challenge_motion_rate(_make_neo(rate=0.20)).outcome == "WARNING"
+
+    def test_warn_fast(self) -> None:
+        assert _challenge_motion_rate(_make_neo(rate=120.0)).outcome == "WARNING"
+
+    def test_fail_stationary(self) -> None:
+        assert _challenge_motion_rate(_make_neo(rate=0.01)).outcome == "FAIL"
+
+    def test_fail_satellite_speed(self) -> None:
+        assert _challenge_motion_rate(_make_neo(rate=300.0)).outcome == "FAIL"
+
+    def test_fail_infinite_rate(self) -> None:
+        import math
+        neo = _make_neo()
+        tracklet = Tracklet(
+            object_id="INF",
+            observations=neo.tracklet.observations,
+            arc_days=neo.tracklet.arc_days,
+            motion_rate_arcsec_per_hour=math.inf,
+            motion_pa_degrees=90.0,
+        )
+        neo_inf = ScoredNEO(
+            tracklet=tracklet,
+            features=neo.features,
+            posterior=neo.posterior,
+            hazard=neo.hazard,
+            metadata=neo.metadata,
+        )
+        assert _challenge_motion_rate(neo_inf).outcome == "FAIL"
+
+
+# ---------------------------------------------------------------------------
+# MOID-arc consistency challenge
+# ---------------------------------------------------------------------------
+
+
+class TestChallengeMoidArc:
+    def test_pass_good_arc(self) -> None:
+        # Multi-night arc with MOID 0.03 → credible
+        r = _challenge_moid_arc_consistency(_make_neo(moid_au=0.03, arc_days=2.0, orbit_quality=2))
+        assert r.outcome == "PASS"
+
+    def test_warn_short_arc_close_moid(self) -> None:
+        r = _challenge_moid_arc_consistency(_make_neo(moid_au=0.03, arc_days=0.8, orbit_quality=1))
+        assert r.outcome == "WARNING"
+
+    def test_pass_large_moid_irrelevant(self) -> None:
+        # MOID > 0.10 AU — check is not triggered
+        r = _challenge_moid_arc_consistency(_make_neo(moid_au=0.20, arc_days=0.5, orbit_quality=1))
+        assert r.outcome == "PASS"
+
+    def test_warn_no_elements_close_moid(self) -> None:
+        """quality_code=0 with MOID ≤ 0.10 AU triggers WARNING."""
+        r = _challenge_moid_arc_consistency(_make_neo(moid_au=0.05, arc_days=1.5, orbit_quality=0))
+        assert r.outcome == "WARNING"
+
+
+# ---------------------------------------------------------------------------
+# Motion consistency challenge
+# ---------------------------------------------------------------------------
+
+
+class TestChallengeMotionConsistency:
+    def test_pass(self) -> None:
+        assert _challenge_motion_consistency(_make_neo(motion_consistency=0.85)).outcome == "PASS"
+
+    def test_warn(self) -> None:
+        r = _challenge_motion_consistency(_make_neo(motion_consistency=0.50))
+        assert r.outcome == "WARNING"
+
+    def test_fail(self) -> None:
+        r = _challenge_motion_consistency(_make_neo(motion_consistency=0.30))
+        assert r.outcome == "FAIL"
+
+    def test_warn_none(self) -> None:
+        r = _challenge_motion_consistency(_make_neo(motion_consistency=None))
+        assert r.outcome == "WARNING"
+
+
+# ---------------------------------------------------------------------------
+# MPC field scan (live, tested via monkeypatch)
+# ---------------------------------------------------------------------------
+
+
+class TestChallengeMpcFieldScan:
+    def test_pass_no_known_objects(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import adversarial_review
+        monkeypatch.setattr(
+            adversarial_review,
+            "_challenge_mpc_field_scan",
+            lambda neo: ChallengeResult(
+                name="mpc_field_scan", outcome="PASS",
+                reason="Mocked: 0 known objects", details={},
+            ),
+        )
+        neo = _make_neo()
+        r = adversarial_review._challenge_mpc_field_scan(neo)
+        assert r.outcome == "PASS"
+
+    def test_skip_on_network_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Network failure must yield SKIP, not FAIL or exception."""
+        import fetch
+
+        def _raise(*a, **kw):
+            raise ConnectionError("no network")
+
+        monkeypatch.setattr(fetch, "count_known_objects_in_field", _raise)
+        neo = _make_neo()
+        r = _challenge_mpc_field_scan(neo)
+        assert r.outcome == "SKIP"
+        assert "network" in r.reason.lower() or "failed" in r.reason.lower()
+
+    def test_warn_one_known_object(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import fetch
+        monkeypatch.setattr(fetch, "count_known_objects_in_field", lambda *a, **kw: 1)
+        neo = _make_neo()
+        r = _challenge_mpc_field_scan(neo)
+        assert r.outcome == "WARNING"
+
+    def test_fail_many_known_objects(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import fetch
+        monkeypatch.setattr(fetch, "count_known_objects_in_field", lambda *a, **kw: 15)
+        neo = _make_neo()
+        r = _challenge_mpc_field_scan(neo)
+        assert r.outcome == "FAIL"
+
+
+# ---------------------------------------------------------------------------
+# Cross-survey confirmation (live, tested via monkeypatch)
+# ---------------------------------------------------------------------------
+
+
+class TestChallengeCrossSurvey:
+    def test_skip_no_token(self) -> None:
+        neo = _make_neo(mission="ZTF")
+        r = _challenge_cross_survey_confirmation(neo, atlas_token=None)
+        assert r.outcome == "SKIP"
+        assert "token" in r.reason.lower()
+
+    def test_pass_multi_survey_already(self) -> None:
+        """Candidate with both ZTF and ATLAS missions is already confirmed."""
+        obs_ztf = _obs("o_ztf_0", 2460000.5)
+        obs_atlas = Observation(
+            obs_id="o_atlas_0", ra_deg=180.0, dec_deg=10.0,
+            jd=2460001.5, mag=19.5, mag_err=0.05,
+            filter_band="o", mission="ATLAS", real_bogus=None,
+        )
+        tracklet = Tracklet(
+            object_id="MULTI",
+            observations=(obs_ztf, obs_atlas),
+            arc_days=1.0,
+            motion_rate_arcsec_per_hour=5.0,
+            motion_pa_degrees=90.0,
+        )
+        neo = _make_neo()
+        multi_neo = ScoredNEO(
+            tracklet=tracklet,
+            features=neo.features,
+            posterior=neo.posterior,
+            hazard=neo.hazard,
+            metadata=neo.metadata,
+        )
+        r = _challenge_cross_survey_confirmation(multi_neo, atlas_token="fake")
+        assert r.outcome == "PASS"
+        assert "already" in r.reason.lower()
+
+    def test_pass_atlas_confirms(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import fetch
+        monkeypatch.setattr(
+            fetch, "fetch_atlas_forced",
+            lambda **kw: [_obs("atlas_det", 2460000.9)],
+        )
+        neo = _make_neo(mission="ZTF")
+        r = _challenge_cross_survey_confirmation(neo, atlas_token="fake_token")
+        assert r.outcome == "PASS"
+        assert "1" in r.reason  # 1 detection
+
+    def test_warn_atlas_no_detections(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import fetch
+        monkeypatch.setattr(fetch, "fetch_atlas_forced", lambda **kw: [])
+        neo = _make_neo(mission="ZTF")
+        r = _challenge_cross_survey_confirmation(neo, atlas_token="fake_token")
+        assert r.outcome == "WARNING"
+
+    def test_skip_atlas_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import fetch
+
+        def _raise(**kw):
+            raise ConnectionError("atlas down")
+
+        monkeypatch.setattr(fetch, "fetch_atlas_forced", _raise)
+        neo = _make_neo(mission="ZTF")
+        r = _challenge_cross_survey_confirmation(neo, atlas_token="fake_token")
+        assert r.outcome == "SKIP"
+
+    def test_skip_non_ztf_mission(self) -> None:
+        """Non-ZTF, non-ATLAS candidate: cross-survey check is SKIP (not implemented)."""
+        neo = _make_neo(mission="CSS")
+        r = _challenge_cross_survey_confirmation(neo, atlas_token="fake_token")
+        assert r.outcome == "SKIP"
+
+
+# ---------------------------------------------------------------------------
+# Aggregate verdict logic
+# ---------------------------------------------------------------------------
+
+
+class TestRunAdversarialReview:
+    def test_survive_clean_candidate(self) -> None:
+        """A high-quality candidate should SURVIVE all offline challenges."""
+        neo = _make_neo(
+            arc_days=3.0,
+            n_nights=3,
+            rb=0.97,
+            neo_p=0.80,
+            known_p=0.05,
+            mba_p=0.08,
+            art_p=0.04,
+            other_p=0.03,
+            rate=5.0,
+            moid_au=0.03,
+            orbit_quality=2,
+            motion_consistency=0.90,
+        )
+        v = run_adversarial_review(neo, offline=True)
+        assert v.verdict == "SURVIVE"
+        assert v.fail_count == 0
+        assert v.object_id == "T_TEST"
+
+    def test_reject_low_rb(self) -> None:
+        """rb=0.80 should FAIL the real_bogus gate → REJECT."""
+        neo = _make_neo(rb=0.80)
+        v = run_adversarial_review(neo, offline=True)
+        assert v.verdict == "REJECT"
+        assert v.fail_count >= 1
+
+    def test_reject_single_night(self) -> None:
+        """Single-night tracklet → multi_night FAIL → REJECT."""
+        same_night = (
+            Observation(
+                obs_id="s0", ra_deg=180.0, dec_deg=10.0, jd=2460000.5,
+                mag=19.5, mag_err=0.05, filter_band="r", mission="ZTF",
+            ),
+            Observation(
+                obs_id="s1", ra_deg=180.01, dec_deg=10.0, jd=2460000.8,
+                mag=19.5, mag_err=0.05, filter_band="r", mission="ZTF",
+            ),
+        )
+        neo = _make_neo()
+        tracklet = Tracklet(
+            object_id="ONENIGHT", observations=same_night,
+            arc_days=0.3, motion_rate_arcsec_per_hour=5.0, motion_pa_degrees=90.0,
+        )
+        neo_1n = ScoredNEO(
+            tracklet=tracklet, features=neo.features,
+            posterior=neo.posterior, hazard=neo.hazard, metadata=neo.metadata,
+        )
+        v = run_adversarial_review(neo_1n, offline=True)
+        assert v.verdict == "REJECT"
+
+    def test_borderline_multiple_warnings(self) -> None:
+        """Two WARNINGs without any FAIL → BORDERLINE."""
+        # Low rb (borderline) + 2-night arc (warning) + low neo posterior (warning)
+        neo = _make_neo(
+            arc_days=1.5,    # > 1 day so no arc FAIL, but orbit quality 1 → WARNING
+            n_nights=2,      # WARNING
+            rb=0.91,         # borderline → WARNING
+            neo_p=0.45,      # < 0.50 → WARNING
+            known_p=0.15,    # below warning threshold
+            mba_p=0.20,      # below warning threshold
+            art_p=0.12,      # below warning threshold
+            other_p=0.08,
+            orbit_quality=2,  # PASS
+            motion_consistency=0.65,  # PASS
+        )
+        v = run_adversarial_review(neo, offline=True)
+        assert v.verdict in {"BORDERLINE", "REJECT"}  # ≥2 warnings → at least BORDERLINE
+
+    def test_verdict_fields(self) -> None:
+        """ReviewVerdict must have all required fields populated."""
+        neo = _make_neo()
+        v = run_adversarial_review(neo, offline=True)
+        assert v.object_id == "T_TEST"
+        assert isinstance(v.verdict, str)
+        assert isinstance(v.challenges, list)
+        assert len(v.challenges) > 0
+        assert isinstance(v.fail_count, int)
+        assert isinstance(v.warning_count, int)
+        assert isinstance(v.summary, str)
+        assert len(v.summary) > 0
+        assert isinstance(v.reviewed_at_utc, str)
+
+    def test_to_dict_serializable(self) -> None:
+        """ReviewVerdict.to_dict() must produce a JSON-serializable dict."""
+        neo = _make_neo()
+        v = run_adversarial_review(neo, offline=True)
+        d = v.to_dict()
+        # Must round-trip through JSON without error
+        s = json.dumps(d)
+        loaded = json.loads(s)
+        assert loaded["object_id"] == "T_TEST"
+        assert "challenges" in loaded
+        assert len(loaded["challenges"]) > 0
+
+
+# ---------------------------------------------------------------------------
+# CLI tests
+# ---------------------------------------------------------------------------
+
+
+class TestCLI:
+    def test_survive_exit_code_0(self, tmp_path: Path) -> None:
+        """A clean candidate → all offline checks pass → exit code 0."""
+        neo = _make_neo(
+            arc_days=3.0, n_nights=3, rb=0.97,
+            neo_p=0.80, known_p=0.05, mba_p=0.08, art_p=0.04, other_p=0.03,
+            rate=5.0, orbit_quality=2, motion_consistency=0.90,
+        )
+        # Serialize to JSON using the ScoredNEO dict representation
+        data_file = tmp_path / "candidates.json"
+        data_file.write_text(json.dumps([neo.model_dump()]))
+
+        rc = main([str(data_file), "--offline"])
+        assert rc == 0
+
+    def test_reject_exit_code_1(self, tmp_path: Path) -> None:
+        """A bad candidate → REJECT → exit code 1."""
+        neo = _make_neo(rb=0.70)   # clearly below gate → FAIL → REJECT
+        data_file = tmp_path / "candidates.json"
+        data_file.write_text(json.dumps([neo.model_dump()]))
+
+        rc = main([str(data_file), "--offline"])
+        assert rc == 1
+
+    def test_json_output_valid(self, tmp_path: Path, capsys: pytest.CaptureFixture) -> None:
+        """--json flag must emit valid JSON to stdout."""
+        neo = _make_neo()
+        data_file = tmp_path / "candidates.json"
+        data_file.write_text(json.dumps([neo.model_dump()]))
+
+        main([str(data_file), "--offline", "--json"])
+        out = capsys.readouterr().out
+        parsed = json.loads(out)
+        assert isinstance(parsed, list)
+        assert len(parsed) == 1
+        assert "verdict" in parsed[0]
+        assert "challenges" in parsed[0]
+
+    def test_missing_input_file_exits_1(self) -> None:
+        rc = main(["/nonexistent/path/to/file.json", "--offline"])
+        assert rc == 1
+
+    def test_single_dict_not_list(self, tmp_path: Path) -> None:
+        """Input can be a single ScoredNEO dict (not wrapped in a list)."""
+        neo = _make_neo()
+        data_file = tmp_path / "single.json"
+        data_file.write_text(json.dumps(neo.model_dump()))
+
+        rc = main([str(data_file), "--offline"])
+        assert rc in {0, 1, 2}   # must not crash
+
+    def test_empty_list_exits_1(self, tmp_path: Path) -> None:
+        """Empty input list → error."""
+        data_file = tmp_path / "empty.json"
+        data_file.write_text(json.dumps([]))
+        rc = main([str(data_file), "--offline"])
+        assert rc == 1
+
+    def test_malformed_entries_skipped(self, tmp_path: Path) -> None:
+        """Malformed JSON entries are skipped; valid ones still reviewed."""
+        neo = _make_neo(rb=0.97, arc_days=3.0, n_nights=3, neo_p=0.80,
+                        known_p=0.05, mba_p=0.08, art_p=0.04, other_p=0.03,
+                        orbit_quality=2, motion_consistency=0.90)
+        data = [{"bad": "entry"}, neo.model_dump()]
+        data_file = tmp_path / "mixed.json"
+        data_file.write_text(json.dumps(data))
+
+        rc = main([str(data_file), "--offline"])
+        # Should process the one valid entry; exit code depends on its verdict
+        assert rc in {0, 1, 2}

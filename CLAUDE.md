@@ -645,37 +645,51 @@ no in-house expert is required or expected.
 
 ### Handoff state as of 2026-06-26 (CURRENT)
 
-**Console output elapsed+ETA compliance (PR #116, pending merge)**:
-Every stage print in `Skills/run_pipeline.py` now includes `elapsed {M}m{S:02d}s`.
-Root cause of 5-minute silent fetch stage: a single blocking `_fetch_with_retry()`
-call with no output for the full duration of network I/O. Fix: restructured to loop
-over surveys one-by-one. Each survey emits `(N/M) Starting <survey>` before the
-call and `(N/M) <survey>: X alerts  elapsed Xm Xs  ETA Xm Xs` after, where ETA
-is computed from actual time-per-survey. Per-tracklet classify/orbit/score/alert
-prints also have `(N/M)` counters + ETA from time-per-tracklet. Satisfies the
-CLAUDE.md standing rule: "elapsed-only heartbeats are not acceptable as a substitute
-for ETA." `docs/CONSOLE_OUTPUT_SPEC.md` updated to document new format.
+**Discovery paper goal established (2026-06-26)**:
+The project goal is a **defensible discovery paper** — not a methods paper and not a
+citizen-science reporting tool. The pipeline generates candidates; two review stages
+filter them before any external submission:
+  1. **Adversarial review** (`Skills/adversarial_review.py`): automated agent tries
+     to REJECT each candidate by finding fatal flaws.
+  2. **Operator review** (Jerome): reviews survivors manually.
+  3. **MPC submission**: surviving candidates submitted → provisional designation.
+  4. **Independent confirmation**: NEOCP follow-up observatories confirm.
+  5. **Discovery paper**: documents the find with MPC designation as proof.
 
-**DO NOT re-run the next live run command** until PR #116 merges to main.
-After merge, the operator command is the same as v0.89.1:
+**Adversarial review implemented (PR pending, v0.89.3)**:
+`Skills/adversarial_review.py` — runs 13 offline challenges + 2 optional live checks
+against each `ScoredNEO`. Verdict: SURVIVE / BORDERLINE / REJECT. Exit code 0/1/2
+for pipeline automation. Tests in `tests/test_adversarial_review_skill.py` (50+ cases).
+This is a **separate post-processing step** — run after `run_pipeline.py`:
 ```bash
+# Step 1: Generate candidates (after PR #116 + PR #117 merge to main)
 git pull origin main
 export PYTHONPATH=src
 caffeinate -i uv run python Skills/run_pipeline.py \
     --ra 284.13 --dec -22.5 --radius 3.5 \
     --start-jd 2461183.0 --end-jd 2461213.0 \
     --surveys ZTF --no-dry-run --force-refresh --no-resume
+
+# Step 2: Run adversarial review on any candidates found
+PYTHONPATH=src uv run python Skills/adversarial_review.py Logs/pipeline_runs/*/candidates.json
 ```
 
-**One human-gated blocker remains**: MPC escalation path (observatory code).
-See `docs/MPC_SUBMISSION_POLICY.md §TODO for Future Agents`. The pipeline prints
-an escalation notice for every submission-ready candidate but makes no actual
-submission until Jerome resolves the observatory code strategy. No code work can
-unblock this — it is a procedural/administrative decision only.
+**Console output elapsed+ETA compliance (PR #116, pending merge)**:
+Every stage print in `Skills/run_pipeline.py` now includes `elapsed {M}m{S:02d}s`.
+`docs/CONSOLE_OUTPUT_SPEC.md` updated to document new format.
+
+**DO NOT give any operator commands** until PR #116 AND PR #117 (adversarial review)
+both merge to main. All code runs from main — operator never checks out feature branches.
+
+**Two human-gated blockers remain**:
+1. **MPC observatory code**: Jerome must contact MPC to determine how a data-analysis
+   pipeline (not an observing telescope) can submit observation reports.
+   See `docs/MPC_SUBMISSION_POLICY.md §TODO for Future Agents`.
+2. **Actual candidate discovery**: The pipeline must find at least one candidate that
+   survives both adversarial review and operator review before a discovery paper is possible.
 
 **Progress tracker**: `docs/evidence/prod-loop/LOOP_PROGRESS.md` — read this
-at session start to avoid repeating completed work. Surviving items: README check,
-MPC escalation path code assessment (limited scope — see §TODO).
+at session start to avoid repeating completed work.
 
 ### Handoff state as of 2026-06-22
 
@@ -964,13 +978,25 @@ succeeded and produced the trained Tier 3 weights now recorded under T1-A.
 
 ### Immediate Next Steps
 
-- **No autonomous code work remains.** All T1/T2 production gaps are closed. The pipeline
-  is citizen-science production-ready. The only remaining item is the human-gated MPC
-  observatory code decision above.
-- When Jerome resolves the observatory code strategy, update `docs/MPC_SUBMISSION_POLICY.md`
-  and `alert.py` to implement the actual submission step.
+**Goal: defensible discovery paper** (established 2026-06-26 with operator Jerome W. Lindsey III).
+Pipeline generates candidates → adversarial review filters → operator reviews survivors →
+MPC submission → provisional designation → independent confirmation → journal paper.
+
+1. **Merge PR #116** (write rate limit must clear): console output + doc sync to v0.89.2.
+2. **Open PR #117**: commit `Skills/adversarial_review.py` +
+   `tests/test_adversarial_review_skill.py` + version bump to v0.89.3.
+3. **Update `docs/MPC_SUBMISSION_POLICY.md`**: add §Adversarial Review section describing
+   the two-stage review process and how it gates external submission.
+4. **Run live pipeline** (after PRs merge to main, using `caffeinate -i` + `--no-dry-run`).
+5. **Run adversarial review** on any candidates found.
+6. **Jerome reviews** any SURVIVE or BORDERLINE candidates.
+7. **Jerome resolves MPC observatory code** (human-gated; no code can help here).
+8. Submit survivors to MPC → await provisional designation.
+
 - Console output is fully compliant with `docs/CONSOLE_OUTPUT_SPEC.md` as of v0.89.2.
-  Use `--no-dry-run` flag for live runs (default is dry_run=True — safe).
+- ALWAYS run from `main` — operator never checks out feature branches.
+- All commands must begin with `git pull origin main`.
+- Never give operator any command before the relevant PR merges.
 
 - Sync docs and changelog after each version bump so `AGENTS.md`, `CLAUDE.md`, `README.md`, and `CHANGELOG.md` stay aligned.
 - Inspect background SQLite schema status with `Skills/background.py schema-status-summary` before running operators against older logs.
