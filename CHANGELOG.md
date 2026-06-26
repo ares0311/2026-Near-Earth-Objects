@@ -3,6 +3,95 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.89.3 — Adversarial review + discovery paper pathway (2026-06-26)
+
+### Added
+- `Skills/adversarial_review.py`: adversarial challenge battery that tries to REJECT
+  scored NEO candidates before any operator review or external submission. Runs 11
+  offline challenges (orbit quality, arc length, multi-night, real/bogus gate,
+  known-object posterior, artifact posterior, NEO dominance, MBA confusion, motion
+  rate plausibility, MOID-arc consistency, motion consistency) plus 2 optional live
+  challenges (MPC field scan, ATLAS cross-survey confirmation). Verdicts: SURVIVE /
+  BORDERLINE / REJECT. Exit codes 0/1/2 for automation. `--offline` and `--json` flags.
+- `tests/test_adversarial_review_skill.py`: 50+ test cases covering every offline
+  challenge PASS/WARNING/FAIL branch, live challenges via monkeypatch, aggregate verdict
+  logic, and CLI entry point.
+- `docs/MPC_SUBMISSION_POLICY.md §Two-Stage Review Process`: documents the new discovery
+  paper pathway — Pipeline → Adversarial Review → Operator Review → MPC → paper.
+
+### Changed
+- `CLAUDE.md`: handoff state updated to reflect discovery paper goal (operator-confirmed
+  2026-06-26 by Jerome W. Lindsey III), two-stage review workflow, and adversarial review
+  implementation status.
+- `docs/MPC_SUBMISSION_POLICY.md §Submission Gates`: added note that pipeline gates are
+  necessary but not sufficient — adversarial review and operator review are also required.
+- `docs/evidence/prod-loop/LOOP_PROGRESS.md`: goal updated from citizen-science reporting
+  to defensible discovery paper; outstanding work items H–K added.
+
+---
+
+## v0.89.2 — Console output elapsed+ETA compliance + adversarial test fixes (2026-06-26)
+
+### Fixed
+- `Skills/run_pipeline.py`: every stage print now includes `elapsed {M}m{S:02d}s`.
+  The fetch stage was previously a single silent blocking call for the full
+  duration of network I/O (observed: 5+ minutes with no output). Restructured to
+  loop over surveys one-by-one, emitting `(N/M) Starting <survey>` before each
+  call and `(N/M) <survey>: X alerts  elapsed Xm Xs  ETA Xm Xs` after, where ETA
+  is computed from actual time-per-survey (the measurable quantity required by
+  CLAUDE.md). Per-tracklet `[classify]` prints also include ETA from real
+  time-per-tracklet. All other stage prints (`[preprocess]`, `[detect]`, `[link]`,
+  `[orbit]`, `[score]`, `[alert]`) include elapsed time. Satisfies the CLAUDE.md
+  system directive: "elapsed-only heartbeats are not acceptable as a substitute
+  for ETA."
+- `tests/test_adversarial.py` (5 failing tests, PR #115):
+  - `test_missing_cutout_detection`: `compute_streak_metric` now returns `None`
+    (not `0.0`) for observations with no difference cutout.
+  - `test_very_fast_neo_links`: Added fourth observation on night 3 so the linker
+    has a propagation target beyond the seed pair's two nights.
+  - `test_missing_orbital_elements_graceful`: Extended `OrbitQualityCode` from
+    `Literal[1,2,3,4]` to `Literal[0,1,2,3,4]` in `schemas.py`.
+  - `test_short_arc_blocks_submission`: Added `sys.path` fix so `conftest` is
+    importable when running with `PYTHONPATH=src`.
+  - `test_run_pipeline_resumes_from_checkpoint` (`test_pipeline.py`): Added
+    `ready_for_submission` patch to prevent `MagicMock < int` TypeError.
+- `src/detect.py`: `compute_streak_metric` return type changed to `float | None`;
+  `filter_by_streak_score` updated to handle `None` streak scores.
+- `docs/CONSOLE_OUTPUT_SPEC.md`: updated to document per-stage elapsed format,
+  per-survey fetch loop format, and per-tracklet ETA.
+
+### Added
+- `tests/test_adversarial.py`: 10 synthetic adversarial test cases (satellite
+  trail rejection, missing/corrupted cutouts, extreme motion rates, network
+  timeout simulation, survey edge coordinates, duplicate obs IDs, degenerate
+  orbital elements, short-arc submission block).
+- `docs/evidence/prod-loop/LOOP_PROGRESS.md`: persistent session progress
+  tracker for the production loop.
+
+### Changed
+- 3600+ tests passing; 100% coverage on Python 3.14; ruff + mypy clean.
+- Version bumped to 0.89.2.
+
+---
+
+## v0.89.1 — ZTF ndet cap fix + CI green (2026-06-22)
+
+### Fixed
+- `src/fetch.py` (`_fetch_ztf_alerce_api` Mode 1): added `ndet_max=3` and
+  `order_mode="ASC"` so the ALeRCE query surfaces single-detection transient
+  OIDs (moving objects) instead of persistent background sources (ndet=500+).
+- Root cause: moving objects appear as ndet=1 OIDs per night because they move
+  ~700 arcsec/night vs the ~1 arcsec OID association radius; the previous
+  `ndet_max=None` returned only persistent stationary sources, which the linker
+  correctly rejected (0 arcsec/hr rate).
+- `max_objects` increased 50 → 200 for broader field coverage.
+- 2 regression tests added to prevent re-introduction of `ndet_max=None` bug.
+
+### Changed
+- Version bumped to 0.89.1.
+
+---
+
 ## v0.89.0 — Python 3.14.6 coverage fixes + T2-C evidence packet (2026-06-20)
 
 ### Fixed

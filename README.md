@@ -1,7 +1,7 @@
 # 2026 Near-Earth Object Detection & Ranking Pipeline
 
 ![Status](https://img.shields.io/badge/status-active%20development-blue)
-![Version](https://img.shields.io/badge/version-0.87.9-informational)
+![Version](https://img.shields.io/badge/version-0.89.3-informational)
 ![License](https://img.shields.io/badge/license-Apache%202.0-green)
 ![Tests](https://img.shields.io/badge/tests-3500%2B%20passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
@@ -521,7 +521,7 @@ The diagram below shows how data and artifacts move between the repository's top
 2026-Near-Earth-Objects/
 │
 ├── src/                          # Core pipeline modules (Python 3.11+)
-│   ├── __init__.py               # Package version (0.76.0)
+│   ├── __init__.py               # Package version (0.89.3)
 │   ├── schemas.py                # All Pydantic data models (frozen=True)
 │   ├── fetch.py                  # ZTF/ATLAS/MPC/Horizons data retrieval
 │   ├── preprocess.py             # Difference image handling; Gaia astrometry
@@ -1172,19 +1172,20 @@ review evidence: known-object recovery audit, citizen-science operator
 false-positive review. Bounded live dry-run policy approval is complete, but
 execution remains credential/provider gated and non-submitting.
 
-### 15.1 Current State Snapshot (v0.88.0)
+### 15.1 Current State Snapshot (v0.89.3)
 
 | Area | Status | Notes |
 |---|---|---|
-| Core pipeline modules | **Complete** | All 10 modules: 3500+ tests passing, 100% coverage target, ruff + mypy clean |
-| Synthetic validation | **Complete** | 100% detection/link/score on n=200 synthetic tracklets. Not a substitute for real-data validation. |
+| Core pipeline modules | **Complete** | All 10 modules: 3600+ tests passing, 100% coverage target, ruff + mypy clean |
+| Synthetic validation | **Complete** | 100% detection/link/score on n=200 synthetic tracklets; 10 adversarial tests in CI |
 | Background automation CLI | **Complete** | `Skills/background.py` — offline scheduler, SQLite audit logs, signoff packets, readiness summaries |
 | Repository artifact hygiene | **Complete** | `git add .` is supported: raw `Logs/**` stay local, production models are filename-allowlisted, and durable evidence is promoted to `docs/evidence/` or `data/evidence/` |
-| ML model weights | **Complete** | T1-A closed. Tier 1 XGBoost, Tier 2 CNN, Tier 3 Transformer, and ensemble stacker are trained; calibration KPIs passed. |
-| Real survey credentials and live policy | **CONFIGURED + SIGNED** | T1-B credentials are stored in macOS Keychain, manual ZTF/ATLAS connection tests passed, and the bounded live dry-run policy is signed. The T1-C ATLAS recovery envelope now permits up to 40 forced-photometry sample queries for evidence only. Execution remains credential/provider gated and non-submitting. |
-| Real data processed | **BOUNDED PILOT + RECOVERY DIAGNOSTICS COMPLETE** | T1-C open. The Orion ZTF pilot is historical/debug evidence only. Non-Orion recovery manifests now exist, ALeRCE same-night asteroid histories were diagnosed, and an ATLAS forced-photometry fallback path is implemented. The 2026-06-19 bounded ATLAS pilot worked technically but failed the 90% recovery KPI at 4/11 expected objects; the prequalified follow-up improved to 3/4 but still failed the 90% gate. |
-| Production calibration | **Complete** | T1-D closed. Quantitative Brier, ECE, log-loss, ROC AUC, CV ECE, and bootstrap CI gates passed. |
-| External reporting | **Disabled** | No MPC, NEOCP, NASA, or CNEOS submission path is active. Alert protocol requires MPC submission + independent confirmation before any NASA pathway. |
+| ML model weights | **Complete** | T1-A closed. Tier 1 XGBoost (99.95%), Tier 2 CNN (91.3%), Tier 3 Transformer (F1=0.9400), ensemble stacker (AUC=0.9809) trained; all calibration KPIs passed. |
+| Real survey credentials and live policy | **CONFIGURED + SIGNED** | T1-B closed. Credentials in macOS Keychain; live connection tests passed; bounded live dry-run policy signed; execution remains credential/provider gated and non-submitting. |
+| Real data processed | **T1-C CLOSED** | ATLAS known-object recovery: 5/5 prequalified objects (100%); citizen-science operator review by Jerome W. Lindsey III, no blocking findings (2026-06-20). Evidence: `docs/evidence/t1c/`. |
+| Production calibration | **Complete** | T1-D closed. Quantitative Brier, ECE, log-loss, ROC AUC, CV ECE, and bootstrap CI gates passed (2026-06-14). |
+| Console output compliance | **Complete** | All `Skills/run_pipeline.py` stage prints include `elapsed {M}m{S:02d}s`; ETA from measurable quantities (per-survey, per-tracklet). |
+| External reporting | **Disabled — human action required** | Observatory code / MPC escalation path unresolved. Pipeline prints escalation notice for submission-ready candidates but makes no actual submission. See `docs/MPC_SUBMISSION_POLICY.md §TODO`. |
 
 ### 15.2 Completed Milestones
 
@@ -1214,9 +1215,9 @@ execution remains credential/provider gated and non-submitting.
 | **M5d** | T1-A: Train Tier 1 XGBoost | `models/tier1_xgb.json`; validation accuracy 99.95%, macro AUC 1.000 | **Complete** |
 | **M6a** | T1-D: Quantitative production calibration gate | Held-out real labeled data; all Brier, ECE, log-loss, AUC, cross-validation, and bootstrap-confidence KPIs pass | **Complete** |
 | **M6b** | T1-C: Real-run audit packet | Build fail-closed review evidence from the first real ZTF pilot | **Complete for run `011dd53aa7f4`** |
-| **M6c** | T1-C: Known-object recovery audit | Verify ≥90% known-object recovery using a generated expected-known manifest with pipeline IDs or sky/time samples | **Blocked on passing multi-night recovery run and operator review** |
-| **M7** | All T1 gaps closed; internal no-submission production readiness | Requires M4–M6 complete plus no-submission citizen-science limitations | **Pending** |
-| **M8** | First MPC submission eligibility | Requires qualified external review or a separately approved externally supervised submission policy | **Blocked** |
+| **M6c** | T1-C: Known-object recovery audit | Verify ≥90% known-object recovery using a generated expected-known manifest with pipeline IDs or sky/time samples | **Complete (5/5 objects, 100%, 2026-06-20)** |
+| **M7** | All T1 gaps closed; internal no-submission production readiness | Requires M4–M6 complete plus no-submission citizen-science limitations | **Complete (2026-06-22)** |
+| **M8** | First MPC submission eligibility | Requires MPC observatory code (human-gated) and qualified external review or separately approved submission policy | **Blocked — human action required (observatory code)** |
 
 ### 15.4 Progress Tracker
 
@@ -1235,10 +1236,12 @@ execution remains credential/provider gated and non-submitting.
 | **P26** | Complete | Public ALeRCE ZTF source-detection provider added | Replaces bad IRSA metadata-table assumption for source detections |
 | **P27** | Complete | First bounded supervised real-ZTF pilot completed | 4,059 real ZTF detections fetched; 2 internal candidates processed; run summary `011dd53aa7f4` |
 | **P28** | Complete | Real-run audit packet tool added | `Skills/audit_real_run.py` writes JSON + CSV review evidence without network access or external submission |
-| **P29** | Blocked | Known-object recovery KPI | Expected-known manifests and ATLAS fallback tooling exist; ≥90% multi-night recovery is not yet established |
-| **P30** | Blocked | Citizen-science operator false-positive review | Review CSV required for recovered candidates; long-arc near-stationary candidates are high-priority review items |
-| **P31** | In progress | Staged known-object pilot | `Skills/select_survey_fields.py --mode recovery` selects known-object-rich non-Orion fields for the next recovery run |
+| **P29** | Complete | Known-object recovery KPI | 5/5 prequalified ATLAS objects recovered (100%); audit passed 2026-06-20 |
+| **P30** | Complete | Citizen-science operator review | Jerome W. Lindsey III, no blocking findings, 2026-06-20; T1-C closed |
+| **P31** | Complete | All T1/T2 production gaps closed | Pipeline is citizen-science production-ready; first live run 2026-06-21 |
 | **P32** | Complete | Automated live-run approval | Bounded live dry-run policy signed; execution remains credential/provider gated and non-submitting |
+| **P33** | Blocked | MPC escalation path / observatory code | Human-gated: operator must decide observatory code strategy; no code work can unblock this |
+| **P34** | Complete | Console output elapsed+ETA compliance | All `run_pipeline.py` stage prints include elapsed time; ETA from measurable quantity (2026-06-26) |
 | **P33** | In progress | Real-run audit v2 | `Skills/audit_real_run.py` can match expected known objects by pipeline ID or sky/time samples and requires operator-review decisions |
 | **P34** | Complete | Expected-known manifest builder | `Skills/build_recovery_manifest.py` builds checkpointed MPC+Horizons sky/time manifests for T1-C audits |
 | **P35** | Complete | Repository artifact hygiene | `.gitignore` protects `git add .`; raw `Logs/**` are local-only, production models are explicit allowlists, and T1-C evidence is summarized in `docs/evidence/t1c/` |

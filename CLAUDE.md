@@ -625,14 +625,14 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.89.0)
+## Current State (v0.89.3)
 
 All 10 pipeline modules are complete. The offline suite passes 3600+ tests (plus
-10 synthetic adversarial tests added 2026-06-21), with 2 live/integration checks
-deselected. CI is green on Python 3.14 with the 100% coverage target.
-All three ML tiers have trained weights: Tier 1 XGBoost (val_acc=99.95%), Tier 2
-CNN (val_acc=91.3%), and Tier 3 Transformer (val_macro_f1=0.9400, best epoch
-17/30). **T1-A CLOSED. T1-B CLOSED. T1-C CLOSED. T1-D CLOSED.**
+10 synthetic adversarial tests), with 2 live/integration checks deselected. CI is
+green on Python 3.14 with the 100% coverage target. All three ML tiers have
+trained weights: Tier 1 XGBoost (val_acc=99.95%), Tier 2 CNN (val_acc=91.3%),
+and Tier 3 Transformer (val_macro_f1=0.9400, best epoch 17/30).
+**T1-A CLOSED. T1-B CLOSED. T1-C CLOSED. T1-D CLOSED.**
 Ensemble stacker KPIs passed 2026-06-14 (AUC=0.9809, Brier=0.0211, ECE=0.0000).
 T2-C CLOSED 2026-06-21 (operator sign-off by Jerome W. Lindsey III).
 T2-D CLOSED 2026-06-21 (model-weight CI job + `Skills/validate_model_weights.py`).
@@ -643,10 +643,58 @@ expert review" guardrail was removed by operator decision on 2026-06-21 — see
 `docs/MPC_SUBMISSION_POLICY.md`. MPC/NEOCP/Scout is the expert review system;
 no in-house expert is required or expected.
 
-### Handoff state as of 2026-06-22 (CURRENT)
+### Handoff state as of 2026-06-26 (CURRENT)
 
-All T1 gaps are closed. All operator commands for T1-C are complete — do NOT
-re-run any ATLAS screening, prequalification, or audit commands.
+**Discovery paper goal established (2026-06-26)**:
+The project goal is a **defensible discovery paper** — not a methods paper and not a
+citizen-science reporting tool. The pipeline generates candidates; two review stages
+filter them before any external submission:
+  1. **Adversarial review** (`Skills/adversarial_review.py`): automated agent tries
+     to REJECT each candidate by finding fatal flaws.
+  2. **Operator review** (Jerome): reviews survivors manually.
+  3. **MPC submission**: surviving candidates submitted → provisional designation.
+  4. **Independent confirmation**: NEOCP follow-up observatories confirm.
+  5. **Discovery paper**: documents the find with MPC designation as proof.
+
+**Adversarial review implemented (PR pending, v0.89.3)**:
+`Skills/adversarial_review.py` — runs 13 offline challenges + 2 optional live checks
+against each `ScoredNEO`. Verdict: SURVIVE / BORDERLINE / REJECT. Exit code 0/1/2
+for pipeline automation. Tests in `tests/test_adversarial_review_skill.py` (50+ cases).
+This is a **separate post-processing step** — run after `run_pipeline.py`:
+```bash
+# Step 1: Generate candidates (after PR #116 + PR #117 merge to main)
+git pull origin main
+export PYTHONPATH=src
+caffeinate -i uv run python Skills/run_pipeline.py \
+    --ra 284.13 --dec -22.5 --radius 3.5 \
+    --start-jd 2461183.0 --end-jd 2461213.0 \
+    --surveys ZTF --no-dry-run --force-refresh --no-resume
+
+# Step 2: Run adversarial review on any candidates found
+PYTHONPATH=src uv run python Skills/adversarial_review.py Logs/pipeline_runs/*/candidates.json
+```
+
+**Console output elapsed+ETA compliance (PR #116, pending merge)**:
+Every stage print in `Skills/run_pipeline.py` now includes `elapsed {M}m{S:02d}s`.
+`docs/CONSOLE_OUTPUT_SPEC.md` updated to document new format.
+
+**DO NOT give any operator commands** until PR #116 AND PR #117 (adversarial review)
+both merge to main. All code runs from main — operator never checks out feature branches.
+
+**Two human-gated blockers remain**:
+1. **MPC observatory code**: Jerome must contact MPC to determine how a data-analysis
+   pipeline (not an observing telescope) can submit observation reports.
+   See `docs/MPC_SUBMISSION_POLICY.md §TODO for Future Agents`.
+2. **Actual candidate discovery**: The pipeline must find at least one candidate that
+   survives both adversarial review and operator review before a discovery paper is possible.
+
+**Progress tracker**: `docs/evidence/prod-loop/LOOP_PROGRESS.md` — read this
+at session start to avoid repeating completed work.
+
+### Handoff state as of 2026-06-22
+
+All T1 and T2 gaps are closed. All operator commands for T1-C are complete —
+do NOT re-run any ATLAS screening, prequalification, or audit commands.
 
 **LIVE PIPELINE OPERATIONAL (2026-06-21)**: First live run completed successfully.
 - Run ID: `6c1b387e0763`, field RA=83.8221 Dec=-5.3911, ZTF, 7-day window
@@ -656,7 +704,7 @@ re-run any ATLAS screening, prequalification, or audit commands.
 - Evidence: `docs/evidence/live/2026-06-21-first-live-run.md`
 - DO NOT re-run this specific command — zero-alert result was expected and confirmed
 
-**ZTF fetch ndet cap fix applied (2026-06-22, PR #115 pending)**:
+**ZTF fetch ndet cap fix + adversarial test fixes (PR #115, MERGED 2026-06-22)**:
 - Root cause of 0 tracklets (Runs 3–5): `_fetch_ztf_alerce_api` Mode 1 used
   `ndet_max=None`, returning persistent stationary sources at fixed sky positions.
   The linker correctly rejected all 3134 seed pairs (rate ≈ 0 arcsec/hr for same
@@ -669,8 +717,10 @@ re-run any ATLAS screening, prequalification, or audit commands.
 - `max_objects` increased 50 → 200 for broader field coverage.
 - Evidence: `docs/evidence/live/2026-06-22-ndet-cap-root-cause.md`
 - 2 regression tests added to prevent re-introduction of ndet_max=None bug.
+- All 5 pre-existing adversarial/pipeline test failures fixed (see AGENTS.md).
+- CI green on Python 3.14 with 100% coverage ✓
 
-**Next live run** (after PR #115 merges to main):
+**Next live run** (operator, from main — PR #115 already merged):
 ```bash
 git pull origin main
 export PYTHONPATH=src
@@ -907,26 +957,46 @@ succeeded and produced the trained Tier 3 weights now recorded under T1-A.
 | `classify.py` | 100% |
 | `fetch.py` | 100% (ztfquery, ATLAS, astroquery.mpc, jplhorizons all mocked) |
 
-### Remaining Operational Milestones
+### Completed Operational Milestones
 
-| Milestone | Description |
-|---|---|
-| 4 | Production live ZTF/ATLAS/Pan-STARRS runs with real credentials and scheduler policy |
-| 5 | Trained Tier 2 CNN weights from labeled ZTF cutouts |
-| 6 | Trained Tier 3 Transformer weights from multi-night MPC/ZTF sequences |
-| 7 | Production ensemble calibration on fresh labeled survey data |
+| Milestone | Status | Description |
+|---|---|---|
+| 4 (partial) | LIVE ✓ | Production live ZTF runs working; first live run 2026-06-21; scheduler policy in `background/config.json` |
+| 5 | DONE ✓ | Tier 2 CNN trained (`models/tier2_cnn.pt`; val_acc=91.3%) |
+| 6 | DONE ✓ | Tier 3 Transformer trained (`models/tier3_transformer.pt`; val_macro_f1=0.9400) |
+| 7 | DONE ✓ | Ensemble calibration: AUC=0.9809, Brier=0.0211, ECE=0.0000, all 7 KPIs pass |
+
+### One Remaining Human-Gated Blocker
+
+- **MPC escalation path (HUMAN DECISION REQUIRED)** — The pipeline processes *public
+  ZTF/ATLAS survey data* (not original telescope observations). Whether this pipeline can
+  submit MPC reports and under what observatory code is an unresolved administrative/policy
+  question. `run_pipeline.py` prints an escalation notice for every submission-ready
+  candidate but makes no actual submission. Jerome must contact MPC or decide on observatory
+  code strategy before any submission can be made.
+  See `docs/MPC_SUBMISSION_POLICY.md §TODO for Future Agents` for full problem statement.
 
 ### Immediate Next Steps
 
-- **TODO (open): MPC escalation path** — How a pipeline processing *public ZTF/ATLAS survey
-  data* (not original observations) submits to MPC without a telescope/observatory code is
-  unresolved. See `docs/MPC_SUBMISSION_POLICY.md §TODO for Future Agents` for the full
-  problem statement. Until resolved, `run_pipeline.py` prints an escalation notice for every
-  submission-ready candidate but makes no actual submission.
+**Goal: defensible discovery paper** (established 2026-06-26 with operator Jerome W. Lindsey III).
+Pipeline generates candidates → adversarial review filters → operator reviews survivors →
+MPC submission → provisional designation → independent confirmation → journal paper.
 
-- **Console output spec**: All pipeline runner scripts must conform to
-  `docs/CONSOLE_OUTPUT_SPEC.md`. `Skills/run_pipeline.py` is compliant as of 2026-06-21.
-  Use `--no-dry-run` flag for live runs (default is dry_run=True).
+1. **Merge PR #116** (write rate limit must clear): console output + doc sync to v0.89.3.
+2. **Open PR #117**: commit `Skills/adversarial_review.py` +
+   `tests/test_adversarial_review_skill.py` + version bump to v0.89.3.
+3. **Update `docs/MPC_SUBMISSION_POLICY.md`**: add §Adversarial Review section describing
+   the two-stage review process and how it gates external submission.
+4. **Run live pipeline** (after PRs merge to main, using `caffeinate -i` + `--no-dry-run`).
+5. **Run adversarial review** on any candidates found.
+6. **Jerome reviews** any SURVIVE or BORDERLINE candidates.
+7. **Jerome resolves MPC observatory code** (human-gated; no code can help here).
+8. Submit survivors to MPC → await provisional designation.
+
+- Console output is fully compliant with `docs/CONSOLE_OUTPUT_SPEC.md` as of v0.89.3.
+- ALWAYS run from `main` — operator never checks out feature branches.
+- All commands must begin with `git pull origin main`.
+- Never give operator any command before the relevant PR merges.
 
 - Sync docs and changelog after each version bump so `AGENTS.md`, `CLAUDE.md`, `README.md`, and `CHANGELOG.md` stay aligned.
 - Inspect background SQLite schema status with `Skills/background.py schema-status-summary` before running operators against older logs.
