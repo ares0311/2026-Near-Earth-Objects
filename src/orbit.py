@@ -2,44 +2,17 @@
 
 from __future__ import annotations
 
-__all__ = ["classify_neo", "compute_moid", "fit_orbit", "arc_quality_report",
-           "propagate_orbit", "predict_ephemeris", "close_approach_table",
-           "compute_orbital_period", "classify_neo_class", "tisserand_parameter",
-           "batch_predict_ephemeris", "resonance_check", "ephemeris_uncertainty",
-           "orbital_energy", "compute_phase_angle",
-           "compute_heliocentric_distance", "compute_synodic_period",
-           "compute_apparent_magnitude", "compute_absolute_magnitude",
-           "compute_perihelion_date", "compute_eccentric_anomaly",
-           "compute_true_anomaly", "compute_mean_motion",
-           "compute_longitude_of_perihelion",
-           "compute_orbital_inclination_class",
-           "compute_mean_anomaly_at_jd",
-           "compute_orbital_velocity",
-           "compute_perihelion_distance",
-           "compute_aphelion_distance",
-           "compute_tisserand_wrt_earth",
-           "compute_orbital_arc_quality",
-           "compute_mean_anomaly_at_epoch",
-           "compute_hill_sphere_radius",
-           "compute_encounter_velocity",
-           "compute_heliocentric_velocity",
-           "compute_semi_latus_rectum",
-           "compute_nodal_precession_rate",
-           "compute_vis_viva_velocity",
-           "compute_jacobi_constant",
-           "compute_earth_moid_estimate",
-           "compute_orbital_eccentricity_class",
-           "compute_orbital_speed_at_perihelion",
-           "compute_impact_parameter",
-           "compute_geocentric_velocity",
-           "compute_orbital_period_years",
-           "compute_longitude_ascending_node_rate",
-           "compute_argument_of_perihelion_rate",
-           "compute_perihelion_velocity",
-           "compute_aphelion_velocity",
-           "compute_specific_angular_momentum",
-           "compute_orbit_complexity",
-           "compute_mean_longitude"]
+__all__ = [
+    "classify_neo",
+    "compute_moid",
+    "fit_orbit",
+    "arc_quality_report",
+    "predict_ephemeris",
+    "close_approach_table",
+    "classify_neo_class",
+    "tisserand_parameter",
+    "compute_mean_motion",
+]
 
 import math
 from typing import NamedTuple
@@ -483,34 +456,6 @@ def arc_quality_report(tracklet: Tracklet) -> dict:
     }
 
 
-def propagate_orbit(elements: OrbitalElements, dt_days: float) -> OrbitalElements:
-    """Propagate Keplerian orbital elements forward by ``dt_days``.
-
-    Uses two-body (Keplerian) propagation: advances the mean anomaly by
-    ``n * dt_days`` where ``n = 2π / T`` is the mean motion.  All other
-    elements are unchanged (no perturbations).
-
-    Returns a new :class:`OrbitalElements` with the updated ``mean_anomaly_deg``
-    and ``epoch_jd``.
-    """
-    a = elements.semi_major_axis_au
-    # Mean motion in deg/day (n = 360 / T, T in days)
-    T_days = 365.25 * math.sqrt(a**3)  # Kepler's third law (AU, yr)
-    n_deg_per_day = 360.0 / T_days if T_days > 0 else 0.0
-    new_M = (elements.mean_anomaly_deg + n_deg_per_day * dt_days) % 360.0
-    return OrbitalElements(
-        semi_major_axis_au=elements.semi_major_axis_au,
-        eccentricity=elements.eccentricity,
-        inclination_deg=elements.inclination_deg,
-        longitude_ascending_node_deg=elements.longitude_ascending_node_deg,
-        argument_perihelion_deg=elements.argument_perihelion_deg,
-        mean_anomaly_deg=new_M,
-        epoch_jd=elements.epoch_jd + dt_days,
-        perihelion_au=elements.perihelion_au,
-        aphelion_au=elements.aphelion_au,
-        quality_code=elements.quality_code,
-        fit_residual_arcsec=elements.fit_residual_arcsec,
-    )
 
 
 def _kepler_equation(M_rad: float, e: float, tol: float = 1e-10) -> float:
@@ -657,16 +602,6 @@ def close_approach_table(
     return rows
 
 
-def compute_orbital_period(elements: OrbitalElements) -> float:
-    """Return the orbital period in days using Kepler's third law.
-
-    T = 365.25 * sqrt(a^3) days, where a is the semi-major axis in AU.
-    Returns 0.0 for unphysical (non-positive) semi-major axis values.
-    """
-    a = elements.semi_major_axis_au
-    if a <= 0.0:
-        return 0.0
-    return 365.25 * math.sqrt(a ** 3)
 
 
 def classify_neo_class(elements: OrbitalElements) -> NEOClass:
@@ -711,399 +646,28 @@ def tisserand_parameter(elements: OrbitalElements) -> float:
     return a_J / a + 2.0 * math.cos(i_rad) * math.sqrt((a / a_J) * (1.0 - e ** 2))
 
 
-def batch_predict_ephemeris(
-    elements_list: list[OrbitalElements],
-    target_jd: float,
-) -> list[dict]:
-    """Predict sky positions for a list of OrbitalElements at one Julian Date.
-
-    Calls :func:`predict_ephemeris` for each element set and returns a list of
-    dicts in the same order.  Each dict has keys:
-      ``ra_deg``, ``dec_deg``, ``helio_dist_au``, ``jd``.
-
-    Objects for which propagation fails are represented by a dict with
-    ``ra_deg=None``, ``dec_deg=None``, ``helio_dist_au=None``, ``jd=target_jd``.
-    """
-    results = []
-    for el in elements_list:
-        try:
-            results.append(predict_ephemeris(el, target_jd))
-        except Exception:
-            results.append({"ra_deg": None, "dec_deg": None,
-                            "helio_dist_au": None, "jd": target_jd})
-    return results
 
 
-_JUPITER_RESONANCES: list[tuple[int, int]] = [
-    (1, 1), (2, 1), (3, 1), (3, 2), (4, 1), (4, 3),
-    (5, 1), (5, 2), (5, 3), (5, 4),
-    (7, 2), (7, 3), (7, 4),
-]
-_JUPITER_PERIOD_YR = 11.862  # Jupiter's orbital period in years
 
 
-def resonance_check(
-    elements: OrbitalElements,
-    tolerance: float = 0.02,
-) -> dict | None:
-    """Check for mean-motion resonance with Jupiter.
-
-    Tests the object's orbital period (from Kepler's 3rd law) against a list
-    of common resonance ratios p:q (object:Jupiter).  Returns a dict with
-    keys ``resonance`` (string like ``"3:1"``), ``period_ratio``, and
-    ``fractional_offset`` if any resonance is within *tolerance* (default 2%).
-    Returns ``None`` if no resonance is found.
-    """
-    a = elements.semi_major_axis_au
-    if a <= 0.0:
-        return None
-    period_yr = a ** 1.5  # Kepler: T = a^(3/2) years (Earth=1 yr)
-    ratio = _JUPITER_PERIOD_YR / period_yr  # mean-motion ratio n_obj/n_J = T_J/T_obj
-
-    for p, q in _JUPITER_RESONANCES:
-        exact = p / q
-        offset = abs(ratio - exact) / exact
-        if offset <= tolerance:
-            return {
-                "resonance": f"{p}:{q}",
-                "period_ratio": round(ratio, 6),
-                "fractional_offset": round(offset, 6),
-            }
-    return None
-
-# Quality-code → typical element uncertainty mapping (fractional, 1-sigma)
-_QUALITY_UNCERTAINTY: dict[int, float] = {
-    1: 0.10,   # arc < 1 day: ~10% element uncertainty
-    2: 0.02,   # multi-night: ~2%
-    3: 0.005,  # multi-week: ~0.5%
-    4: 0.001,  # opposition: ~0.1%
-}
 
 
-def ephemeris_uncertainty(
-    elements: OrbitalElements,
-    target_jd: float,
-) -> dict:
-    """Estimate sky-plane positional uncertainty at *target_jd*.
-
-    Propagates orbital element uncertainties (keyed by quality code) through
-    Keplerian propagation to produce a 1-sigma sky-plane error ellipse in
-    arcseconds.  Returns a dict with keys ``ra_unc_arcsec``, ``dec_unc_arcsec``,
-    and ``jd``.  Both components are equal (circular uncertainty) and scale with
-    propagation time and element quality.
-    """
-    epoch_jd = elements.epoch_jd if elements.epoch_jd is not None else target_jd
-    dt_days = abs(target_jd - epoch_jd)
-
-    frac = _QUALITY_UNCERTAINTY.get(elements.quality_code, 0.10)
-
-    a = elements.semi_major_axis_au
-    if a > 0:
-        # Sky-plane uncertainty grows with propagation time (linear approximation)
-        # Reference: 1 AU at 1 AU geocentric distance subtends ~206265 arcsec
-        base_arcsec = frac * a * 206265.0
-        # Growth with time: ~ dt / orbital_period
-        period_days = (a ** 1.5) * 365.25
-        growth = 1.0 + dt_days / max(period_days, 1.0)
-        unc = base_arcsec * growth
-    else:
-        unc = 1e6  # undefined orbit
-
-    unc = round(float(unc), 2)
-    return {"ra_unc_arcsec": unc, "dec_unc_arcsec": unc, "jd": target_jd}
 
 
-def orbital_energy(elements: OrbitalElements) -> float:
-    """Specific orbital energy in AU²/yr² (two-body, heliocentric).
-
-    E = -GM / (2a) using GM = 4π² AU³/yr².
-    Negative → bound orbit; zero → parabolic; positive → hyperbolic.
-    Returns ``float('inf')`` when ``semi_major_axis_au`` ≤ 0.
-    """
-    a = elements.semi_major_axis_au
-    if a <= 0.0:
-        return float("inf")
-    GM = 4.0 * math.pi ** 2  # AU³/yr²
-    return -GM / (2.0 * a)
 
 
-def compute_phase_angle(elements: OrbitalElements, target_jd: float) -> float:
-    """Sun–target–observer phase angle in degrees at a given Julian Date.
-
-    Uses the heliocentric distance from the orbital elements and an approximate
-    geocentric distance from ``predict_ephemeris`` to compute the phase angle
-    via the law of cosines.  Returns NaN when geometry is degenerate.
-    """
-    try:
-        ephem = predict_ephemeris(elements, target_jd)
-        ra_deg = ephem.get("ra_deg")
-        dec_deg = ephem.get("dec_deg")
-        helio_dist = ephem.get("helio_dist_au")
-        if ra_deg is None or dec_deg is None or helio_dist is None or helio_dist <= 0:
-            return float("nan")
-        # Approximate geocentric distance from predicted RA/Dec and helio_dist
-        # Using simplified geometry: geo_dist ≈ helio_dist - 1 AU (rough for near-Earth)
-        # More accurately: use law of cosines with Earth at ~1 AU and helio_dist
-        a = helio_dist  # target heliocentric distance
-        b = 1.0         # Earth heliocentric distance (AU)
-        # Elongation angle via dot product of position vectors (simplified)
-        # We approximate: cos(phase) = (a² + c² - b²) / (2*a*c)
-        # where c = geocentric distance ≈ sqrt(a² + b² - 2ab*cos(elongation))
-        # Use elongation from RA/Dec relative to the Sun
-        _sun_position_ecliptic(target_jd)  # ensure helper path is exercised
-        # Geocentric distance c from ephem data: use helio dist and 1 AU baseline
-        # cos(elong) from predict_ephemeris RA/Dec vs solar RA/Dec (approximate)
-        # For a simple phase angle, use: phase ≈ arccos((a² + c² - 1)/(2ac))
-        # Approximate c with |helio - 1| as a lower bound
-        c = abs(a - b) + 0.01  # avoid zero
-        cos_phase = (a**2 + c**2 - b**2) / (2.0 * a * c)
-        cos_phase = max(-1.0, min(1.0, cos_phase))
-        return round(math.degrees(math.acos(cos_phase)), 4)
-    except Exception:
-        return float("nan")
 
 
-def compute_heliocentric_distance(elements: OrbitalElements, target_jd: float) -> float:
-    """Heliocentric distance of the object at a given Julian Date.
-
-    Propagates the orbit to ``target_jd`` via Keplerian two-body motion and
-    returns the heliocentric distance in AU.  Returns ``float('inf')`` for
-    degenerate elements (semi-major axis ≤ 0 or eccentricity ≥ 1 for elliptic
-    classification), and ``float('nan')`` if propagation fails for any other
-    reason.
-
-    Args:
-        elements: Orbital elements frozen at epoch_jd.
-        target_jd: Julian Date at which to evaluate the distance.
-
-    Returns:
-        Heliocentric distance in AU, or inf/nan on failure.
-    """
-    a = elements.semi_major_axis_au
-    if a <= 0.0:
-        return float("inf")
-    try:
-        ephem = predict_ephemeris(elements, target_jd)
-        r = ephem.get("helio_dist_au")
-        if r is None or r != r:  # None or NaN
-            return float("nan")
-        return round(float(r), 6)
-    except Exception:
-        return float("nan")
 
 
-def compute_synodic_period(elements: OrbitalElements) -> float:
-    """Compute the synodic period of the object relative to Earth in days.
-
-    Uses the formula 1/P_syn = |1/P_obj - 1/P_earth| where P is the sidereal
-    period in years.  Returns infinity when the object's period equals Earth's
-    (a = 1 AU exactly) and when the semi-major axis is non-positive.
-
-    Args:
-        elements: Orbital elements of the target object.
-
-    Returns:
-        Synodic period in days, or ``math.inf`` for degenerate cases.
-    """
-    a = elements.semi_major_axis_au
-    if a <= 0.0:
-        return math.inf
-    p_obj = math.sqrt(a ** 3)  # sidereal period in years (Kepler's 3rd law)
-    p_earth = 1.0  # Earth's sidereal period in years
-    diff = abs(1.0 / p_obj - 1.0 / p_earth)
-    if diff == 0.0:
-        return math.inf
-    p_syn_years = 1.0 / diff
-    return round(p_syn_years * 365.25, 4)
 
 
-def compute_apparent_magnitude(
-    elements: OrbitalElements,
-    target_jd: float,
-    albedo: float = 0.14,
-) -> float:
-    """Compute the approximate V-band apparent magnitude at a given epoch.
-
-    Uses the IAU HG phase function (G = 0.15) and the heliocentric/geocentric
-    distances from a Keplerian ephemeris prediction.  The absolute magnitude H
-    is derived from the estimated diameter and albedo when
-    ``HazardAssessment.absolute_magnitude_h`` is unavailable; if neither
-    diameter nor albedo provides a finite H the function returns NaN.
-
-    The HG phase function coefficients follow Bowell et al. (1989):
-    phi_1 = exp(-3.33 * tan(alpha/2)^0.63)
-    phi_2 = exp(-1.87 * tan(alpha/2)^1.22)
-    V = H - 2.5 * log10((1 - G) * phi_1 + G * phi_2) + 5 * log10(r * delta)
-
-    Args:
-        elements: Orbital elements of the target.
-        target_jd: Julian Date at which to evaluate the apparent magnitude.
-        albedo: Geometric albedo used to estimate H from diameter (default 0.14).
-
-    Returns:
-        Approximate V-band apparent magnitude, or ``float("nan")`` on failure.
-    """
-    try:
-        phase_angle_deg = compute_phase_angle(elements, target_jd)
-        if math.isnan(phase_angle_deg):
-            return float("nan")
-        alpha = math.radians(phase_angle_deg)
-
-        eph = predict_ephemeris(elements, target_jd)
-        r = eph.get("helio_dist_au", None)
-        if r is None or r <= 0.0:
-            return float("nan")
-
-        # Geocentric distance: approximate from heliocentric distance
-        # (predict_ephemeris does not directly return delta, so estimate via
-        # law of cosines with Earth at 1 AU and phase angle alpha)
-        # delta^2 = r^2 + 1 - 2*r*cos(alpha)
-        delta_sq = r**2 + 1.0 - 2.0 * r * math.cos(alpha)
-        if delta_sq <= 0.0:
-            return float("nan")
-        delta = math.sqrt(delta_sq)
-
-        # Absolute magnitude H from diameter + albedo (H = -2.5 log10(albedo * (D/1329)^2))
-        # Use a fixed H of 18.0 as placeholder when elements carry no H
-        # (callers should supply H via HazardAssessment; here we use a reasonable default)
-        h_mag = 18.0  # default H for unknown size
-        if albedo > 0.0:
-            # If albedo is provided use a typical NEO diameter of 300 m
-            d_km = 0.3  # km
-            h_mag = -2.5 * math.log10(albedo * (d_km / 1.329) ** 2)
-
-        G_slope = 0.15
-        tan_half = math.tan(alpha / 2.0)
-        if tan_half < 0.0:
-            return float("nan")
-        phi1 = math.exp(-3.33 * (tan_half ** 0.63))
-        phi2 = math.exp(-1.87 * (tan_half ** 1.22))
-        phase_correction = -2.5 * math.log10((1.0 - G_slope) * phi1 + G_slope * phi2)
-        dist_correction = 5.0 * math.log10(r * delta)
-        return round(h_mag + phase_correction + dist_correction, 4)
-    except Exception:
-        return float("nan")
 
 
-def compute_absolute_magnitude(
-    observed_mag: float,
-    r_au: float,
-    delta_au: float,
-    phase_deg: float,
-    g: float = 0.15,
-) -> float:
-    """Derive absolute magnitude H from an observed apparent magnitude.
-
-    Inverts the IAU HG phase function:
-    H = V - 5*log10(r * delta) + 2.5*log10((1-G)*phi1 + G*phi2)
-
-    Args:
-        observed_mag: Observed apparent V-band magnitude.
-        r_au: Heliocentric distance in AU.
-        delta_au: Geocentric (observer) distance in AU.
-        phase_deg: Sun-target-observer phase angle in degrees.
-        g: Slope parameter G (default 0.15).
-
-    Returns:
-        Absolute magnitude H as float, or ``float("nan")`` for degenerate inputs.
-    """
-    try:
-        if r_au <= 0.0 or delta_au <= 0.0:
-            return float("nan")
-        alpha = math.radians(phase_deg)
-        tan_half = math.tan(alpha / 2.0)
-        if tan_half < 0.0:
-            return float("nan")
-        phi1 = math.exp(-3.33 * (tan_half ** 0.63))
-        phi2 = math.exp(-1.87 * (tan_half ** 1.22))
-        phase_correction = -2.5 * math.log10((1.0 - g) * phi1 + g * phi2)
-        dist_correction = 5.0 * math.log10(r_au * delta_au)
-        return round(observed_mag - phase_correction - dist_correction, 4)
-    except Exception:
-        return float("nan")
 
 
-def compute_perihelion_date(elements: OrbitalElements) -> float | None:
-    """Compute the JD of next perihelion passage from orbital elements.
-
-    Uses the current mean anomaly, orbital period, and epoch to project
-    forward (or backward minimally) to the nearest future perihelion.
-
-    Args:
-        elements: OrbitalElements with semi-major axis, eccentricity, mean
-            anomaly at epoch, and epoch_jd.
-
-    Returns:
-        JD of next perihelion passage, or ``None`` for hyperbolic/parabolic
-        orbits (e >= 1) or non-positive semi-major axis.
-    """
-    try:
-        a = elements.semi_major_axis_au
-        e = elements.eccentricity
-        if a <= 0.0 or e >= 1.0:
-            return None
-        period_days = compute_orbital_period(elements)
-        if not math.isfinite(period_days) or period_days <= 0.0:
-            return None
-        M_deg = elements.mean_anomaly_deg % 360.0
-        M_rad = math.radians(M_deg)
-        fraction_to_perihelion = (2.0 * math.pi - M_rad) / (2.0 * math.pi)
-        days_to_perihelion = fraction_to_perihelion * period_days
-        return round(elements.epoch_jd + days_to_perihelion, 4)
-    except Exception:
-        return None
 
 
-def compute_eccentric_anomaly(
-    M_rad: float,
-    e: float,
-    tol: float = 1e-10,
-    max_iter: int = 50,
-) -> float:
-    """Solve Kepler's equation M = E - e·sin(E) via Newton-Raphson.
-
-    Args:
-        M_rad: Mean anomaly in radians.
-        e: Orbital eccentricity (must be in [0, 1) for elliptic orbits).
-        tol: Convergence tolerance on |ΔE|.
-        max_iter: Maximum Newton-Raphson iterations.
-
-    Returns:
-        Eccentric anomaly E in radians (same range as M_rad unwrapped).
-
-    Raises:
-        ValueError: If eccentricity is out of range [0, 1) or convergence fails.
-    """
-    if not (0.0 <= e < 1.0):
-        raise ValueError(f"eccentricity must be in [0, 1) for elliptic orbit, got {e}")
-    M = M_rad % (2.0 * math.pi)
-    E = M + e * math.sin(M) * (1.0 + e * math.cos(M))
-    for _ in range(max_iter):
-        dE = (M - E + e * math.sin(E)) / (1.0 - e * math.cos(E))
-        E += dE
-        if abs(dE) < tol:
-            return E
-    raise ValueError(f"Kepler's equation did not converge after {max_iter} iterations")
-
-
-def compute_true_anomaly(E_rad: float, e: float) -> float:
-    """Compute true anomaly from eccentric anomaly via the half-angle formula.
-
-    Args:
-        E_rad: Eccentric anomaly in radians.
-        e: Orbital eccentricity in [0, 1).
-
-    Returns:
-        True anomaly in radians, in the range [0, 2π).
-
-    Raises:
-        ValueError: If eccentricity is not in [0, 1).
-    """
-    if not (0.0 <= e < 1.0):
-        raise ValueError(f"eccentricity must be in [0, 1), got {e}")
-    sqrt_factor = math.sqrt((1.0 + e) / (1.0 - e))
-    nu = 2.0 * math.atan(sqrt_factor * math.tan(E_rad / 2.0))
-    return nu % (2.0 * math.pi)
 
 
 def compute_mean_motion(elements: OrbitalElements) -> float:
@@ -1129,835 +693,89 @@ def compute_mean_motion(elements: OrbitalElements) -> float:
     return 360.0 / T_days
 
 
-def compute_longitude_of_perihelion(elements: object) -> float:
-    """Compute the longitude of perihelion ϖ = Ω + ω (mod 360°).
 
-    Args:
-        elements: Orbital elements with ``longitude_of_ascending_node_deg`` (Ω)
-            and ``argument_of_perihelion_deg`` (ω); defaults to 0.0 if absent.
 
-    Returns:
-        Longitude of perihelion in degrees, in [0, 360).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def propagate_orbit(elements: OrbitalElements, dt_days: float) -> OrbitalElements:
+    """Propagate Keplerian orbital elements forward by ``dt_days``.
+
+    Uses two-body (Keplerian) propagation: advances the mean anomaly by
+    ``n * dt_days`` where ``n = 2π / T`` is the mean motion.  All other
+    elements are unchanged (no perturbations).
+
+    Returns a new :class:`OrbitalElements` with the updated ``mean_anomaly_deg``
+    and ``epoch_jd``.
     """
-    omega_node = float(getattr(elements, "longitude_of_ascending_node_deg", 0.0))
-    omega_peri = float(getattr(elements, "argument_of_perihelion_deg", 0.0))
-    return round((omega_node + omega_peri) % 360.0, 6)
-
-
-def compute_orbital_inclination_class(elements: object) -> str:
-    """Classify an orbit's inclination as prograde, polar, or retrograde.
-
-    Uses the inclination attribute from *elements* (degrees):
-
-    - ``'prograde'``  — i < 85°  (direct motion, low-to-moderate inclination)
-    - ``'polar'``     — 85° ≤ i ≤ 95°  (near-polar orbit)
-    - ``'retrograde'`` — i > 95°  (reverse motion relative to Earth's orbit)
-
-    Falls back to the ``inclination_deg`` attribute name used by
-    :class:`~schemas.OrbitalElements` and also accepts the alternative
-    ``'i_deg'`` name.  Defaults to 0.0 if neither attribute is found.
-
-    Args:
-        elements: Object with an ``inclination_deg`` (or ``i_deg``) attribute.
-
-    Returns:
-        One of ``'prograde'``, ``'polar'``, or ``'retrograde'``.
-    """
-    inc = getattr(elements, "inclination_deg", None)
-    if inc is None:
-        inc = getattr(elements, "i_deg", 0.0)
-    inc = float(inc)
-    if inc < 85.0:
-        return "prograde"
-    if inc <= 95.0:
-        return "polar"
-    return "retrograde"
-
-
-def compute_mean_anomaly_at_jd(elements: object, target_jd: float) -> float | None:
-    """Return the mean anomaly in radians at *target_jd* for a Keplerian orbit.
-
-    The mean anomaly advances uniformly at the mean motion *n = 2π / T*
-    where *T* is the orbital period in days.  Returns *None* when the
-    orbital period is non-positive (hyperbolic or parabolic orbits).
-
-    The result is wrapped to [0, 2π).
-    """
-    import math
-
-    a = float(getattr(elements, "semi_major_axis_au", 0.0) or 0.0)
-    e = float(getattr(elements, "eccentricity", 0.0) or 0.0)
-    if e >= 1.0 or a <= 0.0:
-        return None
-    period_days = 365.25 * math.sqrt(a ** 3)
-    epoch_jd = float(getattr(elements, "epoch_jd", 2451545.0) or 2451545.0)
-    m0_deg = float(getattr(elements, "mean_anomaly_deg", 0.0) or 0.0)
-    m0_rad = math.radians(m0_deg)
-    n_rad_per_day = 2.0 * math.pi / period_days
-    delta_t = target_jd - epoch_jd
-    m_rad = (m0_rad + n_rad_per_day * delta_t) % (2.0 * math.pi)
-    return round(m_rad, 8)
-
-
-def compute_orbital_velocity(elements: object, r_au: float) -> float | None:
-    """Return the orbital speed in km/s at heliocentric distance *r_au*.
-
-    Uses the vis-viva equation:
-
-    .. math::
-
-        v = \\sqrt{GM_\\odot \\left(\\frac{2}{r} - \\frac{1}{a}\\right)}
-
-    where :math:`GM_\\odot = 1.327 \\times 10^{20}` m³/s² and distances are
-    converted from AU (1 AU = 1.496 × 10¹¹ m).  Returns *None* when
-    ``semi_major_axis_au`` is non-positive or *r_au* ≤ 0.
-    """
-    import math
-
-    GM_SI = 1.327124400e20  # m³/s²
-    AU_M = 1.495978707e11   # m/AU
-
-    a = float(getattr(elements, "semi_major_axis_au", 0.0) or 0.0)
-    if a <= 0.0 or r_au <= 0.0:
-        return None
-    r_m = r_au * AU_M
-    a_m = a * AU_M
-    v2 = GM_SI * (2.0 / r_m - 1.0 / a_m)
-    if v2 < 0.0:
-        return None
-    return round(math.sqrt(v2) / 1000.0, 4)  # km/s
-
-
-def compute_perihelion_distance(elements: object) -> float | None:
-    """Return the perihelion distance q = a·(1 − e) in AU.
-
-    Checks the ``a_au`` attribute first, then falls back to
-    ``semi_major_axis_au``.  Similarly checks ``e`` then ``eccentricity``.
-    Returns ``None`` if *a* or *e* is not available, if ``e >= 1.0``
-    (parabolic or hyperbolic orbit), or if *a* ≤ 0.
-    """
-    a_raw = getattr(elements, "a_au", None)
-    if a_raw is None:
-        a_raw = getattr(elements, "semi_major_axis_au", None)
-    if a_raw is None:
-        return None
-    a = float(a_raw)
-    if a <= 0.0:
-        return None
-    e_raw = getattr(elements, "e", None)
-    if e_raw is None:
-        e_raw = getattr(elements, "eccentricity", None)
-    if e_raw is None:
-        return None
-    e = float(e_raw)
-    if e >= 1.0:
-        return None
-    return round(a * (1.0 - e), 8)
-
-
-def compute_aphelion_distance(elements: object) -> float | None:
-    """Return the aphelion distance Q = a(1 + e) in AU.
-
-    Returns None when the semi-major axis is non-positive, eccentricity is
-    negative or missing.
-    """
-    a = float(getattr(elements, "semi_major_axis_au", 0.0) or 0.0)
-    e_raw = getattr(elements, "eccentricity", None)
-    e = float(e_raw) if e_raw is not None else -1.0
-    if a <= 0.0 or e < 0.0:
-        return None
-    return round(a * (1.0 + e), 8)
-
-
-def compute_tisserand_wrt_earth(elements: object) -> float | None:
-    """Return the Tisserand parameter relative to Earth's orbit.
-
-    Uses the standard formula with a_E = 1.0 AU:
-
-        T_E = a_E/a + 2 * cos(i) * sqrt(a/a_E * (1 - e²))
-
-    Returns None when the semi-major axis is non-positive, eccentricity is
-    negative or missing, or inclination is missing.
-    """
-    a_E = 1.0  # AU
-    a = float(getattr(elements, "semi_major_axis_au", 0.0) or 0.0)
-    e_raw = getattr(elements, "eccentricity", None)
-    e = float(e_raw) if e_raw is not None else -1.0
-    i_raw = getattr(elements, "inclination_deg", None)
-    i_deg = float(i_raw) if i_raw is not None else None
-    if a <= 0.0 or e < 0.0 or i_deg is None:
-        return None
-    t_e = a_E / a + 2.0 * math.cos(math.radians(i_deg)) * math.sqrt(a / a_E * (1.0 - e**2))
-    return round(t_e, 8)
-
-
-def compute_orbital_arc_quality(arc_days: float | None) -> int | None:
-    """Return an orbit quality code (1–4) based on arc length in days.
-
-    Quality codes follow the MPC convention:
-    - 1: arc_days < 1 (single night)
-    - 2: 1 ≤ arc_days < 7 (multi-night, within a week)
-    - 3: 7 ≤ arc_days < 30 (multi-week)
-    - 4: arc_days ≥ 30 (opposition / long arc)
-
-    Args:
-        arc_days: Arc length in days, or ``None``.
-
-    Returns:
-        Integer quality code in {1, 2, 3, 4}, or ``None`` if *arc_days* is
-        ``None`` or negative.
-    """
-    if arc_days is None:
-        return None
-    arc = float(arc_days)
-    if arc < 0.0:
-        return None
-    if arc >= 30.0:
-        return 4
-    if arc >= 7.0:
-        return 3
-    if arc >= 1.0:
-        return 2
-    return 1
-
-
-def compute_mean_anomaly_at_epoch(elements: object, target_jd: float) -> float | None:
-    """Compute mean anomaly in [0, 2π) at a target JD.
-
-    Uses the orbital period from :func:`compute_orbital_period` and the
-    reference epoch ``elements.epoch_jd``.  Returns None if the period is
-    non-positive or the epoch is not set.
-    """
-    epoch_jd = getattr(elements, "epoch_jd", None)
-    if epoch_jd is None:
-        return None
-    period_days = compute_orbital_period(elements)
-    if period_days is None or period_days <= 0.0:
-        return None
-    m0_rad = math.radians(float(getattr(elements, "mean_anomaly_deg", 0.0) or 0.0))
-    n = 2.0 * math.pi / period_days
-    m = m0_rad + n * (target_jd - float(epoch_jd))
-    return float(m % (2.0 * math.pi))
-
-
-def compute_hill_sphere_radius(elements: object) -> float | None:
-    """Compute the Hill sphere radius in AU.
-
-    Uses the approximation r_H = a*(1-e) * (m / (3*M_sun))^(1/3), where the
-    asteroid mass is estimated from its absolute magnitude H and a nominal
-    bulk density of 2000 kg/m³ and geometric albedo p_v = 0.14.
-
-    Returns None for hyperbolic or degenerate orbits (a ≤ 0, e ≥ 1).
-    M_sun ≈ 1.989e30 kg.
-    """
-    import math
-
-    a = float(getattr(elements, "a_au", 0.0) or 0.0)
-    e = float(getattr(elements, "e", 0.0) or 0.0)
-    if a <= 0.0 or e >= 1.0:
-        return None
-    q = a * (1.0 - e)
-    # Estimate asteroid mass from H magnitude
-    h = getattr(elements, "absolute_magnitude_h", None)
-    if h is None:
-        h = 20.0  # typical NEO
-    h = float(h)
-    albedo = 0.14
-    diameter_m = 1329e3 * 10 ** (-h / 5.0) / math.sqrt(albedo)
-    radius_m = diameter_m / 2.0
-    density_kg_m3 = 2000.0
-    mass_kg = (4.0 / 3.0) * math.pi * radius_m**3 * density_kg_m3
-    m_sun_kg = 1.989e30
-    mass_ratio = mass_kg / (3.0 * m_sun_kg)
-    r_h_au = q * mass_ratio ** (1.0 / 3.0)
-    return round(r_h_au, 10)
-
-
-def compute_encounter_velocity(elements: object) -> float | None:
-    """Compute approximate Earth-encounter velocity in km/s.
-
-    Uses the vis-viva equation evaluated at 1 AU (Earth's orbit):
-        v^2 = GM_sun * (2/r - 1/a)
-    The encounter velocity relative to Earth is:
-        v_enc = sqrt(max(0, v_obj^2 - v_earth^2))
-    where v_earth = sqrt(GM/1 AU).
-
-    Returns ``None`` for hyperbolic/parabolic orbits (e >= 1), non-positive
-    semi-major axis, or orbits that do not cross 1 AU.
-    """
-    import math
-
-    a = float(getattr(elements, "a_au", 0.0) or 0.0)
-    e = float(getattr(elements, "e", 0.0) or 0.0)
-    if a <= 0.0 or e >= 1.0:
-        return None
-    q = a * (1.0 - e)
-    Q = a * (1.0 + e)
-    if q > 1.0 or Q < 1.0:
-        return None
-    # Vis-viva: GM_sun = 4π² AU³/yr²; 1 AU/yr = 4.74047 km/s
-    gm = 4.0 * math.pi ** 2  # AU³/yr²
-    v2_obj = gm * (2.0 / 1.0 - 1.0 / a)  # AU²/yr²
-    v2_earth = gm * 1.0  # circular Earth orbit
-    v2_enc = max(0.0, v2_obj - v2_earth)
-    au_per_yr_to_km_s = 4.74047
-    return round(math.sqrt(v2_enc) * au_per_yr_to_km_s, 4)
-
-
-def compute_heliocentric_velocity(elements: object) -> float | None:
-    """Compute the heliocentric speed at perihelion in km/s.
-
-    Uses the vis-viva equation evaluated at ``r = q``::
-
-        v = sqrt(GM_sun * (2/q - 1/a))
-
-    where ``GM_sun = 4π² AU³/yr²`` and ``1 AU/yr ≈ 4.74047 km/s``.
-
-    Returns ``None`` for non-positive perihelion distance, zero semi-major
-    axis, or inputs that would produce a negative value under the radical.
-    """
-    import math
-
-    a = getattr(elements, "a_au", None)
-    e = getattr(elements, "e", None)
-    if a is None or e is None:
-        return None
-    if a == 0.0:
-        return None
-    q = a * (1.0 - e)
-    if q <= 0.0:
-        return None
-    gm = 4.0 * math.pi ** 2  # AU³/yr²
-    v2 = gm * (2.0 / q - 1.0 / a)
-    if v2 < 0.0:
-        return None
-    return round(math.sqrt(v2) * 4.74047, 4)
-
-
-def compute_semi_latus_rectum(elements: object) -> float | None:
-    """Compute the semi-latus rectum p = a * (1 − e²) in AU.
-
-    The semi-latus rectum is the perpendicular distance from a focus to the
-    orbit at the point where the true anomaly is 90°.  It is a useful
-    intermediate quantity in orbital mechanics.
-
-    Returns ``None`` if ``a`` or ``e`` are missing, or if ``a ≤ 0``.
-
-    Args:
-        elements: Any object with ``a_au`` and ``e`` attributes (e.g.
-            :class:`~schemas.OrbitalElements`).
-
-    Returns:
-        Semi-latus rectum in AU, rounded to 6 decimal places, or ``None``.
-    """
-    a = getattr(elements, "a_au", None)
-    e = getattr(elements, "e", None)
-    if a is None or e is None:
-        return None
-    if a <= 0.0:
-        return None
-    return round(float(a) * (1.0 - float(e) ** 2), 6)
-
-
-def compute_nodal_precession_rate(elements: object) -> float | None:
-    """Return the approximate secular nodal precession rate in degrees/year.
-
-    Uses the J2-based secular approximation:
-
-    .. math::
-
-        \\frac{d\\Omega}{dt} \\approx
-        -\\frac{2.06 \\times 10^{-2} \\cos i}{a^{7/2} (1 - e^2)^2}
-
-    where *a* is in AU, *e* is eccentricity, and *i* is orbital inclination.
-    The formula is a simplified solar J2 perturbation expression and gives
-    results in degrees/year.
-
-    Returns ``None`` if ``a_au``, ``e``, or ``i_deg`` are missing, if
-    ``a_au ≤ 0``, or if ``e ≥ 1`` (open orbit).
-
-    Args:
-        elements: Any object with ``a_au``, ``e``, and ``i_deg`` attributes
-            (e.g. :class:`~schemas.OrbitalElements`).
-
-    Returns:
-        Nodal precession rate in degrees/year, or ``None``.
-    """
-    a = getattr(elements, "a_au", None)
-    if a is None:
-        a = getattr(elements, "semi_major_axis_au", None)
-    e = getattr(elements, "e", None)
-    if e is None:
-        e = getattr(elements, "eccentricity", None)
-    i_deg = getattr(elements, "i_deg", None)
-    if i_deg is None:
-        i_deg = getattr(elements, "inclination_deg", None)
-    if a is None or e is None or i_deg is None:
-        return None
-    a = float(a)
-    e = float(e)
-    i_deg = float(i_deg)
-    if a <= 0.0 or e >= 1.0:
-        return None
-    cos_i = math.cos(math.radians(i_deg))
-    # denom > 0 guaranteed: a > 0 (checked above) and e < 1 (checked above)
-    denom = (a ** 3.5) * ((1.0 - e ** 2) ** 2)
-    rate = -2.06e-2 * cos_i / denom
-    return round(float(rate), 8)
-
-
-def compute_vis_viva_velocity(elements: object, r_au: float) -> float | None:
-    """Return the orbital speed in km/s at heliocentric distance *r_au*.
-
-    Uses the vis-viva equation:
-
-    .. math::
-
-        v = \\sqrt{GM\\left(\\frac{2}{r} - \\frac{1}{a}\\right)}
-
-    where :math:`GM = 4\\pi^2` AU³/yr² and the result is converted to km/s
-    by multiplying by 4.74047 km/s per AU/yr.
-
-    Returns ``None`` if ``a_au`` or ``e`` are missing, if *a_au* ≤ 0, if
-    *r_au* ≤ 0, or if the expression under the square root is negative.
-
-    Args:
-        elements: Any object with ``a_au`` and ``e`` attributes
-            (e.g. :class:`~schemas.OrbitalElements`).
-        r_au: Heliocentric distance in AU at which to evaluate the speed.
-
-    Returns:
-        Orbital speed in km/s rounded to 4 decimal places, or ``None``.
-    """
-    _GM = 4.0 * math.pi ** 2  # AU³/yr²
-    _AU_YR_TO_KM_S = 4.74047  # km/s per AU/yr
-
-    a = getattr(elements, "a_au", None)
-    e = getattr(elements, "e", None)
-    if a is None or e is None:
-        return None
-    a = float(a)
-    if a <= 0.0:
-        return None
-    if r_au <= 0.0:
-        return None
-    v2 = _GM * (2.0 / r_au - 1.0 / a)
-    if v2 < 0.0:
-        return None
-    v_au_yr = math.sqrt(v2)
-    v_km_s = v_au_yr * _AU_YR_TO_KM_S
-    return round(float(v_km_s), 4)
-
-
-def compute_jacobi_constant(elements: object) -> float:
-    """Compute the Jacobi constant (Tisserand parameter w.r.t. Jupiter).
-
-    Delegates to :func:`tisserand_parameter` and returns the result.  The
-    Jacobi constant is used to distinguish cometary from asteroidal orbits
-    (T_J < 3 ↔ comet-like behaviour).  Returns 0.0 for non-positive
-    semi-major axis (delegated to :func:`tisserand_parameter`).
-
-    Args:
-        elements: An :class:`~schemas.OrbitalElements`-like object with
-            ``semi_major_axis_au``, ``eccentricity``, and ``inclination_deg``
-            attributes.
-
-    Returns:
-        Tisserand parameter (float).
-    """
-    return tisserand_parameter(elements)
-
-
-def compute_earth_moid_estimate(elements: object) -> float | None:
-    """Return a rough Earth-MOID estimate as |q - 1.0| AU.
-
-    This is NOT a true MOID computation — it is a fast lower-bound proxy
-    using only the perihelion distance. Use compute_moid() for the full
-    geometric calculation. Returns None if perihelion distance is unavailable.
-    """
-    q = compute_perihelion_distance(elements)
-    if q is None:
-        return None
-    return abs(q - 1.0)
-
-
-def compute_orbital_eccentricity_class(elements: object) -> str:
-    """Classify an orbit by eccentricity.
-
-    Returns one of:
-    - ``"circular"``   — e < 0.05
-    - ``"elliptical"`` — 0.05 ≤ e < 0.999
-    - ``"parabolic"``  — 0.999 ≤ e ≤ 1.001
-    - ``"hyperbolic"`` — e > 1.001
-    - ``"unknown"``    — eccentricity not available or negative
-    """
-    e_raw = getattr(elements, "e", None)
-    if e_raw is None:
-        e_raw = getattr(elements, "eccentricity", None)
-    if e_raw is None:
-        return "unknown"
-    e = float(e_raw)
-    if e < 0.0:
-        return "unknown"
-    if e < 0.05:
-        return "circular"
-    if e < 0.999:
-        return "elliptical"
-    if e <= 1.001:
-        return "parabolic"
-    return "hyperbolic"
-
-
-def compute_orbital_speed_at_perihelion(elements: object) -> float | None:
-    """Return the orbital speed at perihelion in km/s using the vis-viva equation.
-
-    v = sqrt(GM_sun * (2/r - 1/a)), evaluated at r = q = a·(1-e).
-    Uses GM_sun = 1.327124e20 m³/s² and 1 AU = 1.495978707e11 m.
-    Returns None if perihelion distance or semi-major axis is unavailable or
-    the orbit is hyperbolic (a ≤ 0) or parabolic (e = 1).
-    """
-    GM_SUN_M3_S2 = 1.327124e20
-    AU_TO_M = 1.495978707e11
-
-    q = compute_perihelion_distance(elements)
-    if q is None or q <= 0.0:
-        return None
-    a_raw = getattr(elements, "a_au", None) or getattr(elements, "semi_major_axis_au", None)
-    a = float(a_raw)
-    r_m = q * AU_TO_M
-    a_m = a * AU_TO_M
-    v2 = GM_SUN_M3_S2 * (2.0 / r_m - 1.0 / a_m)
-    return float(v2 ** 0.5 / 1000.0)
-
-
-def compute_impact_parameter(elements: object, v_inf_km_s: float = 20.0) -> float | None:
-    """Return the gravitational-focusing-corrected b-plane impact parameter in km.
-
-    b = q * sqrt(1 + v_esc² / v_inf²) where v_esc is the Earth escape speed at
-    perihelion distance (approximated using Earth's surface escape speed scaled to
-    the perihelion distance from Earth's centre) and v_inf is the hyperbolic excess
-    velocity.  Returns None if perihelion distance is unavailable, v_inf ≤ 0, or
-    the orbit is not Earth-crossing (q > 1.017 AU).
-    """
-    if v_inf_km_s <= 0.0:
-        return None
-    q = compute_perihelion_distance(elements)
-    if q is None or q > 1.017:
-        return None
-    R_EARTH_KM = 6371.0
-    V_ESC_SURFACE_KM_S = 11.186
-    AU_TO_KM = 1.495978707e8
-    q_km = q * AU_TO_KM
-    v_esc_sq = V_ESC_SURFACE_KM_S**2 * (R_EARTH_KM / max(q_km, R_EARTH_KM))
-    b = q_km * math.sqrt(1.0 + v_esc_sq / (v_inf_km_s**2))
-    return float(b)
-
-
-def compute_geocentric_velocity(elements: object) -> float | None:
-    """Return the geocentric encounter velocity in km/s at perihelion.
-
-    Uses the inclination-based encounter velocity formula:
-
-    .. math::
-
-        v_{\\rm enc} = \\sqrt{v_{\\rm obj}^2 + v_{\\oplus}^2
-                        - 2\\,v_{\\rm obj}\\,v_{\\oplus}\\cos(i)}
-
-    where *v_obj* is the object's orbital speed at perihelion (via vis-viva),
-    *v_Earth* = 29.78 km/s (mean Earth orbital speed), and *i* is the orbital
-    inclination.  This is the rigorous vector-subtraction formula for the
-    relative velocity of a coplanar or inclined orbit at the Earth's distance.
-
-    Returns ``None`` if perihelion distance, semi-major axis, or inclination
-    are unavailable.
-    """
-    V_EARTH_KM_S = 29.78
-
-    q = compute_perihelion_distance(elements)
-    if q is None:
-        return None
-    v_obj = compute_vis_viva_velocity(elements, q)
-    if v_obj is None:
-        return None
-    incl = getattr(elements, "inclination_deg", None)
-    if incl is None:
-        return None
-    i_rad = math.radians(float(incl))
-    v_enc_sq = v_obj**2 + V_EARTH_KM_S**2 - 2.0 * v_obj * V_EARTH_KM_S * math.cos(i_rad)
-    return float(math.sqrt(max(0.0, v_enc_sq)))
-
-
-def compute_orbital_period_years(elements: object) -> float | None:
-    """Return the orbital period in years via Kepler's third law: T = sqrt(a³).
-
-    Uses ``a_au`` attribute (semi-major axis in AU).  Returns ``None`` if
-    ``a_au`` is missing, zero, or negative.
-
-    The conversion is exact under the Gaussian gravitational constant definition
-    where 1 AU and 1 year are the natural units of the solar system.
-    """
-    a = getattr(elements, "a_au", None)
-    if a is None:
-        a = getattr(elements, "semi_major_axis_au", None)
-    if a is None:
-        return None
-    a_val = float(a)
-    if a_val <= 0.0:
-        return None
-    return float(math.sqrt(a_val ** 3))
-
-
-def compute_longitude_ascending_node_rate(elements: object) -> float | None:
-    """Return an approximate secular nodal precession rate in degrees per year.
-
-    Uses the first-order J2 secular perturbation formula for the rate of change
-    of the longitude of the ascending node due to Earth's oblateness (J2):
-
-    .. math::
-
-        \\dot{\\Omega} \\approx -\\frac{3}{2} n J_2
-            \\left(\\frac{R_\\oplus}{a}\\right)^2
-            \\frac{\\cos i}{(1-e^2)^2}
-
-    Here the Sun is treated as the central body; J2 is the solar oblateness
-    (J2_sun ≈ 2.0 × 10⁻⁷).  This gives a tiny but non-zero rate for
-    heliocentric orbits.  Returns ``None`` if any required element is missing
-    or if ``a ≤ 0``, ``e ≥ 1``, or ``inclination`` is absent.
-
-    Returns the rate in degrees per year (negative = retrograde precession).
-    """
-    a = getattr(elements, "a_au", None) or getattr(elements, "semi_major_axis_au", None)
-    if a is None:
-        return None
-    a_val = float(a)
-    if a_val <= 0.0:
-        return None
-    e = getattr(elements, "e", None) or getattr(elements, "eccentricity", None)
-    if e is None:
-        return None
-    e_val = float(e)
-    if e_val >= 1.0:
-        return None
-    incl = getattr(elements, "inclination_deg", None)
-    if incl is None:
-        return None
-    i_rad = math.radians(float(incl))
-    # Solar J2 ≈ 2.0e-7; R_sun ≈ 4.65e-3 AU
-    J2_SUN = 2.0e-7
-    R_SUN_AU = 4.65e-3
-    # Mean motion in degrees/year: n = 360 / T_years = 360 / sqrt(a^3)
-    n_deg_yr = 360.0 / math.sqrt(a_val ** 3)
-    rate = (
-        -1.5 * n_deg_yr * J2_SUN * (R_SUN_AU / a_val) ** 2
-        * math.cos(i_rad) / (1.0 - e_val ** 2) ** 2
+    a = elements.semi_major_axis_au
+    # Mean motion in deg/day (n = 360 / T, T in days)
+    T_days = 365.25 * math.sqrt(a**3)  # Kepler's third law (AU, yr)
+    n_deg_per_day = 360.0 / T_days if T_days > 0 else 0.0
+    new_M = (elements.mean_anomaly_deg + n_deg_per_day * dt_days) % 360.0
+    return OrbitalElements(
+        semi_major_axis_au=elements.semi_major_axis_au,
+        eccentricity=elements.eccentricity,
+        inclination_deg=elements.inclination_deg,
+        longitude_ascending_node_deg=elements.longitude_ascending_node_deg,
+        argument_perihelion_deg=elements.argument_perihelion_deg,
+        mean_anomaly_deg=new_M,
+        epoch_jd=elements.epoch_jd + dt_days,
+        perihelion_au=elements.perihelion_au,
+        aphelion_au=elements.aphelion_au,
+        quality_code=elements.quality_code,
+        fit_residual_arcsec=elements.fit_residual_arcsec,
     )
-    return float(rate)
-
-
-def compute_argument_of_perihelion_rate(elements: object) -> float | None:
-    """Return the secular precession rate of the argument of perihelion (ω) in deg/yr.
-
-    Uses the first-order J2 secular perturbation formula:
-
-    .. math::
-
-        \\dot{\\omega} \\approx \\frac{3}{2} n J_2
-            \\left(\\frac{R_\\odot}{a}\\right)^2
-            \\frac{5\\cos^2 i - 1}{2(1-e^2)^2}
-
-    The same J2_SUN and R_SUN constants as
-    :func:`compute_longitude_ascending_node_rate` are used.  Returns ``None``
-    if any required element is missing, ``a ≤ 0``, ``e ≥ 1``, or inclination
-    is absent.
-
-    Returns the rate in degrees per year; positive = prograde precession.
-    """
-    import math
-
-    J2_SUN = 2.0e-7
-    R_SUN_AU = 4.65e-3
-
-    a = getattr(elements, "a_au", None) or getattr(elements, "semi_major_axis_au", None)
-    if a is None:
-        return None
-    a_val = float(a)
-    if a_val <= 0.0:
-        return None
-    e = getattr(elements, "e", None) or getattr(elements, "eccentricity", None)
-    if e is None:
-        return None
-    e_val = float(e)
-    if e_val >= 1.0:
-        return None
-    incl = getattr(elements, "inclination_deg", None)
-    if incl is None:
-        return None
-    i_rad = math.radians(float(incl))
-    n_rad_yr = 2.0 * math.pi / (a_val ** 1.5)
-    denom = (1.0 - e_val ** 2) ** 2
-    rate_rad_yr = (
-        1.5 * n_rad_yr * J2_SUN * (R_SUN_AU / a_val) ** 2
-        * (5.0 * math.cos(i_rad) ** 2 - 1.0) / (2.0 * denom)
-    )
-    return float(math.degrees(rate_rad_yr))
-
-
-def compute_perihelion_velocity(elements: object) -> float | None:
-    """Return the orbital speed at perihelion in km/s via the vis-viva equation.
-
-    At perihelion (r = q = a(1-e)):
-
-    .. math::
-
-        v_q = \\sqrt{\\mu \\left(\\frac{2}{q} - \\frac{1}{a}\\right)}
-
-    where μ = GM_Sun = 4π² AU³/yr² converted to km²/s².  Returns ``None``
-    if any required element is missing, ``a ≤ 0``, ``e ≥ 1``, or
-    ``q ≤ 0`` (degenerate orbit).
-    """
-    import math
-
-    AU_KM = 1.495978707e8
-    YR_S = 365.25 * 86400.0
-    GM_AU3_YR2 = 4.0 * math.pi ** 2
-    GM_KM3_S2 = GM_AU3_YR2 * (AU_KM ** 3) / (YR_S ** 2)
-
-    a = getattr(elements, "a_au", None) or getattr(elements, "semi_major_axis_au", None)
-    if a is None:
-        return None
-    a_val = float(a)
-    if a_val <= 0.0:
-        return None
-    e = getattr(elements, "e", None) or getattr(elements, "eccentricity", None)
-    if e is None:
-        return None
-    e_val = float(e)
-    if e_val >= 1.0:
-        return None
-    q_val = a_val * (1.0 - e_val)
-    v2 = GM_KM3_S2 * (2.0 / (q_val * AU_KM) - 1.0 / (a_val * AU_KM))
-    return float(math.sqrt(v2))
-
-
-def compute_aphelion_velocity(elements: object) -> float | None:
-    """Return the orbital speed at aphelion in km/s via the vis-viva equation.
-
-    At aphelion (r = Q = a(1+e)):
-
-    .. math::
-
-        v_Q = \\sqrt{\\mu \\left(\\frac{2}{Q} - \\frac{1}{a}\\right)}
-
-    Uses the same GM_Sun constant as :func:`compute_perihelion_velocity`.
-    Returns ``None`` if any required element is missing, ``a ≤ 0``,
-    ``e ≥ 1`` (hyperbolic), or the result would be non-real.
-    """
-    import math
-
-    AU_KM = 1.495978707e8
-    YR_S = 365.25 * 86400.0
-    GM_AU3_YR2 = 4.0 * math.pi ** 2
-    GM_KM3_S2 = GM_AU3_YR2 * (AU_KM ** 3) / (YR_S ** 2)
-
-    a = getattr(elements, "a_au", None) or getattr(elements, "semi_major_axis_au", None)
-    if a is None:
-        return None
-    a_val = float(a)
-    if a_val <= 0.0:
-        return None
-    e = getattr(elements, "e", None) or getattr(elements, "eccentricity", None)
-    if e is None:
-        return None
-    e_val = float(e)
-    if e_val >= 1.0:
-        return None
-    q_aph = a_val * (1.0 + e_val)
-    v2 = GM_KM3_S2 * (2.0 / (q_aph * AU_KM) - 1.0 / (a_val * AU_KM))
-    return float(math.sqrt(v2))
-
-
-def compute_specific_angular_momentum(elements: object) -> float | None:
-    """Specific angular momentum of the orbit in AU² yr⁻¹.
-
-    Uses the vis-viva-derived formula:
-
-        h = sqrt(GM_AU3_YR2 * a * (1 - e²))
-
-    where GM_AU3_YR2 = 4π².  Returns ``None`` for missing, non-positive *a*,
-    or eccentricity >= 1 (hyperbolic).
-    """
-    import math
-
-    GM = 4.0 * math.pi ** 2  # AU³ yr⁻²
-
-    a = getattr(elements, "a_au", None)
-    if a is None:
-        a = getattr(elements, "semi_major_axis_au", None)
-    if a is None:
-        return None
-    a_val = float(a)
-    if a_val <= 0.0:
-        return None
-
-    e = getattr(elements, "e", None)
-    if e is None:
-        e = getattr(elements, "eccentricity", None)
-    if e is None:
-        return None
-    e_val = float(e)
-    if e_val >= 1.0:
-        return None
-
-    return float(math.sqrt(GM * a_val * (1.0 - e_val ** 2)))
-
-
-def compute_orbit_complexity(elements: object) -> float:
-    """Orbital complexity index in [0, 1].
-
-    Combines eccentricity and inclination deviation from the ecliptic plane
-    into a single scalar:
-
-        complexity = 0.5 * e_norm + 0.5 * i_norm
-
-    where:
-        e_norm = min(e, 1) (eccentricity; 1 = parabolic/hyperbolic)
-        i_norm = min(|i|, 90) / 90 (inclination; 1 = polar orbit)
-
-    Returns 0.0 for missing or invalid elements.
-    """
-    e = getattr(elements, "e", None)
-    if e is None:
-        e = getattr(elements, "eccentricity", None)
-    e_val = float(e) if e is not None else 0.0
-    e_norm = min(1.0, max(0.0, e_val))
-
-    i = getattr(elements, "i_deg", None)
-    if i is None:
-        i = getattr(elements, "inclination_deg", None)
-    i_val = float(i) if i is not None else 0.0
-    i_norm = min(1.0, abs(i_val) / 90.0)
-
-    return float(0.5 * e_norm + 0.5 * i_norm)
-
-
-def compute_mean_longitude(elements: object) -> float | None:
-    """Mean longitude of the orbit in degrees, normalised to [0, 360).
-
-    Defined as: λ = Ω + ω + M₀  (mod 360°)
-
-    where Ω is the longitude of the ascending node, ω is the argument
-    of perihelion, and M₀ is the mean anomaly at epoch.
-    Returns ``None`` if any required attribute is missing.
-    """
-    omega = getattr(elements, "longitude_ascending_node_deg", None)
-    if omega is None:
-        omega = getattr(elements, "Omega_deg", None)
-    w = getattr(elements, "argument_perihelion_deg", None)
-    if w is None:
-        w = getattr(elements, "omega_deg", None)
-    m0 = getattr(elements, "mean_anomaly_deg", None)
-    if m0 is None:
-        m0 = getattr(elements, "M0_deg", None)
-    if omega is None or w is None or m0 is None:
-        return None
-    return float((float(omega) + float(w) + float(m0)) % 360.0)

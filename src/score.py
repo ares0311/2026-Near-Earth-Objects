@@ -2,46 +2,15 @@
 
 from __future__ import annotations
 
-__all__ = ["score", "score_batch", "rank_candidates", "discovery_report",
-           "followup_priority_table", "pha_candidates", "compute_statistics",
-           "close_approach_candidates", "absolute_magnitude_from_diameter",
-           "compute_impact_energy", "compute_novelty_score",
-           "compute_threat_score", "filter_by_alert_pathway",
-           "compute_followup_urgency", "compute_discovery_score",
-           "compute_observation_priority", "compute_size_estimate",
-           "compute_close_approach_score", "compute_combined_priority",
-           "compute_weighted_priority",
-           "compute_arc_quality_bonus",
-           "compute_weighted_hazard_score",
-           "compute_hazard_grade",
-           "compute_priority_rank",
-           "compute_survey_completeness",
-           "compute_weighted_risk_score",
-           "compute_hazard_summary",
-           "compute_priority_percentile",
-           "compute_arc_completeness_score",
-           "compute_followup_window_score",
-           "compute_astrometric_priority",
-           "compute_size_score",
-           "compute_orbit_uncertainty_score",
-           "compute_detection_completeness_score",
-           "compute_combined_hazard_score",
-           "compute_priority_weighted_moid",
-           "compute_impact_probability_proxy",
-           "compute_survey_efficiency_score",
-           "compute_novelty_rank",
-           "compute_followup_score",
-           "compute_moid_hazard_score",
-           "compute_size_estimate_range",
-           "compute_priority_histogram",
-           "compute_alert_urgency_score",
-           "filter_by_discovery_priority",
-           "get_top_candidates",
-           "compute_pha_fraction",
-           "count_by_alert_pathway",
-           "compute_weighted_hazard_index",
-           "compute_candidate_priority_spread",
-           "compute_batch_priority_stats"]
+__all__ = [
+    "score",
+    "score_batch",
+    "rank_candidates",
+    "discovery_report",
+    "pha_candidates",
+    "compute_followup_urgency",
+    "get_top_candidates",
+]
 
 import math
 import uuid
@@ -55,7 +24,6 @@ from schemas import (
     HazardFlag,
     NEOClass,
     NEOPosterior,
-    NEOStatistics,
     OrbitalElements,
     ScoredNEO,
     ScoringMetadata,
@@ -455,37 +423,6 @@ def discovery_report(neo: ScoredNEO) -> dict:
     }
 
 
-def followup_priority_table(neos: list[ScoredNEO]) -> list[dict]:
-    """Return a flat table of follow-up priorities for all candidates.
-
-    Combines key fields from :func:`discovery_report` into a flat dict per
-    candidate, sorted by descending ``discovery_priority`` with PHA candidates
-    first (mirrors :func:`rank_candidates`).
-
-    Suitable for CSV export, dashboard display, or MPC queue generation.
-
-    Returns a list of dicts with keys:
-      ``rank``, ``object_id``, ``hazard_flag``, ``alert_pathway``,
-      ``discovery_priority``, ``moid_au``, ``neo_class``,
-      ``n_observations``, ``arc_days``, ``motion_rate_arcsec_hr``.
-    """
-    ranked = rank_candidates(neos)
-    rows = []
-    for i, neo in enumerate(ranked):
-        report = discovery_report(neo)
-        rows.append({
-            "rank": i + 1,
-            "object_id": report["object_id"],
-            "hazard_flag": report["hazard"]["hazard_flag"],
-            "alert_pathway": report["hazard"]["alert_pathway"],
-            "discovery_priority": report["scoring"]["discovery_priority"],
-            "moid_au": report["hazard"]["moid_au"],
-            "neo_class": report["hazard"]["neo_class"],
-            "n_observations": report["n_observations"],
-            "arc_days": report["arc_days"],
-            "motion_rate_arcsec_hr": report["motion_rate_arcsec_hr"],
-        })
-    return rows
 
 
 def pha_candidates(neos: list) -> list:
@@ -493,186 +430,18 @@ def pha_candidates(neos: list) -> list:
     return [neo for neo in neos if neo.hazard.hazard_flag == "pha_candidate"]
 
 
-def compute_statistics(neos: list) -> NEOStatistics:
-    """Compute aggregate statistics from a list of ScoredNEO objects.
-
-    Returns a :class:`~schemas.NEOStatistics` instance.
-    """
-    from collections import Counter
-
-    priorities = [neo.metadata.discovery_priority for neo in neos]
-    hazard_flags = [neo.hazard.hazard_flag for neo in neos]
-    pathways = [neo.hazard.alert_pathway for neo in neos]
-    neo_classes = [neo.hazard.neo_class for neo in neos]
-
-    return NEOStatistics(
-        n_total=len(neos),
-        n_pha_candidates=hazard_flags.count("pha_candidate"),
-        n_mpc_submission=pathways.count("mpc_submission"),
-        n_internal_candidate=pathways.count("internal_candidate"),
-        n_known_object=pathways.count("known_object"),
-        mean_discovery_priority=sum(priorities) / len(priorities) if priorities else 0.0,
-        max_discovery_priority=max(priorities) if priorities else 0.0,
-        neo_class_distribution=dict(Counter(neo_classes)),
-    )
 
 
-def close_approach_candidates(neos: list, max_moid_au: float = 0.05) -> list:
-    """Return ScoredNEO objects with a known MOID at or below *max_moid_au*.
-
-    Unlike :func:`pha_candidates` (which also requires H ≤ 22), this function
-    only filters on MOID, letting callers set any threshold — e.g. 0.1 AU for
-    enhanced monitoring or 0.002 AU for imminent-flyby follow-up.
-
-    Objects with ``moid_au=None`` (orbit not well-determined) are excluded.
-    """
-    return [
-        neo for neo in neos
-        if neo.hazard.moid_au is not None and neo.hazard.moid_au <= max_moid_au
-    ]
 
 
-def absolute_magnitude_from_diameter(diameter_m: float, albedo: float = 0.14) -> float:
-    """Compute absolute magnitude H from diameter and geometric albedo.
-
-    Inverse of the standard diameter–albedo relation:
-        D = 1329 km / sqrt(p_v) * 10^(-H/5)
-    Rearranged:
-        H = -5 * log10(D / (1329000 * sqrt(p_v)))
-
-    where D is in metres.  Returns ``float('inf')`` for non-positive inputs.
-    """
-    if diameter_m <= 0.0 or albedo <= 0.0:
-        return float("inf")
-    import math as _math
-    return -5.0 * _math.log10(diameter_m * _math.sqrt(albedo) / 1_329_000.0)
 
 
-def compute_impact_energy(
-    diameter_m: float,
-    velocity_km_s: float,
-    density_kg_m3: float = 2500.0,
-) -> float:
-    """Kinetic impact energy in megatons TNT equivalent.
-
-    E_k = 0.5 * m * v²  with mass from a sphere of given density.
-    1 megaton TNT = 4.184e15 J.
-    Returns 0.0 for non-positive diameter, velocity, or density.
-    """
-    if diameter_m <= 0.0 or velocity_km_s <= 0.0 or density_kg_m3 <= 0.0:
-        return 0.0
-    radius_m = diameter_m / 2.0
-    volume_m3 = (4.0 / 3.0) * math.pi * radius_m ** 3
-    mass_kg = density_kg_m3 * volume_m3
-    velocity_m_s = velocity_km_s * 1_000.0
-    joules = 0.5 * mass_kg * velocity_m_s ** 2
-    megatons = joules / 4.184e15
-    return round(megatons, 6)
 
 
-def compute_novelty_score(neo: object, catalog_elements: list) -> float:
-    """Orbital novelty score in [0, 1] relative to a catalog of known objects.
-
-    Computes a distance metric between the NEO's orbital elements and every
-    element in ``catalog_elements`` using a weighted combination of Δa, Δe, Δi.
-    Returns 1.0 (maximum novelty) when the catalog is empty or orbital elements
-    are unavailable.  Returns 0.0 when an exact match is found.
-
-    Distance metric: d = sqrt((Δa/3)² + (Δe)² + (Δi/180)²)
-    Score = min(1, min_distance / reference_distance) where reference_distance = 1.
-    """
-    el = getattr(getattr(neo, "hazard", None), "orbital_elements", None)
-    if el is None or not catalog_elements:
-        return 1.0
-
-    a0 = el.semi_major_axis_au
-    e0 = el.eccentricity
-    i0 = el.inclination_deg
-
-    min_dist = float("inf")
-    for cat_el in catalog_elements:
-        da = (cat_el.semi_major_axis_au - a0) / 3.0
-        de = cat_el.eccentricity - e0
-        di = (cat_el.inclination_deg - i0) / 180.0
-        d = math.sqrt(da**2 + de**2 + di**2)
-        if d < min_dist:
-            min_dist = d
-
-    return round(min(1.0, float(min_dist)), 4)
 
 
-def compute_threat_score(neo: ScoredNEO) -> float:
-    """Composite threat score combining MOID, H magnitude, and orbit quality.
-
-    Combines three threat-relevant signals into a single [0, 1] score:
-
-    - **MOID proximity**: 1.0 if MOID ≤ 0.01 AU, linearly decaying to 0 at 0.05 AU;
-      0.5 if MOID is unknown.
-    - **Size proxy**: 1.0 if H ≤ 18 (>1 km), linearly decaying to 0 at H = 25.
-    - **Orbit quality**: quality_code / 4.0 (capped at 1).
-
-    The composite score is the geometric mean of the three components.
-    Returns 0.0 if all signals are absent.
-
-    Args:
-        neo: A ScoredNEO object.
-
-    Returns:
-        Threat score in [0, 1].
-    """
-    haz = neo.hazard
-
-    # MOID component
-    moid = haz.moid_au
-    if moid is None:
-        moid_score = 0.5
-    elif moid <= 0.01:
-        moid_score = 1.0
-    elif moid >= 0.05:
-        moid_score = 0.0
-    else:
-        moid_score = 1.0 - (moid - 0.01) / 0.04
-
-    # Size component from H magnitude
-    h = haz.absolute_magnitude_h
-    if h is None:
-        size_score = 0.5
-    elif h <= 18.0:
-        size_score = 1.0
-    elif h >= 25.0:
-        size_score = 0.0
-    else:
-        size_score = 1.0 - (h - 18.0) / 7.0
-
-    # Orbit quality component
-    quality = None
-    if haz.orbital_elements is not None:
-        quality = getattr(haz.orbital_elements, "quality_code", None)
-    if quality is None:
-        orbit_score = 0.5
-    else:
-        orbit_score = min(1.0, int(quality) / 4.0)
-
-    # Geometric mean of three components
-    product = moid_score * size_score * orbit_score
-    if product <= 0.0:
-        return 0.0
-    return round(product ** (1.0 / 3.0), 4)
 
 
-def filter_by_alert_pathway(neos: list[ScoredNEO], pathway: str) -> list[ScoredNEO]:
-    """Filter a list of ScoredNEOs to those with a specific alert pathway.
-
-    Args:
-        neos: List of :class:`~schemas.ScoredNEO` objects.
-        pathway: The alert pathway to filter on (e.g. ``"mpc_submission"``,
-            ``"nasa_pdco_notify"``, ``"internal_candidate"``).
-
-    Returns:
-        Filtered list containing only NEOs whose ``hazard.alert_pathway``
-        matches ``pathway`` exactly.
-    """
-    return [n for n in neos if n.hazard.alert_pathway == pathway]
 
 
 def compute_followup_urgency(neo: ScoredNEO) -> str:
@@ -715,834 +484,66 @@ def compute_followup_urgency(neo: ScoredNEO) -> str:
     return "ROUTINE"
 
 
-def compute_discovery_score(neo: ScoredNEO) -> float:
-    """Compute a composite discovery value score for a scored NEO.
-
-    Blends discovery priority, orbit quality, and brightness into a single
-    [0, 1] score that ranks candidates by their combined scientific and
-    operational value.  Returns 0.0 when all inputs are None.
-
-    Components:
-    - discovery_priority (weight 0.5)
-    - orbit_quality_score (weight 0.3; None → 0.0)
-    - brightness_score (weight 0.2; None → 0.0)
-
-    Args:
-        neo: A :class:`~schemas.ScoredNEO` object.
-
-    Returns:
-        Composite discovery score in [0, 1].
-    """
-    priority = getattr(neo.metadata, "discovery_priority", None) or 0.0
-    orbit_q = neo.features.orbit_quality_score or 0.0
-    brightness = neo.features.brightness_score or 0.0
-    score = 0.5 * priority + 0.3 * orbit_q + 0.2 * brightness
-    return round(min(1.0, max(0.0, float(score))), 4)
 
 
-def compute_observation_priority(neo: ScoredNEO) -> float:
-    """Compute an observational follow-up priority score.
 
-    Combines three factors:
-    - **Arc gap**: time since the last observation in the tracklet (longer gap
-      → more urgent); normalized so 30 days maps to 1.0.  Uses a reference
-      JD of 2460000.0 when no observations are present.
-    - **Discovery priority**: ``metadata.discovery_priority`` (weight 0.4).
-    - **Orbit quality**: ``features.orbit_quality_score`` (weight 0.3;
-      low quality → needs more data → higher urgency inverted to 1 − score).
 
-    The result is clamped to [0, 1].
 
-    Args:
-        neo: A :class:`~schemas.ScoredNEO` object.
 
-    Returns:
-        Observation follow-up priority score in [0, 1].
-    """
-    obs = neo.tracklet.observations
-    if obs:
-        last_jd = max(o.jd for o in obs)
-        ref_jd = 2460000.0
-        gap_days = max(0.0, ref_jd - last_jd)
-        gap_score = min(1.0, gap_days / 30.0)
-    else:
-        gap_score = 0.5
 
-    priority = getattr(neo.metadata, "discovery_priority", None) or 0.0
-    orbit_q = neo.features.orbit_quality_score or 0.0
-    orbit_urgency = 1.0 - orbit_q
 
-    score = 0.3 * gap_score + 0.4 * float(priority) + 0.3 * orbit_urgency
-    return round(min(1.0, max(0.0, float(score))), 4)
 
 
-def compute_size_estimate(neo: ScoredNEO) -> dict | None:
-    """Estimate diameter range from absolute magnitude H.
 
-    Uses the standard H–D relation: ``d = 1329 / sqrt(p_v) * 10^(-H/5) km``
-    with albedo bounds p_v ∈ [0.05, 0.30] to derive minimum and maximum
-    diameter estimates.
 
-    Args:
-        neo: A :class:`~schemas.ScoredNEO` object.
 
-    Returns:
-        Dict with keys:
 
-        - ``"min_m"``: Minimum diameter estimate in metres (p_v = 0.30).
-        - ``"max_m"``: Maximum diameter estimate in metres (p_v = 0.05).
-        - ``"assumed_albedo_range"``: ``[0.05, 0.30]``
-
-        Returns ``None`` if ``absolute_magnitude_h`` is ``None`` or not finite.
-    """
-    h = neo.hazard.absolute_magnitude_h
-    if h is None or not math.isfinite(h):
-        return None
-
-    # d = 1329 / sqrt(p_v) * 10^(-H/5) km
-    def _diam_km(p_v: float) -> float:
-        return 1329.0 / math.sqrt(p_v) * 10.0 ** (-h / 5.0)
-
-    min_km = _diam_km(0.30)  # high albedo → smaller diameter
-    max_km = _diam_km(0.05)  # low albedo → larger diameter
-
-    return {
-        "min_m": round(min_km * 1000.0, 2),
-        "max_m": round(max_km * 1000.0, 2),
-        "assumed_albedo_range": [0.05, 0.30],
-    }
 
-
-def compute_close_approach_score(neo: ScoredNEO) -> float:
-    """Compute a [0, 1] close-approach score from MOID and hazard flag.
 
-    Combines the MOID proximity with the PHA status into a single urgency
-    scalar suitable for ranking and triage.  MOID = 0.0 → score 1.0;
-    MOID ≥ 0.3 AU → score 0.0.  PHAs receive a 0.2 bonus, clamped to 1.0.
 
-    Args:
-        neo: A :class:`~schemas.ScoredNEO` object.
 
-    Returns:
-        Close-approach score in [0, 1].  Returns 0.5 if MOID is unknown.
-    """
-    moid = neo.hazard.moid_au
-    if moid is None:
-        return 0.5
 
-    max_moid = 0.3
-    proximity = max(0.0, 1.0 - float(moid) / max_moid)
 
-    bonus = 0.2 if neo.hazard.hazard_flag == "pha_candidate" else 0.0
-    return round(min(1.0, proximity + bonus), 4)
 
 
-def compute_combined_priority(neo: ScoredNEO) -> float:
-    """Compute a weighted combination of three priority scores.
 
-    Formula:
-        combined = 0.5 * discovery_priority
-                 + 0.3 * compute_observation_priority(neo)
-                 + 0.2 * compute_close_approach_score(neo)
 
-    Result is clamped to [0, 1] and rounded to 4 decimal places.
 
-    Args:
-        neo: A :class:`~schemas.ScoredNEO` object.
 
-    Returns:
-        Combined priority score in [0, 1].
-    """
-    discovery = float(getattr(neo.metadata, "discovery_priority", 0.0) or 0.0)
-    observation = compute_observation_priority(neo)
-    close_approach = compute_close_approach_score(neo)
 
-    combined = 0.5 * discovery + 0.3 * observation + 0.2 * close_approach
-    return round(min(1.0, max(0.0, combined)), 4)
 
 
-def compute_weighted_priority(neo: ScoredNEO, weights: dict | None = None) -> float:
-    """Compute a customisable weighted priority score for a NEO candidate.
 
-    Combines up to four sub-scores with caller-supplied weights (defaulting to
-    equal weights of 0.25 each):
 
-    - ``discovery``: discovery_priority from :attr:`~schemas.ScoringMetadata`
-    - ``threat``: :func:`compute_threat_score`
-    - ``observation``: :func:`compute_observation_priority`
-    - ``close_approach``: :func:`compute_close_approach_score`
 
-    If *weights* is provided it must be a dict with any subset of the four
-    keys above; missing keys default to 0.0.  The weights are normalised so
-    they always sum to 1.0 before the dot product is computed.
 
-    Result is clamped to [0, 1] and rounded to 4 decimal places.
-
-    Args:
-        neo: A :class:`~schemas.ScoredNEO` object.
-        weights: Optional mapping of component name → weight (non-negative).
 
-    Returns:
-        Weighted priority score in [0, 1].
-    """
-    default_weights: dict[str, float] = {
-        "discovery": 0.25,
-        "threat": 0.25,
-        "observation": 0.25,
-        "close_approach": 0.25,
-    }
-    if weights is not None:
-        resolved = {k: float(weights.get(k, 0.0)) for k in default_weights}
-    else:
-        resolved = dict(default_weights)
-
-    total_weight = sum(resolved.values())
-    if total_weight <= 0.0:
-        return 0.0
-
-    scores: dict[str, float] = {
-        "discovery": float(getattr(neo.metadata, "discovery_priority", 0.0) or 0.0),
-        "threat": compute_threat_score(neo),
-        "observation": compute_observation_priority(neo),
-        "close_approach": compute_close_approach_score(neo),
-    }
-
-    weighted = sum(resolved[k] * scores[k] for k in resolved) / total_weight
-    return round(min(1.0, max(0.0, weighted)), 4)
-
-
-def compute_arc_quality_bonus(neo: ScoredNEO) -> float:
-    """Compute a [0, 1] arc-quality bonus based on orbit quality and arc length.
-
-    Rewards candidates with longer, well-constrained arcs:
-
-    - Base score from orbit quality code (1→0.25, 2→0.50, 3→0.75, 4→1.0).
-    - Arc-length modifier: log10(arc_days + 1) / log10(365 + 1), clamped [0, 1].
-    - Final bonus = 0.6 × quality_base + 0.4 × arc_modifier.
-
-    Result is clamped to [0, 1] and rounded to 4 decimal places.
-
-    Args:
-        neo: A :class:`~schemas.ScoredNEO` object.
-
-    Returns:
-        Arc quality bonus in [0, 1].
-    """
-    quality_code = int(getattr(neo.metadata, "orbit_quality_code", 1) or 1)
-    quality_base = min(quality_code, 4) / 4.0
-
-    arc_days = float(getattr(neo.tracklet, "arc_days", 0.0) or 0.0)
-    arc_modifier = math.log10(arc_days + 1.0) / math.log10(366.0)
-    arc_modifier = min(1.0, max(0.0, arc_modifier))
-
-    bonus = 0.6 * quality_base + 0.4 * arc_modifier
-    return round(min(1.0, max(0.0, bonus)), 4)
-
-
-def compute_weighted_hazard_score(neo: ScoredNEO) -> float:
-    """Return a composite hazard score in [0, 1] for a *ScoredNEO*.
-
-    Combines three component scores with fixed weights:
-    - 0.4 × :func:`compute_threat_score` (MOID + size + orbit quality)
-    - 0.4 × :func:`compute_close_approach_score` (MOID proximity + PHA bonus)
-    - 0.2 × :func:`compute_arc_quality_bonus` (arc length + quality code)
-
-    Each component is already bounded [0, 1]; the weighted sum is therefore
-    also in [0, 1] and is rounded to 4 decimal places.
-    """
-    threat = compute_threat_score(neo)
-    close = compute_close_approach_score(neo)
-    arc_bonus = compute_arc_quality_bonus(neo)
-    return round(0.4 * threat + 0.4 * close + 0.2 * arc_bonus, 4)
-
-
-def compute_hazard_grade(neo: ScoredNEO) -> str:
-    """Return a letter grade summarising the hazard level of *neo*.
-
-    Grades are assigned from :func:`compute_weighted_hazard_score`:
-
-    ======= ============================
-    Grade   Weighted hazard score
-    ======= ============================
-    ``"A"`` ≥ 0.7 — urgent
-    ``"B"`` ≥ 0.5 — high priority
-    ``"C"`` ≥ 0.3 — medium priority
-    ``"D"`` < 0.3 — routine
-    ======= ============================
-    """
-    score = compute_weighted_hazard_score(neo)
-    if score >= 0.7:
-        return "A"
-    if score >= 0.5:
-        return "B"
-    if score >= 0.3:
-        return "C"
-    return "D"
-
-
-def compute_priority_rank(neos: list) -> list[dict]:
-    """Return a ranked list of NEO candidates sorted by discovery priority.
-
-    Each element is a dict with keys ``rank`` (1-based integer),
-    ``object_id`` (str), ``discovery_priority`` (float), and
-    ``hazard_flag`` (str).  Candidates without a ``discovery_priority``
-    attribute on their metadata are treated as priority 0.0 and sorted last.
-
-    The list is sorted descending by priority (highest priority = rank 1).
-    """
-    records = []
-    for neo in neos:
-        meta = getattr(neo, "metadata", None)
-        priority = float(getattr(meta, "discovery_priority", 0.0) or 0.0)
-        tracklet = getattr(neo, "tracklet", None)
-        object_id = getattr(tracklet, "object_id", "unknown") if tracklet else "unknown"
-        hazard = getattr(neo, "hazard", None)
-        hazard_flag = getattr(hazard, "hazard_flag", "unknown") if hazard else "unknown"
-        records.append({
-            "object_id": object_id,
-            "discovery_priority": priority,
-            "hazard_flag": hazard_flag,
-        })
-
-    records.sort(key=lambda r: -float(r["discovery_priority"]))
-    return [
-        {"rank": i + 1, **r}
-        for i, r in enumerate(records)
-    ]
-
-
-def compute_survey_completeness(neos: list, limiting_mag: float) -> float:
-    """Return the fraction of NEOs brighter than *limiting_mag*.
-
-    Uses the absolute magnitude H as a proxy for brightness (lower H = larger
-    / brighter object).  NEOs whose H is unknown are excluded from both
-    numerator and denominator.  Returns 0.0 when no NEOs have known H.
-    """
-    total = 0
-    brighter = 0
-    for neo in neos:
-        hazard = getattr(neo, "hazard", None)
-        h = getattr(hazard, "absolute_magnitude_h", None) if hazard else None
-        if h is None:
-            continue
-        total += 1
-        if float(h) <= float(limiting_mag):
-            brighter += 1
-    if total == 0:
-        return 0.0
-    return round(brighter / total, 6)
-
-
-def compute_weighted_risk_score(neo: object) -> float:
-    """Return a combined risk score in [0, 1].
-
-    Weights: 0.5 × threat_score + 0.3 × close_approach_score + 0.2 × orbit_quality_score.
-    Any unknown component contributes its sentinel value (0.5 for threat and
-    close_approach; 0.0 for orbit_quality).  The result is clamped to [0, 1].
-    """
-    threat = compute_threat_score(neo)
-    ca = compute_close_approach_score(neo)
-    features = getattr(neo, "features", None)
-    oq = float(getattr(features, "orbit_quality_score", None) or 0.0) if features else 0.0
-    score = 0.5 * threat + 0.3 * ca + 0.2 * oq
-    return round(float(min(1.0, max(0.0, score))), 6)
-
-
-def compute_hazard_summary(neos: list) -> dict:
-    """Return aggregate hazard statistics across a list of ScoredNEO objects.
-
-    Counts candidates by hazard flag and computes mean discovery priority.
-
-    Args:
-        neos: List of ScoredNEO objects.
-
-    Returns:
-        Dict with keys: ``n_total``, ``n_pha_candidates``, ``n_close_approach``,
-        ``n_nominal``, ``n_unknown``, ``mean_discovery_priority``.
-    """
-    n_total = len(neos)
-    n_pha = 0
-    n_ca = 0
-    n_nominal = 0
-    n_unknown = 0
-    total_priority = 0.0
-    for neo in neos:
-        hazard = getattr(neo, "hazard", None)
-        flag = getattr(hazard, "hazard_flag", "unknown") if hazard else "unknown"
-        if flag == "pha_candidate":
-            n_pha += 1
-        elif flag == "close_approach":
-            n_ca += 1
-        elif flag == "nominal":
-            n_nominal += 1
-        else:
-            n_unknown += 1
-        meta = getattr(neo, "metadata", None)
-        priority = float(getattr(meta, "discovery_priority", 0.0) or 0.0) if meta else 0.0
-        total_priority += priority
-    mean_priority = round(total_priority / n_total, 6) if n_total > 0 else 0.0
-    return {
-        "n_total": n_total,
-        "n_pha_candidates": n_pha,
-        "n_close_approach": n_ca,
-        "n_nominal": n_nominal,
-        "n_unknown": n_unknown,
-        "mean_discovery_priority": mean_priority,
-    }
-
-
-def compute_priority_percentile(neo: object, neos: list) -> float:
-    """Return the fraction of neos with discovery_priority ≤ neo's priority.
-
-    Returns 0.0 if the list is empty.  None priorities are treated as 0.0.
-    Result is in [0, 1], rounded to 6 decimal places.
-    """
-    if not neos:
-        return 0.0
-
-    def _priority(n: object) -> float:
-        meta = getattr(n, "metadata", None)
-        val = getattr(meta, "discovery_priority", 0.0) if meta else 0.0
-        return float(val or 0.0)
-
-    ref = _priority(neo)
-    count = sum(1 for n in neos if _priority(n) <= ref)
-    return round(count / len(neos), 6)
-
-
-def compute_arc_completeness_score(neo: object) -> float:
-    """Compute an arc completeness score in [0, 1].
-
-    Combines arc_coverage_score (weight 0.4), nights_observed_score (weight
-    0.3), and orbit_quality_score (weight 0.3).  Missing feature scores
-    contribute 0.0 (conservative).  Result is clamped to [0, 1] and rounded to
-    6 decimal places.
-    """
-    features = getattr(neo, "features", None)
-
-    def _get(name: str) -> float:
-        if features is None:
-            return 0.0
-        val = getattr(features, name, None)
-        return float(val) if val is not None else 0.0
-
-    ac = _get("arc_coverage_score")
-    nobs = _get("nights_observed_score")
-    oq = _get("orbit_quality_score")
-    score = 0.4 * ac + 0.3 * nobs + 0.3 * oq
-    return round(min(1.0, max(0.0, score)), 6)
-
-
-def compute_followup_window_score(neo: object) -> float:
-    """Compute a follow-up window urgency score in [0, 1].
-
-    Combines:
-    - Gap since last observation (weight 0.5): 1.0 if gap >= 7 days.
-    - Orbit quality gap (weight 0.5): 1.0 if orbit_quality_score = 0.
-
-    Missing values default to 0.5 (neutral).
-    """
-    import time as _time
-
-    tracklet = getattr(neo, "tracklet", None)
-    features = getattr(neo, "features", None)
-
-    last_jd: float | None = None
-    if tracklet:
-        obs = getattr(tracklet, "observations", ())
-        if obs:
-            last_jd = max(float(getattr(o, "jd", 0.0)) for o in obs)
-    if last_jd is not None:
-        now_jd = 2440587.5 + _time.time() / 86400.0
-        gap_days = max(0.0, now_jd - last_jd)
-        gap_score = min(1.0, gap_days / 7.0)
-    else:
-        gap_score = 0.5
-
-    oq = (
-        float(features.orbit_quality_score)
-        if features is not None
-        and getattr(features, "orbit_quality_score", None) is not None
-        else None
-    )
-    orbit_gap_score = max(0.0, 1.0 - oq) if oq is not None else 0.5
-    score = 0.5 * gap_score + 0.5 * orbit_gap_score
-    return round(min(1.0, max(0.0, score)), 6)
-
-
-def compute_astrometric_priority(neo: ScoredNEO) -> float:
-    """Compute the astrometric follow-up priority for a NEO candidate.
-
-    High priority indicates that additional astrometry would be most
-    valuable — when the arc is incomplete but the object is bright and
-    a reasonable orbit has been determined::
-
-        score = 0.4 × (1 − arc_coverage_score)
-              + 0.3 × brightness_score
-              + 0.3 × orbit_quality_score
-
-    Missing feature scores contribute 0.5 (neutral).  Result clamped to
-    ``[0, 1]``.
-    """
-    def _f(name: str) -> float:
-        v = getattr(neo.features, name, None)
-        return float(v) if v is not None else 0.5
-
-    arc = _f("arc_coverage_score")
-    brightness = _f("brightness_score")
-    orbit_q = _f("orbit_quality_score")
-    score = 0.4 * (1.0 - arc) + 0.3 * brightness + 0.3 * orbit_q
-    return float(max(0.0, min(1.0, score)))
-
-
-def compute_size_score(neo: ScoredNEO) -> float:
-    """Compute a size score normalized to the PHA diameter threshold (140 m).
-
-    Returns ``min(1.0, estimated_diameter_m / 140.0)`` when the estimated
-    diameter is available.  Returns ``0.5`` (neutral sentinel) when the
-    diameter is unknown.  The result is clamped to ``[0, 1]``.
-
-    Args:
-        neo: :class:`~schemas.ScoredNEO` object.
-
-    Returns:
-        Size score in [0, 1].  Values ≥ 1.0 indicate the candidate is at or
-        above the PHA size threshold.
-    """
-    diameter = getattr(neo.hazard, "estimated_diameter_m", None)
-    if diameter is None:
-        return 0.5
-    return float(max(0.0, min(1.0, diameter / 140.0)))
-
-
-def compute_orbit_uncertainty_score(neo: ScoredNEO) -> float:
-    """Compute orbit uncertainty score as the complement of orbit quality.
-
-    Returns ``1.0 - orbit_quality_score`` where ``orbit_quality_score`` comes
-    from ``neo.features.orbit_quality_score``.  If the score is ``None``,
-    returns 0.5 (neutral sentinel).  Result is clamped to ``[0, 1]``.
-
-    A higher value indicates greater uncertainty in the orbital solution.
-
-    Args:
-        neo: :class:`~schemas.ScoredNEO` object.
-
-    Returns:
-        Orbit uncertainty score in [0, 1].
-    """
-    oq = getattr(neo.features, "orbit_quality_score", None)
-    if oq is None:
-        return 0.5
-    return float(max(0.0, min(1.0, 1.0 - float(oq))))
-
-
-def compute_detection_completeness_score(neo: ScoredNEO) -> float:
-    """Compute a composite detection completeness score for a scored NEO.
-
-    Combines three feature scores that together reflect how completely the
-    candidate has been observed:
-
-    - ``arc_coverage_score``  (weight 0.5)
-    - ``nights_observed_score`` (weight 0.3)
-    - ``real_bogus_score``      (weight 0.2)
-
-    Missing feature scores (``None``) contribute ``0.0`` to the weighted sum.
-    The result is clamped to ``[0, 1]`` and rounded to 4 decimal places.
-
-    Args:
-        neo: :class:`~schemas.ScoredNEO` object.
-
-    Returns:
-        Detection completeness score in [0, 1].
-    """
-    _arc = neo.features.arc_coverage_score
-    _nights = neo.features.nights_observed_score
-    _rb = neo.features.real_bogus_score
-    arc = float(_arc) if _arc is not None else 0.0
-    nights = float(_nights) if _nights is not None else 0.0
-    rb = float(_rb) if _rb is not None else 0.0
-    score = 0.5 * arc + 0.3 * nights + 0.2 * rb
-    return round(float(min(1.0, max(0.0, score))), 4)
-
-
-def compute_combined_hazard_score(neo: ScoredNEO) -> float:
-    """Compute a combined hazard score from candidate feature scores.
-
-    Weighted combination:
-
-    - ``moid_score``          weight 0.4
-    - ``pha_flag_confidence`` weight 0.3
-    - ``orbit_quality_score`` weight 0.3
-
-    Missing feature scores (``None``) contribute ``0.0`` to the weighted
-    sum.  The result is clamped to ``[0, 1]`` and rounded to 4 decimal
-    places.
-
-    Args:
-        neo: :class:`~schemas.ScoredNEO` object.
-
-    Returns:
-        Combined hazard score in [0, 1].
-    """
-    _moid = neo.features.moid_score
-    _pha = neo.features.pha_flag_confidence
-    _orb = neo.features.orbit_quality_score
-    moid = float(_moid) if _moid is not None else 0.0
-    pha = float(_pha) if _pha is not None else 0.0
-    orb = float(_orb) if _orb is not None else 0.0
-    score = 0.4 * moid + 0.3 * pha + 0.3 * orb
-    return round(float(min(1.0, max(0.0, score))), 4)
-
-
-def compute_priority_weighted_moid(neos: list) -> float | None:
-    """Return the discovery-priority-weighted mean MOID in AU.
-
-    Iterates over *neos*, skipping any candidate whose MOID is ``None`` or
-    whose ``discovery_priority`` is zero or ``None``.  Computes the weighted
-    mean as:
-
-    .. math::
-
-        \\bar{d} = \\frac{\\sum_i p_i \\cdot d_i}{\\sum_i p_i}
-
-    where :math:`p_i` is the ``discovery_priority`` and :math:`d_i` is
-    ``moid_au`` for candidate *i*.
-
-    Returns ``None`` when no valid candidates remain after filtering.
-
-    Args:
-        neos: List of :class:`~schemas.ScoredNEO` objects.
-
-    Returns:
-        Weighted mean MOID in AU (float), or ``None`` if no valid candidates.
-    """
-    weighted_sum = 0.0
-    total_weight = 0.0
-    for neo in neos:
-        moid_au = getattr(getattr(neo, "hazard", None), "moid_au", None)
-        metadata = getattr(neo, "metadata", None)
-        priority = getattr(metadata, "discovery_priority", None)
-        if moid_au is None:
-            continue
-        if priority is None or float(priority) == 0.0:
-            continue
-        weighted_sum += float(priority) * float(moid_au)
-        total_weight += float(priority)
-    if total_weight == 0.0:
-        return None
-    return float(weighted_sum / total_weight)
-
-
-def compute_impact_probability_proxy(neo: object) -> float:
-    """Compute a conservative proxy score for hazard assessment.
-
-    This value is NOT a real impact probability.  It does NOT represent the
-    actual probability of an Earth impact and must NOT be communicated as
-    such.  It is a dimensionless product of three pipeline feature scores
-    for internal prioritisation only.  All hazard assessments must defer
-    to MPC/CNEOS for authoritative impact probability estimates.
-
-    The proxy is computed as:
-        ``moid_score * pha_flag_confidence * orbit_quality_score``
-
-    Any missing (``None``) feature contributes 0.0 to the product.  The
-    result is clamped to [0, 1].
-
-    Args:
-        neo: A :class:`~schemas.ScoredNEO`-like object with a ``features``
-            attribute.
-
-    Returns:
-        Proxy score in [0, 1] (float).
-    """
-    features = getattr(neo, "features", None)
-    moid_score = float(getattr(features, "moid_score", None) or 0.0) if features else 0.0
-    pha_flag = float(getattr(features, "pha_flag_confidence", None) or 0.0) if features else 0.0
-    orbit_q = float(getattr(features, "orbit_quality_score", None) or 0.0) if features else 0.0
-    result = moid_score * pha_flag * orbit_q
-    return float(min(1.0, max(0.0, result)))
-
-
-def compute_survey_efficiency_score(neo: object) -> float:
-    """Compute a survey efficiency score as the geometric mean of arc and night scores.
-
-    Combines ``arc_coverage_score`` and ``nights_observed_score`` from the
-    candidate features using the geometric mean: ``sqrt(arc * nights)``.
-    Missing scores (``None``) are treated as 0.0.  The result is clamped to
-    [0, 1].
-
-    Args:
-        neo: A :class:`~schemas.ScoredNEO`-like object with a ``features``
-            attribute.
-
-    Returns:
-        Survey efficiency score in [0, 1] (float).
-    """
-    features = getattr(neo, "features", None)
-    arc = float(getattr(features, "arc_coverage_score", None) or 0.0) if features else 0.0
-    nights = float(getattr(features, "nights_observed_score", None) or 0.0) if features else 0.0
-    result = math.sqrt(arc * nights)
-    return float(min(1.0, max(0.0, result)))
-
-
-def compute_novelty_rank(neos: list) -> list[tuple[int, str]]:
-    """Return dense novelty rankings for scored NEOs.
-
-    Each element is (rank, object_id) sorted from most novel (rank 1) to
-    least novel. Ties share the same rank (dense ranking). NEOs without a
-    novelty_score are placed at the bottom with rank len(neos).
-    """
-    def _novelty(neo: object) -> float:
-        meta = getattr(neo, "metadata", None)
-        if meta is None:
-            return -1.0
-        v = getattr(meta, "novelty_score", None)
-        return float(v) if v is not None else -1.0
-
-    scored = [(neo, _novelty(neo)) for neo in neos]
-    scored.sort(key=lambda x: x[1], reverse=True)
-
-    result: list[tuple[int, str]] = []
-    rank = 0
-    prev_score: float | None = None
-    for neo, score in scored:
-        if score != prev_score:
-            rank += 1
-            prev_score = score
-        oid = str(getattr(getattr(neo, "tracklet", neo), "object_id", "unknown"))
-        result.append((rank, oid))
-    return result
-
-
-def compute_followup_score(neo: object) -> float:
-    """Return a composite [0, 1] followup priority score.
-
-    Combines discovery priority (weight 0.4), orbit quality (weight 0.4),
-    and brightness score (weight 0.2). Missing components contribute 0.
-    """
-    meta = getattr(neo, "metadata", None)
-    features = getattr(neo, "features", None)
-
-    disc = float(getattr(meta, "discovery_priority", 0.0) or 0.0) if meta else 0.0
-    oq = float(getattr(features, "orbit_quality_score", 0.0) or 0.0) if features else 0.0
-    br = float(getattr(features, "brightness_score", 0.0) or 0.0) if features else 0.0
-
-    return float(min(1.0, max(0.0, 0.4 * disc + 0.4 * oq + 0.2 * br)))
-
-
-def compute_moid_hazard_score(neo: object) -> float:
-    """Return a [0, 1] hazard score based on MOID proximity to Earth.
-
-    Score = 1 − clip(moid_au / 0.5, 0, 1).
-    Objects with MOID ≤ 0 get 1.0; MOID ≥ 0.5 AU get 0.0.
-    Returns 0.5 if MOID is unavailable (conservative unknown).
-    """
-    hazard = getattr(neo, "hazard", None)
-    moid = getattr(hazard, "moid_au", None) if hazard else None
-    if moid is None:
-        return 0.5
-    return float(max(0.0, 1.0 - float(moid) / 0.5))
-
-
-def compute_size_estimate_range(neo: object, albedo_range: tuple = (0.05, 0.25)) -> dict:
-    """Return a dict with min/max estimated diameter in metres using the given albedo range.
-
-    Uses D = (1329 / sqrt(albedo)) * 10^(-H/5) km, where H is the absolute magnitude.
-    Returns {'min_m': None, 'max_m': None} if H is unavailable.
-    Larger albedo → smaller object; min diameter uses max_albedo, max uses min_albedo.
-    """
-    hazard = getattr(neo, "hazard", None)
-    h_mag = getattr(hazard, "absolute_magnitude_h", None) if hazard else None
-    if h_mag is None:
-        return {"min_m": None, "max_m": None}
-    albedo_lo, albedo_hi = float(albedo_range[0]), float(albedo_range[1])
-    h = float(h_mag)
-    factor = 10.0 ** (-h / 5.0)
-    d_at_hi = (1329.0 / math.sqrt(albedo_hi)) * factor * 1000.0
-    d_at_lo = (1329.0 / math.sqrt(albedo_lo)) * factor * 1000.0
-    return {"min_m": float(d_at_hi), "max_m": float(d_at_lo)}
-
-
-def compute_priority_histogram(neos: list, n_bins: int = 5) -> dict:
-    """Return a histogram of discovery_priority values across a list of ScoredNEOs.
-
-    Divides the [0, 1] range into *n_bins* equal-width bins and counts how many
-    candidates fall into each bin.  Returns a dict with keys:
-
-      - ``"bin_edges"``: list of n_bins + 1 edge values (0.0 to 1.0)
-      - ``"counts"``: list of n_bins integer counts
-      - ``"n_total"``: total number of candidates with a valid discovery_priority
-
-    Candidates with None or missing discovery_priority are excluded.
-    *n_bins* is clamped to at least 1.
-    """
-    n_bins = max(1, int(n_bins))
-    priorities: list[float] = []
-    for neo in neos:
-        metadata = getattr(neo, "metadata", None)
-        p = getattr(metadata, "discovery_priority", None) if metadata else None
-        if p is not None:
-            priorities.append(float(p))
-    edges = [float(i) / n_bins for i in range(n_bins + 1)]
-    counts = [0] * n_bins
-    for p in priorities:
-        idx = int(p * n_bins)
-        if idx >= n_bins:
-            idx = n_bins - 1
-        counts[idx] += 1
-    return {
-        "bin_edges": edges,
-        "counts": counts,
-        "n_total": len(priorities),
-    }
-
-
-def compute_alert_urgency_score(neo: object) -> float:
-    """Return a numeric [0, 1] urgency score for a ScoredNEO candidate.
-
-    Combines three components with fixed weights:
-
-    - **MOID proximity** (weight 0.4): 1 − min(moid_au, 0.5) / 0.5.
-      MOID ≤ 0 AU → 1.0; MOID ≥ 0.5 AU → 0.0.  Unknown MOID → 0.5.
-    - **Discovery priority** (weight 0.4): taken from metadata.discovery_priority.
-      Unknown → 0.5.
-    - **Orbit quality score** (weight 0.2): taken from features.orbit_quality_score.
-      Unknown → 0.5.
-
-    Returns a float clamped to [0, 1].
-    """
-    hazard = getattr(neo, "hazard", None)
-    moid = getattr(hazard, "moid_au", None) if hazard else None
-    if moid is None:
-        moid_prox = 0.5
-    else:
-        moid_prox = float(max(0.0, 1.0 - float(moid) / 0.5))
-
-    metadata = getattr(neo, "metadata", None)
-    dp = getattr(metadata, "discovery_priority", None) if metadata else None
-    disc_priority = float(dp) if dp is not None else 0.5
-
-    features = getattr(neo, "features", None)
-    oq = getattr(features, "orbit_quality_score", None) if features else None
-    orbit_quality = float(oq) if oq is not None else 0.5
-
-    score = 0.4 * moid_prox + 0.4 * disc_priority + 0.2 * orbit_quality
-    return float(min(1.0, max(0.0, score)))
-
-
-def filter_by_discovery_priority(neos: list, min_priority: float = 0.5) -> list:
-    """Return the subset of ScoredNEOs with discovery_priority ≥ min_priority.
-
-    Reads ``neo.metadata.discovery_priority``.  NEOs with a missing or None
-    priority are excluded.  Returns an empty list if no candidates qualify.
-    """
-    result = []
-    for neo in neos:
-        metadata = getattr(neo, "metadata", None)
-        p = getattr(metadata, "discovery_priority", None) if metadata else None
-        if p is not None and float(p) >= min_priority:
-            result.append(neo)
-    return result
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 def get_top_candidates(neos: list, n: int = 10) -> list:
@@ -1562,111 +563,11 @@ def get_top_candidates(neos: list, n: int = 10) -> list:
     return sorted_neos[: max(0, int(n))]
 
 
-def compute_pha_fraction(neos: list) -> float:
-    """Return the fraction of scored NEOs flagged as PHA candidates.
-
-    Reads ``neo.hazard.hazard_flag`` and counts those equal to
-    ``"pha_candidate"``.  Returns 0.0 for empty input.
-    """
-    if not neos:
-        return 0.0
-    pha_count = sum(
-        1 for neo in neos
-        if getattr(getattr(neo, "hazard", None), "hazard_flag", None) == "pha_candidate"
-    )
-    return float(pha_count) / len(neos)
 
 
-def count_by_alert_pathway(neos: list) -> dict:
-    """Return a count of all scored NEOs grouped by alert_pathway.
-
-    Reads ``neo.hazard.alert_pathway`` for each NEO in *neos*.  NEOs with
-    a missing hazard or alert_pathway contribute to the ``"unknown"`` key.
-    Returns an empty dict for empty input.
-    """
-    counts: dict = {}
-    for neo in neos:
-        pathway = getattr(getattr(neo, "hazard", None), "alert_pathway", "unknown") or "unknown"
-        counts[pathway] = counts.get(pathway, 0) + 1
-    return counts
 
 
-def compute_weighted_hazard_index(neo: object) -> float:
-    """Weighted hazard index combining threat score, MOID proximity, and orbit quality.
-
-    Components (each in [0, 1]):
-    - threat_score (from compute_threat_score): weight 0.4
-    - MOID proximity: 1 - moid_au/0.05, clamped [0,1]; 0.5 sentinel if unknown: weight 0.3
-    - orbit quality fraction (quality_code/4): weight 0.3
-
-    Returns a value in [0, 1].  Higher values indicate greater hazard concern.
-    """
-    from score import compute_threat_score
-
-    try:
-        threat = float(compute_threat_score(neo))
-    except Exception:
-        threat = 0.0
-
-    hazard = getattr(neo, "hazard", None)
-    moid = getattr(hazard, "moid_au", None) if hazard else None
-    if moid is None:
-        moid_prox = 0.5
-    else:
-        moid_prox = float(min(1.0, max(0.0, 1.0 - float(moid) / 0.05)))
-
-    meta = getattr(neo, "metadata", None)
-    quality_code = getattr(meta, "quality_code", None) if meta else None
-    if quality_code is None:
-        orbit_q = 0.0
-    else:
-        orbit_q = float(min(1.0, float(quality_code) / 4.0))
-
-    return float(min(1.0, max(0.0, 0.4 * threat + 0.3 * moid_prox + 0.3 * orbit_q)))
 
 
-def compute_candidate_priority_spread(neos: list) -> float:
-    """Standard deviation of discovery_priority values across all scored NEOs.
-
-    Returns 0.0 if fewer than 2 candidates have valid priority values.
-    """
-    import math
-
-    priorities = []
-    for neo in neos:
-        meta = getattr(neo, "metadata", None)
-        p = getattr(meta, "discovery_priority", None) if meta else None
-        if p is not None:
-            priorities.append(float(p))
-    if len(priorities) < 2:
-        return 0.0
-    mean = sum(priorities) / len(priorities)
-    variance = sum((p - mean) ** 2 for p in priorities) / len(priorities)
-    return float(math.sqrt(variance))
 
 
-def compute_batch_priority_stats(neos: list) -> dict:
-    """Aggregate statistics of discovery_priority across all scored NEOs.
-
-    Returns a dict with keys: ``mean``, ``std``, ``min``, ``max``.
-    Returns an empty dict if no NEOs have a valid discovery_priority.
-    """
-    import math
-
-    priorities = []
-    for neo in neos:
-        meta = getattr(neo, "metadata", None)
-        p = getattr(meta, "discovery_priority", None) if meta else None
-        if p is not None:
-            priorities.append(float(p))
-    if not priorities:
-        return {}
-    n = len(priorities)
-    mean = sum(priorities) / n
-    variance = sum((p - mean) ** 2 for p in priorities) / n
-    return {
-        "mean": mean,
-        "std": math.sqrt(variance),
-        "min": min(priorities),
-        "max": max(priorities),
-    }

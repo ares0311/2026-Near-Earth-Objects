@@ -2,44 +2,25 @@
 
 from __future__ import annotations
 
-__all__ = ["fetch_ztf", "fetch_atlas", "fetch_mpc_known", "fetch_horizons", "fetch",
-           "fetch_batch", "estimate_limiting_magnitude", "summarise_fetch_result",
-           "merge_survey_alerts", "filter_alerts_by_motion", "build_observation_window",
-           "count_known_objects_in_field", "fetch_mpc_observations",
-           "fetch_atlas_forced", "fetch_ztf_alerts", "estimate_survey_depth",
-           "filter_by_survey", "fetch_panstarrs_catalog", "fetch_css_alerts",
-           "fetch_panstarrs_moving_objects", "fetch_recent_mpc_neos",
-           "estimate_field_completeness",
-           "fetch_known_neo_ephemerides",
-           "fetch_neocp_objects",
-           "fetch_mpc_orbit_elements",
-           "fetch_known_neo_list",
-           "fetch_neocp_confirmed",
-           "fetch_mpc_orbit_catalog",
-           "compute_field_overlap",
-           "fetch_known_phas",
-           "fetch_mpc_neo_counts",
-           "fetch_horizons_ephemeris",
-           "summarize_survey_fields",
-           "count_observations_by_mission",
-           "build_fetch_provenance",
-           "get_fetch_result_age",
-           "deduplicate_observations",
-           "get_survey_coverage_fraction",
-           "partition_by_field",
-           "filter_by_magnitude",
-           "compute_field_sky_area",
-           "compute_survey_overlap",
-           "count_observations_by_night",
-           "compute_temporal_coverage",
-           "compute_observation_rate",
-           "compute_magnitude_distribution",
-           "group_observations_by_night",
-           "count_observations_by_filter",
-           "get_brightest_observation",
-           "get_latest_observation",
-           "get_faintest_observation",
-           "compute_observation_time_span"]
+__all__ = [
+    "fetch_ztf",
+    "fetch_atlas",
+    "fetch_mpc_known",
+    "fetch_horizons",
+    "fetch",
+    "fetch_batch",
+    "count_known_objects_in_field",
+    "fetch_mpc_observations",
+    "fetch_atlas_forced",
+    "fetch_ztf_alerts",
+    "fetch_panstarrs_catalog",
+    "fetch_recent_mpc_neos",
+    "fetch_known_phas",
+    "fetch_horizons_ephemeris",
+    "count_observations_by_mission",
+    "filter_by_magnitude",
+    "compute_observation_rate",
+]
 
 import json
 import os
@@ -703,164 +684,14 @@ def fetch_batch(
     ]
 
 
-def estimate_limiting_magnitude(fetch_result: FetchResult) -> float | None:
-    """Estimate the 5-sigma limiting magnitude from detected source magnitudes.
-
-    Uses the faint-end tail of the magnitude distribution (90th–99th percentile)
-    as a proxy for the survey depth.  Returns ``None`` when fewer than 5
-    observations with valid magnitudes are available.
-    """
-    import statistics
-
-    mags = [
-        obs.mag
-        for obs in fetch_result.alerts
-        if obs.mag is not None and 10.0 < obs.mag < 35.0
-    ]
-    if len(mags) < 5:
-        return None
-
-    mags_sorted = sorted(mags)
-    # Use the 90th–99th percentile band as faint-end estimate
-    lo = int(0.90 * len(mags_sorted))
-    hi = max(lo + 1, int(0.99 * len(mags_sorted)))
-    tail = mags_sorted[lo:hi]
-    return round(statistics.mean(tail), 2) if tail else None
 
 
-def summarise_fetch_result(result: FetchResult) -> dict:
-    """Return a summary dict describing a FetchResult.
-
-    Keys: n_alerts, surveys, search_ra_deg, search_dec_deg, search_radius_deg,
-    start_jd, end_jd, limiting_magnitude.
-    """
-    if not isinstance(result, FetchResult):
-        raise TypeError("result must be a FetchResult")
-    prov = result.provenance
-    return {
-        "n_alerts": len(result.alerts),
-        "surveys": list(prov.surveys),
-        "search_ra_deg": prov.search_ra_deg,
-        "search_dec_deg": prov.search_dec_deg,
-        "search_radius_deg": prov.search_radius_deg,
-        "start_jd": prov.start_jd,
-        "end_jd": prov.end_jd,
-        "limiting_magnitude": prov.limiting_magnitude,
-    }
 
 
-def merge_survey_alerts(results: list[FetchResult]) -> FetchResult:
-    """Merge multiple FetchResult objects into a single FetchResult.
-
-    Deduplicates alerts by obs_id.  The provenance of the merged result
-    reflects the union of all surveys and the widest JD range.
-    """
-    if not results:
-        prov = FetchProvenance(surveys=(), start_jd=0.0, end_jd=0.0)
-        return FetchResult(alerts=(), provenance=prov)
-
-    seen: set[str] = set()
-    merged_alerts: list = []
-    all_surveys: list = []
-    start_jd = float("inf")
-    end_jd = float("-inf")
-
-    for result in results:
-        prov = result.provenance
-        all_surveys.extend(prov.surveys)
-        start_jd = min(start_jd, prov.start_jd)
-        end_jd = max(end_jd, prov.end_jd)
-        for alert in result.alerts:
-            if alert.obs_id not in seen:
-                seen.add(alert.obs_id)
-                merged_alerts.append(alert)
-
-    unique_surveys: tuple = tuple(dict.fromkeys(all_surveys))
-    merged_prov = FetchProvenance(
-        surveys=unique_surveys,
-        start_jd=start_jd,
-        end_jd=end_jd,
-    )
-    return FetchResult(alerts=tuple(merged_alerts), provenance=merged_prov)
 
 
-def filter_alerts_by_motion(
-    alerts: tuple,
-    min_rate_arcsec_hr: float = 0.0,
-    max_rate_arcsec_hr: float = 60.0,
-) -> tuple:
-    """Filter a tuple of Observation objects by apparent motion rate.
-
-    Uses ``ssdistnr`` (solar-system distance) as a proxy: objects with
-    ``ssdistnr`` < 5 arcsec are likely known solar system objects whose
-    motion is already constrained by ZTF.  For observations without
-    ``ssdistnr``, the filter passes them through conservatively.
-
-    In practice, motion rate filtering is most useful as a pre-detect step
-    to remove stationary calibration stars (rate ≈ 0) and LEO satellite
-    streaks (rate > 60 arcsec/hr) from the alert stream.
-
-    Returns a tuple of Observation objects within the specified rate range.
-    """
-
-    result = []
-    for obs in alerts:
-        ssd = getattr(obs, "ssdistnr", None)
-        if ssd is None:
-            # No motion information — keep conservatively
-            result.append(obs)
-            continue
-        # ZTF ssdistnr is in arcseconds; use as proxy for motion displacement
-        # over one 30-second exposure (rate in arcsec/hr = ssd * 120)
-        rate_proxy = float(ssd) * 120.0
-        if min_rate_arcsec_hr <= rate_proxy <= max_rate_arcsec_hr:
-            result.append(obs)
-    return tuple(result)
 
 
-def build_observation_window(
-    ra_deg: float,
-    dec_deg: float,
-    radius_deg: float = 1.0,
-    start_jd: float = 2460000.5,
-    end_jd: float | None = None,
-    surveys: tuple | list | None = None,
-) -> object:
-    """Construct an ObservationWindow schema object from component parameters.
-
-    Validates that ``start_jd < end_jd``, that ``radius_deg > 0``, and that
-    all survey names are valid ``Mission`` literals.  Raises ``ValueError`` on
-    invalid inputs.  Returns an :class:`schemas.ObservationWindow`.
-    """
-    from schemas import ObservationWindow
-
-    if end_jd is None:
-        end_jd = start_jd + 30.0
-
-    if start_jd >= end_jd:
-        raise ValueError(
-            f"start_jd ({start_jd}) must be less than end_jd ({end_jd})"
-        )
-    if radius_deg <= 0.0:
-        raise ValueError(f"radius_deg must be positive (got {radius_deg})")
-
-    valid_missions: set[str] = {"ZTF", "ATLAS", "PanSTARRS", "CSS", "MPC"}
-    if surveys is None:
-        survey_tuple: tuple[Mission, ...] = ("ZTF",)
-    else:
-        bad = [s for s in surveys if s not in valid_missions]
-        if bad:
-            raise ValueError(f"Unknown survey(s): {bad}; valid: {sorted(valid_missions)}")
-        survey_tuple = tuple(surveys)  # type: ignore[assignment]
-
-    return ObservationWindow(
-        ra_deg=ra_deg,
-        dec_deg=dec_deg,
-        radius_deg=radius_deg,
-        start_jd=start_jd,
-        end_jd=end_jd,
-        surveys=survey_tuple,
-    )
 
 
 def count_known_objects_in_field(
@@ -1205,46 +1036,8 @@ def fetch_ztf_alerts(
     return ztf_obs
 
 
-def estimate_survey_depth(fetch_result: FetchResult) -> float | None:
-    """Estimate the limiting magnitude of a survey observation window.
-
-    Returns the 95th-percentile apparent magnitude from all alert observations
-    in the :class:`~schemas.FetchResult`.  This provides a robust proxy for the
-    5-sigma survey depth, robust against a few very bright detections.
-
-    Args:
-        fetch_result: A :class:`~schemas.FetchResult` containing survey alerts.
-
-    Returns:
-        95th-percentile magnitude as ``float``, or ``None`` if there are no
-        valid magnitudes (empty alerts or all sentinel values ≥ 90).
-    """
-    import numpy as np
-
-    mags = [
-        obs.mag
-        for obs in fetch_result.alerts
-        if obs.mag is not None and obs.mag < 90.0
-    ]
-    if not mags:
-        return None
-    return round(float(np.percentile(mags, 95)), 4)
 
 
-def filter_by_survey(fetch_result: FetchResult, surveys: list[str]) -> FetchResult:
-    """Return a new FetchResult containing only alerts from the specified surveys.
-
-    Args:
-        fetch_result: Source :class:`~schemas.FetchResult`.
-        surveys: List of survey name strings to keep (e.g. ``["ZTF", "ATLAS"]``).
-
-    Returns:
-        New :class:`~schemas.FetchResult` with filtered alerts.  Provenance is
-        unchanged.  If ``surveys`` is empty, all alerts are excluded.
-    """
-    allowed = set(surveys)
-    filtered = tuple(obs for obs in fetch_result.alerts if obs.mission in allowed)
-    return FetchResult(alerts=filtered, provenance=fetch_result.provenance)
 
 
 def fetch_panstarrs_catalog(
@@ -1325,173 +1118,8 @@ def fetch_panstarrs_catalog(
     return observations
 
 
-def fetch_css_alerts(
-    ra_deg: float,
-    dec_deg: float,
-    radius_deg: float,
-    start_jd: float | None = None,
-    end_jd: float | None = None,
-    force_refresh: bool = False,
-) -> list:
-    """Fetch Catalina Sky Survey alerts via the MPC astroquery interface.
-
-    Queries the Minor Planet Center observation database for CSS detections
-    (observatory code 703) near a sky position.  Results are disk-cached by
-    (ra, dec, radius).
-
-    Args:
-        ra_deg: Right ascension of search centre in degrees.
-        dec_deg: Declination of search centre in degrees.
-        radius_deg: Search radius in degrees.
-        start_jd: Optional start Julian Date for time filtering (not enforced
-            by MPC API but stored for provenance).
-        end_jd: Optional end Julian Date for time filtering.
-        force_refresh: Bypass the on-disk cache if ``True``.
-
-    Returns:
-        List of :class:`~schemas.Observation` objects from CSS.
-        Returns an empty list on network failure or when no sources are found.
-    """
-    import hashlib
-
-    cache_key = hashlib.md5(
-        f"css:{ra_deg:.6f}:{dec_deg:.6f}:{radius_deg:.6f}".encode()
-    ).hexdigest()
-    cache_path = _CACHE_DIR / f"{cache_key}.json"
-
-    if not force_refresh and cache_path.exists():
-        try:
-            with cache_path.open() as f:
-                raw = json.load(f)
-            return [Observation(**item) for item in raw]
-        except Exception:
-            pass
-
-    observations: list = []
-    try:
-        from astroquery.mpc import MPC  # type: ignore[import]
-
-        results = MPC.query_observations_by_position(  # type: ignore[attr-defined]
-            ra=ra_deg, dec=dec_deg, radius=radius_deg
-        )
-        for row in results:
-            try:
-                # Keep only CSS (observatory code 703) rows
-                obs_code = str(row.get("obs_code") or row.get("observatory_code") or "")
-                submission = str(row.get("submission_info") or "")
-                if obs_code != "703" and "703" not in submission:
-                    continue
-                obs_id = str(
-                    row.get("obs_id") or row.get("id") or row.get("number") or "css_unknown"
-                )
-                jd_val = float(row.get("epoch") or row.get("jd") or 2460000.5)
-                ra_val = float(row.get("ra") or row.get("ra_deg") or ra_deg)
-                dec_val = float(row.get("dec") or row.get("dec_deg") or dec_deg)
-                mag_val = float(row.get("mag") or row.get("magnitude") or 99.0)
-                band = str(row.get("band") or row.get("filter_band") or "V")
-                obs = Observation(
-                    obs_id=f"css_{obs_id}",
-                    jd=jd_val,
-                    ra_deg=ra_val,
-                    dec_deg=dec_val,
-                    mag=mag_val,
-                    mag_err=0.1,
-                    filter_band=band,
-                    mission="CSS",
-                )
-                observations.append(obs)
-            except Exception:
-                continue
-    except Exception:
-        pass
-
-    try:
-        cache_path.parent.mkdir(parents=True, exist_ok=True)
-        with cache_path.open("w") as f:
-            json.dump([o.model_dump() for o in observations], f)
-    except Exception:
-        pass
-
-    return observations
 
 
-def fetch_panstarrs_moving_objects(
-    ra_deg: float,
-    dec_deg: float,
-    radius_deg: float,
-    force_refresh: bool = False,
-) -> list:
-    """Fetch PanSTARRS moving-object detections near a sky position via MAST.
-
-    Queries the PanSTARRS PS1 moving-object catalog (MAST "PANSTARRS" catalog,
-    "detection" table) filtered to rows with non-null ``ssObjectId``, which
-    flags solar-system object detections.  Results are disk-cached.
-
-    Args:
-        ra_deg: Right ascension of the search centre in degrees.
-        dec_deg: Declination of the search centre in degrees.
-        radius_deg: Search radius in degrees.
-        force_refresh: Bypass the on-disk cache if ``True``.
-
-    Returns:
-        List of :class:`~schemas.Observation` objects from PanSTARRS with
-        ``mission="PanSTARRS"``.  Returns an empty list on failure.
-    """
-    import hashlib
-
-    cache_key = hashlib.md5(
-        f"ps1_moving:{ra_deg:.6f}:{dec_deg:.6f}:{radius_deg:.6f}".encode()
-    ).hexdigest()
-    cache_path = _CACHE_DIR / f"{cache_key}.json"
-
-    if not force_refresh and cache_path.exists():
-        try:
-            with cache_path.open() as f:
-                raw = json.load(f)
-            return [Observation(**item) for item in raw]
-        except Exception:
-            pass
-
-    observations: list = []
-    try:
-        from astroquery.mast import Catalogs  # type: ignore[import]
-
-        results = Catalogs.query_region(
-            f"{ra_deg} {dec_deg}",
-            radius=radius_deg,
-            catalog="PanSTARRS",
-            data_release="dr2",
-            table="detection",
-        )
-        for row in results:
-            try:
-                ss_id = row.get("ssObjectId") or row.get("ssobjectid")
-                if not ss_id:
-                    continue
-                obs = Observation(
-                    obs_id=f"ps1_mo_{row.get('detectID') or row.get('detectionID') or 'unk'}",
-                    jd=float(row.get("obsTime") or row.get("epochMjdTai", 0.0)) + 2400000.5,
-                    ra_deg=float(row.get("ra") or row.get("raMean") or ra_deg),
-                    dec_deg=float(row.get("dec") or row.get("decMean") or dec_deg),
-                    mag=float(row.get("psfFlux") or row.get("rMeanPSFMag") or 99.0),
-                    mag_err=float(row.get("psfFluxErr") or 0.1),
-                    filter_band=str(row.get("filterID") or "r"),
-                    mission="PanSTARRS",
-                )
-                observations.append(obs)
-            except Exception:
-                continue
-    except Exception:
-        pass
-
-    try:
-        cache_path.parent.mkdir(parents=True, exist_ok=True)
-        with cache_path.open("w") as f:
-            json.dump([o.model_dump() for o in observations], f)
-    except Exception:
-        pass
-
-    return observations
 
 
 def fetch_recent_mpc_neos(n_days: int = 30, force_refresh: bool = False) -> list[Observation]:
@@ -1567,395 +1195,20 @@ def fetch_recent_mpc_neos(n_days: int = 30, force_refresh: bool = False) -> list
         return []
 
 
-def estimate_field_completeness(
-    fetch_result: object,
-    limiting_mag: float | None = None,
-) -> float:
-    """Estimate the fractional completeness of a survey field.
-
-    Completeness is defined as the fraction of observations whose magnitude is
-    at least 0.5 mag brighter than the field's limiting magnitude (i.e. well
-    above the detection threshold).  Observations with sentinel magnitudes
-    ≥ 90 are treated as non-detections.
-
-    If *limiting_mag* is not supplied, :func:`estimate_survey_depth` is used
-    to derive it from the fetch result.  If no limiting magnitude can be
-    determined, returns 0.0.
-
-    Args:
-        fetch_result: A :class:`~schemas.FetchResult` object.
-        limiting_mag: Optional override for the field limiting magnitude.
-
-    Returns:
-        Completeness fraction in [0, 1], rounded to 4 decimal places.
-        Returns 0.0 for empty or missing observations.
-    """
-    alerts = list(getattr(fetch_result, "alerts", []) or [])
-    if not alerts:
-        return 0.0
-
-    lim = limiting_mag
-    if lim is None:
-        lim = estimate_survey_depth(fetch_result)
-    if lim is None:
-        return 0.0
-
-    threshold = lim - 0.5
-    valid = [o for o in alerts if float(getattr(o, "mag", 99.0)) < 90.0]
-    if not valid:
-        return 0.0
-
-    bright = sum(1 for o in valid if float(getattr(o, "mag", 99.0)) <= threshold)
-    return round(bright / len(valid), 4)
 
 
-def fetch_known_neo_ephemerides(
-    designations: list[str],
-    target_jd: float = 2460000.5,
-    force_refresh: bool = False,
-) -> list:
-    """Fetch geocentric ephemerides for a list of known NEO designations.
-
-    Queries JPL Horizons (via ``astroquery.jplhorizons``) for each designation
-    and returns a list of :class:`~schemas.EphemerisPoint` objects.  Results are
-    disk-cached per (designation, target_jd) pair; use *force_refresh* to bypass.
-
-    Failed individual queries are silently skipped — only successful results are
-    returned.  The order of returned points matches the order of *designations*
-    (absent entries are omitted).
-
-    Args:
-        designations: List of MPC/JPL designation strings, e.g. ``["433", "3200"]``.
-        target_jd: Julian Date for the ephemeris prediction (default 2460000.5).
-        force_refresh: If True, bypass disk cache and re-query.
-
-    Returns:
-        List of :class:`~schemas.EphemerisPoint` objects, one per successful query.
-    """
-    from schemas import EphemerisPoint
-
-    results: list[EphemerisPoint] = []
-    for desig in designations:
-        cache_key = f"neo_eph_{desig}_{target_jd:.2f}"
-        if not force_refresh:
-            cached = _load_cache(cache_key)
-            if cached is not None:
-                try:
-                    results.append(EphemerisPoint.model_validate(cached))
-                    continue
-                except Exception:
-                    pass
-        try:
-            from astroquery.jplhorizons import Horizons  # type: ignore[import]
-
-            obj = Horizons(id=desig, location="500", epochs=target_jd)
-            eph = obj.ephemerides()
-            ra = float(eph["RA"][0])
-            dec = float(eph["DEC"][0])
-            delta = float(eph["delta"][0])
-            r = float(eph["r"][0])
-            phase = float(eph["alpha"][0]) if "alpha" in eph.colnames else None
-            mag = float(eph["V"][0]) if "V" in eph.colnames else None
-            point = EphemerisPoint(
-                object_id=desig,
-                jd=target_jd,
-                ra_deg=ra,
-                dec_deg=dec,
-                delta_au=delta,
-                r_au=r,
-                phase_deg=phase,
-                mag=mag,
-            )
-            _save_cache(cache_key, point.model_dump())
-            results.append(point)
-        except Exception:
-            pass
-    return results
 
 
-def fetch_neocp_objects(force_refresh: bool = False) -> list[dict]:
-    """Return unconfirmed objects currently listed on the MPC NEOCP.
-
-    Each dict contains at minimum ``object_id``, ``score``, ``updated``
-    (ISO timestamp string), ``ra_deg``, ``dec_deg``, and ``mag`` keys
-    populated from the MPC NEOCP feed.  Missing fields default to *None*.
-    Results are disk-cached under the key ``"neocp_objects"``; set
-    *force_refresh* to bypass the cache.
-
-    Returns an empty list if the MPC NEOCP cannot be reached or the
-    response cannot be parsed.
-    """
-    cache_key = "neocp_objects"
-    if not force_refresh:
-        cached = _load_cache(cache_key)
-        if cached is not None and isinstance(cached, list):
-            return cached
-
-    try:
-        from astroquery.mpc import MPC  # type: ignore[import]
-
-        tbl = MPC.query_objects("nea")
-        rows: list[dict] = []
-        for row in tbl:
-            rows.append({
-                "object_id": str(row.get("designation") or row.get("name") or "unknown"),
-                "score": float(row["score"]) if "score" in row.colnames else None,
-                "updated": str(row["updated"]) if "updated" in row.colnames else None,
-                "ra_deg": float(row["ra"]) if "ra" in row.colnames else None,
-                "dec_deg": float(row["dec"]) if "dec" in row.colnames else None,
-                "mag": float(row["vmag"]) if "vmag" in row.colnames else None,
-            })
-        _save_cache(cache_key, rows)
-        return rows
-    except Exception:
-        return []
 
 
-def fetch_mpc_orbit_elements(
-    designation: str,
-    force_refresh: bool = False,
-) -> dict | None:
-    """Fetch orbital elements for *designation* from the MPC via astroquery.
-
-    Results are disk-cached under ``"mpc_orb_{designation}"``.  Set
-    *force_refresh* to bypass the cache.  Returns a dict with keys
-    ``"a"``, ``"e"``, ``"i"``, ``"node"``, ``"peri"``, ``"M"``,
-    ``"epoch_jd"`` (all floats) and ``"designation"`` (str), or
-    *None* if the object cannot be found or the query fails.
-    """
-    cache_key = f"mpc_orb_{designation}"
-    if not force_refresh:
-        cached = _load_cache(cache_key)
-        if cached is not None and isinstance(cached, dict):
-            return cached
-    try:
-        from astroquery.mpc import MPC  # type: ignore[import]
-
-        tbl = MPC.query_object("asteroid", designation=designation)
-        if tbl is None or len(tbl) == 0:
-            return None
-        row = tbl[0]
-        result = {
-            "designation": designation,
-            "a": float(row["semimajor_axis"]) if "semimajor_axis" in tbl.colnames else None,
-            "e": float(row["eccentricity"]) if "eccentricity" in tbl.colnames else None,
-            "i": float(row["inclination"]) if "inclination" in tbl.colnames else None,
-            "node": float(row["ascending_node"]) if "ascending_node" in tbl.colnames else None,
-            "peri": (float(row["argument_of_perihelion"])
-                     if "argument_of_perihelion" in tbl.colnames else None),
-            "M": float(row["mean_anomaly"]) if "mean_anomaly" in tbl.colnames else None,
-            "epoch_jd": float(row["epoch_jd"]) if "epoch_jd" in tbl.colnames else None,
-        }
-        _save_cache(cache_key, result)
-        return result
-    except Exception:
-        return None
 
 
-def fetch_known_neo_list(force_refresh: bool = False) -> list[dict]:
-    """Return a list of known numbered NEOs from the MPC catalog.
-
-    Each entry has keys: ``object_id``, ``a_au``, ``e``, ``i_deg``,
-    ``absolute_magnitude_h``, ``neo_class``.  Returns an empty list on failure.
-    Results are disk-cached under the standard cache directory.
-    """
-    cache_key = "known_neo_list"
-    if not force_refresh:
-        cached = _load_cache(cache_key)
-        if cached is not None and isinstance(cached, list):
-            return cached
-    try:
-        from astroquery.mpc import MPC  # type: ignore[import-untyped]
-
-        tbl = MPC.query_objects("nea")
-        rows: list[dict] = []
-        for row in tbl:
-            a = float(row["semimajor_axis"]) if "semimajor_axis" in tbl.colnames else None
-            e = float(row["eccentricity"]) if "eccentricity" in tbl.colnames else None
-            q = (a * (1.0 - e)) if (a is not None and e is not None) else None
-            Q = (a * (1.0 + e)) if (a is not None and e is not None) else None
-            neo_class: str = "unknown"
-            if q is not None and Q is not None and a is not None:
-                if a < 1.0 and Q > 0.983:
-                    neo_class = "aten"
-                elif Q is not None and Q < 0.983:
-                    neo_class = "ieo"
-                elif a >= 1.0 and q < 1.017:
-                    neo_class = "apollo"
-                elif 1.017 <= q < 1.3:
-                    neo_class = "amor"
-            rows.append({
-                "object_id": (
-                    str(row.get("designation") or row.get("name") or "unknown")
-                ),
-                "a_au": a,
-                "e": e,
-                "i_deg": (
-                    float(row["inclination"]) if "inclination" in tbl.colnames else None
-                ),
-                "absolute_magnitude_h": (
-                    float(row["absolute_magnitude"])
-                    if "absolute_magnitude" in tbl.colnames else None
-                ),
-                "neo_class": neo_class,
-            })
-        _save_cache(cache_key, rows)
-        return rows
-    except Exception:
-        return []
 
 
-def fetch_neocp_confirmed(force_refresh: bool = False) -> list[dict]:
-    """Return a list of recently confirmed NEOCP objects from the MPC catalog.
-
-    Queries the MPC NEA list and returns objects that have a confirmation date
-    available (i.e. were recently on NEOCP and then confirmed). Each entry has
-    keys: ``object_id``, ``a_au``, ``e``, ``i_deg``, ``absolute_magnitude_h``,
-    ``neo_class``, ``confirmed``.  Returns an empty list on failure.
-    Results are disk-cached under ``neocp_confirmed``.
-    """
-    cache_key = "neocp_confirmed"
-    if not force_refresh:
-        cached = _load_cache(cache_key)
-        if cached is not None and isinstance(cached, list):
-            return cached
-    try:
-        from astroquery.mpc import MPC  # type: ignore[import-untyped]
-
-        tbl = MPC.query_objects("nea")
-        rows: list[dict] = []
-        for row in tbl:
-            desig = str(row.get("designation") or row.get("name") or "unknown")
-            a = float(row["semimajor_axis"]) if "semimajor_axis" in tbl.colnames else None
-            e = float(row["eccentricity"]) if "eccentricity" in tbl.colnames else None
-            q = (a * (1.0 - e)) if (a is not None and e is not None) else None
-            Q = (a * (1.0 + e)) if (a is not None and e is not None) else None
-            neo_class: str = "unknown"
-            if q is not None and a is not None and Q is not None:
-                if Q < 0.983:
-                    neo_class = "ieo"
-                elif a < 1.0:
-                    neo_class = "aten"
-                elif q < 1.017:
-                    neo_class = "apollo"
-                elif q < 1.3:
-                    neo_class = "amor"
-            rows.append({
-                "object_id": desig,
-                "a_au": a,
-                "e": e,
-                "i_deg": (
-                    float(row["inclination"]) if "inclination" in tbl.colnames else None
-                ),
-                "absolute_magnitude_h": (
-                    float(row["absolute_magnitude"])
-                    if "absolute_magnitude" in tbl.colnames else None
-                ),
-                "neo_class": neo_class,
-                "confirmed": True,
-            })
-        _save_cache(cache_key, rows)
-        return rows
-    except Exception:
-        return []
 
 
-def fetch_mpc_orbit_catalog(force_refresh: bool = False) -> list[dict]:
-    """Download a sample of MPC orbital elements for known NEOs.
-
-    Queries the MPC NEA catalog via ``astroquery.mpc`` and returns a
-    list of dicts with keys: designation, a_au, e, i_deg, q_au, Q_au,
-    neo_class, absolute_magnitude_h.  Results are disk-cached under the
-    key ``"mpc_orbit_catalog"``.  Returns an empty list on failure.
-    """
-    cache_key = "mpc_orbit_catalog"
-    if not force_refresh:
-        cached = _load_cache(cache_key)
-        if cached is not None and isinstance(cached, list):
-            return cached
-    try:
-        from astroquery.mpc import MPC  # type: ignore[import]
-
-        tbl = MPC.query_objects("nea")
-        rows: list[dict] = []
-        for row in tbl:
-            desig = str(row.get("designation") or row.get("name") or "unknown")
-            a = float(row["semimajor_axis"]) if "semimajor_axis" in tbl.colnames else None
-            e = float(row["eccentricity"]) if "eccentricity" in tbl.colnames else None
-            i = float(row["inclination"]) if "inclination" in tbl.colnames else None
-            h = float(row["absolute_magnitude"]) if "absolute_magnitude" in tbl.colnames else None
-            q = (a * (1.0 - e)) if (a is not None and e is not None) else None
-            Q = (a * (1.0 + e)) if (a is not None and e is not None) else None
-            neo_class: str = "unknown"
-            if q is not None and a is not None and Q is not None:
-                if Q < 0.983:
-                    neo_class = "ieo"
-                elif a < 1.0:
-                    neo_class = "aten"
-                elif q < 1.017:
-                    neo_class = "apollo"
-                elif q < 1.3:
-                    neo_class = "amor"
-            rows.append({
-                "designation": desig,
-                "a_au": a,
-                "e": e,
-                "i_deg": i,
-                "q_au": q,
-                "Q_au": Q,
-                "neo_class": neo_class,
-                "absolute_magnitude_h": h,
-            })
-        _save_cache(cache_key, rows)
-        return rows
-    except Exception:
-        return []
 
 
-def compute_field_overlap(fetch_result1: object, fetch_result2: object) -> float:
-    """Return the fraction of observations in fetch_result1 within 0.1 deg of
-    any observation in fetch_result2.
-
-    Uses the haversine great-circle separation.  Returns 0.0 if either result
-    has no observations.
-
-    Args:
-        fetch_result1: First FetchResult (or object with ``alerts`` attribute).
-        fetch_result2: Second FetchResult (or object with ``alerts`` attribute).
-
-    Returns:
-        Fraction of alerts in fetch_result1 that are within 360 arcsec (0.1 deg)
-        of at least one alert in fetch_result2, in [0, 1].
-    """
-    import math as _math
-
-    alerts1 = list(getattr(fetch_result1, "alerts", []) or [])
-    alerts2 = list(getattr(fetch_result2, "alerts", []) or [])
-    if not alerts1 or not alerts2:
-        return 0.0
-
-    threshold_rad = _math.radians(0.1)
-
-    def _sep(ra1: float, dec1: float, ra2: float, dec2: float) -> float:
-        r1, d1, r2, d2 = (_math.radians(x) for x in (ra1, dec1, ra2, dec2))
-        hav = (
-            _math.sin((d2 - d1) / 2.0) ** 2
-            + _math.cos(d1) * _math.cos(d2) * _math.sin((r2 - r1) / 2.0) ** 2
-        )
-        return 2.0 * _math.asin(_math.sqrt(max(0.0, min(1.0, hav))))
-
-    matched = 0
-    for obs1 in alerts1:
-        ra1 = float(getattr(obs1, "ra_deg", 0.0))
-        dec1 = float(getattr(obs1, "dec_deg", 0.0))
-        for obs2 in alerts2:
-            ra2 = float(getattr(obs2, "ra_deg", 0.0))
-            dec2 = float(getattr(obs2, "dec_deg", 0.0))
-            if _sep(ra1, dec1, ra2, dec2) <= threshold_rad:
-                matched += 1
-                break
-
-    return matched / len(alerts1)
 
 
 def fetch_known_phas(force_refresh: bool = False) -> list[dict]:
@@ -2006,44 +1259,6 @@ def fetch_known_phas(force_refresh: bool = False) -> list[dict]:
         return []
 
 
-def fetch_mpc_neo_counts(force_refresh: bool = False) -> dict[str, int]:
-    """Fetch total known NEO counts by dynamical class from the MPC.
-
-    Returns a dict with keys ``"amor"``, ``"apollo"``, ``"aten"``, ``"ieo"``,
-    and ``"total"``.  Results are disk-cached under the key
-    ``"mpc_neo_counts"``.  Returns an empty dict on failure.
-    """
-    cache_key = "mpc_neo_counts"
-    if not force_refresh:
-        cached = _load_cache(cache_key)
-        if cached is not None and isinstance(cached, dict):
-            return cached
-    try:
-        from astroquery.mpc import MPC  # type: ignore[import]
-
-        MPC.get_observatory_list()  # dummy call to warm up session
-        neo_tbl = MPC.query_objects_in_sky(
-            ra_deg=180.0, dec_deg=0.0, radius=180.0, limiting_magnitude=30.0
-        )
-        counts: dict[str, int] = {"amor": 0, "apollo": 0, "aten": 0, "ieo": 0, "total": 0}
-        for row in neo_tbl:
-            a = float(row.get("a", 0.0) or 0.0)
-            e = float(row.get("e", 0.0) or 0.0)
-            q = a * (1.0 - e)
-            Q = a * (1.0 + e)
-            if a > 1.0 and q < 1.017:
-                counts["apollo"] += 1
-            elif a < 1.0 and Q > 0.983:
-                counts["aten"] += 1
-            elif Q < 0.983:
-                counts["ieo"] += 1
-            elif 1.017 <= q <= 1.3:
-                counts["amor"] += 1
-            counts["total"] += 1
-        _save_cache(cache_key, counts)
-        return counts
-    except Exception:
-        return {}
 
 
 def fetch_horizons_ephemeris(
@@ -2090,86 +1305,8 @@ def fetch_horizons_ephemeris(
         return []
 
 
-def summarize_survey_fields(result: FetchResult) -> list[dict]:
-    """Summarise observations in a FetchResult grouped by field_id.
-
-    Returns a list of dicts, each with keys ``"field_id"``, ``"survey"``,
-    ``"epoch_jd"`` (median JD for the group), and ``"n_observations"``.
-    Observations whose ``field_id`` is ``None`` are grouped under ``"unknown"``.
-    Returns an empty list for an empty FetchResult.
-    """
-    from collections import defaultdict
-    groups: dict[str, list] = defaultdict(list)
-    for obs in result.alerts:
-        key = obs.field_id if obs.field_id is not None else "unknown"
-        groups[key].append(obs)
-    rows = []
-    for fid, obs_list in sorted(groups.items()):
-        jds = [o.jd for o in obs_list if o.jd is not None]
-        epoch = float(sorted(jds)[len(jds) // 2]) if jds else 0.0
-        surveys = [o.mission for o in obs_list if o.mission is not None]
-        survey = surveys[0] if surveys else "unknown"
-        rows.append({
-            "field_id": fid,
-            "survey": survey,
-            "epoch_jd": epoch,
-            "n_observations": len(obs_list),
-        })
-    return rows
 
 
-def build_fetch_provenance(
-    alerts: list | tuple,
-    survey: str,
-    start_jd: float,
-    end_jd: float,
-    *,
-    search_ra_deg: float | None = None,
-    search_dec_deg: float | None = None,
-    search_radius_deg: float | None = None,
-    limiting_magnitude: float | None = None,
-    fetched_at_jd: float = 0.0,
-    cached: bool = False,
-) -> FetchProvenance:
-    """Construct a :class:`~schemas.FetchProvenance` from the given parameters.
-
-    This is a convenience factory that collects fetch-stage metadata into a
-    single immutable provenance object.  The ``survey`` string is normalised
-    to the canonical ``Mission`` literals where possible.
-
-    Args:
-        alerts: List or tuple of :class:`~schemas.Observation` objects returned
-            by the fetch stage (used only for consistency; not stored directly).
-        survey: Survey name string (e.g. ``"ZTF"``, ``"ATLAS"``).
-        start_jd: Start of the search window as a Julian Date.
-        end_jd: End of the search window as a Julian Date.
-        search_ra_deg: Right ascension of the search centre in degrees; None if
-            not applicable.
-        search_dec_deg: Declination of the search centre in degrees; None if not
-            applicable.
-        search_radius_deg: Search cone radius in degrees; None if not applicable.
-        limiting_magnitude: Estimated 5-sigma limiting magnitude; None if
-            unknown.
-        fetched_at_jd: Julian Date at which the fetch was performed (default 0).
-        cached: Whether the result was loaded from a local disk cache.
-
-    Returns:
-        :class:`~schemas.FetchProvenance` capturing all provided metadata.
-    """
-    _KNOWN_MISSIONS = {"ZTF", "ATLAS", "PanSTARRS", "CSS", "MPC"}
-    normalised = survey if survey in _KNOWN_MISSIONS else "ZTF"
-    mission: Mission = normalised  # type: ignore[assignment]
-    return FetchProvenance(
-        surveys=(mission,),
-        start_jd=start_jd,
-        end_jd=end_jd,
-        search_ra_deg=search_ra_deg,
-        search_dec_deg=search_dec_deg,
-        search_radius_deg=search_radius_deg,
-        limiting_magnitude=limiting_magnitude,
-        fetched_at_jd=fetched_at_jd,
-        cached=cached,
-    )
 
 
 def count_observations_by_mission(fetch_result: FetchResult) -> dict[str, int]:
@@ -2192,106 +1329,12 @@ def count_observations_by_mission(fetch_result: FetchResult) -> dict[str, int]:
     return counts
 
 
-def get_fetch_result_age(fetch_result: FetchResult) -> float | None:
-    """Return the age in days of a fetch result.
-
-    Age is defined as the current Julian Date minus the earliest observation
-    JD in the result.  Uses ``astropy.time.Time.now().jd`` for the current
-    JD.  Returns ``None`` if the fetch result contains no observations.
-
-    Args:
-        fetch_result: :class:`~schemas.FetchResult` object.
-
-    Returns:
-        Age in days (float ≥ 0), or ``None`` if no observations are present.
-    """
-    from astropy.time import Time  # noqa: PLC0415
-
-    if not fetch_result.alerts:
-        return None
-    earliest_jd = min(obs.jd for obs in fetch_result.alerts)
-    current_jd = Time.now().jd
-    return float(current_jd - earliest_jd)
 
 
-def deduplicate_observations(observations: object) -> list:
-    """Remove duplicate observations by ``obs_id``, keeping first occurrence.
-
-    Iterates over *observations* (any iterable of objects with an ``obs_id``
-    attribute) and returns a new list containing only the first occurrence of
-    each unique ``obs_id``.  Objects whose ``obs_id`` attribute is missing or
-    ``None`` are treated as having a unique sentinel id and are always kept.
-
-    Args:
-        observations: Any iterable of observation-like objects with an
-            ``obs_id`` attribute.
-
-    Returns:
-        List of deduplicated observations in their original order.
-    """
-    seen: set[object] = set()
-    result: list = []
-    for obs in observations:  # type: ignore[attr-defined]
-        obs_id = getattr(obs, "obs_id", None)
-        if obs_id is None or obs_id not in seen:
-            if obs_id is not None:
-                seen.add(obs_id)
-            result.append(obs)
-    return result
 
 
-def get_survey_coverage_fraction(fetch_result: object, expected_fields: int) -> float:
-    """Return the fraction of expected survey fields represented in a FetchResult.
-
-    Counts the number of unique ``field_id`` values among all observations in
-    *fetch_result.alerts* and divides by *expected_fields*.  Returns a float
-    in [0, 1].  Returns 0.0 if *expected_fields* ≤ 0 or if there are no
-    observations.
-
-    Args:
-        fetch_result: A :class:`~schemas.FetchResult`-like object with an
-            ``alerts`` attribute (iterable of observation-like objects, each
-            with an optional ``field_id`` attribute).
-        expected_fields: Total number of fields expected for full coverage.
-
-    Returns:
-        Coverage fraction in [0, 1].
-    """
-    if expected_fields <= 0:
-        return 0.0
-    alerts = getattr(fetch_result, "alerts", None) or []
-    field_ids: set[object] = set()
-    for obs in alerts:
-        fid = getattr(obs, "field_id", None)
-        if fid is not None:
-            field_ids.add(fid)
-    if not field_ids:
-        return 0.0
-    return float(min(1.0, len(field_ids) / expected_fields))
 
 
-def partition_by_field(fetch_result: object) -> dict[str, list]:
-    """Group observations from a FetchResult by field_id.
-
-    Iterates over ``fetch_result.alerts`` and buckets each observation by its
-    ``field_id`` attribute.  Observations with no ``field_id`` or where the
-    attribute is ``None`` are grouped under the key ``"unknown"``.
-
-    Args:
-        fetch_result: A :class:`~schemas.FetchResult`-like object with an
-            ``alerts`` attribute (iterable of observation-like objects).
-
-    Returns:
-        A ``dict[str, list]`` mapping field_id → list of observations.  Returns
-        an empty dict if the fetch result has no alerts.
-    """
-    alerts = getattr(fetch_result, "alerts", None) or []
-    result: dict[str, list] = {}
-    for obs in alerts:
-        fid = getattr(obs, "field_id", None)
-        key = str(fid) if fid is not None else "unknown"
-        result.setdefault(key, []).append(obs)
-    return result
 
 
 def filter_by_magnitude(observations: list, min_mag: float, max_mag: float) -> list:
@@ -2319,87 +1362,12 @@ def filter_by_magnitude(observations: list, min_mag: float, max_mag: float) -> l
     return result
 
 
-def compute_field_sky_area(radius_deg: float) -> float:
-    """Return the sky area in square degrees for a circular field of given radius.
-
-    Uses the exact spherical-cap formula: 2π·(1 − cos(r)) steradians,
-    converted to square degrees.
-    """
-    import math
-    r_rad = math.radians(abs(radius_deg))
-    steradians = 2.0 * math.pi * (1.0 - math.cos(r_rad))
-    return steradians * (180.0 / math.pi) ** 2
 
 
-def compute_survey_overlap(result1: object, result2: object) -> float:
-    """Return the Jaccard overlap fraction between two FetchResult observation sets.
-
-    Overlap = |shared obs_ids| / |union obs_ids|. Returns 0.0 if both are empty.
-    """
-    alerts1 = getattr(result1, "alerts", None) or []
-    alerts2 = getattr(result2, "alerts", None) or []
-    ids1 = {getattr(o, "obs_id", None) for o in alerts1} - {None}
-    ids2 = {getattr(o, "obs_id", None) for o in alerts2} - {None}
-    union = ids1 | ids2
-    if not union:
-        return 0.0
-    return float(len(ids1 & ids2)) / float(len(union))
 
 
-def count_observations_by_night(fetch_result: object) -> dict:
-    """Return a dict mapping integer JD (floor) to observation count.
-
-    Each observation's JD is floored to an integer night key.
-    Returns an empty dict if the FetchResult has no alerts.
-    """
-    alerts = getattr(fetch_result, "alerts", None) or []
-    counts: dict[int, int] = {}
-    for obs in alerts:
-        jd = getattr(obs, "jd", None)
-        if jd is None:
-            continue
-        night = int(float(jd))
-        counts[night] = counts.get(night, 0) + 1
-    return counts
 
 
-def compute_temporal_coverage(fetch_result: object) -> dict:
-    """Return a summary of the temporal span covered by a FetchResult.
-
-    Returns a dict with keys:
-      - ``n_observations``: total observation count
-      - ``min_jd``: earliest JD (float) or None
-      - ``max_jd``: latest JD (float) or None
-      - ``span_days``: max_jd - min_jd (float) or None if fewer than 2 obs
-      - ``n_nights``: number of distinct integer-JD nights
-
-    Returns all-None / zero values if the FetchResult has no alerts.
-    """
-    alerts = getattr(fetch_result, "alerts", None) or []
-    jds: list[float] = []
-    for obs in alerts:
-        jd = getattr(obs, "jd", None)
-        if jd is not None:
-            jds.append(float(jd))
-    if not jds:
-        return {
-            "n_observations": 0,
-            "min_jd": None,
-            "max_jd": None,
-            "span_days": None,
-            "n_nights": 0,
-        }
-    min_jd = min(jds)
-    max_jd = max(jds)
-    span = (max_jd - min_jd) if len(jds) >= 2 else None
-    n_nights = len({int(j) for j in jds})
-    return {
-        "n_observations": len(jds),
-        "min_jd": min_jd,
-        "max_jd": max_jd,
-        "span_days": span,
-        "n_nights": n_nights,
-    }
 
 
 def compute_observation_rate(fetch_result: object) -> float | None:
@@ -2423,121 +1391,15 @@ def compute_observation_rate(fetch_result: object) -> float | None:
     return float(sum(nights.values()) / len(nights))
 
 
-def compute_magnitude_distribution(fetch_result: object, n_bins: int = 10) -> dict:
-    """Return a histogram of alert magnitudes across a FetchResult.
-
-    Divides the observed magnitude range into *n_bins* equal-width bins and
-    counts observations in each bin.  Returns a dict with keys:
-
-      - ``"bin_edges"``: list of n_bins + 1 edge values
-      - ``"counts"``: list of n_bins integer counts
-      - ``"n_total"``: total number of valid magnitude observations (mag < 90)
-
-    Observations with mag ≥ 90 (sentinel / missing) are excluded.
-    *n_bins* is clamped to at least 1.  Returns zero counts and edges [0, 1]
-    if no valid magnitudes are present.
-    """
-    n_bins = max(1, int(n_bins))
-    alerts = getattr(fetch_result, "alerts", None) or []
-    mags = [
-        float(getattr(o, "mag", 99))
-        for o in alerts
-        if getattr(o, "mag", None) is not None and float(getattr(o, "mag", 99)) < 90.0
-    ]
-    if not mags:
-        edges = [float(i) / n_bins for i in range(n_bins + 1)]
-        return {"bin_edges": edges, "counts": [0] * n_bins, "n_total": 0}
-    lo, hi = min(mags), max(mags)
-    width = (hi - lo) / n_bins if hi > lo else 1.0
-    edges = [lo + i * width for i in range(n_bins + 1)]
-    counts = [0] * n_bins
-    for m in mags:
-        idx = int((m - lo) / width) if width > 0 else 0
-        if idx >= n_bins:
-            idx = n_bins - 1
-        counts[idx] += 1
-    return {"bin_edges": edges, "counts": counts, "n_total": len(mags)}
 
 
-def group_observations_by_night(fetch_result: FetchResult) -> dict:
-    """Group observations in a FetchResult by integer night (floor of JD).
-
-    Returns a dict mapping each integer JD (``int(floor(jd))``) to the list
-    of :class:`Observation` objects whose Julian Date falls in that night.
-    Observations with non-finite JDs are skipped.  Returns an empty dict for
-    empty inputs.
-    """
-    import math
-
-    groups: dict[int, list] = {}
-    for obs in fetch_result.alerts:
-        if not math.isfinite(obs.jd):
-            continue
-        night = int(math.floor(obs.jd))
-        groups.setdefault(night, []).append(obs)
-    return groups
 
 
-def count_observations_by_filter(fetch_result: FetchResult) -> dict:
-    """Return the count of observations per filter band in a FetchResult.
-
-    Returns a dict mapping each ``filter_band`` string to the number of
-    observations in that band.  Returns an empty dict for empty inputs.
-    """
-    counts: dict = {}
-    for obs in fetch_result.alerts:
-        band = obs.filter_band
-        counts[band] = counts.get(band, 0) + 1
-    return counts
 
 
-def get_brightest_observation(fetch_result: FetchResult) -> object | None:
-    """Return the single brightest (lowest-magnitude) Observation in a FetchResult.
-
-    Excludes observations with sentinel magnitudes ≥ 90.  Returns ``None``
-    if the result is empty or all magnitudes are sentinels.
-    """
-    valid = [obs for obs in fetch_result.alerts if obs.mag < 90.0]
-    if not valid:
-        return None
-    return min(valid, key=lambda o: o.mag)
 
 
-def get_latest_observation(fetch_result: FetchResult) -> object | None:
-    """Return the most recent Observation (highest JD) from *fetch_result*.
-
-    Ignores sentinel magnitudes (mag >= 90) and non-finite JDs.
-    Returns ``None`` if no valid observations exist.
-    """
-    import math
-
-    valid = [obs for obs in fetch_result.alerts if math.isfinite(obs.jd)]
-    if not valid:
-        return None
-    return max(valid, key=lambda o: o.jd)
 
 
-def get_faintest_observation(fetch_result: FetchResult) -> object | None:
-    """Return the faintest Observation (highest valid mag) from *fetch_result*.
-
-    Ignores sentinel magnitudes (mag >= 90).  Returns ``None`` if no valid
-    observations exist.
-    """
-    valid = [obs for obs in fetch_result.alerts if obs.mag < 90.0]
-    if not valid:
-        return None
-    return max(valid, key=lambda o: o.mag)
 
 
-def compute_observation_time_span(fetch_result: FetchResult) -> float | None:
-    """Total time span in days covered by valid observations.
-
-    Returns max(JD) − min(JD) across all alerts with finite JDs.
-    Returns ``None`` if fewer than 2 valid JDs exist.
-    """
-    import math
-
-    jds = [obs.jd for obs in fetch_result.alerts if math.isfinite(obs.jd)]
-    if len(jds) < 2:
-        return None
-    return float(max(jds) - min(jds))
