@@ -1,7 +1,7 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.89.0
-**Last updated**: 2026-06-21
+**Current version**: v0.89.2
+**Last updated**: 2026-06-26
 **Purpose**: Mandatory read at session start (per MANDATORY SESSION-START PROTOCOL).  
 Every planning cycle must name the highest-priority unresolved Tier 1 gap and show how proposed steps close or directly unblock it.
 
