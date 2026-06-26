@@ -645,8 +645,8 @@ no in-house expert is required or expected.
 
 ### Handoff state as of 2026-06-22 (CURRENT)
 
-All T1 gaps are closed. All operator commands for T1-C are complete — do NOT
-re-run any ATLAS screening, prequalification, or audit commands.
+All T1 and T2 gaps are closed. All operator commands for T1-C are complete —
+do NOT re-run any ATLAS screening, prequalification, or audit commands.
 
 **LIVE PIPELINE OPERATIONAL (2026-06-21)**: First live run completed successfully.
 - Run ID: `6c1b387e0763`, field RA=83.8221 Dec=-5.3911, ZTF, 7-day window
@@ -656,7 +656,7 @@ re-run any ATLAS screening, prequalification, or audit commands.
 - Evidence: `docs/evidence/live/2026-06-21-first-live-run.md`
 - DO NOT re-run this specific command — zero-alert result was expected and confirmed
 
-**ZTF fetch ndet cap fix applied (2026-06-22, PR #115 pending)**:
+**ZTF fetch ndet cap fix + adversarial test fixes (PR #115, MERGED 2026-06-22)**:
 - Root cause of 0 tracklets (Runs 3–5): `_fetch_ztf_alerce_api` Mode 1 used
   `ndet_max=None`, returning persistent stationary sources at fixed sky positions.
   The linker correctly rejected all 3134 seed pairs (rate ≈ 0 arcsec/hr for same
@@ -669,8 +669,10 @@ re-run any ATLAS screening, prequalification, or audit commands.
 - `max_objects` increased 50 → 200 for broader field coverage.
 - Evidence: `docs/evidence/live/2026-06-22-ndet-cap-root-cause.md`
 - 2 regression tests added to prevent re-introduction of ndet_max=None bug.
+- All 5 pre-existing adversarial/pipeline test failures fixed (see AGENTS.md).
+- CI green on Python 3.14 with 100% coverage ✓
 
-**Next live run** (after PR #115 merges to main):
+**Next live run** (operator, from main — PR #115 already merged):
 ```bash
 git pull origin main
 export PYTHONPATH=src

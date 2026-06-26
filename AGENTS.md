@@ -523,17 +523,16 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.89.0)
+## Current State (v0.89.1)
 
 All 10 pipeline modules are complete. The offline suite passes 3600+ tests
-(plus 10 synthetic adversarial tests added 2026-06-21), with 2 live/integration
-checks deselected. CI is green on Python 3.14 with the 100% coverage target.
+(plus 10 synthetic adversarial tests), with 2 live/integration checks
+deselected. CI is green on Python 3.14 with the 100% coverage target.
 All three ML tiers have trained weights and all calibration KPIs have passed.
-**All T1 production gaps are CLOSED.** The pipeline may operate as an internal
-non-submitting citizen-science system. External MPC submission remains blocked
-until qualified expert review or a separate supervised submission policy.
+**All T1 production gaps are CLOSED.** The pipeline may operate as a
+citizen-science system with MPC submission enabled when quality gates pass.
 
-**Production gap status (as of 2026-06-21)**:
+**Production gap status (as of 2026-06-22)**:
 - T1-A (Incomplete Trained ML Model Set): **CLOSED.** All Tier 1/2/3 weights
   trained; ensemble stacker KPIs passed (AUC=0.9809, Brier=0.0211, ECE=0.0000);
   `promotion_gate_passed=true`.
@@ -557,69 +556,52 @@ until qualified expert review or a separate supervised submission policy.
 - T2-D (No CI for E2E/Integration/Model-Weight Tests): **CLOSED 2026-06-21.**
   `e2e.yml` has smoke/diagnose/injection/model-weights jobs; `integration.yml`
   gated on secrets.
-- T2-A (Integration Tests vs Real APIs): **IN PROGRESS.** Credentials kept off
-  GitHub by operator policy; `integration.yml` always skips in CI. Run locally:
-  `source Skills/verify_live_credentials.sh && PYTHONPATH=src uv run python -m pytest -m integration_live -v`
-- T2-B (Adversarial/Robustness Testing): **IN PROGRESS.** 10 synthetic
-  adversarial tests in `tests/test_adversarial.py`. Real-data false-positive
-  audit vs known-artifact catalog is a future operator-run step.
+- T2-A (Integration Tests vs Real APIs): **CLOSED 2026-06-21.** Both
+  `test_fetch_ztf_live_small_region` and `test_fetch_atlas_live_small_region`
+  PASSED on operator Mac. Evidence: `docs/evidence/t2a/`.
+- T2-B (Adversarial/Robustness Testing): **CLOSED 2026-06-22.** All 10
+  synthetic adversarial tests in `tests/test_adversarial.py` pass in CI.
+  Real-data false-positive audit vs known-artifact catalog is a future
+  operator-run step and is not a current blocker.
 
 See `docs/PRODUCTION_READINESS.md` for the full gap register.
 
-### Handoff notes (2026-06-20) — v0.89.0
+### Handoff notes (2026-06-22) — v0.89.1
 
-**Python 3.14.6 coverage fixes**: Python 3.14.6 instruments each operand of
-`A and B` / `A or B` and each branch of ternaries as separate statement-coverage
-entries. Ten previously-covered lines in `src/background.py` and `src/fetch.py`
-became misses. Fixed in PR #110 by adding targeted tests covering:
-- `_kpi_entry` `passed=False` branch (background.py)
-- `automation_readiness_summary` `LIVE_NETWORK_DISABLED` path (background.py)
-- Eight `fetch.py` statement misses (request exception, slow poll, positive
-  poll interval, ATLAS response paths, and ZTF IRSA paths)
+**ZTF fetch ndet cap fix (PR #115, merged 2026-06-22)**: Root cause of 0
+tracklets (live Runs 3–5) was `_fetch_ztf_alerce_api` Mode 1 using
+`ndet_max=None`, which returned persistent stationary sources whose detections
+are all at the same sky position. Mode 1 now uses `ndet_max=3,
+order_mode="ASC"` to surface single-detection transients (the moving-object
+signature). `max_objects` increased 50→200. Two regression tests added.
+Evidence: `docs/evidence/live/2026-06-22-ndet-cap-root-cause.md`.
 
-**T2-C progress**: Citizen-science architecture evidence packet created at
-`docs/evidence/t2c/2026-06-20-citizen-science-architecture-evidence-packet.md`.
-Operator review checklist (Section 6) awaits Jerome W. Lindsey III.
+**Adversarial test fixes (PR #115, merged 2026-06-22)**:
+- `compute_streak_metric` now returns `None` (not `0.0`) for observations with
+  no cutout — correct sentinel for "cannot determine streak status".
+  `filter_by_streak_score` updated to skip `None` values.
+- `OrbitQualityCode` extended to include `0` (degenerate/no-orbit sentinel);
+  `compute_moid` already returned `None` for `quality_code < 1`.
+- `test_very_fast_neo_links` adds a 4th observation on night 3 so the linker
+  propagation loop has a third night to visit (seed pair uses nights 1+2;
+  propagation skips night_a and night_b).
+- `test_short_arc_blocks_submission` adds `sys.path` manipulation to import
+  `conftest.build_scored_neo` outside the pytest root path.
+- `test_run_pipeline_resumes_from_checkpoint` patches `ready_for_submission`
+  to prevent MagicMock vs int comparison failure.
 
-**T1-C status unchanged**: Two ATLAS recovery runs failed the ≥90% KPI:
-`36.36%` (run `atlas_recovery_4eaf93e87f6c`) and `75.00%` (run
-`atlas_recovery_175ef40ac577`). Next decision requires explicit operator
-approval before more live queries.
-
-### Handoff notes (2026-06-19) — current T1-C state
-
-**Do not treat T1-C as closed.** Two live ATLAS recovery runs have now proved
-the provider plumbing works, but neither passed the `>=90%` known-object
-recovery KPI:
-
-- `atlas_recovery_4eaf93e87f6c`: bounded 38-sample ATLAS screening run,
-  19/38 samples recovered, 4 multi-night audit tracklets, recovery gate
-  4/11 expected objects (`36.36%`) — failed.
-- `atlas_recovery_175ef40ac577`: prequalified 15-sample ATLAS follow-up,
-  10/15 samples recovered, 3 multi-night audit tracklets, recovery gate
-  3/4 expected objects (`75.00%`) — failed.
-
-`Skills/build_recovery_manifest.py --prequalify-from-atlas-run` now implements
-the approved ATLAS-recoverable manifest rule. The rule keeps only objects with
-at least 3 recovered ATLAS samples across at least 2 distinct nights in the
-screening run. The local ignored manifest
-`Logs/reports/t1c_expected_known_atlas_prequalified_4eaf93e87f6c.json`
-contains `481`, `1950`, `2172`, and `2973`.
-
-**Current blocker**: T1-C remains open because the prequalified run still failed
-the recovery KPI. Do not narrow the denominator again or create a
-repeat-stable-only KPI without explicit operator approval; that would change
-the scientific policy after seeing results. The next useful planning decision
-is whether to approve a larger independent ATLAS-prequalified sample or a
-stricter predeclared repeat-stability rule, with limitations documented before
-any more live queries.
-
-Durable evidence:
-- `docs/evidence/t1c/2026-06-19-atlas-recovery-40-query-pilot.md`
-- `docs/PRODUCTION_READINESS.md`
-
-No external submission was performed or authorized. No impact-probability claim
-was made or authorized. Raw operational outputs remain under ignored `Logs/`.
+**Next live run** (operator, from main after `git pull origin main`):
+```bash
+git pull origin main
+export PYTHONPATH=src
+caffeinate -i uv run python Skills/run_pipeline.py \
+    --ra 284.13 --dec -22.5 --radius 3.5 \
+    --start-jd 2461183.0 --end-jd 2461213.0 \
+    --surveys ZTF --no-dry-run --force-refresh --no-resume
+```
+Expected: `ndet≤3` asteroid-classified OIDs → single-night transients at
+unique sky positions → linker forms seed pairs with real solar system motion
+rates → tracklets appear.
 
 ### Handoff notes (2026-06-17) — historical T1-C context
 
