@@ -18,9 +18,13 @@ def main() -> None:
     parser.add_argument("input", help="Path to JSON file (list of ScoredNEO dicts).")
     parser.add_argument(
         "--obs-code",
-        default="Xnn",
+        default="XXX",
         metavar="CODE",
-        help="MPC observatory code (default: Xnn).",
+        help=(
+            "MPC observatory code (default: XXX — the standard placeholder "
+            "for first-time submissions per docs/MPC_SUBMISSION_POLICY.md). "
+            "Replace with your permanent code once assigned."
+        ),
     )
     parser.add_argument(
         "--out",
