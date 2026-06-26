@@ -305,43 +305,93 @@ def run_pipeline(
         )
         tracklets: list[Tracklet] = [_tracklet_from_dict(d) for d in cp["tracklets"]]
     else:
+        # Fetch each survey separately so we can emit per-survey progress with ETA.
+        # Measurable quantity: surveys completed / total surveys.
+        _fetch_start = time.monotonic()
+        _n_surveys = len(surveys)
         print(
-            f"[fetch] Querying {surveys} at RA={ra_deg}, Dec={dec_deg}, r={radius_deg}°",
+            f"[fetch] Querying {_n_surveys} survey(s): {surveys}  "
+            f"RA={ra_deg}, Dec={dec_deg}, r={radius_deg}°  "
+            f"elapsed {_format_duration(time.monotonic() - _t_pipeline_start)}",
             flush=True,
         )
-        fetch_result = _fetch_with_retry(
-            ra_deg=ra_deg,
-            dec_deg=dec_deg,
-            radius_deg=radius_deg,
-            start_jd=start_jd,
-            end_jd=end_jd,
-            surveys=surveys,  # type: ignore[arg-type]
-            atlas_token=atlas_token,
-            force_refresh=force_refresh,
+        all_alerts: list = []
+        for _i_srv, _srv in enumerate(surveys):
+            _srv_done = _i_srv + 1
+            print(
+                f"[fetch] ({_srv_done}/{_n_surveys}) Starting {_srv}  "
+                f"elapsed {_format_duration(time.monotonic() - _t_pipeline_start)}",
+                flush=True,
+            )
+            _partial = _fetch_with_retry(
+                ra_deg=ra_deg,
+                dec_deg=dec_deg,
+                radius_deg=radius_deg,
+                start_jd=start_jd,
+                end_jd=end_jd,
+                surveys=(_srv,),  # type: ignore[arg-type]
+                atlas_token=atlas_token,
+                force_refresh=force_refresh,
+            )
+            all_alerts.extend(_partial.alerts)
+            _srv_elapsed = time.monotonic() - _fetch_start
+            _per_srv = _srv_elapsed / _srv_done
+            _srv_eta = _per_srv * (_n_surveys - _srv_done)
+            print(
+                f"[fetch] ({_srv_done}/{_n_surveys}) {_srv}: "
+                f"{len(_partial.alerts)} alerts  "
+                f"elapsed {_format_duration(time.monotonic() - _t_pipeline_start)}  "
+                f"ETA {_format_duration(_srv_eta)}",
+                flush=True,
+            )
+        print(
+            f"[fetch] Complete: {len(all_alerts)} alerts total  "
+            f"elapsed {_format_duration(time.monotonic() - _t_pipeline_start)}",
+            flush=True,
         )
-        print(f"[fetch] Retrieved {len(fetch_result.alerts)} alerts", flush=True)
 
-        print("[preprocess] Validating and normalising sources", flush=True)
-        prep_result = preprocess(fetch_result.alerts, apply_astrometry=False)
+        print(
+            f"[preprocess] Validating and normalising {len(all_alerts)} sources  "
+            f"elapsed {_format_duration(time.monotonic() - _t_pipeline_start)}",
+            flush=True,
+        )
+        prep_result = preprocess(tuple(all_alerts), apply_astrometry=False)
         n_out = prep_result.provenance.n_sources_out
         n_in = prep_result.provenance.n_sources_in
-        print(f"[preprocess] {n_out}/{n_in} sources passed", flush=True)
+        print(
+            f"[preprocess] {n_out}/{n_in} sources passed  "
+            f"elapsed {_format_duration(time.monotonic() - _t_pipeline_start)}",
+            flush=True,
+        )
 
-        print("[detect] Identifying moving object candidates", flush=True)
+        print(
+            f"[detect] Identifying moving object candidates  "
+            f"elapsed {_format_duration(time.monotonic() - _t_pipeline_start)}",
+            flush=True,
+        )
         det_result = detect(prep_result.sources)
         n_cands = det_result.provenance.n_candidates
         n_known = det_result.provenance.n_known_matches
-        print(f"[detect] {n_cands} candidates, {n_known} known matches", flush=True)
+        print(
+            f"[detect] {n_cands} candidates, {n_known} known matches  "
+            f"elapsed {_format_duration(time.monotonic() - _t_pipeline_start)}",
+            flush=True,
+        )
         link_candidates = det_result.candidates
         if max_candidates is not None and len(link_candidates) > max_candidates:
             print(
                 f"[detect] Pilot cap active: linking first {max_candidates}/"
-                f"{len(link_candidates)} candidates",
+                f"{len(det_result.candidates)} candidates  "
+                f"elapsed {_format_duration(time.monotonic() - _t_pipeline_start)}",
                 flush=True,
             )
             link_candidates = link_candidates[:max_candidates]
 
-        print("[link] Linking candidates across nights", flush=True)
+        print(
+            f"[link] Linking {len(link_candidates)} candidates across nights  "
+            f"elapsed {_format_duration(time.monotonic() - _t_pipeline_start)}",
+            flush=True,
+        )
         link_start = time.monotonic()
 
         def _link_progress(done: int, total: int, n_tracklets: int) -> None:
@@ -356,7 +406,11 @@ def run_pipeline(
 
         link_result = link(link_candidates, progress_callback=_link_progress)
         n_trk = link_result.provenance.n_tracklets
-        print(f"[link] {n_trk} tracklets formed", flush=True)
+        print(
+            f"[link] {n_trk} tracklets formed  "
+            f"elapsed {_format_duration(time.monotonic() - _t_pipeline_start)}",
+            flush=True,
+        )
 
         tracklets = list(link_result.tracklets)
 
@@ -373,25 +427,55 @@ def run_pipeline(
     completed_ids = {r["object_id"] for r in cp.get("partial_results", [])}
     results: list[dict] = list(cp.get("partial_results", []))
 
-    for tracklet in tracklets:
+    # Track per-tracklet timing for ETA.  Only count tracklets processed this
+    # session (not ones reloaded from checkpoint) so ETA reflects real work.
+    _n_tracklets = len(tracklets)
+    _trk_session_start = time.monotonic()
+    _trk_done_this_session = 0
+
+    for _trk_idx, tracklet in enumerate(tracklets):
         if tracklet.object_id in completed_ids:
             # Already scored in a previous (interrupted) run; skip it.
             print(
-                f"[resume] Skipping already-processed {tracklet.object_id}",
+                f"[resume] Skipping already-processed {tracklet.object_id}  "
+                f"elapsed {_format_duration(time.monotonic() - _t_pipeline_start)}",
                 flush=True,
             )
             continue
 
-        print(f"[classify] Classifying tracklet {tracklet.object_id}", flush=True)
+        _trk_done_this_session += 1
+        _trk_elapsed_session = time.monotonic() - _trk_session_start
+        _trk_per_item = _trk_elapsed_session / _trk_done_this_session
+        _trk_remaining = _n_tracklets - _trk_idx - 1
+        _trk_eta = _trk_per_item * _trk_remaining
+
+        print(
+            f"[classify] ({_trk_idx + 1}/{_n_tracklets}) {tracklet.object_id}  "
+            f"elapsed {_format_duration(time.monotonic() - _t_pipeline_start)}  "
+            f"ETA {_format_duration(_trk_eta)}",
+            flush=True,
+        )
         features, posterior = classify(tracklet)
 
-        print(f"[orbit] Fitting orbit for {tracklet.object_id}", flush=True)
+        print(
+            f"[orbit] ({_trk_idx + 1}/{_n_tracklets}) {tracklet.object_id}  "
+            f"elapsed {_format_duration(time.monotonic() - _t_pipeline_start)}",
+            flush=True,
+        )
         orbital = fit_orbit(tracklet)
 
-        print(f"[score] Scoring {tracklet.object_id}", flush=True)
+        print(
+            f"[score] ({_trk_idx + 1}/{_n_tracklets}) {tracklet.object_id}  "
+            f"elapsed {_format_duration(time.monotonic() - _t_pipeline_start)}",
+            flush=True,
+        )
         scored = score(tracklet, features, posterior, orbital)
 
-        print(f"[alert] Processing alert for {tracklet.object_id}", flush=True)
+        print(
+            f"[alert] ({_trk_idx + 1}/{_n_tracklets}) {tracklet.object_id}  "
+            f"elapsed {_format_duration(time.monotonic() - _t_pipeline_start)}",
+            flush=True,
+        )
         alert_result = process_alert(scored, dry_run=dry_run)
 
         # Check submission readiness and print escalation notice if gates pass
