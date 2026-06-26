@@ -36,28 +36,43 @@ Every run must print a header block before any stage output:
 
 ## Stage Prefix Format
 
-Every progress line must begin with a bracketed stage tag followed by a space:
+Every progress line must begin with a bracketed stage tag followed by a space.
+**Every line must also include `elapsed {M}m{S:02d}s`** — no stage print may be
+silent about elapsed time. Long-running stages additionally include an ETA.
 
 ```
-[fetch]      Querying ...
-[preprocess] ...
-[detect]     ...
+[fetch]      Querying 1 survey(s): ('ZTF',)  RA=284.13, Dec=-22.5, r=3.5°  elapsed 0m00s
+[fetch]      (1/1) Starting ZTF  elapsed 0m00s
+[fetch]      (1/1) ZTF: 87 alerts  elapsed 3m42s  ETA 0m00s
+[fetch]      Complete: 87 alerts total  elapsed 3m42s
+[preprocess] Validating and normalising 87 sources  elapsed 3m42s
+[preprocess] 87/87 sources passed  elapsed 3m43s
+[detect]     Identifying moving object candidates  elapsed 3m43s
+[detect]     12 candidates, 0 known matches  elapsed 3m43s
+[link]       Linking 12 candidates across nights  elapsed 3m43s
 [link]       progress 120/500 seed pairs; tracklets=4; elapsed 0m12s  ETA 0m38s
-[classify]   Classifying tracklet NEO-00001
-[orbit]      Fitting orbit for NEO-00001
-[score]      Scoring NEO-00001
-[alert]      Processing alert for NEO-00001
+[link]       2 tracklets formed  elapsed 3m44s
+[classify]   (1/2) NEO-00001  elapsed 3m44s  ETA 0m02s
+[orbit]      (1/2) NEO-00001  elapsed 3m44s
+[score]      (1/2) NEO-00001  elapsed 3m45s
+[alert]      (1/2) NEO-00001  elapsed 3m45s
 [neocp]      Monitoring NEOCP for NEO-00001 (timeout=2.0h)
 [resume]     Checkpoint found (last stage: link); resuming from last completed stage.
 [resume]     Reloading 12 tracklets from checkpoint (skipping fetch / preprocess / detect / link).
-[resume]     Skipping already-processed NEO-00001
+[resume]     Skipping already-processed NEO-00001  elapsed 3m45s
 [cache]      Deleted 3 cache file(s) from .neo_cache/
 [audit]      Run summary written to Logs/pipeline_runs/<key>/run_summary.json
 ```
 
-Stage tags are lowercase and left-justified within 12 characters when printed
-inline with a description, but exact spacing is not required — a single space
-after `]` is sufficient.
+Stage tags are lowercase. A single space after `]` is sufficient.
+
+The **fetch stage** iterates over surveys one-by-one, emitting a `(N/M) Starting <survey>`
+line before each survey call and a `(N/M) <survey>: X alerts  elapsed Xm Xs  ETA Xm Xs`
+line after. ETA is computed from actual time-per-survey.
+
+The **per-tracklet loop** (`[classify]`, `[orbit]`, `[score]`, `[alert]`) includes
+`(idx/total)` counters. `[classify]` also includes an ETA computed from
+time-per-tracklet so far this session.
 
 ---
 
