@@ -477,7 +477,11 @@ Before the pipeline makes its first MPC submission, all of the following must be
 - [x] Guardrail compliance: static scan of all pipeline source confirms zero "confirmed NEO"
       or impact probability assertions ✓ (2026-06-21; all occurrences are negations or
       guardrail enforcement — see `src/background.py:3568` forbidden_phrases check)
-- [x] AGENTS.md and CLAUDE.md synchronized to current version ✓ (2026-06-21)
+- [x] AGENTS.md and CLAUDE.md synchronized to current version ✓ (2026-06-26, v0.89.2)
+- [x] Console output compliance: every `Skills/run_pipeline.py` stage print includes
+      `elapsed {M}m{S:02d}s`; fetch ETA computed from time-per-survey; per-tracklet
+      ETA computed from time-per-tracklet ✓ (2026-06-26, PR #116; satisfies CLAUDE.md
+      standing rule: "elapsed-only heartbeats are not acceptable as a substitute for ETA")
 
 ---
 

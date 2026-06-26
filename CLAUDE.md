@@ -625,14 +625,14 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.89.0)
+## Current State (v0.89.2)
 
 All 10 pipeline modules are complete. The offline suite passes 3600+ tests (plus
-10 synthetic adversarial tests added 2026-06-21), with 2 live/integration checks
-deselected. CI is green on Python 3.14 with the 100% coverage target.
-All three ML tiers have trained weights: Tier 1 XGBoost (val_acc=99.95%), Tier 2
-CNN (val_acc=91.3%), and Tier 3 Transformer (val_macro_f1=0.9400, best epoch
-17/30). **T1-A CLOSED. T1-B CLOSED. T1-C CLOSED. T1-D CLOSED.**
+10 synthetic adversarial tests), with 2 live/integration checks deselected. CI is
+green on Python 3.14 with the 100% coverage target. All three ML tiers have
+trained weights: Tier 1 XGBoost (val_acc=99.95%), Tier 2 CNN (val_acc=91.3%),
+and Tier 3 Transformer (val_macro_f1=0.9400, best epoch 17/30).
+**T1-A CLOSED. T1-B CLOSED. T1-C CLOSED. T1-D CLOSED.**
 Ensemble stacker KPIs passed 2026-06-14 (AUC=0.9809, Brier=0.0211, ECE=0.0000).
 T2-C CLOSED 2026-06-21 (operator sign-off by Jerome W. Lindsey III).
 T2-D CLOSED 2026-06-21 (model-weight CI job + `Skills/validate_model_weights.py`).
@@ -643,7 +643,41 @@ expert review" guardrail was removed by operator decision on 2026-06-21 — see
 `docs/MPC_SUBMISSION_POLICY.md`. MPC/NEOCP/Scout is the expert review system;
 no in-house expert is required or expected.
 
-### Handoff state as of 2026-06-22 (CURRENT)
+### Handoff state as of 2026-06-26 (CURRENT)
+
+**Console output elapsed+ETA compliance (PR #116, pending merge)**:
+Every stage print in `Skills/run_pipeline.py` now includes `elapsed {M}m{S:02d}s`.
+Root cause of 5-minute silent fetch stage: a single blocking `_fetch_with_retry()`
+call with no output for the full duration of network I/O. Fix: restructured to loop
+over surveys one-by-one. Each survey emits `(N/M) Starting <survey>` before the
+call and `(N/M) <survey>: X alerts  elapsed Xm Xs  ETA Xm Xs` after, where ETA
+is computed from actual time-per-survey. Per-tracklet classify/orbit/score/alert
+prints also have `(N/M)` counters + ETA from time-per-tracklet. Satisfies the
+CLAUDE.md standing rule: "elapsed-only heartbeats are not acceptable as a substitute
+for ETA." `docs/CONSOLE_OUTPUT_SPEC.md` updated to document new format.
+
+**DO NOT re-run the next live run command** until PR #116 merges to main.
+After merge, the operator command is the same as v0.89.1:
+```bash
+git pull origin main
+export PYTHONPATH=src
+caffeinate -i uv run python Skills/run_pipeline.py \
+    --ra 284.13 --dec -22.5 --radius 3.5 \
+    --start-jd 2461183.0 --end-jd 2461213.0 \
+    --surveys ZTF --no-dry-run --force-refresh --no-resume
+```
+
+**One human-gated blocker remains**: MPC escalation path (observatory code).
+See `docs/MPC_SUBMISSION_POLICY.md §TODO for Future Agents`. The pipeline prints
+an escalation notice for every submission-ready candidate but makes no actual
+submission until Jerome resolves the observatory code strategy. No code work can
+unblock this — it is a procedural/administrative decision only.
+
+**Progress tracker**: `docs/evidence/prod-loop/LOOP_PROGRESS.md` — read this
+at session start to avoid repeating completed work. Surviving items: README check,
+MPC escalation path code assessment (limited scope — see §TODO).
+
+### Handoff state as of 2026-06-22
 
 All T1 and T2 gaps are closed. All operator commands for T1-C are complete —
 do NOT re-run any ATLAS screening, prequalification, or audit commands.

@@ -523,7 +523,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.89.1)
+## Current State (v0.89.2)
 
 All 10 pipeline modules are complete. The offline suite passes 3600+ tests
 (plus 10 synthetic adversarial tests), with 2 live/integration checks
@@ -531,6 +531,9 @@ deselected. CI is green on Python 3.14 with the 100% coverage target.
 All three ML tiers have trained weights and all calibration KPIs have passed.
 **All T1 production gaps are CLOSED.** The pipeline may operate as a
 citizen-science system with MPC submission enabled when quality gates pass.
+Console output is now fully compliant with `docs/CONSOLE_OUTPUT_SPEC.md` —
+every stage print includes `elapsed {M}m{S:02d}s` and ETA is computed from
+a measurable quantity (surveys done/total, tracklets done/total).
 
 **Production gap status (as of 2026-06-22)**:
 - T1-A (Incomplete Trained ML Model Set): **CLOSED.** All Tier 1/2/3 weights
@@ -565,6 +568,23 @@ citizen-science system with MPC submission enabled when quality gates pass.
   operator-run step and is not a current blocker.
 
 See `docs/PRODUCTION_READINESS.md` for the full gap register.
+
+### Handoff notes (2026-06-26) — v0.89.2 (CURRENT)
+
+**Console output elapsed+ETA compliance (PR #116, pending merge to main)**:
+Every stage print in `Skills/run_pipeline.py` now includes elapsed time.
+Fetch stage restructured to loop per-survey with `(N/M)` counters and
+ETA from actual time-per-survey. Per-tracklet prints have `(N/M)` counters
+and ETA from time-per-tracklet. `docs/CONSOLE_OUTPUT_SPEC.md` updated.
+DO NOT give the operator a live run command until PR #116 is merged to main.
+
+**One remaining human-gated blocker**: MPC escalation path. The pipeline
+prints an escalation notice for submission-ready candidates but makes no
+actual MPC submission — resolving the observatory code strategy requires
+Jerome's administrative decision. See `docs/MPC_SUBMISSION_POLICY.md §TODO`.
+
+**Progress tracker**: `docs/evidence/prod-loop/LOOP_PROGRESS.md` — read
+at session start to avoid repeating completed work.
 
 ### Handoff notes (2026-06-22) — v0.89.1
 
