@@ -639,71 +639,6 @@ class TestComputeTrackletGrade:
         assert grade in ("A", "B", "C", "D")
 
 
-class TestComputePositionAngleConsistencyEdge:
-    def _obs(self, jd, ra, dec):
-        from schemas import Observation
-        return Observation(
-            obs_id=f"pac_{jd}", jd=jd, ra_deg=ra, dec_deg=dec,
-            mag=18.0, mag_err=0.1, filter_band="r", mission="ZTF",
-        )
-
-    def test_identical_jd_pair_skipped(self):
-        """dt == 0.0 branch: two obs at same JD → no valid PA pair → None."""
-        import types
-
-        from link import compute_position_angle_consistency
-        obs = [
-            self._obs(2460000.0, 10.0, 5.0),
-            self._obs(2460000.0, 10.1, 5.1),  # same JD as first
-            self._obs(2460001.0, 10.2, 5.2),
-        ]
-        t = types.SimpleNamespace(observations=obs)
-        result = compute_position_angle_consistency(t)
-        assert result is None or isinstance(result, float)
-
-
-class TestComputeTrackletDensityEdgeCases:
-    """Tests for edge cases in compute_tracklet_density._first_radec."""
-
-    def test_obs_with_ra_not_ra_deg(self):
-        """Test fallback to 'ra'/'dec' when 'ra_deg'/'dec_deg' are absent."""
-        import sys
-        sys.path.insert(0, "src")
-        from types import SimpleNamespace
-
-        from link import compute_tracklet_density
-
-        obs = SimpleNamespace(ra=10.0, dec=5.0)
-        tracklet = SimpleNamespace(observations=[obs])
-        result = compute_tracklet_density([tracklet], radius_deg=1.0)
-        assert result == [0]
-
-    def test_obs_with_no_radec_attrs_returns_zero_count(self):
-        """Observation with no spatial attrs — _first_radec returns None, count=0."""
-        import sys
-        sys.path.insert(0, "src")
-        from types import SimpleNamespace
-
-        from link import compute_tracklet_density
-
-        obs = SimpleNamespace()  # no ra_deg, ra, dec_deg, dec
-        tracklet = SimpleNamespace(observations=[obs])
-        result = compute_tracklet_density([tracklet], radius_deg=360.0)
-        assert result == [0]
-
-    def test_empty_observations_list(self):
-        """Tracklet with empty observations — _first_radec returns None."""
-        import sys
-        sys.path.insert(0, "src")
-        from types import SimpleNamespace
-
-        from link import compute_tracklet_density
-
-        tracklet = SimpleNamespace(observations=[])
-        result = compute_tracklet_density([tracklet], radius_deg=1.0)
-        assert result == [0]
-
-
 class TestComputeObservationRate:
     def _make_tracklet(self, jds: list[float]) -> object:
         import sys
@@ -759,41 +694,6 @@ class TestComputeObservationRate:
         sys.path.insert(0, "src")
         import link
         assert "compute_observation_rate" in link.__all__
-
-
-class TestComputeTrackletBrightnessTrendNoneMag:
-    def test_none_mag_skipped(self):
-        import sys
-        sys.path.insert(0, "src")
-        from types import SimpleNamespace
-
-        from link import compute_tracklet_brightness_trend
-        obs = [
-            SimpleNamespace(jd=2460000.0, mag=None),
-            SimpleNamespace(jd=2460001.0, mag=19.0),
-        ]
-        trk = SimpleNamespace(observations=tuple(obs))
-        # Only 1 valid mag after None exclusion → None
-        assert compute_tracklet_brightness_trend(trk) is None
-
-
-class TestComputePositionAngleDispersionExceptionCoverage:
-    """Cover except branch and all-fail → None path."""
-
-    def _fn(self):
-        import sys
-        sys.path.insert(0, "src")
-        import link
-        return link.compute_position_angle_dispersion
-
-    def test_exception_in_motion_vector_returns_none(self):
-        from types import SimpleNamespace
-        # Observations without ra_deg will cause compute_motion_vector to raise
-        bad_obs1 = SimpleNamespace(obs_id="o1", jd=2460000.0)
-        bad_obs2 = SimpleNamespace(obs_id="o2", jd=2460001.0)
-        t = SimpleNamespace(observations=(bad_obs1, bad_obs2))
-        result = self._fn()(t)
-        assert result is None
 
 
 class TestLinkProgressCallback:

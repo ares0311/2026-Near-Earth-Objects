@@ -78,6 +78,7 @@ import sqlite3
 import subprocess
 import uuid
 from collections.abc import Mapping
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol
@@ -574,6 +575,7 @@ def _resolve_project_path(raw: str) -> Path:
     return path if path.is_absolute() else _ROOT / path
 
 
+@contextmanager
 def _run_lock(db_path: Path, run_id: str) -> Any:
     init_log_db(db_path)
     conn = _connect(db_path)

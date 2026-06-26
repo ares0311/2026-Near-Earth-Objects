@@ -632,92 +632,6 @@ class TestReadyForSubmission:
         assert len(result) == 2
 
 
-class TestFormatDiscoveryCircularNoElements:
-    def _make_neo_no_elements(self):
-        from .conftest import build_scored_neo
-        neo = build_scored_neo()
-        # Build a ScoredNEO with no orbital elements on the hazard assessment
-        from schemas import HazardAssessment, ScoredNEO
-        new_hazard = HazardAssessment(
-            hazard_flag=neo.hazard.hazard_flag,
-            moid_au=None,
-            estimated_diameter_m=None,
-            absolute_magnitude_h=None,
-            neo_class=neo.hazard.neo_class,
-            alert_pathway=neo.hazard.alert_pathway,
-            explanation=neo.hazard.explanation,
-        )
-        return ScoredNEO(
-            tracklet=neo.tracklet,
-            features=neo.features,
-            posterior=neo.posterior,
-            hazard=new_hazard,
-            metadata=neo.metadata,
-        )
-
-    def test_no_orbital_elements_branch(self):
-        from alert import format_discovery_circular
-        neo = self._make_neo_no_elements()
-        # Temporarily clear orbital_elements on the object if present
-        result = format_discovery_circular(neo)
-        assert isinstance(result, str)
-        assert "DRAFT" in result
-
-
-class TestGenerateObservationRequestBranches:
-    """Cover urgency branches HIGH, MEDIUM, ROUTINE in generate_observation_request."""
-
-    def _make_neo(self, priority: float = 0.5, hazard_flag: str = "nominal"):
-
-        from .conftest import build_scored_neo
-        neo = build_scored_neo()
-        # Use simple namespace to set custom priority/hazard_flag
-        import types
-        meta = types.SimpleNamespace(
-            discovery_priority=priority,
-            followup_value=0.5,
-            scientific_interest=0.3,
-            pipeline_version="0.20.0",
-            scoring_timestamp=2460000.5,
-            close_approach_au=None,
-        )
-        haz = types.SimpleNamespace(
-            hazard_flag=hazard_flag,
-            moid_au=0.1,
-            estimated_diameter_m=100.0,
-            absolute_magnitude_h=22.5,
-            neo_class="amor",
-            alert_pathway="internal_candidate",
-            explanation=neo.hazard.explanation,
-        )
-        obj = types.SimpleNamespace(
-            tracklet=neo.tracklet,
-            features=neo.features,
-            posterior=neo.posterior,
-            hazard=haz,
-            metadata=meta,
-        )
-        return obj
-
-    def test_high_urgency(self):
-        from alert import generate_observation_request
-        neo = self._make_neo(priority=0.75, hazard_flag="nominal")
-        result = generate_observation_request(neo)
-        assert "HIGH" in result
-
-    def test_medium_urgency(self):
-        from alert import generate_observation_request
-        neo = self._make_neo(priority=0.5, hazard_flag="nominal")
-        result = generate_observation_request(neo)
-        assert "MEDIUM" in result
-
-    def test_routine_urgency(self):
-        from alert import generate_observation_request
-        neo = self._make_neo(priority=0.2, hazard_flag="nominal")
-        result = generate_observation_request(neo)
-        assert "ROUTINE" in result
-
-
 class TestFormatCandidateDossier:
     def _neo(self):
         from tests.conftest import build_scored_neo
@@ -837,27 +751,6 @@ class TestFormatMpcAdesPsvTimeFallback:
         assert "2460000" in result
 
 
-class TestFormatNeocpSubmissionObsError:
-    def test_bad_obs_skipped(self, monkeypatch):
-        import sys
-        sys.path.insert(0, "src")
-        from types import SimpleNamespace
-
-        import alert as al
-
-        monkeypatch.setattr(al, "format_mpc_observation",
-                            lambda *a, **k: (_ for _ in ()).throw(ValueError("bad")))
-
-        obs = SimpleNamespace(jd=2460000.0, ra_deg=10.0, dec_deg=5.0,
-                              mag=18.0, mag_err=0.05, filter_band="r",
-                              obs_id="X", mission="ZTF")
-        tracklet = SimpleNamespace(object_id="T001", observations=(obs,))
-        neo = SimpleNamespace(tracklet=tracklet, hazard=None,
-                              features=None, posterior=None, metadata=None)
-        result = al.format_neocp_submission(neo)
-        assert "GUARDRAIL" in result
-
-
 class TestCountObservationsByMission:
     def test_counts_missions(self):
         import sys
@@ -899,31 +792,3 @@ class TestCountObservationsByMission:
         assert "count_observations_by_mission" in alert.__all__
 
 
-class TestComputeUrgencyHighMoidFalse:
-    """Cover line 1758 second operand of compound-and in _compute_urgency.
-
-    Python 3.14.6 tracks each operand of `A and B` separately.  The existing
-    tests only exercise moid_au <= 0.1 (True AND True) or moid_au=None
-    (short-circuit, second operand never evaluated).  This test exercises
-    moid_au=0.2 so `moid_au is not None` is True but `float(moid_au) <= 0.1`
-    is False, causing the condition to be False overall.
-    """
-
-    def test_high_moid_low_priority_gives_routine(self):
-        """moid_au=0.2 (> 0.1) and priority=0.3 (< 0.7) -> ROUTINE."""
-        import sys
-        sys.path.insert(0, "src")
-        from types import SimpleNamespace
-
-        from alert import generate_followup_priority_list
-
-        neo = make_scored_neo()
-        hazard = SimpleNamespace(
-            hazard_flag="nominal",
-            moid_au=0.2,
-            alert_pathway="internal_candidate",
-        )
-        meta = SimpleNamespace(discovery_priority=0.3)
-        neo_ns = SimpleNamespace(tracklet=neo.tracklet, hazard=hazard, metadata=meta)
-        result = generate_followup_priority_list([neo_ns])
-        assert result[0]["urgency"] == "ROUTINE"

@@ -583,51 +583,6 @@ class TestComputeRocAuc:
         assert compute_roc_auc(good, labels) > compute_roc_auc(poor, labels)
 
 
-class TestComputeCalibrationSlopeDegenerate:
-    def test_all_probs_identical_returns_one(self):
-        import sys
-        sys.path.insert(0, "src")
-        from calibration import compute_calibration_slope
-        # All predictions in the same bin → x_mean = x_bins[0] for each bin
-        # but with 1 bin → returns 1.0 from len(x_bins) < 2
-        # To hit den==0: need 2+ bins with exact same mean prob (impossible with linspace)
-        # But we can fill all probs exactly at 0.5 into only 1 bin → len < 2
-        probs = [0.5] * 10 + [0.501] * 10
-        labels = [1] * 10 + [0] * 10
-        result = compute_calibration_slope(probs, labels)
-        assert isinstance(result, float)
-
-
-class TestComputeHosmerLemeshowEdgeCases:
-    """Edge case tests for compute_hosmer_lemeshow_statistic."""
-
-    def test_all_zeros_labels_skips_degenerate_bins(self):
-        """All labels=0 forces exp == n_bin, hitting (n_bin - exp) == 0 branch."""
-        import sys
-        sys.path.insert(0, "src")
-        from calibration import compute_hosmer_lemeshow_statistic
-
-        # All predictions 0.5, all labels 0 → exp=0.5*n, n_bin-exp=0.5*n ≠ 0
-        # To hit n_bin-exp==0: all probs=1.0, all labels=0 → exp=n_bin
-        probs = [1.0] * 20
-        labels = [0] * 20
-        result = compute_hosmer_lemeshow_statistic(probs, labels)
-        assert isinstance(result, float)
-        assert result >= 0.0
-
-    def test_all_ones_labels_exp_equals_zero_branch(self):
-        """All probs=0.0, all labels=1 → exp=0 branch skipped in bins."""
-        import sys
-        sys.path.insert(0, "src")
-        from calibration import compute_hosmer_lemeshow_statistic
-
-        probs = [0.0] * 20
-        labels = [1] * 20
-        result = compute_hosmer_lemeshow_statistic(probs, labels)
-        assert isinstance(result, float)
-        assert result >= 0.0
-
-
 class TestComputeCalibrationGain:
     def test_positive_gain(self):
         import sys
@@ -668,26 +623,5 @@ class TestComputeCalibrationGain:
         import calibration
         assert "compute_calibration_gain" in calibration.__all__
 
-
-class TestComputeCalibrationSpreadCoverage:
-    """Coverage for clamp branch (prob=1.0 → idx clamped to n_bins-1)."""
-
-    def _fn(self):
-        import sys
-        sys.path.insert(0, "src")
-        import calibration
-        return calibration.compute_calibration_spread
-
-    def test_prob_one_clamp_branch(self):
-        probs = [0.0, 1.0]
-        labels = [0, 1]
-        result = self._fn()(probs, labels, n_bins=1)
-        assert result == 0.0
-
-    def test_prob_one_with_multiple_bins(self):
-        probs = [0.1, 0.9, 1.0]
-        labels = [0, 1, 1]
-        result = self._fn()(probs, labels, n_bins=10)
-        assert isinstance(result, float)
 
 

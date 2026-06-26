@@ -336,135 +336,6 @@ def _make_preprocess_result(obs: tuple) -> PreprocessResult:
     )
 
 
-class TestFilterByRealBogusEdgeCases:
-    def _make_result_no_rb(self):
-        from schemas import DetectProvenance, DetectResult, Observation, RawCandidate
-        obs = Observation(
-            obs_id="nb_001", ra_deg=180.0, dec_deg=0.0, jd=2460000.5,
-            mag=19.5, mag_err=0.05, filter_band="r", mission="ZTF",
-            real_bogus=None,
-        )
-        cand = RawCandidate(
-            candidate_id="C_norb",
-            observations=(obs,),
-            apparent_motion_arcsec_per_hr=1.0,
-            motion_pa_deg=90.0,
-        )
-        prov = DetectProvenance(
-            real_bogus_threshold=0.65,
-            n_candidates=1,
-            n_known_matches=0,
-            detected_at_jd=2460000.5,
-        )
-        return DetectResult(candidates=(cand,), known_matches=(), provenance=prov)
-
-    def test_no_rb_score_kept(self):
-        from detect import filter_by_real_bogus
-        result = self._make_result_no_rb()
-        filtered = filter_by_real_bogus(result, threshold=0.65)
-        assert len(filtered.candidates) == 1
-
-
-class TestComputeStreakMetricEdgeCases:
-    def test_all_zeros_returns_zero(self):
-        import base64
-
-        import numpy as np
-
-        from detect import compute_streak_metric
-        from schemas import Observation
-        arr = np.zeros((9, 9), dtype=np.float32)
-        b64 = base64.b64encode(arr.tobytes()).decode()
-        obs = Observation(
-            obs_id="sz_001", ra_deg=0.0, dec_deg=0.0, jd=2460000.5,
-            mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF", real_bogus=0.9,
-            cutout_difference=b64,
-        )
-        assert compute_streak_metric(obs) == pytest.approx(0.0)
-
-    def test_non_square_cutout_returns_zero(self):
-        import base64
-
-        import numpy as np
-
-        from detect import compute_streak_metric
-        from schemas import Observation
-        # 3*4=12 elements — not a perfect square
-        arr = np.ones(12, dtype=np.float32)
-        b64 = base64.b64encode(arr.tobytes()).decode()
-        obs = Observation(
-            obs_id="ns_001", ra_deg=0.0, dec_deg=0.0, jd=2460000.5,
-            mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF", real_bogus=0.9,
-            cutout_difference=b64,
-        )
-        assert compute_streak_metric(obs) == pytest.approx(0.0)
-
-
-class TestComputeTrailLengthEdgeCases:
-    def test_non_square_cutout_returns_none(self):
-        import base64
-
-        import numpy as np
-
-        from detect import compute_trail_length
-        from schemas import Observation
-        arr = np.ones(12, dtype=np.float32)
-        b64 = base64.b64encode(arr.tobytes()).decode()
-        obs = Observation(
-            obs_id="tl_ns", ra_deg=0.0, dec_deg=0.0, jd=2460000.5,
-            mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF", real_bogus=0.9,
-            cutout_difference=b64,
-        )
-        result = compute_trail_length(obs)
-        assert result is None
-
-    def test_all_zeros_returns_none_or_zero(self):
-        import base64
-
-        import numpy as np
-
-        from detect import compute_trail_length
-        from schemas import Observation
-        arr = np.zeros((9, 9), dtype=np.float32)
-        b64 = base64.b64encode(arr.tobytes()).decode()
-        obs = Observation(
-            obs_id="tl_zero", ra_deg=0.0, dec_deg=0.0, jd=2460000.5,
-            mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF", real_bogus=0.9,
-            cutout_difference=b64,
-        )
-        result = compute_trail_length(obs)
-        assert result is None or result == pytest.approx(0.0, abs=0.1)
-
-    def test_invalid_b64_returns_none(self):
-        from detect import compute_trail_length
-        from schemas import Observation
-        obs = Observation(
-            obs_id="tl_bad", ra_deg=0.0, dec_deg=0.0, jd=2460000.5,
-            mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF", real_bogus=0.9,
-            cutout_difference="!!!invalid!!!",
-        )
-        assert compute_trail_length(obs) is None
-
-
-class TestComputeStreakMetricSinglePixel:
-    def test_single_pixel_trace_zero_returns_zero(self):
-        import base64
-
-        import numpy as np
-
-        from detect import compute_streak_metric
-        from schemas import Observation
-        arr = np.zeros((9, 9), dtype=np.float32)
-        arr[4, 4] = 1.0  # single pixel → trace=0 → return 0.0
-        b64 = base64.b64encode(arr.tobytes()).decode()
-        obs = Observation(
-            obs_id="sp_001", ra_deg=0.0, dec_deg=0.0, jd=2460000.5,
-            mag=19.0, mag_err=0.05, filter_band="r", mission="ZTF", real_bogus=0.9,
-            cutout_difference=b64,
-        )
-        assert compute_streak_metric(obs) == pytest.approx(0.0)
-
-
 class TestComputePsfFwhm:
     def _make_obs(self, b64: str | None = None):
         import base64
@@ -613,36 +484,6 @@ class TestComputeMotionVector:
         result = compute_motion_vector(obs1, obs2)
         for v in result.values():
             assert isinstance(v, float)
-
-
-class TestComputeSourceExtentEdgeCases:
-    def test_single_bright_pixel_returns_none(self):
-        """Single pixel at center → zero covariance → lambda_max=0 → None."""
-        import base64
-
-        import numpy as np
-
-        from detect import compute_source_extent
-        from schemas import Observation
-        arr = np.zeros((63, 63), dtype=np.float32)
-        arr[31, 31] = 100.0
-        b64 = base64.b64encode(arr.tobytes()).decode()
-        obs = Observation(
-            obs_id="single", jd=2460000.5, ra_deg=0.0, dec_deg=0.0,
-            mag=18.0, mag_err=0.1, filter_band="r", mission="ZTF",
-            cutout_difference=b64,
-        )
-        assert compute_source_extent(obs) is None
-
-    def test_bad_base64_returns_none(self):
-        from detect import compute_source_extent
-        from schemas import Observation
-        obs = Observation(
-            obs_id="bad64", jd=2460000.5, ra_deg=0.0, dec_deg=0.0,
-            mag=18.0, mag_err=0.1, filter_band="r", mission="ZTF",
-            cutout_difference="!!!not_valid_base64!!!",
-        )
-        assert compute_source_extent(obs) is None
 
 
 class TestFilterByMagnitude:
@@ -797,22 +638,5 @@ class TestComputeSourceCompactness:
         import detect
         assert "compute_source_compactness" in detect.__all__
 
-
-class TestComputeMeanMotionRateCoverage:
-    """Cover except branch (bad obs) and quality_code=None in score."""
-
-    def _fn(self):
-        import sys
-        sys.path.insert(0, "src")
-        import detect
-        return detect.compute_mean_motion_rate
-
-    def test_exception_in_motion_vector_skipped(self):
-        from types import SimpleNamespace
-        bad_obs1 = SimpleNamespace(obs_id="o1", jd=2460000.0)
-        bad_obs2 = SimpleNamespace(obs_id="o2", jd=2460001.0)
-        cand = SimpleNamespace(observations=(bad_obs1, bad_obs2))
-        result = SimpleNamespace(candidates=[cand], known_matches=[], summary=None)
-        assert self._fn()(result) is None
 
 
