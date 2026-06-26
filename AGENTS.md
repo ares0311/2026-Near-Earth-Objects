@@ -523,7 +523,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.89.2)
+## Current State (v0.89.3)
 
 All 10 pipeline modules are complete. The offline suite passes 3600+ tests
 (plus 10 synthetic adversarial tests), with 2 live/integration checks
@@ -569,19 +569,39 @@ a measurable quantity (surveys done/total, tracklets done/total).
 
 See `docs/PRODUCTION_READINESS.md` for the full gap register.
 
-### Handoff notes (2026-06-26) — v0.89.2 (CURRENT)
+### Handoff notes (2026-06-26) — v0.89.3 (CURRENT)
+
+**Goal: defensible discovery paper** (operator-confirmed 2026-06-26 by Jerome W. Lindsey III).
+Two-stage review before any external submission:
+  1. `Skills/adversarial_review.py` — automated adversarial challenges try to REJECT
+  2. Operator (Jerome) reviews survivors
+  3. MPC submission → provisional designation → independent confirmation → journal paper
+
+**Adversarial review implemented (v0.89.3, PR #116)**:
+`Skills/adversarial_review.py` — 11 offline challenges + 2 live checks.
+Verdicts: SURVIVE / BORDERLINE / REJECT. Exit codes 0/1/2.
+Tests: `tests/test_adversarial_review_skill.py` (50+ cases).
+Docs: `docs/MPC_SUBMISSION_POLICY.md §Two-Stage Review Process`.
 
 **Console output elapsed+ETA compliance (PR #116, pending merge to main)**:
-Every stage print in `Skills/run_pipeline.py` now includes elapsed time.
-Fetch stage restructured to loop per-survey with `(N/M)` counters and
-ETA from actual time-per-survey. Per-tracklet prints have `(N/M)` counters
-and ETA from time-per-tracklet. `docs/CONSOLE_OUTPUT_SPEC.md` updated.
-DO NOT give the operator a live run command until PR #116 is merged to main.
+Every stage print in `Skills/run_pipeline.py` now includes elapsed time
+and ETA from measurable quantity. `docs/CONSOLE_OUTPUT_SPEC.md` updated.
 
-**One remaining human-gated blocker**: MPC escalation path. The pipeline
-prints an escalation notice for submission-ready candidates but makes no
-actual MPC submission — resolving the observatory code strategy requires
-Jerome's administrative decision. See `docs/MPC_SUBMISSION_POLICY.md §TODO`.
+**DO NOT give the operator any live run command** until PR #116 merges to main.
+After merge, the two-step operator workflow is:
+```bash
+git pull origin main && export PYTHONPATH=src
+caffeinate -i uv run python Skills/run_pipeline.py --ra 284.13 --dec -22.5 \
+    --radius 3.5 --start-jd 2461183.0 --end-jd 2461213.0 \
+    --surveys ZTF --no-dry-run --force-refresh --no-resume
+# Then pipe output through adversarial review:
+PYTHONPATH=src uv run python Skills/adversarial_review.py <candidates.json>
+```
+
+**Two human-gated blockers remain**:
+1. MPC observatory code strategy — Jerome must resolve before any submission.
+   See `docs/MPC_SUBMISSION_POLICY.md §TODO for Future Agents`.
+2. Actual candidate discovery — pipeline must find a survivor before paper is possible.
 
 **Progress tracker**: `docs/evidence/prod-loop/LOOP_PROGRESS.md` — read
 at session start to avoid repeating completed work.

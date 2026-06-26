@@ -1,7 +1,7 @@
 # 2026 Near-Earth Object Detection & Ranking Pipeline
 
 ![Status](https://img.shields.io/badge/status-active%20development-blue)
-![Version](https://img.shields.io/badge/version-0.89.2-informational)
+![Version](https://img.shields.io/badge/version-0.89.3-informational)
 ![License](https://img.shields.io/badge/license-Apache%202.0-green)
 ![Tests](https://img.shields.io/badge/tests-3500%2B%20passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
@@ -521,7 +521,7 @@ The diagram below shows how data and artifacts move between the repository's top
 2026-Near-Earth-Objects/
 │
 ├── src/                          # Core pipeline modules (Python 3.11+)
-│   ├── __init__.py               # Package version (0.89.2)
+│   ├── __init__.py               # Package version (0.89.3)
 │   ├── schemas.py                # All Pydantic data models (frozen=True)
 │   ├── fetch.py                  # ZTF/ATLAS/MPC/Horizons data retrieval
 │   ├── preprocess.py             # Difference image handling; Gaia astrometry
@@ -1172,7 +1172,7 @@ review evidence: known-object recovery audit, citizen-science operator
 false-positive review. Bounded live dry-run policy approval is complete, but
 execution remains credential/provider gated and non-submitting.
 
-### 15.1 Current State Snapshot (v0.89.2)
+### 15.1 Current State Snapshot (v0.89.3)
 
 | Area | Status | Notes |
 |---|---|---|
