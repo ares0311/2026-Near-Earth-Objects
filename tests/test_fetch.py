@@ -3320,7 +3320,7 @@ class TestFetchWiseArchive:
         monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
         # Row MJD outside window: start_jd=2460000.5 → start_mjd=59999.5
         # Row mjd=50000 is far outside
-        mock_row = {"mjd_obs": 50000.0, "w1mpro": 15.0, "w1sigmpro": 0.1, "ra": 180.0, "dec": 10.0}
+        mock_row = {"mjd": 50000.0, "w1mpro": 15.0, "w1sigmpro": 0.1, "ra": 180.0, "dec": 10.0}
         mock_table = [mock_row]
         mock_irsa = MagicMock()
         mock_irsa.query_region.return_value = mock_table
@@ -3341,7 +3341,7 @@ class TestFetchWiseArchive:
         # MJD=59999.5+0.5=60000 → JD=2460000.5 which is within [2460000.5, 2460010.5]
         mjd_in = 2460000.5 - 2_400_000.5  # = 60000.0
         mock_row = {
-            "mjd_obs": mjd_in,
+            "mjd": mjd_in,
             "w1mpro": None,
             "w1sigmpro": None,
             "ra": 180.0,
@@ -3369,7 +3369,7 @@ class TestFetchWiseArchive:
         monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
         mjd_in = 2460005.0 - 2_400_000.5  # = 60004.5
         mock_row = {
-            "mjd_obs": mjd_in,
+            "mjd": mjd_in,
             "w1mpro": 14.3,
             "w1sigmpro": 0.02,
             "ra": 181.5,
@@ -3826,8 +3826,8 @@ class TestFetchWiseMalformedRow:
         """A row with non-numeric ra causes exception; good row still returned."""
         monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
         mjd_ok = 2460005.0 - 2_400_000.5  # valid MJD inside window
-        good_row = {"mjd_obs": mjd_ok, "ra": 180.0, "dec": 10.0, "w1mpro": 14.5, "w1sigmpro": 0.05}
-        bad_row = {"mjd_obs": mjd_ok, "ra": "bad", "dec": 10.0, "w1mpro": 15.0, "w1sigmpro": 0.1}
+        good_row = {"mjd": mjd_ok, "ra": 180.0, "dec": 10.0, "w1mpro": 14.5, "w1sigmpro": 0.05}
+        bad_row = {"mjd": mjd_ok, "ra": "bad", "dec": 10.0, "w1mpro": 15.0, "w1sigmpro": 0.1}
         mock_irsa = MagicMock()
         mock_irsa.query_region.return_value = [bad_row, good_row]
         mock_units = MagicMock()

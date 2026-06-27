@@ -1470,14 +1470,13 @@ def fetch_wise_archive(
     # Build sky coordinate for the cone search centre
     coord = SkyCoord(ra=ra_deg, dec=dec_deg, unit="deg")
     try:
-        # Request only the columns we need: reduces payload vs the default '*'
-        # which can time out for dense fields (e.g. Taurus/Pleiades).
+        # Use SELECT * — explicit column lists fail with ORA-00904 on IRSA TAP
+        # because TAP column names differ from the Python-accessible dict keys.
         table = Irsa.query_region(
             coord,
             catalog="neowiser_p1bs_psd",
             spatial="Cone",
             radius=radius_deg * u.deg,
-            columns="ra,dec,mjd_obs,w1mpro,w1sigmpro",
         )
     except Exception as exc:
         # Print to stderr so operators can diagnose IRSA network/catalog issues.
@@ -1492,10 +1491,19 @@ def fetch_wise_archive(
         import sys
         print(
             f"[fetch] WISE IRSA returned 0 rows for "
-            f"RA={ra_deg:.2f} Dec={dec_deg:.2f} r={radius_deg:.2f}°",
+            f"RA={ra_deg:.2f} Dec={dec_deg:.2f} r={radius_deg:.2f}°"
+            f"  table_cols={getattr(table, 'colnames', 'N/A')}",
             file=sys.stderr, flush=True,
         )
         return []
+
+    # Log row count and column names so operators can verify catalog schema.
+    import sys
+    cols = getattr(table, "colnames", list(table[0].keys()) if len(table) else [])
+    print(
+        f"[fetch] WISE IRSA: {len(table)} total rows, cols={cols}",
+        file=sys.stderr, flush=True,
+    )
 
     # Convert JD time window to MJD for comparison with table values
     start_mjd = start_jd - 2_400_000.5
@@ -1503,8 +1511,7 @@ def fetch_wise_archive(
     obs: list[Observation] = []
     for i, row in enumerate(table):
         try:
-            # NEOWISE neowiser_p1bs_psd uses mjd_obs (not mjd) for epoch
-            mjd = float(row["mjd_obs"])
+            mjd = float(row["mjd"])
             # Skip rows outside the requested time window
             if not (start_mjd <= mjd <= end_mjd):
                 continue
