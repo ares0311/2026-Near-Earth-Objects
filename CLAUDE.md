@@ -1019,8 +1019,7 @@ MPC submission → provisional designation → independent confirmation → jour
 1. ~~Merge PR #116~~ DONE ✓
 2. ~~Open/merge PR #117~~ DONE ✓ (2026-06-27, CI green, 1534 tests, 100% coverage)
 3. ~~**Redesign `fetch.py` discovery layer**~~ DONE ✓ (PR #119 merged 2026-06-27, 1573 tests)
-4. **Update `docs/MPC_SUBMISSION_POLICY.md`**: add §Adversarial Review section describing
-   the two-stage review process and how it gates external submission.
+4. ~~**Update `docs/MPC_SUBMISSION_POLICY.md`**~~ DONE ✓ (PR #121 merged 2026-06-27)
 5. **Run live pipeline** targeting WISE/NEOWISE (operator, from main after PR #119 merged):
    ```bash
    git pull origin main
