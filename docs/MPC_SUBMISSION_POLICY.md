@@ -1,6 +1,7 @@
 # MPC Submission Policy — NEO Detection Pipeline
 
 **Established**: 2026-06-21  
+**Updated**: 2026-06-27 (discovery-paper framing; WISE/NEOWISE as primary data source)  
 **Operator**: Jerome W. Lindsey III  
 **Supersedes**: The prior "blocked until qualified expert review" guardrail in CLAUDE.md and AGENTS.md.
 
@@ -8,16 +9,20 @@
 
 ## Background
 
+The project goal is a **defensible discovery paper**: find new NEOs in unreviewed archival
+data (WISE/NEOWISE, DECam/NOIRLab, TESS FFIs), submit candidates to MPC, obtain a
+provisional designation via independent NEOCP confirmation, and publish. This is not a
+citizen-science reporting tool — every candidate must survive automated adversarial review
+and operator review before any external submission.
+
 The pipeline was previously configured with a guardrail stating that MPC submission was
-"blocked until qualified expert review." Research into how the global NEO discovery
-infrastructure actually works (2026-06-21) revealed this guardrail was based on a
-misunderstanding. The MPC, NEOCP, and CNEOS Scout chain *is* the expert review system.
+"blocked until qualified expert review." Research (2026-06-21) revealed this was based on
+a misunderstanding. The MPC, NEOCP, and CNEOS Scout chain *is* the expert review system.
 No observatory — amateur or professional — arranges its own expert reviewer before
-submitting to MPC. Submitting to MPC and letting the global infrastructure handle
-confirmation and hazard assessment is the correct and established citizen-science pathway.
+submitting to MPC.
 
 Reference programs that operate this way without in-house astronomers:
-- **IASC** (International Astronomical Search Collaboration): 50,000 citizen scientists,
+- **IASC** (International Astronomical Search Collaboration): 50,000 participants,
   ~12,000 asteroid detections, ~5 NEOs confirmed, operating since ~2010.
 - Amateur observatories worldwide hold MPC observatory codes and submit regularly.
 
@@ -130,7 +135,7 @@ Stage 5: Discovery Paper
 
 **Adversarial review challenges** (live, run when not --offline):
 12. MPC field scan (> 10 known objects in 0.5° cone = FAIL; > 0 = WARNING)
-13. Cross-survey confirmation (ATLAS cross-check if ZTF-found; no detection = WARNING)
+13. Cross-survey confirmation (cross-check primary detection against a secondary archive; no confirmation = WARNING)
 
 **Verdict rules**:
 - REJECT: any FAIL → do not advance
@@ -208,10 +213,10 @@ MPC submission best practices for citizen-science programs.
 viable escalation path so that when the pipeline detects a high-quality
 candidate, there is a concrete, executable submission mechanism.
 
-**The unresolved question**: This pipeline processes *public survey data*
-(ZTF/ATLAS photometric alerts) — it does not make original telescope
-observations. MPC observation reports normally require the submitting
-observatory to be the original observer and to hold a registered observatory
+**The unresolved question**: This pipeline re-reduces *publicly archived survey data*
+(WISE/NEOWISE via IRSA, DECam/NOIRLab NSC DR2, TESS FFIs via MAST) — it does not
+make original telescope observations. MPC observation reports normally require the
+submitting observatory to be the original observer and to hold a registered observatory
 code tied to a specific observing site.
 
 **Known constraints**:
@@ -221,16 +226,18 @@ code tied to a specific observing site.
 - The existing `ready_for_submission()` gates and ADES PSV export
   (`Skills/export_ades_report.py`) are implemented; the missing piece is
   authorization to submit.
+- The primary discovery data source is WISE/NEOWISE archival photometry (IRSA,
+  no credentials required); secondary sources are DECam/NOIRLab and TESS FFIs.
 
 **Research needed** (for the agent that picks this up):
-1. Determine whether a pure data-analysis pipeline processing *licensed public
-   alert data* from ZTF/ATLAS can submit MPC reports under those surveys'
-   observatory codes, or whether a separate code is required.
-2. Contact MPC to ask specifically: "We re-reduce public ZTF/ATLAS alerts
-   using our own pipeline; can we submit candidate reports, and if so, what
-   observatory code should we use?"
-3. Investigate whether ZTF/ATLAS have policies on downstream pipelines
-   submitting to MPC from their data.
+1. Determine whether a data-analysis pipeline re-reducing public archival data
+   from WISE/NEOWISE, DECam/NOIRLab, or TESS can submit MPC reports, and if so,
+   under what observatory code.
+2. Contact MPC to ask specifically: "We reduce publicly archived WISE/NEOWISE
+   infrared detections using our own pipeline to identify new NEO candidates.
+   Can we submit observation reports, and if so, what observatory code applies?"
+3. Investigate whether IRSA/NOIRLab/MAST have data-use policies that affect
+   downstream MPC submissions from their public data products.
 4. Document the answer in this file and update `Skills/export_ades_report.py`
    and `alert.py` accordingly.
 
