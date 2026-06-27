@@ -679,27 +679,6 @@ def count_observations_by_mission(neo: object) -> dict[str, int]:
 
 
 
-def _compute_urgency(neo: Any) -> str:
-    """Derive urgency tier for a NEO candidate (internal helper)."""
-    hazard = getattr(neo, "hazard", None)
-    hazard_flag = getattr(hazard, "hazard_flag", "unknown")
-    moid_au = getattr(hazard, "moid_au", None)
-    metadata = getattr(neo, "metadata", None)
-    priority = float(getattr(metadata, "discovery_priority", 0.0) or 0.0)
-    if hazard_flag == "pha_candidate":
-        return "URGENT"
-    # Nested ifs (not compound and) for stable Python 3.14 branch coverage.
-    if moid_au is not None:
-        if float(moid_au) <= 0.1:
-            return "HIGH"
-    if priority >= 0.7:
-        return "MEDIUM"
-    return "ROUTINE"
-
-
-
-
-
 
 
 

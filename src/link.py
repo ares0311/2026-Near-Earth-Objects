@@ -387,12 +387,6 @@ def compute_tracklet_grade(tracklet: object) -> str:
 
 
 
-def _count_nights(tracklet) -> int:
-    """Count distinct integer JD nights in a tracklet."""
-    return len({int(o.jd) for o in getattr(tracklet, "observations", [])})
-
-
-
 
 
 
