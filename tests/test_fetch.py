@@ -3354,6 +3354,48 @@ class TestFetchWiseArchive:
         assert abs(result[0].mag_err - 0.02) < 1e-6
         assert abs(result[0].jd - (mjd_in + 2_400_000.5)) < 1e-6
 
+    def test_tap_job_polls_while_executing_then_completes(self, tmp_path, monkeypatch):
+        """Poll loop sleeps when phase=EXECUTING, exits and returns rows on COMPLETED."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        mjd_in = 2460005.0 - 2_400_000.5
+        mock_row = {"mjd": mjd_in, "ra": 181.5, "dec": 9.5, "w1mpro": 14.0, "w1sigmpro": 0.05}
+
+        mock_job = MagicMock()
+        mock_job.phase = "EXECUTING"
+        call_count = [0]
+
+        def advance_phase():
+            call_count[0] += 1
+            if call_count[0] >= 2:
+                mock_job.phase = "COMPLETED"
+
+        mock_job.update.side_effect = advance_phase
+        mock_dal_result = MagicMock()
+        mock_dal_result.to_table.return_value = [mock_row]
+        mock_job.fetch_result.return_value = mock_dal_result
+        mock_tap_svc = MagicMock()
+        mock_tap_svc.submit_job.return_value = mock_job
+        mock_pyvo = MagicMock()
+        mock_pyvo.dal.TAPService.return_value = mock_tap_svc
+
+        with patch("time.sleep"):  # avoid real 30s sleep in test
+            with patch.dict("sys.modules", {"pyvo": mock_pyvo}):
+                result = fetch_mod.fetch_wise_archive(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
+        assert len(result) == 1
+
+    def test_tap_job_error_phase_returns_empty(self, tmp_path, monkeypatch):
+        """Job ending in ERROR phase raises RuntimeError (caught) → returns empty."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        mock_job = MagicMock()
+        mock_job.phase = "ERROR"
+        mock_tap_svc = MagicMock()
+        mock_tap_svc.submit_job.return_value = mock_job
+        mock_pyvo = MagicMock()
+        mock_pyvo.dal.TAPService.return_value = mock_tap_svc
+        with patch.dict("sys.modules", {"pyvo": mock_pyvo}):
+            result = fetch_mod.fetch_wise_archive(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
+        assert result == []
+
 
 class TestFetchDecamArchive:
     """Tests for fetch_decam_archive."""
