@@ -3850,25 +3850,19 @@ class TestFetchDecamMalformedRow:
     def test_malformed_row_skipped_good_row_kept(self, tmp_path, monkeypatch):
         """A row with non-numeric ra causes exception; good row still returned."""
         monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
-        mjd_ok = 60004.5  # MJD inside window
+        mjd_ok = 60004.5  # MJD inside window (start_mjd=60000.0, end_mjd=60010.0)
         good_row = {"mjd": mjd_ok, "ra": 180.0, "dec": 10.0, "mag_auto": 20.0,
                     "magerr_auto": 0.1, "filter": "r"}
         bad_row = {"mjd": mjd_ok, "ra": "bad", "dec": 10.0, "mag_auto": 21.0,
                    "magerr_auto": 0.1, "filter": "r"}
-        mock_pyvo = MagicMock()
-        mock_service = MagicMock()
-        mock_result = MagicMock()
-        mock_result.__iter__ = MagicMock(return_value=iter([bad_row, good_row]))
-        mock_result.__len__ = MagicMock(return_value=2)
-        mock_service.search.return_value = mock_result
-        mock_pyvo.dal.TAPService.return_value = mock_service
-        with patch.dict("sys.modules", {"pyvo": mock_pyvo}):
-            result = fetch_mod.fetch_decam_archive(
-                180.0, 10.0, 1.0,
-                2460000.5 + 0,   # start_jd → start_mjd = start_jd - 2400000.5 = 60000.0
-                2460010.5 + 0,   # end_jd
-            )
-        # bad_row skipped, good_row returned
+        mock_table = MagicMock()
+        mock_table.__len__ = lambda s: 2
+        mock_table.__iter__ = lambda s: iter([bad_row, good_row])
+        mock_tap = MagicMock()
+        mock_tap.dal.TAPService.return_value.search.return_value.to_table.return_value = mock_table
+        with patch.dict("sys.modules", {"pyvo": mock_tap}):
+            result = fetch_mod.fetch_decam_archive(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
+        # bad_row raises ValueError on float("bad") → skipped; good_row kept
         assert len(result) == 1
         assert result[0].mission == "DECam"
 
