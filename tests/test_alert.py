@@ -427,6 +427,16 @@ class TestMonitorNeocpPublic:
 class TestMonitorNeocpDirect:
     """Tests that exercise the _monitor_neocp function body directly."""
 
+    def test_success_path_returns_checked_dict(self):
+        """Cover line 228: successful requests.get returns status=checked dict."""
+        mock_resp = MagicMock()
+        mock_resp.text = "NEOCP page content"
+        with patch("requests.get", return_value=mock_resp):
+            result = _monitor_neocp("TEST001")
+        assert result["status"] == "checked"
+        assert result["confirmed"] is False
+        assert "NEOCP" in result["raw"]
+
     def test_exception_path_returns_error_dict(self):
         with patch("requests.get", side_effect=ConnectionError("unreachable")):
             result = _monitor_neocp("TEST001")
