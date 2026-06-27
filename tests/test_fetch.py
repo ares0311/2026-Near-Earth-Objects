@@ -3813,3 +3813,123 @@ class TestFetchRoutingNewSurveys:
         assert len(result.alerts) == 1
         assert result.alerts[0].mission == "TESS"
         mt.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Coverage gap tests: exception-handler and branch paths not reached above
+# ---------------------------------------------------------------------------
+
+class TestFetchWiseMalformedRow:
+    """Covers fetch_wise_archive lines 1514-1515: except Exception: continue."""
+
+    def test_malformed_row_skipped_good_row_kept(self, tmp_path, monkeypatch):
+        """A row with non-numeric ra causes exception; good row still returned."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        mjd_ok = 2460005.0 - 2_400_000.5  # valid MJD inside window
+        good_row = {"mjd": mjd_ok, "ra": 180.0, "dec": 10.0, "w1mpro": 14.5, "w1sigmpro": 0.05}
+        bad_row = {"mjd": mjd_ok, "ra": "bad", "dec": 10.0, "w1mpro": 15.0, "w1sigmpro": 0.1}
+        mock_irsa = MagicMock()
+        mock_irsa.query_region.return_value = [bad_row, good_row]
+        mock_units = MagicMock()
+        mock_coord_mod = MagicMock()
+        mock_coord_mod.SkyCoord.return_value = MagicMock()
+        with patch.dict("sys.modules", {
+            "astroquery.ipac.irsa": MagicMock(Irsa=mock_irsa),
+            "astropy.units": mock_units,
+            "astropy.coordinates": mock_coord_mod,
+        }):
+            result = fetch_mod.fetch_wise_archive(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
+        # bad_row skipped, good_row returned
+        assert len(result) == 1
+        assert result[0].mission == "WISE"
+
+
+class TestFetchDecamMalformedRow:
+    """Covers fetch_decam_archive lines 1600-1601: except Exception: continue."""
+
+    def test_malformed_row_skipped_good_row_kept(self, tmp_path, monkeypatch):
+        """A row with non-numeric ra causes exception; good row still returned."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        mjd_ok = 60004.5  # MJD inside window
+        good_row = {"mjd": mjd_ok, "ra": 180.0, "dec": 10.0, "mag_auto": 20.0,
+                    "magerr_auto": 0.1, "filter": "r"}
+        bad_row = {"mjd": mjd_ok, "ra": "bad", "dec": 10.0, "mag_auto": 21.0,
+                   "magerr_auto": 0.1, "filter": "r"}
+        mock_pyvo = MagicMock()
+        mock_service = MagicMock()
+        mock_result = MagicMock()
+        mock_result.__iter__ = MagicMock(return_value=iter([bad_row, good_row]))
+        mock_result.__len__ = MagicMock(return_value=2)
+        mock_service.search.return_value = mock_result
+        mock_pyvo.dal.TAPService.return_value = mock_service
+        with patch.dict("sys.modules", {"pyvo": mock_pyvo}):
+            result = fetch_mod.fetch_decam_archive(
+                180.0, 10.0, 1.0,
+                2460000.5 + 0,   # start_jd → start_mjd = start_jd - 2400000.5 = 60000.0
+                2460010.5 + 0,   # end_jd
+            )
+        # bad_row skipped, good_row returned
+        assert len(result) == 1
+        assert result[0].mission == "DECam"
+
+
+class TestFetchTessCoveragePaths:
+    """Covers remaining TESS branch paths (lines 1675-1676, 1690, 1701, 1719-1720)."""
+
+    def test_tic_query_exception_returns_empty(self, tmp_path, monkeypatch):
+        """Catalogs.query_region raising exception sets tic=None → returns [] (lines 1675-1676)."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        # Valid sector that would pass epoch filter
+        mock_sector = {"t_min": 3000.0, "t_max": 3027.0, "sequence_number": 1}
+        mock_mast = MagicMock()
+        mock_mast.Observations.query_criteria.return_value = [mock_sector]
+        mock_mast.Catalogs.query_region.side_effect = RuntimeError("TIC unavailable")
+        with patch.dict("sys.modules", {"astroquery.mast": mock_mast}):
+            result = fetch_mod.fetch_tess_ffis(180.0, 10.0, 1.0, 2460000.5, 2460030.5)
+        assert result == []
+
+    def test_sector_epoch_out_of_range_skipped(self, tmp_path, monkeypatch):
+        """Sector with epoch far outside JD window is skipped via continue (line 1690)."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        # t_min=0, t_max=27 → epoch_jd = 13.5 + 2457000 = 2457013.5
+        # window: start_jd=2460000.5 ± 14  → [2459986.5, 2460024.5]
+        # 2457013.5 is NOT in that range → line 1690 continue
+        out_of_range_sector = {"t_min": 0.0, "t_max": 27.0, "sequence_number": 9}
+        valid_tic_src = {"ID": "11111", "ra": 180.0, "dec": 10.0, "Tmag": 14.0, "e_Tmag": 0.1}
+        mock_mast = MagicMock()
+        mock_mast.Observations.query_criteria.return_value = [out_of_range_sector]
+        mock_mast.Catalogs.query_region.return_value = [valid_tic_src]
+        with patch.dict("sys.modules", {"astroquery.mast": mock_mast}):
+            result = fetch_mod.fetch_tess_ffis(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
+        assert result == []
+
+    def test_duplicate_tic_source_deduped(self, tmp_path, monkeypatch):
+        """Same TIC source ID in a sector appears twice; second is deduped (line 1701)."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        # epoch_jd = (3000+3027)/2 + 2457000 = 2460013.5, inside window [2459986.5, 2460024.5]
+        mock_sector = {"t_min": 3000.0, "t_max": 3027.0, "sequence_number": 3}
+        tic_src = {"ID": "77777", "ra": 180.0, "dec": 10.0, "Tmag": 14.0, "e_Tmag": 0.1}
+        # Same source listed twice → second occurrence triggers dedup continue
+        mock_mast = MagicMock()
+        mock_mast.Observations.query_criteria.return_value = [mock_sector]
+        mock_mast.Catalogs.query_region.return_value = [tic_src, tic_src]
+        with patch.dict("sys.modules", {"astroquery.mast": mock_mast}):
+            result = fetch_mod.fetch_tess_ffis(180.0, 10.0, 1.0, 2460000.5, 2460030.5)
+        # Only one observation despite two identical TIC rows
+        assert len(result) == 1
+        assert result[0].obs_id == "tess_s3_t77777"
+
+    def test_malformed_tic_row_skipped(self, tmp_path, monkeypatch):
+        """TIC row with non-numeric ra raises exception and is skipped (lines 1719-1720)."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        mock_sector = {"t_min": 3000.0, "t_max": 3027.0, "sequence_number": 4}
+        bad_tic = {"ID": "88888", "ra": "bad_value", "dec": 10.0, "Tmag": 14.0, "e_Tmag": 0.1}
+        good_tic = {"ID": "99999", "ra": 180.0, "dec": 10.0, "Tmag": 14.0, "e_Tmag": 0.1}
+        mock_mast = MagicMock()
+        mock_mast.Observations.query_criteria.return_value = [mock_sector]
+        mock_mast.Catalogs.query_region.return_value = [bad_tic, good_tic]
+        with patch.dict("sys.modules", {"astroquery.mast": mock_mast}):
+            result = fetch_mod.fetch_tess_ffis(180.0, 10.0, 1.0, 2460000.5, 2460030.5)
+        # bad_tic skipped, good_tic kept
+        assert len(result) == 1
+        assert result[0].obs_id == "tess_s4_t99999"
