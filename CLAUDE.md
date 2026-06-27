@@ -694,12 +694,19 @@ filter them before any external submission:
   all citizen-science language replaced with discovery-paper language
 - `docs/near_earth_objects_research_brief.md`: canonical primer, mandatory session read
 
-**PR #124 MERGED (2026-06-27)** ✓ — IRSA error logging + column limit:
+**PR #125 MERGED (2026-06-27)** ✓ — Revert mjd_obs → mjd; remove explicit columns; add column logging:
+- Root cause of PR #124 failure: `columns='ra,dec,mjd_obs,...'` generated ADQL SELECT that Oracle TAP rejected with `ORA-00904: "MJD_OBS": invalid identifier` — proves epoch column is NOT named `mjd_obs`
+- Fix: removed explicit `columns=` parameter (back to SELECT *); reverted `row["mjd_obs"]` → `row["mjd"]`; reverted test mocks to `"mjd"` key
+- Added stderr logging: column names and row count logged on successful IRSA query so operator can verify actual column names on next live run
+- Updated `Skills/diagnose_wise_query.py` to probe `mjd`, `mjd_obs`, `mjd_obs_w1`, `date_obs` candidates
+- CI green at 100% coverage, 1574 tests ✓
+- **Next operator action**: run live WISE pipeline with `--force-refresh --no-resume` (see Step 5 below); paste stderr output showing `[fetch] WISE IRSA: N rows, cols=[...]`
+
+**PR #124 MERGED (2026-06-27)** ✓ — IRSA error logging + column limit (SUPERSEDED by PR #125):
 - Added stderr logging for IRSA exceptions and empty results so operators can diagnose failures
-- Added `columns='ra,dec,mjd_obs,w1mpro,w1sigmpro'` to limit payload (default `*` fetches dozens of columns, likely causing timeout in dense Taurus/Pleiades field)
+- Added `columns='ra,dec,mjd_obs,w1mpro,w1sigmpro'` to limit payload — this turned out to cause ORA-00904 (see PR #125)
 - Added `Skills/diagnose_wise_query.py` for direct IRSA diagnostics
 - CI green at 100% coverage, 1574 tests ✓
-- **Next**: run pipeline again with `--force-refresh --no-resume`; if IRSA still returns 0, run `diagnose_wise_query.py` to see raw error
 
 **PR #123 MERGED (2026-06-27)** ✓ — NEOWISE mjd_obs column fix + coverage:
 - Root cause: `fetch_wise_archive` read `row["mjd"]` but NEOWISE `neowiser_p1bs_psd` uses `mjd_obs`. Every row threw `KeyError`, silently caught, producing 0 observations even when IRSA returned real data (confirmed via 61-second live query).
@@ -1033,17 +1040,18 @@ MPC submission → provisional designation → independent confirmation → jour
 2. ~~Open/merge PR #117~~ DONE ✓ (2026-06-27, CI green, 1534 tests, 100% coverage)
 3. ~~**Redesign `fetch.py` discovery layer**~~ DONE ✓ (PR #119 merged 2026-06-27, 1573 tests)
 4. ~~**Update `docs/MPC_SUBMISSION_POLICY.md`**~~ DONE ✓ (PR #121 merged 2026-06-27)
-5. **Run live pipeline** targeting WISE/NEOWISE — **READY (PR #123 merged)**:
+5. **Run live pipeline** targeting WISE/NEOWISE — **READY (PR #125 merged)**:
    ```bash
    git pull origin main
    export PYTHONPATH=src
    caffeinate -i uv run python Skills/run_pipeline.py \
        --ra 58.0 --dec 20.0 --radius 3.5 \
        --start-jd 2458880.5 --end-jd 2458910.5 \
-       --surveys WISE --no-dry-run --force-refresh
+       --surveys WISE --no-dry-run --force-refresh --no-resume
    ```
-   `--force-refresh` required: previous run cached an empty result list due to the mjd_obs bug.
+   Both `--force-refresh` AND `--no-resume` required: `--force-refresh` clears the IRSA query cache; `--no-resume` forces the checkpoint to be ignored so all stages re-run.
    RA=58.0 Dec=20.0 (Taurus) is correct for a Feb 2020 NEOWISE epoch (NEOWISE scans at ~90° from Sun; Sun at RA≈325° in Feb 2020 → survey strip at RA≈55°).
+   Paste the stderr output — it will show either `[fetch] WISE IRSA: N rows, cols=[...]` (success) or `[fetch] WISE IRSA query FAILED: ...` (new error to diagnose).
    Do NOT use `--surveys ZTF` or `--surveys ATLAS` for discovery.
 6. **Run adversarial review** (`Skills/adversarial_review.py`) on any candidates found.
 7. **Jerome reviews** any SURVIVE or BORDERLINE candidates.
