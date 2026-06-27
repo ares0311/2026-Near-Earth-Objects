@@ -10,10 +10,10 @@ re-processed.
 Console output conforms to docs/CONSOLE_OUTPUT_SPEC.md.
 
 Usage:
-    python Skills/run_pipeline.py \\
+    uv run python Skills/run_pipeline.py \\
         --ra 180.0 --dec 10.0 --radius 1.0 \\
         --start-jd 2460000.0 --end-jd 2460010.0 \\
-        [--surveys ZTF] [--no-dry-run]
+        [--surveys WISE] [--dry-run]
 """
 
 from __future__ import annotations
@@ -275,12 +275,17 @@ def run_pipeline(
         dry_run=dry_run,
     )
 
-    # Warn the operator that live submissions are enabled
+    # Warn the operator that live alert mode was requested while preserving the
+    # independent MPC submission fail-closed gate in alert.py.
     if not dry_run:
-        print("[alert] ⚠  LIVE MODE — external submissions are ENABLED.", flush=True)
+        print(
+            "[alert] LIVE ALERT MODE REQUESTED — MPC submission remains fail-closed "
+            "unless NEO_MPC_SUBMISSION_APPROVED=1 and a real observatory code are set.",
+            flush=True,
+        )
         print("[alert]    Guardrails: no impact-probability claims; no direct PDCO contact.",
               flush=True)
-        print("[alert]    All submissions require quality gates to pass (see alert.py).",
+        print("[alert]    Quality gates still apply before any report is drafted.",
               flush=True)
 
     # Load any existing checkpoint for this parameter set
@@ -562,14 +567,15 @@ def main(argv: list[str] | None = None) -> None:
         ),
     )
     # BooleanOptionalAction gives both --dry-run and --no-dry-run flags.
-    # Default is True (safe: no external submissions) so operators must
-    # explicitly pass --no-dry-run to enable live alert submission.
+    # Default is True (safe: no external submissions). Real archive fetching
+    # does not require --no-dry-run; reserve that flag for a future MPC-enabled
+    # submission workflow after the observatory-code policy is resolved.
     parser.add_argument(
         "--dry-run",
         action=argparse.BooleanOptionalAction,
         default=True,
         help="Simulate alert actions without external submission (default: True). "
-             "Pass --no-dry-run for live operation.",
+             "Real archive fetching works in dry-run mode.",
     )
     parser.add_argument(
         "--atlas-token", type=str, default=None,

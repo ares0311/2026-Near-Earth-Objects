@@ -508,10 +508,15 @@ are sequential — each blocks the next.
   caffeinate -i uv run python Skills/run_pipeline.py \
       --ra <RA> --dec <Dec> --radius 3.5 \
       --start-jd <start> --end-jd <end> \
-      --surveys WISE --no-dry-run \
-      > /tmp/candidates.json
+      --surveys WISE \
+      --output /tmp/candidates.json
   PYTHONPATH=src uv run python Skills/adversarial_review.py /tmp/candidates.json
   ```
+  Keep alert actions in dry-run mode during discovery sweeps. Real archive
+  fetching does not require `--no-dry-run`; actual MPC submission remains
+  fail-closed until `docs/MPC_SUBMISSION_POLICY.md §TODO for Future Agents` is
+  resolved and `alert.py` is configured with a real observatory code plus
+  `NEO_MPC_SUBMISSION_APPROVED=1`.
 
 ### Gate D2: Operator Review
 - [ ] Jerome W. Lindsey III reviews SURVIVE/BORDERLINE candidates

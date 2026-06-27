@@ -27,11 +27,12 @@ rigorous two-stage review process before any external submission.
 
 ## Remaining work (ordered by priority)
 
-### A. Merge PR #116
-- [ ] Un-draft PR #116 and merge to main (still blocked by GitHub write rate limit)
-- Status: write rate limit still active as of latest check.
-- Branch `claude/general-session-rvaEE` has 13 commits ahead of main.
-- DO NOT give any operator commands until PR #116 is merged.
+### A. Merge PR #116 and follow-on discovery-layer PRs ✓ DONE
+- [x] PR #116 merged to main.
+- [x] PR #117 merged to main.
+- [x] PR #119 merged to main.
+- [x] PR #123-#127 merged to main for WISE live-query diagnosis and fixes.
+- Current local `main` is synchronized with `origin/main` at PR #127.
 
 ### H. Integrate adversarial review into the end-to-end workflow
 - [ ] Wire `Skills/adversarial_review.py` output into `Skills/run_pipeline.py` (optional post-stage)
@@ -41,9 +42,13 @@ rigorous two-stage review process before any external submission.
 - Operator workflow:
   ```bash
   git pull origin main
-  PYTHONPATH=src uv run python Skills/run_pipeline.py ... --no-dry-run > /tmp/candidates.json
+  PYTHONPATH=src uv run python Skills/run_pipeline.py ... --output /tmp/candidates.json
   PYTHONPATH=src uv run python Skills/adversarial_review.py /tmp/candidates.json --json
   ```
+  Keep alert actions in dry-run mode during discovery sweeps. Real archive
+  fetching does not require `--no-dry-run`; MPC submission remains blocked until
+  the observatory-code strategy is resolved and `NEO_MPC_SUBMISSION_APPROVED=1`
+  is intentionally set with a real non-placeholder MPC code.
 
 ### I. Version bump to v0.89.3 ✓ DONE (2026-06-26)
 - [x] `src/__init__.py`, `pyproject.toml` → 0.89.3
@@ -82,3 +87,4 @@ rigorous two-stage review process before any external submission.
 | 3 | 2026-06-26 | All doc sync complete; obs-code defaults fixed; versions bumped | Merge PR #116 (waiting for GitHub write rate limit to clear) |
 | 4 | 2026-06-26 | Adversarial review skill implemented; discovery paper goal established | Merge PR #116, then open PR #117 for adversarial review; update docs |
 | 5 | 2026-06-26 | Discovery Paper Gates D1–D7 added to PRODUCTION_READINESS.md; all J items complete | Merge PR #116 (waiting for GitHub write rate limit to clear) |
+| 6 | 2026-06-27 | PR #116-#127 are merged; stale loop item corrected; MPC live submission fail-closed gate added | Run WISE archive discovery sweep from main in alert dry-run mode |
