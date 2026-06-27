@@ -694,7 +694,14 @@ filter them before any external submission:
   all citizen-science language replaced with discovery-paper language
 - `docs/near_earth_objects_research_brief.md`: canonical primer, mandatory session read
 
-**PR #125 MERGED (2026-06-27)** ✓ — Revert mjd_obs → mjd; remove explicit columns; add column logging:
+**PR #127 MERGED (2026-06-27)** ✓ — Use pyvo async TAP with MJD filter for WISE archive query:
+- Root cause of run 2 `RemoteDisconnected`: `Irsa.query_region` uses IRSA sync TAP which has a ~60s server-side timeout. `SELECT *` on a 3.5° cone of `neowiser_p1bs_psd` returns millions of rows, hitting that timeout. No ORA-00904 in run 2 confirmed `mjd` IS the correct epoch column name.
+- Fix: replaced `Irsa.query_region` with `pyvo.dal.TAPService.run_async(adql)` (async TAP = no timeout) plus explicit `mjd BETWEEN start AND end` in ADQL WHERE clause (pushes time filter server-side)
+- Tests updated to mock `pyvo.dal.TAPService` instead of `Irsa.query_region`
+- CI green at 100% coverage, 1574 tests ✓
+- **Next operator action**: run live WISE pipeline with `--force-refresh --no-resume` (see Step 5 below); paste stderr output showing async TAP ADQL query and row count
+
+**PR #125 MERGED (2026-06-27)** ✓ — Revert mjd_obs → mjd; remove explicit columns; add column logging (SUPERSEDED by PR #127):
 - Root cause of PR #124 failure: `columns='ra,dec,mjd_obs,...'` generated ADQL SELECT that Oracle TAP rejected with `ORA-00904: "MJD_OBS": invalid identifier` — proves epoch column is NOT named `mjd_obs`
 - Fix: removed explicit `columns=` parameter (back to SELECT *); reverted `row["mjd_obs"]` → `row["mjd"]`; reverted test mocks to `"mjd"` key
 - Added stderr logging: column names and row count logged on successful IRSA query so operator can verify actual column names on next live run
@@ -1040,7 +1047,7 @@ MPC submission → provisional designation → independent confirmation → jour
 2. ~~Open/merge PR #117~~ DONE ✓ (2026-06-27, CI green, 1534 tests, 100% coverage)
 3. ~~**Redesign `fetch.py` discovery layer**~~ DONE ✓ (PR #119 merged 2026-06-27, 1573 tests)
 4. ~~**Update `docs/MPC_SUBMISSION_POLICY.md`**~~ DONE ✓ (PR #121 merged 2026-06-27)
-5. **Run live pipeline** targeting WISE/NEOWISE — **READY (PR #125 merged)**:
+5. **Run live pipeline** targeting WISE/NEOWISE — **READY (PR #127 merged)**:
    ```bash
    git pull origin main
    export PYTHONPATH=src
@@ -1051,7 +1058,7 @@ MPC submission → provisional designation → independent confirmation → jour
    ```
    Both `--force-refresh` AND `--no-resume` required: `--force-refresh` clears the IRSA query cache; `--no-resume` forces the checkpoint to be ignored so all stages re-run.
    RA=58.0 Dec=20.0 (Taurus) is correct for a Feb 2020 NEOWISE epoch (NEOWISE scans at ~90° from Sun; Sun at RA≈325° in Feb 2020 → survey strip at RA≈55°).
-   Paste the stderr output — it will show either `[fetch] WISE IRSA: N rows, cols=[...]` (success) or `[fetch] WISE IRSA query FAILED: ...` (new error to diagnose).
+   Paste the stderr output — it will show `[fetch] WISE IRSA async TAP query: SELECT ...` then either `[fetch] WISE IRSA: N rows, cols=[...]` (success) or `[fetch] WISE IRSA query FAILED: ...` (new error to diagnose).
    Do NOT use `--surveys ZTF` or `--surveys ATLAS` for discovery.
 6. **Run adversarial review** (`Skills/adversarial_review.py`) on any candidates found.
 7. **Jerome reviews** any SURVIVE or BORDERLINE candidates.
