@@ -1487,11 +1487,35 @@ def fetch_wise_archive(
         f"AND mjd BETWEEN {start_mjd:.6f} AND {end_mjd:.6f}"
     )
     import sys
+    import time as _time
     print(f"[fetch] WISE IRSA async TAP query: {adql}", file=sys.stderr, flush=True)
     try:
         tap = pyvo.dal.TAPService("https://irsa.ipac.caltech.edu/TAP")
-        result = tap.run_async(adql)
-        table = result.to_table()
+        # Submit the async job explicitly so we can poll with heartbeats.
+        # run_async() blocks silently for minutes on large NEOWISE queries,
+        # violating the standing directive on live progress output.
+        job = tap.submit_job(adql)
+        job.run()
+        t0 = _time.monotonic()
+        print(
+            "[fetch] WISE IRSA TAP job submitted — polling every 30s",
+            file=sys.stderr, flush=True,
+        )
+        while True:
+            job.update()
+            phase = job.phase
+            elapsed = _time.monotonic() - t0
+            m, s = divmod(int(elapsed), 60)
+            print(
+                f"[fetch] WISE IRSA TAP: phase={phase}  elapsed {m}m{s:02d}s",
+                file=sys.stderr, flush=True,
+            )
+            if phase in ("COMPLETED", "ERROR", "ABORTED"):
+                break
+            _time.sleep(30)
+        if job.phase != "COMPLETED":
+            raise RuntimeError(f"IRSA TAP job ended in phase={job.phase}")
+        table = job.fetch_result().to_table()
     except Exception as exc:
         # Print to stderr so operators can diagnose IRSA network/catalog issues.
         print(
