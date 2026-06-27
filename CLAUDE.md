@@ -660,7 +660,7 @@ See `docs/MISSION.md` for the authoritative data strategy. The prior "blocked
 until expert review" guardrail was removed by operator decision on 2026-06-21;
 MPC/NEOCP/Scout is the expert review system.
 
-### Handoff state as of 2026-06-26 (CURRENT)
+### Handoff state as of 2026-06-27 (CURRENT)
 
 **Discovery paper goal established (2026-06-26)**:
 The project goal is a **defensible discovery paper** — not a methods paper and not a
@@ -673,24 +673,33 @@ filter them before any external submission:
   4. **Independent confirmation**: NEOCP follow-up observatories confirm.
   5. **Discovery paper**: documents the find with MPC designation as proof.
 
-**Adversarial review implemented (v0.89.3, in PR #117)**:
-`Skills/adversarial_review.py` — runs 13 offline challenges + 2 optional live checks
-against each `ScoredNEO`. Verdict: SURVIVE / BORDERLINE / REJECT. Exit code 0/1/2
-for pipeline automation. Tests in `tests/test_adversarial_review_skill.py` (50+ cases).
-This is a **separate post-processing step** — run after `run_pipeline.py`.
+**PR #117 MERGED (2026-06-27)** ✓:
+- Removed 374 dead helper APIs (v0.40–v0.87 accumulation cycle) and ~2000 tests
+- Added `docs/MISSION.md` (authoritative data strategy)
+- Added `Skills/adversarial_review.py` (13 offline challenges + 2 live checks)
+- Added `tests/test_adversarial_review_skill.py` (50+ cases)
+- System directives updated: discovery-paper framing, research brief wiring, accurate
+  test counts (1531+), Gate D1 command fixed (no `--surveys ZTF`)
+- CI green at 100% coverage on Python 3.14 ✓
+- Test count: 1534 passing (1531 + 3 new fallback tests for classify.py)
+
+**System directive alignment complete (2026-06-27)** ✓:
+- `CLAUDE.md`: step 5 added (read `docs/near_earth_objects_research_brief.md`),
+  WISE/NEOWISE marked as primary discovery target, ZTF/ATLAS as training-only
+- `AGENTS.md`: discovery-paper framing, DECISION-001 updated, test counts fixed
+- `docs/PRODUCTION_READINESS.md`: research brief wired in, Gate D1 fixed,
+  all citizen-science language replaced with discovery-paper language
+- `docs/near_earth_objects_research_brief.md`: canonical primer, mandatory session read
 
 **CRITICAL — discovery data source**: `run_pipeline.py` must target UNREVIEWED archives
 (TESS FFIs, DECam/NOIRLab, WISE/NEOWISE). Do NOT run with `--surveys ZTF` or
 `--surveys ATLAS` for discovery — ZTF ZAPS and ATLAS pipeline have already processed
 those streams. See `docs/MISSION.md §The Two-Part Data Strategy`.
-The fetch.py discovery layer redesign (Step 1 in MISSION.md) must be completed
-before any live discovery run.
+**The fetch.py discovery layer redesign is the next required engineering task.**
+It must be completed before any live discovery run.
 
-**Console output elapsed+ETA compliance (PR #116, MERGED)**:
-Every stage print in `Skills/run_pipeline.py` now includes `elapsed {M}m{S:02d}s`.
-
-**DO NOT give the operator any live run command** until PR #117 merges to main
-AND the fetch.py discovery layer is redesigned to target TESS/DECam/WISE.
+**DO NOT give the operator any live discovery run command** until the fetch.py discovery
+layer is redesigned to target TESS/DECam/WISE.
 
 **Two human-gated blockers remain**:
 1. **MPC observatory code**: Jerome must contact MPC to determine how a data-analysis
@@ -701,6 +710,11 @@ AND the fetch.py discovery layer is redesigned to target TESS/DECam/WISE.
 
 **Progress tracker**: `docs/evidence/prod-loop/LOOP_PROGRESS.md` — read this
 at session start to avoid repeating completed work.
+
+### Handoff state as of 2026-06-26
+
+**Discovery paper goal established (2026-06-26)**:
+See handoff state above (2026-06-27) — superseded.
 
 ### Handoff state as of 2026-06-22
 
@@ -993,16 +1007,19 @@ succeeded and produced the trained Tier 3 weights now recorded under T1-A.
 Pipeline generates candidates → adversarial review filters → operator reviews survivors →
 MPC submission → provisional designation → independent confirmation → journal paper.
 
-1. **Merge PR #116** (write rate limit must clear): console output + doc sync to v0.89.3.
-2. **Open PR #117**: commit `Skills/adversarial_review.py` +
-   `tests/test_adversarial_review_skill.py` + version bump to v0.89.3.
-3. **Update `docs/MPC_SUBMISSION_POLICY.md`**: add §Adversarial Review section describing
+1. ~~Merge PR #116~~ DONE ✓
+2. ~~Open/merge PR #117~~ DONE ✓ (2026-06-27, CI green, 1534 tests, 100% coverage)
+3. **Redesign `fetch.py` discovery layer** — add `fetch_tess_ffis`, `fetch_decam_archive`,
+   `fetch_wise_archive`; retire ZTF/ATLAS as discovery sources. This is the next required
+   engineering task. See `docs/MISSION.md §Step 1`.
+4. **Update `docs/MPC_SUBMISSION_POLICY.md`**: add §Adversarial Review section describing
    the two-stage review process and how it gates external submission.
-4. **Run live pipeline** (after PRs merge to main, using `caffeinate -i` + `--no-dry-run`).
-5. **Run adversarial review** on any candidates found.
-6. **Jerome reviews** any SURVIVE or BORDERLINE candidates.
-7. **Jerome resolves MPC observatory code** (human-gated; no code can help here).
-8. Submit survivors to MPC → await provisional designation.
+5. **Run live pipeline** targeting TESS FFIs / DECam / WISE/NEOWISE (after step 3, using
+   `caffeinate -i` + `--no-dry-run`). Do NOT use `--surveys ZTF` or `--surveys ATLAS`.
+6. **Run adversarial review** (`Skills/adversarial_review.py`) on any candidates found.
+7. **Jerome reviews** any SURVIVE or BORDERLINE candidates.
+8. **Jerome resolves MPC observatory code** (human-gated; no code can help here).
+9. Submit survivors to MPC → await provisional designation.
 
 - Console output is fully compliant with `docs/CONSOLE_OUTPUT_SPEC.md` as of v0.89.3.
 - ALWAYS run from `main` — operator never checks out feature branches.
