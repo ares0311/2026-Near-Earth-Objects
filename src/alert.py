@@ -21,8 +21,6 @@ import time as _time_mod
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
-
 from schemas import (
     AlertPathway,
     Observation,
