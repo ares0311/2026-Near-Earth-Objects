@@ -3257,11 +3257,15 @@ class TestFetchWiseArchive:
         assert result[0].obs_id == "wise_0_60000.00000"
 
     def _make_pyvo_mock(self, table):
-        """Return a mock pyvo module whose TAPService.run_async().to_table() returns table."""
+        """Return a mock pyvo module with submit_job→run→update→fetch_result chain."""
+        mock_job = MagicMock()
+        # phase starts EXECUTING, then COMPLETED on first update() call
+        mock_job.phase = "COMPLETED"
+        mock_dal_result = MagicMock()
+        mock_dal_result.to_table.return_value = table
+        mock_job.fetch_result.return_value = mock_dal_result
         mock_tap_svc = MagicMock()
-        mock_result = MagicMock()
-        mock_result.to_table.return_value = table
-        mock_tap_svc.run_async.return_value = mock_result
+        mock_tap_svc.submit_job.return_value = mock_job
         mock_pyvo = MagicMock()
         mock_pyvo.dal.TAPService.return_value = mock_tap_svc
         return mock_pyvo
@@ -3274,10 +3278,10 @@ class TestFetchWiseArchive:
         assert result == []
 
     def test_api_exception_returns_empty(self, tmp_path, monkeypatch):
-        """TAP run_async raising exception returns empty list."""
+        """TAP submit_job raising exception returns empty list."""
         monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
         mock_tap_svc = MagicMock()
-        mock_tap_svc.run_async.side_effect = RuntimeError("network error")
+        mock_tap_svc.submit_job.side_effect = RuntimeError("network error")
         mock_pyvo = MagicMock()
         mock_pyvo.dal.TAPService.return_value = mock_tap_svc
         with patch.dict("sys.modules", {"pyvo": mock_pyvo}):
@@ -3784,10 +3788,13 @@ class TestFetchWiseMalformedRow:
         mjd_ok = 2460005.0 - 2_400_000.5  # valid MJD inside window
         good_row = {"mjd": mjd_ok, "ra": 180.0, "dec": 10.0, "w1mpro": 14.5, "w1sigmpro": 0.05}
         bad_row = {"mjd": mjd_ok, "ra": "bad", "dec": 10.0, "w1mpro": 15.0, "w1sigmpro": 0.1}
+        mock_job = MagicMock()
+        mock_job.phase = "COMPLETED"
+        mock_dal_result = MagicMock()
+        mock_dal_result.to_table.return_value = [bad_row, good_row]
+        mock_job.fetch_result.return_value = mock_dal_result
         mock_tap_svc = MagicMock()
-        mock_result = MagicMock()
-        mock_result.to_table.return_value = [bad_row, good_row]
-        mock_tap_svc.run_async.return_value = mock_result
+        mock_tap_svc.submit_job.return_value = mock_job
         mock_pyvo = MagicMock()
         mock_pyvo.dal.TAPService.return_value = mock_tap_svc
         with patch.dict("sys.modules", {"pyvo": mock_pyvo}):
