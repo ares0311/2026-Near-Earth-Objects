@@ -36,14 +36,21 @@ It contains the facts a coding agent needs to work productively without re-readi
   worker counts, device selection, batch sizes, and thread limits must be
   configurable or documented runtime defaults, not hidden machine-specific
   constants.
-- **Citizen-science production framing**: Jerome W. Lindsey III is the project
-  operator and reviewer. No in-house NEO domain expert is available or required.
-  The MPC/NEOCP/Scout chain is the expert review system — submitting quality
-  observations to MPC and letting that global infrastructure handle confirmation
-  and hazard assessment is the correct citizen-science pathway. See
-  `docs/MPC_SUBMISSION_POLICY.md` for the full submission policy and escalation
-  pathway. Do NOT reinstate an "expert review required" gate; that block has been
-  removed by operator decision on 2026-06-21.
+- **Discovery paper goal — NOT citizen science**: Jerome W. Lindsey III is the
+  project operator and reviewer. The goal is a **defensible discovery paper**:
+  find new NEOs in unreviewed archival data, submit candidates to MPC, obtain a
+  provisional designation via independent NEOCP confirmation, and publish.
+  We NEVER claim discovery — only "candidates consistent with NEO orbits."
+  Two review stages gate every submission: (1) automated adversarial review
+  (`Skills/adversarial_review.py` — 13 challenges, tries to REJECT each
+  candidate), then (2) operator review. Only SURVIVE/BORDERLINE candidates
+  proceed to MPC submission. See `docs/MISSION.md` (authoritative) and
+  `docs/MPC_SUBMISSION_POLICY.md` for the full submission policy.
+  Do NOT reinstate a "blocked until expert review" guardrail — MPC/NEOCP/Scout
+  IS the expert review system. Do NOT frame this as citizen science.
+  **MANDATORY READ**: `docs/near_earth_objects_research_brief.md` — ranked
+  space assets, frontier AI methods, submission best practices. Read at every
+  session start per CLAUDE.md §MANDATORY SESSION-START PROTOCOL.
 - **Repository artifact policy supports `git add .`**: The standard operator
   cadence may use `git add .`, so `.gitignore` must protect local/generated
   outputs by default. Treat `Logs/**` as local operational output and never
@@ -122,18 +129,25 @@ Build in the order listed. Each module depends on all prior modules.
 
 ### Primary Survey Data
 
-**ZTF (recommended primary source)**
-- Public alert stream via IRSA (`ztfquery` Python package or direct API)
-- 3-night cadence over the full northern sky; $g$, $r$, $i$ bands
-- Difference-image alerts include cutouts (science, reference, difference) — ideal for CNN input
-- Access: `pip install ztfquery`; IRSA account required (free)
-- Key fields per alert: `ra`, `dec`, `jd`, `magpsf`, `sigmapsf`, `fid`, `rb` (real/bogus score), `drb` (deep learning real/bogus), `ssdistnr`, `ssmagnr`
+**WISE/NEOWISE** (primary discovery target — unreviewed archive)
+- Infrared detections of 158,000+ minor planets; no credentials required
+- Access: IRSA WISE/NEOWISE catalogs via `astroquery.ipac.irsa` or IRSA TAP
+- Key value: closest to Sun coverage, IR sensitivity, no ground survey overlap
 
-**ATLAS Forced Photometry Server**
+**TESS FFIs** (discovery target — unreviewed archive)
+- Full Frame Images contain moving-object trails not processed by planet-finding pipeline
+- Access: MAST public archive, no credentials required for public data
+
+**ZTF** (training-data source ONLY — NOT for discovery)
+- Public alert stream via IRSA (`ztfquery` Python package or direct API)
+- Already processed by ZTF ZAPS — do NOT use for discovery
+- 3-night cadence over the full northern sky; $g$, $r$, $i$ bands
+- Key fields: `ra`, `dec`, `jd`, `magpsf`, `rb` (real/bogus score), `drb`, `ssdistnr`
+
+**ATLAS Forced Photometry Server** (training-data source ONLY — NOT for discovery)
 - Public REST API; forced photometry at any sky position
+- Already processed by ATLAS pipeline — do NOT use for discovery
 - Orange ($o$) and cyan ($c$) bands; 2-day cadence
-- Useful for confirming candidates found in ZTF
-- Access: `https://fallingstar-data.com/forcedphot/`
 
 **Minor Planet Center (MPC)**
 - Known object catalog: `astroquery.mpc` or direct MPC API
@@ -153,8 +167,8 @@ Build in the order listed. Each module depends on all prior modules.
 
 ## Core Design Decisions
 
-### DECISION-001: ZTF as Primary Survey
-ZTF provides the richest freely available alert stream with pre-computed difference images, a native real/bogus score, and a well-documented Python API. It is the most scientifically productive single choice for a new project without telescope access.
+### DECISION-001: ZTF as Training-Data Source; WISE/NEOWISE as Primary Discovery Target
+ZTF provided the richest freely available alert stream for ML training (Tier 1 + Tier 2 labels). However, ZTF ZAPS and the ATLAS pipeline already process and submit discoveries from those streams — running our pipeline on ZTF/ATLAS for discovery would produce duplicate submissions. The primary discovery targets are UNREVIEWED archives: WISE/NEOWISE (IRSA, no credentials), TESS FFIs, and DECam/NOIRLab public archives. See `docs/MISSION.md §The Two-Part Data Strategy` and `docs/near_earth_objects_research_brief.md §Ranked Space Assets`.
 
 ### DECISION-002: Tiered ML Architecture
 Follow the same three-tier approach as the exoplanet pipeline:
@@ -525,12 +539,12 @@ and excluded from CI.
 
 ## Current State (v0.89.3)
 
-All 10 pipeline modules are complete. The offline suite passes 3600+ tests
-(plus 10 synthetic adversarial tests), with 2 live/integration checks
+All 10 pipeline modules are complete. The offline suite passes 1531+ tests
+(after dead-code removal in v0.89.3; plus 10+ synthetic adversarial tests), with 2 live/integration checks
 deselected. CI is green on Python 3.14 with the 100% coverage target.
 All three ML tiers have trained weights and all calibration KPIs have passed.
-**All T1 production gaps are CLOSED.** The pipeline may operate as a
-citizen-science system with MPC submission enabled when quality gates pass.
+**All T1 production gaps are CLOSED.** The pipeline is ready to search unreviewed
+archival data (TESS FFIs, DECam/NOIRLab, WISE/NEOWISE) for NEO candidates.
 Console output is now fully compliant with `docs/CONSOLE_OUTPUT_SPEC.md` —
 every stage print includes `elapsed {M}m{S:02d}s` and ETA is computed from
 a measurable quantity (surveys done/total, tracklets done/total).
@@ -547,14 +561,14 @@ a measurable quantity (surveys done/total, tracklets done/total).
   dry-run policy is signed in `background/live_review_policy.example.json`;
   execution still fails closed on missing provider credentials and never
   authorizes external submission or impact-probability claims.
-- T1-C (Real-Data Recovery And Citizen-Science Review Evidence): **CLOSED
+- T1-C (Real-Data Recovery And Operator Review Evidence): **CLOSED
   2026-06-20.** ATLAS Option A follow-up run `atlas_recovery_c1712df0f32c`
-  recovered 5/5 prequalified objects (100%); audit passed; citizen-science
+  recovered 5/5 prequalified objects (100%); audit passed; operator
   review by Jerome W. Lindsey III found no blocking findings. Full evidence:
   `docs/evidence/t1c/2026-06-20-option-a-screening-prequalification.md`.
 - T1-D (No Ensemble Calibration): **CLOSED.** All KPIs passed 2026-06-14.
-- T2-C (No External Expert Review): **CLOSED 2026-06-21.** Citizen-science
-  architecture evidence packet signed by Jerome W. Lindsey III; all 5
+- T2-C (No External Expert Review): **CLOSED 2026-06-21.** Architecture
+  evidence packet signed by Jerome W. Lindsey III (operator sign-off); all 5
   attestation items checked.
 - T2-D (No CI for E2E/Integration/Model-Weight Tests): **CLOSED 2026-06-21.**
   `e2e.yml` has smoke/diagnose/injection/model-weights jobs; `integration.yml`
@@ -654,7 +668,7 @@ rates → tracklets appear.
   preferably from `Skills/select_survey_fields.py --mode recovery`, then audit
   against a manifest containing MPC designations plus sky/time samples.
 - `Skills/audit_real_run.py` is the fail-closed promotion gate. It must verify
-  >=90% known-object recovery and require citizen-science operator review before
+  >=90% known-object recovery and require operator review before
   internal production promotion is allowed. It never authorizes MPC submission,
   NASA notification, or any impact-probability statement.
 
@@ -839,7 +853,7 @@ PYTHONPATH=src uv run python Skills/select_survey_fields.py \
 ### Immediate Next Steps
 
 **No autonomous code work remains.** All T1/T2 production gaps are closed as of
-2026-06-22. The pipeline is citizen-science production-ready.
+2026-06-22. The pipeline is ready for discovery-paper operation against unreviewed archives.
 
 **One human-gated blocker**:
 - **MPC observatory code / escalation path**: Jerome must decide whether and how to

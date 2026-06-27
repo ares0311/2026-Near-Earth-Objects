@@ -6,17 +6,13 @@ __all__ = [
     "DEFAULT_DB_PATH",
     "DEFAULT_REPORT_DIR",
     "DEFAULT_CONFIG_PATH",
-    "init_log_db",
     "background_schema_status_summary",
     "background_schema_migration_preview",
     "background_schema_operations_summary",
     "background_operator_next_action_summary",
     "migrate_background_log_db",
-    "load_config",
     "load_tracklets",
     "score_tracklet",
-    "build_targets",
-    "select_target",
     "background_run_once",
     "record_human_signoff",
     "human_signoff_summary",
@@ -46,12 +42,10 @@ __all__ = [
     "background_operations_snapshot",
     "record_background_operations_snapshot",
     "background_operations_snapshot_log_summary",
-    "audit_report",
     "automation_readiness_summary",
     "record_automation_readiness",
     "automation_readiness_log_summary",
     "live_policy_contract_summary",
-    "live_provider_capabilities",
     "live_provider_readiness",
     "live_credential_inventory",
     "write_live_credential_inventory_report",
@@ -231,242 +225,6 @@ def _add_column_if_missing(
         conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
 
 
-def init_log_db(db_path: Path = DEFAULT_DB_PATH) -> None:
-    """Create the top-level SQLite log database if needed."""
-    with _connect(db_path) as conn:
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS schema_metadata (
-                key TEXT PRIMARY KEY,
-                value TEXT NOT NULL,
-                updated_at_utc TEXT NOT NULL
-            )
-            """
-        )
-        _add_column_if_missing(
-            conn,
-            "schema_metadata",
-            "updated_at_utc",
-            "TEXT NOT NULL DEFAULT ''",
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS run_ledger (
-                run_id TEXT PRIMARY KEY,
-                started_at_utc TEXT NOT NULL,
-                completed_at_utc TEXT NOT NULL,
-                code_version TEXT NOT NULL,
-                schema_version TEXT NOT NULL,
-                input_path TEXT NOT NULL,
-                target_id TEXT NOT NULL,
-                outcome TEXT NOT NULL,
-                selected_score REAL NOT NULL,
-                reason_codes_json TEXT NOT NULL,
-                run_mode TEXT NOT NULL DEFAULT 'manual',
-                config_path TEXT,
-                failure_reason TEXT,
-                live_network_enabled INTEGER NOT NULL,
-                entry_json TEXT NOT NULL
-            )
-            """
-        )
-        _add_column_if_missing(conn, "run_ledger", "run_mode", "TEXT NOT NULL DEFAULT 'manual'")
-        _add_column_if_missing(conn, "run_ledger", "config_path", "TEXT")
-        _add_column_if_missing(conn, "run_ledger", "failure_reason", "TEXT")
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS reviewed_log (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                run_id TEXT NOT NULL UNIQUE,
-                reviewed_at_utc TEXT NOT NULL,
-                target_id TEXT NOT NULL,
-                negative_evidence_json TEXT NOT NULL,
-                rationale TEXT NOT NULL,
-                entry_json TEXT NOT NULL,
-                FOREIGN KEY(run_id) REFERENCES run_ledger(run_id)
-            )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS run_lock (
-                lock_id INTEGER PRIMARY KEY CHECK(lock_id = 1),
-                run_id TEXT NOT NULL,
-                acquired_at_utc TEXT NOT NULL
-            )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS human_signoff_log (
-                signoff_id TEXT PRIMARY KEY,
-                run_id TEXT NOT NULL,
-                target_id TEXT NOT NULL,
-                reviewer TEXT NOT NULL,
-                signed_at_utc TEXT NOT NULL,
-                decision TEXT NOT NULL,
-                scope TEXT NOT NULL,
-                notes TEXT NOT NULL,
-                entry_json TEXT NOT NULL
-            )
-            """
-        )
-        conn.execute(
-            """
-            INSERT INTO schema_metadata (key, value, updated_at_utc)
-            VALUES ('schema_version', ?, ?)
-            ON CONFLICT(key) DO UPDATE SET
-                value = excluded.value,
-                updated_at_utc = excluded.updated_at_utc
-            """,
-            (_SCHEMA_VERSION, _utc_now()),
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS needs_follow_up_log (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                run_id TEXT NOT NULL UNIQUE,
-                recorded_at_utc TEXT NOT NULL,
-                target_id TEXT NOT NULL,
-                trigger_reason_codes_json TEXT NOT NULL,
-                report_path TEXT,
-                human_approval_required INTEGER NOT NULL,
-                entry_json TEXT NOT NULL,
-                FOREIGN KEY(run_id) REFERENCES run_ledger(run_id)
-            )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS automation_readiness_log (
-                readiness_id TEXT PRIMARY KEY,
-                checked_at_utc TEXT NOT NULL,
-                config_path TEXT NOT NULL,
-                scheduler_ready INTEGER NOT NULL,
-                live_mode_ready INTEGER NOT NULL,
-                scheduler_blockers_json TEXT NOT NULL,
-                live_mode_blockers_json TEXT NOT NULL,
-                missing_credential_env_json TEXT NOT NULL,
-                entry_json TEXT NOT NULL
-            )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS blueprint_compliance_log (
-                compliance_id TEXT PRIMARY KEY,
-                checked_at_utc TEXT NOT NULL,
-                input_path TEXT NOT NULL,
-                overall_status TEXT NOT NULL,
-                failed_items_json TEXT NOT NULL,
-                not_applicable_items_json TEXT NOT NULL,
-                entry_json TEXT NOT NULL
-            )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS operations_snapshot_log (
-                snapshot_id TEXT PRIMARY KEY,
-                captured_at_utc TEXT NOT NULL,
-                config_path TEXT NOT NULL,
-                input_path TEXT NOT NULL,
-                next_action TEXT NOT NULL,
-                total_runs INTEGER NOT NULL,
-                unsigned_follow_up_count INTEGER NOT NULL,
-                scheduler_ready INTEGER NOT NULL,
-                live_mode_ready INTEGER NOT NULL,
-                blueprint_status TEXT NOT NULL,
-                entry_json TEXT NOT NULL
-            )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS signoff_packet_log (
-                packet_id TEXT PRIMARY KEY,
-                created_at_utc TEXT NOT NULL,
-                run_id TEXT NOT NULL,
-                target_id TEXT NOT NULL,
-                packet_path TEXT NOT NULL,
-                report_path TEXT,
-                report_readiness_state TEXT NOT NULL,
-                recommended_decision TEXT NOT NULL,
-                entry_json TEXT NOT NULL
-            )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS signoff_packet_decision_log (
-                decision_id TEXT PRIMARY KEY,
-                packet_id TEXT NOT NULL UNIQUE,
-                signoff_id TEXT NOT NULL,
-                run_id TEXT NOT NULL,
-                target_id TEXT NOT NULL,
-                reviewer TEXT NOT NULL,
-                decision TEXT NOT NULL,
-                decided_at_utc TEXT NOT NULL,
-                operations_snapshot_id TEXT,
-                entry_json TEXT NOT NULL
-            )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS live_dry_run_plan_log (
-                plan_id TEXT PRIMARY KEY,
-                planned_at_utc TEXT NOT NULL,
-                config_path TEXT NOT NULL,
-                executable INTEGER NOT NULL,
-                planned_surveys_json TEXT NOT NULL,
-                blockers_json TEXT NOT NULL,
-                entry_json TEXT NOT NULL
-            )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS live_approval_bundle_log (
-                bundle_id TEXT PRIMARY KEY,
-                reviewed_at_utc TEXT NOT NULL,
-                config_path TEXT NOT NULL,
-                approved_to_attempt_live_dry_run INTEGER NOT NULL,
-                blockers_json TEXT NOT NULL,
-                planned_surveys_json TEXT NOT NULL,
-                entry_json TEXT NOT NULL
-            )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS live_operator_handoff_log (
-                handoff_id TEXT PRIMARY KEY,
-                created_at_utc TEXT NOT NULL,
-                config_path TEXT NOT NULL,
-                report_path TEXT NOT NULL,
-                approved_to_attempt_live_dry_run INTEGER NOT NULL,
-                blockers_json TEXT NOT NULL,
-                planned_surveys_json TEXT NOT NULL,
-                entry_json TEXT NOT NULL
-            )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS live_execution_log (
-                attempt_id TEXT PRIMARY KEY,
-                attempted_at_utc TEXT NOT NULL,
-                config_path TEXT NOT NULL,
-                executable INTEGER NOT NULL,
-                outcome TEXT NOT NULL,
-                blockers_json TEXT NOT NULL,
-                query_results_json TEXT NOT NULL,
-                external_submission_enabled INTEGER NOT NULL,
-                entry_json TEXT NOT NULL
-            )
-            """
-        )
 
 
 def _schema_status_from_connection(
@@ -817,20 +575,6 @@ def _resolve_project_path(raw: str) -> Path:
     return path if path.is_absolute() else _ROOT / path
 
 
-def load_config(config_path: Path = DEFAULT_CONFIG_PATH) -> BackgroundConfig:
-    """Load conservative background automation configuration."""
-    if not config_path.exists():
-        return BackgroundConfig(
-            input_path=str(DEFAULT_INPUT_PATH),
-            db_path=str(DEFAULT_DB_PATH),
-            report_dir=str(DEFAULT_REPORT_DIR),
-            follow_up_threshold=_FOLLOW_UP_THRESHOLD,
-        )
-    with config_path.open() as handle:
-        data = json.load(handle)
-    return BackgroundConfig(**data)
-
-
 @contextmanager
 def _run_lock(db_path: Path, run_id: str) -> Any:
     init_log_db(db_path)
@@ -968,34 +712,8 @@ def _priority_factors(scored: ScoredNEO, review_count: int) -> PriorityFactors:
     )
 
 
-def build_targets(
-    input_path: Path = DEFAULT_INPUT_PATH,
-    db_path: Path = DEFAULT_DB_PATH,
-    run_id: str | None = None,
-) -> tuple[BackgroundTarget, ...]:
-    """Score fixture targets and attach priority factors."""
-    actual_run_id = run_id or str(uuid.uuid4())
-    init_log_db(db_path)
-    with _connect(db_path) as conn:
-        targets: list[BackgroundTarget] = []
-        for tracklet in load_tracklets(input_path):
-            scored = score_tracklet(tracklet, actual_run_id)
-            count = _review_count(conn, tracklet.object_id)
-            targets.append(
-                BackgroundTarget(
-                    target_id=tracklet.object_id,
-                    scored_neo=scored,
-                    priority=_priority_factors(scored, count),
-                )
-            )
-    return tuple(targets)
 
 
-def select_target(targets: tuple[BackgroundTarget, ...]) -> BackgroundTarget | None:
-    """Select exactly one target for a bounded run."""
-    if not targets:
-        return None
-    return max(targets, key=lambda target: target.priority.composite_score)
 
 
 def _trigger_reason_codes(
@@ -2854,46 +2572,6 @@ def background_operations_snapshot_log_summary(
         }
 
 
-def audit_report(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]:
-    """Generate a consolidated cross-log audit report.
-
-    Pulls from all background log tables and returns a summary covering:
-      ``total_runs``          — number of ledger entries
-      ``reviewed_count``      — entries in the reviewed log
-      ``needs_follow_up_count`` — entries in the needs-follow-up log
-      ``signoff_coverage``    — fraction of reviewed entries with human signoff
-      ``unsigned_count``      — reviewed entries lacking a signoff
-      ``pha_candidates``      — count of PHA-flagged candidates ever processed
-      ``submission_ready``    — count of candidates recommended for submission
-      ``has_unreviewed_runs`` — True when runs exist with no reviewed/follow-up outcome
-      ``integrity_ok``        — True when log invariants are satisfied
-    """
-    ledger = ledger_summary(db_path)
-    reviewed = reviewed_log_summary(db_path)
-    follow_up = needs_follow_up_summary(db_path)
-    readiness = signoff_readiness_summary(db_path)
-    validation = validation_summary(db_path)
-
-    total_runs: int = ledger.get("total_runs", 0)
-    reviewed_count: int = reviewed.get("total_reviewed", 0)
-    follow_up_count: int = follow_up.get("total_needs_follow_up", 0)
-    outcome_count = reviewed_count + follow_up_count
-
-    signed_off: int = readiness.get("signed_off", 0)
-    unsigned: int = readiness.get("unsigned", 0)
-    signoff_coverage = (signed_off / reviewed_count) if reviewed_count > 0 else 0.0
-
-    return {
-        "total_runs": total_runs,
-        "reviewed_count": reviewed_count,
-        "needs_follow_up_count": follow_up_count,
-        "signoff_coverage": round(signoff_coverage, 4),
-        "unsigned_count": unsigned,
-        "pha_candidates": reviewed.get("pha_count", 0),
-        "submission_ready": reviewed.get("submission_ready_count", 0),
-        "has_unreviewed_runs": outcome_count < total_runs,
-        "integrity_ok": validation.get("integrity_ok", True),
-    }
 
 
 def _one_run_command(config_path: Path = DEFAULT_CONFIG_PATH) -> str:
@@ -3067,9 +2745,6 @@ def live_policy_contract_summary(config_path: Path = DEFAULT_CONFIG_PATH) -> dic
     }
 
 
-def live_provider_capabilities() -> tuple[dict[str, Any], ...]:
-    """Return the no-network live-provider capability registry."""
-    return tuple(dict(_LIVE_PROVIDER_CAPABILITIES[survey]) for survey in _SUPPORTED_LIVE_SURVEYS)
 
 
 def _keychain_service_for_env(env_name: str) -> str:
@@ -4515,3 +4190,286 @@ def launchd_plist(config_path: Path = DEFAULT_CONFIG_PATH) -> str:
 </dict>
 </plist>
 """
+
+
+def init_log_db(db_path: Path = DEFAULT_DB_PATH) -> None:
+    """Create the top-level SQLite log database if needed."""
+    with _connect(db_path) as conn:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS schema_metadata (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                updated_at_utc TEXT NOT NULL
+            )
+            """
+        )
+        _add_column_if_missing(
+            conn,
+            "schema_metadata",
+            "updated_at_utc",
+            "TEXT NOT NULL DEFAULT ''",
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS run_ledger (
+                run_id TEXT PRIMARY KEY,
+                started_at_utc TEXT NOT NULL,
+                completed_at_utc TEXT NOT NULL,
+                code_version TEXT NOT NULL,
+                schema_version TEXT NOT NULL,
+                input_path TEXT NOT NULL,
+                target_id TEXT NOT NULL,
+                outcome TEXT NOT NULL,
+                selected_score REAL NOT NULL,
+                reason_codes_json TEXT NOT NULL,
+                run_mode TEXT NOT NULL DEFAULT 'manual',
+                config_path TEXT,
+                failure_reason TEXT,
+                live_network_enabled INTEGER NOT NULL,
+                entry_json TEXT NOT NULL
+            )
+            """
+        )
+        _add_column_if_missing(conn, "run_ledger", "run_mode", "TEXT NOT NULL DEFAULT 'manual'")
+        _add_column_if_missing(conn, "run_ledger", "config_path", "TEXT")
+        _add_column_if_missing(conn, "run_ledger", "failure_reason", "TEXT")
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS reviewed_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT NOT NULL UNIQUE,
+                reviewed_at_utc TEXT NOT NULL,
+                target_id TEXT NOT NULL,
+                negative_evidence_json TEXT NOT NULL,
+                rationale TEXT NOT NULL,
+                entry_json TEXT NOT NULL,
+                FOREIGN KEY(run_id) REFERENCES run_ledger(run_id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS run_lock (
+                lock_id INTEGER PRIMARY KEY CHECK(lock_id = 1),
+                run_id TEXT NOT NULL,
+                acquired_at_utc TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS human_signoff_log (
+                signoff_id TEXT PRIMARY KEY,
+                run_id TEXT NOT NULL,
+                target_id TEXT NOT NULL,
+                reviewer TEXT NOT NULL,
+                signed_at_utc TEXT NOT NULL,
+                decision TEXT NOT NULL,
+                scope TEXT NOT NULL,
+                notes TEXT NOT NULL,
+                entry_json TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO schema_metadata (key, value, updated_at_utc)
+            VALUES ('schema_version', ?, ?)
+            ON CONFLICT(key) DO UPDATE SET
+                value = excluded.value,
+                updated_at_utc = excluded.updated_at_utc
+            """,
+            (_SCHEMA_VERSION, _utc_now()),
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS needs_follow_up_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT NOT NULL UNIQUE,
+                recorded_at_utc TEXT NOT NULL,
+                target_id TEXT NOT NULL,
+                trigger_reason_codes_json TEXT NOT NULL,
+                report_path TEXT,
+                human_approval_required INTEGER NOT NULL,
+                entry_json TEXT NOT NULL,
+                FOREIGN KEY(run_id) REFERENCES run_ledger(run_id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS automation_readiness_log (
+                readiness_id TEXT PRIMARY KEY,
+                checked_at_utc TEXT NOT NULL,
+                config_path TEXT NOT NULL,
+                scheduler_ready INTEGER NOT NULL,
+                live_mode_ready INTEGER NOT NULL,
+                scheduler_blockers_json TEXT NOT NULL,
+                live_mode_blockers_json TEXT NOT NULL,
+                missing_credential_env_json TEXT NOT NULL,
+                entry_json TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS blueprint_compliance_log (
+                compliance_id TEXT PRIMARY KEY,
+                checked_at_utc TEXT NOT NULL,
+                input_path TEXT NOT NULL,
+                overall_status TEXT NOT NULL,
+                failed_items_json TEXT NOT NULL,
+                not_applicable_items_json TEXT NOT NULL,
+                entry_json TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS operations_snapshot_log (
+                snapshot_id TEXT PRIMARY KEY,
+                captured_at_utc TEXT NOT NULL,
+                config_path TEXT NOT NULL,
+                input_path TEXT NOT NULL,
+                next_action TEXT NOT NULL,
+                total_runs INTEGER NOT NULL,
+                unsigned_follow_up_count INTEGER NOT NULL,
+                scheduler_ready INTEGER NOT NULL,
+                live_mode_ready INTEGER NOT NULL,
+                blueprint_status TEXT NOT NULL,
+                entry_json TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS signoff_packet_log (
+                packet_id TEXT PRIMARY KEY,
+                created_at_utc TEXT NOT NULL,
+                run_id TEXT NOT NULL,
+                target_id TEXT NOT NULL,
+                packet_path TEXT NOT NULL,
+                report_path TEXT,
+                report_readiness_state TEXT NOT NULL,
+                recommended_decision TEXT NOT NULL,
+                entry_json TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS signoff_packet_decision_log (
+                decision_id TEXT PRIMARY KEY,
+                packet_id TEXT NOT NULL UNIQUE,
+                signoff_id TEXT NOT NULL,
+                run_id TEXT NOT NULL,
+                target_id TEXT NOT NULL,
+                reviewer TEXT NOT NULL,
+                decision TEXT NOT NULL,
+                decided_at_utc TEXT NOT NULL,
+                operations_snapshot_id TEXT,
+                entry_json TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS live_dry_run_plan_log (
+                plan_id TEXT PRIMARY KEY,
+                planned_at_utc TEXT NOT NULL,
+                config_path TEXT NOT NULL,
+                executable INTEGER NOT NULL,
+                planned_surveys_json TEXT NOT NULL,
+                blockers_json TEXT NOT NULL,
+                entry_json TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS live_approval_bundle_log (
+                bundle_id TEXT PRIMARY KEY,
+                reviewed_at_utc TEXT NOT NULL,
+                config_path TEXT NOT NULL,
+                approved_to_attempt_live_dry_run INTEGER NOT NULL,
+                blockers_json TEXT NOT NULL,
+                planned_surveys_json TEXT NOT NULL,
+                entry_json TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS live_operator_handoff_log (
+                handoff_id TEXT PRIMARY KEY,
+                created_at_utc TEXT NOT NULL,
+                config_path TEXT NOT NULL,
+                report_path TEXT NOT NULL,
+                approved_to_attempt_live_dry_run INTEGER NOT NULL,
+                blockers_json TEXT NOT NULL,
+                planned_surveys_json TEXT NOT NULL,
+                entry_json TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS live_execution_log (
+                attempt_id TEXT PRIMARY KEY,
+                attempted_at_utc TEXT NOT NULL,
+                config_path TEXT NOT NULL,
+                executable INTEGER NOT NULL,
+                outcome TEXT NOT NULL,
+                blockers_json TEXT NOT NULL,
+                query_results_json TEXT NOT NULL,
+                external_submission_enabled INTEGER NOT NULL,
+                entry_json TEXT NOT NULL
+            )
+            """
+        )
+
+def live_provider_capabilities() -> tuple[dict[str, Any], ...]:
+    """Return the no-network live-provider capability registry."""
+    return tuple(dict(_LIVE_PROVIDER_CAPABILITIES[survey]) for survey in _SUPPORTED_LIVE_SURVEYS)
+
+def load_config(config_path: Path = DEFAULT_CONFIG_PATH) -> BackgroundConfig:
+    """Load conservative background automation configuration."""
+    if not config_path.exists():
+        return BackgroundConfig(
+            input_path=str(DEFAULT_INPUT_PATH),
+            db_path=str(DEFAULT_DB_PATH),
+            report_dir=str(DEFAULT_REPORT_DIR),
+            follow_up_threshold=_FOLLOW_UP_THRESHOLD,
+        )
+    with config_path.open() as handle:
+        data = json.load(handle)
+    return BackgroundConfig(**data)
+
+def select_target(targets: tuple[BackgroundTarget, ...]) -> BackgroundTarget | None:
+    """Select exactly one target for a bounded run."""
+    if not targets:
+        return None
+    return max(targets, key=lambda target: target.priority.composite_score)
+
+def build_targets(
+    input_path: Path = DEFAULT_INPUT_PATH,
+    db_path: Path = DEFAULT_DB_PATH,
+    run_id: str | None = None,
+) -> tuple[BackgroundTarget, ...]:
+    """Score fixture targets and attach priority factors."""
+    actual_run_id = run_id or str(uuid.uuid4())
+    init_log_db(db_path)
+    with _connect(db_path) as conn:
+        targets: list[BackgroundTarget] = []
+        for tracklet in load_tracklets(input_path):
+            scored = score_tracklet(tracklet, actual_run_id)
+            count = _review_count(conn, tracklet.object_id)
+            targets.append(
+                BackgroundTarget(
+                    target_id=tracklet.object_id,
+                    scored_neo=scored,
+                    priority=_priority_factors(scored, count),
+                )
+            )
+    return tuple(targets)

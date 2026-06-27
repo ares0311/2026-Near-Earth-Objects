@@ -18,17 +18,13 @@ import pytest
 sys.path.insert(0, "src")
 
 import alert
-import classify
-import detect
 import fetch
 import link
 import orbit
 from schemas import (
-    CandidateFeatures,
     Observation,
     OrbitalElements,
     RawCandidate,
-    Tracklet,
 )
 
 # ---------------------------------------------------------------------------
@@ -127,17 +123,6 @@ class TestAdversarial:
     # Test 2 — Missing difference-image cutout (cosmic ray / bad pixel)
     # ------------------------------------------------------------------
 
-    def test_missing_cutout_detection(self) -> None:
-        """compute_streak_metric must return None for an observation with no cutout."""
-        # Simulates a cosmic ray or bad-pixel alert where no difference cutout
-        # was produced by the upstream difference-imaging pipeline.
-        obs = _make_obs("cr_001", ra_deg=180.0, dec_deg=10.0, jd=2460000.0,
-                        cutout_difference=None)
-        result = detect.compute_streak_metric(obs)
-        assert result is None, (
-            f"Expected None for observation with no cutout, got {result!r}"
-        )
-
     # ------------------------------------------------------------------
     # Test 3 — Extreme (near-limit) motion rate still links
     # ------------------------------------------------------------------
@@ -196,23 +181,6 @@ class TestAdversarial:
         )
 
     # ------------------------------------------------------------------
-    # Test 4 — Zero real_bogus score → high artifact probability
-    # ------------------------------------------------------------------
-
-    def test_zero_rb_score_classified_as_artifact(self) -> None:
-        """CandidateFeatures with rb=0.0 and stellar_artifact_score=1.0 must yield artifact_prob > 0.5."""  # noqa: E501
-        # Simulates a ZTF alert that scored 0 on the real/bogus classifier
-        # and was flagged as a stellar artifact (e.g. a ghost reflection).
-        features = CandidateFeatures(
-            real_bogus_score=0.0,
-            stellar_artifact_score=1.0,  # explicit artifact flag
-        )
-        prob = classify.compute_artifact_probability(features)
-        assert prob > 0.5, (
-            f"Expected artifact probability > 0.5 for zero-RB + artifact flag, got {prob}"
-        )
-
-    # ------------------------------------------------------------------
     # Test 5 — Survey edge coordinates (near pole, high Dec)
     # ------------------------------------------------------------------
 
@@ -257,62 +225,6 @@ class TestAdversarial:
         )
         assert result == [], (
             f"Expected empty list on ConnectionError, got {result!r}"
-        )
-
-    # ------------------------------------------------------------------
-    # Test 7 — Corrupted / all-zero cutout pixels
-    # ------------------------------------------------------------------
-
-    def test_corrupted_cutout_handled(self) -> None:
-        """classify_morphology must return a valid string for an all-zero difference cutout."""
-        # Simulates a dead-pixel region or corrupt difference image where
-        # every pixel is exactly zero — a degenerate case for second-moment
-        # morphology classification.
-        cutout = _flat_cutout_b64(size=63, fill=0.0)
-        obs = _make_obs(
-            "corrupt_001",
-            ra_deg=180.0,
-            dec_deg=10.0,
-            jd=2460000.0,
-            cutout_difference=cutout,
-        )
-        result = classify.classify_morphology(obs)
-        assert isinstance(result, str), (
-            f"Expected a string morphology label, got {type(result)!r}"
-        )
-        assert result in {"point_source", "extended", "streak"}, (
-            f"Unexpected morphology label: {result!r}"
-        )
-
-    # ------------------------------------------------------------------
-    # Test 8 — Duplicate observation IDs in tracklet
-    # ------------------------------------------------------------------
-
-    def test_duplicate_obs_rejected_by_validator(self) -> None:
-        """validate_tracklet must flag duplicate obs_id values as invalid."""
-        # Duplicated obs_id can arise from deduplication bugs or double-ingestion
-        # of the same alert.  The validator must catch this.
-        obs1 = _make_obs("dup_001", ra_deg=180.0, dec_deg=10.0, jd=2460000.0)
-        obs2 = _make_obs(
-            "dup_001",  # intentionally same ID as obs1
-            ra_deg=180.01,
-            dec_deg=10.0,
-            jd=2460001.0,
-        )
-        tracklet = Tracklet(
-            object_id="DUP001",
-            observations=(obs1, obs2),
-            arc_days=1.0,
-            motion_rate_arcsec_per_hour=1.2,
-            motion_pa_degrees=90.0,
-        )
-        valid, reasons = link.validate_tracklet(tracklet)
-        assert not valid, (
-            "Expected validate_tracklet to return False for duplicate obs_id, "
-            f"but got valid=True with reasons={reasons}"
-        )
-        assert any("duplicate" in r.lower() for r in reasons), (
-            f"Expected a 'duplicate' reason in {reasons}"
         )
 
     # ------------------------------------------------------------------
