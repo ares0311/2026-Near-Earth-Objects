@@ -1470,17 +1470,31 @@ def fetch_wise_archive(
     # Build sky coordinate for the cone search centre
     coord = SkyCoord(ra=ra_deg, dec=dec_deg, unit="deg")
     try:
-        # Query NEOWISE single-epoch table for all detections in the cone
+        # Request only the columns we need: reduces payload vs the default '*'
+        # which can time out for dense fields (e.g. Taurus/Pleiades).
         table = Irsa.query_region(
             coord,
             catalog="neowiser_p1bs_psd",
             spatial="Cone",
             radius=radius_deg * u.deg,
+            columns="ra,dec,mjd_obs,w1mpro,w1sigmpro",
         )
-    except Exception:
+    except Exception as exc:
+        # Print to stderr so operators can diagnose IRSA network/catalog issues.
+        import sys
+        print(
+            f"[fetch] WISE IRSA query FAILED: {type(exc).__name__}: {exc}",
+            file=sys.stderr, flush=True,
+        )
         return []
 
     if table is None or len(table) == 0:
+        import sys
+        print(
+            f"[fetch] WISE IRSA returned 0 rows for "
+            f"RA={ra_deg:.2f} Dec={dec_deg:.2f} r={radius_deg:.2f}°",
+            file=sys.stderr, flush=True,
+        )
         return []
 
     # Convert JD time window to MJD for comparison with table values

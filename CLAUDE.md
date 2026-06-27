@@ -694,6 +694,12 @@ filter them before any external submission:
   all citizen-science language replaced with discovery-paper language
 - `docs/near_earth_objects_research_brief.md`: canonical primer, mandatory session read
 
+**PR #123 MERGED (2026-06-27)** ✓ — NEOWISE mjd_obs column fix + coverage:
+- Root cause: `fetch_wise_archive` read `row["mjd"]` but NEOWISE `neowiser_p1bs_psd` uses `mjd_obs`. Every row threw `KeyError`, silently caught, producing 0 observations even when IRSA returned real data (confirmed via 61-second live query).
+- Fix: `row["mjd_obs"]` in `src/fetch.py`; test mocks updated; `_monitor_neocp` success-path coverage added.
+- CI green at 100% coverage on Python 3.14, 1574 tests ✓
+- **Next operator action**: run live WISE pipeline with `--force-refresh` (see Step 5 below)
+
 **PR #119 MERGED (2026-06-27)** ✓ — fetch.py WISE/DECam/TESS discovery layer:
 - `fetch_wise_archive`: IRSA `neowiser_p1bs_psd` cone search; MJD→JD; disk-cached
 - `fetch_decam_archive`: NOIRLab NSC DR2 via pyvo TAP; disk-cached
@@ -1020,15 +1026,17 @@ MPC submission → provisional designation → independent confirmation → jour
 2. ~~Open/merge PR #117~~ DONE ✓ (2026-06-27, CI green, 1534 tests, 100% coverage)
 3. ~~**Redesign `fetch.py` discovery layer**~~ DONE ✓ (PR #119 merged 2026-06-27, 1573 tests)
 4. ~~**Update `docs/MPC_SUBMISSION_POLICY.md`**~~ DONE ✓ (PR #121 merged 2026-06-27)
-5. **Run live pipeline** targeting WISE/NEOWISE (operator, from main after PR #119 merged):
+5. **Run live pipeline** targeting WISE/NEOWISE — **READY (PR #123 merged)**:
    ```bash
    git pull origin main
    export PYTHONPATH=src
    caffeinate -i uv run python Skills/run_pipeline.py \
-       --ra <RA> --dec <Dec> --radius 3.5 \
-       --start-jd <start> --end-jd <end> \
-       --surveys WISE --no-dry-run
+       --ra 58.0 --dec 20.0 --radius 3.5 \
+       --start-jd 2458880.5 --end-jd 2458910.5 \
+       --surveys WISE --no-dry-run --force-refresh
    ```
+   `--force-refresh` required: previous run cached an empty result list due to the mjd_obs bug.
+   RA=58.0 Dec=20.0 (Taurus) is correct for a Feb 2020 NEOWISE epoch (NEOWISE scans at ~90° from Sun; Sun at RA≈325° in Feb 2020 → survey strip at RA≈55°).
    Do NOT use `--surveys ZTF` or `--surveys ATLAS` for discovery.
 6. **Run adversarial review** (`Skills/adversarial_review.py`) on any candidates found.
 7. **Jerome reviews** any SURVIVE or BORDERLINE candidates.
