@@ -1,9 +1,11 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
 **Current version**: v0.89.3
-**Last updated**: 2026-06-26
+**Last updated**: 2026-06-27
 **Purpose**: Mandatory read at session start (per MANDATORY SESSION-START PROTOCOL).  
 Every planning cycle must name the highest-priority unresolved Tier 1 gap and show how proposed steps close or directly unblock it.
+
+**Also mandatory at session start**: `docs/near_earth_objects_research_brief.md` — canonical primer on ranked space assets (WISE/NEOWISE #2, NEO Surveyor #1, Gaia #3), frontier AI methods (THOR, HelioLinC3D), submission best practices, and key literature. Required to keep agents aligned on the discovery-paper data strategy (step 5 of CLAUDE.md §MANDATORY SESSION-START PROTOCOL).
 
 ---
 
@@ -26,7 +28,7 @@ The following work is done and must NOT be repeated:
 | `calibration.py` | test_calibration.py | 100% |
 
 ### Infrastructure
-- 3500+ offline tests pass; 2 live checks deselected; `ruff` clean; `mypy` clean
+- 1531+ offline tests pass (after dead-code removal in v0.89.3); 2 live checks deselected; `ruff` clean; `mypy` clean
 - Background automation CLI (`Skills/background.py`) with SQLite audit logs
 - 90+ Skills scripts for batch operations, export, diagnostics, visualization
 - 30+ documentation files covering all pipeline stages
@@ -43,9 +45,10 @@ The following work is done and must NOT be repeated:
 ### What "complete" means here
 All modules compile, pass 100% branch coverage, and produce correct output
 **on synthetic/mocked pipeline data**. Real labeled ZTF alerts have been used
-to train and calibrate the ML tiers. A first supervised, bounded real ZTF
-pilot has completed; production still requires the known-object recovery audit
-and citizen-science operator false-positive review described in T1-C.
+to train and calibrate the ML tiers (ZTF = training source only; NOT discovery
+source). Production discovery operation requires the fetch.py redesign to
+target unreviewed archives (TESS FFIs, DECam/NOIRLab, WISE/NEOWISE). T1-C
+known-object recovery audit and operator false-positive review are CLOSED.
 
 ---
 
@@ -185,9 +188,11 @@ follow-up escalation, NASA notification, or public hazard claims.
 
 ---
 
-### T1-C: Real-Data Recovery And Citizen-Science Review Evidence
+### T1-C: Real-Data Recovery And Operator Review Evidence
 
-**What is missing**: The full pipeline (`Fetch → Preprocess → Detect → Link → Classify → Score → Alert`) has now completed one supervised, bounded real ZTF pilot through the public ALeRCE ZTF source-detection provider. Production closure still requires an uncapped or recovery-audit run, ≥90% known-object recovery verification, and citizen-science operator false-positive review.
+**Status**: **CLOSED 2026-06-20.** Known-object recovery ≥90% verified on ATLAS data; operator review by Jerome W. Lindsey III found no blocking findings. This gap is resolved.
+
+**What was missing**: The full pipeline (`Fetch → Preprocess → Detect → Link → Classify → Score → Alert`) needed one recovery-audit run with ≥90% known-object recovery verification and operator false-positive review.
 
 **Why it is Tier 1**: Synthetic data cannot expose real failure modes — coordinate edge cases, survey-specific format quirks, real noise distributions, real artifact morphologies, or real rate-limiting behavior. The pipeline's real-world correctness is unknown until it processes real data.
 
@@ -218,18 +223,14 @@ follow-up escalation, NASA notification, or public hazard claims.
 5. [CODE] Run an uncapped or staged recovery-audit pilot with link progress/ETA
    enabled, preserving `Logs/pipeline_runs/*/run_summary.json` evidence and
    evaluating it through `Skills/audit_real_run.py`.
-6. [HUMAN] The project operator performs citizen-science false-positive review
-   of the audit CSV. This is not professional planetary-defense validation and
-   does not authorize external submission.
+6. [DONE — HUMAN] The project operator (Jerome W. Lindsey III) reviewed the
+   audit CSV. No blocking findings. This is not professional planetary-defense
+   validation and does not authorize external submission.
 7. [CODE] Select a new known-object-rich recovery field. The Orion pilot field
    is retained only as historical/debug evidence and must not be reused for the
    production recovery KPI.
 
-**Current blocker**: T1-C is no longer blocked on zero ZTF fetches, missing
-manifest tooling, or live-review policy sign-off. The next blocker is live
-generation of a non-Orion expected-known recovery manifest, a staged recovery
-run against that manifest, and citizen-science operator false-positive review.
-All runs remain operator-controlled and non-submitting.
+**T1-C is CLOSED.** Known-object recovery (≥90%) verified on ATLAS data; operator false-positive review by Jerome W. Lindsey III completed 2026-06-20 with no blocking findings. All runs remained operator-controlled and non-submitting.
 
 **2026-06-18 diagnostic update**: Recovery field selection now supports live
 ZTF availability probing and broader MPC asteroid-list manifest preselection.
@@ -281,7 +282,7 @@ with at least 3 recovered ATLAS samples across at least 2 distinct nights.
 that rule and produced a local ignored manifest with 4 rows and 15 expected
 samples (`481`, `1950`, `2172`, `2973`). The next blocker is running the
 prequalified manifest through the existing non-submitting T1-C audit path and
-then completing citizen-science operator review if the KPI passes.
+then completing operator review if the KPI passes.
 
 **2026-06-19 prequalified ATLAS recovery run**: The prequalified live run
 `atlas_recovery_175ef40ac577` completed 15 sample queries with no
@@ -306,7 +307,7 @@ Prequalification (≥3 recovered samples, ≥2 distinct nights) yielded **5 obje
 **2026-06-20 Option A follow-up run**: `atlas_recovery_c1712df0f32c` completed —
 23 samples, 16/23 recovered, 5/5 objects emitted audit tracklets. Preliminary
 KPI: **5/5 = 100%** (gate ≥90%). Formal audit via `Skills/audit_real_run.py`
-is the next step; citizen-science operator review follows if audit passes.
+is the next step; operator review follows if audit passes.
 Durable evidence: `docs/evidence/t1c/2026-06-20-option-a-screening-prequalification.md`.
 
 **2026-06-20 audit result: PASSED.** Correct audit used
@@ -314,7 +315,7 @@ Durable evidence: `docs/evidence/t1c/2026-06-20-option-a-screening-prequalificat
 `Recovery gate: evaluated (passed=True)`, 5 tracklets reviewed, 0 same-night,
 5 multi-night, no external submission. T1-C automated KPI gate is now closed.
 
-**2026-06-20 T1-C CLOSED**: Citizen-science operator review completed by Jerome
+**2026-06-20 T1-C CLOSED**: Operator review completed by Jerome
 W. Lindsey III. All 5 tracklets showed physically plausible motion rates
 (26–36 arcsec/hr) and multi-night arcs (12–25 days). No flags, no blocking
 findings. Full evidence: `docs/evidence/t1c/2026-06-20-option-a-screening-prequalification.md`.
@@ -394,21 +395,17 @@ The pipeline has not been tested against:
 
 The Tier 1–3 architecture (XGBoost → CNN → Transformer → stacking) was designed per CLAUDE.md DECISION-002 and literature references (Duev et al. 2019, Lin et al. 2022). The implementation has not been reviewed by an astronomer or ML practitioner with NEO survey experience.
 
-**Citizen-science constraint**: No domain expert is currently available. The
-project may continue as an internal, no-submission citizen-science pipeline
-using conservative evidence packets and explicit limitations. External MPC
-submission remains blocked until qualified review is available or the project
-adopts a separate submission policy with appropriate external oversight.
+**Discovery-paper constraint**: No external domain expert review was required
+per operator decision 2026-06-21. MPC/NEOCP/Scout is the expert review system.
+External MPC submission is gated by `ready_for_submission()` quality gates,
+adversarial review (`Skills/adversarial_review.py`), and operator review —
+not in-house expert validation.
 
-**Needed**: Prepare a citizen-science architecture evidence packet that records
-model assumptions, calibration KPIs, known limitations, and no-submission
-guardrails. This packet does not replace expert validation.
-
-**Progress (2026-06-20)**: Evidence packet created at
+**Progress (2026-06-20)**: Architecture evidence packet created at
 `docs/evidence/t2c/2026-06-20-citizen-science-architecture-evidence-packet.md`.
 Records all five architecture decisions, calibration KPI results for all three
 tiers and the ensemble stacker, known limitations (data, orbital coverage,
-pipeline coverage), no-submission guardrails, and citizen-science framing.
+pipeline coverage), and no-submission guardrails.
 This packet does not authorize any external submission.
 
 **T2-C CLOSED (2026-06-21)**: Section 6 operator review completed by Jerome W.
@@ -459,7 +456,7 @@ Before the pipeline makes its first MPC submission, all of the following must be
 - [x] T1-A resolved: calibration KPI gate passed ✓ (T1-D, 2026-06-14); ensemble stacker KPIs passed ✓ (2026-06-14)
 - [x] T1-B resolved: IRSA and ATLAS credentials configured ✓; live connection test passed ✓; bounded live dry-run policy signed ✓; execution remains credential/provider gated and non-submitting
 - [x] T1-C resolved: ATLAS known-object recovery KPI passed ✓ (5/5 objects, 100%, 2026-06-20);
-      citizen-science operator review completed ✓ (Jerome W. Lindsey III, no blocking findings, 2026-06-20);
+      operator review completed ✓ (Jerome W. Lindsey III, no blocking findings, 2026-06-20);
       full evidence: `docs/evidence/t1c/2026-06-20-option-a-screening-prequalification.md`
 - [x] T1-D resolved: Machine-readable calibration report passes every required
       KPI on held-out real labeled data and records
@@ -468,8 +465,9 @@ Before the pipeline makes its first MPC submission, all of the following must be
       ZTF IRSA + ATLAS FPS live calls confirmed working; credentials kept off GitHub by policy
 - [x] T2-B resolved: 10 synthetic adversarial tests in CI ✓; diagnose_pipeline.py all 10 stages
       PASS on operator Mac ✓ (2026-06-21); real-data artifact audit is a future milestone
-- [x] T2-C resolved: citizen-science architecture evidence packet signed ✓ (Jerome W. Lindsey III, 2026-06-21);
-      all five attestation items checked; no external submission authorized
+- [x] T2-C resolved: architecture evidence packet signed ✓ (Jerome W. Lindsey III, 2026-06-21);
+      all five attestation items checked; no external submission authorized;
+      discovery-paper framing adopted 2026-06-26
 - [x] T2-D resolved: e2e.yml has smoke/diagnose/injection/model-weights jobs ✓ (2026-06-21);
       Skills/validate_model_weights.py validates all four committed model files
 - [x] Alert protocol compliance: `ready_for_submission()` gate validated on 14 diverse synthetic
@@ -499,13 +497,17 @@ are sequential — each blocks the next.
 - [ ] At least one `ScoredNEO` passes `ready_for_submission()` gate from pipeline
 - [ ] That candidate survives `Skills/adversarial_review.py` with verdict = SURVIVE
       (no FAILs; ≤1 WARNING across all 13 challenges)
-- Post-PR-#116-merge operator workflow:
+- **PREREQUISITE**: fetch.py must be redesigned to target unreviewed archives
+  (TESS FFIs, DECam/NOIRLab, WISE/NEOWISE) before any discovery run. Do NOT
+  use `--surveys ZTF` or `--surveys ATLAS` for discovery — those streams are
+  already processed by ZTF ZAPS and the ATLAS pipeline.
+- Post-fetch.py-redesign operator workflow (placeholder — command to be filled
+  when WISE/NEOWISE adapter is implemented):
   ```bash
   git pull origin main && export PYTHONPATH=src
+  # Run against unreviewed archive (WISE/NEOWISE, TESS FFIs, or DECam/NOIRLab)
   caffeinate -i uv run python Skills/run_pipeline.py \
-      --ra 284.13 --dec -22.5 --radius 3.5 \
-      --start-jd 2461183.0 --end-jd 2461213.0 \
-      --surveys ZTF --no-dry-run --force-refresh --no-resume \
+      --surveys WISE --no-dry-run --force-refresh --no-resume \
       > /tmp/candidates.json
   PYTHONPATH=src uv run python Skills/adversarial_review.py /tmp/candidates.json
   ```
@@ -517,7 +519,7 @@ are sequential — each blocks the next.
 
 ### Gate D3: MPC Observatory Code (HUMAN DECISION REQUIRED)
 - [ ] Jerome contacts MPC to establish how a data-analysis pipeline (not an observing
-      telescope) can submit observation reports; or adopts a citizen-science observatory
+      telescope) can submit observation reports; or adopts a data-mining observatory
       code strategy
 - See `docs/MPC_SUBMISSION_POLICY.md §TODO for Future Agents` for full problem statement
 - Blocked by: human administrative decision; no code can unblock this

@@ -15,8 +15,13 @@ It contains the facts a coding agent needs to work productively without re-readi
 4. Call `Read` on `docs/SYSTEM_PROFILE.md` — this committed file governs local
    optimization defaults for project code, tests, notebooks, and operator
    commands.
+5. Call `Read` on `docs/near_earth_objects_research_brief.md` — the canonical
+   primer on ranked space assets (WISE/NEOWISE, NEO Surveyor, Gaia), frontier
+   AI methods (THOR, HelioLinC3D, CNN streak detection), submission best
+   practices, and key literature. Must be re-read each session to keep agents
+   current on the discovery-paper data strategy.
 
-These steps are non-negotiable. No planning or code changes may happen before all five are complete.
+These steps are non-negotiable. No planning or code changes may happen before all six are complete.
 
 ---
 
@@ -67,13 +72,18 @@ If the highest-priority T1 gap cannot be resolved because a human blocker is unr
   worker counts, device selection, batch sizes, and thread limits must be
   configurable or documented runtime defaults, not hidden machine-specific
   constants.
-- **Citizen-science production framing**: Jerome W. Lindsey III is the project
-  operator and reviewer. No in-house NEO domain expert is available or required.
-  The MPC/NEOCP/Scout chain is the expert review system — submitting quality
-  observations to MPC is the correct and established citizen-science pathway.
-  See `docs/MPC_SUBMISSION_POLICY.md` for the full operator-approved submission
-  policy (established 2026-06-21). Do NOT reinstate a "blocked until expert
-  review" guardrail; that block was removed by operator decision.
+- **Discovery paper goal — NOT citizen science**: Jerome W. Lindsey III is the
+  project operator and reviewer. The goal is a **defensible discovery paper**:
+  find new NEOs in unreviewed archival data, submit candidates to MPC, obtain
+  a provisional designation via independent NEOCP confirmation, and publish.
+  We NEVER claim discovery — only "candidates consistent with NEO orbits."
+  Two review stages gate every submission: (1) automated adversarial review
+  (`Skills/adversarial_review.py` — 13 challenges, tries to REJECT each
+  candidate), then (2) operator review. Only SURVIVE/BORDERLINE candidates
+  proceed to MPC submission. See `docs/MISSION.md` (authoritative) and
+  `docs/MPC_SUBMISSION_POLICY.md` for the full submission policy.
+  Do NOT reinstate a "blocked until expert review" guardrail — MPC/NEOCP/Scout
+  IS the expert review system. Do NOT frame this as citizen science.
 - **Repository artifact policy supports `git add .`**: The standard operator
   cadence may use `git add .`, so `.gitignore` must protect local/generated
   outputs by default. Treat `Logs/**` as local operational output and never
@@ -174,10 +184,15 @@ Near-Earth Objects are small solar system bodies with perihelion distances $q < 
 Potentially Hazardous Asteroids (PHAs) are NEOs with absolute magnitude $H \leq 22$ (diameter $\gtrsim 140$ m) and Minimum Orbit Intersection Distance (MOID) $\leq 0.05$ AU. The pipeline must identify and flag PHA candidates.
 
 The global NEO survey is dominated by:
-- **ZTF** (Zwicky Transient Facility) — primary data source; public alert stream
-- **ATLAS** — Asteroid Terrestrial-impact Last Alert System; 24–48 hr warning capability
+- **ZTF** (Zwicky Transient Facility) — **training-data source only** (ZTF ZAPS already processes and submits discoveries); public alert stream
+- **ATLAS** — **training-data source only** (ATLAS pipeline already processes and submits); 24–48 hr warning capability
 - **Pan-STARRS** — deep survey; public catalog access
 - **CSS** (Catalina Sky Survey) — MPC-feeding survey
+- **WISE/NEOWISE** (archival) — **primary discovery target** for this pipeline; infrared detections of 158,000+ minor planets; accessible via IRSA without credentials
+- **NEO Surveyor** (launch ≥ 2027) — future dedicated IR discovery mission; not yet available
+- **Rubin/LSST** (upcoming) — will discover 100,000+ NEOs; tracklet-less linking (HelioLinC3D) required
+
+**Key discovery constraint**: This pipeline must target UNREVIEWED archives — TESS FFIs, DECam/NOIRLab, WISE/NEOWISE — NOT ZTF/ATLAS (already processed by their own pipelines). See `docs/MISSION.md` (authoritative) and `docs/near_earth_objects_research_brief.md` for ranked asset details.
 
 As of 2026, approximately 35,000 NEOs are known. Rubin/LSST is expected to discover 100,000+ more over its 10-year survey.
 
@@ -637,11 +652,13 @@ Ensemble stacker KPIs passed 2026-06-14 (AUC=0.9809, Brier=0.0211, ECE=0.0000).
 T2-C CLOSED 2026-06-21 (operator sign-off by Jerome W. Lindsey III).
 T2-D CLOSED 2026-06-21 (model-weight CI job + `Skills/validate_model_weights.py`).
 
-**No T1 production blockers remain.** The pipeline may operate as a citizen-science
-system with MPC submission enabled when quality gates pass. The prior "blocked until
-expert review" guardrail was removed by operator decision on 2026-06-21 — see
-`docs/MPC_SUBMISSION_POLICY.md`. MPC/NEOCP/Scout is the expert review system;
-no in-house expert is required or expected.
+**No T1 production blockers remain.** The pipeline is ready to search unreviewed
+archival data (TESS FFIs, DECam/NOIRLab, WISE/NEOWISE) for NEO candidates.
+ZTF/ATLAS are training-data sources only — they are NOT used for discovery (ZTF
+ZAPS and ATLAS pipeline already process those streams and submit to MPC).
+See `docs/MISSION.md` for the authoritative data strategy. The prior "blocked
+until expert review" guardrail was removed by operator decision on 2026-06-21;
+MPC/NEOCP/Scout is the expert review system.
 
 ### Handoff state as of 2026-06-26 (CURRENT)
 
@@ -656,30 +673,24 @@ filter them before any external submission:
   4. **Independent confirmation**: NEOCP follow-up observatories confirm.
   5. **Discovery paper**: documents the find with MPC designation as proof.
 
-**Adversarial review implemented (PR pending, v0.89.3)**:
+**Adversarial review implemented (v0.89.3, in PR #117)**:
 `Skills/adversarial_review.py` — runs 13 offline challenges + 2 optional live checks
 against each `ScoredNEO`. Verdict: SURVIVE / BORDERLINE / REJECT. Exit code 0/1/2
 for pipeline automation. Tests in `tests/test_adversarial_review_skill.py` (50+ cases).
-This is a **separate post-processing step** — run after `run_pipeline.py`:
-```bash
-# Step 1: Generate candidates (after PR #116 + PR #117 merge to main)
-git pull origin main
-export PYTHONPATH=src
-caffeinate -i uv run python Skills/run_pipeline.py \
-    --ra 284.13 --dec -22.5 --radius 3.5 \
-    --start-jd 2461183.0 --end-jd 2461213.0 \
-    --surveys ZTF --no-dry-run --force-refresh --no-resume
+This is a **separate post-processing step** — run after `run_pipeline.py`.
 
-# Step 2: Run adversarial review on any candidates found
-PYTHONPATH=src uv run python Skills/adversarial_review.py Logs/pipeline_runs/*/candidates.json
-```
+**CRITICAL — discovery data source**: `run_pipeline.py` must target UNREVIEWED archives
+(TESS FFIs, DECam/NOIRLab, WISE/NEOWISE). Do NOT run with `--surveys ZTF` or
+`--surveys ATLAS` for discovery — ZTF ZAPS and ATLAS pipeline have already processed
+those streams. See `docs/MISSION.md §The Two-Part Data Strategy`.
+The fetch.py discovery layer redesign (Step 1 in MISSION.md) must be completed
+before any live discovery run.
 
-**Console output elapsed+ETA compliance (PR #116, pending merge)**:
+**Console output elapsed+ETA compliance (PR #116, MERGED)**:
 Every stage print in `Skills/run_pipeline.py` now includes `elapsed {M}m{S:02d}s`.
-`docs/CONSOLE_OUTPUT_SPEC.md` updated to document new format.
 
-**DO NOT give any operator commands** until PR #116 AND PR #117 (adversarial review)
-both merge to main. All code runs from main — operator never checks out feature branches.
+**DO NOT give the operator any live run command** until PR #117 merges to main
+AND the fetch.py discovery layer is redesigned to target TESS/DECam/WISE.
 
 **Two human-gated blockers remain**:
 1. **MPC observatory code**: Jerome must contact MPC to determine how a data-analysis
@@ -741,7 +752,7 @@ sky positions → linker can form seed pairs with real solar system motion rates
 **T2-B** (live false-positive audit): `Skills/diagnose_pipeline.py --json` confirmed
 all 10 synthetic pipeline stages pass (2026-06-21, 25s). Real-data audit against
 known-artifact catalog remains a future operator-run step when a credentialed live
-ZTF run is available. Not blocking for current citizen-science production scope.
+ZTF run is available. Not blocking for current discovery-paper production scope.
 
 **All T2 checklist items are now resolved:**
 - T2-A: CLOSED ✓ (2026-06-21)
@@ -797,7 +808,7 @@ preferably from `Skills/select_survey_fields.py --mode recovery`, then build an
 expected-known manifest with `Skills/build_recovery_manifest.py` containing MPC
 designations plus Horizons sky/time samples.
 `Skills/audit_real_run.py` is the fail-closed promotion gate: it must verify
->=90% known-object recovery and require citizen-science operator review before
+>=90% known-object recovery and require operator review before
 internal production promotion is allowed. It never authorizes MPC submission,
 NASA notification, or any impact-probability statement.
 
