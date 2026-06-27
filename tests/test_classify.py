@@ -133,6 +133,33 @@ class TestTier1Predict:
         assert proba["neo_candidate"] > proba["stellar_artifact"]
 
 
+class TestTier1HeuristicFallback:
+    """Cover the heuristic fallback path (lines 187-203) when no XGB model is available."""
+
+    def test_fallback_returns_five_classes(self, monkeypatch):
+        monkeypatch.setattr(cls_mod, "_load_xgb_model", lambda: None)
+        f = CandidateFeatures(real_bogus_score=0.8, motion_consistency_score=0.6)
+        proba = _tier1_predict(f, model=None)
+        assert set(proba.keys()) == {
+            "neo_candidate", "known_object", "main_belt_asteroid",
+            "stellar_artifact", "other_solar_system",
+        }
+
+    def test_fallback_nonnegative_and_normalised(self, monkeypatch):
+        monkeypatch.setattr(cls_mod, "_load_xgb_model", lambda: None)
+        f = CandidateFeatures(real_bogus_score=0.9, nights_observed_score=0.5,
+                               known_object_score=0.1)
+        proba = _tier1_predict(f, model=None)
+        assert all(v is not None and v >= 0.0 for v in proba.values())
+        assert abs(sum(proba.values()) - 1.0) < 1e-9
+
+    def test_fallback_none_scores_use_defaults(self, monkeypatch):
+        monkeypatch.setattr(cls_mod, "_load_xgb_model", lambda: None)
+        f = CandidateFeatures()  # all scores None
+        proba = _tier1_predict(f, model=None)
+        assert all(v is not None and v >= 0.0 for v in proba.values())
+
+
 class TestClassifyPipeline:
     def test_returns_features_and_posterior(self):
         t = make_tracklet()
