@@ -1064,6 +1064,18 @@ MPC submission → provisional designation → independent confirmation → jour
 8. **Jerome resolves MPC observatory code** (human-gated; no code can help here).
 9. Submit survivors to MPC → await provisional designation.
 
+**Operator WISE run evidence (2026-06-27, PR #127 main)**:
+Jerome ran the Taurus WISE command before PR #131 merged. IRSA async TAP returned
+`111913` rows with live columns `['ra', 'dec', 'mjd', 'w1mpro', 'w1sigmpro']`;
+the pipeline parsed `85335` WISE observations, preprocessed all of them, detected
+`535` candidates, linked `0` tracklets, processed `0` candidates, and wrote run
+summary `Logs/pipeline_runs/756e0dc7b6be/run_summary.json`. The transcript also
+showed masked WISE photometry warnings for `w1mpro` and `w1sigmpro`. Durable
+evidence: `docs/evidence/live/2026-06-27-wise-live-sweep.md`. Do not ask the
+operator to repeat this exact run; next code work should handle masked WISE
+photometry explicitly and diagnose why `535` WISE candidates yielded `0`
+tracklets.
+
 - Console output is fully compliant with `docs/CONSOLE_OUTPUT_SPEC.md` as of v0.90.0.
 - ALWAYS run from `main` — operator never checks out feature branches.
 - All commands must begin with `git pull origin main`.

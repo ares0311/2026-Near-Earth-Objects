@@ -88,3 +88,4 @@ rigorous two-stage review process before any external submission.
 | 4 | 2026-06-26 | Adversarial review skill implemented; discovery paper goal established | Merge PR #116, then open PR #117 for adversarial review; update docs |
 | 5 | 2026-06-26 | Discovery Paper Gates D1–D7 added to PRODUCTION_READINESS.md; all J items complete | Merge PR #116 (waiting for GitHub write rate limit to clear) |
 | 6 | 2026-06-27 | PR #116-#127 are merged; stale loop item corrected; MPC live submission fail-closed gate added | Run WISE archive discovery sweep from main in alert dry-run mode |
+| 7 | 2026-06-27 | Operator WISE sweep `756e0dc7b6be` recorded: 111913 IRSA rows, 85335 observations, 535 candidates, 0 tracklets | Do not rerun same WISE command; fix masked WISE photometry handling and diagnose 0-tracklet linking |

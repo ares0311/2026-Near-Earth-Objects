@@ -518,6 +518,16 @@ are sequential — each blocks the next.
   resolved and `alert.py` is configured with a real observatory code plus
   `NEO_MPC_SUBMISSION_APPROVED=1`.
 
+**2026-06-27 WISE live archive sweep evidence**: Jerome ran the Taurus WISE
+command from `main` after pulling PR #127. IRSA async TAP returned `111913`
+rows with columns `['ra', 'dec', 'mjd', 'w1mpro', 'w1sigmpro']`; the pipeline
+parsed `85335` WISE observations, detected `535` moving-object candidates, linked
+`0` tracklets, processed `0` candidates, and produced no submission-ready
+candidates. This closes the WISE schema/fetch uncertainty for that field and
+moves the next D1 blocker downstream to WISE photometry cleanup and
+detection/linking diagnostics. Evidence:
+`docs/evidence/live/2026-06-27-wise-live-sweep.md`.
+
 ### Gate D2: Operator Review
 - [ ] Jerome W. Lindsey III reviews SURVIVE/BORDERLINE candidates
 - [ ] Jerome approves at least one candidate for MPC submission
