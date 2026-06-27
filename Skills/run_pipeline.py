@@ -546,7 +546,21 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--radius", type=float, default=1.0)
     parser.add_argument("--start-jd", type=float, required=True)
     parser.add_argument("--end-jd", type=float, required=True)
-    parser.add_argument("--surveys", nargs="+", default=["ZTF"])
+    # Discovery sources: WISE/NEOWISE, DECam/NOIRLab, TESS FFIs are the
+    # unreviewed archives this pipeline targets. ZTF and ATLAS are training
+    # data only (their own pipelines already submit discoveries to MPC).
+    # See docs/MISSION.md §The Two-Part Data Strategy.
+    parser.add_argument(
+        "--surveys",
+        nargs="+",
+        default=["WISE"],
+        choices=["ZTF", "ATLAS", "MPC", "PanSTARRS", "CSS", "WISE", "DECam", "TESS"],
+        help=(
+            "Discovery archive(s) to query. Default: WISE (primary discovery target). "
+            "WISE/DECam/TESS target unreviewed archives. "
+            "ZTF/ATLAS are training-data sources only — do NOT use for discovery."
+        ),
+    )
     # BooleanOptionalAction gives both --dry-run and --no-dry-run flags.
     # Default is True (safe: no external submissions) so operators must
     # explicitly pass --no-dry-run to enable live alert submission.

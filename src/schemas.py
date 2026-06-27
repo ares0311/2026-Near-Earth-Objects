@@ -109,7 +109,7 @@ OptScore = float | None  # optional [0, 1]
 # Enumerations (Literal unions)
 # ---------------------------------------------------------------------------
 
-Mission = Literal["ZTF", "ATLAS", "PanSTARRS", "CSS", "MPC"]
+Mission = Literal["ZTF", "ATLAS", "PanSTARRS", "CSS", "MPC", "TESS", "DECam", "WISE"]
 
 NEOClass = Literal["amor", "apollo", "aten", "ieo", "unknown"]
 

@@ -20,6 +20,10 @@ __all__ = [
     "count_observations_by_mission",
     "filter_by_magnitude",
     "compute_observation_rate",
+    "fetch_wise_archive",
+    "fetch_decam_archive",
+    "fetch_tess_ffis",
+    "fetch_discovery",
 ]
 
 import json
@@ -641,6 +645,24 @@ def fetch(
             )
         elif survey == "MPC":
             all_alerts.extend(fetch_mpc_known(ra_deg, dec_deg, radius_deg))
+        elif survey == "TESS":
+            # Route to TESS FFI archive fetch for discovery runs
+            all_alerts.extend(
+                fetch_tess_ffis(ra_deg, dec_deg, radius_deg, start_jd, end_jd,
+                                force_refresh=force_refresh)
+            )
+        elif survey == "DECam":
+            # Route to DECam/NOIRLab NSC DR2 archive fetch for discovery runs
+            all_alerts.extend(
+                fetch_decam_archive(ra_deg, dec_deg, radius_deg, start_jd, end_jd,
+                                    force_refresh=force_refresh)
+            )
+        elif survey == "WISE":
+            # Route to WISE/NEOWISE archive fetch for discovery runs
+            all_alerts.extend(
+                fetch_wise_archive(ra_deg, dec_deg, radius_deg, start_jd, end_jd,
+                                   force_refresh=force_refresh)
+            )
 
     provenance = FetchProvenance(
         surveys=surveys,
@@ -1403,3 +1425,361 @@ def compute_observation_rate(fetch_result: object) -> float | None:
 
 
 
+
+# ---------------------------------------------------------------------------
+# Discovery archives (unreviewed): WISE/NEOWISE, DECam/NOIRLab, TESS FFIs
+# ---------------------------------------------------------------------------
+
+
+def fetch_wise_archive(
+    ra_deg: float,
+    dec_deg: float,
+    radius_deg: float,
+    start_jd: float,
+    end_jd: float,
+    force_refresh: bool = False,
+) -> list[Observation]:
+    """Query NASA IRSA for WISE/NEOWISE single-exposure source detections.
+
+    Targets the NEOWISE single-epoch photometry catalog (neowiser_p1bs_psd),
+    which covers 2013-2024 with infrared detections of 158,000+ minor planets.
+    Infrared sensitivity finds low-albedo NEOs that optical surveys miss.
+    Each row is one single-exposure detection at a unique epoch — exactly the
+    format the linker needs to identify multi-night moving sources.
+
+    Returns Observation objects with mission='WISE'.
+    """
+    import hashlib
+    # Stable cache key derived from all query parameters
+    cache_key = hashlib.md5(
+        f"wise_{ra_deg}_{dec_deg}_{radius_deg}_{start_jd}_{end_jd}".encode()
+    ).hexdigest()
+    cached = _load_cache(cache_key, force_refresh=force_refresh)
+    if cached is not None:
+        # Reconstruct Observation objects from cached dicts
+        return [Observation(**row) for row in cached]
+
+    try:
+        import astropy.units as u
+        from astropy.coordinates import SkyCoord
+        from astroquery.ipac.irsa import Irsa  # type: ignore[import]
+    except ImportError:
+        # Return empty list when astroquery is not installed
+        return []
+
+    # Build sky coordinate for the cone search centre
+    coord = SkyCoord(ra=ra_deg, dec=dec_deg, unit="deg")
+    try:
+        # Query NEOWISE single-epoch table for all detections in the cone
+        table = Irsa.query_region(
+            coord,
+            catalog="neowiser_p1bs_psd",
+            spatial="Cone",
+            radius=radius_deg * u.deg,
+        )
+    except Exception:
+        return []
+
+    if table is None or len(table) == 0:
+        return []
+
+    # Convert JD time window to MJD for comparison with table values
+    start_mjd = start_jd - 2_400_000.5
+    end_mjd = end_jd - 2_400_000.5
+    obs: list[Observation] = []
+    for i, row in enumerate(table):
+        try:
+            mjd = float(row["mjd"])
+            # Skip rows outside the requested time window
+            if not (start_mjd <= mjd <= end_mjd):
+                continue
+            jd = mjd + 2_400_000.5
+            # Use sentinel 99.0 for missing magnitudes
+            w1_raw = row["w1mpro"]
+            w1 = float(w1_raw) if w1_raw is not None else 99.0
+            w1err_raw = row["w1sigmpro"]
+            w1_err = float(w1err_raw) if w1err_raw is not None else 0.1
+            obs.append(
+                Observation(
+                    obs_id=f"wise_{i}_{mjd:.5f}",
+                    ra_deg=float(row["ra"]),
+                    dec_deg=float(row["dec"]),
+                    jd=jd,
+                    mag=w1,
+                    mag_err=w1_err or 0.1,
+                    filter_band="W1",
+                    mission="WISE",
+                )
+            )
+        except Exception:
+            continue
+
+    _save_cache(cache_key, [o.model_dump() for o in obs])
+    return obs
+
+
+def fetch_decam_archive(
+    ra_deg: float,
+    dec_deg: float,
+    radius_deg: float,
+    start_jd: float,
+    end_jd: float,
+    force_refresh: bool = False,
+) -> list[Observation]:
+    """Query NOIRLab Astro Data Lab for DECam per-epoch source detections.
+
+    Queries the NOIRLab Source Catalog DR2 (NSC DR2) via the Data Lab TAP
+    service. NSC DR2 contains 3.9 billion individual source measurements from
+    DECam and other instruments with per-epoch MJD timestamps, enabling
+    multi-night moving-object linking.
+
+    Requires the pyvo package (pip install pyvo).
+    Returns Observation objects with mission='DECam'.
+    """
+    import hashlib
+    # Stable cache key derived from all query parameters
+    cache_key = hashlib.md5(
+        f"decam_{ra_deg}_{dec_deg}_{radius_deg}_{start_jd}_{end_jd}".encode()
+    ).hexdigest()
+    cached = _load_cache(cache_key, force_refresh=force_refresh)
+    if cached is not None:
+        # Reconstruct Observation objects from cached dicts
+        return [Observation(**row) for row in cached]
+
+    try:
+        import pyvo  # type: ignore[import]
+    except ImportError:
+        # Return empty list when pyvo is not installed
+        return []
+
+    # Convert JD time window to MJD for the TAP query
+    start_mjd = start_jd - 2_400_000.5
+    end_mjd = end_jd - 2_400_000.5
+    # ADQL cone query using q3c spatial indexing function for efficiency
+    adql = (
+        f"SELECT ra, dec, mjd, mag_auto, magerr_auto, filter "
+        f"FROM nsc_dr2.meas "
+        f"WHERE q3c_radial_query(ra, dec, {ra_deg}, {dec_deg}, {radius_deg}) "
+        f"AND mjd BETWEEN {start_mjd} AND {end_mjd} "
+        f"LIMIT 2000"
+    )
+    try:
+        service = pyvo.dal.TAPService("https://datalab.noirlab.edu/tap")
+        result = service.search(adql)
+        table = result.to_table()
+    except Exception:
+        return []
+
+    if table is None or len(table) == 0:
+        return []
+
+    obs: list[Observation] = []
+    for i, row in enumerate(table):
+        try:
+            mjd = float(row["mjd"])
+            jd = mjd + 2_400_000.5
+            # Use sentinel 99.0 for missing magnitudes
+            mag_raw = row["mag_auto"]
+            mag = float(mag_raw) if mag_raw is not None else 99.0
+            magerr_raw = row["magerr_auto"]
+            mag_err = float(magerr_raw) if magerr_raw is not None else 0.1
+            filt_raw = row["filter"]
+            filt = str(filt_raw) if filt_raw is not None else "?"
+            obs.append(
+                Observation(
+                    obs_id=f"decam_{i}_{mjd:.5f}",
+                    ra_deg=float(row["ra"]),
+                    dec_deg=float(row["dec"]),
+                    jd=jd,
+                    mag=mag,
+                    mag_err=mag_err or 0.1,
+                    filter_band=filt,
+                    mission="DECam",
+                )
+            )
+        except Exception:
+            continue
+
+    _save_cache(cache_key, [o.model_dump() for o in obs])
+    return obs
+
+
+def fetch_tess_ffis(
+    ra_deg: float,
+    dec_deg: float,
+    radius_deg: float,
+    start_jd: float,
+    end_jd: float,
+    force_refresh: bool = False,
+) -> list[Observation]:
+    """Query MAST for TESS FFI source detections in a sky region.
+
+    Queries the MAST observations service for TESS sectors covering the field
+    during the requested time window, then retrieves TIC catalog sources in
+    the field for each sector epoch. Each returned Observation carries the
+    sector midpoint JD and a TIC source position, giving the linker multi-epoch
+    coverage across the 27-day sector windows.
+
+    Note: The TIC catalog contains static stellar sources used as the reference
+    background. Moving NEO candidates appear as sources present in FFI images
+    but absent from the TIC; full FFI-level source detection is performed by
+    preprocess.py. This fetch layer provides sector coverage metadata and static
+    reference positions.
+
+    JD conversion: TESS uses BTJD (Barycentric TESS Julian Date);
+    BTJD = JD - 2457000.0 (exact offset defined by the TESS mission).
+
+    Returns Observation objects with mission='TESS'.
+    """
+    import hashlib
+    # Stable cache key derived from all query parameters
+    cache_key = hashlib.md5(
+        f"tess_{ra_deg}_{dec_deg}_{radius_deg}_{start_jd}_{end_jd}".encode()
+    ).hexdigest()
+    cached = _load_cache(cache_key, force_refresh=force_refresh)
+    if cached is not None:
+        # Reconstruct Observation objects from cached dicts
+        return [Observation(**row) for row in cached]
+
+    try:
+        from astroquery.mast import Catalogs, Observations  # type: ignore[import]
+    except ImportError:
+        # Return empty list when astroquery.mast is not installed
+        return []
+
+    # BTJD = JD - 2457000.0 (exact TESS mission epoch offset)
+    _BTJD_OFFSET = 2_457_000.0
+    start_btjd = start_jd - _BTJD_OFFSET
+    end_btjd = end_jd - _BTJD_OFFSET
+
+    try:
+        # Query MAST for TESS image observations covering the field
+        tess_obs = Observations.query_criteria(
+            coordinates=f"{ra_deg} {dec_deg}",
+            radius=f"{radius_deg * 3600:.1f} arcsec",
+            obs_collection="TESS",
+            dataproduct_type="image",
+            t_min=[start_btjd - 14, end_btjd + 14],  # sector overlap margin
+        )
+    except Exception:
+        return []
+
+    if tess_obs is None or len(tess_obs) == 0:
+        return []
+
+    try:
+        # Retrieve TIC catalog sources as reference positions for the field
+        tic = Catalogs.query_region(
+            f"{ra_deg} {dec_deg}", radius=radius_deg, catalog="TIC"
+        )
+    except Exception:
+        tic = None
+
+    if tic is None or len(tic) == 0:
+        return []
+
+    obs: list[Observation] = []
+    seen: set[str] = set()
+    for sector_row in tess_obs:
+        try:
+            # Convert sector time range to JD for epoch assignment
+            t_min = float(sector_row["t_min"]) if sector_row["t_min"] is not None else start_btjd
+            t_max = float(sector_row["t_max"]) if sector_row["t_max"] is not None else end_btjd
+            epoch_jd = (t_min + t_max) / 2.0 + _BTJD_OFFSET
+            if not (start_jd - 14 <= epoch_jd <= end_jd + 14):
+                continue
+            seq = sector_row["sequence_number"]
+            sec_id = str(seq) if seq is not None else "0"
+        except Exception:
+            continue
+
+        # Limit TIC sources per sector to avoid observation explosion
+        for src in tic[:50]:
+            try:
+                src_key = f"{src['ID']}_{sec_id}"
+                if src_key in seen:
+                    continue
+                seen.add(src_key)
+                tmag_raw = src["Tmag"]
+                tmag = float(tmag_raw) if tmag_raw is not None else 20.0
+                tmag_err_raw = src.get("e_Tmag")
+                tmag_err = float(tmag_err_raw) if tmag_err_raw is not None else 0.1
+                obs.append(
+                    Observation(
+                        obs_id=f"tess_s{sec_id}_t{src['ID']}",
+                        ra_deg=float(src["ra"]),
+                        dec_deg=float(src["dec"]),
+                        jd=epoch_jd,
+                        mag=tmag,
+                        mag_err=tmag_err or 0.1,
+                        filter_band="T",
+                        mission="TESS",
+                    )
+                )
+            except Exception:
+                continue
+
+    _save_cache(cache_key, [o.model_dump() for o in obs])
+    return obs
+
+
+def fetch_discovery(
+    ra_deg: float,
+    dec_deg: float,
+    radius_deg: float,
+    start_jd: float,
+    end_jd: float,
+    sources: tuple[str, ...] = ("WISE", "DECam", "TESS"),
+    force_refresh: bool = False,
+) -> FetchResult:
+    """Fetch from unreviewed discovery archives for NEO candidate detection.
+
+    Routes to fetch_wise_archive, fetch_decam_archive, and/or fetch_tess_ffis
+    depending on the requested sources. ZTF and ATLAS are NOT valid discovery
+    sources — they are training data only (ZTF ZAPS and ATLAS pipeline already
+    process those streams and submit to MPC). See docs/MISSION.md.
+
+    Args:
+        sources: Which unreviewed archives to query. Subset of
+                 ("WISE", "DECam", "TESS"). Default: all three.
+
+    Returns:
+        FetchResult with observations from the requested archives.
+    """
+    from astropy.time import Time
+
+    # Record the wall-clock time this function was called
+    fetched_at_jd = Time.now().jd
+    all_alerts: list[Observation] = []
+
+    for src in sources:
+        if src == "WISE":
+            # Query NEOWISE single-epoch catalog via IRSA
+            all_alerts.extend(
+                fetch_wise_archive(ra_deg, dec_deg, radius_deg, start_jd, end_jd,
+                                   force_refresh=force_refresh)
+            )
+        elif src == "DECam":
+            # Query NOIRLab NSC DR2 via Data Lab TAP
+            all_alerts.extend(
+                fetch_decam_archive(ra_deg, dec_deg, radius_deg, start_jd, end_jd,
+                                    force_refresh=force_refresh)
+            )
+        elif src == "TESS":
+            # Query MAST for TESS FFI sector coverage and TIC reference positions
+            all_alerts.extend(
+                fetch_tess_ffis(ra_deg, dec_deg, radius_deg, start_jd, end_jd,
+                                force_refresh=force_refresh)
+            )
+
+    provenance = FetchProvenance(
+        surveys=tuple(sources),  # type: ignore[arg-type]
+        start_jd=start_jd,
+        end_jd=end_jd,
+        search_ra_deg=ra_deg,
+        search_dec_deg=dec_deg,
+        search_radius_deg=radius_deg,
+        fetched_at_jd=fetched_at_jd,
+        cached=False,
+    )
+    return FetchResult(alerts=tuple(all_alerts), provenance=provenance)

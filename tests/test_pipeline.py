@@ -2161,6 +2161,7 @@ class TestRunPipelineCheckpointResume:
             mod.main([
                 "--ra", "10.0", "--dec", "5.0",
                 "--start-jd", "2460000.0", "--end-jd", "2460001.0",
+                "--surveys", "ZTF",
                 "--no-delete-cache",
             ])
 

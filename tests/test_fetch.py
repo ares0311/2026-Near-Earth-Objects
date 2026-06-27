@@ -3220,3 +3220,710 @@ class TestFetchAtlasForcedRemainingBranches:
             )
 
         assert 0.1 in sleep_calls
+
+
+# ---------------------------------------------------------------------------
+# TestDiscoveryFetch — tests for fetch_wise_archive, fetch_decam_archive,
+# fetch_tess_ffis, fetch_discovery, and fetch() routing for new surveys
+# ---------------------------------------------------------------------------
+
+
+class TestFetchWiseArchive:
+    """Tests for fetch_wise_archive."""
+
+    def test_cache_hit_returns_observations(self, tmp_path, monkeypatch):
+        """Cache hit path: load from cache and return Observation objects."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        # Seed the cache with one pre-built observation dict
+        import hashlib
+        cache_key = hashlib.md5(
+            b"wise_180.0_10.0_1.0_2460000.5_2460010.5"
+        ).hexdigest()
+        cached_data = [{
+            "obs_id": "wise_0_60000.00000",
+            "ra_deg": 180.0,
+            "dec_deg": 10.0,
+            "jd": 2460000.5,
+            "mag": 15.5,
+            "mag_err": 0.05,
+            "filter_band": "W1",
+            "mission": "WISE",
+        }]
+        fetch_mod._save_cache(cache_key, cached_data)
+
+        result = fetch_mod.fetch_wise_archive(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
+        assert len(result) == 1
+        assert result[0].mission == "WISE"
+        assert result[0].obs_id == "wise_0_60000.00000"
+
+    def test_import_error_returns_empty(self, tmp_path, monkeypatch):
+        """ImportError (no astroquery) returns empty list."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        with patch.dict("sys.modules", {
+            "astroquery.ipac.irsa": None,
+            "astropy.units": None,
+            "astropy.coordinates": None,
+        }):
+            result = fetch_mod.fetch_wise_archive(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
+        assert result == []
+
+    def test_api_exception_returns_empty(self, tmp_path, monkeypatch):
+        """Irsa.query_region raising exception returns empty list."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        mock_irsa = MagicMock()
+        mock_irsa.query_region.side_effect = RuntimeError("network error")
+        mock_units = MagicMock()
+        mock_coord_mod = MagicMock()
+        mock_coord_mod.SkyCoord.return_value = MagicMock()
+        with patch.dict("sys.modules", {
+            "astroquery.ipac.irsa": MagicMock(Irsa=mock_irsa),
+            "astropy.units": mock_units,
+            "astropy.coordinates": mock_coord_mod,
+        }):
+            result = fetch_mod.fetch_wise_archive(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
+        assert result == []
+
+    def test_empty_table_returns_empty(self, tmp_path, monkeypatch):
+        """Empty table from IRSA returns empty list."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        mock_irsa = MagicMock()
+        mock_irsa.query_region.return_value = []  # empty
+        mock_units = MagicMock()
+        mock_coord_mod = MagicMock()
+        mock_coord_mod.SkyCoord.return_value = MagicMock()
+        with patch.dict("sys.modules", {
+            "astroquery.ipac.irsa": MagicMock(Irsa=mock_irsa),
+            "astropy.units": mock_units,
+            "astropy.coordinates": mock_coord_mod,
+        }):
+            result = fetch_mod.fetch_wise_archive(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
+        assert result == []
+
+    def test_none_table_returns_empty(self, tmp_path, monkeypatch):
+        """None table from IRSA returns empty list."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        mock_irsa = MagicMock()
+        mock_irsa.query_region.return_value = None
+        mock_units = MagicMock()
+        mock_coord_mod = MagicMock()
+        mock_coord_mod.SkyCoord.return_value = MagicMock()
+        with patch.dict("sys.modules", {
+            "astroquery.ipac.irsa": MagicMock(Irsa=mock_irsa),
+            "astropy.units": mock_units,
+            "astropy.coordinates": mock_coord_mod,
+        }):
+            result = fetch_mod.fetch_wise_archive(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
+        assert result == []
+
+    def test_row_outside_jd_window_skipped(self, tmp_path, monkeypatch):
+        """Row with mjd outside requested JD window is skipped."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        # Row MJD outside window: start_jd=2460000.5 → start_mjd=59999.5
+        # Row mjd=50000 is far outside
+        mock_row = {"mjd": 50000.0, "w1mpro": 15.0, "w1sigmpro": 0.1, "ra": 180.0, "dec": 10.0}
+        mock_table = [mock_row]
+        mock_irsa = MagicMock()
+        mock_irsa.query_region.return_value = mock_table
+        mock_units = MagicMock()
+        mock_coord_mod = MagicMock()
+        mock_coord_mod.SkyCoord.return_value = MagicMock()
+        with patch.dict("sys.modules", {
+            "astroquery.ipac.irsa": MagicMock(Irsa=mock_irsa),
+            "astropy.units": mock_units,
+            "astropy.coordinates": mock_coord_mod,
+        }):
+            result = fetch_mod.fetch_wise_archive(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
+        assert result == []
+
+    def test_row_with_none_mag_uses_sentinel(self, tmp_path, monkeypatch):
+        """Row with None w1mpro uses sentinel 99.0; None w1sigmpro uses 0.1."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        # MJD=59999.5+0.5=60000 → JD=2460000.5 which is within [2460000.5, 2460010.5]
+        mjd_in = 2460000.5 - 2_400_000.5  # = 60000.0
+        mock_row = {
+            "mjd": mjd_in,
+            "w1mpro": None,
+            "w1sigmpro": None,
+            "ra": 180.0,
+            "dec": 10.0,
+        }
+        mock_table = [mock_row]
+        mock_irsa = MagicMock()
+        mock_irsa.query_region.return_value = mock_table
+        mock_units = MagicMock()
+        mock_coord_mod = MagicMock()
+        mock_coord_mod.SkyCoord.return_value = MagicMock()
+        with patch.dict("sys.modules", {
+            "astroquery.ipac.irsa": MagicMock(Irsa=mock_irsa),
+            "astropy.units": mock_units,
+            "astropy.coordinates": mock_coord_mod,
+        }):
+            result = fetch_mod.fetch_wise_archive(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
+        assert len(result) == 1
+        assert result[0].mag == 99.0
+        assert result[0].mag_err == 0.1
+        assert result[0].mission == "WISE"
+
+    def test_successful_row_within_jd_window(self, tmp_path, monkeypatch):
+        """Successful row within JD window creates correct Observation."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        mjd_in = 2460005.0 - 2_400_000.5  # = 60004.5
+        mock_row = {
+            "mjd": mjd_in,
+            "w1mpro": 14.3,
+            "w1sigmpro": 0.02,
+            "ra": 181.5,
+            "dec": 9.5,
+        }
+        mock_table = [mock_row]
+        mock_irsa = MagicMock()
+        mock_irsa.query_region.return_value = mock_table
+        mock_units = MagicMock()
+        mock_coord_mod = MagicMock()
+        mock_coord_mod.SkyCoord.return_value = MagicMock()
+        with patch.dict("sys.modules", {
+            "astroquery.ipac.irsa": MagicMock(Irsa=mock_irsa),
+            "astropy.units": mock_units,
+            "astropy.coordinates": mock_coord_mod,
+        }):
+            result = fetch_mod.fetch_wise_archive(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
+        assert len(result) == 1
+        assert result[0].mission == "WISE"
+        assert result[0].filter_band == "W1"
+        assert abs(result[0].mag - 14.3) < 1e-6
+        assert abs(result[0].mag_err - 0.02) < 1e-6
+        assert abs(result[0].jd - (mjd_in + 2_400_000.5)) < 1e-6
+
+
+class TestFetchDecamArchive:
+    """Tests for fetch_decam_archive."""
+
+    def test_cache_hit_returns_observations(self, tmp_path, monkeypatch):
+        """Cache hit path: load from cache and return Observation objects."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        import hashlib
+        cache_key = hashlib.md5(
+            b"decam_180.0_10.0_1.0_2460000.5_2460010.5"
+        ).hexdigest()
+        cached_data = [{
+            "obs_id": "decam_0_60000.00000",
+            "ra_deg": 180.0,
+            "dec_deg": 10.0,
+            "jd": 2460000.5,
+            "mag": 21.0,
+            "mag_err": 0.1,
+            "filter_band": "r",
+            "mission": "DECam",
+        }]
+        fetch_mod._save_cache(cache_key, cached_data)
+
+        result = fetch_mod.fetch_decam_archive(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
+        assert len(result) == 1
+        assert result[0].mission == "DECam"
+
+    def test_import_error_returns_empty(self, tmp_path, monkeypatch):
+        """ImportError (no pyvo) returns empty list."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        with patch.dict("sys.modules", {"pyvo": None}):
+            result = fetch_mod.fetch_decam_archive(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
+        assert result == []
+
+    def test_api_exception_returns_empty(self, tmp_path, monkeypatch):
+        """TAP service raising exception returns empty list."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        mock_tap = MagicMock()
+        mock_tap.dal.TAPService.return_value.search.side_effect = RuntimeError("tap error")
+        with patch.dict("sys.modules", {"pyvo": mock_tap}):
+            result = fetch_mod.fetch_decam_archive(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
+        assert result == []
+
+    def test_empty_table_returns_empty(self, tmp_path, monkeypatch):
+        """Empty table from TAP returns empty list."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        mock_tap = MagicMock()
+        mock_tap.dal.TAPService.return_value.search.return_value.to_table.return_value = []
+        with patch.dict("sys.modules", {"pyvo": mock_tap}):
+            result = fetch_mod.fetch_decam_archive(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
+        assert result == []
+
+    def test_none_table_returns_empty(self, tmp_path, monkeypatch):
+        """None table from TAP returns empty list."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        mock_tap = MagicMock()
+        mock_tap.dal.TAPService.return_value.search.return_value.to_table.return_value = None
+        with patch.dict("sys.modules", {"pyvo": mock_tap}):
+            result = fetch_mod.fetch_decam_archive(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
+        assert result == []
+
+    def test_successful_row(self, tmp_path, monkeypatch):
+        """Successful row creates correct DECam Observation."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        mjd_in = 2460005.0 - 2_400_000.5
+        mock_row = {
+            "mjd": mjd_in,
+            "mag_auto": 21.5,
+            "magerr_auto": 0.08,
+            "filter": "g",
+            "ra": 180.5,
+            "dec": 10.2,
+        }
+        mock_table = MagicMock()
+        mock_table.__len__ = lambda s: 1
+        mock_table.__iter__ = lambda s: iter([mock_row])
+        mock_tap = MagicMock()
+        mock_tap.dal.TAPService.return_value.search.return_value.to_table.return_value = mock_table
+        with patch.dict("sys.modules", {"pyvo": mock_tap}):
+            result = fetch_mod.fetch_decam_archive(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
+        assert len(result) == 1
+        assert result[0].mission == "DECam"
+        assert result[0].filter_band == "g"
+        assert abs(result[0].mag - 21.5) < 1e-6
+
+    def test_row_with_none_fields(self, tmp_path, monkeypatch):
+        """Row with None mag_auto, magerr_auto, filter uses defaults."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        mjd_in = 2460005.0 - 2_400_000.5
+        mock_row = {
+            "mjd": mjd_in,
+            "mag_auto": None,
+            "magerr_auto": None,
+            "filter": None,
+            "ra": 180.5,
+            "dec": 10.2,
+        }
+        mock_table = MagicMock()
+        mock_table.__len__ = lambda s: 1
+        mock_table.__iter__ = lambda s: iter([mock_row])
+        mock_tap = MagicMock()
+        mock_tap.dal.TAPService.return_value.search.return_value.to_table.return_value = mock_table
+        with patch.dict("sys.modules", {"pyvo": mock_tap}):
+            result = fetch_mod.fetch_decam_archive(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
+        assert len(result) == 1
+        assert result[0].mag == 99.0
+        assert result[0].mag_err == 0.1
+        assert result[0].filter_band == "?"
+
+
+class TestFetchTessFFIs:
+    """Tests for fetch_tess_ffis."""
+
+    def test_cache_hit_returns_observations(self, tmp_path, monkeypatch):
+        """Cache hit path: load from cache and return Observation objects."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        import hashlib
+        cache_key = hashlib.md5(
+            b"tess_180.0_10.0_1.0_2460000.5_2460010.5"
+        ).hexdigest()
+        cached_data = [{
+            "obs_id": "tess_s1_t12345",
+            "ra_deg": 180.0,
+            "dec_deg": 10.0,
+            "jd": 2460005.0,
+            "mag": 14.0,
+            "mag_err": 0.01,
+            "filter_band": "T",
+            "mission": "TESS",
+        }]
+        fetch_mod._save_cache(cache_key, cached_data)
+
+        result = fetch_mod.fetch_tess_ffis(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
+        assert len(result) == 1
+        assert result[0].mission == "TESS"
+
+    def test_import_error_returns_empty(self, tmp_path, monkeypatch):
+        """ImportError (no astroquery.mast) returns empty list."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        with patch.dict("sys.modules", {"astroquery.mast": None}):
+            result = fetch_mod.fetch_tess_ffis(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
+        assert result == []
+
+    def test_observations_api_exception_returns_empty(self, tmp_path, monkeypatch):
+        """Observations.query_criteria raising exception returns empty list."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        mock_mast = MagicMock()
+        mock_mast.Observations.query_criteria.side_effect = RuntimeError("mast error")
+        with patch.dict("sys.modules", {"astroquery.mast": mock_mast}):
+            result = fetch_mod.fetch_tess_ffis(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
+        assert result == []
+
+    def test_no_sectors_found_returns_empty(self, tmp_path, monkeypatch):
+        """Empty TESS observations table returns empty list."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        mock_mast = MagicMock()
+        mock_mast.Observations.query_criteria.return_value = []
+        with patch.dict("sys.modules", {"astroquery.mast": mock_mast}):
+            result = fetch_mod.fetch_tess_ffis(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
+        assert result == []
+
+    def test_none_sectors_returns_empty(self, tmp_path, monkeypatch):
+        """None TESS observations returns empty list."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        mock_mast = MagicMock()
+        mock_mast.Observations.query_criteria.return_value = None
+        with patch.dict("sys.modules", {"astroquery.mast": mock_mast}):
+            result = fetch_mod.fetch_tess_ffis(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
+        assert result == []
+
+    def test_sectors_found_but_tic_none_returns_empty(self, tmp_path, monkeypatch):
+        """Sectors found but TIC query returns None gives empty list."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        mock_sector = {
+            "t_min": 3000.0,
+            "t_max": 3027.0,
+            "sequence_number": 1,
+        }
+        mock_mast = MagicMock()
+        mock_mast.Observations.query_criteria.return_value = [mock_sector]
+        mock_mast.Catalogs.query_region.return_value = None
+        with patch.dict("sys.modules", {"astroquery.mast": mock_mast}):
+            result = fetch_mod.fetch_tess_ffis(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
+        assert result == []
+
+    def test_sectors_found_but_tic_empty_returns_empty(self, tmp_path, monkeypatch):
+        """Sectors found but TIC query returns empty table gives empty list."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        mock_sector = {
+            "t_min": 3000.0,
+            "t_max": 3027.0,
+            "sequence_number": 1,
+        }
+        mock_mast = MagicMock()
+        mock_mast.Observations.query_criteria.return_value = [mock_sector]
+        mock_mast.Catalogs.query_region.return_value = []
+        with patch.dict("sys.modules", {"astroquery.mast": mock_mast}):
+            result = fetch_mod.fetch_tess_ffis(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
+        assert result == []
+
+    def test_full_successful_path(self, tmp_path, monkeypatch):
+        """Full path: sector + TIC sources produces TESS Observations."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        # BTJD offset = 2457000.0; JD 2460000.5 → BTJD = 3000.5
+        # sector t_min=3000.0, t_max=3027.0 → epoch_jd = 3013.5 + 2457000 = 2460013.5
+        # start_jd=2460000.5, end_jd=2460030.5 → epoch_jd within window+margin
+        mock_sector = {
+            "t_min": 3000.0,
+            "t_max": 3027.0,
+            "sequence_number": 5,
+        }
+        mock_tic_src = {
+            "ID": "99001",
+            "ra": 180.1,
+            "dec": 10.1,
+            "Tmag": 13.2,
+            "e_Tmag": 0.05,
+        }
+        mock_mast = MagicMock()
+        mock_mast.Observations.query_criteria.return_value = [mock_sector]
+        mock_mast.Catalogs.query_region.return_value = [mock_tic_src]
+        with patch.dict("sys.modules", {"astroquery.mast": mock_mast}):
+            result = fetch_mod.fetch_tess_ffis(180.0, 10.0, 1.0, 2460000.5, 2460030.5)
+        assert len(result) == 1
+        assert result[0].mission == "TESS"
+        assert result[0].filter_band == "T"
+        assert result[0].obs_id == "tess_s5_t99001"
+        assert abs(result[0].mag - 13.2) < 1e-6
+
+    def test_sector_row_bad_epoch_skipped(self, tmp_path, monkeypatch):
+        """Sector row that raises exception during epoch parse is skipped."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        # A sector row with bad t_min that causes a failure
+        mock_bad_sector = {"t_min": "not_a_number", "t_max": "also_bad", "sequence_number": 1}
+        mock_tic_src = {
+            "ID": "12345",
+            "ra": 180.0,
+            "dec": 10.0,
+            "Tmag": 14.0,
+            "e_Tmag": 0.1,
+        }
+        mock_mast = MagicMock()
+        mock_mast.Observations.query_criteria.return_value = [mock_bad_sector]
+        mock_mast.Catalogs.query_region.return_value = [mock_tic_src]
+        with patch.dict("sys.modules", {"astroquery.mast": mock_mast}):
+            result = fetch_mod.fetch_tess_ffis(180.0, 10.0, 1.0, 2460000.5, 2460030.5)
+        # Bad sector row is skipped; result is empty
+        assert result == []
+
+    def test_tic_source_none_tmag_uses_default(self, tmp_path, monkeypatch):
+        """TIC source with None Tmag uses default magnitude 20.0."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        mock_sector = {
+            "t_min": 3000.0,
+            "t_max": 3027.0,
+            "sequence_number": 2,
+        }
+        mock_tic_src = {
+            "ID": "55555",
+            "ra": 180.0,
+            "dec": 10.0,
+            "Tmag": None,
+            "e_Tmag": None,
+        }
+        mock_mast = MagicMock()
+        mock_mast.Observations.query_criteria.return_value = [mock_sector]
+        mock_mast.Catalogs.query_region.return_value = [mock_tic_src]
+        with patch.dict("sys.modules", {"astroquery.mast": mock_mast}):
+            result = fetch_mod.fetch_tess_ffis(180.0, 10.0, 1.0, 2460000.5, 2460030.5)
+        assert len(result) == 1
+        assert result[0].mag == 20.0
+        assert result[0].mag_err == 0.1
+
+
+class TestFetchDiscovery:
+    """Tests for fetch_discovery."""
+
+    def test_wise_only(self, tmp_path, monkeypatch):
+        """sources=('WISE',) calls fetch_wise_archive and returns FetchResult."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        dummy_obs = Observation(
+            obs_id="wise_test",
+            ra_deg=180.0, dec_deg=10.0, jd=2460005.0,
+            mag=15.0, mag_err=0.1, filter_band="W1", mission="WISE",
+        )
+        with patch.object(fetch_mod, "fetch_wise_archive", return_value=[dummy_obs]) as mw, \
+             patch.object(fetch_mod, "fetch_decam_archive", return_value=[]) as md, \
+             patch.object(fetch_mod, "fetch_tess_ffis", return_value=[]) as mt:
+            result = fetch_mod.fetch_discovery(180.0, 10.0, 1.0, 2460000.5, 2460010.5,
+                                               sources=("WISE",))
+        assert len(result.alerts) == 1
+        assert result.alerts[0].mission == "WISE"
+        mw.assert_called_once()
+        md.assert_not_called()
+        mt.assert_not_called()
+
+    def test_decam_only(self, tmp_path, monkeypatch):
+        """sources=('DECam',) calls fetch_decam_archive and returns FetchResult."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        dummy_obs = Observation(
+            obs_id="decam_test",
+            ra_deg=180.0, dec_deg=10.0, jd=2460005.0,
+            mag=21.0, mag_err=0.1, filter_band="g", mission="DECam",
+        )
+        with patch.object(fetch_mod, "fetch_wise_archive", return_value=[]) as mw, \
+             patch.object(fetch_mod, "fetch_decam_archive", return_value=[dummy_obs]) as md, \
+             patch.object(fetch_mod, "fetch_tess_ffis", return_value=[]) as mt:
+            result = fetch_mod.fetch_discovery(180.0, 10.0, 1.0, 2460000.5, 2460010.5,
+                                               sources=("DECam",))
+        assert len(result.alerts) == 1
+        assert result.alerts[0].mission == "DECam"
+        mw.assert_not_called()
+        md.assert_called_once()
+        mt.assert_not_called()
+
+    def test_tess_only(self, tmp_path, monkeypatch):
+        """sources=('TESS',) calls fetch_tess_ffis and returns FetchResult."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        dummy_obs = Observation(
+            obs_id="tess_test",
+            ra_deg=180.0, dec_deg=10.0, jd=2460005.0,
+            mag=14.0, mag_err=0.05, filter_band="T", mission="TESS",
+        )
+        with patch.object(fetch_mod, "fetch_wise_archive", return_value=[]) as mw, \
+             patch.object(fetch_mod, "fetch_decam_archive", return_value=[]) as md, \
+             patch.object(fetch_mod, "fetch_tess_ffis", return_value=[dummy_obs]) as mt:
+            result = fetch_mod.fetch_discovery(180.0, 10.0, 1.0, 2460000.5, 2460010.5,
+                                               sources=("TESS",))
+        assert len(result.alerts) == 1
+        assert result.alerts[0].mission == "TESS"
+        mw.assert_not_called()
+        md.assert_not_called()
+        mt.assert_called_once()
+
+    def test_all_three_sources(self, tmp_path, monkeypatch):
+        """sources=('WISE','DECam','TESS') calls all three and combines results."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        def make_obs(obs_id, mission, filter_band):
+            return Observation(
+                obs_id=obs_id, ra_deg=180.0, dec_deg=10.0, jd=2460005.0,
+                mag=15.0, mag_err=0.1, filter_band=filter_band, mission=mission,
+            )
+        with patch.object(fetch_mod, "fetch_wise_archive",
+                          return_value=[make_obs("w1", "WISE", "W1")]) as mw, \
+             patch.object(fetch_mod, "fetch_decam_archive",
+                          return_value=[make_obs("d1", "DECam", "g")]) as md, \
+             patch.object(fetch_mod, "fetch_tess_ffis",
+                          return_value=[make_obs("t1", "TESS", "T")]) as mt:
+            result = fetch_mod.fetch_discovery(180.0, 10.0, 1.0, 2460000.5, 2460010.5,
+                                               sources=("WISE", "DECam", "TESS"))
+        assert len(result.alerts) == 3
+        missions = {obs.mission for obs in result.alerts}
+        assert missions == {"WISE", "DECam", "TESS"}
+        mw.assert_called_once()
+        md.assert_called_once()
+        mt.assert_called_once()
+
+    def test_empty_sources_returns_empty_result(self, tmp_path, monkeypatch):
+        """Empty sources tuple: no archive queried, FetchResult has no alerts."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        with patch.object(fetch_mod, "fetch_wise_archive", return_value=[]) as mw, \
+             patch.object(fetch_mod, "fetch_decam_archive", return_value=[]) as md, \
+             patch.object(fetch_mod, "fetch_tess_ffis", return_value=[]) as mt:
+            # Empty sources: no archive is called; provenance has empty surveys tuple
+            result = fetch_mod.fetch_discovery(180.0, 10.0, 1.0, 2460000.5, 2460010.5,
+                                               sources=())
+        assert len(result.alerts) == 0
+        mw.assert_not_called()
+        md.assert_not_called()
+        mt.assert_not_called()
+
+
+class TestFetchRoutingNewSurveys:
+    """Tests for fetch() routing TESS/DECam/WISE to new archive functions."""
+
+    def test_fetch_routes_wise_survey(self, tmp_path, monkeypatch):
+        """surveys=('WISE',) in fetch() calls fetch_wise_archive."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        dummy_obs = Observation(
+            obs_id="wise_r",
+            ra_deg=180.0, dec_deg=10.0, jd=2460005.0,
+            mag=15.0, mag_err=0.1, filter_band="W1", mission="WISE",
+        )
+        with patch.object(fetch_mod, "fetch_wise_archive", return_value=[dummy_obs]) as mw:
+            result = fetch_mod.fetch(180.0, 10.0, 1.0, 2460000.5, 2460010.5,
+                                     surveys=("WISE",))  # type: ignore[arg-type]
+        assert len(result.alerts) == 1
+        assert result.alerts[0].mission == "WISE"
+        mw.assert_called_once()
+
+    def test_fetch_routes_decam_survey(self, tmp_path, monkeypatch):
+        """surveys=('DECam',) in fetch() calls fetch_decam_archive."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        dummy_obs = Observation(
+            obs_id="decam_r",
+            ra_deg=180.0, dec_deg=10.0, jd=2460005.0,
+            mag=21.0, mag_err=0.1, filter_band="g", mission="DECam",
+        )
+        with patch.object(fetch_mod, "fetch_decam_archive", return_value=[dummy_obs]) as md:
+            result = fetch_mod.fetch(180.0, 10.0, 1.0, 2460000.5, 2460010.5,
+                                     surveys=("DECam",))  # type: ignore[arg-type]
+        assert len(result.alerts) == 1
+        assert result.alerts[0].mission == "DECam"
+        md.assert_called_once()
+
+    def test_fetch_routes_tess_survey(self, tmp_path, monkeypatch):
+        """surveys=('TESS',) in fetch() calls fetch_tess_ffis."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        dummy_obs = Observation(
+            obs_id="tess_r",
+            ra_deg=180.0, dec_deg=10.0, jd=2460005.0,
+            mag=14.0, mag_err=0.05, filter_band="T", mission="TESS",
+        )
+        with patch.object(fetch_mod, "fetch_tess_ffis", return_value=[dummy_obs]) as mt:
+            result = fetch_mod.fetch(180.0, 10.0, 1.0, 2460000.5, 2460010.5,
+                                     surveys=("TESS",))  # type: ignore[arg-type]
+        assert len(result.alerts) == 1
+        assert result.alerts[0].mission == "TESS"
+        mt.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Coverage gap tests: exception-handler and branch paths not reached above
+# ---------------------------------------------------------------------------
+
+class TestFetchWiseMalformedRow:
+    """Covers fetch_wise_archive lines 1514-1515: except Exception: continue."""
+
+    def test_malformed_row_skipped_good_row_kept(self, tmp_path, monkeypatch):
+        """A row with non-numeric ra causes exception; good row still returned."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        mjd_ok = 2460005.0 - 2_400_000.5  # valid MJD inside window
+        good_row = {"mjd": mjd_ok, "ra": 180.0, "dec": 10.0, "w1mpro": 14.5, "w1sigmpro": 0.05}
+        bad_row = {"mjd": mjd_ok, "ra": "bad", "dec": 10.0, "w1mpro": 15.0, "w1sigmpro": 0.1}
+        mock_irsa = MagicMock()
+        mock_irsa.query_region.return_value = [bad_row, good_row]
+        mock_units = MagicMock()
+        mock_coord_mod = MagicMock()
+        mock_coord_mod.SkyCoord.return_value = MagicMock()
+        with patch.dict("sys.modules", {
+            "astroquery.ipac.irsa": MagicMock(Irsa=mock_irsa),
+            "astropy.units": mock_units,
+            "astropy.coordinates": mock_coord_mod,
+        }):
+            result = fetch_mod.fetch_wise_archive(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
+        # bad_row skipped, good_row returned
+        assert len(result) == 1
+        assert result[0].mission == "WISE"
+
+
+class TestFetchDecamMalformedRow:
+    """Covers fetch_decam_archive lines 1600-1601: except Exception: continue."""
+
+    def test_malformed_row_skipped_good_row_kept(self, tmp_path, monkeypatch):
+        """A row with non-numeric ra causes exception; good row still returned."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        mjd_ok = 60004.5  # MJD inside window (start_mjd=60000.0, end_mjd=60010.0)
+        good_row = {"mjd": mjd_ok, "ra": 180.0, "dec": 10.0, "mag_auto": 20.0,
+                    "magerr_auto": 0.1, "filter": "r"}
+        bad_row = {"mjd": mjd_ok, "ra": "bad", "dec": 10.0, "mag_auto": 21.0,
+                   "magerr_auto": 0.1, "filter": "r"}
+        mock_table = MagicMock()
+        mock_table.__len__ = lambda s: 2
+        mock_table.__iter__ = lambda s: iter([bad_row, good_row])
+        mock_tap = MagicMock()
+        mock_tap.dal.TAPService.return_value.search.return_value.to_table.return_value = mock_table
+        with patch.dict("sys.modules", {"pyvo": mock_tap}):
+            result = fetch_mod.fetch_decam_archive(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
+        # bad_row raises ValueError on float("bad") → skipped; good_row kept
+        assert len(result) == 1
+        assert result[0].mission == "DECam"
+
+
+class TestFetchTessCoveragePaths:
+    """Covers remaining TESS branch paths (lines 1675-1676, 1690, 1701, 1719-1720)."""
+
+    def test_tic_query_exception_returns_empty(self, tmp_path, monkeypatch):
+        """Catalogs.query_region raising exception sets tic=None → returns [] (lines 1675-1676)."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        # Valid sector that would pass epoch filter
+        mock_sector = {"t_min": 3000.0, "t_max": 3027.0, "sequence_number": 1}
+        mock_mast = MagicMock()
+        mock_mast.Observations.query_criteria.return_value = [mock_sector]
+        mock_mast.Catalogs.query_region.side_effect = RuntimeError("TIC unavailable")
+        with patch.dict("sys.modules", {"astroquery.mast": mock_mast}):
+            result = fetch_mod.fetch_tess_ffis(180.0, 10.0, 1.0, 2460000.5, 2460030.5)
+        assert result == []
+
+    def test_sector_epoch_out_of_range_skipped(self, tmp_path, monkeypatch):
+        """Sector with epoch far outside JD window is skipped via continue (line 1690)."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        # t_min=0, t_max=27 → epoch_jd = 13.5 + 2457000 = 2457013.5
+        # window: start_jd=2460000.5 ± 14  → [2459986.5, 2460024.5]
+        # 2457013.5 is NOT in that range → line 1690 continue
+        out_of_range_sector = {"t_min": 0.0, "t_max": 27.0, "sequence_number": 9}
+        valid_tic_src = {"ID": "11111", "ra": 180.0, "dec": 10.0, "Tmag": 14.0, "e_Tmag": 0.1}
+        mock_mast = MagicMock()
+        mock_mast.Observations.query_criteria.return_value = [out_of_range_sector]
+        mock_mast.Catalogs.query_region.return_value = [valid_tic_src]
+        with patch.dict("sys.modules", {"astroquery.mast": mock_mast}):
+            result = fetch_mod.fetch_tess_ffis(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
+        assert result == []
+
+    def test_duplicate_tic_source_deduped(self, tmp_path, monkeypatch):
+        """Same TIC source ID in a sector appears twice; second is deduped (line 1701)."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        # epoch_jd = (3000+3027)/2 + 2457000 = 2460013.5, inside window [2459986.5, 2460024.5]
+        mock_sector = {"t_min": 3000.0, "t_max": 3027.0, "sequence_number": 3}
+        tic_src = {"ID": "77777", "ra": 180.0, "dec": 10.0, "Tmag": 14.0, "e_Tmag": 0.1}
+        # Same source listed twice → second occurrence triggers dedup continue
+        mock_mast = MagicMock()
+        mock_mast.Observations.query_criteria.return_value = [mock_sector]
+        mock_mast.Catalogs.query_region.return_value = [tic_src, tic_src]
+        with patch.dict("sys.modules", {"astroquery.mast": mock_mast}):
+            result = fetch_mod.fetch_tess_ffis(180.0, 10.0, 1.0, 2460000.5, 2460030.5)
+        # Only one observation despite two identical TIC rows
+        assert len(result) == 1
+        assert result[0].obs_id == "tess_s3_t77777"
+
+    def test_malformed_tic_row_skipped(self, tmp_path, monkeypatch):
+        """TIC row with non-numeric ra raises exception and is skipped (lines 1719-1720)."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        mock_sector = {"t_min": 3000.0, "t_max": 3027.0, "sequence_number": 4}
+        bad_tic = {"ID": "88888", "ra": "bad_value", "dec": 10.0, "Tmag": 14.0, "e_Tmag": 0.1}
+        good_tic = {"ID": "99999", "ra": 180.0, "dec": 10.0, "Tmag": 14.0, "e_Tmag": 0.1}
+        mock_mast = MagicMock()
+        mock_mast.Observations.query_criteria.return_value = [mock_sector]
+        mock_mast.Catalogs.query_region.return_value = [bad_tic, good_tic]
+        with patch.dict("sys.modules", {"astroquery.mast": mock_mast}):
+            result = fetch_mod.fetch_tess_ffis(180.0, 10.0, 1.0, 2460000.5, 2460030.5)
+        # bad_tic skipped, good_tic kept
+        assert len(result) == 1
+        assert result[0].obs_id == "tess_s4_t99999"
