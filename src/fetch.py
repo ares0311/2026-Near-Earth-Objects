@@ -1688,7 +1688,8 @@ def fetch_tess_ffis(
             epoch_jd = (t_min + t_max) / 2.0 + _BTJD_OFFSET
             if not (start_jd - 14 <= epoch_jd <= end_jd + 14):
                 continue
-            sec_id = str(sector_row["sequence_number"]) if sector_row["sequence_number"] is not None else "0"
+            seq = sector_row["sequence_number"]
+            sec_id = str(seq) if seq is not None else "0"
         except Exception:
             continue
 
