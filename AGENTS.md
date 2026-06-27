@@ -111,7 +111,7 @@ Each stage produces a typed, immutable result object. No shared mutable state.
 | Module | Status | Tests | Description |
 |---|---|---|---|
 | `schemas.py` | complete | test_schemas.py | All pipeline data models (Pydantic, frozen) |
-| `fetch.py` | complete | test_fetch.py | ZTF/ATLAS/MPC data retrieval |
+| `fetch.py` | complete | test_fetch.py | WISE/DECam/TESS discovery layer + ZTF/ATLAS/MPC (training) |
 | `preprocess.py` | complete | test_preprocess.py | Difference image handling, source extraction |
 | `detect.py` | complete | test_detect.py | Moving object detection; streak/trail identification |
 | `link.py` | complete | test_link.py | Tracklet linking across nights |
@@ -537,14 +537,15 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.89.3)
+## Current State (v0.90.0)
 
-All 10 pipeline modules are complete. The offline suite passes 1531+ tests
-(after dead-code removal in v0.89.3; plus 10+ synthetic adversarial tests), with 2 live/integration checks
-deselected. CI is green on Python 3.14 with the 100% coverage target.
-All three ML tiers have trained weights and all calibration KPIs have passed.
-**All T1 production gaps are CLOSED.** The pipeline is ready to search unreviewed
-archival data (TESS FFIs, DECam/NOIRLab, WISE/NEOWISE) for NEO candidates.
+All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
+2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
+coverage target. All three ML tiers have trained weights and all calibration KPIs
+have passed. **All T1 production gaps are CLOSED.** The discovery fetch layer
+targeting WISE/NEOWISE, DECam/NOIRLab, and TESS FFIs is complete (PR #119,
+2026-06-27). The pipeline is ready to search unreviewed archival data for NEO
+candidates. `run_pipeline.py` default survey is now `WISE`.
 Console output is now fully compliant with `docs/CONSOLE_OUTPUT_SPEC.md` —
 every stage print includes `elapsed {M}m{S:02d}s` and ETA is computed from
 a measurable quantity (surveys done/total, tracklets done/total).
@@ -583,7 +584,7 @@ a measurable quantity (surveys done/total, tracklets done/total).
 
 See `docs/PRODUCTION_READINESS.md` for the full gap register.
 
-### Handoff notes (2026-06-26) — v0.89.3 (CURRENT)
+### Handoff notes (2026-06-27) — v0.90.0 (CURRENT)
 
 **Goal: defensible discovery paper** (operator-confirmed 2026-06-26 by Jerome W. Lindsey III).
 Two-stage review before any external submission:
@@ -591,24 +592,29 @@ Two-stage review before any external submission:
   2. Operator (Jerome) reviews survivors
   3. MPC submission → provisional designation → independent confirmation → journal paper
 
-**Adversarial review implemented (v0.89.3, PR #116)**:
-`Skills/adversarial_review.py` — 11 offline challenges + 2 live checks.
+**Discovery fetch layer complete (PR #119, 2026-06-27)**:
+- `fetch_wise_archive`: IRSA `neowiser_p1bs_psd` cone search; MJD→JD; disk-cached
+- `fetch_decam_archive`: NOIRLab NSC DR2 via pyvo TAP; disk-cached
+- `fetch_tess_ffis`: MAST `Observations.query_criteria()` + TIC catalog; BTJD→JD; disk-cached
+- `fetch_discovery`: routing enforcer — raises `ValueError` for ZTF/ATLAS inputs
+- `Mission` literal extended: `"TESS"`, `"DECam"`, `"WISE"` added
+- `run_pipeline.py` default changed to `--surveys WISE`
+- 1573 tests; 100% coverage; CI green on Python 3.14 ✓
+
+**Adversarial review implemented (v0.89.3, PR #116/117)**:
+`Skills/adversarial_review.py` — 13 challenges + 2 live checks.
 Verdicts: SURVIVE / BORDERLINE / REJECT. Exit codes 0/1/2.
 Tests: `tests/test_adversarial_review_skill.py` (50+ cases).
-Docs: `docs/MPC_SUBMISSION_POLICY.md §Two-Stage Review Process`.
 
-**Console output elapsed+ETA compliance (PR #116, pending merge to main)**:
-Every stage print in `Skills/run_pipeline.py` now includes elapsed time
-and ETA from measurable quantity. `docs/CONSOLE_OUTPUT_SPEC.md` updated.
-
-**DO NOT give the operator any live run command** until PR #116 merges to main.
-After merge, the two-step operator workflow is:
+**Live pipeline operator command** (after `git pull origin main`):
 ```bash
 git pull origin main && export PYTHONPATH=src
-caffeinate -i uv run python Skills/run_pipeline.py --ra 284.13 --dec -22.5 \
-    --radius 3.5 --start-jd 2461183.0 --end-jd 2461213.0 \
-    --surveys ZTF --no-dry-run --force-refresh --no-resume
-# Then pipe output through adversarial review:
+# Target WISE/NEOWISE archival data — do NOT use --surveys ZTF for discovery
+caffeinate -i uv run python Skills/run_pipeline.py \
+    --ra <RA> --dec <Dec> --radius 3.5 \
+    --start-jd <start> --end-jd <end> \
+    --surveys WISE --no-dry-run
+# Then run adversarial review on any candidates:
 PYTHONPATH=src uv run python Skills/adversarial_review.py <candidates.json>
 ```
 

@@ -46,9 +46,10 @@ The following work is done and must NOT be repeated:
 All modules compile, pass 100% branch coverage, and produce correct output
 **on synthetic/mocked pipeline data**. Real labeled ZTF alerts have been used
 to train and calibrate the ML tiers (ZTF = training source only; NOT discovery
-source). Production discovery operation requires the fetch.py redesign to
-target unreviewed archives (TESS FFIs, DECam/NOIRLab, WISE/NEOWISE). T1-C
-known-object recovery audit and operator false-positive review are CLOSED.
+source). The fetch.py discovery layer targeting unreviewed archives
+(WISE/NEOWISE, DECam/NOIRLab, TESS FFIs) is now complete (PR #119,
+2026-06-27). T1-C known-object recovery audit and operator false-positive
+review are CLOSED.
 
 ---
 
@@ -497,17 +498,17 @@ are sequential — each blocks the next.
 - [ ] At least one `ScoredNEO` passes `ready_for_submission()` gate from pipeline
 - [ ] That candidate survives `Skills/adversarial_review.py` with verdict = SURVIVE
       (no FAILs; ≤1 WARNING across all 13 challenges)
-- **PREREQUISITE**: fetch.py must be redesigned to target unreviewed archives
-  (TESS FFIs, DECam/NOIRLab, WISE/NEOWISE) before any discovery run. Do NOT
-  use `--surveys ZTF` or `--surveys ATLAS` for discovery — those streams are
-  already processed by ZTF ZAPS and the ATLAS pipeline.
-- Post-fetch.py-redesign operator workflow (placeholder — command to be filled
-  when WISE/NEOWISE adapter is implemented):
+- **fetch.py discovery layer is COMPLETE** (PR #119, 2026-06-27). Do NOT use
+  `--surveys ZTF` or `--surveys ATLAS` for discovery — those streams are already
+  processed by ZTF ZAPS and the ATLAS pipeline.
+- Operator workflow (from main, PR #119 already merged):
   ```bash
   git pull origin main && export PYTHONPATH=src
-  # Run against unreviewed archive (WISE/NEOWISE, TESS FFIs, or DECam/NOIRLab)
+  # Default is --surveys WISE; target unreviewed WISE/NEOWISE archive
   caffeinate -i uv run python Skills/run_pipeline.py \
-      --surveys WISE --no-dry-run --force-refresh --no-resume \
+      --ra <RA> --dec <Dec> --radius 3.5 \
+      --start-jd <start> --end-jd <end> \
+      --surveys WISE --no-dry-run \
       > /tmp/candidates.json
   PYTHONPATH=src uv run python Skills/adversarial_review.py /tmp/candidates.json
   ```

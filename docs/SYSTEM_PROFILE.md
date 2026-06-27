@@ -72,6 +72,22 @@ For PyTorch training on this Mac, prefer `mps`/Metal when
 selected device, batch size, worker count, and relevant thread settings in their
 stdout logs and any training report artifact.
 
+**All tensor data must be moved to the device explicitly.** Moving the model
+alone (`.to(device)`) is not sufficient — input tensors, label tensors, and any
+intermediate tensors passed to the model must also be moved. The canonical
+pattern:
+```python
+device = torch.device("mps") if torch.backends.mps.is_available() else torch.device("cpu")
+model = model.to(device)
+# Inside training loop:
+inputs = inputs.to(device)
+labels = labels.to(device)
+```
+Failing to move data tensors to the same device as the model will raise a
+`RuntimeError` on MPS. This is a mandatory implementation requirement for all
+training scripts in this project (Tier 2 CNN, Tier 3 Transformer, ensemble
+stacker).
+
 ---
 
 ## Project-Specific Guidance

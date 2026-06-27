@@ -211,7 +211,7 @@ Each stage produces a typed, immutable result object. No shared mutable state.
 | Module | Status | Tests | Description |
 |---|---|---|---|
 | `schemas.py` | complete | test_schemas.py | All pipeline data models (Pydantic, frozen) |
-| `fetch.py` | complete | test_fetch.py | ZTF/ATLAS/MPC data retrieval |
+| `fetch.py` | complete | test_fetch.py | WISE/DECam/TESS discovery layer + ZTF/ATLAS/MPC (training) |
 | `preprocess.py` | complete | test_preprocess.py | Difference image handling, source extraction |
 | `detect.py` | complete | test_detect.py | Moving object detection; streak/trail identification |
 | `link.py` | complete | test_link.py | Tracklet linking across nights |
@@ -260,8 +260,8 @@ Build in the order listed. Each module depends on all prior modules.
 
 ## Core Design Decisions
 
-### DECISION-001: ZTF as Primary Survey
-ZTF provides the richest freely available alert stream with pre-computed difference images, a native real/bogus score, and a well-documented Python API. It is the most scientifically productive single choice for a new project without telescope access.
+### DECISION-001: WISE/NEOWISE as Primary Discovery Archive (updated 2026-06-27)
+WISE/NEOWISE is the primary discovery target: 158,000+ minor-planet infrared detections in unreviewed archival data accessible via IRSA without credentials. DECam/NOIRLab NSC DR2 and TESS FFIs are secondary discovery targets. ZTF and ATLAS are **training-data sources only** — ZTF ZAPS and the ATLAS pipeline already process those streams and submit discoveries to MPC. The pipeline must never be run in discovery mode against ZTF or ATLAS; use `--surveys WISE` (default), `DECam`, or `TESS`. See `docs/MISSION.md §The Two-Part Data Strategy`.
 
 ### DECISION-002: Tiered ML Architecture
 Follow the same three-tier approach as the exoplanet pipeline:
@@ -288,7 +288,7 @@ Mirror the exoplanet pipeline's conservatism:
 All models use `ConfigDict(frozen=True)` — immutable after construction.
 
 ```python
-Mission = Literal["ZTF", "ATLAS", "PanSTARRS", "CSS", "MPC"]
+Mission = Literal["ZTF", "ATLAS", "PanSTARRS", "CSS", "MPC", "TESS", "DECam", "WISE"]
 
 NEOClass = Literal["amor", "apollo", "aten", "ieo", "unknown"]
 
@@ -640,17 +640,20 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.89.3)
+## Current State (v0.90.0)
 
-All 10 pipeline modules are complete. The offline suite passes 3600+ tests (plus
-10 synthetic adversarial tests), with 2 live/integration checks deselected. CI is
-green on Python 3.14 with the 100% coverage target. All three ML tiers have
-trained weights: Tier 1 XGBoost (val_acc=99.95%), Tier 2 CNN (val_acc=91.3%),
-and Tier 3 Transformer (val_macro_f1=0.9400, best epoch 17/30).
+All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
+2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
+coverage target. All three ML tiers have trained weights: Tier 1 XGBoost
+(val_acc=99.95%), Tier 2 CNN (val_acc=91.3%), and Tier 3 Transformer
+(val_macro_f1=0.9400, best epoch 17/30).
 **T1-A CLOSED. T1-B CLOSED. T1-C CLOSED. T1-D CLOSED.**
 Ensemble stacker KPIs passed 2026-06-14 (AUC=0.9809, Brier=0.0211, ECE=0.0000).
 T2-C CLOSED 2026-06-21 (operator sign-off by Jerome W. Lindsey III).
 T2-D CLOSED 2026-06-21 (model-weight CI job + `Skills/validate_model_weights.py`).
+**fetch.py discovery layer COMPLETE (PR #119, 2026-06-27)**: `fetch_wise_archive`,
+`fetch_decam_archive`, `fetch_tess_ffis`, `fetch_discovery` routing layer added.
+`run_pipeline.py` default survey changed from ZTF → WISE.
 
 **No T1 production blockers remain.** The pipeline is ready to search unreviewed
 archival data (TESS FFIs, DECam/NOIRLab, WISE/NEOWISE) for NEO candidates.
@@ -691,15 +694,21 @@ filter them before any external submission:
   all citizen-science language replaced with discovery-paper language
 - `docs/near_earth_objects_research_brief.md`: canonical primer, mandatory session read
 
+**PR #119 MERGED (2026-06-27)** ✓ — fetch.py WISE/DECam/TESS discovery layer:
+- `fetch_wise_archive`: IRSA `neowiser_p1bs_psd` cone search; MJD→JD; disk-cached
+- `fetch_decam_archive`: NOIRLab NSC DR2 via pyvo TAP; disk-cached
+- `fetch_tess_ffis`: MAST `Observations.query_criteria()` + TIC catalog; BTJD→JD; disk-cached
+- `fetch_discovery`: routing enforcer — raises `ValueError` for ZTF/ATLAS inputs
+- `schemas.py` `Mission` extended: `"TESS"`, `"DECam"`, `"WISE"` added
+- `run_pipeline.py` default survey changed from `ZTF` → `WISE`; choices expanded
+- CI green at 100% coverage on Python 3.14, 1573 tests ✓
+- `docs/SYSTEM_PROFILE.md` updated: explicit note that tensor data must be `.to(device)`
+
 **CRITICAL — discovery data source**: `run_pipeline.py` must target UNREVIEWED archives
 (TESS FFIs, DECam/NOIRLab, WISE/NEOWISE). Do NOT run with `--surveys ZTF` or
 `--surveys ATLAS` for discovery — ZTF ZAPS and ATLAS pipeline have already processed
 those streams. See `docs/MISSION.md §The Two-Part Data Strategy`.
-**The fetch.py discovery layer redesign is the next required engineering task.**
-It must be completed before any live discovery run.
-
-**DO NOT give the operator any live discovery run command** until the fetch.py discovery
-layer is redesigned to target TESS/DECam/WISE.
+Default is now `--surveys WISE` which is correct for discovery.
 
 **Two human-gated blockers remain**:
 1. **MPC observatory code**: Jerome must contact MPC to determine how a data-analysis
@@ -980,7 +989,7 @@ succeeded and produced the trained Tier 3 weights now recorded under T1-A.
 | `orbit.py` | 100% |
 | `detect.py` | 100% |
 | `classify.py` | 100% |
-| `fetch.py` | 100% (ztfquery, ATLAS, astroquery.mpc, jplhorizons all mocked) |
+| `fetch.py` | 100% (WISE/DECam/TESS + ztfquery, ATLAS, astroquery.mpc, jplhorizons all mocked) |
 
 ### Completed Operational Milestones
 
@@ -1009,19 +1018,25 @@ MPC submission → provisional designation → independent confirmation → jour
 
 1. ~~Merge PR #116~~ DONE ✓
 2. ~~Open/merge PR #117~~ DONE ✓ (2026-06-27, CI green, 1534 tests, 100% coverage)
-3. **Redesign `fetch.py` discovery layer** — add `fetch_tess_ffis`, `fetch_decam_archive`,
-   `fetch_wise_archive`; retire ZTF/ATLAS as discovery sources. This is the next required
-   engineering task. See `docs/MISSION.md §Step 1`.
+3. ~~**Redesign `fetch.py` discovery layer**~~ DONE ✓ (PR #119 merged 2026-06-27, 1573 tests)
 4. **Update `docs/MPC_SUBMISSION_POLICY.md`**: add §Adversarial Review section describing
    the two-stage review process and how it gates external submission.
-5. **Run live pipeline** targeting TESS FFIs / DECam / WISE/NEOWISE (after step 3, using
-   `caffeinate -i` + `--no-dry-run`). Do NOT use `--surveys ZTF` or `--surveys ATLAS`.
+5. **Run live pipeline** targeting WISE/NEOWISE (operator, from main after PR #119 merged):
+   ```bash
+   git pull origin main
+   export PYTHONPATH=src
+   caffeinate -i uv run python Skills/run_pipeline.py \
+       --ra <RA> --dec <Dec> --radius 3.5 \
+       --start-jd <start> --end-jd <end> \
+       --surveys WISE --no-dry-run
+   ```
+   Do NOT use `--surveys ZTF` or `--surveys ATLAS` for discovery.
 6. **Run adversarial review** (`Skills/adversarial_review.py`) on any candidates found.
 7. **Jerome reviews** any SURVIVE or BORDERLINE candidates.
 8. **Jerome resolves MPC observatory code** (human-gated; no code can help here).
 9. Submit survivors to MPC → await provisional designation.
 
-- Console output is fully compliant with `docs/CONSOLE_OUTPUT_SPEC.md` as of v0.89.3.
+- Console output is fully compliant with `docs/CONSOLE_OUTPUT_SPEC.md` as of v0.90.0.
 - ALWAYS run from `main` — operator never checks out feature branches.
 - All commands must begin with `git pull origin main`.
 - Never give operator any command before the relevant PR merges.
