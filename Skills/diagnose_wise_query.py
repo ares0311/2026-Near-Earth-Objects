@@ -36,14 +36,22 @@ try:
         start_mjd = start_jd - 2_400_000.5
         end_mjd = end_jd - 2_400_000.5
         print(f"  MJD filter: {start_mjd:.1f} to {end_mjd:.1f}", flush=True)
-        if "mjd_obs" in table.colnames:
-            in_window = sum(1 for row in table if start_mjd <= float(row["mjd_obs"]) <= end_mjd)
+        # Try to find the epoch column
+        epoch_col = None
+        for candidate in ("mjd", "mjd_obs", "mjd_obs_w1", "date_obs"):
+            if candidate in table.colnames:
+                epoch_col = candidate
+                break
+        print(f"  Epoch column detected: {epoch_col}", flush=True)
+        if epoch_col:
+            in_window = sum(
+                1 for row in table if start_mjd <= float(row[epoch_col]) <= end_mjd
+            )
             print(f"  Rows in MJD window: {in_window} / {len(table)}", flush=True)
-            # Show MJD range in table
-            mjds = [float(row["mjd_obs"]) for row in table]
+            mjds = [float(row[epoch_col]) for row in table]
             print(f"  MJD range in table: {min(mjds):.1f} to {max(mjds):.1f}", flush=True)
         else:
-            print(f"  WARNING: 'mjd_obs' not in columns! Columns are: {table.colnames}", flush=True)
+            print(f"  WARNING: no epoch column found in {table.colnames}", flush=True)
     else:
         print("  Table is empty or None.", flush=True)
 except Exception as exc:

@@ -694,6 +694,13 @@ filter them before any external submission:
   all citizen-science language replaced with discovery-paper language
 - `docs/near_earth_objects_research_brief.md`: canonical primer, mandatory session read
 
+**PR #124 MERGED (2026-06-27)** ✓ — IRSA error logging + column limit:
+- Added stderr logging for IRSA exceptions and empty results so operators can diagnose failures
+- Added `columns='ra,dec,mjd_obs,w1mpro,w1sigmpro'` to limit payload (default `*` fetches dozens of columns, likely causing timeout in dense Taurus/Pleiades field)
+- Added `Skills/diagnose_wise_query.py` for direct IRSA diagnostics
+- CI green at 100% coverage, 1574 tests ✓
+- **Next**: run pipeline again with `--force-refresh --no-resume`; if IRSA still returns 0, run `diagnose_wise_query.py` to see raw error
+
 **PR #123 MERGED (2026-06-27)** ✓ — NEOWISE mjd_obs column fix + coverage:
 - Root cause: `fetch_wise_archive` read `row["mjd"]` but NEOWISE `neowiser_p1bs_psd` uses `mjd_obs`. Every row threw `KeyError`, silently caught, producing 0 observations even when IRSA returned real data (confirmed via 61-second live query).
 - Fix: `row["mjd_obs"]` in `src/fetch.py`; test mocks updated; `_monitor_neocp` success-path coverage added.
