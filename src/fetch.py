@@ -1489,7 +1489,8 @@ def fetch_wise_archive(
     obs: list[Observation] = []
     for i, row in enumerate(table):
         try:
-            mjd = float(row["mjd"])
+            # NEOWISE neowiser_p1bs_psd uses mjd_obs (not mjd) for epoch
+            mjd = float(row["mjd_obs"])
             # Skip rows outside the requested time window
             if not (start_mjd <= mjd <= end_mjd):
                 continue
