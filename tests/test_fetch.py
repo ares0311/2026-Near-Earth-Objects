@@ -3256,90 +3256,64 @@ class TestFetchWiseArchive:
         assert result[0].mission == "WISE"
         assert result[0].obs_id == "wise_0_60000.00000"
 
+    def _make_pyvo_mock(self, table):
+        """Return a mock pyvo module whose TAPService.run_async().to_table() returns table."""
+        mock_tap_svc = MagicMock()
+        mock_result = MagicMock()
+        mock_result.to_table.return_value = table
+        mock_tap_svc.run_async.return_value = mock_result
+        mock_pyvo = MagicMock()
+        mock_pyvo.dal.TAPService.return_value = mock_tap_svc
+        return mock_pyvo
+
     def test_import_error_returns_empty(self, tmp_path, monkeypatch):
-        """ImportError (no astroquery) returns empty list."""
+        """ImportError (no pyvo) returns empty list."""
         monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
-        with patch.dict("sys.modules", {
-            "astroquery.ipac.irsa": None,
-            "astropy.units": None,
-            "astropy.coordinates": None,
-        }):
+        with patch.dict("sys.modules", {"pyvo": None}):
             result = fetch_mod.fetch_wise_archive(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
         assert result == []
 
     def test_api_exception_returns_empty(self, tmp_path, monkeypatch):
-        """Irsa.query_region raising exception returns empty list."""
+        """TAP run_async raising exception returns empty list."""
         monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
-        mock_irsa = MagicMock()
-        mock_irsa.query_region.side_effect = RuntimeError("network error")
-        mock_units = MagicMock()
-        mock_coord_mod = MagicMock()
-        mock_coord_mod.SkyCoord.return_value = MagicMock()
-        with patch.dict("sys.modules", {
-            "astroquery.ipac.irsa": MagicMock(Irsa=mock_irsa),
-            "astropy.units": mock_units,
-            "astropy.coordinates": mock_coord_mod,
-        }):
+        mock_tap_svc = MagicMock()
+        mock_tap_svc.run_async.side_effect = RuntimeError("network error")
+        mock_pyvo = MagicMock()
+        mock_pyvo.dal.TAPService.return_value = mock_tap_svc
+        with patch.dict("sys.modules", {"pyvo": mock_pyvo}):
             result = fetch_mod.fetch_wise_archive(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
         assert result == []
 
     def test_empty_table_returns_empty(self, tmp_path, monkeypatch):
-        """Empty table from IRSA returns empty list."""
+        """Empty table from IRSA TAP returns empty list."""
         monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
-        mock_irsa = MagicMock()
-        mock_irsa.query_region.return_value = []  # empty
-        mock_units = MagicMock()
-        mock_coord_mod = MagicMock()
-        mock_coord_mod.SkyCoord.return_value = MagicMock()
-        with patch.dict("sys.modules", {
-            "astroquery.ipac.irsa": MagicMock(Irsa=mock_irsa),
-            "astropy.units": mock_units,
-            "astropy.coordinates": mock_coord_mod,
-        }):
+        mock_pyvo = self._make_pyvo_mock([])
+        with patch.dict("sys.modules", {"pyvo": mock_pyvo}):
             result = fetch_mod.fetch_wise_archive(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
         assert result == []
 
     def test_none_table_returns_empty(self, tmp_path, monkeypatch):
-        """None table from IRSA returns empty list."""
+        """None table from IRSA TAP returns empty list."""
         monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
-        mock_irsa = MagicMock()
-        mock_irsa.query_region.return_value = None
-        mock_units = MagicMock()
-        mock_coord_mod = MagicMock()
-        mock_coord_mod.SkyCoord.return_value = MagicMock()
-        with patch.dict("sys.modules", {
-            "astroquery.ipac.irsa": MagicMock(Irsa=mock_irsa),
-            "astropy.units": mock_units,
-            "astropy.coordinates": mock_coord_mod,
-        }):
+        mock_pyvo = self._make_pyvo_mock(None)
+        with patch.dict("sys.modules", {"pyvo": mock_pyvo}):
             result = fetch_mod.fetch_wise_archive(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
         assert result == []
 
     def test_row_outside_jd_window_skipped(self, tmp_path, monkeypatch):
-        """Row with mjd outside requested JD window is skipped."""
+        """Client-side guard: row with mjd outside JD window is skipped."""
         monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
-        # Row MJD outside window: start_jd=2460000.5 → start_mjd=59999.5
-        # Row mjd=50000 is far outside
+        # start_jd=2460000.5 → start_mjd=59999.5; row mjd=50000 is far outside
         mock_row = {"mjd": 50000.0, "w1mpro": 15.0, "w1sigmpro": 0.1, "ra": 180.0, "dec": 10.0}
-        mock_table = [mock_row]
-        mock_irsa = MagicMock()
-        mock_irsa.query_region.return_value = mock_table
-        mock_units = MagicMock()
-        mock_coord_mod = MagicMock()
-        mock_coord_mod.SkyCoord.return_value = MagicMock()
-        with patch.dict("sys.modules", {
-            "astroquery.ipac.irsa": MagicMock(Irsa=mock_irsa),
-            "astropy.units": mock_units,
-            "astropy.coordinates": mock_coord_mod,
-        }):
+        mock_pyvo = self._make_pyvo_mock([mock_row])
+        with patch.dict("sys.modules", {"pyvo": mock_pyvo}):
             result = fetch_mod.fetch_wise_archive(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
         assert result == []
 
     def test_row_with_none_mag_uses_sentinel(self, tmp_path, monkeypatch):
         """Row with None w1mpro uses sentinel 99.0; None w1sigmpro uses 0.1."""
         monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
-        # MJD=59999.5+0.5=60000 → JD=2460000.5 which is within [2460000.5, 2460010.5]
-        mjd_in = 2460000.5 - 2_400_000.5  # = 60000.0
+        mjd_in = 2460000.5 - 2_400_000.5  # = 60000.0, within [2460000.5, 2460010.5]
         mock_row = {
             "mjd": mjd_in,
             "w1mpro": None,
@@ -3347,17 +3321,8 @@ class TestFetchWiseArchive:
             "ra": 180.0,
             "dec": 10.0,
         }
-        mock_table = [mock_row]
-        mock_irsa = MagicMock()
-        mock_irsa.query_region.return_value = mock_table
-        mock_units = MagicMock()
-        mock_coord_mod = MagicMock()
-        mock_coord_mod.SkyCoord.return_value = MagicMock()
-        with patch.dict("sys.modules", {
-            "astroquery.ipac.irsa": MagicMock(Irsa=mock_irsa),
-            "astropy.units": mock_units,
-            "astropy.coordinates": mock_coord_mod,
-        }):
+        mock_pyvo = self._make_pyvo_mock([mock_row])
+        with patch.dict("sys.modules", {"pyvo": mock_pyvo}):
             result = fetch_mod.fetch_wise_archive(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
         assert len(result) == 1
         assert result[0].mag == 99.0
@@ -3375,17 +3340,8 @@ class TestFetchWiseArchive:
             "ra": 181.5,
             "dec": 9.5,
         }
-        mock_table = [mock_row]
-        mock_irsa = MagicMock()
-        mock_irsa.query_region.return_value = mock_table
-        mock_units = MagicMock()
-        mock_coord_mod = MagicMock()
-        mock_coord_mod.SkyCoord.return_value = MagicMock()
-        with patch.dict("sys.modules", {
-            "astroquery.ipac.irsa": MagicMock(Irsa=mock_irsa),
-            "astropy.units": mock_units,
-            "astropy.coordinates": mock_coord_mod,
-        }):
+        mock_pyvo = self._make_pyvo_mock([mock_row])
+        with patch.dict("sys.modules", {"pyvo": mock_pyvo}):
             result = fetch_mod.fetch_wise_archive(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
         assert len(result) == 1
         assert result[0].mission == "WISE"
@@ -3820,7 +3776,7 @@ class TestFetchRoutingNewSurveys:
 # ---------------------------------------------------------------------------
 
 class TestFetchWiseMalformedRow:
-    """Covers fetch_wise_archive lines 1514-1515: except Exception: continue."""
+    """Covers fetch_wise_archive: except Exception: continue in row loop."""
 
     def test_malformed_row_skipped_good_row_kept(self, tmp_path, monkeypatch):
         """A row with non-numeric ra causes exception; good row still returned."""
@@ -3828,16 +3784,13 @@ class TestFetchWiseMalformedRow:
         mjd_ok = 2460005.0 - 2_400_000.5  # valid MJD inside window
         good_row = {"mjd": mjd_ok, "ra": 180.0, "dec": 10.0, "w1mpro": 14.5, "w1sigmpro": 0.05}
         bad_row = {"mjd": mjd_ok, "ra": "bad", "dec": 10.0, "w1mpro": 15.0, "w1sigmpro": 0.1}
-        mock_irsa = MagicMock()
-        mock_irsa.query_region.return_value = [bad_row, good_row]
-        mock_units = MagicMock()
-        mock_coord_mod = MagicMock()
-        mock_coord_mod.SkyCoord.return_value = MagicMock()
-        with patch.dict("sys.modules", {
-            "astroquery.ipac.irsa": MagicMock(Irsa=mock_irsa),
-            "astropy.units": mock_units,
-            "astropy.coordinates": mock_coord_mod,
-        }):
+        mock_tap_svc = MagicMock()
+        mock_result = MagicMock()
+        mock_result.to_table.return_value = [bad_row, good_row]
+        mock_tap_svc.run_async.return_value = mock_result
+        mock_pyvo = MagicMock()
+        mock_pyvo.dal.TAPService.return_value = mock_tap_svc
+        with patch.dict("sys.modules", {"pyvo": mock_pyvo}):
             result = fetch_mod.fetch_wise_archive(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
         # bad_row skipped, good_row returned
         assert len(result) == 1
