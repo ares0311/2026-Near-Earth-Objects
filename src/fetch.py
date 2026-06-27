@@ -1459,28 +1459,41 @@ def fetch_wise_archive(
         # Reconstruct Observation objects from cached dicts
         return [Observation(**row) for row in cached]
 
+    # Convert JD window to MJD upfront so we can push the filter server-side.
+    # "mjd" is the confirmed epoch column name in neowiser_p1bs_psd — ORA-00904
+    # proves "mjd_obs" is wrong; run 2 confirmed no ORA-00904 with "mjd".
+    start_mjd = start_jd - 2_400_000.5
+    end_mjd = end_jd - 2_400_000.5
+
+    # Use pyvo async TAP directly instead of Irsa.query_region.
+    # Rationale: Irsa.query_region uses the synchronous TAP endpoint which has
+    # a ~60-second server-side wall-clock timeout.  A 3.5° cone on
+    # neowiser_p1bs_psd returns millions of rows with no time filter, reliably
+    # hitting that timeout → RemoteDisconnected.  Async TAP has no timeout, and
+    # pushing the MJD filter into ADQL means IRSA only streams the ~30-day
+    # window of rows rather than the full multi-year cone.
     try:
-        import astropy.units as u
-        from astropy.coordinates import SkyCoord
-        from astroquery.ipac.irsa import Irsa  # type: ignore[import]
+        import pyvo  # type: ignore[import]
     except ImportError:
-        # Return empty list when astroquery is not installed
         return []
 
-    # Build sky coordinate for the cone search centre
-    coord = SkyCoord(ra=ra_deg, dec=dec_deg, unit="deg")
+    adql = (
+        "SELECT ra, dec, mjd, w1mpro, w1sigmpro "
+        "FROM neowiser_p1bs_psd "
+        "WHERE CONTAINS("
+        f"  POINT('ICRS', ra, dec),"
+        f"  CIRCLE('ICRS', {ra_deg:.6f}, {dec_deg:.6f}, {radius_deg:.6f})"
+        ") = 1 "
+        f"AND mjd BETWEEN {start_mjd:.6f} AND {end_mjd:.6f}"
+    )
+    import sys
+    print(f"[fetch] WISE IRSA async TAP query: {adql}", file=sys.stderr, flush=True)
     try:
-        # Use SELECT * — explicit column lists fail with ORA-00904 on IRSA TAP
-        # because TAP column names differ from the Python-accessible dict keys.
-        table = Irsa.query_region(
-            coord,
-            catalog="neowiser_p1bs_psd",
-            spatial="Cone",
-            radius=radius_deg * u.deg,
-        )
+        tap = pyvo.dal.TAPService("https://irsa.ipac.caltech.edu/TAP")
+        result = tap.run_async(adql)
+        table = result.to_table()
     except Exception as exc:
         # Print to stderr so operators can diagnose IRSA network/catalog issues.
-        import sys
         print(
             f"[fetch] WISE IRSA query FAILED: {type(exc).__name__}: {exc}",
             file=sys.stderr, flush=True,
@@ -1505,9 +1518,6 @@ def fetch_wise_archive(
         file=sys.stderr, flush=True,
     )
 
-    # Convert JD time window to MJD for comparison with table values
-    start_mjd = start_jd - 2_400_000.5
-    end_mjd = end_jd - 2_400_000.5
     obs: list[Observation] = []
     for i, row in enumerate(table):
         try:
