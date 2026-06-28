@@ -53,6 +53,28 @@ approximately half a year. The next diagnostic should either probe a full-year
 or mission-era interval with a bounded field, or switch to a field/window with
 known repeated WISE coverage.
 
+## Probe 3: Same Field, 370-Day Window
+
+Command:
+
+```bash
+PYTHONPATH=src caffeinate -i uv run --python 3.14 python -c 'from fetch import fetch_wise_archive; obs=fetch_wise_archive(58.0,20.0,1.0,2458880.5,2459250.5,force_refresh=True); nights=sorted({int(o.jd) for o in obs}); print({"n_obs": len(obs), "n_nights": len(nights), "nights": nights[:30], "last_nights": nights[-30:]})'
+```
+
+Result:
+
+- WISE rows/observations: `328022`
+- Integer-JD nights: `8`
+- Nights: `[2458883, 2459083, 2459084, 2459085, 2459086, 2459242, 2459243, 2459244]`
+- TAP elapsed: about `2m02s`
+
+Interpretation:
+
+The same Taurus field does have multi-night WISE coverage over a full-year
+window, but the 1.0-degree result is too large for an immediate full pipeline
+diagnostic. The next bounded production probe should shrink the radius or pick
+a smaller field while preserving at least two integer-JD nights.
+
 ## Safety
 
 This was a read-only archive fetch. No MPC submission was performed. No

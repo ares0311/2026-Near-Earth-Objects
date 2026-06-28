@@ -99,3 +99,4 @@ rigorous two-stage review process before any external submission.
 | 13 | 2026-06-28 | PR #136 merged; bounded WISE rerun produced 5200 candidates on only 1 integer-JD night, so seed_pairs=0 and tracklets=0 | Select or probe a WISE field/window that spans at least 2 integer-JD nights after preprocessing |
 | 14 | 2026-06-28 | Same Taurus field expanded to 30 days still produced 5206 WISE observations on only night `2458883` | Use WISE cadence-aware probing rather than blindly expanding the same month |
 | 15 | 2026-06-28 | Same Taurus field expanded to 195 days still produced only night `2458883` | Probe full-year/mission-era interval or switch to a field/window with known repeated WISE coverage |
+| 16 | 2026-06-28 | Same Taurus field expanded to 370 days produced 328022 observations on 8 nights | Shrink radius or select a smaller field while preserving multi-night WISE coverage |
