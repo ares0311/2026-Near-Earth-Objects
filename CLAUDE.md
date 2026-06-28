@@ -720,7 +720,15 @@ filter them before any external submission:
 - Validation: WISE fetch tests passed (`20 passed`), targeted ruff clean, mypy clean across 12 source files, full local suite passed (`1590 passed, 2 deselected`), and GitHub CI passed before merge.
 - Post-merge diagnostic from `main` at `dd35a8c0` completed: `5206` WISE rows, `5200/5206` preprocessed, `5200` singleton candidates, `0` linked tracklets, `0` candidates processed, dry-run safety intact.
 - Evidence: `docs/evidence/live/2026-06-28-wise-prefilter-diagnostic-post-pyvo.md`.
-- **NEXT CODE ACTION — NOT YET DONE**: diagnose why current WISE archive singleton candidates do not link into multi-night tracklets. Do not rerun the same 1.0°/7-day Taurus diagnostic until that diagnosis is recorded and a distinct fix or selection change is ready.
+- This was diagnosed after PR #136; see the next handoff block.
+
+**PR #136 MERGED (2026-06-28)** ✓ — Linker rejection diagnostics:
+- Linker provenance now records nights, observations, total seed pairs, rate-window seeds, satellite rejects, min-observation/min-night rejects, and chi-square rejects. Checkpoints persist the counters.
+- Operator validation before merge: targeted pytest `80 passed`, ruff clean, mypy clean. GitHub CI passed before merge.
+- Post-merge bounded WISE rerun from `main` at `b8ca1312`: `5206` rows, `5200/5206` preprocessed, `5200` candidates, `0` tracklets.
+- Root cause for this specific run: link diagnostics showed `n_nights=1` and `n_seed_pairs_total=0`, so the 1.0°/7-day Taurus sample is not a multi-night linking test. The linker correctly formed no seed pairs.
+- Evidence: `docs/evidence/live/2026-06-28-wise-linker-diagnostics-one-night.md`.
+- **NEXT CODE ACTION — NOT YET DONE**: select or probe a WISE field/window that spans at least two integer-JD nights after preprocessing. Do not rerun the same 1.0°/7-day Taurus diagnostic.
 
 **PR #127 MERGED (2026-06-27)** ✓ — Use pyvo async TAP with MJD filter for WISE archive query (SUPERSEDED by PR #129):
 - Root cause of run 2 `RemoteDisconnected`: `Irsa.query_region` uses IRSA sync TAP which has a ~60s server-side timeout. `SELECT *` on a 3.5° cone of `neowiser_p1bs_psd` returns millions of rows, hitting that timeout. No ORA-00904 in run 2 confirmed `mjd` IS the correct epoch column name.
@@ -1074,7 +1082,7 @@ MPC submission → provisional designation → independent confirmation → jour
 2. ~~Open/merge PR #117~~ DONE ✓ (2026-06-27, CI green, 1534 tests, 100% coverage)
 3. ~~**Redesign `fetch.py` discovery layer**~~ DONE ✓ (PR #119 merged 2026-06-27, 1573 tests)
 4. ~~**Update `docs/MPC_SUBMISSION_POLICY.md`**~~ DONE ✓ (PR #121 merged 2026-06-27)
-5. **WISE/NEOWISE discovery sweep state — PR #135 merged; diagnose 5200 singleton candidates -> 0 tracklets next**:
+5. **WISE/NEOWISE discovery sweep state — PR #136 merged; the 7-day Taurus diagnostic is one-night only**:
    ```bash
    git pull origin main
    export PYTHONPATH=src
@@ -1096,10 +1104,11 @@ MPC submission → provisional designation → independent confirmation → jour
    submission or impact-probability claim.
    A post-PR #133 diagnostic from `main` failed before result retrieval because
    pyvo 1.9.0 has no public `AsyncTAPJob.update()` method. PR #135 fixed that
-   blocker. The post-merge run completed and produced `5206` WISE rows,
-   `5200` singleton candidates, and `0` linked tracklets. Do not rerun this
-   command again until the WISE singleton-linking failure is diagnosed from
-   local evidence and a distinct fix or selection change is ready.
+   blocker. PR #136 added linker diagnostics. The post-PR #136 rerun completed
+   and proved this exact 1.0°/7-day Taurus window has only one integer-JD night
+   after preprocessing (`n_nights=1`, `n_seed_pairs_total=0`). Do not rerun
+   this command again. The next live diagnostic must use a distinct WISE
+   field/window selected to produce at least two integer-JD nights.
    Both `--force-refresh` AND `--no-resume` are required when intentionally re-running a field: `--force-refresh` clears the IRSA query cache; `--no-resume` forces the checkpoint to be ignored so all stages re-run.
    RA=58.0 Dec=20.0 (Taurus) is correct for a Feb 2020 NEOWISE epoch (NEOWISE scans at ~90° from Sun; Sun at RA≈325° in Feb 2020 → survey strip at RA≈55°).
    Expected output with PR #129 code: 30s heartbeat lines (`[fetch] WISE IRSA TAP: phase=EXECUTING  elapsed Xm Xs`) then `[fetch] WISE IRSA: N rows, cols=[...]` on completion.

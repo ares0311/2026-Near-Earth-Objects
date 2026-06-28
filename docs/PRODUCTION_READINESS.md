@@ -575,6 +575,19 @@ Next D1 step: diagnose why current WISE archive singleton candidates do not
 link into multi-night tracklets; do not rerun the same 1.0°/7-day Taurus
 diagnostic until a distinct fix or field-selection change is ready.
 
+**2026-06-28 PR #136 merged and linker diagnostics complete**: Linker
+provenance now records nights, observations, seed-pair totals, rate-window
+seeds, satellite rejects, min-observation/min-night rejects, and chi-square
+rejects. The post-merge bounded WISE rerun from `main` at `b8ca1312` produced
+`5206` WISE rows, `5200/5206` preprocessed, `5200` singleton candidates, and
+`0` tracklets. The new diagnostics show `n_nights=1` and
+`n_seed_pairs_total=0`; therefore this specific 1.0-degree, 7-day Taurus window
+is not a valid multi-night WISE linking test. Evidence:
+`docs/evidence/live/2026-06-28-wise-linker-diagnostics-one-night.md`.
+Next D1 step: select or probe a distinct WISE field/window that spans at least
+two integer-JD nights after preprocessing; do not rerun the same 7-day Taurus
+diagnostic.
+
 ### Gate D2: Operator Review
 - [ ] Jerome W. Lindsey III reviews SURVIVE/BORDERLINE candidates
 - [ ] Jerome approves at least one candidate for MPC submission

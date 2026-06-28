@@ -636,9 +636,7 @@ Tests: `tests/test_adversarial_review_skill.py` (50+ cases).
   no attribute 'update'`. Root cause: pyvo 1.9.0 exposes `_update()`/`wait()`,
   not public `update()`. Evidence:
   `docs/evidence/live/2026-06-28-wise-prefilter-diagnostic-pyvo-update.md`.
-- NOT YET DONE: merge the pyvo polling compatibility PR, then rerun the smaller
-  WISE dry-run diagnostic from `main`. Do not repeat the exact 3.5°/30-day
-  Taurus sweep yet, and do not give feature-branch commands to the operator.
+- This pyvo blocker was closed by PR #135.
 
 **PR #135 merged (2026-06-28)**:
 - WISE TAP polling is now compatible with pyvo 1.9.0: the poll loop uses public
@@ -654,23 +652,26 @@ Tests: `tests/test_adversarial_review_skill.py` (50+ cases).
   diagnostic until that diagnosis is recorded and a distinct fix or selection
   change is ready.
 
-**Live pipeline operator command** (after `git pull origin main`):
-```bash
-git pull origin main
-export PYTHONPATH=src
-export OMP_NUM_THREADS=1
-export OPENBLAS_NUM_THREADS=1
-export VECLIB_MAXIMUM_THREADS=1
-export NUMEXPR_MAX_THREADS=1
-# Target WISE/NEOWISE archival data — do NOT use --surveys ZTF for discovery
-caffeinate -i uv run python Skills/run_pipeline.py \
-    --ra 58.0 --dec 20.0 --radius 1.0 \
-    --start-jd 2458880.5 --end-jd 2458887.5 \
-    --surveys WISE --force-refresh --no-resume \
-    --output Logs/reports/wise_prefilter_diagnostic_58_20_7d.json
-# Then run adversarial review on any candidates:
-PYTHONPATH=src uv run python Skills/adversarial_review.py Logs/reports/wise_prefilter_diagnostic_58_20_7d.json
-```
+**PR #136 merged (2026-06-28)**:
+- Linker provenance now records nights, observations, total seed pairs,
+  rate-window seeds, satellite rejects, min-observation/min-night rejects, and
+  chi-square rejects. Zero-tracklet runs persist these counters in
+  `checkpoint.json` and print them when seed pairs exist.
+- Operator validation before merge: targeted pytest `80 passed`, ruff clean,
+  mypy clean. GitHub CI passed before merge.
+- Post-merge bounded WISE rerun from `main` at `b8ca1312`: `5206` rows,
+  `5200/5206` preprocessed, `5200` candidates, `0` tracklets.
+  Link diagnostics: `n_nights=1`, `n_seed_pairs_total=0`.
+- Evidence:
+  `docs/evidence/live/2026-06-28-wise-linker-diagnostics-one-night.md`.
+- NOT YET DONE: select or probe a WISE field/window that spans at least two
+  integer-JD nights after preprocessing. Do not rerun the same 1.0°/7-day
+  Taurus diagnostic; it is proven to be a one-night sample.
+
+**No current live pipeline operator command is approved in this handoff.**
+The next command must use a distinct WISE field/window selected specifically to
+produce at least two integer-JD nights after preprocessing.
+
 Keep discovery sweeps in alert dry-run mode. Live archive fetching does not
 require `--no-dry-run`; actual MPC submission remains fail-closed until the
 MPC observatory-code path is resolved and `NEO_MPC_SUBMISSION_APPROVED=1` is
