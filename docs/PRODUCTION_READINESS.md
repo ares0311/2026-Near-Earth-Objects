@@ -1,7 +1,7 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.89.3
-**Last updated**: 2026-06-27
+**Current version**: v0.90.0
+**Last updated**: 2026-06-28
 **Purpose**: Mandatory read at session start (per MANDATORY SESSION-START PROTOCOL).  
 Every planning cycle must name the highest-priority unresolved Tier 1 gap and show how proposed steps close or directly unblock it.
 
@@ -587,6 +587,17 @@ is not a valid multi-night WISE linking test. Evidence:
 Next D1 step: select or probe a distinct WISE field/window that spans at least
 two integer-JD nights after preprocessing; do not rerun the same 7-day Taurus
 diagnostic.
+
+**2026-06-28 WISE window selection update**: Taurus same-field probes show why
+the previous 7-day diagnostic was non-informative and identify a bounded
+multi-night candidate window. A 1.0-degree, 370-day probe returned `328022`
+observations on `8` nights, too large for the next full pipeline run. A
+0.2-degree, 370-day probe returned `12061` observations on `6` nights
+(`[2458883, 2459084, 2459085, 2459242, 2459243, 2459244]`), making it the next
+bounded WISE dry-run candidate. Evidence:
+`docs/evidence/live/2026-06-28-wise-window-night-probes.md`. Next D1 step: run
+the 0.2-degree full-year WISE dry-run pipeline from merged `main` and inspect
+linker provenance.
 
 ### Gate D2: Operator Review
 - [ ] Jerome W. Lindsey III reviews SURVIVE/BORDERLINE candidates

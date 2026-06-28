@@ -100,3 +100,4 @@ rigorous two-stage review process before any external submission.
 | 14 | 2026-06-28 | Same Taurus field expanded to 30 days still produced 5206 WISE observations on only night `2458883` | Use WISE cadence-aware probing rather than blindly expanding the same month |
 | 15 | 2026-06-28 | Same Taurus field expanded to 195 days still produced only night `2458883` | Probe full-year/mission-era interval or switch to a field/window with known repeated WISE coverage |
 | 16 | 2026-06-28 | Same Taurus field expanded to 370 days produced 328022 observations on 8 nights | Shrink radius or select a smaller field while preserving multi-night WISE coverage |
+| 17 | 2026-06-28 | Taurus 370-day window at 0.2° produced 12061 observations on 6 nights | Run bounded WISE dry-run pipeline on the 0.2° full-year window from `main` |

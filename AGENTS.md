@@ -668,9 +668,31 @@ Tests: `tests/test_adversarial_review_skill.py` (50+ cases).
   integer-JD nights after preprocessing. Do not rerun the same 1.0°/7-day
   Taurus diagnostic; it is proven to be a one-night sample.
 
-**No current live pipeline operator command is approved in this handoff.**
-The next command must use a distinct WISE field/window selected specifically to
-produce at least two integer-JD nights after preprocessing.
+**WISE window probes after PR #136 (2026-06-28)**:
+- 1.0° Taurus, 30 days: `5206` observations on one night (`2458883`).
+- 1.0° Taurus, 195 days: `5206` observations on one night (`2458883`).
+- 1.0° Taurus, 370 days: `328022` observations on eight nights, too large for
+  the next full pipeline diagnostic.
+- 0.2° Taurus, 370 days: `12061` observations on six nights
+  (`2458883`, `2459084`, `2459085`, `2459242`, `2459243`, `2459244`).
+- Evidence: `docs/evidence/live/2026-06-28-wise-window-night-probes.md`.
+- NOT YET DONE: run the bounded WISE dry-run pipeline on the 0.2° full-year
+  window from `main`, then record linker provenance before any follow-up.
+
+**Next live pipeline operator command** (after evidence/version sync is merged):
+```bash
+git pull origin main
+export PYTHONPATH=src
+export OMP_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
+export VECLIB_MAXIMUM_THREADS=1
+export NUMEXPR_MAX_THREADS=1
+caffeinate -i uv run --python 3.14 python Skills/run_pipeline.py \
+    --ra 58.0 --dec 20.0 --radius 0.2 \
+    --start-jd 2458880.5 --end-jd 2459250.5 \
+    --surveys WISE --force-refresh --no-resume \
+    --output Logs/reports/wise_prefilter_diagnostic_58_20_370d_r0p2.json
+```
 
 Keep discovery sweeps in alert dry-run mode. Live archive fetching does not
 require `--no-dry-run`; actual MPC submission remains fail-closed until the

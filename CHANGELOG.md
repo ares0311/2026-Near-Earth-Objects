@@ -3,6 +3,36 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.0 — Discovery archive live-readiness hardening (2026-06-28)
+
+### Added
+- Discovery archive fetch layer for WISE/NEOWISE, DECam/NOIRLab, and TESS FFIs,
+  with ZTF and ATLAS kept as training-data sources rather than discovery streams.
+- WISE/NEOWISE async TAP polling compatibility for pyvo versions that expose
+  `_update()` instead of public `update()`, while preserving live heartbeat
+  output.
+- Linker provenance diagnostics for zero-tracklet production runs: nights,
+  observations, seed-pair totals, rate-window seeds, satellite rejects,
+  min-observation/min-night rejects, and chi-square rejects.
+- Durable live evidence for the WISE Taurus diagnostics, including the
+  one-night failure mode and full-year/narrow-radius night-count probes.
+
+### Changed
+- `Skills/run_pipeline.py` defaults to the WISE discovery path and remains
+  fail-closed for MPC submission unless a real observatory-code strategy and
+  explicit approval are present.
+- WISE ADQL now prefilters the broad NEOWISE point-source archive using IRSA
+  association columns (`sso_flg`, `allwise_cntr`, `n_allwise`, `source_id`) to
+  keep known solar-system associations and AllWISE-unmatched rows.
+- Discovery archive rows from WISE/DECam/TESS are preserved as singleton
+  candidates for multi-night linking instead of being discarded by same-night
+  pair requirements.
+- README, package metadata, and readiness docs now align on `v0.90.0`.
+
+### Safety
+- No external submission path was enabled.
+- No impact-probability claims or confirmed-object claims were introduced.
+
 ## v0.89.3 — Adversarial review + discovery paper pathway (2026-06-26)
 
 ### Added

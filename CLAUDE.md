@@ -1082,7 +1082,7 @@ MPC submission → provisional designation → independent confirmation → jour
 2. ~~Open/merge PR #117~~ DONE ✓ (2026-06-27, CI green, 1534 tests, 100% coverage)
 3. ~~**Redesign `fetch.py` discovery layer**~~ DONE ✓ (PR #119 merged 2026-06-27, 1573 tests)
 4. ~~**Update `docs/MPC_SUBMISSION_POLICY.md`**~~ DONE ✓ (PR #121 merged 2026-06-27)
-5. **WISE/NEOWISE discovery sweep state — PR #136 merged; the 7-day Taurus diagnostic is one-night only**:
+5. **WISE/NEOWISE discovery sweep state — 0.2° Taurus full-year window selected for next dry run**:
    ```bash
    git pull origin main
    export PYTHONPATH=src
@@ -1090,28 +1090,28 @@ MPC submission → provisional designation → independent confirmation → jour
    export OPENBLAS_NUM_THREADS=1
    export VECLIB_MAXIMUM_THREADS=1
    export NUMEXPR_MAX_THREADS=1
-   caffeinate -i uv run python Skills/run_pipeline.py \
-       --ra 58.0 --dec 20.0 --radius 1.0 \
-       --start-jd 2458880.5 --end-jd 2458887.5 \
+   caffeinate -i uv run --python 3.14 python Skills/run_pipeline.py \
+       --ra 58.0 --dec 20.0 --radius 0.2 \
+       --start-jd 2458880.5 --end-jd 2459250.5 \
        --surveys WISE --force-refresh --no-resume \
-       --output Logs/reports/wise_prefilter_diagnostic_58_20_7d.json
+       --output Logs/reports/wise_prefilter_diagnostic_58_20_370d_r0p2.json
    ```
    This command shape is safe after PR #131 because it does not pass `--no-dry-run`.
    It also avoids repeating the exact 3.5°/30-day Taurus sweep already recorded
-   in `docs/evidence/live/2026-06-27-wise-live-sweep.md`. Expected post-PR #133
-   behavior: far fewer WISE rows than `85335`, archive singleton candidates
-   instead of arbitrary same-night point-source pairs, and still no external
-   submission or impact-probability claim.
+   in `docs/evidence/live/2026-06-27-wise-live-sweep.md`.
    A post-PR #133 diagnostic from `main` failed before result retrieval because
    pyvo 1.9.0 has no public `AsyncTAPJob.update()` method. PR #135 fixed that
    blocker. PR #136 added linker diagnostics. The post-PR #136 rerun completed
    and proved this exact 1.0°/7-day Taurus window has only one integer-JD night
    after preprocessing (`n_nights=1`, `n_seed_pairs_total=0`). Do not rerun
-   this command again. The next live diagnostic must use a distinct WISE
-   field/window selected to produce at least two integer-JD nights.
+   that command again. Subsequent WISE probes found that the 0.2° full-year
+   Taurus window returns `12061` observations across `6` integer-JD nights,
+   making it the next bounded dry-run candidate.
    Both `--force-refresh` AND `--no-resume` are required when intentionally re-running a field: `--force-refresh` clears the IRSA query cache; `--no-resume` forces the checkpoint to be ignored so all stages re-run.
    RA=58.0 Dec=20.0 (Taurus) is correct for a Feb 2020 NEOWISE epoch (NEOWISE scans at ~90° from Sun; Sun at RA≈325° in Feb 2020 → survey strip at RA≈55°).
-   Expected output with PR #129 code: 30s heartbeat lines (`[fetch] WISE IRSA TAP: phase=EXECUTING  elapsed Xm Xs`) then `[fetch] WISE IRSA: N rows, cols=[...]` on completion.
+   Expected output: WISE TAP heartbeat lines, approximately `12061` fetched
+   WISE observations, linker provenance with at least `n_nights=2`, and still
+   no external submission or impact-probability claim.
    Do NOT use `--surveys ZTF` or `--surveys ATLAS` for discovery.
    Do NOT pass `--no-dry-run` during discovery sweeps. Real archive fetching
    works in dry-run mode; actual MPC submission remains blocked until the
