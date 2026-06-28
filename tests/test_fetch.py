@@ -2,6 +2,7 @@
 
 import hashlib
 import sys
+import warnings
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -3328,6 +3329,48 @@ class TestFetchWiseArchive:
         assert result[0].mag == 99.0
         assert result[0].mag_err == 0.1
         assert result[0].mission == "WISE"
+
+    def test_masked_wise_photometry_uses_sentinel_without_warning(self, tmp_path, monkeypatch):
+        """Masked WISE magnitudes are missing data, not nan-producing floats."""
+        import numpy as np
+
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        mjd_in = 2460000.5 - 2_400_000.5
+        mock_row = {
+            "mjd": mjd_in,
+            "w1mpro": np.ma.masked,
+            "w1sigmpro": np.ma.masked,
+            "ra": 180.0,
+            "dec": 10.0,
+        }
+        mock_pyvo = self._make_pyvo_mock([mock_row])
+        with patch.dict("sys.modules", {"pyvo": mock_pyvo}):
+            with warnings.catch_warnings(record=True) as caught:
+                result = fetch_mod.fetch_wise_archive(
+                    180.0, 10.0, 1.0, 2460000.5, 2460010.5
+                )
+        assert caught == []
+        assert len(result) == 1
+        assert result[0].mag == 99.0
+        assert result[0].mag_err == 0.1
+
+    def test_masked_wise_position_is_skipped(self, tmp_path, monkeypatch):
+        """Masked WISE coordinates cannot produce valid astrometry, so skip the row."""
+        import numpy as np
+
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        mjd_in = 2460000.5 - 2_400_000.5
+        mock_row = {
+            "mjd": mjd_in,
+            "w1mpro": 14.3,
+            "w1sigmpro": 0.02,
+            "ra": np.ma.masked,
+            "dec": 10.0,
+        }
+        mock_pyvo = self._make_pyvo_mock([mock_row])
+        with patch.dict("sys.modules", {"pyvo": mock_pyvo}):
+            result = fetch_mod.fetch_wise_archive(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
+        assert result == []
 
     def test_successful_row_within_jd_window(self, tmp_path, monkeypatch):
         """Successful row within JD window creates correct Observation."""
