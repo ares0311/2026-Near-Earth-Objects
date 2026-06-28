@@ -97,3 +97,4 @@ rigorous two-stage review process before any external submission.
 | 11 | 2026-06-28 | PR #135 merged; post-merge WISE diagnostic completed from `main`: 5206 rows, 5200 candidates, 0 tracklets, dry-run safety intact | Diagnose WISE singleton-candidate linking failure before any repeat live run |
 | 12 | 2026-06-28 | Linker rejection diagnostics added and operator-validated locally: targeted pytest `80 passed`, ruff clean, mypy clean | Publish diagnostics PR, wait for CI, merge, then rerun the bounded WISE diagnostic from `main` |
 | 13 | 2026-06-28 | PR #136 merged; bounded WISE rerun produced 5200 candidates on only 1 integer-JD night, so seed_pairs=0 and tracklets=0 | Select or probe a WISE field/window that spans at least 2 integer-JD nights after preprocessing |
+| 14 | 2026-06-28 | Same Taurus field expanded to 30 days still produced 5206 WISE observations on only night `2458883` | Use WISE cadence-aware probing rather than blindly expanding the same month |
