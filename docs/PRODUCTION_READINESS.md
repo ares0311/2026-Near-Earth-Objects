@@ -524,9 +524,16 @@ rows with columns `['ra', 'dec', 'mjd', 'w1mpro', 'w1sigmpro']`; the pipeline
 parsed `85335` WISE observations, detected `535` moving-object candidates, linked
 `0` tracklets, processed `0` candidates, and produced no submission-ready
 candidates. This closes the WISE schema/fetch uncertainty for that field and
-moves the next D1 blocker downstream to WISE photometry cleanup and
-detection/linking diagnostics. Evidence:
+moves the next D1 blocker downstream to detection/linking diagnostics. Evidence:
 `docs/evidence/live/2026-06-27-wise-live-sweep.md`.
+
+**2026-06-28 PR #131 update**: Discovery sweeps now remain fail-closed for live
+MPC submission unless explicitly approved with `NEO_MPC_SUBMISSION_APPROVED=1`
+and a real non-placeholder MPC observatory code. WISE masked photometry values
+are handled as missing-data sentinels instead of becoming `nan`. CI is green
+with 1583 offline tests and 100% coverage. Do not ask the operator to repeat the
+same Taurus sweep before diagnosing why the recorded `535` WISE candidates
+linked into `0` tracklets.
 
 ### Gate D2: Operator Review
 - [ ] Jerome W. Lindsey III reviews SURVIVE/BORDERLINE candidates

@@ -606,6 +606,20 @@ Two-stage review before any external submission:
 Verdicts: SURVIVE / BORDERLINE / REJECT. Exit codes 0/1/2.
 Tests: `tests/test_adversarial_review_skill.py` (50+ cases).
 
+**PR #131 merged (2026-06-28)**:
+- Discovery sweeps now fail closed for live MPC submission unless
+  `NEO_MPC_SUBMISSION_APPROVED=1` is set with a real non-placeholder MPC
+  observatory code.
+- The Taurus WISE run evidence is durable at
+  `docs/evidence/live/2026-06-27-wise-live-sweep.md`: `111913` IRSA rows,
+  `85335` parsed observations, `535` moving-object candidates, `0` linked
+  tracklets.
+- WISE masked photometry values are handled as missing-data sentinels instead
+  of being converted to `nan`.
+- Do not ask the operator to repeat the same Taurus sweep. The next production
+  task is to diagnose why those `535` WISE candidates produced `0` tracklets,
+  then either patch linking/detection or choose a new targeted field.
+
 **Live pipeline operator command** (after `git pull origin main`):
 ```bash
 git pull origin main && export PYTHONPATH=src
