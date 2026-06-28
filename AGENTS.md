@@ -616,9 +616,21 @@ Tests: `tests/test_adversarial_review_skill.py` (50+ cases).
   tracklets.
 - WISE masked photometry values are handled as missing-data sentinels instead
   of being converted to `nan`.
-- Do not ask the operator to repeat the same Taurus sweep. The next production
-  task is to diagnose why those `535` WISE candidates produced `0` tracklets,
-  then either patch linking/detection or choose a new targeted field.
+- Do not ask the operator to repeat the same Taurus sweep.
+
+**PR #133 in progress (2026-06-28)**:
+- Root cause of the Taurus `535` candidates -> `0` tracklets result: WISE fetch
+  queried the broad static NEOWISE point-source population, then `detect()`
+  required same-night pairs before `link()` saw archive rows.
+- Branch `codex/wise-discovery-prefilter-linking` narrows WISE ADQL with
+  official IRSA association columns (`sso_flg`, `allwise_cntr`, `n_allwise`,
+  `source_id`) and preserves prefiltered WISE/DECam/TESS archive rows as
+  singleton candidates for multi-night linking.
+- Operator validation on Python 3.14.3: `80 passed in 0.86s`; targeted ruff
+  clean; mypy clean across 12 source files.
+- Evidence: `docs/evidence/live/2026-06-28-wise-linking-root-cause.md`.
+- NOT YET DONE: merge this PR to `main`, then run the next WISE dry-run
+  diagnostic from `main`.
 
 **Live pipeline operator command** (after `git pull origin main`):
 ```bash

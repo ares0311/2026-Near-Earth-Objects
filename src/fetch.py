@@ -1449,6 +1449,28 @@ def _table_float_or_default(value: Any, default: float) -> float:
     return parsed if math.isfinite(parsed) else default
 
 
+def _table_value_or_default(row: Any, key: str, default: Any = None) -> Any:
+    """Return an optional archive table value without requiring every column."""
+    try:
+        return row[key]
+    except (KeyError, TypeError, ValueError):
+        return default
+
+
+def _table_str_or_default(value: Any, default: str | None = None) -> str | None:
+    """Return a usable string from an archive table scalar, or a safe default."""
+    if value is None:
+        return default
+    try:
+        mask = getattr(value, "mask", False)
+        if bool(mask):
+            return default
+    except (TypeError, ValueError):
+        return default
+    text = str(value).strip()
+    return text or default
+
+
 def fetch_wise_archive(
     ra_deg: float,
     dec_deg: float,
@@ -1464,13 +1486,18 @@ def fetch_wise_archive(
     Infrared sensitivity finds low-albedo NEOs that optical surveys miss.
     Each row is one single-exposure detection at a unique epoch — exactly the
     format the linker needs to identify multi-night moving sources.
+    The query keeps known SSOs plus AllWISE-unmatched rows to avoid flooding
+    the linker with stationary point sources.
 
     Returns Observation objects with mission='WISE'.
     """
     import hashlib
-    # Stable cache key derived from all query parameters
+    # Stable cache key derived from all query parameters and WISE query policy.
     cache_key = hashlib.md5(
-        f"wise_{ra_deg}_{dec_deg}_{radius_deg}_{start_jd}_{end_jd}".encode()
+        (
+            "wise_moving_prefilter_v1_"
+            f"{ra_deg}_{dec_deg}_{radius_deg}_{start_jd}_{end_jd}"
+        ).encode()
     ).hexdigest()
     cached = _load_cache(cache_key, force_refresh=force_refresh)
     if cached is not None:
@@ -1496,13 +1523,15 @@ def fetch_wise_archive(
         return []
 
     adql = (
-        "SELECT ra, dec, mjd, w1mpro, w1sigmpro "
+        "SELECT source_id, ra, dec, mjd, w1mpro, w1sigmpro, "
+        "sso_flg, allwise_cntr, n_allwise, r_allwise "
         "FROM neowiser_p1bs_psd "
         "WHERE CONTAINS("
         f"  POINT('ICRS', ra, dec),"
         f"  CIRCLE('ICRS', {ra_deg:.6f}, {dec_deg:.6f}, {radius_deg:.6f})"
         ") = 1 "
         f"AND mjd BETWEEN {start_mjd:.6f} AND {end_mjd:.6f}"
+        " AND (sso_flg = 1 OR allwise_cntr IS NULL OR n_allwise = 0)"
     )
     import sys
     import time as _time
@@ -1575,9 +1604,13 @@ def fetch_wise_archive(
             dec = _table_float_or_default(row["dec"], math.nan)
             if not (math.isfinite(ra) and math.isfinite(dec)):
                 continue
+            source_id = _table_str_or_default(
+                _table_value_or_default(row, "source_id"),
+                f"wise_{i}_{mjd:.5f}",
+            )
             obs.append(
                 Observation(
-                    obs_id=f"wise_{i}_{mjd:.5f}",
+                    obs_id=str(source_id),
                     ra_deg=ra,
                     dec_deg=dec,
                     jd=jd,

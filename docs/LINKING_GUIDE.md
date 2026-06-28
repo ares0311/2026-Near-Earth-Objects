@@ -12,6 +12,12 @@ The link stage receives a list of `RawCandidate` objects from `detect.py` and at
 RawCandidate (single night) → link() → Tracklet (multi-night)
 ```
 
+Discovery archive rows from WISE/NEOWISE, DECam, and TESS may arrive as one
+prefiltered source detection per visit rather than a same-night pair. `detect.py`
+therefore preserves those archive detections as singleton `RawCandidate`
+objects after source-specific prefiltering. The linker still requires the final
+tracklet to satisfy the normal multi-night and multi-observation gates.
+
 The algorithm is inspired by THOR (Moeyens et al. 2021) but implemented as a pure Python/NumPy solution without external orbit-determination dependencies.
 
 ---

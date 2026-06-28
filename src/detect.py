@@ -32,6 +32,7 @@ _REAL_BOGUS_THRESHOLD = 0.65  # ZTF rb score; configurable
 _MOTION_MIN_ARCSEC_PER_HR = 0.01
 _MOTION_MAX_ARCSEC_PER_HR = 60.0
 _MPC_MATCH_RADIUS_ARCSEC = 5.0
+_DISCOVERY_ARCHIVE_MISSIONS = {"WISE", "DECam", "TESS"}
 
 
 # ---------------------------------------------------------------------------
@@ -253,6 +254,31 @@ def _find_object_history_sources(
     return candidates
 
 
+def _preserve_discovery_archive_singletons(
+    observations: tuple[Observation, ...],
+) -> list[RawCandidate]:
+    """Pass prefiltered discovery archive detections to the multi-night linker.
+
+    WISE/DECam/TESS archive rows are single-epoch detections, not broker object
+    histories. Requiring an intra-night pair before linking drops one-visit-per-
+    night moving objects, which is exactly the discovery-archive use case.
+    """
+    candidates: list[RawCandidate] = []
+    for obs in observations:
+        if obs.mission not in _DISCOVERY_ARCHIVE_MISSIONS:
+            continue
+        candidates.append(
+            RawCandidate(
+                candidate_id=obs.obs_id,
+                observations=(obs,),
+                apparent_motion_arcsec_per_hr=None,
+                motion_pa_deg=None,
+                is_streak=_is_streak(obs),
+            )
+        )
+    return candidates
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
@@ -283,7 +309,17 @@ def detect(
         for cand in all_candidates
         for obs in cand.observations
     }
-    ungrouped = tuple(obs for obs in passing_tuple if obs.obs_id not in object_history_obs)
+    ungrouped_tuple = tuple(
+        obs for obs in passing_tuple if obs.obs_id not in object_history_obs
+    )
+    archive_candidates = _preserve_discovery_archive_singletons(ungrouped_tuple)
+    all_candidates.extend(archive_candidates)
+    archive_obs = {
+        obs.obs_id
+        for cand in archive_candidates
+        for obs in cand.observations
+    }
+    ungrouped = tuple(obs for obs in ungrouped_tuple if obs.obs_id not in archive_obs)
     nights = _group_by_night(ungrouped)
     for night_obs in nights.values():
         all_candidates.extend(_find_moving_sources(night_obs))
@@ -508,7 +544,6 @@ def compute_source_compactness(obs: object) -> float | None:
         return round(float(min(1.0, max(0.0, peak / total))), 6)
     except Exception:
         return None
-
 
 
 

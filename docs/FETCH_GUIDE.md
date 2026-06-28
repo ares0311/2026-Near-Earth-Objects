@@ -204,5 +204,11 @@ results = fetch_batch([window1, window2, window3])
 
 - ZTF real/bogus scores (`rb`, `drb`) should be treated as pre-filters, not absolute truth.  Use `rb ≥ 0.65` as the default threshold (configurable in `detect.py`).
 - ATLAS forced photometry uses fixed apertures; point-spread-function magnitudes are more reliable for faint objects.
+- WISE/NEOWISE archive fetches use `neowiser_p1bs_psd` association columns as a
+  first-pass candidate prefilter: keep known solar-system associations
+  (`sso_flg = 1`) and AllWISE-unmatched rows (`allwise_cntr IS NULL OR
+  n_allwise = 0`). This avoids feeding the linker the full static point-source
+  population. It is not a discovery claim; multi-night linking and review gates
+  still decide whether a row is scientifically interesting.
 - MPC ephemerides are approximate for short-arc objects; match radius should be ≥5 arcsec for quality-code-1 orbits.
 - All magnitudes ≥ 90 are sentinels for non-detections and are excluded from depth estimates and photometric statistics.
