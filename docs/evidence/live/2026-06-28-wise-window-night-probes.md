@@ -31,6 +31,28 @@ The same Taurus field remains a one-night WISE sample even when expanded from
 7 days to 30 days. The next probe should use WISE cadence knowledge rather than
 expanding this month blindly.
 
+## Probe 2: Same Field, 195-Day Window
+
+Command:
+
+```bash
+PYTHONPATH=src caffeinate -i uv run --python 3.14 python -c 'from fetch import fetch_wise_archive; obs=fetch_wise_archive(58.0,20.0,1.0,2458880.5,2459075.5,force_refresh=True); nights=sorted({int(o.jd) for o in obs}); print({"n_obs": len(obs), "n_nights": len(nights), "nights": nights[:20], "last_nights": nights[-20:]})'
+```
+
+Result:
+
+- WISE rows/observations: `5206`
+- Integer-JD nights: `1`
+- Nights: `[2458883]`
+- TAP elapsed: about `2m02s`
+
+Interpretation:
+
+The same Taurus field remains a one-night WISE sample even when expanded to
+approximately half a year. The next diagnostic should either probe a full-year
+or mission-era interval with a bounded field, or switch to a field/window with
+known repeated WISE coverage.
+
 ## Safety
 
 This was a read-only archive fetch. No MPC submission was performed. No
