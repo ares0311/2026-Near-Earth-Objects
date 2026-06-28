@@ -3427,6 +3427,58 @@ class TestFetchWiseArchive:
         assert fetch_mod._table_str_or_default(np.ma.masked, "fallback") == "fallback"
         assert fetch_mod._table_str_or_default(BrokenMaskedValue(), "fallback") == "fallback"
 
+    def test_tap_job_refresh_uses_public_update_when_available(self):
+        """TAP refresh uses public update() on pyvo versions that expose it."""
+
+        class PublicUpdateJob:
+            """Minimal TAP job that records the public update call."""
+
+            phase = "EXECUTING"
+
+            def __init__(self):
+                """Initialize the call counter used by the assertion."""
+                self.update_calls = 0
+
+            def update(self):
+                """Advance the mock job to completed through the public API."""
+                self.update_calls += 1
+                self.phase = "COMPLETED"
+
+        job = PublicUpdateJob()
+        assert fetch_mod._refresh_tap_job_phase(job) == "COMPLETED"
+        assert job.update_calls == 1
+
+    def test_tap_job_refresh_uses_private_update_fallback(self):
+        """TAP refresh supports pyvo 1.9 jobs that expose _update() only."""
+
+        class PrivateUpdateJob:
+            """Minimal pyvo 1.9-style job without public update()."""
+
+            phase = "EXECUTING"
+
+            def __init__(self):
+                """Initialize the captured call arguments."""
+                self.update_calls = []
+
+            def _update(self, wait_for_statechange=False, timeout=None):
+                """Record fallback refresh arguments and complete the job."""
+                self.update_calls.append((wait_for_statechange, timeout))
+                self.phase = "COMPLETED"
+
+        job = PrivateUpdateJob()
+        assert fetch_mod._refresh_tap_job_phase(job, timeout_seconds=3.5) == "COMPLETED"
+        assert job.update_calls == [(False, 3.5)]
+
+    def test_tap_job_refresh_without_update_returns_cached_phase(self):
+        """TAP refresh degrades to the cached phase for simple job handles."""
+
+        class CachedPhaseJob:
+            """Minimal job handle that has no refresh method."""
+
+            phase = "COMPLETED"
+
+        assert fetch_mod._refresh_tap_job_phase(CachedPhaseJob()) == "COMPLETED"
+
     def test_successful_row_within_jd_window(self, tmp_path, monkeypatch):
         """Successful row within JD window creates correct Observation."""
         monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
@@ -3503,6 +3555,47 @@ class TestFetchWiseArchive:
             with patch.dict("sys.modules", {"pyvo": mock_pyvo}):
                 result = fetch_mod.fetch_wise_archive(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
         assert len(result) == 1
+
+    def test_tap_job_private_update_fallback_completes_query(self, tmp_path, monkeypatch):
+        """Fetch uses _update() fallback when pyvo jobs lack public update()."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        mjd_in = 2460005.0 - 2_400_000.5
+        mock_row = {"mjd": mjd_in, "ra": 181.5, "dec": 9.5, "w1mpro": 14.0, "w1sigmpro": 0.05}
+
+        class PrivateUpdateJob:
+            """Small pyvo 1.9-style TAP job used by the live compatibility path."""
+
+            phase = "EXECUTING"
+
+            def __init__(self):
+                """Build result mocks and capture fallback refresh calls."""
+                self.update_calls = []
+                self.dal_result = MagicMock()
+                self.dal_result.to_table.return_value = [mock_row]
+
+            def run(self):
+                """Mirror pyvo's explicit async-job start call."""
+
+            def _update(self, wait_for_statechange=False, timeout=None):
+                """Complete on first fallback refresh so the fetch loop exits."""
+                self.update_calls.append((wait_for_statechange, timeout))
+                self.phase = "COMPLETED"
+
+            def fetch_result(self):
+                """Return the mocked TAP result table wrapper."""
+                return self.dal_result
+
+        mock_job = PrivateUpdateJob()
+        mock_tap_svc = MagicMock()
+        mock_tap_svc.submit_job.return_value = mock_job
+        mock_pyvo = MagicMock()
+        mock_pyvo.dal.TAPService.return_value = mock_tap_svc
+
+        with patch.dict("sys.modules", {"pyvo": mock_pyvo}):
+            result = fetch_mod.fetch_wise_archive(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
+
+        assert len(result) == 1
+        assert mock_job.update_calls == [(False, 10.0)]
 
     def test_tap_job_error_phase_returns_empty(self, tmp_path, monkeypatch):
         """Job ending in ERROR phase raises RuntimeError (caught) → returns empty."""

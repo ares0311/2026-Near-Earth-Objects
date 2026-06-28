@@ -550,6 +550,18 @@ missing helper coverage; coverage test added, full local pytest passed
 smaller WISE dry-run diagnostic from `main`; do not repeat the exact 3.5°/30-day
 Taurus sweep yet.
 
+**2026-06-28 pyvo polling compatibility update**: The smaller WISE diagnostic
+was run from `main` at `2a786e18` and reached the PR #133 WISE ADQL path, but
+failed before result retrieval with `AttributeError: 'AsyncTAPJob' object has no
+attribute 'update'`. Root cause: the installed pyvo 1.9.0 async job exposes
+`_update()`/`wait()` but not public `update()`. The compatibility fix preserves
+explicit heartbeat polling, uses public `update()` when available, falls back to
+the pyvo 1.9.0 one-shot `_update()` call, and never switches WISE fetching to a
+silent blocking wait. Evidence and predicted operator output:
+`docs/evidence/live/2026-06-28-wise-prefilter-diagnostic-pyvo-update.md`.
+Next D1 step after merge: rerun the smaller WISE dry-run diagnostic from
+`main`; do not give feature-branch commands to the operator.
+
 ### Gate D2: Operator Review
 - [ ] Jerome W. Lindsey III reviews SURVIVE/BORDERLINE candidates
 - [ ] Jerome approves at least one candidate for MPC submission
