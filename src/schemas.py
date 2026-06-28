@@ -387,6 +387,14 @@ class LinkProvenance(BaseModel):
     n_tracklets: int
     min_nights: int
     min_observations: int
+    n_nights: int = 0
+    n_observations: int = 0
+    n_seed_pairs_total: int = 0
+    n_seed_pairs_rate_window: int = 0
+    n_seed_pairs_satellite_rejected: int = 0
+    n_arcs_below_min_observations: int = 0
+    n_arcs_below_min_nights: int = 0
+    n_arcs_chi2_rejected: int = 0
     linked_at_jd: float = 0.0
 
 

@@ -215,6 +215,10 @@ class TestLinkPipeline:
         result = link(cands, min_nights=2, min_observations=3, position_tolerance_arcsec=30.0)
         # Tracklet may or may not form depending on chi² — provenance always populated
         assert result.provenance.min_nights == 2
+        assert result.provenance.n_nights == 3
+        assert result.provenance.n_observations == 3
+        assert result.provenance.n_seed_pairs_total == 3
+        assert result.provenance.n_seed_pairs_rate_window >= 1
 
     def test_too_fast_motion_skipped(self):
         # Motion >> 60 arcsec/hr between nights → seed pair rejected at rate check
@@ -226,6 +230,8 @@ class TestLinkPipeline:
             min_nights=2, min_observations=3,
         )
         assert len(result.tracklets) == 0
+        assert result.provenance.n_seed_pairs_total == 3
+        assert result.provenance.n_seed_pairs_rate_window == 0
 
     def test_insufficient_nights_coverage_skipped(self):
         # 3 sorted nights, but night_c obs is far → arc only spans 2 nights < min_nights=3
@@ -239,6 +245,7 @@ class TestLinkPipeline:
             min_observations=2,
         )
         assert len(result.tracklets) == 0
+        assert result.provenance.n_arcs_below_min_nights >= 1
 
     def test_high_chi2_arc_rejected(self):
         # Valid 3-night arc with non-linear dec motion → chi2 > tight threshold
@@ -254,6 +261,7 @@ class TestLinkPipeline:
             chi2_threshold=0.001,
         )
         assert len(result.tracklets) == 0
+        assert result.provenance.n_arcs_chi2_rejected >= 1
 
     def test_arc_below_min_obs_skipped(self):
         # Seed pair found (2 obs, valid motion) but min_observations=3 → arc rejected at line 228
@@ -267,6 +275,7 @@ class TestLinkPipeline:
         result = link((cand_a, cand_b), min_nights=2, min_observations=3,
                       position_tolerance_arcsec=10.0)
         assert len(result.tracklets) == 0
+        assert result.provenance.n_arcs_below_min_observations >= 1
 
     def test_improved_link_rate_after_chi2_fix(self):
         """Regression: fixed error proxy raises link rate from 62% to ≥90% on noisy arcs."""
