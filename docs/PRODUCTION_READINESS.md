@@ -562,6 +562,19 @@ silent blocking wait. Evidence and predicted operator output:
 Next D1 step after merge: rerun the smaller WISE dry-run diagnostic from
 `main`; do not give feature-branch commands to the operator.
 
+**2026-06-28 PR #135 merged and post-merge diagnostic complete**: WISE TAP
+polling is now compatible with pyvo 1.9.0 while preserving explicit heartbeat
+output. GitHub CI passed before merge; local validation included the full
+offline suite (`1590 passed, 2 deselected`). The post-merge smaller WISE
+diagnostic from `main` at `dd35a8c0` completed in dry-run mode: `5206` WISE
+rows, `5200/5206` preprocessed, `5200` singleton candidates, `0` linked
+tracklets, `0` candidates processed, and no external submission path invoked.
+Evidence:
+`docs/evidence/live/2026-06-28-wise-prefilter-diagnostic-post-pyvo.md`.
+Next D1 step: diagnose why current WISE archive singleton candidates do not
+link into multi-night tracklets; do not rerun the same 1.0°/7-day Taurus
+diagnostic until a distinct fix or field-selection change is ready.
+
 ### Gate D2: Operator Review
 - [ ] Jerome W. Lindsey III reviews SURVIVE/BORDERLINE candidates
 - [ ] Jerome approves at least one candidate for MPC submission

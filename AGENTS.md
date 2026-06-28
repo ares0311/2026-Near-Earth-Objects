@@ -640,6 +640,20 @@ Tests: `tests/test_adversarial_review_skill.py` (50+ cases).
   WISE dry-run diagnostic from `main`. Do not repeat the exact 3.5°/30-day
   Taurus sweep yet, and do not give feature-branch commands to the operator.
 
+**PR #135 merged (2026-06-28)**:
+- WISE TAP polling is now compatible with pyvo 1.9.0: the poll loop uses public
+  `update()` when available, falls back to one-shot `_update()`, and preserves
+  explicit heartbeat output.
+- Post-merge smaller diagnostic from `main` at `dd35a8c0` completed:
+  `5206` WISE rows, `5200/5206` preprocessed, `5200` singleton candidates,
+  `0` linked tracklets, `0` candidates processed, dry-run safety intact.
+- Evidence:
+  `docs/evidence/live/2026-06-28-wise-prefilter-diagnostic-post-pyvo.md`.
+- NOT YET DONE: diagnose why current WISE archive singleton candidates do not
+  link into multi-night tracklets. Do not rerun the same 1.0°/7-day Taurus
+  diagnostic until that diagnosis is recorded and a distinct fix or selection
+  change is ready.
+
 **Live pipeline operator command** (after `git pull origin main`):
 ```bash
 git pull origin main
