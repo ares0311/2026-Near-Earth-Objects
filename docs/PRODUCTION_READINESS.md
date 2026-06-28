@@ -535,17 +535,20 @@ with 1583 offline tests and 100% coverage. Do not ask the operator to repeat the
 same Taurus sweep before diagnosing why the recorded `535` WISE candidates
 linked into `0` tracklets.
 
-**2026-06-28 PR #133 in progress**: Root cause diagnosed for the Taurus
+**2026-06-28 PR #133 merged**: Root cause diagnosed for the Taurus
 `535` candidates -> `0` tracklets result. `fetch_wise_archive()` queried the
 broad static NEOWISE point-source population, and `detect()` required same-night
-pairs before the linker could see archive rows. Branch
-`codex/wise-discovery-prefilter-linking` uses official IRSA association columns
-(`sso_flg`, `allwise_cntr`, `n_allwise`, `source_id`) to prefilter WISE rows and
-preserves prefiltered WISE/DECam/TESS archive detections as singleton candidates
-for multi-night linking. Operator validation on Python 3.14.3 passed:
-`80 passed in 0.86s`; targeted ruff clean; mypy clean across 12 source files.
-Evidence: `docs/evidence/live/2026-06-28-wise-linking-root-cause.md`. Do not
-issue the next WISE diagnostic command until this PR is merged to `main`.
+pairs before the linker could see archive rows. The merged fix uses official
+IRSA association columns (`sso_flg`, `allwise_cntr`, `n_allwise`, `source_id`)
+to prefilter WISE rows and preserves prefiltered WISE/DECam/TESS archive
+detections as singleton candidates for multi-night linking. Validation:
+operator targeted run on Python 3.14.3 passed (`80 passed in 0.86s`; targeted
+ruff clean; mypy clean across 12 source files). CI initially failed only on
+missing helper coverage; coverage test added, full local pytest passed
+(`1586 passed, 2 deselected`), and GitHub CI passed before merge. Evidence:
+`docs/evidence/live/2026-06-28-wise-linking-root-cause.md`. Next D1 step: run a
+smaller WISE dry-run diagnostic from `main`; do not repeat the exact 3.5°/30-day
+Taurus sweep yet.
 
 ### Gate D2: Operator Review
 - [ ] Jerome W. Lindsey III reviews SURVIVE/BORDERLINE candidates

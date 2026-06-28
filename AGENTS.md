@@ -618,31 +618,38 @@ Tests: `tests/test_adversarial_review_skill.py` (50+ cases).
   of being converted to `nan`.
 - Do not ask the operator to repeat the same Taurus sweep.
 
-**PR #133 in progress (2026-06-28)**:
+**PR #133 merged (2026-06-28)**:
 - Root cause of the Taurus `535` candidates -> `0` tracklets result: WISE fetch
   queried the broad static NEOWISE point-source population, then `detect()`
   required same-night pairs before `link()` saw archive rows.
-- Branch `codex/wise-discovery-prefilter-linking` narrows WISE ADQL with
-  official IRSA association columns (`sso_flg`, `allwise_cntr`, `n_allwise`,
-  `source_id`) and preserves prefiltered WISE/DECam/TESS archive rows as
-  singleton candidates for multi-night linking.
-- Operator validation on Python 3.14.3: `80 passed in 0.86s`; targeted ruff
-  clean; mypy clean across 12 source files.
+- WISE ADQL now narrows rows with official IRSA association columns (`sso_flg`,
+  `allwise_cntr`, `n_allwise`, `source_id`) and preserves prefiltered
+  WISE/DECam/TESS archive rows as singleton candidates for multi-night linking.
+- Validation: operator targeted run on Python 3.14.3 passed (`80 passed in
+  0.86s`; targeted ruff clean; mypy clean across 12 source files). CI initially
+  failed only on missing helper coverage; coverage test added, full local
+  pytest passed (`1586 passed, 2 deselected`), and GitHub CI passed before
+  merge.
 - Evidence: `docs/evidence/live/2026-06-28-wise-linking-root-cause.md`.
-- NOT YET DONE: merge this PR to `main`, then run the next WISE dry-run
-  diagnostic from `main`.
+- NOT YET DONE: run the smaller WISE dry-run diagnostic from `main`. Do not
+  repeat the exact 3.5°/30-day Taurus sweep yet.
 
 **Live pipeline operator command** (after `git pull origin main`):
 ```bash
-git pull origin main && export PYTHONPATH=src
+git pull origin main
+export PYTHONPATH=src
+export OMP_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
+export VECLIB_MAXIMUM_THREADS=1
+export NUMEXPR_MAX_THREADS=1
 # Target WISE/NEOWISE archival data — do NOT use --surveys ZTF for discovery
 caffeinate -i uv run python Skills/run_pipeline.py \
-    --ra <RA> --dec <Dec> --radius 3.5 \
-    --start-jd <start> --end-jd <end> \
-    --surveys WISE \
-    --output /tmp/wise_candidates.json
+    --ra 58.0 --dec 20.0 --radius 1.0 \
+    --start-jd 2458880.5 --end-jd 2458887.5 \
+    --surveys WISE --force-refresh --no-resume \
+    --output Logs/reports/wise_prefilter_diagnostic_58_20_7d.json
 # Then run adversarial review on any candidates:
-PYTHONPATH=src uv run python Skills/adversarial_review.py /tmp/wise_candidates.json
+PYTHONPATH=src uv run python Skills/adversarial_review.py Logs/reports/wise_prefilter_diagnostic_58_20_7d.json
 ```
 Keep discovery sweeps in alert dry-run mode. Live archive fetching does not
 require `--no-dry-run`; actual MPC submission remains fail-closed until the
