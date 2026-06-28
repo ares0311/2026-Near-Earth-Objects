@@ -701,6 +701,12 @@ filter them before any external submission:
 - CI green at 100% coverage, 1576 tests ✓
 - **Next operator action**: run live WISE pipeline with `--force-refresh --no-resume` (see Step 5 below); paste stderr showing 30s heartbeat lines and final row count.
 
+**PR #131 MERGED (2026-06-28)** ✓ — Fail closed discovery sweeps and clean WISE masked photometry:
+- Root cause of the unsafe operator transcript: the live WISE sweep was run with `--no-dry-run`, so console output said external submissions were enabled even though zero candidates reached alert processing. Discovery sweeps must stay in alert dry-run mode until the MPC observatory-code path is resolved.
+- Fix: `Skills/run_pipeline.py` and `src/alert.py` now keep MPC submission fail-closed unless `NEO_MPC_SUBMISSION_APPROVED=1` is intentionally set with a real non-placeholder observatory code. PR #131 also records the Taurus WISE run evidence and handles masked WISE table scalars without converting them to `nan`.
+- CI green at 100% coverage, 1583 tests ✓
+- **Next code action**: diagnose why the recorded Taurus WISE sweep produced `535` moving-object candidates but `0` linked tracklets. Do not ask the operator to repeat that exact run until the linking diagnostic has a concrete hypothesis to test.
+
 **PR #127 MERGED (2026-06-27)** ✓ — Use pyvo async TAP with MJD filter for WISE archive query (SUPERSEDED by PR #129):
 - Root cause of run 2 `RemoteDisconnected`: `Irsa.query_region` uses IRSA sync TAP which has a ~60s server-side timeout. `SELECT *` on a 3.5° cone of `neowiser_p1bs_psd` returns millions of rows, hitting that timeout. No ORA-00904 in run 2 confirmed `mjd` IS the correct epoch column name.
 - Fix: replaced `Irsa.query_region` with `pyvo.dal.TAPService.run_async(adql)` (async TAP = no timeout) plus explicit `mjd BETWEEN start AND end` in ADQL WHERE clause (pushes time filter server-side)
@@ -1053,7 +1059,7 @@ MPC submission → provisional designation → independent confirmation → jour
 2. ~~Open/merge PR #117~~ DONE ✓ (2026-06-27, CI green, 1534 tests, 100% coverage)
 3. ~~**Redesign `fetch.py` discovery layer**~~ DONE ✓ (PR #119 merged 2026-06-27, 1573 tests)
 4. ~~**Update `docs/MPC_SUBMISSION_POLICY.md`**~~ DONE ✓ (PR #121 merged 2026-06-27)
-5. **Run live archive pipeline** targeting WISE/NEOWISE — **READY after PR #131 merges**:
+5. **WISE/NEOWISE discovery sweep state — PR #131 merged; do not repeat Taurus before diagnosis**:
    ```bash
    git pull origin main
    export PYTHONPATH=src
@@ -1063,7 +1069,12 @@ MPC submission → provisional designation → independent confirmation → jour
        --surveys WISE --force-refresh --no-resume \
        --output /tmp/wise_candidates.json
    ```
-   Both `--force-refresh` AND `--no-resume` required: `--force-refresh` clears the IRSA query cache; `--no-resume` forces the checkpoint to be ignored so all stages re-run.
+   This command shape is safe after PR #131 because it does not pass `--no-dry-run`.
+   Do not run the exact Taurus coordinates again as a next step: that result is
+   already recorded in `docs/evidence/live/2026-06-27-wise-live-sweep.md`.
+   First diagnose why `535` WISE moving-object candidates yielded `0` linked
+   tracklets, then choose either a focused code fix or a new targeted field.
+   Both `--force-refresh` AND `--no-resume` are required when intentionally re-running a field: `--force-refresh` clears the IRSA query cache; `--no-resume` forces the checkpoint to be ignored so all stages re-run.
    RA=58.0 Dec=20.0 (Taurus) is correct for a Feb 2020 NEOWISE epoch (NEOWISE scans at ~90° from Sun; Sun at RA≈325° in Feb 2020 → survey strip at RA≈55°).
    Expected output with PR #129 code: 30s heartbeat lines (`[fetch] WISE IRSA TAP: phase=EXECUTING  elapsed Xm Xs`) then `[fetch] WISE IRSA: N rows, cols=[...]` on completion.
    Do NOT use `--surveys ZTF` or `--surveys ATLAS` for discovery.
@@ -1084,10 +1095,10 @@ the pipeline parsed `85335` WISE observations, preprocessed all of them, detecte
 `535` candidates, linked `0` tracklets, processed `0` candidates, and wrote run
 summary `Logs/pipeline_runs/756e0dc7b6be/run_summary.json`. The transcript also
 showed masked WISE photometry warnings for `w1mpro` and `w1sigmpro`. Durable
-evidence: `docs/evidence/live/2026-06-27-wise-live-sweep.md`. Do not ask the
-operator to repeat this exact run; next code work should handle masked WISE
-photometry explicitly and diagnose why `535` WISE candidates yielded `0`
-tracklets.
+evidence: `docs/evidence/live/2026-06-27-wise-live-sweep.md`. PR #131 now
+handles masked WISE photometry explicitly and keeps discovery sweeps in alert
+dry-run mode. Do not ask the operator to repeat this exact run; next code work
+should diagnose why `535` WISE candidates yielded `0` tracklets.
 
 - Console output is fully compliant with `docs/CONSOLE_OUTPUT_SPEC.md` as of v0.90.0.
 - ALWAYS run from `main` — operator never checks out feature branches.

@@ -32,7 +32,9 @@ rigorous two-stage review process before any external submission.
 - [x] PR #117 merged to main.
 - [x] PR #119 merged to main.
 - [x] PR #123-#127 merged to main for WISE live-query diagnosis and fixes.
-- Current local `main` is synchronized with `origin/main` at PR #127.
+- [x] PR #131 merged to main for fail-closed discovery sweeps, WISE masked
+      photometry cleanup, and durable Taurus WISE run evidence.
+- Current local `main` is synchronized with `origin/main` at PR #131.
 
 ### H. Integrate adversarial review into the end-to-end workflow
 - [ ] Wire `Skills/adversarial_review.py` output into `Skills/run_pipeline.py` (optional post-stage)
@@ -89,3 +91,4 @@ rigorous two-stage review process before any external submission.
 | 5 | 2026-06-26 | Discovery Paper Gates D1–D7 added to PRODUCTION_READINESS.md; all J items complete | Merge PR #116 (waiting for GitHub write rate limit to clear) |
 | 6 | 2026-06-27 | PR #116-#127 are merged; stale loop item corrected; MPC live submission fail-closed gate added | Run WISE archive discovery sweep from main in alert dry-run mode |
 | 7 | 2026-06-27 | Operator WISE sweep `756e0dc7b6be` recorded: 111913 IRSA rows, 85335 observations, 535 candidates, 0 tracklets | Do not rerun same WISE command; fix masked WISE photometry handling and diagnose 0-tracklet linking |
+| 8 | 2026-06-28 | PR #131 merged: discovery sweeps fail closed for MPC submission and WISE masked photometry is handled without `nan` conversion | Diagnose why the recorded WISE sweep produced 535 candidates but 0 linked tracklets before asking for another operator run |
