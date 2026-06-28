@@ -3238,7 +3238,7 @@ class TestFetchWiseArchive:
         # Seed the cache with one pre-built observation dict
         import hashlib
         cache_key = hashlib.md5(
-            b"wise_180.0_10.0_1.0_2460000.5_2460010.5"
+            b"wise_moving_prefilter_v1_180.0_10.0_1.0_2460000.5_2460010.5"
         ).hexdigest()
         cached_data = [{
             "obs_id": "wise_0_60000.00000",
@@ -3405,6 +3405,28 @@ class TestFetchWiseArchive:
 
         assert fetch_mod._table_float_or_default(NonFloatScalar(), 0.1) == 0.1
 
+    def test_table_str_masked_and_broken_values_use_default(self):
+        """Masked or malformed archive string scalars fall back safely."""
+        import numpy as np
+
+        class BrokenMask:
+            """Mask-like object whose truth conversion mirrors malformed table state."""
+
+            def __bool__(self):
+                """Raise during truth testing so the string fallback is covered."""
+                raise TypeError("mask truth value unavailable")
+
+        class BrokenMaskedValue:
+            """Astropy-like scalar wrapper with a mask attribute that cannot bool()."""
+
+            mask = BrokenMask()
+
+        assert fetch_mod._table_str_or_default(None, "fallback") == "fallback"
+        assert fetch_mod._table_str_or_default("", "fallback") == "fallback"
+        assert fetch_mod._table_str_or_default("  wise_id  ", "fallback") == "wise_id"
+        assert fetch_mod._table_str_or_default(np.ma.masked, "fallback") == "fallback"
+        assert fetch_mod._table_str_or_default(BrokenMaskedValue(), "fallback") == "fallback"
+
     def test_successful_row_within_jd_window(self, tmp_path, monkeypatch):
         """Successful row within JD window creates correct Observation."""
         monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
@@ -3425,6 +3447,33 @@ class TestFetchWiseArchive:
         assert abs(result[0].mag - 14.3) < 1e-6
         assert abs(result[0].mag_err - 0.02) < 1e-6
         assert abs(result[0].jd - (mjd_in + 2_400_000.5)) < 1e-6
+
+    def test_wise_query_prefilters_static_sources(self, tmp_path, monkeypatch):
+        """WISE ADQL keeps known SSOs and AllWISE-unmatched rows, not all stars."""
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        mjd_in = 2460005.0 - 2_400_000.5
+        mock_row = {
+            "source_id": "wise_source_123",
+            "mjd": mjd_in,
+            "w1mpro": 14.3,
+            "w1sigmpro": 0.02,
+            "ra": 181.5,
+            "dec": 9.5,
+            "sso_flg": 1,
+            "allwise_cntr": None,
+            "n_allwise": 0,
+            "r_allwise": None,
+        }
+        mock_pyvo = self._make_pyvo_mock([mock_row])
+        with patch.dict("sys.modules", {"pyvo": mock_pyvo}):
+            result = fetch_mod.fetch_wise_archive(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
+
+        submit_job = mock_pyvo.dal.TAPService.return_value.submit_job
+        adql = submit_job.call_args.args[0]
+        assert "sso_flg = 1" in adql
+        assert "allwise_cntr IS NULL" in adql
+        assert "n_allwise = 0" in adql
+        assert result[0].obs_id == "wise_source_123"
 
     def test_tap_job_polls_while_executing_then_completes(self, tmp_path, monkeypatch):
         """Poll loop sleeps when phase=EXECUTING, exits and returns rows on COMPLETED."""

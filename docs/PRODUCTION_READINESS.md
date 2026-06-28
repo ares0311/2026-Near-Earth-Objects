@@ -535,6 +535,18 @@ with 1583 offline tests and 100% coverage. Do not ask the operator to repeat the
 same Taurus sweep before diagnosing why the recorded `535` WISE candidates
 linked into `0` tracklets.
 
+**2026-06-28 PR #133 in progress**: Root cause diagnosed for the Taurus
+`535` candidates -> `0` tracklets result. `fetch_wise_archive()` queried the
+broad static NEOWISE point-source population, and `detect()` required same-night
+pairs before the linker could see archive rows. Branch
+`codex/wise-discovery-prefilter-linking` uses official IRSA association columns
+(`sso_flg`, `allwise_cntr`, `n_allwise`, `source_id`) to prefilter WISE rows and
+preserves prefiltered WISE/DECam/TESS archive detections as singleton candidates
+for multi-night linking. Operator validation on Python 3.14.3 passed:
+`80 passed in 0.86s`; targeted ruff clean; mypy clean across 12 source files.
+Evidence: `docs/evidence/live/2026-06-28-wise-linking-root-cause.md`. Do not
+issue the next WISE diagnostic command until this PR is merged to `main`.
+
 ### Gate D2: Operator Review
 - [ ] Jerome W. Lindsey III reviews SURVIVE/BORDERLINE candidates
 - [ ] Jerome approves at least one candidate for MPC submission

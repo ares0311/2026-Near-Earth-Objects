@@ -180,6 +180,31 @@ class TestDetectPipeline:
         result = _find_object_history_sources((obs,))
         assert result == []
 
+    def test_preserves_wise_singletons_for_multi_night_linking(self):
+        from link import link
+
+        obs = tuple(
+            make_obs(
+                obs_id=f"wise_src_{night}",
+                mission="WISE",
+                filter_band="W1",
+                jd=2460000.5 + night,
+                ra_deg=180.0 + night * (24.0 / 3600.0),
+                dec_deg=0.0,
+            )
+            for night in range(3)
+        )
+        result = detect(obs, mpc_cross_match=False)
+        assert len(result.candidates) == 3
+
+        linked = link(
+            tuple(result.candidates),
+            min_nights=2,
+            min_observations=3,
+            position_tolerance_arcsec=30.0,
+        )
+        assert len(linked.tracklets) == 1
+
 
 class TestIsStreak:
     def _make_streak_cutout(self) -> str:
@@ -637,6 +662,5 @@ class TestComputeSourceCompactness:
         sys.path.insert(0, "src")
         import detect
         assert "compute_source_compactness" in detect.__all__
-
 
 

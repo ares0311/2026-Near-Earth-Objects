@@ -705,7 +705,13 @@ filter them before any external submission:
 - Root cause of the unsafe operator transcript: the live WISE sweep was run with `--no-dry-run`, so console output said external submissions were enabled even though zero candidates reached alert processing. Discovery sweeps must stay in alert dry-run mode until the MPC observatory-code path is resolved.
 - Fix: `Skills/run_pipeline.py` and `src/alert.py` now keep MPC submission fail-closed unless `NEO_MPC_SUBMISSION_APPROVED=1` is intentionally set with a real non-placeholder observatory code. PR #131 also records the Taurus WISE run evidence and handles masked WISE table scalars without converting them to `nan`.
 - CI green at 100% coverage, 1583 tests ✓
-- **Next code action**: diagnose why the recorded Taurus WISE sweep produced `535` moving-object candidates but `0` linked tracklets. Do not ask the operator to repeat that exact run until the linking diagnostic has a concrete hypothesis to test.
+
+**PR #133 IN PROGRESS (2026-06-28)** — WISE moving-source prefilter and discovery-archive singleton linking:
+- Root cause of the Taurus `535` candidates → `0` tracklets result: `fetch_wise_archive()` queried the broad NEOWISE point-source table using only sky/time constraints, so the result was dominated by static stars/galaxies; `detect()` then required same-night pairs before `link()` saw archive rows, dropping the one-detection-per-visit WISE discovery use case.
+- Fix in branch `codex/wise-discovery-prefilter-linking`: WISE ADQL selects official IRSA association columns (`sso_flg`, `allwise_cntr`, `n_allwise`, `source_id`) and prefilters to known SSOs plus AllWISE-unmatched rows; `detect()` preserves prefiltered WISE/DECam/TESS archive detections as singleton `RawCandidate` objects for multi-night linking.
+- Operator validation on Python 3.14.3: `80 passed in 0.86s`; targeted ruff clean; mypy clean across 12 source files.
+- Evidence: `docs/evidence/live/2026-06-28-wise-linking-root-cause.md`.
+- **NOT YET DONE**: merge the PR to `main`, then give the next WISE dry-run diagnostic command from `main`. Do not ask the operator to run feature-branch code.
 
 **PR #127 MERGED (2026-06-27)** ✓ — Use pyvo async TAP with MJD filter for WISE archive query (SUPERSEDED by PR #129):
 - Root cause of run 2 `RemoteDisconnected`: `Irsa.query_region` uses IRSA sync TAP which has a ~60s server-side timeout. `SELECT *` on a 3.5° cone of `neowiser_p1bs_psd` returns millions of rows, hitting that timeout. No ORA-00904 in run 2 confirmed `mjd` IS the correct epoch column name.
