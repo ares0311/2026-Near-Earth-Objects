@@ -2,6 +2,8 @@
 
 Date: 2026-06-28
 
+Merge status: PR #133 merged to `main` at `0aa553da`.
+
 ## Context
 
 The Taurus WISE sweep `756e0dc7b6be` returned `111913` IRSA rows, parsed
@@ -70,6 +72,9 @@ PYTHONPATH=src uv run --python 3.14 --extra dev python -m mypy src
 ```
 
 Result: `80 passed in 0.86s`; ruff clean; mypy clean across 12 source files.
+CI initially failed only because the new string-scalar helper missed defensive
+branch coverage. A focused coverage test was added; full local pytest then
+passed with `1586 passed, 2 deselected`, and GitHub CI passed before merge.
 
 After merge to `main`, run a smaller WISE diagnostic field in alert dry-run mode
 and compare:

@@ -706,12 +706,12 @@ filter them before any external submission:
 - Fix: `Skills/run_pipeline.py` and `src/alert.py` now keep MPC submission fail-closed unless `NEO_MPC_SUBMISSION_APPROVED=1` is intentionally set with a real non-placeholder observatory code. PR #131 also records the Taurus WISE run evidence and handles masked WISE table scalars without converting them to `nan`.
 - CI green at 100% coverage, 1583 tests ✓
 
-**PR #133 IN PROGRESS (2026-06-28)** — WISE moving-source prefilter and discovery-archive singleton linking:
+**PR #133 MERGED (2026-06-28)** ✓ — WISE moving-source prefilter and discovery-archive singleton linking:
 - Root cause of the Taurus `535` candidates → `0` tracklets result: `fetch_wise_archive()` queried the broad NEOWISE point-source table using only sky/time constraints, so the result was dominated by static stars/galaxies; `detect()` then required same-night pairs before `link()` saw archive rows, dropping the one-detection-per-visit WISE discovery use case.
-- Fix in branch `codex/wise-discovery-prefilter-linking`: WISE ADQL selects official IRSA association columns (`sso_flg`, `allwise_cntr`, `n_allwise`, `source_id`) and prefilters to known SSOs plus AllWISE-unmatched rows; `detect()` preserves prefiltered WISE/DECam/TESS archive detections as singleton `RawCandidate` objects for multi-night linking.
-- Operator validation on Python 3.14.3: `80 passed in 0.86s`; targeted ruff clean; mypy clean across 12 source files.
+- Fix: WISE ADQL selects official IRSA association columns (`sso_flg`, `allwise_cntr`, `n_allwise`, `source_id`) and prefilters to known SSOs plus AllWISE-unmatched rows; `detect()` preserves prefiltered WISE/DECam/TESS archive detections as singleton `RawCandidate` objects for multi-night linking.
+- Validation: operator targeted run on Python 3.14.3 passed (`80 passed in 0.86s`; targeted ruff clean; mypy clean across 12 source files). CI initially failed only on missing coverage for the new string-scalar helper; coverage test added, full local pytest passed (`1586 passed, 2 deselected`), and GitHub CI passed before merge.
 - Evidence: `docs/evidence/live/2026-06-28-wise-linking-root-cause.md`.
-- **NOT YET DONE**: merge the PR to `main`, then give the next WISE dry-run diagnostic command from `main`. Do not ask the operator to run feature-branch code.
+- **NEXT OPERATOR ACTION — NOT YET DONE**: run the smaller WISE prefilter diagnostic from `main` (see Step 5 below). Do not repeat the exact 3.5°/30-day Taurus sweep yet.
 
 **PR #127 MERGED (2026-06-27)** ✓ — Use pyvo async TAP with MJD filter for WISE archive query (SUPERSEDED by PR #129):
 - Root cause of run 2 `RemoteDisconnected`: `Irsa.query_region` uses IRSA sync TAP which has a ~60s server-side timeout. `SELECT *` on a 3.5° cone of `neowiser_p1bs_psd` returns millions of rows, hitting that timeout. No ORA-00904 in run 2 confirmed `mjd` IS the correct epoch column name.
@@ -1065,21 +1065,26 @@ MPC submission → provisional designation → independent confirmation → jour
 2. ~~Open/merge PR #117~~ DONE ✓ (2026-06-27, CI green, 1534 tests, 100% coverage)
 3. ~~**Redesign `fetch.py` discovery layer**~~ DONE ✓ (PR #119 merged 2026-06-27, 1573 tests)
 4. ~~**Update `docs/MPC_SUBMISSION_POLICY.md`**~~ DONE ✓ (PR #121 merged 2026-06-27)
-5. **WISE/NEOWISE discovery sweep state — PR #131 merged; do not repeat Taurus before diagnosis**:
+5. **WISE/NEOWISE discovery sweep state — PR #133 merged; run a smaller prefilter diagnostic next**:
    ```bash
    git pull origin main
    export PYTHONPATH=src
+   export OMP_NUM_THREADS=1
+   export OPENBLAS_NUM_THREADS=1
+   export VECLIB_MAXIMUM_THREADS=1
+   export NUMEXPR_MAX_THREADS=1
    caffeinate -i uv run python Skills/run_pipeline.py \
-       --ra 58.0 --dec 20.0 --radius 3.5 \
-       --start-jd 2458880.5 --end-jd 2458910.5 \
+       --ra 58.0 --dec 20.0 --radius 1.0 \
+       --start-jd 2458880.5 --end-jd 2458887.5 \
        --surveys WISE --force-refresh --no-resume \
-       --output /tmp/wise_candidates.json
+       --output Logs/reports/wise_prefilter_diagnostic_58_20_7d.json
    ```
    This command shape is safe after PR #131 because it does not pass `--no-dry-run`.
-   Do not run the exact Taurus coordinates again as a next step: that result is
-   already recorded in `docs/evidence/live/2026-06-27-wise-live-sweep.md`.
-   First diagnose why `535` WISE moving-object candidates yielded `0` linked
-   tracklets, then choose either a focused code fix or a new targeted field.
+   It also avoids repeating the exact 3.5°/30-day Taurus sweep already recorded
+   in `docs/evidence/live/2026-06-27-wise-live-sweep.md`. Expected post-PR #133
+   behavior: far fewer WISE rows than `85335`, archive singleton candidates
+   instead of arbitrary same-night point-source pairs, and still no external
+   submission or impact-probability claim.
    Both `--force-refresh` AND `--no-resume` are required when intentionally re-running a field: `--force-refresh` clears the IRSA query cache; `--no-resume` forces the checkpoint to be ignored so all stages re-run.
    RA=58.0 Dec=20.0 (Taurus) is correct for a Feb 2020 NEOWISE epoch (NEOWISE scans at ~90° from Sun; Sun at RA≈325° in Feb 2020 → survey strip at RA≈55°).
    Expected output with PR #129 code: 30s heartbeat lines (`[fetch] WISE IRSA TAP: phase=EXECUTING  elapsed Xm Xs`) then `[fetch] WISE IRSA: N rows, cols=[...]` on completion.
