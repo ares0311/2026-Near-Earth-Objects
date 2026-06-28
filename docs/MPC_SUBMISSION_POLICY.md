@@ -245,5 +245,10 @@ code tied to a specific observing site.
 - `run_pipeline.py` will print an escalation notice for every candidate that
   passes `ready_for_submission()`, directing the operator to this TODO.
 - No actual MPC submission should be made.
+- `alert.py` must fail closed for live MPC submission unless all of the
+  following are true: the operator intentionally sets
+  `NEO_MPC_SUBMISSION_APPROVED=1`, a real non-placeholder MPC observatory code
+  is provided, and the candidate has passed the pipeline quality gates plus
+  adversarial/operator review.
 - The operator (Jerome W. Lindsey III) retains the decision on when to
   contact MPC and how to characterize the data source.

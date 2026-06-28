@@ -508,10 +508,25 @@ are sequential — each blocks the next.
   caffeinate -i uv run python Skills/run_pipeline.py \
       --ra <RA> --dec <Dec> --radius 3.5 \
       --start-jd <start> --end-jd <end> \
-      --surveys WISE --no-dry-run \
-      > /tmp/candidates.json
+      --surveys WISE \
+      --output /tmp/candidates.json
   PYTHONPATH=src uv run python Skills/adversarial_review.py /tmp/candidates.json
   ```
+  Keep alert actions in dry-run mode during discovery sweeps. Real archive
+  fetching does not require `--no-dry-run`; actual MPC submission remains
+  fail-closed until `docs/MPC_SUBMISSION_POLICY.md §TODO for Future Agents` is
+  resolved and `alert.py` is configured with a real observatory code plus
+  `NEO_MPC_SUBMISSION_APPROVED=1`.
+
+**2026-06-27 WISE live archive sweep evidence**: Jerome ran the Taurus WISE
+command from `main` after pulling PR #127. IRSA async TAP returned `111913`
+rows with columns `['ra', 'dec', 'mjd', 'w1mpro', 'w1sigmpro']`; the pipeline
+parsed `85335` WISE observations, detected `535` moving-object candidates, linked
+`0` tracklets, processed `0` candidates, and produced no submission-ready
+candidates. This closes the WISE schema/fetch uncertainty for that field and
+moves the next D1 blocker downstream to WISE photometry cleanup and
+detection/linking diagnostics. Evidence:
+`docs/evidence/live/2026-06-27-wise-live-sweep.md`.
 
 ### Gate D2: Operator Review
 - [ ] Jerome W. Lindsey III reviews SURVIVE/BORDERLINE candidates

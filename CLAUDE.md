@@ -787,7 +787,7 @@ do NOT re-run any ATLAS screening, prequalification, or audit commands.
 - All 5 pre-existing adversarial/pipeline test failures fixed (see AGENTS.md).
 - CI green on Python 3.14 with 100% coverage ✓
 
-**Next live run** (operator, from main — PR #115 already merged):
+**Historical next live run (SUPERSEDED — do NOT run for discovery)**:
 ```bash
 git pull origin main
 export PYTHONPATH=src
@@ -1053,23 +1053,41 @@ MPC submission → provisional designation → independent confirmation → jour
 2. ~~Open/merge PR #117~~ DONE ✓ (2026-06-27, CI green, 1534 tests, 100% coverage)
 3. ~~**Redesign `fetch.py` discovery layer**~~ DONE ✓ (PR #119 merged 2026-06-27, 1573 tests)
 4. ~~**Update `docs/MPC_SUBMISSION_POLICY.md`**~~ DONE ✓ (PR #121 merged 2026-06-27)
-5. **Run live pipeline** targeting WISE/NEOWISE — **READY (PR #129 merged)**:
+5. **Run live archive pipeline** targeting WISE/NEOWISE — **READY after PR #131 merges**:
    ```bash
    git pull origin main
    export PYTHONPATH=src
    caffeinate -i uv run python Skills/run_pipeline.py \
        --ra 58.0 --dec 20.0 --radius 3.5 \
        --start-jd 2458880.5 --end-jd 2458910.5 \
-       --surveys WISE --no-dry-run --force-refresh --no-resume
+       --surveys WISE --force-refresh --no-resume \
+       --output /tmp/wise_candidates.json
    ```
    Both `--force-refresh` AND `--no-resume` required: `--force-refresh` clears the IRSA query cache; `--no-resume` forces the checkpoint to be ignored so all stages re-run.
    RA=58.0 Dec=20.0 (Taurus) is correct for a Feb 2020 NEOWISE epoch (NEOWISE scans at ~90° from Sun; Sun at RA≈325° in Feb 2020 → survey strip at RA≈55°).
    Expected output with PR #129 code: 30s heartbeat lines (`[fetch] WISE IRSA TAP: phase=EXECUTING  elapsed Xm Xs`) then `[fetch] WISE IRSA: N rows, cols=[...]` on completion.
    Do NOT use `--surveys ZTF` or `--surveys ATLAS` for discovery.
-6. **Run adversarial review** (`Skills/adversarial_review.py`) on any candidates found.
+   Do NOT pass `--no-dry-run` during discovery sweeps. Real archive fetching
+   works in dry-run mode; actual MPC submission remains blocked until the
+   observatory-code path is resolved and `NEO_MPC_SUBMISSION_APPROVED=1` is set
+   with a real non-placeholder MPC code.
+6. **Run adversarial review** (`Skills/adversarial_review.py`) on any candidates found:
+   `PYTHONPATH=src uv run python Skills/adversarial_review.py /tmp/wise_candidates.json`.
 7. **Jerome reviews** any SURVIVE or BORDERLINE candidates.
 8. **Jerome resolves MPC observatory code** (human-gated; no code can help here).
 9. Submit survivors to MPC → await provisional designation.
+
+**Operator WISE run evidence (2026-06-27, PR #127 main)**:
+Jerome ran the Taurus WISE command before PR #131 merged. IRSA async TAP returned
+`111913` rows with live columns `['ra', 'dec', 'mjd', 'w1mpro', 'w1sigmpro']`;
+the pipeline parsed `85335` WISE observations, preprocessed all of them, detected
+`535` candidates, linked `0` tracklets, processed `0` candidates, and wrote run
+summary `Logs/pipeline_runs/756e0dc7b6be/run_summary.json`. The transcript also
+showed masked WISE photometry warnings for `w1mpro` and `w1sigmpro`. Durable
+evidence: `docs/evidence/live/2026-06-27-wise-live-sweep.md`. Do not ask the
+operator to repeat this exact run; next code work should handle masked WISE
+photometry explicitly and diagnose why `535` WISE candidates yielded `0`
+tracklets.
 
 - Console output is fully compliant with `docs/CONSOLE_OUTPUT_SPEC.md` as of v0.90.0.
 - ALWAYS run from `main` — operator never checks out feature branches.

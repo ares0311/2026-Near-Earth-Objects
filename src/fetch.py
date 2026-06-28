@@ -27,6 +27,7 @@ __all__ = [
 ]
 
 import json
+import math
 import os
 import time
 from collections.abc import Callable
@@ -1431,6 +1432,23 @@ def compute_observation_rate(fetch_result: object) -> float | None:
 # ---------------------------------------------------------------------------
 
 
+def _table_float_or_default(value: Any, default: float) -> float:
+    """Return a finite float from an archive table scalar, or a safe default."""
+    if value is None:
+        return default
+    try:
+        mask = getattr(value, "mask", False)
+        if bool(mask):
+            return default
+    except (TypeError, ValueError):
+        return default
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return default
+    return parsed if math.isfinite(parsed) else default
+
+
 def fetch_wise_archive(
     ra_deg: float,
     dec_deg: float,
@@ -1545,21 +1563,23 @@ def fetch_wise_archive(
     obs: list[Observation] = []
     for i, row in enumerate(table):
         try:
-            mjd = float(row["mjd"])
+            mjd = _table_float_or_default(row["mjd"], math.nan)
             # Skip rows outside the requested time window
             if not (start_mjd <= mjd <= end_mjd):
                 continue
             jd = mjd + 2_400_000.5
-            # Use sentinel 99.0 for missing magnitudes
-            w1_raw = row["w1mpro"]
-            w1 = float(w1_raw) if w1_raw is not None else 99.0
-            w1err_raw = row["w1sigmpro"]
-            w1_err = float(w1err_raw) if w1err_raw is not None else 0.1
+            # Use safe sentinels for masked or missing WISE photometry.
+            w1 = _table_float_or_default(row["w1mpro"], 99.0)
+            w1_err = _table_float_or_default(row["w1sigmpro"], 0.1)
+            ra = _table_float_or_default(row["ra"], math.nan)
+            dec = _table_float_or_default(row["dec"], math.nan)
+            if not (math.isfinite(ra) and math.isfinite(dec)):
+                continue
             obs.append(
                 Observation(
                     obs_id=f"wise_{i}_{mjd:.5f}",
-                    ra_deg=float(row["ra"]),
-                    dec_deg=float(row["dec"]),
+                    ra_deg=ra,
+                    dec_deg=dec,
                     jd=jd,
                     mag=w1,
                     mag_err=w1_err or 0.1,

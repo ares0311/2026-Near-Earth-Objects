@@ -613,10 +613,15 @@ git pull origin main && export PYTHONPATH=src
 caffeinate -i uv run python Skills/run_pipeline.py \
     --ra <RA> --dec <Dec> --radius 3.5 \
     --start-jd <start> --end-jd <end> \
-    --surveys WISE --no-dry-run
+    --surveys WISE \
+    --output /tmp/wise_candidates.json
 # Then run adversarial review on any candidates:
-PYTHONPATH=src uv run python Skills/adversarial_review.py <candidates.json>
+PYTHONPATH=src uv run python Skills/adversarial_review.py /tmp/wise_candidates.json
 ```
+Keep discovery sweeps in alert dry-run mode. Live archive fetching does not
+require `--no-dry-run`; actual MPC submission remains fail-closed until the
+MPC observatory-code path is resolved and `NEO_MPC_SUBMISSION_APPROVED=1` is
+set with a real non-placeholder observatory code.
 
 **Two human-gated blockers remain**:
 1. MPC observatory code strategy — Jerome must resolve before any submission.
@@ -650,7 +655,7 @@ Evidence: `docs/evidence/live/2026-06-22-ndet-cap-root-cause.md`.
 - `test_run_pipeline_resumes_from_checkpoint` patches `ready_for_submission`
   to prevent MagicMock vs int comparison failure.
 
-**Next live run** (operator, from main after `git pull origin main`):
+**Historical next live run (SUPERSEDED — do NOT run for discovery)**:
 ```bash
 git pull origin main
 export PYTHONPATH=src
@@ -873,7 +878,7 @@ PYTHONPATH=src uv run python Skills/select_survey_fields.py \
 2. Update `alert.py` to perform the actual submission in `run_pipeline.py`.
 3. Update `Skills/export_ades_report.py` `--obs-code` default to the assigned code.
 
-**Next live run** (when PR #116 is merged to main):
+**Historical next live run (SUPERSEDED — do NOT run for discovery)**:
 ```bash
 git pull origin main
 source Skills/verify_live_credentials.sh

@@ -2,6 +2,7 @@
 
 import hashlib
 import sys
+import warnings
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -3333,6 +3334,77 @@ class TestFetchWiseArchive:
         assert result[0].mag_err == 0.1
         assert result[0].mission == "WISE"
 
+    def test_masked_wise_photometry_uses_sentinel_without_warning(self, tmp_path, monkeypatch):
+        """Masked WISE magnitudes are missing data, not nan-producing floats."""
+        import numpy as np
+
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        mjd_in = 2460000.5 - 2_400_000.5
+        mock_row = {
+            "mjd": mjd_in,
+            "w1mpro": np.ma.masked,
+            "w1sigmpro": np.ma.masked,
+            "ra": 180.0,
+            "dec": 10.0,
+        }
+        mock_pyvo = self._make_pyvo_mock([mock_row])
+        with patch.dict("sys.modules", {"pyvo": mock_pyvo}):
+            with warnings.catch_warnings(record=True) as caught:
+                result = fetch_mod.fetch_wise_archive(
+                    180.0, 10.0, 1.0, 2460000.5, 2460010.5
+                )
+        assert caught == []
+        assert len(result) == 1
+        assert result[0].mag == 99.0
+        assert result[0].mag_err == 0.1
+
+    def test_masked_wise_position_is_skipped(self, tmp_path, monkeypatch):
+        """Masked WISE coordinates cannot produce valid astrometry, so skip the row."""
+        import numpy as np
+
+        monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        mjd_in = 2460000.5 - 2_400_000.5
+        mock_row = {
+            "mjd": mjd_in,
+            "w1mpro": 14.3,
+            "w1sigmpro": 0.02,
+            "ra": np.ma.masked,
+            "dec": 10.0,
+        }
+        mock_pyvo = self._make_pyvo_mock([mock_row])
+        with patch.dict("sys.modules", {"pyvo": mock_pyvo}):
+            result = fetch_mod.fetch_wise_archive(180.0, 10.0, 1.0, 2460000.5, 2460010.5)
+        assert result == []
+
+    def test_mask_truth_error_uses_default(self):
+        """A broken table mask object is treated as missing WISE scalar data."""
+
+        class BrokenMask:
+            """Mask-like object whose truth conversion mirrors malformed table state."""
+
+            def __bool__(self):
+                """Raise during truth testing so the defensive branch is covered."""
+                raise TypeError("mask truth value unavailable")
+
+        class BrokenMaskedValue:
+            """Astropy-like scalar wrapper with a mask attribute that cannot bool()."""
+
+            mask = BrokenMask()
+
+        assert fetch_mod._table_float_or_default(BrokenMaskedValue(), 99.0) == 99.0
+
+    def test_float_parse_error_uses_default(self):
+        """A table scalar that cannot convert to float is treated as missing."""
+
+        class NonFloatScalar:
+            """Archive scalar wrapper whose float conversion fails deterministically."""
+
+            def __float__(self):
+                """Raise during conversion so the fallback branch is covered."""
+                raise TypeError("scalar cannot be converted")
+
+        assert fetch_mod._table_float_or_default(NonFloatScalar(), 0.1) == 0.1
+
     def test_successful_row_within_jd_window(self, tmp_path, monkeypatch):
         """Successful row within JD window creates correct Observation."""
         monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
@@ -3825,11 +3897,12 @@ class TestFetchWiseMalformedRow:
     """Covers fetch_wise_archive: except Exception: continue in row loop."""
 
     def test_malformed_row_skipped_good_row_kept(self, tmp_path, monkeypatch):
-        """A row with non-numeric ra causes exception; good row still returned."""
+        """A row that raises on field access is skipped; good row still returned."""
         monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
         mjd_ok = 2460005.0 - 2_400_000.5  # valid MJD inside window
         good_row = {"mjd": mjd_ok, "ra": 180.0, "dec": 10.0, "w1mpro": 14.5, "w1sigmpro": 0.05}
-        bad_row = {"mjd": mjd_ok, "ra": "bad", "dec": 10.0, "w1mpro": 15.0, "w1sigmpro": 0.1}
+        bad_row = MagicMock()
+        bad_row.__getitem__.side_effect = RuntimeError("malformed WISE row")
         mock_job = MagicMock()
         mock_job.phase = "COMPLETED"
         mock_dal_result = MagicMock()

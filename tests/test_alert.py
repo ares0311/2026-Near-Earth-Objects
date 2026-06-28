@@ -246,20 +246,42 @@ class TestSubmitToMpc:
     def test_live_submission_success(self, tmp_path, monkeypatch):
         import alert as alert_mod
         monkeypatch.setattr(alert_mod, "_LOG_DIR", tmp_path)
+        monkeypatch.setenv("NEO_MPC_SUBMISSION_APPROVED", "1")
         neo = make_scored_neo(rb=0.95, orbit_quality=2, moid_au=0.03)
         mock_resp = MagicMock()
         mock_resp.raise_for_status = MagicMock()
         mock_resp.status_code = 200
         with patch("requests.post", return_value=mock_resp):
-            result = _submit_to_mpc(neo, dry_run=False)
+            result = _submit_to_mpc(neo, dry_run=False, obs_code="G96")
         assert result is True
+
+    def test_live_submission_blocked_without_explicit_env_gate(self, tmp_path, monkeypatch):
+        import alert as alert_mod
+        monkeypatch.setattr(alert_mod, "_LOG_DIR", tmp_path)
+        monkeypatch.delenv("NEO_MPC_SUBMISSION_APPROVED", raising=False)
+        neo = make_scored_neo(rb=0.95, orbit_quality=2, moid_au=0.03)
+        with patch("requests.post") as mock_post:
+            result = _submit_to_mpc(neo, dry_run=False, obs_code="G96")
+        assert result is False
+        mock_post.assert_not_called()
+
+    def test_live_submission_blocked_with_placeholder_obscode(self, tmp_path, monkeypatch):
+        import alert as alert_mod
+        monkeypatch.setattr(alert_mod, "_LOG_DIR", tmp_path)
+        monkeypatch.setenv("NEO_MPC_SUBMISSION_APPROVED", "1")
+        neo = make_scored_neo(rb=0.95, orbit_quality=2, moid_au=0.03)
+        with patch("requests.post") as mock_post:
+            result = _submit_to_mpc(neo, dry_run=False, obs_code="XXX")
+        assert result is False
+        mock_post.assert_not_called()
 
     def test_live_submission_failure(self, tmp_path, monkeypatch):
         import alert as alert_mod
         monkeypatch.setattr(alert_mod, "_LOG_DIR", tmp_path)
+        monkeypatch.setenv("NEO_MPC_SUBMISSION_APPROVED", "1")
         neo = make_scored_neo(rb=0.95, orbit_quality=2, moid_au=0.03)
         with patch("requests.post", side_effect=Exception("network error")):
-            result = _submit_to_mpc(neo, dry_run=False)
+            result = _submit_to_mpc(neo, dry_run=False, obs_code="G96")
         assert result is False
 
 
@@ -800,5 +822,4 @@ class TestCountObservationsByMission:
         sys.path.insert(0, "src")
         import alert
         assert "count_observations_by_mission" in alert.__all__
-
 

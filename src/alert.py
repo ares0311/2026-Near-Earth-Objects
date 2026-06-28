@@ -17,6 +17,7 @@ __all__ = [
 
 import json
 import logging
+import os
 import time as _time_mod
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -47,7 +48,8 @@ _logger = logging.getLogger(__name__)
 # Cols 71-71: band
 # Cols 78-80: observatory code
 
-_MPC_OBS_CODE = "Xnn"  # placeholder; replace with real MPC observatory code
+_MPC_OBS_CODE = "XXX"  # MPC placeholder for new observers; replace with assigned code.
+_MPC_SUBMISSION_ENV = "NEO_MPC_SUBMISSION_APPROVED"
 
 
 def _pack_provisional(designation: str) -> str:
@@ -182,20 +184,40 @@ def _log_alert(
 # ---------------------------------------------------------------------------
 
 
-def _submit_to_mpc(neo: ScoredNEO, dry_run: bool = True) -> bool:
+def _live_mpc_submission_is_enabled(obs_code: str) -> tuple[bool, str]:
+    """Return whether live MPC submission is explicitly enabled and configured."""
+    if os.environ.get(_MPC_SUBMISSION_ENV) != "1":
+        return False, f"{_MPC_SUBMISSION_ENV}=1 is not set"
+    if obs_code.upper() in {"", "XXX", "XNN"}:
+        return False, "MPC observatory code is still a placeholder"
+    return True, "live MPC submission explicitly enabled"
+
+
+def _submit_to_mpc(
+    neo: ScoredNEO,
+    dry_run: bool = True,
+    obs_code: str = _MPC_OBS_CODE,
+) -> bool:
     """Submit observation report to MPC.
 
     In dry_run mode (default for safety), writes the report to disk only.
-    Real submission requires MPC credentials and explicit opt-in.
+    Real submission requires a non-placeholder MPC code and explicit opt-in via
+    ``NEO_MPC_SUBMISSION_APPROVED=1`` so live archive runs cannot accidentally
+    submit before the observatory-code policy is resolved.
     """
-    report = format_mpc_report(neo)
+    report = format_mpc_report(neo, obs_code=obs_code)
     report_path = _LOG_DIR / f"mpc_report_{neo.tracklet.object_id}.txt"
     _LOG_DIR.mkdir(parents=True, exist_ok=True)
     report_path.write_text(report)
     _logger.info("MPC report written to %s", report_path)
 
     if dry_run:
-        _logger.warning("DRY RUN: MPC submission skipped. Set dry_run=False for live submission.")
+        _logger.warning("DRY RUN: MPC submission skipped.")
+        return False
+
+    enabled, reason = _live_mpc_submission_is_enabled(obs_code)
+    if not enabled:
+        _logger.error("MPC submission blocked: %s", reason)
         return False
 
     # Live submission path (requires MPC account)
@@ -348,8 +370,9 @@ def process_alert(
         return result
 
     # Step 1: MPC submission
-    submitted = _submit_to_mpc(neo, dry_run=dry_run)
-    actions.append(f"MPC report {'submitted' if submitted else 'drafted (dry_run)'}")
+    submitted = _submit_to_mpc(neo, dry_run=dry_run, obs_code=mpc_obs_code)
+    mpc_action = "submitted" if submitted else "drafted; submission skipped or blocked"
+    actions.append(f"MPC report {mpc_action}")
     _log_alert(neo, pathway, "mpc_submission")
 
     # Step 2: NEOCP monitoring (non-blocking; returns immediately for async follow-up)
