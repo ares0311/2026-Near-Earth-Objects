@@ -3393,6 +3393,18 @@ class TestFetchWiseArchive:
 
         assert fetch_mod._table_float_or_default(BrokenMaskedValue(), 99.0) == 99.0
 
+    def test_float_parse_error_uses_default(self):
+        """A table scalar that cannot convert to float is treated as missing."""
+
+        class NonFloatScalar:
+            """Archive scalar wrapper whose float conversion fails deterministically."""
+
+            def __float__(self):
+                """Raise during conversion so the fallback branch is covered."""
+                raise TypeError("scalar cannot be converted")
+
+        assert fetch_mod._table_float_or_default(NonFloatScalar(), 0.1) == 0.1
+
     def test_successful_row_within_jd_window(self, tmp_path, monkeypatch):
         """Successful row within JD window creates correct Observation."""
         monkeypatch.setattr(fetch_mod, "_CACHE_DIR", tmp_path / ".neo_cache")
