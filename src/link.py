@@ -206,7 +206,7 @@ def _link_candidates(
     min_obs: int = _MIN_OBSERVATIONS,
     progress_callback: Callable[[int, int, int], None] | None = None,
     progress_every_pairs: int = 5000,
-) -> list[Tracklet]:
+) -> tuple[list[Tracklet], dict[str, int]]:
     """Link single-night candidates into multi-night tracklets.
 
     Algorithm (simplified THOR):
@@ -218,9 +218,19 @@ def _link_candidates(
     """
     nights = _obs_by_night(candidates)
     sorted_nights = sorted(nights.keys())
+    diagnostics = {
+        "n_nights": len(sorted_nights),
+        "n_observations": sum(len(obs) for obs in nights.values()),
+        "n_seed_pairs_total": 0,
+        "n_seed_pairs_rate_window": 0,
+        "n_seed_pairs_satellite_rejected": 0,
+        "n_arcs_below_min_observations": 0,
+        "n_arcs_below_min_nights": 0,
+        "n_arcs_chi2_rejected": 0,
+    }
 
     if len(sorted_nights) < min_nights:
-        return []
+        return [], diagnostics
 
     tracklets: list[Tracklet] = []
     used_obs_ids: set[str] = set()
@@ -231,6 +241,7 @@ def _link_candidates(
             if dt_days > 30:
                 break
             total_pairs += len(nights[night_a]) * len(nights[night_b])
+    diagnostics["n_seed_pairs_total"] = total_pairs
     processed_pairs = 0
 
     for ni, night_a in enumerate(sorted_nights[:-1]):
@@ -265,7 +276,9 @@ def _link_candidates(
                     rate = math.hypot(dra, ddec)
                     if not (_MOTION_MIN_ARCSEC_PER_HR <= rate <= _MOTION_MAX_ARCSEC_PER_HR):
                         continue
+                    diagnostics["n_seed_pairs_rate_window"] += 1
                     if _is_satellite_trail(dra, ddec, rate):
+                        diagnostics["n_seed_pairs_satellite_rejected"] += 1
                         continue
 
                     # Seed pair found — propagate to remaining nights
@@ -285,15 +298,18 @@ def _link_candidates(
                                 break
 
                     if len(arc_obs) < min_obs:
+                        diagnostics["n_arcs_below_min_observations"] += 1
                         continue
 
                     nights_covered = len({int(o.jd) for o in arc_obs})
                     if nights_covered < min_nights:
+                        diagnostics["n_arcs_below_min_nights"] += 1
                         continue
 
                     # Fit linear model and check chi²
                     _, _, _, _, reduced_chi2 = _fit_linear_motion(arc_obs)
                     if reduced_chi2 > chi2_threshold:
+                        diagnostics["n_arcs_chi2_rejected"] += 1
                         continue
 
                     # Accept tracklet
@@ -302,7 +318,7 @@ def _link_candidates(
                     used_obs_ids.update(o.obs_id for o in arc_obs)
                     break  # move on from obs_b once tracklet formed
 
-    return tracklets
+    return tracklets, diagnostics
 
 
 # ---------------------------------------------------------------------------
@@ -324,7 +340,7 @@ def link(
 
     Requires ≥min_nights distinct nights and ≥min_observations detections per tracklet.
     """
-    tracklets = _link_candidates(
+    tracklets, diagnostics = _link_candidates(
         candidates,
         tolerance_arcsec=position_tolerance_arcsec,
         chi2_threshold=chi2_threshold,
@@ -336,6 +352,7 @@ def link(
         n_tracklets=len(tracklets),
         min_nights=min_nights,
         min_observations=min_observations,
+        **diagnostics,
     )
     return LinkResult(tracklets=tuple(tracklets), provenance=provenance)
 

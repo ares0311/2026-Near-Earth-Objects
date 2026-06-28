@@ -2018,7 +2018,14 @@ class TestRunPipelineCheckpointResume:
         fake_det.provenance.n_known_matches = 0
         fake_link = MagicMock()
         fake_link.tracklets = ()
-        fake_link.provenance.n_tracklets = 0
+        from schemas import LinkProvenance
+        fake_link.provenance = LinkProvenance(
+            n_tracklets=0,
+            min_nights=2,
+            min_observations=3,
+            n_nights=0,
+            n_observations=0,
+        )
 
         run_dir = tmp_path / "run_abc"
         with (
@@ -2035,6 +2042,7 @@ class TestRunPipelineCheckpointResume:
         cp = _json.loads((run_dir / "checkpoint.json").read_text())
         assert cp["last_stage"] == "link"
         assert "tracklets" in cp
+        assert cp["link_provenance"]["n_tracklets"] == 0
 
     def test_run_pipeline_caps_candidates_before_link(self, tmp_path):
         """max_candidates bounds the candidate set handed to the linker."""
@@ -2053,7 +2061,12 @@ class TestRunPipelineCheckpointResume:
         fake_det.provenance.n_known_matches = 0
         fake_link = MagicMock()
         fake_link.tracklets = ()
-        fake_link.provenance.n_tracklets = 0
+        from schemas import LinkProvenance
+        fake_link.provenance = LinkProvenance(
+            n_tracklets=0,
+            min_nights=2,
+            min_observations=3,
+        )
 
         with (
             patch.object(mod, "_fetch_with_retry", return_value=fake_fetch_result),

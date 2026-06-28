@@ -161,6 +161,8 @@ class TestLinkResult:
         prov = LinkProvenance(n_tracklets=0, min_nights=2, min_observations=3)
         result = LinkResult(tracklets=(), provenance=prov)
         assert result.provenance.n_tracklets == 0
+        assert result.provenance.n_seed_pairs_total == 0
+        assert result.provenance.n_arcs_chi2_rejected == 0
 
 
 class TestOrbitalElements:

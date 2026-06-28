@@ -416,6 +416,21 @@ def run_pipeline(
             f"elapsed {_format_duration(time.monotonic() - _t_pipeline_start)}",
             flush=True,
         )
+        link_diag = link_result.provenance
+        if n_trk == 0 and link_diag.n_seed_pairs_total > 0:
+            print(
+                "[link] diagnostics "
+                f"nights={link_diag.n_nights}; "
+                f"observations={link_diag.n_observations}; "
+                f"seed_pairs={link_diag.n_seed_pairs_total}; "
+                f"rate_ok={link_diag.n_seed_pairs_rate_window}; "
+                f"satellite_rejected={link_diag.n_seed_pairs_satellite_rejected}; "
+                f"below_min_obs={link_diag.n_arcs_below_min_observations}; "
+                f"below_min_nights={link_diag.n_arcs_below_min_nights}; "
+                f"chi2_rejected={link_diag.n_arcs_chi2_rejected}; "
+                f"elapsed {_format_duration(time.monotonic() - _t_pipeline_start)}",
+                flush=True,
+            )
 
         tracklets = list(link_result.tracklets)
 
@@ -425,6 +440,7 @@ def run_pipeline(
             _save_checkpoint(run_dir, {
                 "last_stage": "link",
                 "tracklets": [_tracklet_to_dict(t) for t in tracklets],
+                "link_provenance": link_result.provenance.model_dump(),
                 "partial_results": [],
             })
 
