@@ -631,8 +631,14 @@ Tests: `tests/test_adversarial_review_skill.py` (50+ cases).
   pytest passed (`1586 passed, 2 deselected`), and GitHub CI passed before
   merge.
 - Evidence: `docs/evidence/live/2026-06-28-wise-linking-root-cause.md`.
-- NOT YET DONE: run the smaller WISE dry-run diagnostic from `main`. Do not
-  repeat the exact 3.5°/30-day Taurus sweep yet.
+- Follow-up diagnostic from `main` at `2a786e18` reached WISE pyvo polling but
+  failed before result retrieval with `AttributeError: 'AsyncTAPJob' object has
+  no attribute 'update'`. Root cause: pyvo 1.9.0 exposes `_update()`/`wait()`,
+  not public `update()`. Evidence:
+  `docs/evidence/live/2026-06-28-wise-prefilter-diagnostic-pyvo-update.md`.
+- NOT YET DONE: merge the pyvo polling compatibility PR, then rerun the smaller
+  WISE dry-run diagnostic from `main`. Do not repeat the exact 3.5°/30-day
+  Taurus sweep yet, and do not give feature-branch commands to the operator.
 
 **Live pipeline operator command** (after `git pull origin main`):
 ```bash

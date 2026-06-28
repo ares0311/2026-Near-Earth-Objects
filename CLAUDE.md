@@ -711,7 +711,8 @@ filter them before any external submission:
 - Fix: WISE ADQL selects official IRSA association columns (`sso_flg`, `allwise_cntr`, `n_allwise`, `source_id`) and prefilters to known SSOs plus AllWISE-unmatched rows; `detect()` preserves prefiltered WISE/DECam/TESS archive detections as singleton `RawCandidate` objects for multi-night linking.
 - Validation: operator targeted run on Python 3.14.3 passed (`80 passed in 0.86s`; targeted ruff clean; mypy clean across 12 source files). CI initially failed only on missing coverage for the new string-scalar helper; coverage test added, full local pytest passed (`1586 passed, 2 deselected`), and GitHub CI passed before merge.
 - Evidence: `docs/evidence/live/2026-06-28-wise-linking-root-cause.md`.
-- **NEXT OPERATOR ACTION — NOT YET DONE**: run the smaller WISE prefilter diagnostic from `main` (see Step 5 below). Do not repeat the exact 3.5°/30-day Taurus sweep yet.
+- Follow-up diagnostic from `main` at `2a786e18` reached the pyvo polling path but failed before result retrieval with `AttributeError: 'AsyncTAPJob' object has no attribute 'update'`. Root cause: pyvo 1.9.0 exposes `_update()`/`wait()` but not public `update()`. Evidence: `docs/evidence/live/2026-06-28-wise-prefilter-diagnostic-pyvo-update.md`.
+- **NEXT CODE ACTION — NOT YET DONE**: merge the pyvo polling compatibility PR, then rerun the smaller WISE prefilter diagnostic from `main` (see Step 5 below). Do not give the operator this command from a feature branch.
 
 **PR #127 MERGED (2026-06-27)** ✓ — Use pyvo async TAP with MJD filter for WISE archive query (SUPERSEDED by PR #129):
 - Root cause of run 2 `RemoteDisconnected`: `Irsa.query_region` uses IRSA sync TAP which has a ~60s server-side timeout. `SELECT *` on a 3.5° cone of `neowiser_p1bs_psd` returns millions of rows, hitting that timeout. No ORA-00904 in run 2 confirmed `mjd` IS the correct epoch column name.
@@ -1065,7 +1066,7 @@ MPC submission → provisional designation → independent confirmation → jour
 2. ~~Open/merge PR #117~~ DONE ✓ (2026-06-27, CI green, 1534 tests, 100% coverage)
 3. ~~**Redesign `fetch.py` discovery layer**~~ DONE ✓ (PR #119 merged 2026-06-27, 1573 tests)
 4. ~~**Update `docs/MPC_SUBMISSION_POLICY.md`**~~ DONE ✓ (PR #121 merged 2026-06-27)
-5. **WISE/NEOWISE discovery sweep state — PR #133 merged; run a smaller prefilter diagnostic next**:
+5. **WISE/NEOWISE discovery sweep state — pyvo polling compatibility must merge before the smaller diagnostic is rerun**:
    ```bash
    git pull origin main
    export PYTHONPATH=src
@@ -1085,6 +1086,9 @@ MPC submission → provisional designation → independent confirmation → jour
    behavior: far fewer WISE rows than `85335`, archive singleton candidates
    instead of arbitrary same-night point-source pairs, and still no external
    submission or impact-probability claim.
+   A post-PR #133 diagnostic from `main` failed before result retrieval because
+   pyvo 1.9.0 has no public `AsyncTAPJob.update()` method. Do not rerun this
+   command until the pyvo polling compatibility PR is merged to `main`.
    Both `--force-refresh` AND `--no-resume` are required when intentionally re-running a field: `--force-refresh` clears the IRSA query cache; `--no-resume` forces the checkpoint to be ignored so all stages re-run.
    RA=58.0 Dec=20.0 (Taurus) is correct for a Feb 2020 NEOWISE epoch (NEOWISE scans at ~90° from Sun; Sun at RA≈325° in Feb 2020 → survey strip at RA≈55°).
    Expected output with PR #129 code: 30s heartbeat lines (`[fetch] WISE IRSA TAP: phase=EXECUTING  elapsed Xm Xs`) then `[fetch] WISE IRSA: N rows, cols=[...]` on completion.

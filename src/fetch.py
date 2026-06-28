@@ -1471,6 +1471,29 @@ def _table_str_or_default(value: Any, default: str | None = None) -> str | None:
     return text or default
 
 
+def _refresh_tap_job_phase(job: Any, timeout_seconds: float = 10.0) -> str:
+    """Refresh a pyvo TAP async job and return its current phase.
+
+    pyvo versions differ here: some expose a public ``update()`` method, while
+    pyvo 1.9.0 exposes only the internal ``_update()`` helper plus blocking
+    ``wait()``.  We prefer a one-shot refresh so the caller can keep printing
+    live progress instead of disappearing inside a long blocking wait.
+    """
+    update = getattr(job, "update", None)
+    if callable(update):
+        update()
+        return str(job.phase)
+
+    private_update = getattr(job, "_update", None)
+    if callable(private_update):
+        private_update(wait_for_statechange=False, timeout=timeout_seconds)
+        return str(job.phase)
+
+    # Last resort for simple mocks or cached job handles: report the known
+    # phase without refreshing rather than failing before fetch_result().
+    return str(getattr(job, "phase", "UNKNOWN"))
+
+
 def fetch_wise_archive(
     ra_deg: float,
     dec_deg: float,
@@ -1549,8 +1572,7 @@ def fetch_wise_archive(
             file=sys.stderr, flush=True,
         )
         while True:
-            job.update()
-            phase = job.phase
+            phase = _refresh_tap_job_phase(job)
             elapsed = _time.monotonic() - t0
             m, s = divmod(int(elapsed), 60)
             print(
@@ -1560,8 +1582,8 @@ def fetch_wise_archive(
             if phase in ("COMPLETED", "ERROR", "ABORTED"):
                 break
             _time.sleep(30)
-        if job.phase != "COMPLETED":
-            raise RuntimeError(f"IRSA TAP job ended in phase={job.phase}")
+        if phase != "COMPLETED":
+            raise RuntimeError(f"IRSA TAP job ended in phase={phase}")
         table = job.fetch_result().to_table()
     except Exception as exc:
         # Print to stderr so operators can diagnose IRSA network/catalog issues.
