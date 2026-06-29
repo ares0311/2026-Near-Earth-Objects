@@ -1299,7 +1299,7 @@ wheels = [
 
 [[package]]
 name = "neo-detection"
-version = "0.90.0"
+version = "0.90.2"
 source = { editable = "." }
 dependencies = [
     { name = "alerce" },

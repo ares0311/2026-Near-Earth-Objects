@@ -1,6 +1,6 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.90.1
+**Current version**: v0.90.2
 **Last updated**: 2026-06-29
 **Purpose**: Mandatory read at session start (per MANDATORY SESSION-START PROTOCOL).  
 Every planning cycle must name the highest-priority unresolved Tier 1 gap and show how proposed steps close or directly unblock it.
@@ -619,6 +619,15 @@ configured budget (default `1000000`; set `0` only for a documented override).
 Use `--link-scale-plan-out Logs/reports/<name>.json` on bounded diagnostics to
 write the top night-pair and sky-cell contributors before the fail-closed stop;
 the plan is diagnostic only and does not authorize a broad-field override.
+
+**2026-06-29 scale-plan hardening update**: `--link-scale-plan-out` now records
+a budget-derived diagnostic radius and recommended subfield parameters from the
+actual blocked run inputs. These subfields are explicitly labeled as bounded
+diagnostics, not complete-field tiling proof, because naive sky-cell partitioning
+can miss objects that cross cell boundaries. Next D1 step after merge: run one
+recommended WISE diagnostic subfield from `recommended_diagnostic_subfields` and
+review the full `--review-packet-out` adversarial evidence if tracklets are
+produced.
 
 ### Gate D2: Operator Review
 - [ ] Jerome W. Lindsey III reviews SURVIVE/BORDERLINE candidates

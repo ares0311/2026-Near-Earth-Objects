@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import sys
 import time
 from datetime import UTC, datetime
@@ -151,6 +152,12 @@ def _build_link_scale_plan(
     candidates: tuple,
     max_link_seed_pairs: int,
     *,
+    ra_deg: float | None = None,
+    dec_deg: float | None = None,
+    radius_deg: float | None = None,
+    start_jd: float | None = None,
+    end_jd: float | None = None,
+    surveys: tuple[str, ...] = (),
     sky_cell_deg: float = 0.2,
     top_n: int = 12,
 ) -> dict:
@@ -199,6 +206,35 @@ def _build_link_scale_plan(
         })
 
     total_seed_pairs = sum(pair["seed_pairs"] for pair in night_pairs)
+    recommended_radius_deg: float | None = None
+    if radius_deg is not None and total_seed_pairs > max_link_seed_pairs > 0:
+        # Area scales approximately with radius^2 for a small cone. Use a
+        # conservative 0.8 factor so the next diagnostic is likely below the
+        # budget even when the field density is not perfectly uniform.
+        scale = math.sqrt(max_link_seed_pairs / total_seed_pairs) * 0.8
+        recommended_radius_deg = round(max(0.01, min(radius_deg, radius_deg * scale)), 4)
+
+    diagnostic_subfields = []
+    if (
+        recommended_radius_deg is not None
+        and start_jd is not None
+        and end_jd is not None
+        and surveys
+    ):
+        for cell in sky_cells[: min(6, len(sky_cells))]:
+            diagnostic_subfields.append({
+                "ra_deg": cell["center_ra_deg"],
+                "dec_deg": cell["center_dec_deg"],
+                "radius_deg": recommended_radius_deg,
+                "start_jd": start_jd,
+                "end_jd": end_jd,
+                "surveys": list(surveys),
+                "reason": (
+                    "Top-density sky cell from the blocked scale plan; use as "
+                    "a bounded diagnostic, not as complete-field evidence."
+                ),
+            })
+
     return {
         "status": "blocked_seed_pair_budget",
         "max_link_seed_pairs": max_link_seed_pairs,
@@ -216,8 +252,16 @@ def _build_link_scale_plan(
             reverse=True,
         )[:top_n],
         "top_sky_cells": sky_cells,
+        "recommended_diagnostic_radius_deg": recommended_radius_deg,
+        "recommended_diagnostic_subfields": diagnostic_subfields,
+        "tiling_limitations": [
+            "These subfields are bounded diagnostics, not a complete tiling proof.",
+            "Naive sky-cell tiling can miss objects that cross cell boundaries.",
+            "Production completeness requires documented overlap or a different "
+            "linking algorithm before promotion.",
+        ],
         "recommended_next_actions": [
-            "Run a smaller field or shorter window selected from top_night_pairs.",
+            "Run one recommended_diagnostic_subfield from main in dry-run mode.",
             "Use --max-candidates only for bounded diagnostics, not promotion.",
             "Override --max-link-seed-pairs only after documenting a scale plan.",
         ],
@@ -232,10 +276,26 @@ def _write_link_scale_plan(
     path: Path,
     candidates: tuple,
     max_link_seed_pairs: int,
+    *,
+    ra_deg: float | None = None,
+    dec_deg: float | None = None,
+    radius_deg: float | None = None,
+    start_jd: float | None = None,
+    end_jd: float | None = None,
+    surveys: tuple[str, ...] = (),
 ) -> None:
     """Write a JSON scale plan for a fail-closed link budget stop."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    plan = _build_link_scale_plan(candidates, max_link_seed_pairs)
+    plan = _build_link_scale_plan(
+        candidates,
+        max_link_seed_pairs,
+        ra_deg=ra_deg,
+        dec_deg=dec_deg,
+        radius_deg=radius_deg,
+        start_jd=start_jd,
+        end_jd=end_jd,
+        surveys=surveys,
+    )
     path.write_text(json.dumps(plan, indent=2, sort_keys=True) + "\n")
 
 
@@ -522,6 +582,12 @@ def run_pipeline(
                     link_scale_plan_out,
                     link_candidates,
                     max_link_seed_pairs,
+                    ra_deg=ra_deg,
+                    dec_deg=dec_deg,
+                    radius_deg=radius_deg,
+                    start_jd=start_jd,
+                    end_jd=end_jd,
+                    surveys=surveys,
                 )
                 print(
                     f"[link] Scale plan written to {link_scale_plan_out}",

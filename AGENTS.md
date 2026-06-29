@@ -537,7 +537,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.1)
+## Current State (v0.90.2)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -584,22 +584,24 @@ a measurable quantity (surveys done/total, tracklets done/total).
 
 See `docs/PRODUCTION_READINESS.md` for the full gap register.
 
-### Handoff notes (2026-06-29) — v0.90.1 (CURRENT)
+### Handoff notes (2026-06-29) — v0.90.2 (CURRENT)
 
-**v0.90.1 patch status**:
+**v0.90.2 patch status**:
 - WISE/NEOWISE ADES export is fail-closed: `stn=C51` requires written MPC
   confirmation, and ADES note `Z` is emitted for this non-survey archival
   remeasurement pipeline.
 - `Skills/run_pipeline.py --link-scale-plan-out` writes top night-pair and
-  sky-cell diagnostics when the link seed-pair budget fails closed.
+  sky-cell diagnostics when the link seed-pair budget fails closed, including
+  a budget-derived diagnostic radius and recommended subfield parameters.
 - Operator scale-plan probe result: `11786731` estimated seed pairs over the
   `1000000` default budget. Dominant night pairs are `2459084/2459085`
   (`9102120`) and `2459243/2459244` (`2503474`).
 - Expected seed-budget stops now exit cleanly with audit/output artifacts, not
   unhandled tracebacks.
-- **NEXT PRODUCTION ACTION — NOT YET DONE**: choose a smaller WISE diagnostic
-  from the dominant night pairs or implement a scientifically safe tiling
-  strategy. Do not override `--max-link-seed-pairs` blindly.
+- **NEXT PRODUCTION ACTION — NOT YET DONE**: after the scale-plan patch is on
+  `main`, run one recommended WISE diagnostic subfield from
+  `recommended_diagnostic_subfields`. Do not override `--max-link-seed-pairs`
+  blindly, and do not treat diagnostic subfields as complete-field evidence.
 
 **Goal: defensible discovery paper** (operator-confirmed 2026-06-26 by Jerome W. Lindsey III).
 Two-stage review before any external submission:

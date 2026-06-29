@@ -640,7 +640,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.1)
+## Current State (v0.90.2)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -665,23 +665,27 @@ MPC/NEOCP/Scout is the expert review system.
 
 ### Handoff state as of 2026-06-29 (CURRENT)
 
-**v0.90.1 patch status**:
+**v0.90.2 patch status**:
 - WISE/NEOWISE ADES export is now fail-closed around MPC authority:
   `stn=C51` is allowed only after written MPC confirmation is recorded, and
   ADES note `Z` is added for archival survey astrometry reported by this
   non-survey pipeline.
 - `Skills/run_pipeline.py --link-scale-plan-out` writes a compact JSON scale
-  plan when the link seed-pair budget fails closed.
+  plan when the link seed-pair budget fails closed. The plan now includes a
+  budget-derived diagnostic radius, recommended subfield parameters, and
+  explicit limitations warning that sky-cell diagnostics are not complete-field
+  tiling evidence.
 - The operator's 0.2-degree, 370-day WISE scale-plan probe produced
   `11786731` estimated seed pairs over the `1000000` default budget. Dominant
   night pairs: `2459084/2459085` (`9102120` seed pairs) and
   `2459243/2459244` (`2503474` seed pairs).
 - Expected seed-budget stops now exit cleanly with audit/output artifacts
   instead of printing a Python traceback.
-- **NEXT PRODUCTION ACTION — NOT YET DONE**: choose a smaller WISE diagnostic
-  from those dominant night pairs, or implement a scientifically safe tiling
-  strategy before any broad-field override. Do not override
-  `--max-link-seed-pairs` blindly.
+- **NEXT PRODUCTION ACTION — NOT YET DONE**: after this scale-plan patch is on
+  `main`, run one recommended WISE diagnostic subfield from
+  `recommended_diagnostic_subfields`. Do not override `--max-link-seed-pairs`
+  blindly, and do not present diagnostic subfields as complete-field recovery
+  evidence.
 
 **Discovery paper goal established (2026-06-26)**:
 The project goal is a **defensible discovery paper** — not a methods paper and not a
@@ -1149,7 +1153,7 @@ handles masked WISE photometry explicitly and keeps discovery sweeps in alert
 dry-run mode. Do not ask the operator to repeat this exact run; next code work
 should diagnose why `535` WISE candidates yielded `0` tracklets.
 
-- Console output is fully compliant with `docs/CONSOLE_OUTPUT_SPEC.md` as of v0.90.1.
+- Console output is fully compliant with `docs/CONSOLE_OUTPUT_SPEC.md` as of v0.90.2.
 - ALWAYS run from `main` — operator never checks out feature branches.
 - All commands must begin with `git pull origin main`.
 - Never give operator any command before the relevant PR merges.

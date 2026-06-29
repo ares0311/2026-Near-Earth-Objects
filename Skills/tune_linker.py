@@ -2,7 +2,7 @@
 """Parametric sweep of link.py tolerance and chi² threshold vs link/score rate.
 
 Usage:
-    PYTHONPATH=src python Skills/tune_linker.py [--n 50] [--seed 42]
+    PYTHONPATH=src uv run python Skills/tune_linker.py [--n 50] [--seed 42]
 """
 
 from __future__ import annotations
@@ -15,12 +15,23 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 import numpy as np
 
-from classify import classify, extract_features
+from classify import extract_features
 from detect import detect
 from link import link
 from orbit import fit_orbit
-from schemas import Observation
+from schemas import NEOPosterior, Observation
 from score import score
+
+_SYNTHETIC_SWEEP_POSTERIOR = NEOPosterior(
+    # The linker sweep measures link/orbit/score plumbing, not ML inference.
+    # Use a deterministic posterior so this utility does not load Tier 3
+    # Transformer weights or initialize PyTorch during lightweight smoke tests.
+    neo_candidate=0.6,
+    known_object=0.1,
+    main_belt_asteroid=0.1,
+    stellar_artifact=0.1,
+    other_solar_system=0.1,
+)
 
 
 def _make_obs(obs_id: str, jd: float, ra_deg: float, dec_deg: float, mag: float) -> Observation:
@@ -73,8 +84,7 @@ def _run_one(n: int, seed: int, tol: float, chi2: float) -> tuple[float, float]:
             t = lr.tracklets[0]
             feats = extract_features(t)
             orb = fit_orbit(t)
-            feats_cls, post = classify(t, feats)
-            score(t, feats_cls, post, orb)
+            score(t, feats, _SYNTHETIC_SWEEP_POSTERIOR, orb)
             n_scored += 1
     return n_linked / max(n, 1), n_scored / max(n, 1)
 
