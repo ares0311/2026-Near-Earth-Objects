@@ -826,6 +826,46 @@ def run_adversarial_review(
     )
 
 
+def review_unparseable_candidate(
+    item: object,
+    index: int,
+    error: Exception,
+) -> ReviewVerdict:
+    """Return a fail-closed verdict for compact or malformed review packets."""
+    object_id = f"item_{index}"
+    keys: list[str] = []
+    if isinstance(item, dict):
+        object_id = str(item.get("object_id") or object_id)
+        keys = sorted(str(k) for k in item)
+
+    challenge = ChallengeResult(
+        name="review_packet_schema",
+        outcome="FAIL",
+        reason=(
+            "Input is not a full ScoredNEO review packet; adversarial review "
+            "cannot verify tracklet, feature, posterior, hazard, and metadata evidence."
+        ),
+        details={
+            "item_index": index,
+            "object_id": object_id,
+            "available_keys": keys,
+            "parse_error": str(error),
+        },
+    )
+    return ReviewVerdict(
+        object_id=object_id,
+        verdict="REJECT",
+        challenges=[challenge],
+        fail_count=1,
+        warning_count=0,
+        summary=(
+            "REJECTED: candidate packet is incomplete for adversarial review. "
+            "Run or export a full ScoredNEO evidence packet before operator review."
+        ),
+        reviewed_at_utc=datetime.now(UTC).isoformat(),
+    )
+
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -910,23 +950,27 @@ def main(argv: list[str] | None = None) -> int:
     if isinstance(data, dict):
         data = [data]
 
-    # Parse ScoredNEO objects (skip malformed entries with a warning)
+    # Parse ScoredNEO objects. Compact pipeline summary rows fail closed as
+    # structured REJECT verdicts instead of being silently skipped.
     neos: list[ScoredNEO] = []
+    malformed_verdicts: list[ReviewVerdict] = []
     for i, item in enumerate(data):
         try:
             neos.append(ScoredNEO(**item))
         except Exception as exc:
             print(
-                f"WARNING: skipping item {i} — could not parse as ScoredNEO: {exc}",
+                f"WARNING: item {i} is not a full ScoredNEO review packet; "
+                "recording fail-closed REJECT verdict.",
                 file=sys.stderr,
             )
+            malformed_verdicts.append(review_unparseable_candidate(item, i, exc))
 
-    if not neos:
+    if not neos and not malformed_verdicts:
         print("ERROR: no valid ScoredNEO entries found in input.", file=sys.stderr)
         return 1
 
     # Run adversarial review on each candidate
-    verdicts: list[ReviewVerdict] = []
+    verdicts: list[ReviewVerdict] = list(malformed_verdicts)
     for neo in neos:
         v = run_adversarial_review(neo, offline=args.offline, atlas_token=atlas_token)
         verdicts.append(v)

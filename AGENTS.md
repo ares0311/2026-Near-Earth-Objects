@@ -676,23 +676,23 @@ Tests: `tests/test_adversarial_review_skill.py` (50+ cases).
 - 0.2° Taurus, 370 days: `12061` observations on six nights
   (`2458883`, `2459084`, `2459085`, `2459242`, `2459243`, `2459244`).
 - Evidence: `docs/evidence/live/2026-06-28-wise-window-night-probes.md`.
-- NOT YET DONE: run the bounded WISE dry-run pipeline on the 0.2° full-year
-  window from `main`, then record linker provenance before any follow-up.
 
-**Next live pipeline operator command** (after evidence/version sync is merged):
-```bash
-git pull origin main
-export PYTHONPATH=src
-export OMP_NUM_THREADS=1
-export OPENBLAS_NUM_THREADS=1
-export VECLIB_MAXIMUM_THREADS=1
-export NUMEXPR_MAX_THREADS=1
-caffeinate -i uv run --python 3.14 python Skills/run_pipeline.py \
-    --ra 58.0 --dec 20.0 --radius 0.2 \
-    --start-jd 2458880.5 --end-jd 2459250.5 \
-    --surveys WISE --force-refresh --no-resume \
-    --output Logs/reports/wise_prefilter_diagnostic_58_20_370d_r0p2.json
-```
+**WISE cap-2000 dry run (2026-06-29)**:
+- Evidence: `docs/evidence/live/2026-06-29-wise-cap2000-dry-run.md`.
+- The selected 0.2° Taurus full-year window is data-viable: `12061` WISE rows,
+  `12042/12061` valid sources, and multi-night tracklets can form.
+- The uncapped `12042`-candidate all-pairs linker path projected tens of
+  minutes and was intentionally interrupted; do not rerun it as the next
+  diagnostic.
+- The explicit bounded run with `--max-candidates 2000` completed in `35.32s`,
+  linked `243289` seed pairs, produced `19` tracklets, processed `19`
+  candidates, and found `0` submission-ready candidates.
+- `Skills/adversarial_review.py` now fails closed on compact pipeline summary
+  rows. The cap-2000 output produced `19/19` structured `REJECT` verdicts
+  because the output rows are not full `ScoredNEO` review packets.
+- NEXT CODE ACTION: make `run_pipeline.py` export or preserve full `ScoredNEO`
+  evidence packets for adversarial review, then address WISE-scale linking with
+  a scale-aware strategy before attempting uncapped 12k-candidate runs.
 
 Keep discovery sweeps in alert dry-run mode. Live archive fetching does not
 require `--no-dry-run`; actual MPC submission remains fail-closed until the

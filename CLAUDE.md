@@ -1082,36 +1082,25 @@ MPC submission → provisional designation → independent confirmation → jour
 2. ~~Open/merge PR #117~~ DONE ✓ (2026-06-27, CI green, 1534 tests, 100% coverage)
 3. ~~**Redesign `fetch.py` discovery layer**~~ DONE ✓ (PR #119 merged 2026-06-27, 1573 tests)
 4. ~~**Update `docs/MPC_SUBMISSION_POLICY.md`**~~ DONE ✓ (PR #121 merged 2026-06-27)
-5. **WISE/NEOWISE discovery sweep state — 0.2° Taurus full-year window selected for next dry run**:
-   ```bash
-   git pull origin main
-   export PYTHONPATH=src
-   export OMP_NUM_THREADS=1
-   export OPENBLAS_NUM_THREADS=1
-   export VECLIB_MAXIMUM_THREADS=1
-   export NUMEXPR_MAX_THREADS=1
-   caffeinate -i uv run --python 3.14 python Skills/run_pipeline.py \
-       --ra 58.0 --dec 20.0 --radius 0.2 \
-       --start-jd 2458880.5 --end-jd 2459250.5 \
-       --surveys WISE --force-refresh --no-resume \
-       --output Logs/reports/wise_prefilter_diagnostic_58_20_370d_r0p2.json
-   ```
-   This command shape is safe after PR #131 because it does not pass `--no-dry-run`.
-   It also avoids repeating the exact 3.5°/30-day Taurus sweep already recorded
-   in `docs/evidence/live/2026-06-27-wise-live-sweep.md`.
-   A post-PR #133 diagnostic from `main` failed before result retrieval because
-   pyvo 1.9.0 has no public `AsyncTAPJob.update()` method. PR #135 fixed that
-   blocker. PR #136 added linker diagnostics. The post-PR #136 rerun completed
-   and proved this exact 1.0°/7-day Taurus window has only one integer-JD night
-   after preprocessing (`n_nights=1`, `n_seed_pairs_total=0`). Do not rerun
-   that command again. Subsequent WISE probes found that the 0.2° full-year
-   Taurus window returns `12061` observations across `6` integer-JD nights,
-   making it the next bounded dry-run candidate.
-   Both `--force-refresh` AND `--no-resume` are required when intentionally re-running a field: `--force-refresh` clears the IRSA query cache; `--no-resume` forces the checkpoint to be ignored so all stages re-run.
+5. **WISE/NEOWISE discovery sweep state — 0.2° Taurus full-year cap-2000 dry run completed**:
+   - Evidence: `docs/evidence/live/2026-06-29-wise-cap2000-dry-run.md`.
+   - The selected Taurus window is data-viable: `12061` WISE rows,
+     `12042/12061` preprocessed sources, and `6` integer-JD nights.
+   - The uncapped `12042`-candidate all-pairs linker path projected tens of
+     minutes and was intentionally interrupted. Do not repeat the uncapped
+     command as the next diagnostic.
+   - The explicit bounded run used `--max-candidates 2000`, linked `243289`
+     seed pairs in `28s`, formed `19` tracklets, processed `19` candidates,
+     found `0` submission-ready candidates, and completed in `35.32s`.
+   - Offline adversarial review now fails closed on compact pipeline summary
+     rows. The cap-2000 report produced `19/19` `REJECT` verdicts because
+     `run_pipeline.py` wrote flattened rows rather than full `ScoredNEO`
+     review packets.
+   - NEXT CODE ACTION: make `run_pipeline.py` export or preserve full
+     `ScoredNEO` evidence packets for adversarial review, then implement a
+     scale-aware WISE linking strategy before another uncapped 12k-candidate
+     run.
    RA=58.0 Dec=20.0 (Taurus) is correct for a Feb 2020 NEOWISE epoch (NEOWISE scans at ~90° from Sun; Sun at RA≈325° in Feb 2020 → survey strip at RA≈55°).
-   Expected output: WISE TAP heartbeat lines, approximately `12061` fetched
-   WISE observations, linker provenance with at least `n_nights=2`, and still
-   no external submission or impact-probability claim.
    Do NOT use `--surveys ZTF` or `--surveys ATLAS` for discovery.
    Do NOT pass `--no-dry-run` during discovery sweeps. Real archive fetching
    works in dry-run mode; actual MPC submission remains blocked until the

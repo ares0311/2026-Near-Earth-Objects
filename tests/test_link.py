@@ -10,6 +10,7 @@ from link import (
     _obs_by_night,
     _predict_from_arc,
     _sep_arcsec,
+    _sep_arcsec_array,
     link,
 )
 from schemas import Observation, RawCandidate, Tracklet
@@ -46,6 +47,18 @@ class TestSepArcsec:
     def test_one_degree(self):
         sep = _sep_arcsec(0.0, 0.0, 1.0, 0.0)
         assert sep == pytest.approx(3600.0, rel=1e-4)
+
+    def test_vectorized_matches_scalar(self):
+        import numpy as np
+
+        ras = np.array([10.0, 10.1, 10.2])
+        decs = np.array([20.0, 20.1, 20.2])
+        seps = _sep_arcsec_array(ras, decs, 10.05, 20.05)
+        expected = [
+            _sep_arcsec(float(ra), float(dec), 10.05, 20.05)
+            for ra, dec in zip(ras, decs, strict=True)
+        ]
+        assert seps.tolist() == pytest.approx(expected)
 
 
 class TestObsByNight:
@@ -737,3 +750,29 @@ class TestLinkProgressCallback:
         # Each call must satisfy processed <= total.
         for processed, total, _ in calls:
             assert processed <= total
+
+
+class TestLinkVectorizedExtension:
+    """Regression coverage for WISE-scale night extension inside the linker."""
+
+    def test_extension_chooses_nearest_observation_not_first(self):
+        # The first third-night observation is deliberately outside tolerance;
+        # the second one is the continuation. A first-match-only scan or stale
+        # prediction would miss this tracklet.
+        obs1 = make_obs(obs_id="v1", jd=2460000.0, ra_deg=180.0, dec_deg=0.0)
+        obs2 = make_obs(obs_id="v2", jd=2460001.0, ra_deg=180.01, dec_deg=0.0)
+        distractor = make_obs(obs_id="v3_bad", jd=2460002.0, ra_deg=181.0, dec_deg=0.0)
+        continuation = make_obs(obs_id="v3_good", jd=2460002.0, ra_deg=180.02, dec_deg=0.0)
+        result = link(
+            tuple(
+                make_candidate((obs,), rate=1.5)
+                for obs in (obs1, obs2, distractor, continuation)
+            ),
+            min_nights=2,
+            min_observations=3,
+            position_tolerance_arcsec=5.0,
+        )
+        assert len(result.tracklets) == 1
+        obs_ids = {obs.obs_id for obs in result.tracklets[0].observations}
+        assert "v3_good" in obs_ids
+        assert "v3_bad" not in obs_ids

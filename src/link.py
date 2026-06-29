@@ -52,6 +52,22 @@ def _sep_arcsec(ra1: float, dec1: float, ra2: float, dec2: float) -> float:
     return math.degrees(math.acos(cos_sep)) * 3600.0
 
 
+def _sep_arcsec_array(
+    ra_deg: np.ndarray,
+    dec_deg: np.ndarray,
+    target_ra_deg: float,
+    target_dec_deg: float,
+) -> np.ndarray:
+    """Vectorized angular separation from many observations to one sky point."""
+    r1 = np.radians(ra_deg)
+    d1 = np.radians(dec_deg)
+    r2 = math.radians(target_ra_deg)
+    d2 = math.radians(target_dec_deg)
+    cos_sep = np.sin(d1) * math.sin(d2) + np.cos(d1) * math.cos(d2) * np.cos(r1 - r2)
+    cos_sep = np.clip(cos_sep, -1.0, 1.0)
+    return np.degrees(np.arccos(cos_sep)) * 3600.0
+
+
 def _is_satellite_trail(dra: float, ddec: float, rate: float) -> bool:
     """Return True if motion looks like a satellite or debris trail.
 
@@ -232,6 +248,16 @@ def _link_candidates(
     if len(sorted_nights) < min_nights:
         return [], diagnostics
 
+    night_arrays = {
+        night: (
+            obs_list,
+            np.array([obs.ra_deg for obs in obs_list], dtype=float),
+            np.array([obs.dec_deg for obs in obs_list], dtype=float),
+            tuple(obs.obs_id for obs in obs_list),
+        )
+        for night, obs_list in nights.items()
+    }
+
     tracklets: list[Tracklet] = []
     used_obs_ids: set[str] = set()
     total_pairs = 0
@@ -281,21 +307,29 @@ def _link_candidates(
                         diagnostics["n_seed_pairs_satellite_rejected"] += 1
                         continue
 
-                    # Seed pair found — propagate to remaining nights
+                    # Seed pair found - propagate to remaining nights
                     arc_obs: list[Observation] = [obs_a, obs_b]
 
                     for night_c in sorted_nights:
                         if night_c in (night_a, night_b):
                             continue
-                        for obs_c in nights[night_c]:
-                            if obs_c.obs_id in used_obs_ids:
-                                continue
-                            # Use arc-based predictor once we have ≥2 obs for better accuracy
-                            pred_ra, pred_dec = _predict_from_arc(arc_obs, obs_c.jd)
-                            sep = _sep_arcsec(obs_c.ra_deg, obs_c.dec_deg, pred_ra, pred_dec)
-                            if sep <= tolerance_arcsec:
-                                arc_obs.append(obs_c)
-                                break
+                        obs_c_list, ra_arr, dec_arr, obs_ids = night_arrays[night_c]
+                        if not obs_c_list:
+                            continue
+                        pred_ra, pred_dec = _predict_from_arc(
+                            arc_obs,
+                            obs_c_list[0].jd,
+                        )
+                        separations = _sep_arcsec_array(ra_arr, dec_arr, pred_ra, pred_dec)
+                        if used_obs_ids:
+                            used_mask = np.array(
+                                [obs_id in used_obs_ids for obs_id in obs_ids],
+                                dtype=bool,
+                            )
+                            separations = np.where(used_mask, np.inf, separations)
+                        best_idx = int(np.argmin(separations))
+                        if float(separations[best_idx]) <= tolerance_arcsec:
+                            arc_obs.append(obs_c_list[best_idx])
 
                     if len(arc_obs) < min_obs:
                         diagnostics["n_arcs_below_min_observations"] += 1

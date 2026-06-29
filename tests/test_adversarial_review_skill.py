@@ -753,6 +753,33 @@ class TestCLI:
         assert "verdict" in parsed[0]
         assert "challenges" in parsed[0]
 
+    def test_flat_pipeline_summary_rows_fail_closed(
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture,
+    ) -> None:
+        """Compact run_pipeline rows are rejected as incomplete review packets."""
+        data_file = tmp_path / "pipeline_summary.json"
+        data_file.write_text(json.dumps([
+            {
+                "object_id": "flat_001",
+                "neo_probability": 0.01,
+                "hazard_flag": "unknown",
+                "alert_pathway": "internal_candidate",
+                "moid_au": None,
+                "_submission_ready": False,
+            }
+        ]))
+
+        rc = main([str(data_file), "--offline", "--json"])
+        out = capsys.readouterr().out
+        parsed = json.loads(out)
+
+        assert rc == 1
+        assert parsed[0]["object_id"] == "flat_001"
+        assert parsed[0]["verdict"] == "REJECT"
+        assert parsed[0]["challenges"][0]["name"] == "review_packet_schema"
+
     def test_missing_input_file_exits_1(self) -> None:
         rc = main(["/nonexistent/path/to/file.json", "--offline"])
         assert rc == 1

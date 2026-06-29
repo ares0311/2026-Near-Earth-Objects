@@ -593,11 +593,21 @@ the previous 7-day diagnostic was non-informative and identify a bounded
 multi-night candidate window. A 1.0-degree, 370-day probe returned `328022`
 observations on `8` nights, too large for the next full pipeline run. A
 0.2-degree, 370-day probe returned `12061` observations on `6` nights
-(`[2458883, 2459084, 2459085, 2459242, 2459243, 2459244]`), making it the next
-bounded WISE dry-run candidate. Evidence:
-`docs/evidence/live/2026-06-28-wise-window-night-probes.md`. Next D1 step: run
-the 0.2-degree full-year WISE dry-run pipeline from merged `main` and inspect
-linker provenance.
+(`[2458883, 2459084, 2459085, 2459242, 2459243, 2459244]`). Evidence:
+`docs/evidence/live/2026-06-28-wise-window-night-probes.md`.
+
+**2026-06-29 WISE cap-2000 dry-run update**: The selected 0.2-degree window ran
+through the full dry-run pipeline with `--max-candidates 2000`: `12061` WISE
+rows, `12042/12061` preprocessed sources, `243289` capped seed pairs, `19`
+tracklets, `19` candidates processed, `0` submission-ready candidates, and
+`35.32s` elapsed. The uncapped `12042`-candidate all-pairs linker path projected
+tens of minutes and was intentionally interrupted. Offline adversarial review
+now fails closed on compact pipeline summary rows; this run produced `19/19`
+structured `REJECT` verdicts because full `ScoredNEO` review packets were not
+exported. Evidence: `docs/evidence/live/2026-06-29-wise-cap2000-dry-run.md`.
+Next D1 step: make `run_pipeline.py` export or preserve full `ScoredNEO`
+evidence packets for adversarial review, then implement a scale-aware WISE
+linking strategy before another uncapped 12k-candidate run.
 
 ### Gate D2: Operator Review
 - [ ] Jerome W. Lindsey III reviews SURVIVE/BORDERLINE candidates
