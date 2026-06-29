@@ -51,6 +51,11 @@ _INFRA_ERRORS = (ConnectionError, TimeoutError, OSError)
 # intentionally larger diagnostics after a tiling/scale plan is documented.
 _DEFAULT_MAX_LINK_SEED_PAIRS = 1_000_000
 
+
+class LinkSeedBudgetExceeded(RuntimeError):
+    """Expected fail-closed stop when broad-field linking exceeds budget."""
+
+
 # ── Console output helpers ────────────────────────────────────────────────────
 
 _LINE = "═" * 65
@@ -529,7 +534,7 @@ def run_pipeline(
                 "--max-link-seed-pairs override after documenting the scale plan."
             )
             print(f"[link] {message}", flush=True)
-            raise RuntimeError(message)
+            raise LinkSeedBudgetExceeded(message)
 
         print(
             f"[link] Linking {len(link_candidates)} candidates across nights  "
@@ -819,30 +824,40 @@ def main(argv: list[str] | None = None) -> None:
     if _CACHE_DIR.is_dir():
         cache_files_before = sorted(f.name for f in _CACHE_DIR.glob("*.json"))
 
-    results = run_pipeline(
-        ra_deg=args.ra,
-        dec_deg=args.dec,
-        radius_deg=args.radius,
-        start_jd=args.start_jd,
-        end_jd=args.end_jd,
-        surveys=surveys,
-        max_candidates=args.max_candidates,
-        dry_run=args.dry_run,
-        atlas_token=args.atlas_token,
-        force_refresh=args.force_refresh,
-        neocp_timeout_hours=args.neocp_timeout_hours,
-        neocp_poll_interval_hours=args.neocp_poll_interval,
-        run_dir=run_dir,
-        resume=not args.no_resume,
-        run_id=key,
-        review_packet_out=Path(args.review_packet_out) if args.review_packet_out else None,
-        max_link_seed_pairs=(
-            None if args.max_link_seed_pairs <= 0 else args.max_link_seed_pairs
-        ),
-        link_scale_plan_out=(
-            Path(args.link_scale_plan_out) if args.link_scale_plan_out else None
-        ),
-    )
+    results: list[dict] = []
+    run_status = "complete"
+    failure_reason: str | None = None
+    exit_code = 0
+    try:
+        results = run_pipeline(
+            ra_deg=args.ra,
+            dec_deg=args.dec,
+            radius_deg=args.radius,
+            start_jd=args.start_jd,
+            end_jd=args.end_jd,
+            surveys=surveys,
+            max_candidates=args.max_candidates,
+            dry_run=args.dry_run,
+            atlas_token=args.atlas_token,
+            force_refresh=args.force_refresh,
+            neocp_timeout_hours=args.neocp_timeout_hours,
+            neocp_poll_interval_hours=args.neocp_poll_interval,
+            run_dir=run_dir,
+            resume=not args.no_resume,
+            run_id=key,
+            review_packet_out=Path(args.review_packet_out) if args.review_packet_out else None,
+            max_link_seed_pairs=(
+                None if args.max_link_seed_pairs <= 0 else args.max_link_seed_pairs
+            ),
+            link_scale_plan_out=(
+                Path(args.link_scale_plan_out) if args.link_scale_plan_out else None
+            ),
+        )
+    except LinkSeedBudgetExceeded as exc:
+        run_status = "blocked_link_seed_budget"
+        failure_reason = str(exc)
+        exit_code = 2
+        print(f"[link] BLOCKED: {failure_reason}", flush=True)
 
     elapsed = round(time.monotonic() - t_start, 2)
 
@@ -870,6 +885,9 @@ def main(argv: list[str] | None = None) -> None:
             "surveys": list(surveys),
             "max_candidates": args.max_candidates,
             "dry_run": args.dry_run,
+            "status": run_status,
+            "failure_reason": failure_reason,
+            "link_scale_plan_out": args.link_scale_plan_out,
             "n_results": len(results),
             "elapsed_seconds": elapsed,
             "cache_files_downloaded": cache_files_before,
@@ -886,6 +904,9 @@ def main(argv: list[str] | None = None) -> None:
         print(f"Results written to {args.output}", flush=True)
     else:
         print(json.dumps(results, indent=2))
+
+    if exit_code:
+        raise SystemExit(exit_code)
 
 
 if __name__ == "__main__":

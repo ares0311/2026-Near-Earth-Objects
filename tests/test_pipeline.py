@@ -2376,6 +2376,41 @@ class TestRunPipelineCheckpointResume:
         _, kwargs = mock_rp.call_args
         assert kwargs["link_scale_plan_out"] == plan_out
 
+    def test_main_link_seed_budget_stop_exits_cleanly(self, tmp_path, monkeypatch):
+        """Expected link-budget stops write audit/output artifacts without traceback."""
+        import json as _json
+        from unittest.mock import patch
+
+        import pytest
+        mod = self._load_skill()
+        run_root = tmp_path / "runs"
+        output = tmp_path / "results.json"
+        monkeypatch.setattr(mod, "_LOG_ROOT", run_root)
+        monkeypatch.setattr(mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        with (
+            patch.object(
+                mod,
+                "run_pipeline",
+                side_effect=mod.LinkSeedBudgetExceeded("too many seed pairs"),
+            ),
+            pytest.raises(SystemExit) as exc_info,
+        ):
+            mod.main([
+                "--ra", "10.0", "--dec", "5.0",
+                "--start-jd", "2460000.0", "--end-jd", "2460001.0",
+                "--output", str(output),
+                "--no-delete-cache",
+            ])
+
+        assert exc_info.value.code == 2
+        assert _json.loads(output.read_text()) == []
+        summaries = sorted(run_root.glob("*/run_summary.json"))
+        assert len(summaries) == 1
+        summary = _json.loads(summaries[0].read_text())
+        assert summary["status"] == "blocked_link_seed_budget"
+        assert summary["failure_reason"] == "too many seed pairs"
+
 
 class TestFetchWithRetryJsonError:
     """_fetch_with_retry must not retry json.JSONDecodeError — empty API responses
