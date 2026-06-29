@@ -690,9 +690,13 @@ Tests: `tests/test_adversarial_review_skill.py` (50+ cases).
 - `Skills/adversarial_review.py` now fails closed on compact pipeline summary
   rows. The cap-2000 output produced `19/19` structured `REJECT` verdicts
   because the output rows are not full `ScoredNEO` review packets.
-- NEXT CODE ACTION: make `run_pipeline.py` export or preserve full `ScoredNEO`
-  evidence packets for adversarial review, then address WISE-scale linking with
-  a scale-aware strategy before attempting uncapped 12k-candidate runs.
+- `run_pipeline.py --review-packet-out` was then added and live-validated on
+  the same bounded WISE diagnostic. The rerun wrote `21` full `ScoredNEO`
+  packets; offline adversarial review produced `21/21 REJECT` verdicts with
+  fatal `orbit_quality`, `real_bogus`, `artifact_posterior`, and
+  `neo_dominance` challenges. No candidate advanced to operator review.
+- NEXT CODE ACTION: address WISE-scale linking with a scale-aware strategy or
+  explicit tiling plan before attempting uncapped 12k-candidate runs.
 
 Keep discovery sweeps in alert dry-run mode. Live archive fetching does not
 require `--no-dry-run`; actual MPC submission remains fail-closed until the

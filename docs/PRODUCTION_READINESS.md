@@ -604,10 +604,16 @@ tracklets, `19` candidates processed, `0` submission-ready candidates, and
 tens of minutes and was intentionally interrupted. Offline adversarial review
 now fails closed on compact pipeline summary rows; this run produced `19/19`
 structured `REJECT` verdicts because full `ScoredNEO` review packets were not
-exported. Evidence: `docs/evidence/live/2026-06-29-wise-cap2000-dry-run.md`.
-Next D1 step: make `run_pipeline.py` export or preserve full `ScoredNEO`
-evidence packets for adversarial review, then implement a scale-aware WISE
-linking strategy before another uncapped 12k-candidate run.
+exported.
+
+`run_pipeline.py --review-packet-out` was then added and live-validated on the
+same bounded diagnostic. The rerun wrote `21` full `ScoredNEO` packets and
+offline adversarial review produced `21/21 REJECT` verdicts with fatal
+`orbit_quality`, `real_bogus`, `artifact_posterior`, and `neo_dominance`
+challenges. No candidate advanced to operator review. Evidence:
+`docs/evidence/live/2026-06-29-wise-cap2000-dry-run.md`. Next D1 step:
+implement a scale-aware WISE linking strategy or explicit tiling plan before
+another uncapped 12k-candidate run.
 
 ### Gate D2: Operator Review
 - [ ] Jerome W. Lindsey III reviews SURVIVE/BORDERLINE candidates

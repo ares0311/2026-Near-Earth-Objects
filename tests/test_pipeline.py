@@ -2129,6 +2129,49 @@ class TestRunPipelineCheckpointResume:
         assert len(results) == 1
         assert results[0]["object_id"] == "T001"
 
+    def test_run_pipeline_writes_review_packet_output(self, tmp_path):
+        """run_pipeline writes full review packets when review_packet_out is set."""
+        import json as _json
+        from unittest.mock import MagicMock, patch
+        mod = self._load_skill()
+
+        t = self._make_tracklet()
+        mod._save_checkpoint(tmp_path, {
+            "last_stage": "link",
+            "tracklets": [mod._tracklet_to_dict(t)],
+            "partial_results": [],
+        })
+
+        scored = MagicMock()
+        scored.posterior.neo_candidate = 0.5
+        scored.hazard.hazard_flag = "nominal"
+        scored.hazard.alert_pathway = "internal_candidate"
+        scored.hazard.moid_au = None
+        scored.metadata.discovery_priority = 0.3
+        scored.model_dump.return_value = {"tracklet": {"object_id": "T001"}}
+
+        review_out = tmp_path / "review_packets.json"
+        with (
+            patch.object(mod, "classify", return_value=(MagicMock(), MagicMock())),
+            patch.object(mod, "fit_orbit", return_value=MagicMock()),
+            patch.object(mod, "score", return_value=scored),
+            patch.object(mod, "process_alert", return_value={"actions": []}),
+            patch.object(mod, "summarise", return_value="summary"),
+            patch.object(mod, "ready_for_submission", return_value=(False, [])),
+        ):
+            mod.run_pipeline(
+                ra_deg=0.0, dec_deg=0.0, radius_deg=1.0,
+                start_jd=0.0, end_jd=1.0,
+                run_dir=tmp_path, resume=True,
+                review_packet_out=review_out,
+            )
+
+        packets = _json.loads(review_out.read_text())
+        checkpoint = _json.loads((tmp_path / "checkpoint.json").read_text())
+        assert packets == [{"tracklet": {"object_id": "T001"}}]
+        assert checkpoint["review_packets"] == packets
+        scored.model_dump.assert_called_with(mode="json")
+
     # --- run_pipeline resume: skip completed tracklets ---
 
     def test_run_pipeline_skips_completed_tracklets(self, tmp_path):
@@ -2214,6 +2257,25 @@ class TestRunPipelineCheckpointResume:
 
         _, kwargs = mock_rp.call_args
         assert kwargs["max_candidates"] == 80
+
+    def test_main_review_packet_out_flag(self, tmp_path, monkeypatch):
+        """--review-packet-out passes a Path to run_pipeline."""
+        from unittest.mock import patch
+        mod = self._load_skill()
+        monkeypatch.setattr(mod, "_LOG_ROOT", tmp_path / "runs")
+        monkeypatch.setattr(mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        review_out = tmp_path / "review.json"
+
+        with patch.object(mod, "run_pipeline", return_value=[]) as mock_rp:
+            mod.main([
+                "--ra", "10.0", "--dec", "5.0",
+                "--start-jd", "2460000.0", "--end-jd", "2460001.0",
+                "--review-packet-out", str(review_out),
+                "--no-delete-cache",
+            ])
+
+        _, kwargs = mock_rp.call_args
+        assert kwargs["review_packet_out"] == review_out
 
 
 class TestFetchWithRetryJsonError:

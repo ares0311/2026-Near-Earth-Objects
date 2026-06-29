@@ -52,7 +52,7 @@ All printed candidate summaries had `alert_pathway=internal_candidate`,
 unknown hazard flag, unknown MOID, very low NEO posterior, and high artifact
 posterior. The run did not assert impact probability.
 
-## Adversarial Review Outcome
+## Initial Compact-Output Adversarial Review Outcome
 
 `Skills/adversarial_review.py` now fails closed on compact pipeline summary
 rows. The bounded WISE report contains flattened result rows rather than full
@@ -64,11 +64,54 @@ code task: export or preserve full `ScoredNEO` evidence packets from
 `run_pipeline.py` so automated adversarial review can evaluate real candidates
 instead of rejecting compact summaries as incomplete.
 
+## Full Review-Packet Rerun
+
+`run_pipeline.py` was updated to support `--review-packet-out`, then the same
+bounded WISE diagnostic was rerun:
+
+```bash
+OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 NUMEXPR_MAX_THREADS=1 PYTHONPATH=src caffeinate -i uv run --python 3.14 python Skills/run_pipeline.py \
+  --ra 58.0 --dec 20.0 --radius 0.2 \
+  --start-jd 2458880.5 --end-jd 2459250.5 \
+  --surveys WISE --no-resume --max-candidates 2000 \
+  --output Logs/reports/wise_prefilter_diagnostic_58_20_370d_r0p2_cap2000.json \
+  --review-packet-out Logs/reports/wise_prefilter_diagnostic_58_20_370d_r0p2_cap2000_review_packets.json
+```
+
+Rerun results:
+
+- WISE rows/alerts: `12061`
+- Preprocessed sources: `12042/12061`
+- Detected singleton candidates: `12042`
+- Explicit link cap: first `2000/12042` candidates
+- Link seed pairs under cap: `185960`
+- Tracklets formed: `21`
+- Candidates processed: `21`
+- Submission-ready candidates: `0`
+- Pipeline elapsed time: `49s`
+- Full review packets written:
+  `Logs/reports/wise_prefilter_diagnostic_58_20_370d_r0p2_cap2000_review_packets.json`
+
+Offline adversarial review of the full packets:
+
+```bash
+PYTHONPATH=src uv run --python 3.14 python Skills/adversarial_review.py Logs/reports/wise_prefilter_diagnostic_58_20_370d_r0p2_cap2000_review_packets.json --offline --json > Logs/reports/wise_prefilter_diagnostic_58_20_370d_r0p2_cap2000_full_adversarial_review.json
+```
+
+Full-packet review result:
+
+- Candidates reviewed: `21`
+- Verdicts: `21/21 REJECT`
+- Common fatal challenges: `orbit_quality`, `real_bogus`,
+  `artifact_posterior`, `neo_dominance`
+- No candidates advanced to operator review.
+
 ## Interpretation
 
 The selected WISE window is viable for bounded diagnostics and can produce
-multi-night tracklets. The remaining production work is not data availability;
-it is evidence-packet completeness and scalable linking. A full uncapped
+multi-night tracklets. Full adversarial-review packet export is now implemented
+and validated on this run. No candidate survived. The remaining production work
+is scalable linking and better discovery-field/tiling strategy. A full uncapped
 12k-candidate pass remains too expensive for the current all-pairs linker and
 should not be repeated until a scale-aware linking strategy or explicit survey
 tiling plan is implemented.

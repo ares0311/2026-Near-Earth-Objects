@@ -260,6 +260,7 @@ def run_pipeline(
     run_dir: Path | None = None,
     resume: bool = True,
     run_id: str = "unknown",
+    review_packet_out: Path | None = None,
 ) -> list[dict]:
     _t_pipeline_start = time.monotonic()
 
@@ -447,6 +448,7 @@ def run_pipeline(
     # ── Stage 2: Per-tracklet classify → orbit → score → alert ───────────────
     completed_ids = {r["object_id"] for r in cp.get("partial_results", [])}
     results: list[dict] = list(cp.get("partial_results", []))
+    review_packets: list[dict] = list(cp.get("review_packets", []))
 
     # Track per-tracklet timing for ETA.  Only count tracklets processed this
     # session (not ones reloaded from checkpoint) so ETA reflects real work.
@@ -540,14 +542,19 @@ def run_pipeline(
             "alert_actions": alert_result["actions"],
             "_submission_ready": ready,
         })
+        if review_packet_out is not None:
+            review_packets.append(scored.model_dump(mode="json"))
 
         # Checkpoint after each tracklet: a kill here loses at most one item.
         if run_dir is not None:
-            _save_checkpoint(run_dir, {
+            checkpoint = {
                 "last_stage": "partial",
                 "tracklets": [_tracklet_to_dict(t) for t in tracklets],
                 "partial_results": results,
-            })
+            }
+            if review_packet_out is not None:
+                checkpoint["review_packets"] = review_packets
+            _save_checkpoint(run_dir, checkpoint)
 
     n_ready = sum(1 for r in results if r.get("_submission_ready", False))
     _print_run_footer(
@@ -555,6 +562,10 @@ def run_pipeline(
         n_ready=n_ready,
         elapsed_s=time.monotonic() - _t_pipeline_start,
     )
+    if review_packet_out is not None:
+        review_packet_out.parent.mkdir(parents=True, exist_ok=True)
+        review_packet_out.write_text(json.dumps(review_packets, indent=2))
+        print(f"Review packets written to {review_packet_out}", flush=True)
     return results
 
 
@@ -615,6 +626,15 @@ def main(argv: list[str] | None = None) -> None:
     )
     parser.add_argument("--output", type=str, default=None)
     parser.add_argument(
+        "--review-packet-out",
+        type=str,
+        default=None,
+        help=(
+            "Optional JSON output path for full ScoredNEO packets suitable for "
+            "Skills/adversarial_review.py."
+        ),
+    )
+    parser.add_argument(
         "--no-delete-cache", action="store_true", default=False,
         help="Skip deleting .neo_cache files after the run (default: delete)",
     )
@@ -659,6 +679,7 @@ def main(argv: list[str] | None = None) -> None:
         run_dir=run_dir,
         resume=not args.no_resume,
         run_id=key,
+        review_packet_out=Path(args.review_packet_out) if args.review_packet_out else None,
     )
 
     elapsed = round(time.monotonic() - t_start, 2)

@@ -1096,10 +1096,13 @@ MPC submission → provisional designation → independent confirmation → jour
      rows. The cap-2000 report produced `19/19` `REJECT` verdicts because
      `run_pipeline.py` wrote flattened rows rather than full `ScoredNEO`
      review packets.
-   - NEXT CODE ACTION: make `run_pipeline.py` export or preserve full
-     `ScoredNEO` evidence packets for adversarial review, then implement a
-     scale-aware WISE linking strategy before another uncapped 12k-candidate
-     run.
+   - `run_pipeline.py --review-packet-out` was added and live-validated on the
+     same bounded WISE diagnostic. The rerun wrote `21` full `ScoredNEO`
+     packets; offline adversarial review produced `21/21 REJECT` verdicts with
+     fatal `orbit_quality`, `real_bogus`, `artifact_posterior`, and
+     `neo_dominance` challenges. No candidate advanced to operator review.
+   - NEXT CODE ACTION: implement a scale-aware WISE linking strategy or
+     explicit tiling plan before another uncapped 12k-candidate run.
    RA=58.0 Dec=20.0 (Taurus) is correct for a Feb 2020 NEOWISE epoch (NEOWISE scans at ~90° from Sun; Sun at RA≈325° in Feb 2020 → survey strip at RA≈55°).
    Do NOT use `--surveys ZTF` or `--surveys ATLAS` for discovery.
    Do NOT pass `--no-dry-run` during discovery sweeps. Real archive fetching
