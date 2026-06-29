@@ -613,7 +613,9 @@ offline adversarial review produced `21/21 REJECT` verdicts with fatal
 challenges. No candidate advanced to operator review. Evidence:
 `docs/evidence/live/2026-06-29-wise-cap2000-dry-run.md`. Next D1 step:
 implement a scale-aware WISE linking strategy or explicit tiling plan before
-another uncapped 12k-candidate run.
+another uncapped 12k-candidate run. `run_pipeline.py --max-link-seed-pairs`
+now fails closed before linking when estimated all-pairs seed work exceeds the
+configured budget (default `1000000`; set `0` only for a documented override).
 
 ### Gate D2: Operator Review
 - [ ] Jerome W. Lindsey III reviews SURVIVE/BORDERLINE candidates

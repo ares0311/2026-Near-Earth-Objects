@@ -2084,6 +2084,59 @@ class TestRunPipelineCheckpointResume:
         assert len(linked_candidates) == 2
         assert mock_link.call_args.kwargs["progress_callback"] is not None
 
+    def test_run_pipeline_fails_closed_when_link_seed_budget_exceeded(self, tmp_path):
+        """Large all-pairs link jobs fail before entering the linker."""
+        from unittest.mock import MagicMock, patch
+
+        from schemas import Observation, RawCandidate
+        mod = self._load_skill()
+
+        fake_fetch_result = MagicMock()
+        fake_fetch_result.alerts = []
+        fake_prep = MagicMock()
+        fake_prep.sources = ()
+        fake_prep.provenance.n_sources_out = 0
+        fake_prep.provenance.n_sources_in = 0
+        candidates = tuple(
+            RawCandidate(
+                candidate_id=f"c{i}",
+                observations=(
+                    Observation(
+                        obs_id=f"o{i}",
+                        ra_deg=180.0,
+                        dec_deg=0.0,
+                        jd=2460000.5 + (i % 2),
+                        mag=19.0,
+                        mag_err=0.05,
+                        filter_band="r",
+                        mission="WISE",
+                    ),
+                ),
+                apparent_motion_arcsec_per_hr=1.0,
+                motion_pa_deg=90.0,
+            )
+            for i in range(4)
+        )
+        fake_det = MagicMock()
+        fake_det.candidates = candidates
+        fake_det.provenance.n_candidates = len(candidates)
+        fake_det.provenance.n_known_matches = 0
+
+        with (
+            patch.object(mod, "_fetch_with_retry", return_value=fake_fetch_result),
+            patch.object(mod, "preprocess", return_value=fake_prep),
+            patch.object(mod, "detect", return_value=fake_det),
+            patch.object(mod, "link") as mock_link,
+            pytest.raises(RuntimeError, match="Link seed-pair budget exceeded"),
+        ):
+            mod.run_pipeline(
+                ra_deg=0.0, dec_deg=0.0, radius_deg=1.0,
+                start_jd=0.0, end_jd=1.0, run_dir=tmp_path,
+                max_link_seed_pairs=3,
+            )
+
+        mock_link.assert_not_called()
+
     # --- run_pipeline resume: skip fetch/link ---
 
     def test_run_pipeline_resumes_from_checkpoint(self, tmp_path):
@@ -2276,6 +2329,24 @@ class TestRunPipelineCheckpointResume:
 
         _, kwargs = mock_rp.call_args
         assert kwargs["review_packet_out"] == review_out
+
+    def test_main_max_link_seed_pairs_zero_disables_budget(self, tmp_path, monkeypatch):
+        """--max-link-seed-pairs 0 passes None to disable the guard explicitly."""
+        from unittest.mock import patch
+        mod = self._load_skill()
+        monkeypatch.setattr(mod, "_LOG_ROOT", tmp_path / "runs")
+        monkeypatch.setattr(mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        with patch.object(mod, "run_pipeline", return_value=[]) as mock_rp:
+            mod.main([
+                "--ra", "10.0", "--dec", "5.0",
+                "--start-jd", "2460000.0", "--end-jd", "2460001.0",
+                "--max-link-seed-pairs", "0",
+                "--no-delete-cache",
+            ])
+
+        _, kwargs = mock_rp.call_args
+        assert kwargs["max_link_seed_pairs"] is None
 
 
 class TestFetchWithRetryJsonError:

@@ -695,6 +695,9 @@ Tests: `tests/test_adversarial_review_skill.py` (50+ cases).
   packets; offline adversarial review produced `21/21 REJECT` verdicts with
   fatal `orbit_quality`, `real_bogus`, `artifact_posterior`, and
   `neo_dominance` challenges. No candidate advanced to operator review.
+- `run_pipeline.py --max-link-seed-pairs` now fails closed before the linker
+  when estimated all-pairs seed work exceeds the configured budget
+  (default `1000000`; set `0` only for a documented override).
 - NEXT CODE ACTION: address WISE-scale linking with a scale-aware strategy or
   explicit tiling plan before attempting uncapped 12k-candidate runs.
 

@@ -1101,6 +1101,9 @@ MPC submission → provisional designation → independent confirmation → jour
      packets; offline adversarial review produced `21/21 REJECT` verdicts with
      fatal `orbit_quality`, `real_bogus`, `artifact_posterior`, and
      `neo_dominance` challenges. No candidate advanced to operator review.
+   - `run_pipeline.py --max-link-seed-pairs` now fails closed before the linker
+     when estimated all-pairs seed work exceeds the configured budget
+     (default `1000000`; set `0` only for a documented override).
    - NEXT CODE ACTION: implement a scale-aware WISE linking strategy or
      explicit tiling plan before another uncapped 12k-candidate run.
    RA=58.0 Dec=20.0 (Taurus) is correct for a Feb 2020 NEOWISE epoch (NEOWISE scans at ~90° from Sun; Sun at RA≈325° in Feb 2020 → survey strip at RA≈55°).

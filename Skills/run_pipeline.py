@@ -47,6 +47,10 @@ _LOG_ROOT = Path("Logs") / "pipeline_runs"
 # Network errors that warrant a retry
 _INFRA_ERRORS = (ConnectionError, TimeoutError, OSError)
 
+# Guardrail for all-pairs linking. Override with --max-link-seed-pairs for
+# intentionally larger diagnostics after a tiling/scale plan is documented.
+_DEFAULT_MAX_LINK_SEED_PAIRS = 1_000_000
+
 # ── Console output helpers ────────────────────────────────────────────────────
 
 _LINE = "═" * 65
@@ -117,6 +121,24 @@ def _print_escalation_notice(
     print("└─────────────────────────────────────────────────────────────────┘", flush=True)
     if dry_run:
         print("[alert] DRY RUN — no external submission performed.", flush=True)
+
+
+def _estimate_link_seed_pairs(candidates: tuple) -> int:
+    """Estimate linker seed pairs using the same 30-day night-pair window."""
+    counts_by_night: dict[int, int] = {}
+    for cand in candidates:
+        for obs in getattr(cand, "observations", ()):
+            night = int(obs.jd)
+            counts_by_night[night] = counts_by_night.get(night, 0) + 1
+
+    total = 0
+    nights = sorted(counts_by_night)
+    for idx, night_a in enumerate(nights[:-1]):
+        for night_b in nights[idx + 1 :]:
+            if night_b - night_a > 30:
+                break
+            total += counts_by_night[night_a] * counts_by_night[night_b]
+    return total
 
 
 # ── Checkpoint helpers ────────────────────────────────────────────────────────
@@ -261,6 +283,7 @@ def run_pipeline(
     resume: bool = True,
     run_id: str = "unknown",
     review_packet_out: Path | None = None,
+    max_link_seed_pairs: int | None = _DEFAULT_MAX_LINK_SEED_PAIRS,
 ) -> list[dict]:
     _t_pipeline_start = time.monotonic()
 
@@ -392,6 +415,17 @@ def run_pipeline(
                 flush=True,
             )
             link_candidates = link_candidates[:max_candidates]
+
+        estimated_seed_pairs = _estimate_link_seed_pairs(link_candidates)
+        if max_link_seed_pairs is not None and estimated_seed_pairs > max_link_seed_pairs:
+            message = (
+                "Link seed-pair budget exceeded: "
+                f"{estimated_seed_pairs} estimated seed pairs > {max_link_seed_pairs}. "
+                "Use --max-candidates, a smaller field/window, or an explicit "
+                "--max-link-seed-pairs override after documenting the scale plan."
+            )
+            print(f"[link] {message}", flush=True)
+            raise RuntimeError(message)
 
         print(
             f"[link] Linking {len(link_candidates)} candidates across nights  "
@@ -617,6 +651,15 @@ def main(argv: list[str] | None = None) -> None:
         help="Optional bounded pilot cap for the number of detected candidates sent to linking",
     )
     parser.add_argument(
+        "--max-link-seed-pairs",
+        type=int,
+        default=_DEFAULT_MAX_LINK_SEED_PAIRS,
+        help=(
+            "Fail closed before linking if estimated seed pairs exceed this budget "
+            f"(default {_DEFAULT_MAX_LINK_SEED_PAIRS}; set 0 to disable)."
+        ),
+    )
+    parser.add_argument(
         "--neocp-timeout-hours", type=float, default=0.0,
         help="Hours to poll NEOCP for independent confirmation (0 = skip)",
     )
@@ -680,6 +723,9 @@ def main(argv: list[str] | None = None) -> None:
         resume=not args.no_resume,
         run_id=key,
         review_packet_out=Path(args.review_packet_out) if args.review_packet_out else None,
+        max_link_seed_pairs=(
+            None if args.max_link_seed_pairs <= 0 else args.max_link_seed_pairs
+        ),
     )
 
     elapsed = round(time.monotonic() - t_start, 2)
