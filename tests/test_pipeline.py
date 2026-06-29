@@ -2145,6 +2145,11 @@ class TestRunPipelineCheckpointResume:
         assert plan["max_link_seed_pairs"] == 3
         assert plan["safety"]["no_external_submission"] is True
         assert plan["top_night_pairs"][0]["seed_pairs"] == 4
+        assert plan["recommended_diagnostic_radius_deg"] == pytest.approx(0.6928)
+        assert plan["recommended_diagnostic_subfields"][0]["start_jd"] == 0.0
+        assert plan["recommended_diagnostic_subfields"][0]["end_jd"] == 1.0
+        assert plan["recommended_diagnostic_subfields"][0]["surveys"] == ["ZTF"]
+        assert "not a complete tiling proof" in plan["tiling_limitations"][0]
 
     # --- run_pipeline resume: skip fetch/link ---
 

@@ -3,6 +3,24 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.2 — WISE diagnostic subfields and test-hang cleanup (2026-06-29)
+
+### Added
+- Link scale plans now include a budget-derived diagnostic radius, recommended
+  subfield parameters, and explicit warnings that diagnostic subfields are not
+  complete-field tiling evidence.
+
+### Changed
+- `Skills/tune_linker.py` now uses a deterministic synthetic posterior for
+  linker sweeps, avoiding unnecessary Tier 3 Transformer/PyTorch initialization
+  in lightweight smoke tests.
+- `uv.lock` now records the local package version as `0.90.2`, matching
+  `pyproject.toml`, `src.__version__`, and the roadmap documents.
+
+### Safety
+- No external submission path was enabled.
+- No impact-probability claims or confirmed-object claims were introduced.
+
 ## v0.90.1 — WISE submission authority and scale-plan hardening (2026-06-29)
 
 ### Added
