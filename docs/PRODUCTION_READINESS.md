@@ -1,7 +1,7 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.90.0
-**Last updated**: 2026-06-28
+**Current version**: v0.90.1
+**Last updated**: 2026-06-29
 **Purpose**: Mandatory read at session start (per MANDATORY SESSION-START PROTOCOL).  
 Every planning cycle must name the highest-priority unresolved Tier 1 gap and show how proposed steps close or directly unblock it.
 
@@ -514,9 +514,9 @@ are sequential — each blocks the next.
   ```
   Keep alert actions in dry-run mode during discovery sweeps. Real archive
   fetching does not require `--no-dry-run`; actual MPC submission remains
-  fail-closed until `docs/MPC_SUBMISSION_POLICY.md §TODO for Future Agents` is
-  resolved and `alert.py` is configured with a real observatory code plus
-  `NEO_MPC_SUBMISSION_APPROVED=1`.
+  fail-closed until `docs/MPC_SUBMISSION_POLICY.md §TODO for Future Agents —
+  Archival WISE Submission Authority` is resolved and `alert.py` is configured
+  with a confirmed observatory/source code plus `NEO_MPC_SUBMISSION_APPROVED=1`.
 
 **2026-06-27 WISE live archive sweep evidence**: Jerome ran the Taurus WISE
 command from `main` after pulling PR #127. IRSA async TAP returned `111913`
@@ -629,7 +629,7 @@ the plan is diagnostic only and does not authorize a broad-field override.
 - [ ] Jerome contacts MPC to establish how a data-analysis pipeline (not an observing
       telescope) can submit observation reports; or adopts a data-mining observatory
       code strategy
-- See `docs/MPC_SUBMISSION_POLICY.md §TODO for Future Agents` for full problem statement
+- See `docs/MPC_SUBMISSION_POLICY.md §TODO for Future Agents — Archival WISE Submission Authority` for full problem statement
 - Blocked by: human administrative decision; no code can unblock this
 
 ### Gate D4: MPC Submission

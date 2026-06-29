@@ -537,7 +537,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.0)
+## Current State (v0.90.1)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -584,7 +584,22 @@ a measurable quantity (surveys done/total, tracklets done/total).
 
 See `docs/PRODUCTION_READINESS.md` for the full gap register.
 
-### Handoff notes (2026-06-27) — v0.90.0 (CURRENT)
+### Handoff notes (2026-06-29) — v0.90.1 (CURRENT)
+
+**v0.90.1 patch status**:
+- WISE/NEOWISE ADES export is fail-closed: `stn=C51` requires written MPC
+  confirmation, and ADES note `Z` is emitted for this non-survey archival
+  remeasurement pipeline.
+- `Skills/run_pipeline.py --link-scale-plan-out` writes top night-pair and
+  sky-cell diagnostics when the link seed-pair budget fails closed.
+- Operator scale-plan probe result: `11786731` estimated seed pairs over the
+  `1000000` default budget. Dominant night pairs are `2459084/2459085`
+  (`9102120`) and `2459243/2459244` (`2503474`).
+- Expected seed-budget stops now exit cleanly with audit/output artifacts, not
+  unhandled tracebacks.
+- **NEXT PRODUCTION ACTION — NOT YET DONE**: choose a smaller WISE diagnostic
+  from the dominant night pairs or implement a scientifically safe tiling
+  strategy. Do not override `--max-link-seed-pairs` blindly.
 
 **Goal: defensible discovery paper** (operator-confirmed 2026-06-26 by Jerome W. Lindsey III).
 Two-stage review before any external submission:
@@ -708,7 +723,7 @@ set with a real non-placeholder observatory code.
 
 **Two human-gated blockers remain**:
 1. MPC observatory code strategy — Jerome must resolve before any submission.
-   See `docs/MPC_SUBMISSION_POLICY.md §TODO for Future Agents`.
+   See `docs/MPC_SUBMISSION_POLICY.md §TODO for Future Agents — Archival WISE Submission Authority`.
 2. Actual candidate discovery — pipeline must find a survivor before paper is possible.
 
 **Progress tracker**: `docs/evidence/prod-loop/LOOP_PROGRESS.md` — read
@@ -952,12 +967,12 @@ PYTHONPATH=src uv run python Skills/select_survey_fields.py \
 **One human-gated blocker**:
 - **MPC observatory code / escalation path**: Jerome must decide whether and how to
   obtain an observatory code to submit MPC reports. See
-  `docs/MPC_SUBMISSION_POLICY.md §TODO for Future Agents`.
+  `docs/MPC_SUBMISSION_POLICY.md §TODO for Future Agents — Archival WISE Submission Authority`.
   The pipeline prints an escalation notice for submission-ready candidates but makes
   no actual submission until this is resolved.
 
 **When Jerome resolves the observatory code strategy**:
-1. Update `docs/MPC_SUBMISSION_POLICY.md` §TODO with the answer.
+1. Update `docs/MPC_SUBMISSION_POLICY.md` §TODO for Future Agents with the answer.
 2. Update `alert.py` to perform the actual submission in `run_pipeline.py`.
 3. Update `Skills/export_ades_report.py` `--obs-code` default to the assigned code.
 

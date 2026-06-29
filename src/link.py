@@ -314,8 +314,6 @@ def _link_candidates(
                         if night_c in (night_a, night_b):
                             continue
                         obs_c_list, ra_arr, dec_arr, obs_ids = night_arrays[night_c]
-                        if not obs_c_list:
-                            continue
                         pred_ra, pred_dec = _predict_from_arc(
                             arc_obs,
                             obs_c_list[0].jd,

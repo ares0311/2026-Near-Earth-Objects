@@ -108,7 +108,7 @@ Stage 2: Operator Review (Jerome)
          Jerome reviews survivors manually and decides which to submit.
           │
           ▼
-Stage 3: MPC Submission (once observatory code resolved — see §TODO)
+Stage 3: MPC Submission (once archival WISE authority is resolved — see §TODO)
          Submit ADES PSV observations → MPC assigns provisional designation
           │
           ▼

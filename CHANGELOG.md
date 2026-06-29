@@ -3,6 +3,27 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.1 — WISE submission authority and scale-plan hardening (2026-06-29)
+
+### Added
+- WISE/NEOWISE ADES export now defaults to ADES `A22`, applies MPC station
+  code `C51` only behind explicit recorded MPC confirmation, and adds ADES
+  note `Z` for archival survey astrometry reported by this non-survey pipeline.
+- `Skills/run_pipeline.py --link-scale-plan-out` writes diagnostic JSON with
+  top night-pair and sky-cell contributors when the link seed-pair budget fails
+  closed.
+
+### Changed
+- Expected link seed-budget stops now exit cleanly with audit/output artifacts
+  instead of printing an unhandled traceback.
+- D1 WISE production-loop handoff now records the `11786731` seed-pair
+  full-window scale-plan result and directs the next run toward smaller
+  WISE diagnostics selected from the dominant night pairs.
+
+### Safety
+- No external submission path was enabled.
+- No impact-probability claims or confirmed-object claims were introduced.
+
 ## v0.90.0 — Discovery archive live-readiness hardening (2026-06-28)
 
 ### Added

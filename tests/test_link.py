@@ -660,6 +660,25 @@ class TestComputeTrackletGrade:
         grade = compute_tracklet_grade(t)
         assert grade in ("A", "B", "C", "D")
 
+    def test_c_grade_for_short_multinight_arc(self):
+        from link import compute_tracklet_grade
+
+        # This short two-night arc is long enough for C but too short for B.
+        obs = (
+            make_obs(obs_id="c_grade_1", jd=2460000.0, ra_deg=180.0, dec_deg=0.0),
+            make_obs(obs_id="c_grade_2", jd=2460000.5, ra_deg=180.011, dec_deg=0.0),
+            make_obs(obs_id="c_grade_3", jd=2460001.0, ra_deg=180.02, dec_deg=0.0),
+        )
+        tracklet = Tracklet(
+            object_id="C_grade",
+            observations=obs,
+            arc_days=1.0,
+            motion_rate_arcsec_per_hour=3.0,
+            motion_pa_degrees=90.0,
+        )
+
+        assert compute_tracklet_grade(tracklet) == "C"
+
 
 class TestComputeObservationRate:
     def _make_tracklet(self, jds: list[float]) -> object:

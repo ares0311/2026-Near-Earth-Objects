@@ -640,7 +640,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.0)
+## Current State (v0.90.1)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -663,7 +663,25 @@ See `docs/MISSION.md` for the authoritative data strategy. The prior "blocked
 until expert review" guardrail was removed by operator decision on 2026-06-21;
 MPC/NEOCP/Scout is the expert review system.
 
-### Handoff state as of 2026-06-27 (CURRENT)
+### Handoff state as of 2026-06-29 (CURRENT)
+
+**v0.90.1 patch status**:
+- WISE/NEOWISE ADES export is now fail-closed around MPC authority:
+  `stn=C51` is allowed only after written MPC confirmation is recorded, and
+  ADES note `Z` is added for archival survey astrometry reported by this
+  non-survey pipeline.
+- `Skills/run_pipeline.py --link-scale-plan-out` writes a compact JSON scale
+  plan when the link seed-pair budget fails closed.
+- The operator's 0.2-degree, 370-day WISE scale-plan probe produced
+  `11786731` estimated seed pairs over the `1000000` default budget. Dominant
+  night pairs: `2459084/2459085` (`9102120` seed pairs) and
+  `2459243/2459244` (`2503474` seed pairs).
+- Expected seed-budget stops now exit cleanly with audit/output artifacts
+  instead of printing a Python traceback.
+- **NEXT PRODUCTION ACTION — NOT YET DONE**: choose a smaller WISE diagnostic
+  from those dominant night pairs, or implement a scientifically safe tiling
+  strategy before any broad-field override. Do not override
+  `--max-link-seed-pairs` blindly.
 
 **Discovery paper goal established (2026-06-26)**:
 The project goal is a **defensible discovery paper** — not a methods paper and not a
@@ -775,7 +793,7 @@ Default is now `--surveys WISE` which is correct for discovery.
 **Two human-gated blockers remain**:
 1. **MPC observatory code**: Jerome must contact MPC to determine how a data-analysis
    pipeline (not an observing telescope) can submit observation reports.
-   See `docs/MPC_SUBMISSION_POLICY.md §TODO for Future Agents`.
+   See `docs/MPC_SUBMISSION_POLICY.md §TODO for Future Agents — Archival WISE Submission Authority`.
 2. **Actual candidate discovery**: The pipeline must find at least one candidate that
    survives both adversarial review and operator review before a discovery paper is possible.
 
@@ -1064,13 +1082,14 @@ succeeded and produced the trained Tier 3 weights now recorded under T1-A.
 
 ### One Remaining Human-Gated Blocker
 
-- **MPC escalation path (HUMAN DECISION REQUIRED)** — The pipeline processes *public
-  ZTF/ATLAS survey data* (not original telescope observations). Whether this pipeline can
-  submit MPC reports and under what observatory code is an unresolved administrative/policy
-  question. `run_pipeline.py` prints an escalation notice for every submission-ready
-  candidate but makes no actual submission. Jerome must contact MPC or decide on observatory
-  code strategy before any submission can be made.
-  See `docs/MPC_SUBMISSION_POLICY.md §TODO for Future Agents` for full problem statement.
+- **MPC archival WISE authority (HUMAN DECISION REQUIRED)** — MPC sources
+  document `C51` as the WISE station code and ADES note `Z` for survey
+  astrometry reported by a non-survey measurer/pipeline, but written MPC
+  confirmation is still required before this independent archival pipeline may
+  submit WISE/NEOWISE remeasurements under `C51`. `run_pipeline.py` prints an
+  escalation notice for every submission-ready candidate but makes no actual
+  submission. See `docs/MPC_SUBMISSION_POLICY.md §TODO for Future Agents —
+  Archival WISE Submission Authority` for the current problem statement.
 
 ### Immediate Next Steps
 
@@ -1130,7 +1149,7 @@ handles masked WISE photometry explicitly and keeps discovery sweeps in alert
 dry-run mode. Do not ask the operator to repeat this exact run; next code work
 should diagnose why `535` WISE candidates yielded `0` tracklets.
 
-- Console output is fully compliant with `docs/CONSOLE_OUTPUT_SPEC.md` as of v0.90.0.
+- Console output is fully compliant with `docs/CONSOLE_OUTPUT_SPEC.md` as of v0.90.1.
 - ALWAYS run from `main` — operator never checks out feature branches.
 - All commands must begin with `git pull origin main`.
 - Never give operator any command before the relevant PR merges.
