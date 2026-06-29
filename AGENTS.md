@@ -596,12 +596,18 @@ See `docs/PRODUCTION_READINESS.md` for the full gap register.
 - Operator scale-plan probe result: `11786731` estimated seed pairs over the
   `1000000` default budget. Dominant night pairs are `2459084/2459085`
   (`9102120`) and `2459243/2459244` (`2503474`).
+- The v0.90.2 scale-plan probe on `main` regenerated the full-window stop and
+  emitted `recommended_diagnostic_subfields`; durable evidence is
+  `docs/evidence/live/2026-06-29-wise-v0902-scale-plan-subfields.md`.
+  First subfield: RA `58.1`, Dec `20.1`, radius `0.0466`, JD
+  `2458880.5` to `2459250.5`, survey `WISE`.
 - Expected seed-budget stops now exit cleanly with audit/output artifacts, not
   unhandled tracebacks.
-- **NEXT PRODUCTION ACTION — NOT YET DONE**: after the scale-plan patch is on
-  `main`, run one recommended WISE diagnostic subfield from
-  `recommended_diagnostic_subfields`. Do not override `--max-link-seed-pairs`
-  blindly, and do not treat diagnostic subfields as complete-field evidence.
+- **NEXT PRODUCTION ACTION — NOT YET DONE**: run the first verified WISE
+  diagnostic subfield from the evidence file and review full
+  `--review-packet-out` packets with `Skills/adversarial_review.py` if any are
+  produced. Do not override `--max-link-seed-pairs` blindly, and do not treat
+  diagnostic subfields as complete-field evidence.
 
 **Goal: defensible discovery paper** (operator-confirmed 2026-06-26 by Jerome W. Lindsey III).
 Two-stage review before any external submission:

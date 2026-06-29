@@ -679,13 +679,18 @@ MPC/NEOCP/Scout is the expert review system.
   `11786731` estimated seed pairs over the `1000000` default budget. Dominant
   night pairs: `2459084/2459085` (`9102120` seed pairs) and
   `2459243/2459244` (`2503474` seed pairs).
+- The v0.90.2 scale-plan probe on `main` regenerated the full-window stop and
+  emitted `recommended_diagnostic_subfields`; durable evidence is
+  `docs/evidence/live/2026-06-29-wise-v0902-scale-plan-subfields.md`.
+  First subfield: RA `58.1`, Dec `20.1`, radius `0.0466`, JD
+  `2458880.5` to `2459250.5`, survey `WISE`.
 - Expected seed-budget stops now exit cleanly with audit/output artifacts
   instead of printing a Python traceback.
-- **NEXT PRODUCTION ACTION — NOT YET DONE**: after this scale-plan patch is on
-  `main`, run one recommended WISE diagnostic subfield from
-  `recommended_diagnostic_subfields`. Do not override `--max-link-seed-pairs`
-  blindly, and do not present diagnostic subfields as complete-field recovery
-  evidence.
+- **NEXT PRODUCTION ACTION — NOT YET DONE**: run the first verified WISE
+  diagnostic subfield from the evidence file and review full
+  `--review-packet-out` packets with `Skills/adversarial_review.py` if any are
+  produced. Do not override `--max-link-seed-pairs` blindly, and do not present
+  diagnostic subfields as complete-field recovery evidence.
 
 **Discovery paper goal established (2026-06-26)**:
 The project goal is a **defensible discovery paper** — not a methods paper and not a

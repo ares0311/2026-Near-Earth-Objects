@@ -629,6 +629,15 @@ recommended WISE diagnostic subfield from `recommended_diagnostic_subfields` and
 review the full `--review-packet-out` adversarial evidence if tracklets are
 produced.
 
+**2026-06-29 v0.90.2 scale-plan probe complete**: The merged `main` scale-plan
+probe repeated the Taurus 0.2-degree, 370-day WISE dry run and correctly stopped
+at `11786731` estimated seed pairs over the `1000000` default budget after
+fetching `12061` WISE rows and detecting `12042` singleton candidates. The
+scale plan recommended radius `0.0466` degrees and first diagnostic subfield
+RA `58.1`, Dec `20.1`, JD `2458880.5` to `2459250.5`, survey `WISE`. Durable
+evidence and the exact next command are recorded in
+`docs/evidence/live/2026-06-29-wise-v0902-scale-plan-subfields.md`.
+
 ### Gate D2: Operator Review
 - [ ] Jerome W. Lindsey III reviews SURVIVE/BORDERLINE candidates
 - [ ] Jerome approves at least one candidate for MPC submission
