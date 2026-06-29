@@ -142,6 +142,98 @@ def _estimate_link_seed_pairs(candidates: tuple) -> int:
     return total
 
 
+def _build_link_scale_plan(
+    candidates: tuple,
+    max_link_seed_pairs: int,
+    *,
+    sky_cell_deg: float = 0.2,
+    top_n: int = 12,
+) -> dict:
+    """Build an operator scale plan before fail-closed broad-field linking.
+
+    The plan is diagnostic only. It does not authorize an all-pairs override and
+    does not partition candidates for science processing; it shows which nights
+    and approximate sky cells dominate seed-pair work so the next run can use a
+    smaller field/window or documented pilot cap.
+    """
+    counts_by_night: dict[int, int] = {}
+    cell_counts: dict[tuple[int, int], int] = {}
+    for cand in candidates:
+        for obs in getattr(cand, "observations", ()):
+            night = int(obs.jd)
+            counts_by_night[night] = counts_by_night.get(night, 0) + 1
+            ra = float(getattr(obs, "ra_deg", 0.0))
+            dec = float(getattr(obs, "dec_deg", 0.0))
+            cell = (int(ra // sky_cell_deg), int((dec + 90.0) // sky_cell_deg))
+            cell_counts[cell] = cell_counts.get(cell, 0) + 1
+
+    night_pairs: list[dict[str, int]] = []
+    nights = sorted(counts_by_night)
+    for idx, night_a in enumerate(nights[:-1]):
+        for night_b in nights[idx + 1 :]:
+            if night_b - night_a > 30:
+                break
+            seed_pairs = counts_by_night[night_a] * counts_by_night[night_b]
+            night_pairs.append({
+                "night_a": night_a,
+                "night_b": night_b,
+                "seed_pairs": seed_pairs,
+            })
+
+    sky_cells = []
+    for (ra_idx, dec_idx), n_obs in sorted(
+        cell_counts.items(),
+        key=lambda item: item[1],
+        reverse=True,
+    )[:top_n]:
+        sky_cells.append({
+            "center_ra_deg": round((ra_idx + 0.5) * sky_cell_deg, 6),
+            "center_dec_deg": round((dec_idx + 0.5) * sky_cell_deg - 90.0, 6),
+            "cell_size_deg": sky_cell_deg,
+            "n_observations": n_obs,
+        })
+
+    total_seed_pairs = sum(pair["seed_pairs"] for pair in night_pairs)
+    return {
+        "status": "blocked_seed_pair_budget",
+        "max_link_seed_pairs": max_link_seed_pairs,
+        "estimated_seed_pairs": total_seed_pairs,
+        "n_candidates": len(candidates),
+        "n_observations": sum(counts_by_night.values()),
+        "n_nights": len(nights),
+        "nights": [
+            {"night": night, "n_observations": counts_by_night[night]}
+            for night in nights
+        ],
+        "top_night_pairs": sorted(
+            night_pairs,
+            key=lambda pair: pair["seed_pairs"],
+            reverse=True,
+        )[:top_n],
+        "top_sky_cells": sky_cells,
+        "recommended_next_actions": [
+            "Run a smaller field or shorter window selected from top_night_pairs.",
+            "Use --max-candidates only for bounded diagnostics, not promotion.",
+            "Override --max-link-seed-pairs only after documenting a scale plan.",
+        ],
+        "safety": {
+            "no_external_submission": True,
+            "no_impact_probability_claim": True,
+        },
+    }
+
+
+def _write_link_scale_plan(
+    path: Path,
+    candidates: tuple,
+    max_link_seed_pairs: int,
+) -> None:
+    """Write a JSON scale plan for a fail-closed link budget stop."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    plan = _build_link_scale_plan(candidates, max_link_seed_pairs)
+    path.write_text(json.dumps(plan, indent=2, sort_keys=True) + "\n")
+
+
 # ── Checkpoint helpers ────────────────────────────────────────────────────────
 
 def _param_key(
@@ -285,6 +377,7 @@ def run_pipeline(
     run_id: str = "unknown",
     review_packet_out: Path | None = None,
     max_link_seed_pairs: int | None = _DEFAULT_MAX_LINK_SEED_PAIRS,
+    link_scale_plan_out: Path | None = None,
 ) -> list[dict]:
     _t_pipeline_start = time.monotonic()
 
@@ -419,6 +512,16 @@ def run_pipeline(
 
         estimated_seed_pairs = _estimate_link_seed_pairs(link_candidates)
         if max_link_seed_pairs is not None and estimated_seed_pairs > max_link_seed_pairs:
+            if link_scale_plan_out is not None:
+                _write_link_scale_plan(
+                    link_scale_plan_out,
+                    link_candidates,
+                    max_link_seed_pairs,
+                )
+                print(
+                    f"[link] Scale plan written to {link_scale_plan_out}",
+                    flush=True,
+                )
             message = (
                 "Link seed-pair budget exceeded: "
                 f"{estimated_seed_pairs} estimated seed pairs > {max_link_seed_pairs}. "
@@ -679,6 +782,15 @@ def main(argv: list[str] | None = None) -> None:
         ),
     )
     parser.add_argument(
+        "--link-scale-plan-out",
+        type=str,
+        default=None,
+        help=(
+            "Optional JSON output path for a fail-closed link scale plan when "
+            "--max-link-seed-pairs is exceeded."
+        ),
+    )
+    parser.add_argument(
         "--no-delete-cache", action="store_true", default=False,
         help="Skip deleting .neo_cache files after the run (default: delete)",
     )
@@ -726,6 +838,9 @@ def main(argv: list[str] | None = None) -> None:
         review_packet_out=Path(args.review_packet_out) if args.review_packet_out else None,
         max_link_seed_pairs=(
             None if args.max_link_seed_pairs <= 0 else args.max_link_seed_pairs
+        ),
+        link_scale_plan_out=(
+            Path(args.link_scale_plan_out) if args.link_scale_plan_out else None
         ),
     )
 

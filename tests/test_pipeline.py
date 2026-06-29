@@ -2086,6 +2086,7 @@ class TestRunPipelineCheckpointResume:
 
     def test_run_pipeline_fails_closed_when_link_seed_budget_exceeded(self, tmp_path):
         """Large all-pairs link jobs fail before entering the linker."""
+        import json as _json
         from unittest.mock import MagicMock, patch
 
         from schemas import Observation, RawCandidate
@@ -2121,6 +2122,7 @@ class TestRunPipelineCheckpointResume:
         fake_det.candidates = candidates
         fake_det.provenance.n_candidates = len(candidates)
         fake_det.provenance.n_known_matches = 0
+        scale_plan = tmp_path / "link_scale_plan.json"
 
         with (
             patch.object(mod, "_fetch_with_retry", return_value=fake_fetch_result),
@@ -2133,9 +2135,16 @@ class TestRunPipelineCheckpointResume:
                 ra_deg=0.0, dec_deg=0.0, radius_deg=1.0,
                 start_jd=0.0, end_jd=1.0, run_dir=tmp_path,
                 max_link_seed_pairs=3,
+                link_scale_plan_out=scale_plan,
             )
 
         mock_link.assert_not_called()
+        plan = _json.loads(scale_plan.read_text())
+        assert plan["status"] == "blocked_seed_pair_budget"
+        assert plan["estimated_seed_pairs"] == 4
+        assert plan["max_link_seed_pairs"] == 3
+        assert plan["safety"]["no_external_submission"] is True
+        assert plan["top_night_pairs"][0]["seed_pairs"] == 4
 
     # --- run_pipeline resume: skip fetch/link ---
 
@@ -2347,6 +2356,25 @@ class TestRunPipelineCheckpointResume:
 
         _, kwargs = mock_rp.call_args
         assert kwargs["max_link_seed_pairs"] is None
+
+    def test_main_link_scale_plan_out_flag(self, tmp_path, monkeypatch):
+        """--link-scale-plan-out is passed through as a Path."""
+        from unittest.mock import patch
+        mod = self._load_skill()
+        monkeypatch.setattr(mod, "_LOG_ROOT", tmp_path / "runs")
+        monkeypatch.setattr(mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+        plan_out = tmp_path / "scale_plan.json"
+
+        with patch.object(mod, "run_pipeline", return_value=[]) as mock_rp:
+            mod.main([
+                "--ra", "10.0", "--dec", "5.0",
+                "--start-jd", "2460000.0", "--end-jd", "2460001.0",
+                "--link-scale-plan-out", str(plan_out),
+                "--no-delete-cache",
+            ])
+
+        _, kwargs = mock_rp.call_args
+        assert kwargs["link_scale_plan_out"] == plan_out
 
 
 class TestFetchWithRetryJsonError:

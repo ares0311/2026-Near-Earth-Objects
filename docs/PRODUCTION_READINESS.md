@@ -616,6 +616,9 @@ implement a scale-aware WISE linking strategy or explicit tiling plan before
 another uncapped 12k-candidate run. `run_pipeline.py --max-link-seed-pairs`
 now fails closed before linking when estimated all-pairs seed work exceeds the
 configured budget (default `1000000`; set `0` only for a documented override).
+Use `--link-scale-plan-out Logs/reports/<name>.json` on bounded diagnostics to
+write the top night-pair and sky-cell contributors before the fail-closed stop;
+the plan is diagnostic only and does not authorize a broad-field override.
 
 ### Gate D2: Operator Review
 - [ ] Jerome W. Lindsey III reviews SURVIVE/BORDERLINE candidates
