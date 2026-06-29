@@ -207,11 +207,26 @@ MPC submission best practices for citizen-science programs.
 
 ---
 
-## TODO for Future Agents — Escalation Path (Unresolved)
+## TODO for Future Agents — Archival WISE Submission Authority
 
-**Status**: Open as of 2026-06-21. Operator-approved direction: implement a
-viable escalation path so that when the pipeline detects a high-quality
-candidate, there is a concrete, executable submission mechanism.
+**Status**: Partly resolved as of 2026-06-29. The current standards note is
+`docs/mpc_wise_neowise_archival_astrometry_submission.md`.
+
+**What is now documented from MPC sources**:
+- MPC's official observatory-code list assigns `C51` to `WISE`; no separate
+  NEOWISE station code has been documented in project research.
+- ADES is the current standard submission format. The project should prepare
+  ADES 2022 PSV/XML records, not rely on legacy MPC1992/80-column output.
+- ADES note `Z` exists for survey astrometry reported by a non-survey
+  measurer/pipeline, which matches this project's archival remeasurement role.
+- WAMO is for checking post-submission processing status, not for submitting.
+
+**What is still unresolved**: MPC documentation found so far does **not**
+explicitly authorize an independent third-party pipeline to submit public
+archival WISE/NEOWISE remeasurements using `stn=C51`, and it does not publish a
+WISE-specific required-field recipe for third-party archival remeasurements.
+Written MPC confirmation is still required before any live WISE/NEOWISE
+submission.
 
 **The unresolved question**: This pipeline re-reduces *publicly archived survey data*
 (WISE/NEOWISE via IRSA, DECam/NOIRLab NSC DR2, TESS FFIs via MAST) — it does not
@@ -224,27 +239,30 @@ code tied to a specific observing site.
 - An observatory code (3-char MPC identifier) is normally issued to a specific
   instrument/site, not to a data-analysis pipeline.
 - The existing `ready_for_submission()` gates and ADES PSV export
-  (`Skills/export_ades_report.py`) are implemented; the missing piece is
-  authorization to submit.
+  (`Skills/export_ades_report.py`) are implemented.
+- `alert.py` and `Skills/export_ades_report.py` now fail closed for
+  WISE/NEOWISE ADES export unless the station code is `C51` and the explicit
+  `--mpc-confirmed-wise-c51-submission` flag is supplied after written MPC
+  confirmation is recorded.
 - The primary discovery data source is WISE/NEOWISE archival photometry (IRSA,
   no credentials required); secondary sources are DECam/NOIRLab and TESS FFIs.
 
-**Research needed** (for the agent that picks this up):
-1. Determine whether a data-analysis pipeline re-reducing public archival data
-   from WISE/NEOWISE, DECam/NOIRLab, or TESS can submit MPC reports, and if so,
-   under what observatory code.
-2. Contact MPC to ask specifically: "We reduce publicly archived WISE/NEOWISE
+**Human/operator action needed**:
+1. Contact MPC to ask specifically: "We reduce publicly archived WISE/NEOWISE
    infrared detections using our own pipeline to identify new NEO candidates.
-   Can we submit observation reports, and if so, what observatory code applies?"
-3. Investigate whether IRSA/NOIRLab/MAST have data-use policies that affect
+   Can we submit ADES observation reports using station code C51 with note Z,
+   and what submitter/program metadata and spacecraft fields do you require?"
+2. Investigate whether IRSA/NOIRLab/MAST have data-use policies that affect
    downstream MPC submissions from their public data products.
-4. Document the answer in this file and update `Skills/export_ades_report.py`
-   and `alert.py` accordingly.
+3. Record the MPC response in this file before enabling the WISE C51 export flag
+   for production artifacts.
 
 **Until this is resolved**:
 - `run_pipeline.py` will print an escalation notice for every candidate that
   passes `ready_for_submission()`, directing the operator to this TODO.
 - No actual MPC submission should be made.
+- WISE/NEOWISE ADES export with `stn=C51` must remain blocked unless written MPC
+  confirmation has been recorded and the explicit confirmation flag is supplied.
 - `alert.py` must fail closed for live MPC submission unless all of the
   following are true: the operator intentionally sets
   `NEO_MPC_SUBMISSION_APPROVED=1`, a real non-placeholder MPC observatory code

@@ -116,8 +116,9 @@ def _print_escalation_notice(
     print(f"│     RB score: {rb_str}", flush=True)
     print(f"│     Pathway : {pathway}", flush=True)
     print(f"│     Priority: {priority:.4f}", flush=True)
-    print("│     TODO: Escalation path not yet implemented — see", flush=True)
-    print("│           docs/MPC_SUBMISSION_POLICY.md §TODO for future agents", flush=True)
+    print("│     TODO: MPC archival-submission authority unresolved — see", flush=True)
+    print("│           docs/MPC_SUBMISSION_POLICY.md", flush=True)
+    print("│           §Archival WISE Submission Authority", flush=True)
     print("└─────────────────────────────────────────────────────────────────┘", flush=True)
     if dry_run:
         print("[alert] DRY RUN — no external submission performed.", flush=True)

@@ -76,10 +76,14 @@ rigorous two-stage review process before any external submission.
   is merged to main and `git pull origin main` is confirmed. This applies even if code
   exists on the feature branch. Commands are blocked until merge.
 
-## One remaining human-gated blocker (no code can resolve this)
-- **MPC observatory code**: Jerome must contact MPC to determine how a
-  data-analysis pipeline (not an observing telescope) can submit observation
-  reports. See `docs/MPC_SUBMISSION_POLICY.md §TODO for Future Agents`.
+## One remaining human-gated submission blocker (no code can resolve this)
+- **MPC archival WISE authority**: MPC sources document `C51` as the WISE station
+  code, ADES as the current submission format, and ADES note `Z` for
+  non-survey measurer/pipeline survey astrometry. They do not explicitly
+  authorize this independent archival pipeline to submit WISE/NEOWISE
+  remeasurements under `C51`. Jerome must obtain written MPC confirmation before
+  any live WISE/NEOWISE submission. See `docs/MPC_SUBMISSION_POLICY.md` and
+  `docs/mpc_wise_neowise_archival_astrometry_submission.md`.
 
 ## Iteration log
 | # | Date | What was done | Next action |
@@ -105,3 +109,4 @@ rigorous two-stage review process before any external submission.
 | 19 | 2026-06-29 | Offline adversarial review now fails closed on compact pipeline summaries; the WISE cap-2000 report produced 19/19 `REJECT` verdicts for incomplete review packets | Make `run_pipeline.py` write a full adversarial-review input artifact for candidate survivors |
 | 20 | 2026-06-29 | `run_pipeline.py --review-packet-out` added and live-validated: rerun produced 21 full `ScoredNEO` packets, 21/21 adversarial `REJECT`, 0 operator-review survivors | Focus D1 on scalable WISE linking and field/tiling strategy; do not rerun uncapped 12042-candidate all-pairs linking |
 | 21 | 2026-06-29 | `run_pipeline.py --max-link-seed-pairs` added: default seed-pair budget fails closed before unbounded all-pairs linking; `0` disables only for documented overrides | Implement the actual scale-aware WISE linking/tiling strategy rather than overriding the guard for broad fields |
+| 22 | 2026-06-29 | MPC WISE standards note converted into code policy: ADES defaults to `A22`; WISE archival ADES export requires `stn=C51`, ADES note `Z`, and explicit recorded MPC confirmation | Continue D1 scale-aware WISE linking/tiling; submission remains blocked until MPC confirms third-party archival WISE C51 authority |

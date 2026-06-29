@@ -12,6 +12,7 @@ __all__ = [
     "ready_for_submission",
     "format_candidate_dossier",
     "format_mpc_ades_psv",
+    "validate_ades_submission_authority",
     "count_observations_by_mission",
 ]
 
@@ -50,6 +51,9 @@ _logger = logging.getLogger(__name__)
 
 _MPC_OBS_CODE = "XXX"  # MPC placeholder for new observers; replace with assigned code.
 _MPC_SUBMISSION_ENV = "NEO_MPC_SUBMISSION_APPROVED"
+_WISE_MISSIONS = {"WISE", "NEOWISE"}
+_WISE_MPC_OBS_CODE = "C51"
+_WISE_ADES_NOTE = "Z"
 
 
 def _pack_provisional(designation: str) -> str:
@@ -191,6 +195,46 @@ def _live_mpc_submission_is_enabled(obs_code: str) -> tuple[bool, str]:
     if obs_code.upper() in {"", "XXX", "XNN"}:
         return False, "MPC observatory code is still a placeholder"
     return True, "live MPC submission explicitly enabled"
+
+
+def _observation_missions(neo: object) -> set[str]:
+    """Return upper-case mission names present in a scored candidate."""
+    tracklet = getattr(neo, "tracklet", None)
+    observations = getattr(tracklet, "observations", ()) or ()
+    return {str(getattr(obs, "mission", "")).upper() for obs in observations}
+
+
+def validate_ades_submission_authority(
+    neo: object,
+    obs_code: str,
+    *,
+    wise_c51_confirmed: bool = False,
+) -> None:
+    """Fail closed on archival WISE/NEOWISE ADES authority gaps.
+
+    MPC documentation identifies C51 as the WISE station code and ADES note Z
+    as the non-survey measurer/pipeline marker, but the project has not yet
+    recorded MPC confirmation that this independent archival pipeline may submit
+    remeasured WISE/NEOWISE observations under C51.  Until that confirmation is
+    explicit, WISE/NEOWISE ADES export must not silently produce submit-ready
+    records.
+    """
+    missions = _observation_missions(neo)
+    if missions.isdisjoint(_WISE_MISSIONS):
+        return
+
+    normalized_obs_code = obs_code.upper()
+    if normalized_obs_code != _WISE_MPC_OBS_CODE:
+        raise ValueError(
+            "WISE/NEOWISE archival ADES export requires MPC station code C51; "
+            "other codes are not documented for WISE source observations."
+        )
+    if not wise_c51_confirmed:
+        raise ValueError(
+            "WISE/NEOWISE C51 export requires written MPC confirmation for "
+            "third-party archival remeasurement submission. Pass "
+            "wise_c51_confirmed=True only after recording that confirmation."
+        )
 
 
 def _submit_to_mpc(
@@ -604,19 +648,44 @@ def format_candidate_dossier(neo: ScoredNEO) -> str:
 
 
 
-def format_mpc_ades_psv(neo: ScoredNEO, obs_code: str = _MPC_OBS_CODE) -> str:  # type: ignore[name-defined]
+def _ades_notes_for_candidate(neo: object, notes: str = "") -> str:
+    """Return normalized ADES notes, adding WISE note Z when required."""
+    parts = [part.strip().upper() for part in notes.split(",") if part.strip()]
+    missions = _observation_missions(neo)
+    if not missions.isdisjoint(_WISE_MISSIONS) and _WISE_ADES_NOTE not in parts:
+        parts.append(_WISE_ADES_NOTE)
+    return ",".join(parts)
+
+
+def format_mpc_ades_psv(
+    neo: ScoredNEO,
+    obs_code: str = _MPC_OBS_CODE,
+    *,
+    ades_version: str = "A22",
+    program_code: str = "",
+    notes: str = "",
+    wise_c51_confirmed: bool = False,
+) -> str:  # type: ignore[name-defined]
     """Format observations as an ADES pipe-separated-values (PSV) block.
 
     Produces the header and data rows for the ADES PSV format
-    (MPC ADES v2017; see https://www.minorplanetcenter.net/iau/info/ADES.html).
+    (MPC ADES 2022 by default).
     Each observation maps to one PSV data row.  The function does **not**
     transmit any data; it returns the formatted string only.
 
     GUARDRAIL: Do not publicly announce any impact probability.
     All hazard assessment must be referred to MPC/CNEOS.
     """
+    validate_ades_submission_authority(
+        neo,
+        obs_code,
+        wise_c51_confirmed=wise_c51_confirmed,
+    )
+    normalized_notes = _ades_notes_for_candidate(neo, notes)
+    uses_wise_data = not _observation_missions(neo).isdisjoint(_WISE_MISSIONS)
+
     lines: list[str] = []
-    lines.append("# version=2017")
+    lines.append(f"# version={ades_version}")
     lines.append("# observatory")
     lines.append(f"! mpcCode {obs_code}")
     lines.append("# submitter")
@@ -626,14 +695,22 @@ def format_mpc_ades_psv(neo: ScoredNEO, obs_code: str = _MPC_OBS_CODE) -> str:  
     lines.append("# measurers")
     lines.append("! name Automated")
     lines.append("# telescope")
-    lines.append("! design Survey")
+    telescope_design = (
+        "WISE archival survey remeasurement" if uses_wise_data else "Survey"
+    )
+    lines.append(f"! design {telescope_design}")
     lines.append("! aperture 1.2")
     lines.append("! detector CCD")
     lines.append("# data")
     header_fields = [
         "permID", "provID", "obsTime", "ra", "dec",
-        "mag", "band", "stn", "remarks",
+        "mag", "band", "stn",
     ]
+    if program_code:
+        header_fields.append("prog")
+    if normalized_notes:
+        header_fields.append("notes")
+    header_fields.append("remarks")
     lines.append("| " + " | ".join(header_fields) + " |")
 
     obs_sorted = sorted(neo.tracklet.observations, key=lambda o: o.jd)
@@ -655,8 +732,17 @@ def format_mpc_ades_psv(neo: ScoredNEO, obs_code: str = _MPC_OBS_CODE) -> str:  
             mag_str,
             obs.filter_band,
             obs_code,
-            "",                                    # remarks
         ]
+        if program_code:
+            row.append(program_code)
+        if normalized_notes:
+            row.append(normalized_notes)
+        remarks = (
+            "archival WISE astrometry remeasured by non-survey pipeline"
+            if uses_wise_data
+            else ""
+        )
+        row.append(remarks)
         lines.append("| " + " | ".join(row) + " |")
 
     return "\n".join(lines)

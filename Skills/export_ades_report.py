@@ -27,6 +27,38 @@ def main() -> None:
         ),
     )
     parser.add_argument(
+        "--ades-version",
+        default="A22",
+        metavar="VERSION",
+        help="ADES version marker to emit (default: A22).",
+    )
+    parser.add_argument(
+        "--program-code",
+        default="",
+        metavar="CODE",
+        help=(
+            "Optional MPC program code. Use only after MPC assigns or confirms "
+            "the correct code for this archival measurement context."
+        ),
+    )
+    parser.add_argument(
+        "--notes",
+        default="",
+        metavar="NOTES",
+        help=(
+            "Optional comma-separated ADES notes. WISE/NEOWISE records add Z "
+            "automatically after MPC C51 confirmation."
+        ),
+    )
+    parser.add_argument(
+        "--mpc-confirmed-wise-c51-submission",
+        action="store_true",
+        help=(
+            "Allow ADES export for WISE/NEOWISE archival records with stn=C51. "
+            "Use only after written MPC confirmation is recorded in docs."
+        ),
+    )
+    parser.add_argument(
         "--out",
         default=None,
         metavar="FILE",
@@ -56,6 +88,7 @@ def main() -> None:
     from types import SimpleNamespace
 
     results = []
+    failed = False
     for item in data:
         object_id = (
             item.get("tracklet", {}).get("object_id")
@@ -91,12 +124,27 @@ def main() -> None:
         neo_ns = SimpleNamespace(tracklet=tracklet_ns, hazard=hazard_ns)
 
         try:
-            psv = format_mpc_ades_psv(neo_ns, obs_code=args.obs_code)
+            psv = format_mpc_ades_psv(
+                neo_ns,
+                obs_code=args.obs_code,
+                ades_version=args.ades_version,
+                program_code=args.program_code,
+                notes=args.notes,
+                wise_c51_confirmed=args.mpc_confirmed_wise_c51_submission,
+            )
         except Exception as exc:
-            print(f"WARNING: could not format {object_id}: {exc}", file=sys.stderr)
+            print(f"ERROR: could not format {object_id}: {exc}", file=sys.stderr)
             psv = ""
+            failed = True
 
         results.append({"object_id": object_id, "psv": psv})
+
+    if failed:
+        print(
+            "No submit-ready ADES report was produced for at least one candidate.",
+            file=sys.stderr,
+        )
+        sys.exit(2)
 
     if args.json:
         output = json.dumps(results, indent=2)

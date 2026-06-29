@@ -50,9 +50,10 @@ def make_scored_neo(
     orbit_quality: int = 2,
     hazard_flag: str = "pha_candidate",
     alert_pathway: str = "mpc_submission",
+    mission: str = "ZTF",
 ) -> ScoredNEO:
     obs = tuple(
-        make_obs(obs_id=f"o{i}", jd=2460000.5 + i)
+        make_obs(obs_id=f"o{i}", jd=2460000.5 + i, mission=mission)
         for i in range(3)
     )
     tracklet = Tracklet("T001", obs, 2.0, 1.2, 90.0)
@@ -717,7 +718,7 @@ class TestFormatMpcAdesPsv:
         from alert import format_mpc_ades_psv
         neo = make_scored_neo()
         result = format_mpc_ades_psv(neo)
-        assert "version=2017" in result
+        assert "version=A22" in result
         assert "mpcCode" in result
         assert "T001" in result
 
@@ -760,6 +761,48 @@ class TestFormatMpcAdesPsv:
         assert "ra" in result
         assert "dec" in result
 
+    def test_wise_requires_c51_station_code(self):
+        import sys
+        sys.path.insert(0, "src")
+        import pytest
+
+        from alert import format_mpc_ades_psv
+        neo = make_scored_neo(mission="WISE")
+
+        with pytest.raises(ValueError, match="requires MPC station code C51"):
+            format_mpc_ades_psv(neo, obs_code="XXX")
+
+    def test_wise_c51_requires_mpc_confirmation(self):
+        import sys
+        sys.path.insert(0, "src")
+        import pytest
+
+        from alert import format_mpc_ades_psv
+        neo = make_scored_neo(mission="WISE")
+
+        with pytest.raises(ValueError, match="requires written MPC confirmation"):
+            format_mpc_ades_psv(neo, obs_code="C51")
+
+    def test_wise_c51_confirmed_adds_note_z(self):
+        import sys
+        sys.path.insert(0, "src")
+        from alert import format_mpc_ades_psv
+        neo = make_scored_neo(mission="WISE")
+
+        result = format_mpc_ades_psv(
+            neo,
+            obs_code="C51",
+            wise_c51_confirmed=True,
+            program_code="A",
+        )
+
+        assert "version=A22" in result
+        assert "mpcCode C51" in result
+        assert "notes" in result
+        assert "|  | T001 |" in result
+        assert "| r | C51 | A | Z |" in result
+        assert "non-survey pipeline" in result
+
 
 class TestFormatMpcAdesPsvTimeFallback:
     def test_astropy_time_failure_uses_str(self, monkeypatch):
@@ -778,7 +821,7 @@ class TestFormatMpcAdesPsvTimeFallback:
         from alert import format_mpc_ades_psv
         neo = make_scored_neo()
         result = format_mpc_ades_psv(neo)
-        assert "version=2017" in result
+        assert "version=A22" in result
         # JD value appears as string fallback
         assert "2460000" in result
 
@@ -822,4 +865,3 @@ class TestCountObservationsByMission:
         sys.path.insert(0, "src")
         import alert
         assert "count_observations_by_mission" in alert.__all__
-
