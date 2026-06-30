@@ -537,7 +537,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.4)
+## Current State (v0.90.5)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -584,7 +584,21 @@ a measurable quantity (surveys done/total, tracklets done/total).
 
 See `docs/PRODUCTION_READINESS.md` for the full gap register.
 
-### Handoff notes (2026-06-30) — v0.90.4 (CURRENT)
+### Handoff notes (2026-06-30) — v0.90.5 (CURRENT)
+
+**v0.90.5 patch status**:
+- `Skills/select_survey_fields.py --wise-archive-probes` now enriches ranked
+  field selections with dry-run WISE/NEOWISE scale-plan probe commands. These
+  commands use `caffeinate -i`, `uv run --python 3.14`, bounded native
+  numerical thread settings, `--surveys WISE`, `--force-refresh`, and
+  `--link-scale-plan-out`.
+- This is the next D1 path after Taurus exhaustion: use the selector to choose a
+  new non-Taurus parent field/window and run a scale-plan probe before any full
+  diagnostic. Do not hand-pick new WISE coordinates without either selector
+  output or a documented field-window rationale.
+- Generated commands are dry-run only and do not authorize external submission.
+  Run adversarial review only after a pipeline run reports a non-zero full
+  `ScoredNEO` review-packet count.
 
 **v0.90.4 patch status**:
 - `detect.py`, `link.py`, and `Skills/audit_real_run.py` now share the
