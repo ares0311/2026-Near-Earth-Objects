@@ -130,7 +130,7 @@ class TestAdversarial:
     def test_very_fast_neo_links(self) -> None:
         """Observations at ~55 arcsec/hr must form a tracklet within the 60 arcsec/hr limit."""
         # Simulate a very fast NEO — near the top of the allowed motion range
-        # (0.01–60 arcsec/hr).  Three observations across two nights.
+        # ((0.05–60 arcsec/hr)).  Three observations across two nights.
         target_rate_arcsec_hr = 55.0  # just under the 60 arcsec/hr ceiling
         dt_hr = 1.0
         dt_jd = dt_hr / 24.0

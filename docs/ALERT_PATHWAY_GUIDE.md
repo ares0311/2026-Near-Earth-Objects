@@ -38,7 +38,7 @@ To advance to `mpc_submission`:
 
 1. `real_bogus_score ≥ 0.65`
 2. Arc length ≥ 1 day (orbit quality code ≥ 2)
-3. Motion rate consistent with solar system object (0.01–60 arcsec/hr)
+3. Motion rate consistent with solar system object (0.05–60 arcsec/hr)
 
 To advance to `nasa_pdco_notify` (the highest gate):
 

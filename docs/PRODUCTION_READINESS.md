@@ -1,7 +1,7 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.90.3
-**Last updated**: 2026-06-29
+**Current version**: v0.90.4
+**Last updated**: 2026-06-30
 **Purpose**: Mandatory read at session start (per MANDATORY SESSION-START PROTOCOL).  
 Every planning cycle must name the highest-priority unresolved Tier 1 gap and show how proposed steps close or directly unblock it.
 
@@ -718,6 +718,15 @@ artifact-dominated internal candidates, not review survivors. Next D1 step:
 do not rerun these Taurus subfields; select a new WISE/NEOWISE field-window
 strategy likely to produce faster non-static candidates, or improve
 WISE-specific filtering/linking before the next operator live run.
+
+**2026-06-30 v0.90.4 D1 motion-floor alignment**: `detect.py`, `link.py`, and
+`audit_real_run.py` now use the same `0.05 arcsec/hr` lower motion floor as
+`Skills/adversarial_review.py` and `docs/MISSION.md`. This prevents
+near-stationary WISE associations from becoming review packets that are
+guaranteed to fail D1 on the motion-rate challenge. The next D1 blocker after
+this patch is not Taurus reruns; it is either a new WISE/NEOWISE field-window
+strategy likely to produce faster non-static candidates, or a defensible
+WISE-native real/bogus/quality policy for archive detections.
 
 ### Gate D2: Operator Review
 - [ ] Jerome W. Lindsey III reviews SURVIVE/BORDERLINE candidates

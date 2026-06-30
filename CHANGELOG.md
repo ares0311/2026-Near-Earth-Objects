@@ -3,6 +3,22 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.4 — D1 motion-floor alignment (2026-06-30)
+
+### Changed
+- `detect.py`, `link.py`, and `Skills/audit_real_run.py` now use the same
+  `0.05 arcsec/hr` lower motion floor as adversarial review and
+  `docs/MISSION.md`.
+- `src/background.py` now lazy-loads heavy classify/orbit/score stages so
+  metadata-only background CLI commands do not time out during cold subprocess
+  startup.
+- D1 handoff docs now explicitly say the Taurus v0.90.3 subfields are exhausted
+  and should not be rerun.
+
+### Safety
+- No external submission path was enabled.
+- No impact-probability claims or confirmed-object claims were introduced.
+
 ## v0.90.3 — D1 review-packet and scale-plan guardrails (2026-06-29)
 
 ### Added

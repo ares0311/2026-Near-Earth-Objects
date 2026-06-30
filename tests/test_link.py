@@ -246,6 +246,33 @@ class TestLinkPipeline:
         assert result.provenance.n_seed_pairs_total == 3
         assert result.provenance.n_seed_pairs_rate_window == 0
 
+    def test_below_adversarial_motion_floor_skipped(self):
+        # D1 adversarial review hard-fails rates below 0.05 arcsec/hr, so the
+        # linker should not emit near-stationary review packets at lower rates.
+        low_rate = 0.04
+        dra_per_day = low_rate * 24 / 3600
+        obs_a = make_obs(obs_id="slow_a", jd=2460000.0, ra_deg=180.0, dec_deg=5.0)
+        obs_b = make_obs(
+            obs_id="slow_b",
+            jd=2460001.0,
+            ra_deg=180.0 + dra_per_day,
+            dec_deg=5.0,
+        )
+        obs_c = make_obs(
+            obs_id="slow_c",
+            jd=2460002.0,
+            ra_deg=180.0 + 2 * dra_per_day,
+            dec_deg=5.0,
+        )
+        result = link(
+            (make_candidate((obs_a,)), make_candidate((obs_b,)), make_candidate((obs_c,))),
+            min_nights=2,
+            min_observations=3,
+        )
+        assert len(result.tracklets) == 0
+        assert result.provenance.n_seed_pairs_total == 3
+        assert result.provenance.n_seed_pairs_rate_window == 0
+
     def test_insufficient_nights_coverage_skipped(self):
         # 3 sorted nights, but night_c obs is far → arc only spans 2 nights < min_nights=3
         dra = 1.0 * 24 / 3600  # 1 arcsec/hr in deg/day

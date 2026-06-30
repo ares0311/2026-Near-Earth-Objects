@@ -83,8 +83,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol
 
-from classify import classify, extract_features
-from orbit import fit_orbit
 from schemas import (
     BackgroundConfig,
     BackgroundOutcome,
@@ -106,7 +104,6 @@ from schemas import (
     SubmissionRecommendation,
     Tracklet,
 )
-from score import score
 
 _ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CONFIG_PATH = _ROOT / "background" / "config.json"
@@ -625,6 +622,13 @@ def load_tracklets(path: Path = DEFAULT_INPUT_PATH) -> tuple[Tracklet, ...]:
 
 def score_tracklet(tracklet: Tracklet, run_id: str) -> ScoredNEO:
     """Run the local classify -> orbit -> score path for a fixture target."""
+    # Import the heavy pipeline stages only for commands that actually score a
+    # target. Metadata-only CLI commands must stay fast enough for subprocess
+    # tests and operator status checks.
+    from classify import classify, extract_features
+    from orbit import fit_orbit
+    from score import score
+
     features = extract_features(tracklet)
     features_cls, posterior = classify(tracklet, features)
     orbital = fit_orbit(tracklet)
@@ -3103,6 +3107,10 @@ def _scoring_kpi_case(
     posterior: NEOPosterior,
     orbital: OrbitalElements | None,
 ) -> ScoredNEO:
+    # Keep scoring import lazy so unrelated background CLI summaries do not pay
+    # the full pipeline import cost on every cold subprocess startup.
+    from score import score
+
     return score(
         _scoring_kpi_tracklet(case_id),
         features,

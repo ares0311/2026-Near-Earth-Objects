@@ -29,7 +29,10 @@ from schemas import (
 # ---------------------------------------------------------------------------
 
 _REAL_BOGUS_THRESHOLD = 0.65  # ZTF rb score; configurable
-_MOTION_MIN_ARCSEC_PER_HR = 0.01
+# Keep the discovery-stage floor aligned with adversarial review. Tracklets
+# below 0.05 arcsec/hr are rejected as stationary/artifact-like before operator
+# review, so admitting them here creates packets that cannot advance D1.
+_MOTION_MIN_ARCSEC_PER_HR = 0.05
 _MOTION_MAX_ARCSEC_PER_HR = 60.0
 _MPC_MATCH_RADIUS_ARCSEC = 5.0
 _DISCOVERY_ARCHIVE_MISSIONS = {"WISE", "DECam", "TESS"}
@@ -544,7 +547,6 @@ def compute_source_compactness(obs: object) -> float | None:
         return round(float(min(1.0, max(0.0, peak / total))), 6)
     except Exception:
         return None
-
 
 
 

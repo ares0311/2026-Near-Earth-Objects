@@ -138,7 +138,7 @@ Link single-night detections into multi-night tracklets using linear motion prop
 
 **Notes**:
 - Requires ≥`min_nights` distinct nights and ≥`min_observations` total detections.
-- Motion rate gate: 0.01–`max_rate_arcsec_per_hr` arcsec/hr between seed nights.
+- Motion rate gate: 0.05–`max_rate_arcsec_per_hr` arcsec/hr between seed nights.
 - Seed pairs more than 30 days apart are skipped.
 - Candidate pairs exhibiting purely E-W or N-S linear motion at rate ≥ 30 arcsec/hr are rejected as probable satellite trails (`_is_satellite_trail` filter).
 

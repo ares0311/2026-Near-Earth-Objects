@@ -147,6 +147,28 @@ class TestDetectPipeline:
         result = detect((obs1, obs2), mpc_cross_match=False)
         assert len(result.candidates) == 0
 
+    def test_below_adversarial_motion_floor_excluded(self):
+        # D1 adversarial review hard-fails rates below 0.05 arcsec/hr, so the
+        # detection stage must not emit near-stationary candidates at lower rates.
+        obs1 = make_obs(
+            obs_id="slow_a",
+            field_id="slow-object",
+            jd=2460000.5,
+            ra_deg=180.0,
+            dec_deg=0.0,
+            real_bogus=0.9,
+        )
+        obs2 = make_obs(
+            obs_id="slow_b",
+            field_id="slow-object",
+            jd=2460001.5,
+            ra_deg=180.000266,
+            dec_deg=0.0,
+            real_bogus=0.9,
+        )
+        result = detect((obs1, obs2), mpc_cross_match=False)
+        assert len(result.candidates) == 0
+
     def test_preserves_broker_object_history_candidate(self):
         obs1 = make_obs(
             obs_id="a",
@@ -266,7 +288,7 @@ class TestCrossMatchMpc:
 
 class TestFindMovingSources:
     def test_too_slow_motion_excluded(self):
-        # Essentially stationary — rate < 0.01 arcsec/hr
+        # Essentially stationary — rate < 0.05 arcsec/hr
         obs1 = make_obs(obs_id="a", jd=2460000.5, ra_deg=180.0)
         obs2 = make_obs(obs_id="b", jd=2460001.5, ra_deg=180.0)
         result = _find_moving_sources([obs1, obs2])
@@ -662,5 +684,4 @@ class TestComputeSourceCompactness:
         sys.path.insert(0, "src")
         import detect
         assert "compute_source_compactness" in detect.__all__
-
 
