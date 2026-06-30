@@ -1,6 +1,6 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.90.4
+**Current version**: v0.90.5
 **Last updated**: 2026-06-30
 **Purpose**: Mandatory read at session start (per MANDATORY SESSION-START PROTOCOL).  
 Every planning cycle must name the highest-priority unresolved Tier 1 gap and show how proposed steps close or directly unblock it.
@@ -727,6 +727,18 @@ guaranteed to fail D1 on the motion-rate challenge. The next D1 blocker after
 this patch is not Taurus reruns; it is either a new WISE/NEOWISE field-window
 strategy likely to produce faster non-static candidates, or a defensible
 WISE-native real/bogus/quality policy for archive detections.
+
+**2026-06-30 v0.90.5 WISE parent-field probe selector**:
+`Skills/select_survey_fields.py --wise-archive-probes` now enriches ranked
+field selections with copy-paste-safe WISE/NEOWISE scale-plan probe commands.
+The generated commands use `caffeinate -i`, Python 3.14 via `uv run`, bounded
+native thread settings, dry-run mode, and `--link-scale-plan-out` so the next
+non-Taurus parent field is measured before any full diagnostic run. This closes
+the immediate D1 planning/tooling gap after the Taurus diagnostics were
+exhausted. Next D1 step: run the selector for a non-Taurus WISE archive window,
+then run the top generated scale-plan probe from merged `main`; do not run
+adversarial review unless the subsequent pipeline run writes non-zero full
+`ScoredNEO` review packets.
 
 ### Gate D2: Operator Review
 - [ ] Jerome W. Lindsey III reviews SURVIVE/BORDERLINE candidates

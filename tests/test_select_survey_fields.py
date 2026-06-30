@@ -442,6 +442,42 @@ class TestZtfAvailabilityProbe:
         assert filtered[0]["rank"] == 1
 
 
+class TestWiseArchiveProbeCommands:
+    def test_wise_scale_probe_outputs_are_dry_run_and_directive_compliant(self):
+        field = {"ra_deg": 58.1, "dec_deg": 19.9}
+        result = ssf.wise_scale_probe_outputs(
+            field,
+            start_jd=2458880.5,
+            end_jd=2459250.5,
+            radius_deg=0.2,
+        )
+
+        command = result["wise_scale_probe_command"]
+        assert "caffeinate -i uv run --python 3.14 python Skills/run_pipeline.py" in command
+        assert "OMP_NUM_THREADS=1" in command
+        assert "OPENBLAS_NUM_THREADS=1" in command
+        assert "VECLIB_MAXIMUM_THREADS=1" in command
+        assert "NUMEXPR_MAX_THREADS=1" in command
+        assert "--surveys WISE" in command
+        assert "--link-scale-plan-out Logs/reports/wise_scale_plan_ra58p10_dec19p90" in command
+        assert "--no-dry-run" not in command
+        assert "No external submission" not in command
+        assert result["wise_safety"].startswith("dry-run scale-plan probe only")
+
+    def test_add_wise_archive_probe_commands_keeps_field_metadata(self):
+        fields = [{"rank": 1, "ra_deg": 58.1, "dec_deg": 19.9, "score": 0.9}]
+        enriched = ssf.add_wise_archive_probe_commands(
+            fields,
+            start_jd=2458880.5,
+            end_jd=2459250.5,
+        )
+
+        assert enriched[0]["rank"] == 1
+        assert enriched[0]["score"] == 0.9
+        assert enriched[0]["wise_parent_radius_deg"] == pytest.approx(0.2)
+        assert enriched[0]["wise_start_jd"] == pytest.approx(2458880.5)
+
+
 # ── CLI smoke tests ────────────────────────────────────────────────────────────
 
 class TestCLI:
@@ -493,3 +529,28 @@ class TestCLI:
         data = json.loads(out)
         assert len(data) <= 2
         assert all(row["ztf_object_count"] >= 1 for row in data)
+
+    def test_wise_archive_probes_cli_json(self, capsys):
+        ssf.main([
+            "--jd", "2459065.5",
+            "--mode", "aten",
+            "--top-n", "2",
+            "--wise-archive-probes",
+            "--start-jd", "2458880.5",
+            "--end-jd", "2459250.5",
+            "--json",
+        ])
+        out = capsys.readouterr().out
+        data = json.loads(out)
+        assert len(data) <= 2
+        assert all("wise_scale_probe_command" in row for row in data)
+        assert all("--surveys WISE" in row["wise_scale_probe_command"] for row in data)
+
+    def test_wise_archive_probes_requires_window(self):
+        with pytest.raises(SystemExit):
+            ssf.main([
+                "--jd", "2459065.5",
+                "--mode", "aten",
+                "--wise-archive-probes",
+                "--json",
+            ])

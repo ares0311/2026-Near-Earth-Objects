@@ -3,6 +3,23 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.5 — WISE parent-field probe selector (2026-06-30)
+
+### Added
+- `Skills/select_survey_fields.py --wise-archive-probes` now adds
+  directive-compliant WISE/NEOWISE scale-plan probe commands to ranked field
+  selections.
+- The generated probe commands use `caffeinate -i`, Python 3.14 through
+  `uv run`, bounded native numerical threads, dry-run pipeline execution, and
+  `--link-scale-plan-out` so new parent fields are measured before full D1
+  diagnostics.
+- Offline tests now cover WISE probe command generation, metadata preservation,
+  JSON CLI output, and required archive-window validation.
+
+### Safety
+- No external submission path was enabled.
+- No impact-probability claims or confirmed-object claims were introduced.
+
 ## v0.90.4 — D1 motion-floor alignment (2026-06-30)
 
 ### Changed

@@ -50,6 +50,8 @@ Usage::
     uv run python Skills/select_survey_fields.py --jd now --mode ieo  --top-n 10
     uv run python Skills/select_survey_fields.py --jd now --mode recovery --top-n 15 --json
     uv run python Skills/select_survey_fields.py --jd 2461000.5 --history-dir Logs/pipeline_runs
+    uv run python Skills/select_survey_fields.py --jd 2459065.5 --mode aten \
+        --top-n 3 --wise-archive-probes --start-jd 2458880.5 --end-jd 2459250.5 --json
 """
 
 from __future__ import annotations
@@ -110,6 +112,10 @@ _DEDUP_RADIUS_DEG = _FIELD_RADIUS_DEG  # skip fields within one FoV of selected
 
 # Overlap radius for novelty comparison against run history
 _HISTORY_OVERLAP_DEG = 5.0
+
+# WISE/NEOWISE diagnostic defaults: small parent cones are scale-plan probes,
+# not complete discovery tiles. The linker may recommend smaller subfields.
+_WISE_PARENT_RADIUS_DEG = 0.2
 
 
 # ── Vectorised geometry helpers ───────────────────────────────────────────────
@@ -594,6 +600,94 @@ def filter_fields_by_ztf_availability(
     return accepted
 
 
+def wise_scale_probe_outputs(
+    field: dict,
+    *,
+    start_jd: float,
+    end_jd: float,
+    radius_deg: float = _WISE_PARENT_RADIUS_DEG,
+) -> dict:
+    """Return directive-compliant WISE scale-plan outputs for a selected field.
+
+    This does not claim the field is productive. It produces the first live
+    measurement command for a candidate parent field: a dry-run WISE scale plan
+    that can rank support-positive diagnostic subfields before any full run.
+    """
+    ra = float(field["ra_deg"])
+    dec = float(field["dec_deg"])
+    label = f"ra{ra:.2f}_dec{dec:.2f}".replace("-", "m").replace(".", "p")
+    scale_plan = f"Logs/reports/wise_scale_plan_{label}_{start_jd:.1f}_{end_jd:.1f}.json"
+    probe_out = f"Logs/reports/wise_scale_probe_{label}_{start_jd:.1f}_{end_jd:.1f}.json"
+    args = [
+        "caffeinate",
+        "-i",
+        "uv",
+        "run",
+        "--python",
+        "3.14",
+        "python",
+        "Skills/run_pipeline.py",
+        "--ra",
+        f"{ra:.4f}",
+        "--dec",
+        f"{dec:.4f}",
+        "--radius",
+        f"{radius_deg:.4f}",
+        "--start-jd",
+        f"{start_jd:.1f}",
+        "--end-jd",
+        f"{end_jd:.1f}",
+        "--surveys",
+        "WISE",
+        "--no-resume",
+        "--force-refresh",
+        "--link-scale-plan-out",
+        scale_plan,
+        "--output",
+        probe_out,
+    ]
+    command = (
+        "OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 "
+        "NUMEXPR_MAX_THREADS=1 PYTHONPATH=src "
+        + " ".join(args)
+    )
+    return {
+        "wise_parent_radius_deg": round(radius_deg, 4),
+        "wise_start_jd": round(start_jd, 1),
+        "wise_end_jd": round(end_jd, 1),
+        "wise_scale_plan_out": scale_plan,
+        "wise_probe_out": probe_out,
+        "wise_scale_probe_command": command,
+        "wise_safety": (
+            "dry-run scale-plan probe only; no external submission; "
+            "do not run adversarial review unless non-zero ScoredNEO packets are written"
+        ),
+    }
+
+
+def add_wise_archive_probe_commands(
+    fields: list[dict],
+    *,
+    start_jd: float,
+    end_jd: float,
+    radius_deg: float = _WISE_PARENT_RADIUS_DEG,
+) -> list[dict]:
+    """Add WISE archive scale-plan probe commands to selected field rows."""
+    enriched: list[dict] = []
+    for field in fields:
+        row = dict(field)
+        row.update(
+            wise_scale_probe_outputs(
+                field,
+                start_jd=start_jd,
+                end_jd=end_jd,
+                radius_deg=radius_deg,
+            )
+        )
+        enriched.append(row)
+    return enriched
+
+
 # ── CLI ────────────────────────────────────────────────────────────────────────
 
 def main(argv: list[str] | None = None) -> None:
@@ -611,6 +705,8 @@ def main(argv: list[str] | None = None) -> None:
             "  uv run python Skills/select_survey_fields.py --jd now --mode recovery --top-n 10\n"
             "  uv run python Skills/select_survey_fields.py --jd now "
             "--history-dir Logs/pipeline_runs\n"
+            "  uv run python Skills/select_survey_fields.py --jd 2459065.5 --mode aten "
+            "--wise-archive-probes --start-jd 2458880.5 --end-jd 2459250.5 --json\n"
         ),
     )
     parser.add_argument(
@@ -676,6 +772,35 @@ def main(argv: list[str] | None = None) -> None:
         default=40,
         help="Number of analytically ranked fields to live-probe before filtering.",
     )
+    parser.add_argument(
+        "--wise-archive-probes",
+        action="store_true",
+        help=(
+            "Add dry-run WISE/NEOWISE scale-plan probe commands to each selected "
+            "field. Requires --start-jd and --end-jd."
+        ),
+    )
+    parser.add_argument(
+        "--start-jd",
+        type=float,
+        default=None,
+        help="Start JD for WISE/NEOWISE archive scale-plan probe commands.",
+    )
+    parser.add_argument(
+        "--end-jd",
+        type=float,
+        default=None,
+        help="End JD for WISE/NEOWISE archive scale-plan probe commands.",
+    )
+    parser.add_argument(
+        "--wise-parent-radius",
+        type=float,
+        default=_WISE_PARENT_RADIUS_DEG,
+        help=(
+            "Parent cone radius, in degrees, for WISE scale-plan probes. "
+            f"Default: {_WISE_PARENT_RADIUS_DEG}."
+        ),
+    )
     args = parser.parse_args(argv)
 
     if args.jd == "now":
@@ -700,6 +825,18 @@ def main(argv: list[str] | None = None) -> None:
             end_jd=args.ztf_end_jd if args.ztf_end_jd is not None else jd,
             min_objects=args.ztf_min_objects,
             top_n=args.top_n,
+        )
+    if args.wise_archive_probes:
+        if args.start_jd is None or args.end_jd is None:
+            parser.error("--wise-archive-probes requires --start-jd and --end-jd")
+        if args.end_jd <= args.start_jd:
+            parser.error("--end-jd must be greater than --start-jd")
+        fields = fields[: args.top_n]
+        fields = add_wise_archive_probe_commands(
+            fields,
+            start_jd=args.start_jd,
+            end_jd=args.end_jd,
+            radius_deg=args.wise_parent_radius,
         )
 
     if args.json_out:
@@ -730,6 +867,10 @@ def main(argv: list[str] | None = None) -> None:
               f"--radius {_FIELD_RADIUS_DEG}")
         print(f"  (score={top['score']:.4f}  elong={top['elongation_deg']:.1f}°  "
               f"ecl_lat={top['ecl_lat_deg']:.1f}°  {top['hours_visible']:.1f}h visible)")
+        if args.wise_archive_probes:
+            print()
+            print("Top WISE scale-plan probe — copy exactly:")
+            print(top["wise_scale_probe_command"])
 
 
 if __name__ == "__main__":
