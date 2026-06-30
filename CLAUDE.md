@@ -640,7 +640,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.2)
+## Current State (v0.90.3)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -664,6 +664,17 @@ until expert review" guardrail was removed by operator decision on 2026-06-21;
 MPC/NEOCP/Scout is the expert review system.
 
 ### Handoff state as of 2026-06-29 (CURRENT)
+
+**v0.90.3 patch status**:
+- `Skills/run_pipeline.py --review-packet-out` now prints the number of full
+  `ScoredNEO` packets written. If the count is zero, it prints a fail-closed
+  operator instruction to skip adversarial review because an empty packet file
+  is not reviewable input.
+- `Skills/run_pipeline.py --link-scale-plan-out` now ranks recommended
+  diagnostic subfields by local cross-night seed-pair support and records
+  `support_metrics` for each recommendation, including whether the subfield can
+  support at least three observations across at least two nights inside the
+  recommended diagnostic radius.
 
 **v0.90.2 patch status**:
 - WISE/NEOWISE ADES export is now fail-closed around MPC authority:
@@ -697,10 +708,10 @@ MPC/NEOCP/Scout is the expert review system.
 - Expected seed-budget stops now exit cleanly with audit/output artifacts
   instead of printing a Python traceback.
 - **NEXT PRODUCTION ACTION — NOT YET DONE**: do not rerun the RA `58.1`, Dec
-  `20.1`, radius `0.0466` subfield. Select a different v0.90.2 recommended
-  subfield or improve subfield selection to prioritize regions likely to
-  produce three-observation tracklets, not only high observation density. Only
-  run adversarial review after verifying non-empty full review packets.
+  `20.1`, radius `0.0466` subfield. Regenerate or inspect a v0.90.3 scale plan
+  with `support_metrics`, choose a different support-positive diagnostic
+  subfield, and only run adversarial review after the pipeline reports a
+  non-zero full `ScoredNEO` packet count.
 
 **Discovery paper goal established (2026-06-26)**:
 The project goal is a **defensible discovery paper** — not a methods paper and not a

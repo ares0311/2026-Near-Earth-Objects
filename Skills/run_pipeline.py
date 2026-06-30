@@ -138,6 +138,11 @@ def _estimate_link_seed_pairs(candidates: tuple) -> int:
             night = int(obs.jd)
             counts_by_night[night] = counts_by_night.get(night, 0) + 1
 
+    return _estimate_seed_pairs_from_night_counts(counts_by_night)
+
+
+def _estimate_seed_pairs_from_night_counts(counts_by_night: dict[int, int]) -> int:
+    """Estimate cross-night seed pairs from per-night observation counts."""
     total = 0
     nights = sorted(counts_by_night)
     for idx, night_a in enumerate(nights[:-1]):
@@ -146,6 +151,63 @@ def _estimate_link_seed_pairs(candidates: tuple) -> int:
                 break
             total += counts_by_night[night_a] * counts_by_night[night_b]
     return total
+
+
+def _angular_separation_deg(
+    ra_a_deg: float,
+    dec_a_deg: float,
+    ra_b_deg: float,
+    dec_b_deg: float,
+) -> float:
+    """Return the great-circle separation between two sky positions in degrees."""
+    ra_a = math.radians(ra_a_deg % 360.0)
+    ra_b = math.radians(ra_b_deg % 360.0)
+    dec_a = math.radians(dec_a_deg)
+    dec_b = math.radians(dec_b_deg)
+    cos_sep = (
+        math.sin(dec_a) * math.sin(dec_b)
+        + math.cos(dec_a) * math.cos(dec_b) * math.cos(ra_a - ra_b)
+    )
+    return math.degrees(math.acos(max(-1.0, min(1.0, cos_sep))))
+
+
+def _subfield_support_metrics(
+    candidates: tuple,
+    *,
+    center_ra_deg: float,
+    center_dec_deg: float,
+    radius_deg: float,
+) -> dict:
+    """Summarize whether a recommended diagnostic subfield can feed linking."""
+    counts_by_night: dict[int, int] = {}
+    for cand in candidates:
+        for obs in getattr(cand, "observations", ()):
+            obs_ra = float(getattr(obs, "ra_deg", 0.0))
+            obs_dec = float(getattr(obs, "dec_deg", 0.0))
+            if _angular_separation_deg(obs_ra, obs_dec, center_ra_deg, center_dec_deg) > radius_deg:
+                continue
+            night = int(obs.jd)
+            counts_by_night[night] = counts_by_night.get(night, 0) + 1
+
+    # These are support diagnostics only. Actual tracklets still require the
+    # linker to pass rate, satellite/debris, observation-count, and chi-square gates.
+    n_observations = sum(counts_by_night.values())
+    estimated_seed_pairs = _estimate_seed_pairs_from_night_counts(counts_by_night)
+    can_support_tracklet = (
+        n_observations >= 3
+        and len(counts_by_night) >= 2
+        and estimated_seed_pairs > 0
+    )
+    return {
+        "n_observations": n_observations,
+        "n_nights": len(counts_by_night),
+        "estimated_seed_pairs": estimated_seed_pairs,
+        "can_support_three_observation_tracklet": can_support_tracklet,
+        "nights": [
+            {"night": night, "n_observations": counts_by_night[night]}
+            for night in sorted(counts_by_night)
+        ],
+    }
 
 
 def _build_link_scale_plan(
@@ -170,6 +232,7 @@ def _build_link_scale_plan(
     """
     counts_by_night: dict[int, int] = {}
     cell_counts: dict[tuple[int, int], int] = {}
+    cell_counts_by_night: dict[tuple[int, int], dict[int, int]] = {}
     for cand in candidates:
         for obs in getattr(cand, "observations", ()):
             night = int(obs.jd)
@@ -178,6 +241,8 @@ def _build_link_scale_plan(
             dec = float(getattr(obs, "dec_deg", 0.0))
             cell = (int(ra // sky_cell_deg), int((dec + 90.0) // sky_cell_deg))
             cell_counts[cell] = cell_counts.get(cell, 0) + 1
+            cell_nights = cell_counts_by_night.setdefault(cell, {})
+            cell_nights[night] = cell_nights.get(night, 0) + 1
 
     night_pairs: list[dict[str, int]] = []
     nights = sorted(counts_by_night)
@@ -193,17 +258,28 @@ def _build_link_scale_plan(
             })
 
     sky_cells = []
-    for (ra_idx, dec_idx), n_obs in sorted(
-        cell_counts.items(),
-        key=lambda item: item[1],
-        reverse=True,
-    )[:top_n]:
+    for (ra_idx, dec_idx), n_obs in cell_counts.items():
+        cell_nights = cell_counts_by_night[(ra_idx, dec_idx)]
+        cell_seed_pairs = _estimate_seed_pairs_from_night_counts(cell_nights)
+        can_support_tracklet = n_obs >= 3 and len(cell_nights) >= 2 and cell_seed_pairs > 0
         sky_cells.append({
             "center_ra_deg": round((ra_idx + 0.5) * sky_cell_deg, 6),
             "center_dec_deg": round((dec_idx + 0.5) * sky_cell_deg - 90.0, 6),
             "cell_size_deg": sky_cell_deg,
             "n_observations": n_obs,
+            "n_nights": len(cell_nights),
+            "estimated_seed_pairs": cell_seed_pairs,
+            "can_support_three_observation_tracklet": can_support_tracklet,
         })
+    sky_cells = sorted(
+        sky_cells,
+        key=lambda cell: (
+            cell["can_support_three_observation_tracklet"],
+            cell["estimated_seed_pairs"],
+            cell["n_observations"],
+        ),
+        reverse=True,
+    )[:top_n]
 
     total_seed_pairs = sum(pair["seed_pairs"] for pair in night_pairs)
     recommended_radius_deg: float | None = None
@@ -222,6 +298,12 @@ def _build_link_scale_plan(
         and surveys
     ):
         for cell in sky_cells[: min(6, len(sky_cells))]:
+            support = _subfield_support_metrics(
+                candidates,
+                center_ra_deg=cell["center_ra_deg"],
+                center_dec_deg=cell["center_dec_deg"],
+                radius_deg=recommended_radius_deg,
+            )
             diagnostic_subfields.append({
                 "ra_deg": cell["center_ra_deg"],
                 "dec_deg": cell["center_dec_deg"],
@@ -229,11 +311,22 @@ def _build_link_scale_plan(
                 "start_jd": start_jd,
                 "end_jd": end_jd,
                 "surveys": list(surveys),
+                "support_metrics": support,
                 "reason": (
-                    "Top-density sky cell from the blocked scale plan; use as "
-                    "a bounded diagnostic, not as complete-field evidence."
+                    "Sky cell ranked by cross-night seed-pair support from the "
+                    "blocked scale plan; use as a bounded diagnostic, not as "
+                    "complete-field evidence."
                 ),
             })
+        diagnostic_subfields = sorted(
+            diagnostic_subfields,
+            key=lambda subfield: (
+                subfield["support_metrics"]["can_support_three_observation_tracklet"],
+                subfield["support_metrics"]["estimated_seed_pairs"],
+                subfield["support_metrics"]["n_observations"],
+            ),
+            reverse=True,
+        )
 
     return {
         "status": "blocked_seed_pair_budget",
@@ -254,14 +347,23 @@ def _build_link_scale_plan(
         "top_sky_cells": sky_cells,
         "recommended_diagnostic_radius_deg": recommended_radius_deg,
         "recommended_diagnostic_subfields": diagnostic_subfields,
+        "diagnostic_selection_basis": (
+            "Recommended subfields are ranked by local cross-night seed-pair "
+            "support and whether at least three observations across at least "
+            "two nights are present inside the recommended diagnostic radius."
+        ),
         "tiling_limitations": [
             "These subfields are bounded diagnostics, not a complete tiling proof.",
             "Naive sky-cell tiling can miss objects that cross cell boundaries.",
             "Production completeness requires documented overlap or a different "
             "linking algorithm before promotion.",
+            "A support-positive subfield can still produce zero tracklets after "
+            "rate, satellite/debris, minimum-observation, and chi-square gates.",
         ],
         "recommended_next_actions": [
             "Run one recommended_diagnostic_subfield from main in dry-run mode.",
+            "Skip any recommended subfield whose support_metrics cannot support "
+            "a three-observation multi-night tracklet.",
             "Use --max-candidates only for bounded diagnostics, not promotion.",
             "Override --max-link-seed-pairs only after documenting a scale plan.",
         ],
@@ -774,7 +876,18 @@ def run_pipeline(
     if review_packet_out is not None:
         review_packet_out.parent.mkdir(parents=True, exist_ok=True)
         review_packet_out.write_text(json.dumps(review_packets, indent=2))
-        print(f"Review packets written to {review_packet_out}", flush=True)
+        print(
+            f"Review packets written to {review_packet_out} "
+            f"({len(review_packets)} packet(s))",
+            flush=True,
+        )
+        if not review_packets:
+            # Empty review-packet artifacts are valid evidence of no linked
+            # candidates, but they are not valid inputs to adversarial_review.py.
+            print(
+                "[review] No reviewable ScoredNEO packets; skip adversarial review.",
+                flush=True,
+            )
     return results
 
 

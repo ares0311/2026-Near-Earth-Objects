@@ -1,6 +1,6 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.90.2
+**Current version**: v0.90.3
 **Last updated**: 2026-06-29
 **Purpose**: Mandatory read at session start (per MANDATORY SESSION-START PROTOCOL).  
 Every planning cycle must name the highest-priority unresolved Tier 1 gap and show how proposed steps close or directly unblock it.
@@ -651,6 +651,16 @@ do not rerun this exact subfield; select a different recommended subfield or
 improve selection to prioritize areas likely to produce at least
 three-observation tracklets. Future operator instructions must verify non-empty
 full `ScoredNEO` packets before running `Skills/adversarial_review.py`.
+
+**2026-06-29 v0.90.3 D1 guardrail hardening**: `Skills/run_pipeline.py` now
+prints the number of full `ScoredNEO` review packets written and explicitly
+instructs the operator to skip adversarial review when that count is zero. Link
+scale plans now add local `support_metrics` to recommended diagnostic subfields,
+including whether a subfield has at least three observations across at least two
+nights inside the recommended radius. Next D1 step: regenerate or inspect a
+v0.90.3 scale plan, choose a support-positive subfield that is not the failed
+RA `58.1`, Dec `20.1`, radius `0.0466` diagnostic, and run adversarial review
+only if full review packets are non-empty.
 
 ### Gate D2: Operator Review
 - [ ] Jerome W. Lindsey III reviews SURVIVE/BORDERLINE candidates
