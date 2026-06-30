@@ -674,6 +674,20 @@ attempted that live run, but the approval layer rejected it because of a usage
 limit. Durable evidence and the exact operator command are recorded in
 `docs/evidence/live/2026-06-30-wise-v0903-scale-plan-support.md`.
 
+**2026-06-30 v0.90.3 rank 1 diagnostic complete**: The rank 1 support-positive
+WISE subfield at RA `58.1`, Dec `19.9`, radius `0.0466` was run from merged
+`main`. The dry run fetched `701` WISE rows, passed `701/701`, detected `701`
+singleton candidates, linked `48105` seed pairs, formed `3` tracklets, wrote
+`3` full review packets, and produced `0` submission-ready candidates. Offline
+adversarial review evaluated all `3` packets and returned `3/3` `REJECT`
+verdicts. Shared rejection causes were missing orbit elements, missing
+real/bogus score, artifact posterior about `0.98` to `0.99`, NEO posterior
+about `0.001`, and motion below the hard `0.05 arcsec/hr` lower bound. Durable
+evidence: `docs/evidence/live/2026-06-30-wise-v0903-subfield-58p1-19p9.md`.
+Next D1 step: run the next distinct support-positive subfield from the v0.90.3
+scale plan, RA `57.9`, Dec `20.1`, radius `0.0466`, and only run adversarial
+review after a non-zero full `ScoredNEO` packet count is reported.
+
 ### Gate D2: Operator Review
 - [ ] Jerome W. Lindsey III reviews SURVIVE/BORDERLINE candidates
 - [ ] Jerome approves at least one candidate for MPC submission
