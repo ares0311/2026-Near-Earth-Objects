@@ -740,6 +740,19 @@ then run the top generated scale-plan probe from merged `main`; do not run
 adversarial review unless the subsequent pipeline run writes non-zero full
 `ScoredNEO` review packets.
 
+**2026-06-30 v0.90.5 non-Taurus parent-field scale-plan probe complete**: The
+v0.90.5 selector-generated parent field at RA `209.64`, Dec `-15.0`, radius
+`0.2`, JD `2458880.5` to `2459250.5`, survey `WISE`, ran from merged `main`.
+The dry run fetched `16582` WISE rows, passed `16558/16582`, detected `16558`
+singleton candidates, and stopped fail-closed at `27845455` estimated seed
+pairs over the `1000000` default budget. The scale plan recommended radius
+`0.0303` degrees and four support-positive diagnostic subfields. Durable
+evidence and the exact next command are recorded in
+`docs/evidence/live/2026-06-30-wise-v0905-parent-field-probe.md`. Next D1 step:
+run the rank 1 support-positive subfield from merged `main`: RA `209.5`, Dec
+`-14.9`, radius `0.0303`; only run adversarial review after a non-zero full
+`ScoredNEO` packet count is reported.
+
 ### Gate D2: Operator Review
 - [ ] Jerome W. Lindsey III reviews SURVIVE/BORDERLINE candidates
 - [ ] Jerome approves at least one candidate for MPC submission
