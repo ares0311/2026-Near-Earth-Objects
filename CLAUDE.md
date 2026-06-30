@@ -719,10 +719,17 @@ MPC/NEOCP/Scout is the expert review system.
   radius `0.0466`. It produced `691` WISE rows, `2` tracklets, `2` full review
   packets, and `2/2` offline adversarial `REJECT` verdicts. Durable evidence:
   `docs/evidence/live/2026-06-30-wise-v0903-subfield-57p9-20p1.md`.
-  **NEXT PRODUCTION ACTION — NOT YET DONE**: run the next remaining distinct
-  support-positive subfield from the v0.90.3 scale plan: RA `57.9`, Dec `19.9`,
-  radius `0.0466`. Only run adversarial review after the pipeline reports a
-  non-zero full `ScoredNEO` packet count.
+  The final remaining distinct support-positive diagnostic was then run: RA
+  `57.9`, Dec `19.9`, radius `0.0466`. It produced `668` WISE rows, `2`
+  tracklets, `2` full review packets, and `2/2` offline adversarial `REJECT`
+  verdicts. Durable evidence:
+  `docs/evidence/live/2026-06-30-wise-v0903-subfield-57p9-19p9.md`.
+  **NEXT PRODUCTION ACTION — NOT YET DONE**: do not rerun the Taurus v0.90.3
+  diagnostic subfields. The support-positive Taurus loop produced either zero
+  tracklets or only adversarial `REJECT` candidates. Move D1 forward by
+  selecting a new WISE/NEOWISE field-window strategy likely to produce faster,
+  non-static candidates, or by improving WISE-specific filtering/linking before
+  the next operator live run.
 
 **Discovery paper goal established (2026-06-26)**:
 The project goal is a **defensible discovery paper** — not a methods paper and not a

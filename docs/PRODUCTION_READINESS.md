@@ -698,9 +698,26 @@ Shared rejection causes matched the rank 1 diagnostic: missing orbit elements,
 missing real/bogus score, artifact posterior about `0.99`, NEO posterior about
 `0.001`, and motion below the hard `0.05 arcsec/hr` lower bound. Durable
 evidence: `docs/evidence/live/2026-06-30-wise-v0903-subfield-57p9-20p1.md`.
-Next D1 step: run the next remaining distinct support-positive subfield from
-the v0.90.3 scale plan, RA `57.9`, Dec `19.9`, radius `0.0466`, and only run
-adversarial review after a non-zero full `ScoredNEO` packet count is reported.
+At that point, the next D1 step was the remaining distinct support-positive
+rank 4 subfield, RA `57.9`, Dec `19.9`, radius `0.0466`; that operator-run
+blocker was later cleared by the rank 4 diagnostic recorded below.
+
+**2026-06-30 v0.90.3 rank 4 diagnostic complete**: The final remaining
+distinct support-positive Taurus WISE subfield at RA `57.9`, Dec `19.9`, radius
+`0.0466` was run by the operator. The dry run fetched `668` WISE rows, passed
+`665/668`, detected `665` singleton candidates, linked `18776` seed pairs,
+formed `2` tracklets, wrote `2` full review packets, and produced `0`
+submission-ready candidates. Offline adversarial review evaluated both packets
+and returned `2/2` `REJECT` verdicts. Shared rejection causes again matched
+the prior diagnostics: missing orbit elements, missing real/bogus score,
+artifact posterior about `0.98` to `0.99`, NEO posterior about `0.001`, and
+motion below the hard `0.05 arcsec/hr` lower bound. Durable evidence:
+`docs/evidence/live/2026-06-30-wise-v0903-subfield-57p9-19p9.md`. Root cause:
+this Taurus WISE diagnostic set is producing near-stationary,
+artifact-dominated internal candidates, not review survivors. Next D1 step:
+do not rerun these Taurus subfields; select a new WISE/NEOWISE field-window
+strategy likely to produce faster non-static candidates, or improve
+WISE-specific filtering/linking before the next operator live run.
 
 ### Gate D2: Operator Review
 - [ ] Jerome W. Lindsey III reviews SURVIVE/BORDERLINE candidates
