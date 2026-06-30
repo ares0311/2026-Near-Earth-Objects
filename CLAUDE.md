@@ -678,6 +678,16 @@ MPC/NEOCP/Scout is the expert review system.
 - Generated commands are dry-run only and do not authorize external submission.
   Run adversarial review only after a pipeline run reports a non-zero full
   `ScoredNEO` review-packet count.
+- The selector-generated non-Taurus parent field was live-probed from merged
+  `main`: RA `209.64`, Dec `-15.0`, radius `0.2`, JD `2458880.5` to
+  `2459250.5`, survey `WISE`. It fetched `16582` WISE rows, passed
+  `16558/16582`, detected `16558` singleton candidates, and stopped
+  fail-closed at `27845455` estimated seed pairs over the `1000000` budget.
+  Durable evidence:
+  `docs/evidence/live/2026-06-30-wise-v0905-parent-field-probe.md`.
+  **NEXT PRODUCTION ACTION — NOT YET DONE**: run the rank 1 support-positive
+  subfield from the v0.90.5 scale plan: RA `209.5`, Dec `-14.9`, radius
+  `0.0303`; run adversarial review only if full review packets are non-empty.
 
 **v0.90.4 patch status**:
 - `detect.py`, `link.py`, and `Skills/audit_real_run.py` now share the
