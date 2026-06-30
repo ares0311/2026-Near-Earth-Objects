@@ -721,8 +721,11 @@ MPC/NEOCP/Scout is the expert review system.
   `docs/evidence/live/2026-06-30-wise-v0903-subfield-57p9-20p1.md`.
   **NEXT PRODUCTION ACTION — NOT YET DONE**: run the next remaining distinct
   support-positive subfield from the v0.90.3 scale plan: RA `57.9`, Dec `19.9`,
-  radius `0.0466`. Only run adversarial review after the pipeline reports a
-  non-zero full `ScoredNEO` packet count.
+  radius `0.0466`. Codex attempted this live dry run from merged `main`, but
+  the Codex approval layer rejected it because of a usage limit; this was not a
+  repository, IRSA, Python, or pipeline failure. Operator action is needed to
+  run the documented command. Only run adversarial review after the pipeline
+  reports a non-zero full `ScoredNEO` packet count.
 
 **Discovery paper goal established (2026-06-26)**:
 The project goal is a **defensible discovery paper** — not a methods paper and not a

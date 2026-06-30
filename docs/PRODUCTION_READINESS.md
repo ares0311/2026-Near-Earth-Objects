@@ -701,6 +701,9 @@ evidence: `docs/evidence/live/2026-06-30-wise-v0903-subfield-57p9-20p1.md`.
 Next D1 step: run the next remaining distinct support-positive subfield from
 the v0.90.3 scale plan, RA `57.9`, Dec `19.9`, radius `0.0466`, and only run
 adversarial review after a non-zero full `ScoredNEO` packet count is reported.
+Codex attempted this rank 4 live dry run from merged `main`, but the Codex
+approval layer rejected it because of a usage limit; this is an operator-run
+blocker, not a repository, IRSA, Python, or pipeline failure.
 
 ### Gate D2: Operator Review
 - [ ] Jerome W. Lindsey III reviews SURVIVE/BORDERLINE candidates
