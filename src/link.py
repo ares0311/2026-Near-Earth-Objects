@@ -30,7 +30,10 @@ from schemas import (
 
 _MIN_NIGHTS = 2
 _MIN_OBSERVATIONS = 3
-_MOTION_MIN_ARCSEC_PER_HR = 0.01
+# Keep the linker floor aligned with the adversarial review hard gate. This
+# prevents long-arc near-stationary WISE associations from becoming review
+# packets that are guaranteed to fail D1 on motion-rate grounds.
+_MOTION_MIN_ARCSEC_PER_HR = 0.05
 _MOTION_MAX_ARCSEC_PER_HR = 60.0
 _POSITION_TOLERANCE_ARCSEC = 10.0  # sky-plane prediction window
 _CHI2_DOF_THRESHOLD = 5.0  # max reduced chi² for orbit consistency

@@ -25,7 +25,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 from schemas import Observation, Tracklet
 
 _KNOWN_RECOVERY_THRESHOLD = 0.90
-_MIN_SOLAR_SYSTEM_MOTION_ARCSEC_PER_HOUR = 0.01
+# Match the production adversarial-review hard lower bound. Slower linked arcs
+# are treated as near-stationary/artifact-like and cannot advance to operator
+# review.
+_MIN_SOLAR_SYSTEM_MOTION_ARCSEC_PER_HOUR = 0.05
 _LONG_ARC_DAYS = 30.0
 _DEFAULT_MATCH_TOLERANCE_ARCSEC = 5.0
 _DEFAULT_MATCH_TOLERANCE_DAYS = 0.02

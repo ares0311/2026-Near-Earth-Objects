@@ -28,7 +28,7 @@ The algorithm is inspired by THOR (Moeyens et al. 2021) but implemented as a pur
 
 All pairs of detections from different nights within a configurable time window are tested for kinematic consistency:
 
-- **Motion rate**: must satisfy `0.01 ≤ rate ≤ 60 arcsec/hr` (solar-system object window)
+- **Motion rate**: must satisfy `0.05 ≤ rate ≤ 60 arcsec/hr` (production solar-system object window aligned with adversarial review)
 - **Position angle consistency**: pair PA must be within `±30°` of the initial pair PA
 - **Position tolerance**: predicted position vs observed position must be within `position_tolerance_arcsec` (default `5.0`)
 

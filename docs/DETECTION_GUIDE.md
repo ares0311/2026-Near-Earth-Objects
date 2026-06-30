@@ -38,7 +38,7 @@ filtered = filter_by_real_bogus(detect_result, threshold=0.80)
 
 After RB filtering, sources are compared across epochs to identify motion:
 
-1. **Apparent motion rate** — computed from successive position differences; `0.01–60 arcsec/hr` is the allowed range for solar system objects.
+1. **Apparent motion rate** — computed from successive position differences; `0.05–60 arcsec/hr` is the production allowed range. This floor matches adversarial review, which hard-rejects slower near-stationary candidates before operator review.
 2. **Motion consistency** — direction (position angle) is checked for consistency across ≥3 epochs.
 3. **Streak detection** — very fast-moving NEOs (rate > ~15 arcsec/30 s exposure) will trail; the streak metric (`compute_streak_metric`) captures elongation from difference-image second moments.
 

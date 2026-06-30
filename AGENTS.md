@@ -312,7 +312,7 @@ class ScoredNEO(BaseModel):
 **Inputs**: single-night candidates across multiple nights
 **Process**:
 - Implement a simplified tracklet linker (THOR-inspired; Moeyens et al. 2021):
-  - Pair detections consistent with solar system object motion (0.01–60 arcsec/hr)
+  - Pair detections consistent with solar system object motion (0.05–60 arcsec/hr)
   - Extend pairs to triplets and longer arcs using a $\chi^2$ orbit-consistency test
 - Require ≥3 detections on ≥2 nights for a reportable tracklet
 - Compute arc length, motion rate, position angle, and rate uncertainty
@@ -537,7 +537,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.3)
+## Current State (v0.90.4)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -584,7 +584,19 @@ a measurable quantity (surveys done/total, tracklets done/total).
 
 See `docs/PRODUCTION_READINESS.md` for the full gap register.
 
-### Handoff notes (2026-06-29) — v0.90.3 (CURRENT)
+### Handoff notes (2026-06-30) — v0.90.4 (CURRENT)
+
+**v0.90.4 patch status**:
+- `detect.py`, `link.py`, and `Skills/audit_real_run.py` now share the
+  adversarial-review hard lower motion floor of `0.05 arcsec/hr`. This prevents
+  WISE near-stationary associations from producing review packets that are
+  guaranteed to fail D1 on motion-rate grounds.
+- `src/background.py` now lazy-loads classify/orbit/score stages so
+  metadata-only background CLI commands avoid cold-start subprocess timeouts.
+- The Taurus v0.90.3 diagnostic subfields remain exhausted; do not rerun them.
+  The next D1 blocker is either a new WISE/NEOWISE field-window strategy likely
+  to produce faster non-static candidates, or a defensible WISE-native
+  real/bogus/quality policy for archive detections.
 
 **v0.90.3 patch status**:
 - `Skills/run_pipeline.py --review-packet-out` now prints the number of full

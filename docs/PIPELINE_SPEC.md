@@ -90,7 +90,7 @@ Each stage produces a typed, immutable result object. No shared mutable state.
 **Inputs**: single-night candidates across multiple nights
 
 **Process**:
-- Pair detections consistent with solar system object motion (0.01–60 arcsec/hr)
+- Pair detections consistent with solar system object motion (0.05–60 arcsec/hr)
 - Extend pairs to triplets and longer arcs using χ² orbit-consistency test
 - Require ≥ 3 detections on ≥ 2 nights for a reportable tracklet
 - Compute arc length, motion rate, position angle, and rate uncertainty
