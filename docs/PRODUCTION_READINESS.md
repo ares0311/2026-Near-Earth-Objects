@@ -662,6 +662,18 @@ v0.90.3 scale plan, choose a support-positive subfield that is not the failed
 RA `58.1`, Dec `20.1`, radius `0.0466` diagnostic, and run adversarial review
 only if full review packets are non-empty.
 
+**2026-06-30 v0.90.3 scale-plan support metrics regenerated**: The Taurus
+WISE/NEOWISE 0.2 degree, 370 day scale-plan probe was rerun on merged `main`
+with v0.90.3. It again fetched `12061` WISE rows, passed `12042/12061`, detected
+`12042` singleton candidates, and stopped fail-closed at `11786731` estimated
+seed pairs over the `1000000` budget. The new `support_metrics` identify four
+support-positive diagnostic subfields. The prior failed subfield RA `58.1`, Dec
+`20.1`, radius `0.0466` is rank 3 and should not be rerun next. The next
+verified diagnostic is rank 1: RA `58.1`, Dec `19.9`, radius `0.0466`. Codex
+attempted that live run, but the approval layer rejected it because of a usage
+limit. Durable evidence and the exact operator command are recorded in
+`docs/evidence/live/2026-06-30-wise-v0903-scale-plan-support.md`.
+
 ### Gate D2: Operator Review
 - [ ] Jerome W. Lindsey III reviews SURVIVE/BORDERLINE candidates
 - [ ] Jerome approves at least one candidate for MPC submission

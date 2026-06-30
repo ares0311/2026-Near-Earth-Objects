@@ -708,10 +708,14 @@ MPC/NEOCP/Scout is the expert review system.
 - Expected seed-budget stops now exit cleanly with audit/output artifacts
   instead of printing a Python traceback.
 - **NEXT PRODUCTION ACTION — NOT YET DONE**: do not rerun the RA `58.1`, Dec
-  `20.1`, radius `0.0466` subfield. Regenerate or inspect a v0.90.3 scale plan
-  with `support_metrics`, choose a different support-positive diagnostic
-  subfield, and only run adversarial review after the pipeline reports a
-  non-zero full `ScoredNEO` packet count.
+  `20.1`, radius `0.0466` subfield. The v0.90.3 scale plan has been
+  regenerated and recorded at
+  `docs/evidence/live/2026-06-30-wise-v0903-scale-plan-support.md`. The next
+  verified diagnostic is the rank 1 support-positive subfield: RA `58.1`, Dec
+  `19.9`, radius `0.0466`. Codex attempted this live run, but the approval
+  layer rejected it because of a usage limit. Operator action is needed to run
+  the documented command if the limit has not reset. Only run adversarial review
+  after the pipeline reports a non-zero full `ScoredNEO` packet count.
 
 **Discovery paper goal established (2026-06-26)**:
 The project goal is a **defensible discovery paper** — not a methods paper and not a
