@@ -2149,6 +2149,12 @@ class TestRunPipelineCheckpointResume:
         assert plan["recommended_diagnostic_subfields"][0]["start_jd"] == 0.0
         assert plan["recommended_diagnostic_subfields"][0]["end_jd"] == 1.0
         assert plan["recommended_diagnostic_subfields"][0]["surveys"] == ["ZTF"]
+        assert "cross-night seed-pair support" in plan["diagnostic_selection_basis"]
+        assert plan["top_sky_cells"][0]["can_support_three_observation_tracklet"] is True
+        support = plan["recommended_diagnostic_subfields"][0]["support_metrics"]
+        assert support["can_support_three_observation_tracklet"] is True
+        assert support["n_observations"] == 4
+        assert support["estimated_seed_pairs"] == 4
         assert "not a complete tiling proof" in plan["tiling_limitations"][0]
 
     # --- run_pipeline resume: skip fetch/link ---
@@ -2196,7 +2202,7 @@ class TestRunPipelineCheckpointResume:
         assert len(results) == 1
         assert results[0]["object_id"] == "T001"
 
-    def test_run_pipeline_writes_review_packet_output(self, tmp_path):
+    def test_run_pipeline_writes_review_packet_output(self, tmp_path, capsys):
         """run_pipeline writes full review packets when review_packet_out is set."""
         import json as _json
         from unittest.mock import MagicMock, patch
@@ -2238,6 +2244,39 @@ class TestRunPipelineCheckpointResume:
         assert packets == [{"tracklet": {"object_id": "T001"}}]
         assert checkpoint["review_packets"] == packets
         scored.model_dump.assert_called_with(mode="json")
+        output = capsys.readouterr().out
+        assert "Review packets written to" in output
+        assert "(1 packet(s))" in output
+
+    def test_run_pipeline_zero_review_packets_prints_skip_guidance(self, tmp_path, capsys):
+        """Empty review-packet files tell the operator to skip adversarial review."""
+        import json as _json
+        from unittest.mock import patch
+        mod = self._load_skill()
+
+        # Pre-populate an empty link checkpoint so the test exercises the same
+        # no-tracklet path that produced an empty operator review-packet file.
+        mod._save_checkpoint(tmp_path, {
+            "last_stage": "link",
+            "tracklets": [],
+            "partial_results": [],
+        })
+
+        review_out = tmp_path / "review_packets.json"
+        with patch.object(mod, "fetch") as mock_fetch:
+            results = mod.run_pipeline(
+                ra_deg=0.0, dec_deg=0.0, radius_deg=1.0,
+                start_jd=0.0, end_jd=1.0,
+                run_dir=tmp_path, resume=True,
+                review_packet_out=review_out,
+            )
+
+        output = capsys.readouterr().out
+        mock_fetch.assert_not_called()
+        assert results == []
+        assert _json.loads(review_out.read_text()) == []
+        assert "(0 packet(s))" in output
+        assert "skip adversarial review" in output
 
     # --- run_pipeline resume: skip completed tracklets ---
 

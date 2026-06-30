@@ -3,6 +3,28 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.3 — D1 review-packet and scale-plan guardrails (2026-06-29)
+
+### Added
+- `Skills/run_pipeline.py --link-scale-plan-out` now ranks recommended
+  diagnostic subfields by local cross-night seed-pair support and records
+  `support_metrics` showing whether each subfield can support at least three
+  observations across at least two nights.
+- `Skills/run_pipeline.py --review-packet-out` now prints the number of full
+  `ScoredNEO` packets written and explicitly tells the operator to skip
+  adversarial review when the packet file is empty.
+
+### Changed
+- D1 WISE diagnostic guidance now distinguishes empty packet artifacts from
+  reviewable adversarial-review inputs, preventing another failed review step on
+  a no-tracklet run.
+- Version metadata now records `0.90.3` in `pyproject.toml`, `src.__version__`,
+  `uv.lock`, and the roadmap documents.
+
+### Safety
+- No external submission path was enabled.
+- No impact-probability claims or confirmed-object claims were introduced.
+
 ## v0.90.2 — WISE diagnostic subfields and test-hang cleanup (2026-06-29)
 
 ### Added
