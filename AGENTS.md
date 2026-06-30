@@ -632,8 +632,12 @@ See `docs/PRODUCTION_READINESS.md` for the full gap register.
   produced `701` WISE rows, `3` tracklets, `3` full review packets, and `3/3`
   offline adversarial `REJECT` verdicts. Durable evidence:
   `docs/evidence/live/2026-06-30-wise-v0903-subfield-58p1-19p9.md`.
-  **NEXT PRODUCTION ACTION — NOT YET DONE**: run the next distinct
-  support-positive subfield from the v0.90.3 scale plan: RA `57.9`, Dec `20.1`,
+  The rank 2 support-positive diagnostic was also run: RA `57.9`, Dec `20.1`,
+  radius `0.0466`. It produced `691` WISE rows, `2` tracklets, `2` full review
+  packets, and `2/2` offline adversarial `REJECT` verdicts. Durable evidence:
+  `docs/evidence/live/2026-06-30-wise-v0903-subfield-57p9-20p1.md`.
+  **NEXT PRODUCTION ACTION — NOT YET DONE**: run the next remaining distinct
+  support-positive subfield from the v0.90.3 scale plan: RA `57.9`, Dec `19.9`,
   radius `0.0466`. Only run adversarial review after the pipeline reports a
   non-zero full `ScoredNEO` packet count.
 

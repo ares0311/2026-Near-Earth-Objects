@@ -688,6 +688,20 @@ Next D1 step: run the next distinct support-positive subfield from the v0.90.3
 scale plan, RA `57.9`, Dec `20.1`, radius `0.0466`, and only run adversarial
 review after a non-zero full `ScoredNEO` packet count is reported.
 
+**2026-06-30 v0.90.3 rank 2 diagnostic complete**: The rank 2 support-positive
+WISE subfield at RA `57.9`, Dec `20.1`, radius `0.0466` was run from merged
+`main`. The dry run fetched `691` WISE rows, passed `691/691`, detected `691`
+singleton candidates, linked `33540` seed pairs, formed `2` tracklets, wrote
+`2` full review packets, and produced `0` submission-ready candidates. Offline
+adversarial review evaluated both packets and returned `2/2` `REJECT` verdicts.
+Shared rejection causes matched the rank 1 diagnostic: missing orbit elements,
+missing real/bogus score, artifact posterior about `0.99`, NEO posterior about
+`0.001`, and motion below the hard `0.05 arcsec/hr` lower bound. Durable
+evidence: `docs/evidence/live/2026-06-30-wise-v0903-subfield-57p9-20p1.md`.
+Next D1 step: run the next remaining distinct support-positive subfield from
+the v0.90.3 scale plan, RA `57.9`, Dec `19.9`, radius `0.0466`, and only run
+adversarial review after a non-zero full `ScoredNEO` packet count is reported.
+
 ### Gate D2: Operator Review
 - [ ] Jerome W. Lindsey III reviews SURVIVE/BORDERLINE candidates
 - [ ] Jerome approves at least one candidate for MPC submission
