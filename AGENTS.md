@@ -601,13 +601,23 @@ See `docs/PRODUCTION_READINESS.md` for the full gap register.
   `docs/evidence/live/2026-06-29-wise-v0902-scale-plan-subfields.md`.
   First subfield: RA `58.1`, Dec `20.1`, radius `0.0466`, JD
   `2458880.5` to `2459250.5`, survey `WISE`.
+- The first verified subfield was run by the operator. It fetched `532` WISE
+  rows, passed `531/532`, detected `531` singleton candidates, linked `25053`
+  seed pairs across `4` nights, and formed `0` tracklets. Candidate and
+  review-packet outputs were empty arrays (`[]`). Durable evidence:
+  `docs/evidence/live/2026-06-29-wise-v0902-subfield-diagnostic.md`.
+- Important correction: do not run `Skills/adversarial_review.py` on
+  `--review-packet-out` files until confirming the file contains at least one
+  full `ScoredNEO` entry. The first subfield's adversarial-review command
+  failed correctly with `ERROR: no valid ScoredNEO entries found in input`
+  because no tracklets meant no reviewable packets.
 - Expected seed-budget stops now exit cleanly with audit/output artifacts, not
   unhandled tracebacks.
-- **NEXT PRODUCTION ACTION — NOT YET DONE**: run the first verified WISE
-  diagnostic subfield from the evidence file and review full
-  `--review-packet-out` packets with `Skills/adversarial_review.py` if any are
-  produced. Do not override `--max-link-seed-pairs` blindly, and do not treat
-  diagnostic subfields as complete-field evidence.
+- **NEXT PRODUCTION ACTION — NOT YET DONE**: do not rerun the RA `58.1`, Dec
+  `20.1`, radius `0.0466` subfield. Select a different v0.90.2 recommended
+  subfield or improve subfield selection to prioritize regions likely to
+  produce three-observation tracklets, not only high observation density. Only
+  run adversarial review after verifying non-empty full review packets.
 
 **Goal: defensible discovery paper** (operator-confirmed 2026-06-26 by Jerome W. Lindsey III).
 Two-stage review before any external submission:

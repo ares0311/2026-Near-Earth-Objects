@@ -638,6 +638,20 @@ RA `58.1`, Dec `20.1`, JD `2458880.5` to `2459250.5`, survey `WISE`. Durable
 evidence and the exact next command are recorded in
 `docs/evidence/live/2026-06-29-wise-v0902-scale-plan-subfields.md`.
 
+**2026-06-29 first v0.90.2 subfield diagnostic complete**: The operator ran
+the first recommended subfield at RA `58.1`, Dec `20.1`, radius `0.0466`.
+The run fetched `532` WISE rows, passed `531/532`, detected `531` singleton
+candidates, linked `25053` seed pairs across `4` nights, and formed `0`
+tracklets. Candidate and review-packet JSON outputs were empty arrays (`[]`).
+The attempted adversarial-review command failed correctly with
+`ERROR: no valid ScoredNEO entries found in input` because no tracklets meant no
+reviewable packets. Durable evidence:
+`docs/evidence/live/2026-06-29-wise-v0902-subfield-diagnostic.md`. Next D1 step:
+do not rerun this exact subfield; select a different recommended subfield or
+improve selection to prioritize areas likely to produce at least
+three-observation tracklets. Future operator instructions must verify non-empty
+full `ScoredNEO` packets before running `Skills/adversarial_review.py`.
+
 ### Gate D2: Operator Review
 - [ ] Jerome W. Lindsey III reviews SURVIVE/BORDERLINE candidates
 - [ ] Jerome approves at least one candidate for MPC submission
