@@ -19,7 +19,7 @@ It contains the facts a coding agent needs to work productively without re-readi
   `pytest`, `mypy`, or `ruff` directly — always prefix with `uv run` so the
   correct interpreter and locked dependencies are used. CI enforces the same
   via `astral-sh/setup-uv@v5` with `python-version: "3.14"`.
-  Example: `PYTHONPATH=src uv run python -m pytest`
+  Example: `PYTHONPATH=src uv run --python 3.14 python -m pytest`
 - **Local system profile governs optimization defaults**: `docs/SYSTEM_PROFILE.md`
   is a committed directive for local resource sizing. Optimize project code,
   tests, and operator commands for that profile unless portability or a task
@@ -484,20 +484,20 @@ The project venv is Python 3.14.3 managed by uv from `uv.lock`.
 
 ```bash
 # Lint
-uv run ruff check .
-uv run ruff check . --fix
+uv run --python 3.14 ruff check .
+uv run --python 3.14 ruff check . --fix
 
 # Type-check
-uv run python -m mypy src
+uv run --python 3.14 python -m mypy src
 
 # Tests
-PYTHONPATH=src uv run python -m pytest
+PYTHONPATH=src uv run --python 3.14 python -m pytest
 
 # macOS local runs with XGBoost/OpenMP may need deterministic threading
-OMP_NUM_THREADS=1 PYTHONPATH=src uv run python -m pytest
+OMP_NUM_THREADS=1 PYTHONPATH=src uv run --python 3.14 python -m pytest
 
 # All three
-uv run ruff check . && uv run python -m mypy src && PYTHONPATH=src uv run python -m pytest
+uv run --python 3.14 ruff check . && uv run --python 3.14 python -m mypy src && PYTHONPATH=src uv run --python 3.14 python -m pytest
 ```
 
 Live integration tests (require network access to ZTF/ATLAS/MPC) must be marked:
@@ -584,7 +584,17 @@ a measurable quantity (surveys done/total, tracklets done/total).
 
 See `docs/PRODUCTION_READINESS.md` for the full gap register.
 
-### Handoff notes (2026-06-30) — v0.90.5 (CURRENT)
+### Handoff notes (2026-07-01) — v0.90.5 (CURRENT)
+
+**Current production definition**:
+- Production readiness now means demonstrated capability to find, score,
+  reject, review, and package candidates from unreviewed archival discovery
+  data with defensible, industry-standard confidence controls. It does not
+  require that the project has already found a genuinely new NEO.
+- Highest-priority open gates are P1/P2 in
+  `docs/PRODUCTION_READINESS.md`: discovery-source positive control and
+  survey-native confidence policy. Actual candidate survival is a later
+  event-driven discovery gate.
 
 **v0.90.5 patch status**:
 - `Skills/select_survey_fields.py --wise-archive-probes` now enriches ranked
@@ -606,9 +616,19 @@ See `docs/PRODUCTION_READINESS.md` for the full gap register.
   fail-closed at `27845455` estimated seed pairs over the `1000000` budget.
   Durable evidence:
   `docs/evidence/live/2026-06-30-wise-v0905-parent-field-probe.md`.
-  **NEXT PRODUCTION ACTION — NOT YET DONE**: run the rank 1 support-positive
-  subfield from the v0.90.5 scale plan: RA `209.5`, Dec `-14.9`, radius
-  `0.0303`; run adversarial review only if full review packets are non-empty.
+- The rank 1 v0.90.5 support-positive subfield was then run from merged
+  `main`: RA `209.5`, Dec `-14.9`, radius `0.0303`. It fetched `690` WISE
+  rows, passed `686/690`, detected `686` singleton candidates, linked `58596`
+  seed pairs, and produced `0` tracklets and `0` review packets. The pipeline
+  correctly instructed the operator to skip adversarial review. This is valid
+  diagnostic evidence, not a crash, but P1 remains open because no full
+  `ScoredNEO` packet was produced.
+- **NEXT PRODUCTION ACTION — NOT YET DONE**: close P1/P2 by implementing or
+  documenting a discovery-source positive-control path (known-object recovery
+  through WISE/DECam/TESS or a source-native injection/recovery harness) and a
+  source-native confidence policy for WISE/DECam/TESS. Do not ask the operator
+  for another live WISE run until that path or policy supplies a measured,
+  non-guesswork reason.
 
 **v0.90.4 patch status**:
 - `detect.py`, `link.py`, and `Skills/audit_real_run.py` now share the
@@ -840,7 +860,7 @@ Evidence: `docs/evidence/live/2026-06-22-ndet-cap-root-cause.md`.
 ```bash
 git pull origin main
 export PYTHONPATH=src
-caffeinate -i uv run python Skills/run_pipeline.py \
+caffeinate -i uv run --python 3.14 python Skills/run_pipeline.py \
     --ra 284.13 --dec -22.5 --radius 3.5 \
     --start-jd 2461183.0 --end-jd 2461213.0 \
     --surveys ZTF --no-dry-run --force-refresh --no-resume
@@ -874,7 +894,7 @@ The script uses `security find-generic-password -s "neo-detection:ATLAS_TOKEN" -
 **Operator recovery-field selection command**:
 ```bash
 git pull origin main
-PYTHONPATH=src uv run python Skills/select_survey_fields.py \
+PYTHONPATH=src uv run --python 3.14 python Skills/select_survey_fields.py \
   --jd now \
   --mode recovery \
   --top-n 10 \
@@ -1064,7 +1084,7 @@ PYTHONPATH=src uv run python Skills/select_survey_fields.py \
 git pull origin main
 source Skills/verify_live_credentials.sh
 export PYTHONPATH=src
-caffeinate -i uv run python Skills/run_pipeline.py \
+caffeinate -i uv run --python 3.14 python Skills/run_pipeline.py \
     --ra 284.13 --dec -22.5 --radius 3.5 \
     --start-jd 2461183.0 --end-jd 2461213.0 \
     --surveys ZTF --no-dry-run --force-refresh --no-resume

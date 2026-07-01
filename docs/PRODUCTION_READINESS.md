@@ -1,9 +1,9 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
 **Current version**: v0.90.5
-**Last updated**: 2026-06-30
+**Last updated**: 2026-07-01
 **Purpose**: Mandatory read at session start (per MANDATORY SESSION-START PROTOCOL).  
-Every planning cycle must name the highest-priority unresolved Tier 1 gap and show how proposed steps close or directly unblock it.
+Every planning cycle must name the highest-priority unresolved production-capability gate and show how proposed steps close or directly unblock it.
 
 **Also mandatory at session start**: `docs/near_earth_objects_research_brief.md` — canonical primer on ranked space assets (WISE/NEOWISE #2, NEO Surveyor #1, Gaia #3), frontier AI methods (THOR, HelioLinC3D), submission best practices, and key literature. Required to keep agents aligned on the discovery-paper data strategy (step 5 of CLAUDE.md §MANDATORY SESSION-START PROTOCOL).
 
@@ -51,11 +51,43 @@ source). The fetch.py discovery layer targeting unreviewed archives
 2026-06-27). T1-C known-object recovery audit and operator false-positive
 review are CLOSED.
 
+### Production Definition (operator-approved 2026-07-01)
+
+For this project, **production** means the pipeline has demonstrated the
+capability to find, score, reject, review, and package candidate moving objects
+from unreviewed archival discovery data with defensible, industry-standard
+confidence controls. Production does **not** require that the project has
+already found a genuinely new NEO; a real discovery is expected to be rare.
+
+Production readiness requires:
+
+1. A discovery-source positive control or equivalent injection/recovery proof
+   showing that the WISE/NEOWISE, DECam, or TESS discovery path can produce full
+   `ScoredNEO` review packets when a valid moving-object signal is present.
+2. Quantitative, survey-native confidence gates for discovery data, including
+   astrometric residuals, multi-exposure/multi-night motion consistency, static
+   source rejection, known-object and satellite checks, artifact rejection, and
+   orbit-quality constraints. ZTF-style real/bogus evidence may support the
+   ensemble but must not be the only confidence basis for WISE/DECam/TESS
+   discovery candidates.
+3. A no-submission end-to-end drill that takes a positive-control packet
+   through adversarial review, operator review, and MPC-compatible report
+   generation while verifying that external submission remains fail-closed.
+4. A documented MPC submission protocol for the relevant archive source,
+   including source attribution, station/observatory-code handling, ADES fields,
+   operator approval, and no-impact-claim guardrails.
+
+Finding an actual new candidate that survives these controls starts the
+Discovery Event Gates below; it is not itself a prerequisite for declaring the
+software production-capable.
+
 ---
 
-## Tier 1 Gaps — Must Be Closed Before Production Operation
+## Tier 1 Gaps — Historical Engineering Gates
 
-These gaps prevent the pipeline from being safely or usefully operated on real sky data. They are ordered by priority; the **highest-priority gap is listed first**.
+These gaps prevented the pipeline from being safely or usefully operated on real
+sky data. They are retained as historical evidence because they define the
+engineering foundation under the current production-capability gates.
 
 ### T1-A: Incomplete Trained ML Model Set (HIGHEST PRIORITY)
 
@@ -443,15 +475,18 @@ These items cannot be completed by code generation alone. They require real-worl
 
 | Blocker | Owner | Unblocks |
 |---|---|---|
-| External expert review of ML architecture | Not currently available | External MPC submission |
+| Archival WISE/NEOWISE MPC submission authority | Jerome W. Lindsey III + MPC | Live WISE/NEOWISE MPC submission |
 | Live review policy sign-off | CLOSED 2026-06-18 by Jerome W. Lindsey III | T1-B |
-| Known-object recovery audit and false-positive review | Citizen-science project operator | T1-C |
+| Known-object recovery audit and false-positive review | CLOSED 2026-06-20 by Jerome W. Lindsey III | T1-C |
 
 ---
 
 ## Production Readiness Checklist
 
-Before the pipeline makes its first MPC submission, all of the following must be TRUE:
+The historical T1/T2 engineering readiness checklist below is complete. The
+open production-capability gates that follow this checklist define whether the
+software is ready to search for and package candidates under the operator's
+2026-07-01 production definition.
 
 - [x] T1-A resolved: Tier 1 XGBoost ✓ (val_acc=99.95%); Tier 2 CNN ✓ (val_acc=91.3%); Tier 3 Transformer ✓ (val_macro_f1=0.9400); ensemble stacker ✓ (AUC=0.9809, all 7 KPIs pass, 2026-06-14)
 - [x] T1-A resolved: calibration KPI gate passed ✓ (T1-D, 2026-06-14); ensemble stacker KPIs passed ✓ (2026-06-14)
@@ -488,29 +523,120 @@ Before the pipeline makes its first MPC submission, all of the following must be
 
 ---
 
-## Discovery Paper Gates (post-T1/T2; currently OPEN)
+## Production Capability Gates (post-T1/T2; currently OPEN)
 
-All T1 and T2 gaps are closed. The next milestone is a defensible discovery paper
-requiring independent confirmation and an MPC provisional designation. These gates
-are sequential — each blocks the next.
+These gates define production readiness under the operator-approved definition
+above. They intentionally do **not** require that the project has already found
+a new NEO.
 
-### Gate D1: Candidate Survival (pipeline + adversarial review)
+### Gate P1: Discovery-source positive control
+- [ ] Demonstrate that at least one unreviewed-archive discovery path
+      (WISE/NEOWISE, DECam, or TESS) can produce a full `ScoredNEO` review
+      packet when a valid moving-object signal is present. Acceptable evidence:
+      known-object recovery through the discovery path, or a documented
+      injection/recovery harness using source-specific cadence, noise,
+      astrometry, photometry, and artifact assumptions.
+- [ ] The positive-control packet must satisfy the structural requirements for
+      review: at least 3 detections, at least 2 nights when the source supports
+      multi-night linking, orbit-quality code sufficient for the claimed use,
+      full provenance, and no external submission.
+- Current status: **open**. The WISE/NEOWISE live diagnostics prove that fetch,
+      preprocessing, seed-pair budgeting, fail-closed review routing, and
+      report writing work, but the most recent v0.90.5 support-positive
+      subfield at RA `209.5`, Dec `-14.9`, radius `0.0303` produced `0`
+      tracklets and `0` review packets after `58596` seed pairs. That is a
+      valid diagnostic result, not a runtime failure, but it does not close P1.
+
+### Gate P2: Survey-native confidence policy
+- [ ] Document quantitative confidence thresholds for WISE/NEOWISE, DECam, and
+      TESS discovery candidates. The policy must cover astrometric residuals,
+      timing provenance, signal-to-noise or photometric quality, static-source
+      rejection, satellite/artifact rejection, known-object checks, motion-rate
+      plausibility, and orbit/link residuals.
+- [ ] The policy must explain how existing ML outputs map onto each discovery
+      source. In particular, a missing or non-native ZTF real/bogus score must
+      fail closed or be replaced by a source-appropriate evidence term; it must
+      not silently pass as production confidence.
+- Current status: **open**. Existing calibration KPIs close the ZTF-trained ML
+      calibration gap, but WISE/NEOWISE archive detections still need an
+      explicit source-native confidence policy before production capability can
+      be declared.
+
+### Gate P3: No-submission package drill
+- [ ] Run an end-to-end dry drill from a P1 positive-control packet through
+      `Skills/adversarial_review.py`, operator review packet generation, and
+      MPC-compatible export (`Skills/export_ades_report.py` preferred).
+- [ ] Verify the drill records no external submission, no impact-probability
+      claim, and fail-closed behavior unless the operator has intentionally set
+      every live-submission approval control.
+- Current status: **open**. Export tools and fail-closed guards exist, but this
+      drill depends on a P1 packet and the P2 confidence policy.
+
+### Gate P4: MPC submission protocol
+- [ ] Resolve and document the submission pathway for archival WISE/NEOWISE
+      remeasurements before any WISE/NEOWISE live MPC submission. Required
+      details: source attribution, station/observatory-code handling, ADES note
+      usage, submitter/program metadata, and written MPC confirmation if `C51`
+      is used for a third-party archival remeasurement.
+- [ ] Keep `alert.py` and `Skills/export_ades_report.py` fail-closed until the
+      protocol is recorded in `docs/MPC_SUBMISSION_POLICY.md` and the operator
+      explicitly approves live submission.
+- Current status: **open / human-gated**. See
+      `docs/MPC_SUBMISSION_POLICY.md §TODO for Future Agents — Archival WISE
+      Submission Authority`.
+
+### Gate P5: Operator go/no-go runbook
+- [ ] Maintain a one-page operator flow for the day a real candidate appears:
+      review packet location, adversarial-review command, operator-review
+      checklist, ADES export command, MPC submission authority check, and
+      forbidden communications.
+- [ ] The flow must state that `SURVIVE` or `BORDERLINE` means "candidate may
+      be reviewed for MPC submission," not "confirmed NEO" or any impact-risk
+      assertion.
+- Current status: **open**. The ingredients exist across this document,
+      `docs/MPC_SUBMISSION_POLICY.md`, and `README.md`; they still need one
+      compact operational flow after P1-P4 are aligned.
+
+---
+
+## Discovery Event Gates (after production capability; event-driven)
+
+These gates begin only after production capability is established and a real
+candidate appears. They are sequential — each blocks the next — but they are not
+required merely to declare the software production-capable.
+
+### Gate D1: Real candidate survival (pipeline + adversarial review)
 - [ ] At least one `ScoredNEO` passes `ready_for_submission()` gate from pipeline
 - [ ] That candidate survives `Skills/adversarial_review.py` with verdict = SURVIVE
       (no FAILs; ≤1 WARNING across all 13 challenges)
 - **fetch.py discovery layer is COMPLETE** (PR #119, 2026-06-27). Do NOT use
   `--surveys ZTF` or `--surveys ATLAS` for discovery — those streams are already
   processed by ZTF ZAPS and the ATLAS pipeline.
-- Operator workflow (from main, PR #119 already merged):
+- Operator workflow template (from merged `main`; replace placeholders only
+  with values emitted by selector output or documented field-window rationale):
   ```bash
-  git pull origin main && export PYTHONPATH=src
-  # Default is --surveys WISE; target unreviewed WISE/NEOWISE archive
-  caffeinate -i uv run python Skills/run_pipeline.py \
+  git pull origin main
+
+  # Bound native numerical libraries to prevent oversubscription on the local Mac.
+  export OMP_NUM_THREADS=1
+  export OPENBLAS_NUM_THREADS=1
+  export VECLIB_MAXIMUM_THREADS=1
+  export NUMEXPR_MAX_THREADS=1
+  export PYTHONPATH=src
+
+  # Default remains dry-run unless explicitly approved elsewhere; this command
+  # targets unreviewed WISE/NEOWISE archive data and writes review packets.
+  caffeinate -i uv run --python 3.14 python Skills/run_pipeline.py \
       --ra <RA> --dec <Dec> --radius 3.5 \
       --start-jd <start> --end-jd <end> \
       --surveys WISE \
-      --output /tmp/candidates.json
-  PYTHONPATH=src uv run python Skills/adversarial_review.py /tmp/candidates.json
+      --review-packet-out Logs/reports/<slug>_review_packets.json \
+      --output Logs/reports/<slug>_candidates.json
+
+  # Run adversarial review only if run_pipeline.py reports a non-zero full
+  # ScoredNEO review-packet count.
+  PYTHONPATH=src uv run --python 3.14 python Skills/adversarial_review.py \
+      Logs/reports/<slug>_review_packets.json --offline --json
   ```
   Keep alert actions in dry-run mode during discovery sweeps. Real archive
   fetching does not require `--no-dry-run`; actual MPC submission remains
@@ -748,10 +874,19 @@ singleton candidates, and stopped fail-closed at `27845455` estimated seed
 pairs over the `1000000` default budget. The scale plan recommended radius
 `0.0303` degrees and four support-positive diagnostic subfields. Durable
 evidence and the exact next command are recorded in
-`docs/evidence/live/2026-06-30-wise-v0905-parent-field-probe.md`. Next D1 step:
-run the rank 1 support-positive subfield from merged `main`: RA `209.5`, Dec
-`-14.9`, radius `0.0303`; only run adversarial review after a non-zero full
-`ScoredNEO` packet count is reported.
+`docs/evidence/live/2026-06-30-wise-v0905-parent-field-probe.md`.
+
+**2026-06-30 v0.90.5 rank 1 support-positive diagnostic complete**: The rank 1
+v0.90.5 support-positive subfield at RA `209.5`, Dec `-14.9`, radius `0.0303`
+was run from merged `main`. It fetched `690` WISE rows, passed `686/690`,
+detected `686` singleton candidates, linked `58596` seed pairs, and produced
+`0` tracklets and `0` full review packets. The pipeline correctly printed the
+skip-adversarial-review instruction because there was no reviewable `ScoredNEO`
+input. This is valid diagnostic evidence, not a runtime failure, but it does
+not close P1. Next production-capability step: close P1/P2 by building a
+discovery-source positive-control path or a documented source-native
+injection/recovery harness, and by documenting WISE/DECam/TESS confidence
+metrics before further live operator runs.
 
 ### Gate D2: Operator Review
 - [ ] Jerome W. Lindsey III reviews SURVIVE/BORDERLINE candidates
@@ -790,9 +925,15 @@ run the rank 1 support-positive subfield from merged `main`: RA `209.5`, Dec
 
 Any plan proposed after reading this file must:
 
-1. Name the highest-priority unresolved Tier 1 gap by its ID (e.g., "T1-A: No Trained ML Model Weights").
-2. Show how each proposed step closes or directly unblocks that gap.
+1. Name the highest-priority unresolved production-capability gate by its ID
+   (for example, "P1: Discovery-source positive control" or
+   "P2: Survey-native confidence policy").
+2. Show how each proposed step closes or directly unblocks that gate.
 3. Include outside blockers as explicit named steps (not glossed over).
-4. Never propose log modules, schemas, or scaffolding that do not directly unblock a named T1 or T2 gap.
+4. Never propose log modules, schemas, or scaffolding that do not directly
+   unblock a named production-capability gate or a still-authoritative T1/T2
+   regression.
 5. Never repeat work listed under "What Is Complete" above.
-6. If the plan cannot close any Tier 1 gap (because a human blocker is unresolved), it must explicitly state that and limit scope to Tier 2 gaps or AGENTS.md/documentation sync.
+6. If the plan cannot close a production-capability gate because a human
+   blocker is unresolved, it must explicitly state that and limit scope to
+   directly related evidence, policy, or documentation sync.
