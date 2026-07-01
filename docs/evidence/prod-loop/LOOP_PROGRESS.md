@@ -1,29 +1,40 @@
 # Production Loop Progress Tracker
 <!-- Updated each iteration so compaction doesn't erase memory -->
 
-## Session goal (UPDATED 2026-06-26)
+## Session goal (UPDATED 2026-07-01)
 
-Build a **defensible discovery paper** pipeline:
-  1. Pipeline generates scored NEO candidates
-  2. Adversarial review agent tries to REJECT each candidate (finds fatal flaws)
-  3. Operator (Jerome) reviews survivors
-  4. Survivors submitted to MPC → provisional designation → independent confirmation
-  5. Journal paper documents the discovery with the MPC designation as proof
+Build a **production-capable discovery-paper pipeline**. Production capability
+means the software can find, score, reject, review, and package candidate moving
+objects from unreviewed archival discovery data with defensible,
+industry-standard confidence controls. It does **not** require that the project
+has already found a genuinely new NEO.
 
-This replaces the original "citizen-science production" framing.  The pipeline is
-NOT a citizen-science reporting tool — it is a candidate GENERATOR that feeds a
-rigorous two-stage review process before any external submission.
+When a real candidate appears, the separate discovery-event sequence begins:
+  1. Pipeline generates full `ScoredNEO` review packets from discovery data.
+  2. Adversarial review tries to REJECT each candidate.
+  3. Operator (Jerome W. Lindsey III) reviews SURVIVE/BORDERLINE packets.
+  4. Approved survivors are packaged for MPC using the documented submission
+     protocol.
+  5. MPC/NEOCP/Scout provide the external expert review and confirmation path.
+  6. A journal paper can document confirmed MPC-designated outcomes.
+
+This tracker must not treat "actually found a new NEO" as a production
+readiness prerequisite. A real discovery is an event gate, not the readiness
+definition.
 
 ## What is already DONE (do not repeat)
 
 - All T1/T2 gap register items: CLOSED (see PRODUCTION_READINESS.md)
 - PR #115: adversarial test fixes + ndet cap fix → merged 2026-06-22
-- PR #116: docs update + console output ETA fix (run_pipeline.py) → OPEN, CI pending
-- Console output: ALL stage prints now have elapsed + ETA (committed d69ed77)
-- All session-start docs synced to v0.89.3 (originally done at v0.89.2, version bumped since)
+- PR #116 and all follow-on WISE diagnostic PRs through v0.90.5 are merged.
+- Console output: ALL stage prints now have elapsed + ETA.
+- All session-start docs synced through v0.90.5.
 - obs-code defaults standardized to `XXX` in all export Skills
 - LOOP_PROGRESS.md created as persistent tracker
 - **Adversarial review skill**: `Skills/adversarial_review.py` + `tests/test_adversarial_review_skill.py` ✓
+- **Production definition**: capability-based P1-P5 gates added to
+  `docs/PRODUCTION_READINESS.md`; actual discovery is no longer a readiness
+  prerequisite.
 
 ## Remaining work (ordered by priority)
 
@@ -34,42 +45,77 @@ rigorous two-stage review process before any external submission.
 - [x] PR #123-#127 merged to main for WISE live-query diagnosis and fixes.
 - [x] PR #131 merged to main for fail-closed discovery sweeps, WISE masked
       photometry cleanup, and durable Taurus WISE run evidence.
-- Current local `main` is synchronized with `origin/main` at PR #131.
+- Current local `main` is synchronized with `origin/main` at PR #145 before
+  the production-capability runbook sync branch.
 
-### H. Integrate adversarial review into the end-to-end workflow
-- [ ] Wire `Skills/adversarial_review.py` output into `Skills/run_pipeline.py` (optional post-stage)
-  OR document it as a separate post-processing step in `docs/PRODUCTION_READINESS.md`.
-- Current decision: keep it as a **separate step** — run pipeline, then pipe the candidates JSON
-  through adversarial_review.py before showing anything to the operator.
-- Operator workflow:
+### H. Integrate adversarial review into the end-to-end workflow ✓ DONE
+- Current decision: keep adversarial review as a **separate step**. Run the
+  pipeline with `--review-packet-out`, then run `Skills/adversarial_review.py`
+  only if the pipeline reports a non-zero full `ScoredNEO` packet count.
+- Operator workflow template:
   ```bash
   git pull origin main
-  PYTHONPATH=src uv run python Skills/run_pipeline.py ... --output /tmp/candidates.json
-  PYTHONPATH=src uv run python Skills/adversarial_review.py /tmp/candidates.json --json
+
+  # Bound native numerical libraries to avoid oversubscription on the local Mac.
+  export OMP_NUM_THREADS=1
+  export OPENBLAS_NUM_THREADS=1
+  export VECLIB_MAXIMUM_THREADS=1
+  export NUMEXPR_MAX_THREADS=1
+  export PYTHONPATH=src
+
+  # Dry-run by default; writes full review packets when tracklets are produced.
+  caffeinate -i uv run --python 3.14 python Skills/run_pipeline.py \
+    --ra <RA> --dec <Dec> --radius <radius> \
+    --start-jd <start_jd> --end-jd <end_jd> \
+    --surveys WISE \
+    --review-packet-out Logs/reports/<slug>_review_packets.json \
+    --output Logs/reports/<slug>_candidates.json
+
+  # Run only if run_pipeline.py reports non-zero full ScoredNEO packets.
+  PYTHONPATH=src uv run --python 3.14 python Skills/adversarial_review.py \
+    Logs/reports/<slug>_review_packets.json --offline --json
   ```
   Keep alert actions in dry-run mode during discovery sweeps. Real archive
   fetching does not require `--no-dry-run`; MPC submission remains blocked until
   the observatory-code strategy is resolved and `NEO_MPC_SUBMISSION_APPROVED=1`
   is intentionally set with a real non-placeholder MPC code.
 
-### I. Version bump to v0.89.3 ✓ DONE (2026-06-26)
-- [x] `src/__init__.py`, `pyproject.toml` → 0.89.3
-- [x] `CHANGELOG.md` v0.89.3 entry added
-- [x] `README.md`, `AGENTS.md`, `CLAUDE.md`, `docs/PRODUCTION_READINESS.md` → v0.89.3
-- All in PR #116 (same branch)
+### I. Version coherence ✓ DONE (current v0.90.5)
+- [x] `src/__init__.py`, `pyproject.toml` → 0.90.5
+- [x] `README.md`, `AGENTS.md`, `CLAUDE.md`, `docs/PRODUCTION_READINESS.md`
+      describe v0.90.5 state and current production-capability gates.
+- [x] Recent PR history through #145 confirms clear forward progress rather
+      than repeated reruns of exhausted Taurus diagnostics.
 
-### J. Update docs to reflect discovery paper pathway ✓ DONE (2026-06-26)
+### J. Update docs to reflect discovery paper pathway ✓ DONE
 - [x] `docs/MPC_SUBMISSION_POLICY.md`: §Two-Stage Review Process added with full challenge list
 - [x] `CLAUDE.md` §Immediate Next Steps: discovery paper goal + 8-step roadmap
 - [x] `AGENTS.md` §Handoff notes: discovery paper goal + two-step operator workflow
-- [x] `docs/PRODUCTION_READINESS.md`: Discovery Paper Gates D1–D7 added as post-T1/T2 section
+- [x] `docs/PRODUCTION_READINESS.md`: Production Capability Gates P1-P5 added
+      ahead of event-driven Discovery Gates D1-D7.
 
-### K. Discovery paper prerequisite work (no code, human decisions needed)
-- [ ] Jerome must resolve MPC observatory code strategy (still pending — see §TODO in MPC_SUBMISSION_POLICY.md)
-- [ ] At least 1 candidate must survive adversarial review + operator review
-- [ ] MPC must assign a provisional designation after submission
-- [ ] Independent confirmation from NEOCP follow-up observatories
-- [ ] Only THEN can a discovery paper be written
+### K. Production capability prerequisite work
+- [ ] P1: prove a WISE/NEOWISE, DECam, or TESS discovery path can produce a
+      full `ScoredNEO` packet when a valid moving-object signal is present.
+      Known-object recovery through the discovery path or a documented
+      source-native injection/recovery harness is acceptable.
+- [ ] P2: document quantitative source-native confidence gates for discovery
+      data. WISE/DECam/TESS candidates must not rely solely on ZTF-style
+      real/bogus evidence.
+- [ ] P3: run a no-submission package drill from a P1 packet through
+      adversarial review, operator packet generation, and MPC-compatible export.
+- [ ] P4: resolve archival WISE/NEOWISE MPC submission authority before any
+      live WISE/NEOWISE MPC submission.
+- [ ] P5: maintain a compact operator go/no-go flow for the day a real
+      candidate appears.
+
+### L. Discovery-event prerequisite work (not required for production readiness)
+- [ ] At least 1 real candidate survives adversarial review + operator review.
+- [ ] MPC submission is authorized under the recorded source/observatory-code
+      protocol.
+- [ ] MPC assigns a provisional designation after submission.
+- [ ] Independent confirmation from NEOCP follow-up observatories occurs.
+- [ ] Only then can a discovery paper claim a confirmed MPC-designated outcome.
 
 ## Standing rules reminder (operator commands)
 - **OPERATOR ALWAYS RUNS FROM MAIN**: Never give Jerome a command until the relevant PR
@@ -112,3 +158,8 @@ rigorous two-stage review process before any external submission.
 | 22 | 2026-06-29 | MPC WISE standards note converted into code policy: ADES defaults to `A22`; WISE archival ADES export requires `stn=C51`, ADES note `Z`, and explicit recorded MPC confirmation | Continue D1 scale-aware WISE linking/tiling; submission remains blocked until MPC confirms third-party archival WISE C51 authority |
 | 23 | 2026-06-29 | Added `--link-scale-plan-out` so seed-pair budget stops can write top night-pair and sky-cell diagnostics before failing closed | Use the scale plan from the next bounded WISE diagnostic to choose smaller field/window runs; do not override the budget blindly |
 | 24 | 2026-06-29 | Operator scale-plan probe produced `11786731` seed pairs over the `1000000` budget; CLI budget stops now exit cleanly with audit/output artifacts instead of an unhandled traceback | Use top night pairs `2459084/2459085` and `2459243/2459244` to choose the next smaller WISE diagnostic |
+| 25 | 2026-06-30 | v0.90.3 Taurus support-positive subfields produced review packets but all adversarial results were `REJECT`; root cause was near-stationary/artifact-dominated internal candidates | Do not rerun exhausted Taurus subfields; use non-Taurus WISE field selection or WISE-native filtering/linking improvements |
+| 26 | 2026-06-30 | v0.90.4 aligned `detect.py`, `link.py`, and audit motion floors with adversarial review at `0.05 arcsec/hr` | Prevent guaranteed-reject near-stationary packets before review |
+| 27 | 2026-06-30 | v0.90.5 selector-generated non-Taurus parent field at RA `209.64`, Dec `-15.0`, radius `0.2` fetched `16582` WISE rows and stopped fail-closed at `27845455` seed pairs | Run support-positive diagnostic subfields from the scale plan, then review packets only if non-empty |
+| 28 | 2026-06-30 | Rank 1 v0.90.5 support-positive subfield RA `209.5`, Dec `-14.9`, radius `0.0303` fetched `690` rows, linked `58596` seed pairs, produced `0` tracklets and `0` review packets | Treat this as a valid diagnostic, not a crash; P1 remains open because no full `ScoredNEO` packet was produced |
+| 29 | 2026-07-01 | Production definition updated: readiness means demonstrated capability to find, score, review, reject, and package candidates; an actual new NEO is a discovery event, not a production prerequisite | Close P1/P2 next: discovery-source positive control and source-native confidence policy |

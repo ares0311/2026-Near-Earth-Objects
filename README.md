@@ -109,7 +109,7 @@ The pipeline implements a strict directed acyclic graph (DAG) of processing stag
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    NEO DETECTION PIPELINE  v0.87.0                  │
+│                    NEO DETECTION PIPELINE  v0.90.5                  │
 └─────────────────────────────────────────────────────────────────────┘
 
   External Data Sources
@@ -662,13 +662,13 @@ After installing (see §11), run the following two commands from the repository 
 
 ```bash
 # Step 1 — confirm every module is working correctly
-PYTHONPATH=src uv run python Skills/smoke_test.py
+PYTHONPATH=src uv run --python 3.14 python Skills/smoke_test.py
 ```
 *This takes about 10 seconds. If you see "All modules OK — smoke test passed." the installation is healthy.*
 
 ```bash
 # Step 2 — score the two bundled example tracklets
-PYTHONPATH=src uv run python Skills/batch_score.py data/sample_tracklets.json
+PYTHONPATH=src uv run --python 3.14 python Skills/batch_score.py data/sample_tracklets.json
 ```
 *This runs the classification and scoring pipeline on two synthetic NEO candidates that are included with the repository. It prints a ranked table showing the posterior probability that each candidate is a genuine NEO, its hazard flag, and its estimated size.*
 
@@ -683,21 +683,35 @@ PYTHONPATH=src uv run python Skills/batch_score.py data/sample_tracklets.json
 | `estimated_diameter_m` | Rough size estimate in metres, assuming a typical rocky asteroid reflectivity. Treat as order-of-magnitude only. |
 | `alert_pathway` | What the pipeline recommends doing next (see §10.5 below). |
 
-### 10.4 Running on a Real Sky Region
+### 10.4 Running on a Discovery Sky Region
 
-Public ZTF dry runs do not require an IRSA token. Proprietary ZTF access uses
-IRSA username/password, while ATLAS uses `ATLAS_TOKEN`.
+Discovery runs target unreviewed archival sources such as WISE/NEOWISE, DECam,
+and TESS. Do not use ZTF or ATLAS as discovery sources; they are training and
+calibration sources only. Use coordinates and windows emitted by
+`Skills/select_survey_fields.py --wise-archive-probes` or by a documented
+field-window rationale, not hand-picked guesses.
 
 ```bash
-# Run the pipeline on a 5-degree radius around RA=180°, Dec=0° for one week
-PYTHONPATH=src uv run python Skills/run_pipeline.py \
-    --ra 180.0 \
-    --dec 0.0 \
-    --radius 5.0 \
-    --start-jd 2460796.5 \
-    --end-jd 2460802.5 \
-    --surveys ZTF \
-    --max-candidates 80
+# Pull the latest merged code before an operator dry run.
+git pull origin main
+
+# Bound native numerical libraries to prevent local oversubscription.
+export OMP_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
+export VECLIB_MAXIMUM_THREADS=1
+export NUMEXPR_MAX_THREADS=1
+export PYTHONPATH=src
+
+# Run a dry WISE/NEOWISE archive diagnostic from verified field-window inputs.
+caffeinate -i uv run --python 3.14 python Skills/run_pipeline.py \
+    --ra <RA> \
+    --dec <Dec> \
+    --radius <radius> \
+    --start-jd <start_jd> \
+    --end-jd <end_jd> \
+    --surveys WISE \
+    --review-packet-out Logs/reports/<slug>_review_packets.json \
+    --output Logs/reports/<slug>_candidates.json
 ```
 
 **Parameters you can change:**
@@ -728,7 +742,7 @@ The `alert_pathway` value in the output tells you exactly what action, if any, i
 If any candidates carry `alert_pathway = mpc_submission`, generate the formatted report with:
 
 ```bash
-PYTHONPATH=src python Skills/export_mpc_report.py \
+PYTHONPATH=src uv run --python 3.14 python Skills/export_mpc_report.py \
     results/scored_neos.json \
     --out reports/mpc_report.txt
 ```
@@ -740,7 +754,7 @@ The output file (`reports/mpc_report.txt`) is in the MPC 80-column observation f
 To plot the sky positions and light curve of a candidate for visual inspection:
 
 ```bash
-PYTHONPATH=src python Skills/visualize_tracklets.py data/sample_tracklets.json
+PYTHONPATH=src uv run --python 3.14 python Skills/visualize_tracklets.py data/sample_tracklets.json
 ```
 
 This opens a matplotlib window showing:
@@ -768,7 +782,7 @@ Classifier recalibration is necessary when (a) the pipeline is deployed on a new
 Download the current MPC confirmed NEO catalog and a main-belt asteroid sample as a labeled CSV:
 
 ```bash
-PYTHONPATH=src python Skills/generate_training_labels.py \
+PYTHONPATH=src uv run --python 3.14 python Skills/generate_training_labels.py \
     --output data/training_labels.csv \
     --n-mba 5000
 ```
@@ -784,7 +798,7 @@ Tier 1 retraining uses only tabular features (no images required, no GPU needed)
 ```bash
 # Retraining is handled inside classify.py via its public API.
 # Use the following one-liner to trigger a retrain from the labels CSV:
-PYTHONPATH=src python -c "
+PYTHONPATH=src uv run --python 3.14 python -c "
 from classify import retrain_tier1
 retrain_tier1(
     labels_csv='data/training_labels.csv',
@@ -802,7 +816,7 @@ The script prints a classification report (precision, recall, F1 per class) and 
 Tier 2 requires a labeled dataset of ZTF image cutlet triplets. Prepare a CSV with columns `object_id`, `cutout_path`, `label` (1 = real, 0 = bogus):
 
 ```bash
-PYTHONPATH=src python Skills/train_tier2_cnn.py \
+PYTHONPATH=src uv run --python 3.14 python Skills/train_tier2_cnn.py \
     --labels data/cutout_labels.csv \
     --cutout-dir data/cutouts/ \
     --output models/tier2_cnn.pt \
@@ -819,7 +833,7 @@ Tier 3 requires the designation-grouped train, calibration, and test CSV files
 produced by `Skills/build_sequence_dataset.py`:
 
 ```bash
-caffeinate -i .venv/bin/python Skills/train_tier3_transformer.py \
+caffeinate -i uv run --python 3.14 python Skills/train_tier3_transformer.py \
     --train data/sequences/production/train.csv \
     --validation data/sequences/production/calibration.csv \
     --test data/sequences/production/test.csv \
@@ -836,7 +850,7 @@ accuracy, macro-F1, per-class recall, source/model hashes, and class counts.
 After retraining any tier, refit the Platt or isotonic calibrator on the held-out validation set. This step adjusts raw classifier scores to produce well-calibrated probabilities (i.e., a score of 0.8 should correspond to an 80% true-positive rate):
 
 ```bash
-PYTHONPATH=src python Skills/evaluate_calibration.py \
+PYTHONPATH=src uv run --python 3.14 python Skills/evaluate_calibration.py \
     --scores results/validation_scores.json \
     --method isotonic \
     --output models/calibrator_isotonic.pkl \
@@ -862,7 +876,7 @@ The script outputs:
 If the recalibration is triggered by a drop in link rate, run a parametric sweep of the two most sensitive linker parameters before refitting the classifier:
 
 ```bash
-PYTHONPATH=src python Skills/tune_linker.py \
+PYTHONPATH=src uv run --python 3.14 python Skills/tune_linker.py \
     --tol-min 0.5 --tol-max 5.0 --tol-steps 10 \
     --chi2-min 4.0 --chi2-max 16.0 --chi2-steps 7
 ```
@@ -874,7 +888,7 @@ This prints a grid table of (tolerance, chi2_threshold) → link rate. Choose th
 After any retraining or recalibration, run the injection-recovery benchmark to confirm that end-to-end pipeline performance has not regressed:
 
 ```bash
-PYTHONPATH=src python Skills/injection_recovery.py \
+PYTHONPATH=src uv run --python 3.14 python Skills/injection_recovery.py \
     --n 100 \
     --seed 42 \
     --json results/ir_post_recal.json
@@ -893,7 +907,7 @@ Compare the output against the baseline in `data/injection_recovery_baseline.jso
 | 5. Calibrator refit | `evaluate_calibration.py` | ECE ≤ 0.05; Brier ≤ 0.10 |
 | 6. Linker tuned (if needed) | `tune_linker.py` | Link rate ≥ baseline − 5% |
 | 7. Injection-recovery passed | `injection_recovery.py` | Link + score rate ≥ baseline − 5% |
-| 8. Full default test collection is stable | `pytest --collect-only` | 3475 passing tests; 2 live/integration tests deselected |
+| 8. Full default test collection is stable | `uv run --python 3.14 python -m pytest --collect-only` | 3475 passing tests; 2 live/integration tests deselected |
 | 9. Models committed | `git add models/` | New weights in version control |
 
 ---
@@ -904,11 +918,11 @@ Compare the output against the baseline in `data/injection_recovery_baseline.jso
 
 | Requirement | Minimum | Recommended |
 |---|---|---|
-| Python | 3.11 | 3.12 |
-| RAM | 4 GB | 16 GB (CNN training) |
-| GPU | Not required | Required for Tier 2 / Tier 3 training |
+| Python | 3.14.3 via `uv` | 3.14.3 via `uv` |
+| RAM | 4 GB | 64 GB local profile for large discovery diagnostics and training |
+| GPU | Not required for inference | Apple Metal/MPS or equivalent for Tier 2 / Tier 3 training |
 | Disk | 1 GB | 10 GB (alert cache + cutout archive) |
-| Network | — | Required for live ZTF / ATLAS / MPC queries |
+| Network | — | Required for live archive/API queries and MPC-related checks |
 
 ### 10.2 Clone and Install
 
@@ -959,35 +973,35 @@ pip install ztfquery
 
 ```bash
 # Smoke test — exercises all ten modules end-to-end with synthetic data
-PYTHONPATH=src python Skills/smoke_test.py
+PYTHONPATH=src uv run --python 3.14 python Skills/smoke_test.py
 # Expected: "All modules OK — smoke test passed." (exit 0)
 ```
 
 ### 13.2 Inspect Default Test Collection
 
 ```bash
-OMP_NUM_THREADS=1 PYTHONPATH=src python -m pytest --collect-only -q
+OMP_NUM_THREADS=1 PYTHONPATH=src uv run --python 3.14 python -m pytest --collect-only -q
 # Expected result: 3475 passing tests; 2 live/integration checks deselected.
 ```
 
 For a full local run, use:
 
 ```bash
-OMP_NUM_THREADS=1 PYTHONPATH=src python -m pytest -q
+OMP_NUM_THREADS=1 PYTHONPATH=src uv run --python 3.14 python -m pytest -q
 ```
 
 ### 13.3 Score a Batch of Tracklets
 
 ```bash
 # Score the two synthetic tracklets in data/sample_tracklets.json
-PYTHONPATH=src python Skills/batch_score.py data/sample_tracklets.json
+PYTHONPATH=src uv run --python 3.14 python Skills/batch_score.py data/sample_tracklets.json
 ```
 
 ### 13.4 Injection-Recovery Experiment
 
 ```bash
 # Inject 50 synthetic NEOs (default), run through full pipeline, report recovery rates
-PYTHONPATH=src python Skills/injection_recovery.py --n 50 --seed 42 --json results/ir_run.json
+PYTHONPATH=src uv run --python 3.14 python Skills/injection_recovery.py --n 50 --seed 42 --json results/ir_run.json
 # Expected baseline: 100% detect, 100% link, 100% score on the n=200 baseline
 ```
 
@@ -995,51 +1009,51 @@ PYTHONPATH=src python Skills/injection_recovery.py --n 50 --seed 42 --json resul
 
 ```bash
 # Sweep position_tolerance_arcsec × chi2_threshold; report link rate table
-PYTHONPATH=src python Skills/tune_linker.py
+PYTHONPATH=src uv run --python 3.14 python Skills/tune_linker.py
 ```
 
 ### 13.6 Run One Background Search Cycle
 
 ```bash
-PYTHONPATH=src python Skills/background.py run-once
-PYTHONPATH=src python Skills/background.py schema-status-summary
-PYTHONPATH=src python Skills/background.py init-log-db-preview
-PYTHONPATH=src python Skills/background.py schema-operations-summary
-PYTHONPATH=src python Skills/background.py operator-next-action
-PYTHONPATH=src python Skills/background.py init-log-db
-PYTHONPATH=src python Skills/background.py ledger-summary
-PYTHONPATH=src python Skills/background.py needs-follow-up-summary
-PYTHONPATH=src python Skills/background.py internal-follow-up-disposition
-PYTHONPATH=src python Skills/background.py validation-summary
-PYTHONPATH=src python Skills/background.py blueprint-compliance-summary
-PYTHONPATH=src python Skills/background.py record-blueprint-compliance-summary
-PYTHONPATH=src python Skills/background.py blueprint-compliance-log-summary
-PYTHONPATH=src python Skills/background.py signoff-readiness
-PYTHONPATH=src python Skills/background.py record-automation-readiness
-PYTHONPATH=src python Skills/background.py automation-readiness-log-summary
-PYTHONPATH=src python Skills/background.py live-policy-contract-summary
-PYTHONPATH=src python Skills/background.py live-provider-readiness-summary
-PYTHONPATH=src python Skills/background.py live-credential-inventory
-PYTHONPATH=src python Skills/background.py live-credential-inventory --write-report Logs/reports/credential_inventory_latest.json
-PYTHONPATH=src python Skills/background.py live-policy-approval-checklist
-PYTHONPATH=src python Skills/background.py live-policy-approval-checklist --write-report Logs/reports/live_policy_approval_checklist_latest.json
-PYTHONPATH=src python Skills/background.py scoring-metrics-kpi-report
-PYTHONPATH=src python Skills/background.py scoring-metrics-kpi-report --write-report Logs/reports/scoring_metrics_kpi_latest.json
-PYTHONPATH=src python Skills/background.py live-dry-run-approval-bundle
-PYTHONPATH=src python Skills/background.py record-live-dry-run-approval-bundle
-PYTHONPATH=src python Skills/background.py live-dry-run-approval-bundle-log-summary
-PYTHONPATH=src python Skills/background.py live-dry-run-operator-handoff
-PYTHONPATH=src python Skills/background.py write-live-dry-run-operator-handoff
-PYTHONPATH=src python Skills/background.py record-live-dry-run-operator-handoff
-PYTHONPATH=src python Skills/background.py live-dry-run-operator-handoff-log-summary
-PYTHONPATH=src python Skills/background.py live-dry-run-plan
-PYTHONPATH=src python Skills/background.py record-live-dry-run-plan
-PYTHONPATH=src python Skills/background.py live-dry-run-plan-log-summary
-PYTHONPATH=src python Skills/background.py live-dry-run-execute
-PYTHONPATH=src python Skills/background.py live-execution-log-summary
-PYTHONPATH=src python Skills/background.py unsigned-follow-up
-PYTHONPATH=src python Skills/background.py signoff-packet-decision-readiness
-PYTHONPATH=src python Skills/background.py latest-undecided-signoff-packet
+PYTHONPATH=src uv run --python 3.14 python Skills/background.py run-once
+PYTHONPATH=src uv run --python 3.14 python Skills/background.py schema-status-summary
+PYTHONPATH=src uv run --python 3.14 python Skills/background.py init-log-db-preview
+PYTHONPATH=src uv run --python 3.14 python Skills/background.py schema-operations-summary
+PYTHONPATH=src uv run --python 3.14 python Skills/background.py operator-next-action
+PYTHONPATH=src uv run --python 3.14 python Skills/background.py init-log-db
+PYTHONPATH=src uv run --python 3.14 python Skills/background.py ledger-summary
+PYTHONPATH=src uv run --python 3.14 python Skills/background.py needs-follow-up-summary
+PYTHONPATH=src uv run --python 3.14 python Skills/background.py internal-follow-up-disposition
+PYTHONPATH=src uv run --python 3.14 python Skills/background.py validation-summary
+PYTHONPATH=src uv run --python 3.14 python Skills/background.py blueprint-compliance-summary
+PYTHONPATH=src uv run --python 3.14 python Skills/background.py record-blueprint-compliance-summary
+PYTHONPATH=src uv run --python 3.14 python Skills/background.py blueprint-compliance-log-summary
+PYTHONPATH=src uv run --python 3.14 python Skills/background.py signoff-readiness
+PYTHONPATH=src uv run --python 3.14 python Skills/background.py record-automation-readiness
+PYTHONPATH=src uv run --python 3.14 python Skills/background.py automation-readiness-log-summary
+PYTHONPATH=src uv run --python 3.14 python Skills/background.py live-policy-contract-summary
+PYTHONPATH=src uv run --python 3.14 python Skills/background.py live-provider-readiness-summary
+PYTHONPATH=src uv run --python 3.14 python Skills/background.py live-credential-inventory
+PYTHONPATH=src uv run --python 3.14 python Skills/background.py live-credential-inventory --write-report Logs/reports/credential_inventory_latest.json
+PYTHONPATH=src uv run --python 3.14 python Skills/background.py live-policy-approval-checklist
+PYTHONPATH=src uv run --python 3.14 python Skills/background.py live-policy-approval-checklist --write-report Logs/reports/live_policy_approval_checklist_latest.json
+PYTHONPATH=src uv run --python 3.14 python Skills/background.py scoring-metrics-kpi-report
+PYTHONPATH=src uv run --python 3.14 python Skills/background.py scoring-metrics-kpi-report --write-report Logs/reports/scoring_metrics_kpi_latest.json
+PYTHONPATH=src uv run --python 3.14 python Skills/background.py live-dry-run-approval-bundle
+PYTHONPATH=src uv run --python 3.14 python Skills/background.py record-live-dry-run-approval-bundle
+PYTHONPATH=src uv run --python 3.14 python Skills/background.py live-dry-run-approval-bundle-log-summary
+PYTHONPATH=src uv run --python 3.14 python Skills/background.py live-dry-run-operator-handoff
+PYTHONPATH=src uv run --python 3.14 python Skills/background.py write-live-dry-run-operator-handoff
+PYTHONPATH=src uv run --python 3.14 python Skills/background.py record-live-dry-run-operator-handoff
+PYTHONPATH=src uv run --python 3.14 python Skills/background.py live-dry-run-operator-handoff-log-summary
+PYTHONPATH=src uv run --python 3.14 python Skills/background.py live-dry-run-plan
+PYTHONPATH=src uv run --python 3.14 python Skills/background.py record-live-dry-run-plan
+PYTHONPATH=src uv run --python 3.14 python Skills/background.py live-dry-run-plan-log-summary
+PYTHONPATH=src uv run --python 3.14 python Skills/background.py live-dry-run-execute
+PYTHONPATH=src uv run --python 3.14 python Skills/background.py live-execution-log-summary
+PYTHONPATH=src uv run --python 3.14 python Skills/background.py unsigned-follow-up
+PYTHONPATH=src uv run --python 3.14 python Skills/background.py signoff-packet-decision-readiness
+PYTHONPATH=src uv run --python 3.14 python Skills/background.py latest-undecided-signoff-packet
 ```
 
 Background automation writes top-level SQLite logs to `Logs/background.sqlite`.
@@ -1083,16 +1097,34 @@ Deprecated one-file background wrapper scripts have been removed.
 
 ```bash
 # Export MPC-formatted observation reports from a scored NEO JSON file
-PYTHONPATH=src python Skills/export_mpc_report.py results/scored_neos.json --out reports/mpc_report.txt
+PYTHONPATH=src uv run --python 3.14 python Skills/export_mpc_report.py results/scored_neos.json --out reports/mpc_report.txt
 ```
 
 ### 13.8 End-to-End Pipeline Run
 
 ```bash
-# Full pipeline run against public ZTF access
-PYTHONPATH=src python Skills/run_pipeline.py \
-    --ra 180.0 --dec 0.0 --radius 5.0 \
-    --start 2026-05-01 --end 2026-05-07
+# Full dry-run pipeline diagnostic against a verified WISE/NEOWISE archive window
+git pull origin main
+export OMP_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
+export VECLIB_MAXIMUM_THREADS=1
+export NUMEXPR_MAX_THREADS=1
+export PYTHONPATH=src
+
+caffeinate -i uv run --python 3.14 python Skills/run_pipeline.py \
+    --ra <RA> --dec <Dec> --radius <radius> \
+    --start-jd <start_jd> --end-jd <end_jd> \
+    --surveys WISE \
+    --review-packet-out Logs/reports/<slug>_review_packets.json \
+    --output Logs/reports/<slug>_candidates.json
+```
+
+Only run adversarial review after `run_pipeline.py` reports a non-zero full
+`ScoredNEO` review-packet count:
+
+```bash
+PYTHONPATH=src uv run --python 3.14 python Skills/adversarial_review.py \
+    Logs/reports/<slug>_review_packets.json --offline --json
 ```
 
 ---
@@ -1104,9 +1136,9 @@ PYTHONPATH=src python Skills/run_pipeline.py \
 Every commit triggers the CI workflow (`.github/workflows/ci.yml`), which runs in sequence:
 
 ```bash
-ruff check .                        # PEP 8 + style lint
-python -m mypy src                  # Static type checking (strict mode)
-PYTHONPATH=src python -m pytest     # Full test suite + coverage gate
+uv run --python 3.14 ruff check .  # PEP 8 + style lint
+uv run --python 3.14 python -m mypy src  # Static type checking (strict mode)
+PYTHONPATH=src uv run --python 3.14 python -m pytest     # Full test suite + coverage gate
 ```
 
 The coverage gate is set to **100%**; any line not exercised by at least one test fails CI.
@@ -1165,12 +1197,21 @@ The older n=50 baseline remains in `data/injection_recovery_baseline.json` for h
 
 **Primary directive: all work must advance the project to production. See `docs/PRODUCTION_READINESS.md` for the authoritative gap register.**
 
-**Highest-priority production loop: D1 — WISE/NEOWISE discovery dry-runs.** The
-T1/T2 readiness gaps are closed. Current work is focused on bounded
-WISE/NEOWISE archive sweeps that can produce candidate packets, adversarial
-review outcomes, and operator review evidence without external submission.
-MPC submission remains fail-closed until archival WISE/NEOWISE submission
-authority is resolved with MPC and a candidate survives the required gates.
+**Highest-priority production loop: P1/P2 — discovery-source positive control
+and survey-native confidence policy.** The T1/T2 readiness gaps are closed.
+Production now means demonstrated capability to find, score, reject, review,
+and package candidates from unreviewed archival discovery data with
+industry-standard confidence controls. It does **not** require that the project
+has already found a genuinely new NEO. A real candidate starts the later
+Discovery Event Gates in `docs/PRODUCTION_READINESS.md`; it is not the
+definition of production readiness.
+
+Current work is focused on proving that WISE/NEOWISE, DECam, or TESS discovery
+paths can produce full `ScoredNEO` review packets when a valid moving-object
+signal is present, while documenting source-native confidence gates and keeping
+all external submission paths fail-closed. MPC submission remains blocked until
+archival WISE/NEOWISE submission authority is resolved with MPC and a real
+candidate survives adversarial plus operator review.
 
 ### 15.1 Current State Snapshot (v0.90.5)
 
@@ -1187,6 +1228,7 @@ authority is resolved with MPC and a candidate survives the required gates.
 | Console output compliance | **Complete** | All `Skills/run_pipeline.py` stage prints include `elapsed {M}m{S:02d}s`; ETA from measurable quantities (per-survey, per-tracklet). |
 | External reporting | **Disabled — human action required** | WISE/NEOWISE ADES export now fails closed unless `stn=C51` and explicit written MPC confirmation are recorded; no actual submission is made. See `docs/MPC_SUBMISSION_POLICY.md §Archival WISE Submission Authority`. |
 | WISE scale-plan diagnostics | **In progress** | `--link-scale-plan-out` emits budget-derived diagnostic subfields with local cross-night support metrics. `Skills/select_survey_fields.py --wise-archive-probes` now generates directive-compliant dry-run parent-field scale-plan commands for new non-Taurus WISE/NEOWISE windows. |
+| Production capability gates | **Open** | P1 discovery-source positive control, P2 survey-native confidence policy, P3 no-submission package drill, P4 MPC submission protocol, and P5 operator go/no-go runbook are tracked in `docs/PRODUCTION_READINESS.md`. Actual discovery is an event gate, not a production prerequisite. |
 
 ### 15.2 Completed Milestones
 
@@ -1217,8 +1259,9 @@ authority is resolved with MPC and a candidate survives the required gates.
 | **M6a** | T1-D: Quantitative production calibration gate | Held-out real labeled data; all Brier, ECE, log-loss, AUC, cross-validation, and bootstrap-confidence KPIs pass | **Complete** |
 | **M6b** | T1-C: Real-run audit packet | Build fail-closed review evidence from the first real ZTF pilot | **Complete for run `011dd53aa7f4`** |
 | **M6c** | T1-C: Known-object recovery audit | Verify ≥90% known-object recovery using a generated expected-known manifest with pipeline IDs or sky/time samples | **Complete (5/5 objects, 100%, 2026-06-20)** |
-| **M7** | All T1 gaps closed; internal no-submission production readiness | Requires M4-M6 complete plus no-submission discovery-paper guardrails | **Complete (2026-06-22)** |
-| **M8** | First MPC submission eligibility | Requires MPC observatory code (human-gated), adversarial review survival, operator review, and policy-compliant candidate evidence | **Blocked - human action required (observatory code)** |
+| **M7** | All T1/T2 engineering gaps closed | Requires M4-M6 complete plus no-submission discovery-paper guardrails | **Complete (2026-06-22)** |
+| **M8** | Production capability readiness | Requires P1 discovery-source positive control, P2 source-native confidence gates, P3 no-submission package drill, P4 submission protocol, and P5 operator go/no-go runbook | **Open** |
+| **M9** | First MPC submission eligibility | Event-driven; requires a real candidate, adversarial review survival, operator review, and policy-compliant candidate evidence after P4 is resolved | **Blocked until candidate + MPC authority** |
 
 ### 15.4 Progress Tracker
 
@@ -1247,11 +1290,13 @@ authority is resolved with MPC and a candidate survives the required gates.
 | **P34** | Complete | Expected-known manifest builder | `Skills/build_recovery_manifest.py` builds checkpointed MPC+Horizons sky/time manifests for T1-C audits |
 | **P35** | Complete | Repository artifact hygiene | `.gitignore` protects `git add .`; raw `Logs/**` are local-only, production models are explicit allowlists, and T1-C evidence is summarized in `docs/evidence/t1c/` |
 | **P36** | In progress | ATLAS forced-photometry fallback | `Skills/fetch_atlas_data.py --expected-known ...` writes audit-compatible recovery packets; provider request format, polling, in-flight checkpointing, task-URL resume, and force-refresh stale negative replay are fixed; the 2026-06-19 bounded 38-sample ATLAS pilot worked technically but failed the 90% recovery KPI at 4/11 expected objects; the prequalified 15-sample follow-up improved to 3/4 but still failed |
+| **P37** | Open | Production capability definition | Production is now defined as demonstrated ability to find, score, review, reject, and package candidates with industry-standard confidence controls. Actual discovery is not required for readiness. See `docs/PRODUCTION_READINESS.md §Production Definition`. |
 
 ### 15.5 Known Limitations
 
 - **Real-data evidence is bounded**: The first ALeRCE-backed ZTF pilot processed real detections and produced two internal candidates, but it was capped at 80 linked candidates.
 - **Known-object recovery evidence is complete for T1-C**: The prequalified ATLAS recovery run passed 5/5 objects (100%) and closed the recovery KPI; future discovery sweeps still need their own candidate-level review.
+- **Production readiness is capability-based**: The project still needs P1/P2 evidence that a discovery-source path can produce full review packets under source-native confidence gates. It does not need to find a new NEO before being production-capable.
 - **Operator review remains required for candidates**: Recovered or newly linked candidates need adversarial review plus Jerome W. Lindsey III's operator review before any MPC path is considered.
 - **External expert review happens through MPC/NEOCP/Scout**: Internal production readiness does not authorize MPC submission or hazard notification.
 - **Automated live execution remains gated**: The bounded live dry-run policy is signed, but runs still require provider credential readiness and remain non-submitting.

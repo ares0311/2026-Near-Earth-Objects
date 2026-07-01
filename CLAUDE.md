@@ -55,7 +55,7 @@ If the highest-priority T1 gap cannot be resolved because a human blocker is unr
   `pytest`, `mypy`, or `ruff` directly — always prefix with `uv run` so the
   correct interpreter and locked dependencies are used. CI enforces the same
   via `astral-sh/setup-uv@v5` with `python-version: "3.14"`.
-  Example: `PYTHONPATH=src uv run python -m pytest`
+  Example: `PYTHONPATH=src uv run --python 3.14 python -m pytest`
 - **Local system profile governs optimization defaults**: `docs/SYSTEM_PROFILE.md`
   is a committed directive for local resource sizing. Optimize project code,
   tests, notebooks, and operator commands for that profile unless portability or
@@ -97,7 +97,7 @@ If the highest-priority T1 gap cannot be resolved because a human blocker is unr
   local run debris, fix `.gitignore` and untrack it before committing.
 
 - **Always comment all code**: Every function, class, script, shell command, and non-trivial code block must include comments explaining what it does and why. This applies to all Python source files, all Skills scripts, all shell commands given to the operator, and all inline code snippets in documentation. No exceptions. This rule overrides any default behavior that would omit comments.
-- **caffeinate all long-running Mac commands**: Any operator command expected to run longer than ~30 seconds must be prefixed with `caffeinate -i` to prevent macOS from sleeping mid-run. This applies to all downloads, training runs, and pipeline executions. Example: `caffeinate -i uv run python Skills/download_ztf_training_alerts.py ...`
+- **caffeinate all long-running Mac commands**: Any operator command expected to run longer than ~30 seconds must be prefixed with `caffeinate -i` to prevent macOS from sleeping mid-run. This applies to all downloads, training runs, and pipeline executions. Example: `caffeinate -i uv run --python 3.14 python Skills/download_ztf_training_alerts.py ...`
 - **All long-running scripts must print live progress with ETA**: Any script or pipeline stage that runs for more than a few seconds MUST emit per-item or per-batch progress lines to **stdout**, including: items processed / total, current status, running accepted counts, elapsed time, and estimated time remaining (ETA). Silent long-running processes are unacceptable — the operator must always be able to see that the process is alive and estimate when it will finish. This rule applies to all Skills scripts that loop over network queries, training epochs, or large data processing. Use `print(..., flush=True)` (stdout, NOT stderr — stderr is not reliably interleaved with stdout in the operator's terminal). ETA format: `elapsed {m}m{s:02d}s  ETA {m}m{s:02d}s`. ETA must be computed from a measurable quantity (bytes read, items processed, batches done) — elapsed-only heartbeats are not acceptable as a substitute for ETA.
 
 - **All long-running pipeline scripts must implement checkpoint/resume**: Any Skills script that makes network calls or processes items in a loop MUST survive a network drop, machine sleep, or process kill without losing work. The implementation rules are:
@@ -588,20 +588,20 @@ The project venv is Python 3.14.3 managed by uv from `uv.lock`. Using bare
 
 ```bash
 # Lint
-uv run ruff check .
-uv run ruff check . --fix
+uv run --python 3.14 ruff check .
+uv run --python 3.14 ruff check . --fix
 
 # Type-check
-uv run python -m mypy src
+uv run --python 3.14 python -m mypy src
 
 # Tests (PYTHONPATH=src set via env for uv run)
-PYTHONPATH=src uv run python -m pytest
+PYTHONPATH=src uv run --python 3.14 python -m pytest
 
 # macOS local runs with XGBoost/OpenMP may need deterministic threading
-OMP_NUM_THREADS=1 PYTHONPATH=src uv run python -m pytest
+OMP_NUM_THREADS=1 PYTHONPATH=src uv run --python 3.14 python -m pytest
 
 # All three
-uv run ruff check . && uv run python -m mypy src && PYTHONPATH=src uv run python -m pytest
+uv run --python 3.14 ruff check . && uv run --python 3.14 python -m mypy src && PYTHONPATH=src uv run --python 3.14 python -m pytest
 ```
 
 CI uses `uv sync --extra dev` (from `uv.lock`) then `uv run` — identical to
@@ -685,9 +685,19 @@ MPC/NEOCP/Scout is the expert review system.
   fail-closed at `27845455` estimated seed pairs over the `1000000` budget.
   Durable evidence:
   `docs/evidence/live/2026-06-30-wise-v0905-parent-field-probe.md`.
-  **NEXT PRODUCTION ACTION — NOT YET DONE**: run the rank 1 support-positive
-  subfield from the v0.90.5 scale plan: RA `209.5`, Dec `-14.9`, radius
-  `0.0303`; run adversarial review only if full review packets are non-empty.
+- The rank 1 v0.90.5 support-positive subfield was then run from merged
+  `main`: RA `209.5`, Dec `-14.9`, radius `0.0303`. It fetched `690` WISE
+  rows, passed `686/690`, detected `686` singleton candidates, linked `58596`
+  seed pairs, and produced `0` tracklets and `0` review packets. The pipeline
+  correctly instructed the operator to skip adversarial review. This is valid
+  diagnostic evidence, not a crash, but P1 remains open because no full
+  `ScoredNEO` packet was produced.
+- **NEXT PRODUCTION ACTION — NOT YET DONE**: close P1/P2 by implementing or
+  documenting a discovery-source positive-control path (known-object recovery
+  through WISE/DECam/TESS or a source-native injection/recovery harness) and a
+  source-native confidence policy for WISE/DECam/TESS. Do not ask the operator
+  for another live WISE run until that path or policy supplies a measured,
+  non-guesswork reason.
 
 **v0.90.4 patch status**:
 - `detect.py`, `link.py`, and `Skills/audit_real_run.py` now share the
@@ -922,7 +932,7 @@ do NOT re-run any ATLAS screening, prequalification, or audit commands.
 ```bash
 git pull origin main
 export PYTHONPATH=src
-caffeinate -i uv run python Skills/run_pipeline.py \
+caffeinate -i uv run --python 3.14 python Skills/run_pipeline.py \
     --ra 284.13 --dec -22.5 --radius 3.5 \
     --start-jd 2461183.0 --end-jd 2461213.0 \
     --surveys ZTF --no-dry-run --force-refresh --no-resume
@@ -1003,7 +1013,7 @@ NASA notification, or any impact-probability statement.
 ```bash
 git pull origin main
 export PYTHONPATH=src
-uv run python Skills/select_survey_fields.py \
+uv run --python 3.14 python Skills/select_survey_fields.py \
     --jd now \
     --mode recovery \
     --top-n 10 \
@@ -1216,7 +1226,7 @@ MPC submission → provisional designation → independent confirmation → jour
    observatory-code path is resolved and `NEO_MPC_SUBMISSION_APPROVED=1` is set
    with a real non-placeholder MPC code.
 6. **Run adversarial review** (`Skills/adversarial_review.py`) on any candidates found:
-   `PYTHONPATH=src uv run python Skills/adversarial_review.py /tmp/wise_candidates.json`.
+   `PYTHONPATH=src uv run --python 3.14 python Skills/adversarial_review.py /tmp/wise_candidates.json`.
 7. **Jerome reviews** any SURVIVE or BORDERLINE candidates.
 8. **Jerome resolves MPC observatory code** (human-gated; no code can help here).
 9. Submit survivors to MPC → await provisional designation.
