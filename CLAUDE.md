@@ -679,7 +679,32 @@ See `docs/MISSION.md` for the authoritative data strategy. The prior "blocked
 until expert review" guardrail was removed by operator decision on 2026-06-21;
 MPC/NEOCP/Scout is the expert review system.
 
-### Handoff state as of 2026-07-02 v7 (CURRENT)
+### Handoff state as of 2026-07-02 v8 (CURRENT)
+
+**First live Phase 0 probe run (2026-07-02, operator Mac, `main` @ `d4f3f908`)**:
+5 probes run, elapsed 3m23s. Results:
+- `irsa_ztf_sci_metadata`: **HTTP 200** — confirmed reachable without
+  credentials, matches the brief's claim.
+- `jpl_sbdb_neo_query`: **HTTP 400** — server reachable, request rejected.
+  Root cause not yet known; need the response body.
+- `mpc_get_obs`: **HTTP 501** — server reachable, unusual status for a
+  documented GET endpoint. Root cause not yet known; need the response body.
+- `fink_schema`, `fink_swagger`: both **FAILED** after 5 retries with
+  `SSLError: SSLEOFError` (TLS handshake dropped, not a 4xx). Inconclusive —
+  could be a WAF/CDN blocking this TLS client fingerprint, a transient
+  outage, or something else. Needs a retry and/or a different client to
+  distinguish.
+- Full per-probe response bodies were written locally to
+  `docs/evidence/phase0/{data_sources_verified.md,auth_requirements.md,
+  phase0_probe_results.json}` on the operator's Mac by the script itself but
+  were not yet pasted/committed as of this handoff. Console-level summary
+  preserved at `docs/evidence/phase0/2026-07-02-first-live-probe-console.md`.
+- **NEXT PRODUCTION ACTION — NOT YET DONE**: get the operator to paste or
+  commit the three files above so the actual JPL SBDB / MPC response bodies
+  can be read and the 400/501 causes diagnosed before adjusting the brief's
+  example request URLs or building any ingestion code against them.
+
+### Handoff state as of 2026-07-02 v7
 
 **Phase 0 tool built (v0.90.13)**: `Skills/verify_ztf_dr24_sources.py` probes
 the exact endpoints cited in `docs/neo_discovery_agent_brief.md` (Fink
