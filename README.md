@@ -1,7 +1,7 @@
 # 2026 Near-Earth Object Detection & Ranking Pipeline
 
 ![Status](https://img.shields.io/badge/status-active%20development-blue)
-![Version](https://img.shields.io/badge/version-0.90.9-informational)
+![Version](https://img.shields.io/badge/version-0.90.10-informational)
 ![License](https://img.shields.io/badge/license-Apache%202.0-green)
 ![Tests](https://img.shields.io/badge/tests-3500%2B%20passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
@@ -12,7 +12,7 @@
 
 ## Abstract
 
-Near-Earth Objects (NEOs) — small solar system bodies with perihelion distances $q < 1.3$ AU — represent both a premier target for planetary science and the only known category of natural disaster that is, in principle, preventable. Despite three decades of systematic survey effort, population completeness models estimate that the majority of NEOs larger than 140 meters remain undetected, sustaining the need for automated, high-throughput discovery pipelines capable of operating at the cadence and scale of modern wide-field photometric surveys. This work presents a research pipeline for the detection, multi-night linking, orbital characterization, and hazard ranking of NEO candidates derived from public training streams and unreviewed archival survey data. The system implements a seven-stage directed acyclic processing graph — fetch, preprocess, detect, link, classify, orbit, score — followed by a mandatory three-step alert protocol governing all external communications. Classification employs a three-tier ensemble architecture: a gradient-boosted tree classifier on tabular features (Tier 1), a convolutional neural network operating on 63×63-pixel ZTF image triplets following the architecture of Duev et al. (2019) (Tier 2), and a BERT-style Transformer trained on multi-night observation sequences following Lin et al. (2022) (Tier 3), with outputs combined by a logistic regression meta-learner and calibrated via Platt scaling or isotonic regression. Hazard assessment follows a Bayesian log-score model over five competing hypotheses with deliberately pessimistic priors for new NEO candidates. Preliminary orbit determination uses Gauss's method with differential correction, and Potentially Hazardous Asteroid (PHA) flags are gated on orbit quality code ≥ 2 and independently confirmed MOID ≤ 0.05 AU. As of version 0.90.9, all ten pipeline modules are implemented, all three ML tiers and the ensemble stacker have passed quantitative calibration KPIs, T1/T2 production gaps are closed, and the discovery fetch layer targets WISE/NEOWISE, DECam/NOIRLab, and TESS FFIs while keeping ZTF/ATLAS as training-data sources only. Background automation provides top-level SQLite audit logs and fail-closed readiness controls. Injection-recovery validation now includes the legacy ZTF-shaped synthetic baseline and a WISE/NEOWISE discovery-source positive control; synthetic results are used as controlled path evidence, not live-sky discovery evidence. The discovery-agent brief is authoritative for source verification, no future-catalog leakage, historical replay, pretrained-model audits, and auditable candidate-ranker design. The pipeline produces MPC-compatible 80-column, ADES PSV, and JSON observation reports and implements a non-negotiable three-step pathway — MPC submission, independent observatory confirmation, and conditional NASA PDCO notification — ensuring that no autonomous impact claim is ever issued. MPC submission remains disabled until archival WISE/NEOWISE submission authority is resolved with MPC and a candidate survives adversarial plus operator review.
+Near-Earth Objects (NEOs) — small solar system bodies with perihelion distances $q < 1.3$ AU — represent both a premier target for planetary science and the only known category of natural disaster that is, in principle, preventable. Despite three decades of systematic survey effort, population completeness models estimate that the majority of NEOs larger than 140 meters remain undetected, sustaining the need for automated, high-throughput discovery pipelines capable of operating at the cadence and scale of modern wide-field photometric surveys. This work presents a research pipeline for the detection, multi-night linking, orbital characterization, and hazard ranking of NEO candidates derived from public training streams and unreviewed archival survey data. The system implements a seven-stage directed acyclic processing graph — fetch, preprocess, detect, link, classify, orbit, score — followed by a mandatory three-step alert protocol governing all external communications. Classification employs a three-tier ensemble architecture: a gradient-boosted tree classifier on tabular features (Tier 1), a convolutional neural network operating on 63×63-pixel ZTF image triplets following the architecture of Duev et al. (2019) (Tier 2), and a BERT-style Transformer trained on multi-night observation sequences following Lin et al. (2022) (Tier 3), with outputs combined by a logistic regression meta-learner and calibrated via Platt scaling or isotonic regression. Hazard assessment follows a Bayesian log-score model over five competing hypotheses with deliberately pessimistic priors for new NEO candidates. Preliminary orbit determination uses Gauss's method with differential correction, and Potentially Hazardous Asteroid (PHA) flags are gated on orbit quality code ≥ 2 and independently confirmed MOID ≤ 0.05 AU. As of version 0.90.10, all ten pipeline modules are implemented, all three ML tiers and the ensemble stacker have passed quantitative calibration KPIs, T1/T2 production gaps are closed, and the discovery fetch layer targets WISE/NEOWISE, DECam/NOIRLab, and TESS FFIs while keeping ZTF/ATLAS as training-data sources only. Background automation provides top-level SQLite audit logs and fail-closed readiness controls. Injection-recovery validation now includes the legacy ZTF-shaped synthetic baseline and a WISE/NEOWISE discovery-source positive control; synthetic results are used as controlled path evidence, not live-sky discovery evidence. The discovery-agent brief is authoritative for source verification, no future-catalog leakage, historical replay, pretrained-model audits, and auditable candidate-ranker design. The pipeline produces MPC-compatible 80-column, ADES PSV, and JSON observation reports and implements a non-negotiable three-step pathway — MPC submission, independent observatory confirmation, and conditional NASA PDCO notification — ensuring that no autonomous impact claim is ever issued. MPC submission remains disabled until archival WISE/NEOWISE submission authority is resolved with MPC and a candidate survives adversarial plus operator review.
 
 **Keywords:** near-Earth objects, planetary defense, asteroid detection, automated pipeline, machine learning, real/bogus classification, orbit determination, Bayesian scoring, ZTF, Minor Planet Center
 
@@ -57,7 +57,7 @@ This repository implements a complete, research-grade automated detection and ra
 4. **Independent confirmation before alert** — the NASA PDCO notification pathway is gated on MPC submission *and* independent observatory confirmation, not on pipeline confidence alone.
 5. **No autonomous impact claims** — the system produces ranked candidates and hazard flags; it defers all authoritative impact probability statements to CNEOS Scout and Sentry.
 
-The pipeline follows the build order: `schemas` -> `fetch` -> `preprocess` -> `detect` -> `link` -> `classify` -> `orbit` -> `score` -> `alert` -> `calibration`. Each stage consumes the immutable, typed output of all prior stages. As of v0.90.9, all ten pipeline modules plus background automation are complete, all three ML tiers have trained weights, calibration KPIs have passed, T1/T2 production gaps are closed, and the discovery fetch layer is active for WISE/NEOWISE, DECam, and TESS. External MPC submission remains disabled until archival WISE/NEOWISE submission authority and candidate review gates are satisfied. See `docs/PRODUCTION_READINESS.md` for the authoritative production register.
+The pipeline follows the build order: `schemas` -> `fetch` -> `preprocess` -> `detect` -> `link` -> `classify` -> `orbit` -> `score` -> `alert` -> `calibration`. Each stage consumes the immutable, typed output of all prior stages. As of v0.90.10, all ten pipeline modules plus background automation are complete, all three ML tiers have trained weights, calibration KPIs have passed, T1/T2 production gaps are closed, and the discovery fetch layer is active for WISE/NEOWISE, DECam, and TESS. External MPC submission remains disabled until archival WISE/NEOWISE submission authority and candidate review gates are satisfied. See `docs/PRODUCTION_READINESS.md` for the authoritative production register.
 
 ---
 
@@ -109,7 +109,7 @@ The pipeline implements a strict directed acyclic graph (DAG) of processing stag
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    NEO DETECTION PIPELINE  v0.90.9                  │
+│                    NEO DETECTION PIPELINE  v0.90.10                  │
 └─────────────────────────────────────────────────────────────────────┘
 
   External Data Sources
@@ -521,7 +521,7 @@ The diagram below shows how data and artifacts move between the repository's top
 2026-Near-Earth-Objects/
 │
 ├── src/                          # Core pipeline modules (Python 3.11+)
-│   ├── __init__.py               # Package version (0.90.9)
+│   ├── __init__.py               # Package version (0.90.10)
 │   ├── schemas.py                # All Pydantic data models (frozen=True)
 │   ├── fetch.py                  # ZTF/ATLAS/MPC/Horizons data retrieval
 │   ├── preprocess.py             # Difference image handling; Gaia astrometry
@@ -1213,7 +1213,7 @@ all external submission paths fail-closed. MPC submission remains blocked until
 archival WISE/NEOWISE submission authority is resolved with MPC and a real
 candidate survives adversarial plus operator review.
 
-### 15.1 Current State Snapshot (v0.90.9)
+### 15.1 Current State Snapshot (v0.90.10)
 
 | Area | Status | Notes |
 |---|---|---|
@@ -1228,7 +1228,7 @@ candidate survives adversarial plus operator review.
 | Console output compliance | **Complete** | All `Skills/run_pipeline.py` stage prints include `elapsed {M}m{S:02d}s`; ETA from measurable quantities (per-survey, per-tracklet). |
 | External reporting | **Disabled — human action required** | WISE/NEOWISE ADES export now fails closed unless `stn=C51` and explicit written MPC confirmation are recorded; no actual submission is made. See `docs/MPC_SUBMISSION_POLICY.md §Archival WISE Submission Authority`. |
 | WISE scale-plan diagnostics | **In progress** | `--link-scale-plan-out` emits budget-derived diagnostic subfields with local cross-night support metrics. `Skills/select_survey_fields.py --wise-archive-probes` now generates directive-compliant dry-run parent-field scale-plan commands for new non-Taurus WISE/NEOWISE windows. |
-| Production capability gates | **Partially closed** | P1, P2 (`docs/SURVEY_NATIVE_CONFIDENCE_POLICY.md`), and P3 (`docs/evidence/prod-loop/2026-07-02-gate-p3-no-submission-drill.md`) are closed. P4 MPC submission protocol is the next open production gate and is human-gated (archival WISE C51 authority). P5 operator go/no-go runbook is tracked in `docs/PRODUCTION_READINESS.md`. Actual discovery is an event gate, not a production prerequisite. |
+| Production capability gates | **P1-P3, P5 closed; P4 open (human-gated)** | P1, P2 (`docs/SURVEY_NATIVE_CONFIDENCE_POLICY.md`), P3 (`docs/evidence/prod-loop/2026-07-02-gate-p3-no-submission-drill.md`), and P5 (`docs/OPERATOR_GO_NO_GO_RUNBOOK.md`) are closed. P4 MPC submission protocol is the only remaining open production gate and is human-gated — it requires Jerome's written MPC confirmation for archival WISE C51 authority; no code change can close it. Actual discovery is an event gate, not a production prerequisite. |
 
 ### 15.2 Completed Milestones
 

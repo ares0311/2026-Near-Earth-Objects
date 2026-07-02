@@ -1,6 +1,6 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.90.9
+**Current version**: v0.90.10
 **Last updated**: 2026-07-02
 **Purpose**: Mandatory read at session start (per MANDATORY SESSION-START PROTOCOL).  
 Every planning cycle must name the highest-priority unresolved production-capability gate and show how proposed steps close or directly unblock it.
@@ -639,16 +639,21 @@ a new NEO.
       Submission Authority`.
 
 ### Gate P5: Operator go/no-go runbook
-- [ ] Maintain a one-page operator flow for the day a real candidate appears:
+- [x] Maintain a one-page operator flow for the day a real candidate appears:
       review packet location, adversarial-review command, operator-review
       checklist, ADES export command, MPC submission authority check, and
       forbidden communications.
-- [ ] The flow must state that `SURVIVE` or `BORDERLINE` means "candidate may
+- [x] The flow must state that `SURVIVE` or `BORDERLINE` means "candidate may
       be reviewed for MPC submission," not "confirmed NEO" or any impact-risk
       assertion.
-- Current status: **open**. The ingredients exist across this document,
-      `docs/MPC_SUBMISSION_POLICY.md`, and `README.md`; they still need one
-      compact operational flow after P1-P4 are aligned.
+- Current status: **CLOSED (2026-07-02)**. `docs/OPERATOR_GO_NO_GO_RUNBOOK.md`
+      is the one-page flow: review packet location, the exact
+      `Skills/adversarial_review.py` and `Skills/export_ades_report.py`
+      commands (verified against the Gate P3 drill), an operator-review
+      checklist, the Gate P4 human-gated MPC-authority check, and the
+      permanent forbidden-communications list. States explicitly that
+      `SURVIVE`/`BORDERLINE` means "candidate may be reviewed for MPC
+      submission," never "confirmed NEO" or an impact-risk claim.
 
 ---
 
