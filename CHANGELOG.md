@@ -3,6 +3,54 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.28 — Fix silent hang in classify(): unprotected Tier 1/3 model file reads (2026-07-02)
+
+### Fixed
+- **Root cause of the `injection_recovery.py` hang at item (1/200) with zero
+  output, including zero heartbeat output from the PR #163 CNN warmup fix**:
+  `_load_xgb_model()` (Tier 1) called `clf.load_model(str(model_path))` — a
+  bare path-based read with no chunked pre-read, no heartbeat, and no print
+  statement of any kind. `_tier1_predict()` runs FIRST inside `classify()`,
+  before Tier 2 (CNN) or Tier 3 (Transformer) are ever reached, so this
+  unprotected read blocked before any of the CNN loader's deadlock
+  mitigations (matmul/conv2d warmup + heartbeat, added in PR #163) were ever
+  executed. Operator-provided per-stage diagnostic prints confirmed
+  execution reached `classify()` and then produced no further output,
+  isolating the hang to this function.
+- `_load_transformer_model()` (Tier 3) had the identical unprotected-read
+  bug (`torch.load(str(model_path), ...)`) and would have caused the same
+  silent hang on any tracklet reaching Tier 3 without Tier 2 cutouts first
+  (which is what actually warms up ATen/Accelerate today).
+- Added a shared `_read_file_with_heartbeat(path, label, interval=5.0)`
+  helper: reads any model file in 64 KB chunks with a heartbeat thread that
+  prints if the read exceeds `interval` seconds — the same fix pattern
+  already proven for the Tier 2 CNN loader, now applied to the two loaders
+  that never received it. `_load_xgb_model()` now pre-reads the file and
+  hands xgboost a `bytearray` instead of a path string; `_load_transformer_model()`
+  now pre-reads into `BytesIO` and adds its own independent matmul warmup
+  (it cannot assume Tier 2 already ran).
+- Removed the temporary per-stage diagnostic prints added to
+  `Skills/injection_recovery.py` for this investigation — they served their
+  purpose (isolating the hang to `classify()`) and are not needed now that
+  the root cause is fixed.
+- 2 new tests: `TestReadFileWithHeartbeat` verifies both correct byte-exact
+  reads and that the heartbeat actually prints during a slow read.
+  `test_returns_model_when_xgb_available` extended to assert the loader now
+  passes a `bytearray` (not a path) to `xgboost.load_model()`.
+- **Verified in the coding-agent sandbox**: `_load_xgb_model()` confirmed
+  to load the real committed `models/tier1_xgb.json` correctly via the new
+  bytearray path (`n_classes_=5`). `_load_transformer_model()`'s new code
+  path was exercised through the `_read_file_with_heartbeat` call before
+  falling back to `None` at `_build_transformer_model()`, since this sandbox
+  has no `torch` install and cannot exercise real transformer loading or
+  the macOS-specific ATen deadlock itself — that part remains unverified
+  until the operator's next real run. If the operator's next run reaches
+  `classify()` and the console shows nothing at all for Tier 1 (not even
+  the "reading Tier 1 XGBoost model" heartbeat), the true cause is
+  something even earlier (e.g. the plain `import xgboost` statement's
+  native library load) and needs fresh re-diagnosis, not another patch to
+  these same two functions.
+
 ## v0.90.27 — Record ALeRCE Gate Z3 source assessment (2026-07-02)
 
 ### Added

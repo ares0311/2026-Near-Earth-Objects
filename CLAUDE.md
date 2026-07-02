@@ -656,7 +656,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.27)
+## Current State (v0.90.28)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -685,7 +685,65 @@ provider is real bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-02 v13 (CURRENT)
+### Handoff state as of 2026-07-02 v14 (CURRENT)
+
+**v0.90.24's CNN-warmup fix (PR #163) did NOT resolve the injection_recovery
+hang — root cause was misdiagnosed until per-stage diagnostic prints
+isolated it.** After PR #163 merged, the operator re-ran the Gate Z3
+recheck command and hit the same hang at item (1/200) with zero output —
+critically, not even a single heartbeat line from the PR #163 CNN warmup
+fix. Per the standing rule ("failed fix → re-diagnose, not re-patch"), this
+proved that fix's diagnosis was wrong, not just insufficient. Rather than
+patching `_load_cnn_model()` a third time, added temporary per-stage print
+statements around every call inside `run_injection_recovery()`'s loop
+(`detect()`, `link()`, `extract_features()`, `fit_orbit()`, `classify()`,
+`score()`). The operator's next run showed execution reaching
+`classify()` and then producing zero further output — isolating the hang
+to inside `classify()`, before Tier 2's CNN is ever reached.
+
+**True root cause**: `_load_xgb_model()` (Tier 1) called
+`clf.load_model(str(model_path))` — a bare path-based read with **zero**
+chunked pre-read, heartbeat, or print statement of any kind. `_tier1_predict()`
+runs first inside `classify()`, before Tier 2 (CNN) or Tier 3 (Transformer),
+so this unprotected read blocked before any of PR #163's CNN deadlock
+mitigations were ever executed — explaining the zero-heartbeat symptom.
+`_load_transformer_model()` had the identical unprotected-read bug and
+would have caused the same hang on any tracklet reaching Tier 3 without
+Tier 2 cutouts first.
+
+**v0.90.28 fix**: added a shared `_read_file_with_heartbeat()` helper
+(64 KB chunked reads + heartbeat thread, same pattern already proven for
+the CNN loader) and applied it to both `_load_xgb_model()` (now passes
+xgboost a `bytearray` instead of a path) and `_load_transformer_model()`
+(now pre-reads into `BytesIO` plus its own independent matmul warmup,
+since it cannot assume Tier 2 already ran). Removed the temporary
+diagnostic prints from `injection_recovery.py` now that the root cause is
+fixed. Verified in the sandbox: `_load_xgb_model()` loads the real
+committed `models/tier1_xgb.json` correctly via the new bytearray path
+(`n_classes_=5`, confirmed with `pip install xgboost scikit-learn`).
+`_load_transformer_model()`'s new code path was exercised through
+`_read_file_with_heartbeat()` but this sandbox has no `torch` install
+(network-restricted, install times out) and cannot exercise the real
+macOS-specific ATen deadlock — that part remains unverified until the
+operator's next real run.
+
+**Predicted operator console output after this fix**: after
+`[injection] (1/200) ...`, the console should show either (a) rapid
+progression through all 200 items with no further prints (if the XGBoost
+model file was already fully synced locally), or (b) a
+`  reading Tier 1 XGBoost model … still working (0m05s elapsed)` heartbeat
+line every 5 seconds if the file read is genuinely slow (e.g. Dropbox not
+yet fully synced), followed by progression once the read completes. If the
+console instead shows nothing at all — not even that heartbeat — for
+several minutes, the cause is something even earlier than `_load_xgb_model()`
+itself (e.g. the bare `import xgboost` statement's native library load) and
+needs fresh re-diagnosis from this new symptom, not another patch to
+`_load_xgb_model()` or `_load_transformer_model()`.
+
+**Next operator action**: re-run the Gate Z3 recheck command from `main`
+after this PR merges and paste the console output.
+
+### Handoff state as of 2026-07-02 v13
 
 **Current merged state through PR #163**:
 
