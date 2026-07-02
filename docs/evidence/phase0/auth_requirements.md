@@ -9,3 +9,4 @@ Phase 0 auth verification per docs/neo_discovery_agent_brief.md.
 | jpl_sbdb_neo_query | not required for this GET | HTTP 200 observed |
 | mpc_get_obs | not required for this GET | HTTP 200 observed |
 | irsa_ztf_sci_metadata | not required for this GET | HTTP 200 observed |
+| uw_ztf_alert_archive_listing | not required for this GET | HTTP 200 observed |

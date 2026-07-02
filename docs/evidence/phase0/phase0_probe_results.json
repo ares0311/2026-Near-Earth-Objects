@@ -25,15 +25,15 @@
     "url": "https://ssd-api.jpl.nasa.gov/sbdb_query.api?fields=spkid,pdes,full_name,class,neo,pha,moid,H,epoch,e,a,q,i,om,w,ma&sb-group=neo&full-prec=true&limit=3",
     "status_code": 200,
     "headers": {
-      "Date": "Thu, 02 Jul 2026 07:31:20 GMT",
+      "Date": "Thu, 02 Jul 2026 21:15:19 GMT",
       "Content-Type": "application/json",
       "Transfer-Encoding": "chunked",
-      "Connection": "keep-alive",
+      "Connection": "close",
       "Server": "nginx",
       "X-Robots-Tag": "noindex, nofollow, noarchive",
-      "Set-Cookie": "AWSALBAPP-0=_remove_; Expires=Thu, 09 Jul 2026 07:31:20 GMT; Path=/, AWSALBAPP-1=_remove_; Expires=Thu, 09 Jul 2026 07:31:20 GMT; Path=/, AWSALBAPP-2=_remove_; Expires=Thu, 09 Jul 2026 07:31:20 GMT; Path=/, AWSALBAPP-3=_remove_; Expires=Thu, 09 Jul 2026 07:31:20 GMT; Path=/"
+      "Set-Cookie": "AWSALBAPP-0=_remove_; Expires=Thu, 09 Jul 2026 21:15:19 GMT; Path=/, AWSALBAPP-1=_remove_; Expires=Thu, 09 Jul 2026 21:15:19 GMT; Path=/, AWSALBAPP-2=_remove_; Expires=Thu, 09 Jul 2026 21:15:19 GMT; Path=/, AWSALBAPP-3=_remove_; Expires=Thu, 09 Jul 2026 21:15:19 GMT; Path=/"
     },
-    "body_preview": "{\"signature\":{\"source\":\"NASA/JPL SBDB (Small-Body DataBase) Query API\",\"version\":\"1.0\"},\"fields\":[\"spkid\",\"pdes\",\"full_name\",\"class\",\"neo\",\"pha\",\"moid\",\"H\",\"epoch\",\"e\",\"a\",\"q\",\"i\",\"om\",\"w\",\"ma\"],\"data\":[[20000433,\"433\",\"   433 Eros (A898 PA)\",\"AMO\",\"Y\",\"N\",\".148798\",\"10.40\",\"2461200.5\",\".2228779627700761\",\"1.458243716760167\",\"1.133233327946397\",\"10.82854410314273\",\"304.2679713350896\",\"178.9181319135911\",\"62.51145501986792\"],[20000719,\"719\",\"   719 Albert (A911 TB)\",\"AMO\",\"Y\",\"N\",\".201591\",\"15.59\",\"2461200.5\",\".54659281141853\",\"2.636949566436567\",\"1.19561188934913\",\"11.57235893021322\",\"183.8602907856791\",\"156.1759693786955\",\"286.6772166822684\"],[20000887,\"887\",\"   887 Alinda (A918 AA)\",\"AMO\",\"Y\",\"N\",\".080116\",\"13.82\",\"2461200.5\",\".5710841391815443\",\"2.473998953398223\",\"1.061137390760757\",\"9.399997659652634\",\"110.4059976344421\",\"350.5493927253791\",\"132.1789097744492\"]],\"count\":42153}",
+    "body_preview": "{\"signature\":{\"version\":\"1.0\",\"source\":\"NASA/JPL SBDB (Small-Body DataBase) Query API\"},\"fields\":[\"spkid\",\"pdes\",\"full_name\",\"class\",\"neo\",\"pha\",\"moid\",\"H\",\"epoch\",\"e\",\"a\",\"q\",\"i\",\"om\",\"w\",\"ma\"],\"data\":[[20000433,\"433\",\"   433 Eros (A898 PA)\",\"AMO\",\"Y\",\"N\",\".148798\",\"10.40\",\"2461200.5\",\".2228779627700761\",\"1.458243716760167\",\"1.133233327946397\",\"10.82854410314273\",\"304.2679713350896\",\"178.9181319135911\",\"62.51145501986792\"],[20000719,\"719\",\"   719 Albert (A911 TB)\",\"AMO\",\"Y\",\"N\",\".201591\",\"15.59\",\"2461200.5\",\".54659281141853\",\"2.636949566436567\",\"1.19561188934913\",\"11.57235893021322\",\"183.8602907856791\",\"156.1759693786955\",\"286.6772166822684\"],[20000887,\"887\",\"   887 Alinda (A918 AA)\",\"AMO\",\"Y\",\"N\",\".080116\",\"13.82\",\"2461200.5\",\".5710841391815443\",\"2.473998953398223\",\"1.061137390760757\",\"9.399997659652634\",\"110.4059976344421\",\"350.5493927253791\",\"132.1789097744492\"]],\"count\":42153}",
     "body_truncated": false,
     "error": null
   },
@@ -44,9 +44,9 @@
     "status_code": 200,
     "headers": {
       "Server": "nginx/1.30.2",
-      "Date": "Thu, 02 Jul 2026 07:29:39 GMT",
+      "Date": "Thu, 02 Jul 2026 21:13:07 GMT",
       "Content-Type": "application/json",
-      "Content-Length": "9909354",
+      "Content-Length": "9911962",
       "Connection": "keep-alive",
       "Access-Control-Allow-Origin": "*"
     },
@@ -61,13 +61,30 @@
     "status_code": 200,
     "headers": {
       "Server": "nginx",
-      "Date": "Thu, 02 Jul 2026 07:31:36 GMT",
+      "Date": "Thu, 02 Jul 2026 21:15:43 GMT",
       "Content-Type": "text/plain",
-      "Content-Length": "2124761",
+      "Content-Length": "2126702",
       "Connection": "keep-alive",
-      "Set-Cookie": "anonymous=cc/ca/605fae688cade5f33bde3869e6b4"
+      "Set-Cookie": "anonymous=c8/1e/47d67075ac92078a48fa8511fab1"
     },
-    "body_preview": "\\fixlen = T\n\\RowsRetrieved = 3277\n\\QUERY_STATUS = 'OK'\n\\ in_row_id\n\\ in_ra\n\\ in_dec\n\\ ra (deg)\n\\ ___ Right ascension of image center\n\\ dec (deg)\n\\ ___ Declination of image center\n\\ infobits\n\\ ___ Info bit flags\n\\ field\n\\ ___ ZTF field number\n\\ ccdid\n\\ ___ CCD number (1..16)\n\\ qid\n\\ ___ Quadrant ID (1..4)\n\\ rcid\n\\ ___ Readout-channel ID (0..63)\n\\ fid\n\\ ___ Filter ID\n\\ filtercode\n\\ ___ Filter code (abbreviated name)\n\\ pid\n\\ ___ Science product ID\n\\ nid\n\\ ___ Day/night ID\n\\ expid\n\\ ___ Exposure ID\n\\ itid\n\\ ___ Image type ID\n\\ imgtype\n\\ ___ Image type name\n\\ imgtypecode\n\\ ___ Single letter image type code\n\\ obsdate\n\\ ___ Observation UT date/time\n\\ obsjd (d)\n\\ ___ Observation Julian day\n\\ exptime (s)\n\\ ___ Exposure time\n\\ filefracday\n\\ ___ Integer (YYYYMMDDdddddd) used in product file names\n\\ seeing (arcsec)\n\\ ___ Seeing FWHM\n\\ airmass\n\\ ___ Telescope airmass\n\\ moonillf\n\\ ___ Moon illuminated fraction\n\\ moonesb\n\\ ___ Moon excess in sky brightness\n\\ maglimit (mag)\n\\ ___ Magnitude limit\n\\ crpix1 (pix)\n\\ ___ Reference pixel value for axis 1\n\\ crpix2 (pix)\n\\ ___ Reference pixel value for axis 2\n\\ crval1 (deg)\n\\ ___ Reference position right ascension at crpix1,crpix2\n\\ crval2 (deg)\n\\ ___ Reference position declination at crpix1,crpix2\n\\ cd11 (deg/pix)\n\\ ___ CD matrix element 1,1\n\\ cd12 (deg/pix)\n\\ ___ CD matrix element 1,2\n\\ cd21 (deg/pix)\n\\ ___ CD matrix element 2,1\n\\ cd22 (deg/pix)\n\\ ___ CD matrix element 2,2\n\\ ra1 (deg)\n\\ ___ Right ascension of first image corner\n\\ dec1 (deg)\n\\ ___ Declination of first image corner\n\\ ra2 (deg)\n\\ ___ Right ascension of second image corner\n\\ dec2 (deg)\n\\ ___ Declination of second image corner\n\\ ra3 (deg)\n\\ ___ Right ascension of third image corner\n\\ dec3 (deg)\n\\ ___ Declination of third image corner\n\\ ra4 (deg)\n\\ ___ Right ascension of fourth image corner\n\\ dec4 (deg)\n\\ ___ Declination of fourth image corner\n\\ ipac_pub_date\n\\ ___ UT date/time of raw product release\n\\ ipac_gid\n\\ ___ IPAC Group ID\n|in_row_id|             in_ra|            in_d",
+    "body_preview": "\\fixlen = T\n\\RowsRetrieved = 3280\n\\QUERY_STATUS = 'OK'\n\\ in_row_id\n\\ in_ra\n\\ in_dec\n\\ ra (deg)\n\\ ___ Right ascension of image center\n\\ dec (deg)\n\\ ___ Declination of image center\n\\ infobits\n\\ ___ Info bit flags\n\\ field\n\\ ___ ZTF field number\n\\ ccdid\n\\ ___ CCD number (1..16)\n\\ qid\n\\ ___ Quadrant ID (1..4)\n\\ rcid\n\\ ___ Readout-channel ID (0..63)\n\\ fid\n\\ ___ Filter ID\n\\ filtercode\n\\ ___ Filter code (abbreviated name)\n\\ pid\n\\ ___ Science product ID\n\\ nid\n\\ ___ Day/night ID\n\\ expid\n\\ ___ Exposure ID\n\\ itid\n\\ ___ Image type ID\n\\ imgtype\n\\ ___ Image type name\n\\ imgtypecode\n\\ ___ Single letter image type code\n\\ obsdate\n\\ ___ Observation UT date/time\n\\ obsjd (d)\n\\ ___ Observation Julian day\n\\ exptime (s)\n\\ ___ Exposure time\n\\ filefracday\n\\ ___ Integer (YYYYMMDDdddddd) used in product file names\n\\ seeing (arcsec)\n\\ ___ Seeing FWHM\n\\ airmass\n\\ ___ Telescope airmass\n\\ moonillf\n\\ ___ Moon illuminated fraction\n\\ moonesb\n\\ ___ Moon excess in sky brightness\n\\ maglimit (mag)\n\\ ___ Magnitude limit\n\\ crpix1 (pix)\n\\ ___ Reference pixel value for axis 1\n\\ crpix2 (pix)\n\\ ___ Reference pixel value for axis 2\n\\ crval1 (deg)\n\\ ___ Reference position right ascension at crpix1,crpix2\n\\ crval2 (deg)\n\\ ___ Reference position declination at crpix1,crpix2\n\\ cd11 (deg/pix)\n\\ ___ CD matrix element 1,1\n\\ cd12 (deg/pix)\n\\ ___ CD matrix element 1,2\n\\ cd21 (deg/pix)\n\\ ___ CD matrix element 2,1\n\\ cd22 (deg/pix)\n\\ ___ CD matrix element 2,2\n\\ ra1 (deg)\n\\ ___ Right ascension of first image corner\n\\ dec1 (deg)\n\\ ___ Declination of first image corner\n\\ ra2 (deg)\n\\ ___ Right ascension of second image corner\n\\ dec2 (deg)\n\\ ___ Declination of second image corner\n\\ ra3 (deg)\n\\ ___ Right ascension of third image corner\n\\ dec3 (deg)\n\\ ___ Declination of third image corner\n\\ ra4 (deg)\n\\ ___ Right ascension of fourth image corner\n\\ dec4 (deg)\n\\ ___ Declination of fourth image corner\n\\ ipac_pub_date\n\\ ___ UT date/time of raw product release\n\\ ipac_gid\n\\ ___ IPAC Group ID\n|in_row_id|             in_ra|            in_d",
+    "body_truncated": true,
+    "error": null
+  },
+  "uw_ztf_alert_archive_listing": {
+    "id": "uw_ztf_alert_archive_listing",
+    "brief_section": "NOT in docs/neo_discovery_agent_brief.md -- new candidate found via WebSearch 2026-07-02, see docs/evidence/phase0/2026-07-02-gate-z3-uw-alert-archive-candidate.md",
+    "url": "https://ztf.uw.edu/alerts/public/",
+    "status_code": 200,
+    "headers": {
+      "Date": "Thu, 02 Jul 2026 21:15:50 GMT",
+      "Server": "Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips",
+      "Keep-Alive": "timeout=5, max=100",
+      "Connection": "Keep-Alive",
+      "Transfer-Encoding": "chunked",
+      "Content-Type": "text/html;charset=ISO-8859-1"
+    },
+    "body_preview": "<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"utf-8\">\n  <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title></title>\n  <link rel=\"stylesheet\" type=\"text/css\" href=\"/alerts/public/fancy-index/style.css\">\n  <style>img[src$=\".svg\"] { width: 16px; }</style>\n</head>\n<body>\n\n<div id=\"banner\" style='display: none'>\nNotice: This website will be offline for maintenance on Wednesday, June\n20th, between 8am and 6pm PST.\n</div>\n\n<div id=\"docs\">\n\n<div>\n<h3>What is included?</h3>\nBelow you will find compressed tar archives of ZTF event alerts (observations\ndetected in image differences). Each tar\nfile contains alerts collected in the given night (UTC-based), with each\nalert stored in a separate file in the <a\nhref=\"https://zwickytransientfacility.github.io/ztf-avro-alert/\">AVRO\nformat</a>. To get you started, we offer <a\nhref=\"https://github.com/ZwickyTransientFacility/ztf-avro-alert\">a\nrepository</a> with few basic utilities for reading AVRO-serialized data, as\nwell as an <a href=\"https://github.com/ZwickyTransientFacility/ztf-avro-alert/blob/master/notebooks/Working_with_avro_files.ipynb\">example\nJupyter notebook</a>.\nThe schema fields are described <a href=\"https://zwickytransientfacility.github.io/ztf-avro-alert/schema.html\">here</a>.\n</div>\n\n<div>\n<h3>Why this service?</h3>\nWe are providing this archive as simple alternative to public event brokers.\nFull-featured event brokers that provide real-time access to these alerts include <a href=\"https://mars.lco.global/\">MARS</a>, <a href=\"https://lasair.roe.ac.uk/\">Lasair</a>, <a href=\"https://antares.noao.edu/\">ANTARES</a>, and <a href=\"http://alerce.science/\">ALeRCE</a>.\n</div>\n\n<div>\n<h3>Known caveats</h3>\n<ul>\n<li>The data provided on this site is generated automatically.\nThe files provided contain a full, unfiltered, 5-sigma alert stream.\nDepending on your science case, you may wish to improve the purity of your sample by\n<a href=\"https://git",
     "body_truncated": true,
     "error": null
   }

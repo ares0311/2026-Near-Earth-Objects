@@ -12,3 +12,4 @@ not an assumption from the brief text.
 | jpl_sbdb_neo_query | Concrete Starting API Calls > JPL SBDB Query: NEO-Only (corrected) | https://ssd-api.jpl.nasa.gov/sbdb_query.api?fields=spkid,pdes,full_name,class,neo,pha,moid,H,epoch,e,a,q,i,om,w,ma&sb-group=neo&full-prec=true&limit=3 | 200 | reachable without credentials |
 | mpc_get_obs | Concrete Starting API Calls > MPC Observations API (corrected) | https://data.minorplanetcenter.net/api/get-obs | 200 | reachable without credentials |
 | irsa_ztf_sci_metadata | Concrete Starting API Calls > IRSA ZTF Image Metadata Search | https://irsa.ipac.caltech.edu/ibe/search/ztf/products/sci?POS=358.3,25.6 | 200 | reachable without credentials |
+| uw_ztf_alert_archive_listing | NOT in docs/neo_discovery_agent_brief.md -- new candidate found via WebSearch 2026-07-02, see docs/evidence/phase0/2026-07-02-gate-z3-uw-alert-archive-candidate.md | https://ztf.uw.edu/alerts/public/ | 200 | reachable without credentials |
