@@ -94,14 +94,17 @@ Near-Earth Objects are small solar system bodies with perihelion distances $q < 
 Potentially Hazardous Asteroids (PHAs) are NEOs with absolute magnitude $H \leq 22$ (diameter $\gtrsim 140$ m) and Minimum Orbit Intersection Distance (MOID) $\leq 0.05$ AU. The pipeline must identify and flag PHA candidates.
 
 The global NEO survey is dominated by:
-- **ZTF** (Zwicky Transient Facility) — training, benchmarking, and
-  historical-replay reference source; public alert/image archive
+- **ZTF** (Zwicky Transient Facility) — **primary discovery source as of
+  2026-07-02** via ZTF DR24 archival historical replay (see
+  `docs/MISSION.md §Operator Decision`). Live ZTF alert-stream consumption
+  remains prohibited; only bounded archival historical replay is permitted.
 - **ATLAS** — training and recovery-evidence source; 24–48 hr warning-capable
   survey stream already processed for operational discovery
 - **Pan-STARRS** — deep survey; public catalog access
 - **CSS** (Catalina Sky Survey) — MPC-feeding survey
-- **WISE/NEOWISE, DECam, and TESS** — active production discovery-source
-  targets in this repo because they provide less-reviewed archival data paths
+- **WISE/NEOWISE, DECam, and TESS** — **secondary/paused discovery sources**
+  as of 2026-07-02 (were primary through v0.90.10); code and Gate P1–P5
+  evidence preserved but not the active development target
 
 `docs/neo_discovery_agent_brief.md` adds the authoritative rule that ZTF/Fink,
 Fink-FAT, and SNAPS are methodology, benchmark, source-verification, and
@@ -181,8 +184,16 @@ Build in the order listed. Each module depends on all prior modules.
 
 ## Core Design Decisions
 
-### DECISION-001: ZTF as Training-Data Source; WISE/NEOWISE as Primary Discovery Target
-ZTF provided the richest freely available alert stream for ML training (Tier 1 + Tier 2 labels). However, ZTF ZAPS and the ATLAS pipeline already process and submit discoveries from those streams — running our pipeline on ZTF/ATLAS for discovery would produce duplicate submissions. The primary discovery targets are UNREVIEWED archives: WISE/NEOWISE (IRSA, no credentials), TESS FFIs, and DECam/NOIRLab public archives. See `docs/MISSION.md §The Two-Part Data Strategy` and `docs/near_earth_objects_research_brief.md §Ranked Space Assets`.
+### DECISION-001: ZTF DR24 historical replay as primary discovery path (SUPERSEDED 2026-07-02)
+**Superseded by operator decision 2026-07-02** (see `docs/MISSION.md
+§Operator Decision`): `docs/neo_discovery_agent_brief.md` now supersedes the
+WISE-primary strategy below. ZTF DR24 archival historical replay is the
+primary discovery path; WISE/DECam/TESS are secondary/paused. Live
+ZTF/ATLAS alert-stream discovery remains prohibited — the change is
+specifically that bounded, time-aware *archival* ZTF DR24 reprocessing is
+now permitted and primary, per the brief's Fink-FAT precedent.
+
+**Original decision (2026-06-27, now secondary)**: ZTF provided the richest freely available alert stream for ML training (Tier 1 + Tier 2 labels). ZTF ZAPS and the ATLAS pipeline already process and submit discoveries from live streams — running the pipeline on live ZTF/ATLAS for discovery would produce duplicate submissions. WISE/NEOWISE (IRSA, no credentials), TESS FFIs, and DECam/NOIRLab were the primary discovery targets. See `docs/near_earth_objects_research_brief.md §Ranked Space Assets`.
 
 ### DECISION-002: Tiered ML Architecture
 Follow the same three-tier approach as the exoplanet pipeline:
@@ -598,7 +609,31 @@ a measurable quantity (surveys done/total, tracklets done/total).
 
 See `docs/PRODUCTION_READINESS.md` for the full gap register.
 
-### Handoff notes (2026-07-02) — v0.90.11 (CURRENT)
+### Handoff notes (2026-07-02) — v0.90.12 (CURRENT) — MAJOR PIVOT
+
+**Operator decision: ZTF DR24 historical replay is now the primary discovery
+pipeline, superseding WISE/DECam/TESS.** Full record: `docs/MISSION.md
+§Operator Decision (2026-07-02)`. Key points:
+
+- `docs/neo_discovery_agent_brief.md` supersedes the 2026-07-01
+  reconciliation that kept WISE/DECam/TESS primary. Build the brief's Phase
+  1 pipeline next: ZTF DR24 archival historical replay, time-aware
+  known-object exclusion, Fink-FAT-style tracklet linker, LightGBM/XGBoost
+  candidate ranker.
+- WISE/DECam/TESS code and all Gate P1–P5 evidence are preserved, not
+  deleted — secondary/paused, not the active target.
+- Live ZTF/ATLAS alert-stream discovery is still prohibited. Only bounded,
+  time-aware archival ZTF DR24 reprocessing is newly permitted.
+- The `docs/PRODUCTION_READINESS.md` P1–P5 gates describe the now-secondary
+  WISE/DECam/TESS pipeline and do not establish readiness for the new ZTF
+  DR24 pipeline. New gates are needed before claiming that pipeline is
+  production-capable.
+- **Next production action**: Phase 0 source verification (ZTF DR24/Fink/JPL
+  SBDB/MPC access, auth, schema) per the brief — required before any
+  ingestion code is written. Produce `data_sources_verified.md`,
+  `auth_requirements.md`, `pretrained_model_audit.md`.
+
+### Handoff notes (2026-07-02) — v0.90.11
 
 **Correction (operator-flagged 2026-07-02)**: earlier same-day handoff notes
 described Gate P4 as something requiring active operator action ("Jerome

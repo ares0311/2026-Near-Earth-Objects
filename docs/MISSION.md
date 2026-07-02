@@ -3,7 +3,8 @@
 **Read this before reading anything else. This file and
 `docs/neo_discovery_agent_brief.md` are jointly authoritative.**
 
-Last updated: 2026-07-02
+Last updated: 2026-07-02 (operator decision: brief supersedes the prior
+WISE/DECam/TESS-primary strategy — see §Operator Decision below)
 
 ---
 
@@ -16,132 +17,123 @@ a publishable scientific paper.
 
 We do NOT claim discovery. We claim to have found **candidates for expert review**.
 
-## Authoritative Brief Integration
+## Operator Decision (2026-07-02): The Brief Is Now the Primary Pipeline
 
-`docs/neo_discovery_agent_brief.md` is now an authoritative workflow brief for
-how agents should design, validate, and evaluate NEO candidate discovery work.
-It governs:
+Jerome W. Lindsey III has decided that `docs/neo_discovery_agent_brief.md`
+**supersedes** the WISE/DECam/TESS-primary strategy this file previously
+described. This is a deliberate reversal of the 2026-07-01 reconciliation
+(commit `a1934808`), which had kept WISE/DECam/TESS as primary and treated
+the brief as reference-only. That reconciliation is now void.
+
+**What this means concretely:**
+
+- **ZTF DR24 historical replay is now the primary discovery path**, not a
+  training-only or benchmark-only reference. The brief's own precedent
+  (Fink-FAT: 111,275,131 processed ZTF alerts → 389,530 Solar System
+  candidates → 327 new orbits, 65 unreported in MPC at publication time) is
+  the proof this is not circular — ZTF's own real-time pipeline processing
+  alerts does not mean every alert was linked into a reported orbit. Historical
+  reprocessing of the full archive with a dedicated linker can still surface
+  candidates ZTF's own pipeline never assembled into a discovery.
+- **Fink/Fink-FAT and SNAPS are architecture and benchmark references** for
+  the linker and ranker, per the brief.
+- **WISE/NEOWISE, DECam, and TESS are demoted to secondary/paused.** Their
+  code (`fetch_wise_archive`, `fetch_decam_archive`, `fetch_tess_ffis`,
+  `fetch_discovery`), the Gate P1–P5 evidence, and
+  `docs/SURVEY_NATIVE_CONFIDENCE_POLICY.md` are **not deleted** — they remain
+  a working, previously-verified secondary path and a decision record. They
+  are simply no longer the pipeline the operator wants developed next.
+- **Live ZTF alert-stream monitoring and live ATLAS remain training/reference
+  only** — that specific prohibition is unchanged and is not what this
+  decision reverses. The distinction is: *live, real-time* ZTF/ATLAS alert
+  consumption is still circular (ZTF ZAPS/ATLAS already process and submit
+  from that stream in real time); *archival, historical-replay* reprocessing
+  of ZTF DR24 is not circular, per the brief's own argument and the Fink-FAT
+  precedent.
+- **The production-capability gate register (`docs/PRODUCTION_READINESS.md`
+  P1–P5) was written against the WISE/DECam/TESS pipeline.** Those gates
+  stay CLOSED as a historical record of verified work on that path, but they
+  no longer define production readiness for the *current* primary pipeline.
+  New gates for the ZTF DR24 historical-replay pipeline must be defined
+  before that pipeline can be called production-capable. Do not claim
+  production readiness for the new pipeline until that happens.
+
+## Brief Requirements (from `docs/neo_discovery_agent_brief.md`, now binding)
 
 - Candidate language: use "candidate NEO," "candidate moving object,"
   "unassociated moving-source candidate," or equivalent non-confirming terms.
-- Historical replay discipline: no future-catalog leakage, time-aware MPC/JPL
-  known-object masking, and retrospective validation against later outcomes.
-- Source-verification discipline: verify public APIs, auth requirements, schema
-  behavior, rate limits, and current counts before building ingestion jobs.
-- Model discipline: use auditable rankers first, treat pretrained/deep models
-  as feature extractors or baselines until verified, and create a
-  `pretrained_model_audit.md` record before using any pretrained model in
-  training or evaluation.
-
-Where this file and the brief appear to differ, use this reconciliation:
-
-- WISE/NEOWISE, DECam, and TESS remain the active production discovery sources
-  because they are the current unreviewed-archive implementation path.
-- ZTF DR24, Fink/Fink-FAT, and SNAPS from the brief are authoritative
-  historical-replay, benchmarking, feature-engineering, source-verification, and
-  candidate-ranker references. They may be used to validate methodology and
-  rankers, but they must not become an MPC discovery-submission stream unless a
-  future documented decision proves the work is not duplicating already
-  processed ZTF/ATLAS survey submissions.
-- Any source claim, API schema, URL, credential assumption, or dataset count in
-  the brief must still be verified before operator commands or ingestion code
-  depend on it.
+- Historical replay discipline: no future-catalog leakage — reconstruct the
+  known-object catalog state as of the start of the replay window, and never
+  use catalog knowledge gained after the replay window ends.
+- Source-verification discipline: verify public APIs, auth requirements,
+  schema behavior, rate limits, and current counts before building ingestion
+  jobs. Phase 0 deliverables (`data_sources_verified.md`, `schema_snapshot/`,
+  `sample_ingest_report.md`, `auth_requirements.md`,
+  `pretrained_model_audit.md`) are required before Phase 1 ingestion begins.
+- Model discipline: build the rule-based historical-replay baseline before
+  any ML; build known-object exclusion before candidate ranking; build
+  simple linear tracklet linking before graph/neural linking; train
+  LightGBM/XGBoost before experimenting with end-to-end neural ranking.
+  Pretrained/deep models are feature extractors or baselines only, and
+  require a `pretrained_model_audit.md` entry before use.
+- Every candidate score is a prioritization score, not a discovery or
+  confirmation.
 
 ---
 
-## The Two-Part Data Strategy
-
-### Part 1: Training Data (use ZTF and ATLAS)
-
-ZTF and ATLAS are used ONLY to train and calibrate the ML models:
-- Tier 1 XGBoost: trained on ZTF real/bogus labels
-- Tier 2 CNN: trained on ZTF image triplet labels
-- Tier 3 Transformer: trained on MPC tracklet sequences
-- Ensemble stacker: trained on ZTF-origin validation samples
-
-Once trained, the models are FROZEN. ZTF and ATLAS are NOT queried during discovery.
-
-### Part 2: Discovery Data (use unreviewed archives)
-
-The discovery fetch layer targets data that professional NEO pipelines have NOT
-already processed. In priority order:
-
-| Source | Why it's unreviewed | Access |
-|---|---|---|
-| **TESS Full-Frame Images (FFIs)** | TESS is an exoplanet mission. No NEO detection pipeline runs on FFIs. Full sky, 30-min cadence, 2018–present. | NASA MAST (public) |
-| **DECam/NOIRLab archival data** | Dark Energy Survey and other DECam programs image large sky areas but are not NEO-focused. No systematic NEO linking applied. | NOIRLab Astro Data Lab (public) |
-| **WISE/NEOWISE raw images** | NEOWISE team characterizes KNOWN objects via thermal modeling. The raw archival images have not been systematically searched for new NEO discoveries via source linking. Infrared finds low-albedo objects that optical surveys miss. | NASA IPAC (public) |
-| **Rubin/LSST early data** | As Rubin comes online (2025–2027), early data releases will contain untapped NEO discovery potential before the LSST Solar System Processing pipeline catches up. | LSST Science Platform |
-
-**NEVER use ZTF/ALeRCE or ATLAS as the discovery source.** ZTF ZAPS and the ATLAS
-pipeline have already processed those streams and submitted to MPC. Searching them
-for new NEOs is circular.
-
----
-
-## The Pipeline
+## The Pipeline (per the brief's architecture)
 
 ```
-Unreviewed Archive (TESS / DECam / WISE)
+ZTF DR24 / public ZTF archive (bounded historical time window)
     │
     ▼
-fetch.py: retrieve image data or source catalogs from archive APIs
+Source verifier (Phase 0): confirm Fink/IRSA-ZTF/JPL SBDB/MPC access,
+    auth, schema, rate limits — before any ingestion code depends on them
     │
     ▼
-preprocess.py: extract point sources, difference images, photometry
+Historical replay ingestor: pull the bounded window with raw payloads,
+    hashes, timestamps, full provenance
     │
     ▼
-detect.py: identify moving sources (motion > 0.05 arcsec/hr)
+Known-object exclusion: time-aware catalog snapshot lookup — suppress
+    detections already associated with a known object AT OBSERVATION TIME
     │
     ▼
-link.py: THOR-style tracklet linking across nights (≥3 detections, ≥2 nights)
+Alert/image quality filter: rule-based artifact rejection; real/bogus
+    score if available
     │
     ▼
-orbit.py: Gauss IOD + differential correction → orbital elements + MOID
+Feature builder: motion rate, direction consistency, brightness, filter,
+    SNR, sky position, quality flags, detection count, time span
     │
     ▼
-classify.py: ML ensemble (Tier 1 XGBoost + Tier 2 CNN + Tier 3 Transformer)
+Tracklet linker: linear motion + time/direction consistency (Fink-FAT-style
+    reference architecture)
     │
     ▼
-score.py: hazard assessment, discovery priority ranking
+Candidate ranker: LightGBM/XGBoost — NOT the existing three-tier ZTF
+    classifier, which was trained for live real/bogus classification, not
+    historical-replay candidate ranking. This is new work.
     │
     ▼
-ready_for_submission() gate:
-  MOID ≤ 0.05 AU
-  orbit quality code ≥ 2
-  real_bogus score ≥ 0.90
-  not a known MPC object
-    │
-    ▼ (if gate passes)
-Skills/adversarial_review.py: 13-challenge automated rejection attempt
-  → REJECT: discard candidate
-  → BORDERLINE / SURVIVE: pass to operator
+Retrospective validator: compare ranked candidates against later MPC/JPL
+    outcomes WITHOUT future-catalog leakage — recall, purity@K, false
+    positive rate
     │
     ▼
-Operator review (Jerome W. Lindsey III): reviews SURVIVE/BORDERLINE candidates
+Candidate report generator: auditable Markdown/JSON reports, no discovery
+    claim, explicit "unconfirmed until validated by appropriate authority"
+    caveat
     │
-    ▼
-[HUMAN GATE] Jerome decides which candidates to submit
-    │
-    ▼
-Skills/export_ades_report.py: format in MPC ADES PSV format
-    │
-    ▼
-Submit to MPC (observatory code XXX until permanent code assigned)
-    │
-    ▼
-MPC: calculates digest2 automatically
-  digest2 > 65 → posted to NEOCP
-  NEOCP → global follow-up observatories confirm independently
-  Scout/Sentry → impact probability (automated; we do not assert this)
-    │
-    ▼
-MPC assigns provisional designation → MPEC publication
-    │
-    ▼
-Paper: "We identified N candidates from TESS/DECam/WISE using this pipeline.
-        Here is the methodology and the candidates submitted to MPC."
+    ▼ (only for a candidate an operator chooses to pursue for real-world submission)
+Skills/adversarial_review.py → operator review → Skills/export_ades_report.py
+    → MPC submission → NEOCP → MPC provisional designation → paper
 ```
+
+The final four stages (adversarial review through paper) are unchanged from
+the existing pipeline and are already implemented — they operate on whatever
+`ScoredNEO`-shaped candidate reaches them, regardless of source. What's new
+is everything upstream of "Candidate ranker."
 
 ---
 
@@ -162,12 +154,8 @@ Do NOT contact NASA PDCO directly. Scout handles that automatically if warranted
 `Skills/adversarial_review.py` tries to REJECT each candidate with 13 challenges
 before any operator sees it. The logic: attempt to disprove that we found anything.
 If the null hypothesis (that we found nothing) cannot be rejected, the candidate
-proceeds to operator review.
-
-A separate, candidate-specific rejection model may be built once a specific candidate
-is found — that model is tailored to the specific object, its orbit, its photometry,
-and any alternative explanations (artifact, known MBA, satellite, etc.). This model
-cannot be specified in advance because it depends on what is found.
+proceeds to operator review. This stays unchanged under the new pipeline — it is
+source-agnostic and consumes whatever `ScoredNEO` packet is produced.
 
 ---
 
@@ -186,7 +174,9 @@ cannot be specified in advance because it depends on what is found.
 - Public helper APIs that are not called by the pipeline
 - Documentation files that repeat what other docs say
 - Skills scripts that wrap a single function
-- Additional fetch sources for ZTF/ATLAS discovery (they are training data only)
+- Live ZTF alert-stream or live ATLAS discovery code (still circular —
+  distinct from ZTF DR24 archival historical replay, which is now the
+  primary path)
 - Any code that asserts impact probability
 - Any code that contacts NASA PDCO directly
 
@@ -196,61 +186,41 @@ that the operator actually runs.
 
 ---
 
-## Training Data Cleanup (TODO)
+## Immediate Next Steps (ordered, per the brief's phased plan)
 
-The ML models are trained and weights are committed:
-- `models/tier1_xgb.json` — Tier 1 XGBoost (KEEP)
-- `models/tier2_cnn.pt` — Tier 2 CNN (KEEP)
-- `models/tier3_transformer.pt` — Tier 3 Transformer (KEEP)
-- `models/ensemble_stacker.pkl` — Ensemble meta-learner (KEEP if present)
-
-Raw training data cached locally (ZTF alert JSONs, MPC observation downloads,
-ALeRCE sequence files) should be DELETED from the operator's Mac once models
-are confirmed working. These are reproducible from public sources. Storage
-freed is significant (estimated several GB). Operator action required:
-
-```bash
-# After confirming model weights load correctly via:
-PYTHONPATH=src uv run python Skills/validate_model_weights.py
-
-# Delete cached training data (NOT the model weights):
-rm -rf ~/.neo_cache/training/
-rm -rf data/ztf_alerts_raw/
-rm -rf data/mpc_sequences_raw/
-rm -rf data/alerce_sequences_raw/
-# Confirm models/ directory still intact:
-ls -lh models/
-```
-
----
-
-## Immediate Next Steps (ordered)
-
-1. **Redesign `fetch.py` discovery layer** — replace `fetch_ztf` / `fetch_atlas`
-   discovery path with `fetch_tess_ffis`, `fetch_decam_archive`, `fetch_wise_archive`.
-   ZTF/ATLAS fetch functions stay for training use only.
-
-2. **PR for dead code removal** — 374 dead helper APIs and their tests removed
-   (commit `0c49d83` on `claude/general-session-rvaEE`). Needs PR and CI.
-
-3. **Jerome contacts MPC** about observatory code for a data-analysis pipeline
-   (not a telescope). See `docs/MPC_SUBMISSION_POLICY.md §TODO for Future Agents`.
-
-4. **Run pipeline on TESS FFIs or DECam data** — first real discovery attempt
-   on unreviewed data. Operator action after Step 1 is merged.
+1. **Phase 0 — Source verification** (required before any ingestion code is
+   written): verify ZTF DR24/public archive access, Fink API auth/schema
+   (`swagger.json`), JPL SBDB query behavior, MPC observation API behavior,
+   and IRSA ZTF image metadata access. Produce
+   `data_sources_verified.md`, `auth_requirements.md`, and
+   `pretrained_model_audit.md` (even if the answer is "no third-party
+   pretrained model in use yet").
+2. **Phase 1 — ZTF DR24 + Fink/SNAPS historical replay prototype**: bounded
+   historical time window, known-object exclusion, rule-based quality
+   filters, handcrafted tabular features, linear tracklet linker, logistic
+   regression baseline, then LightGBM/XGBoost candidate ranker.
+3. **Phase 2 — Validation**: compare against later MPC/JPL outcomes; recall
+   and purity@K; logistic regression vs. LightGBM/XGBoost ablation.
+4. **Define new production-capability gates** for this pipeline (the
+   existing P1–P5 register describes the now-secondary WISE/DECam/TESS
+   path) before claiming production readiness for ZTF DR24 historical
+   replay.
 
 ---
 
 ## Doom Loop Prevention
 
 Every session must read this file first. If a proposed task does not advance
-Step 1–4 above, do not do it. Specifically:
+the phases above, do not do it. Specifically:
 
 - Do not add more helper functions to src/ modules
 - Do not add more Skills that wrap individual functions
 - Do not write more documentation that restates this document
 - Do not re-train ML models unless a specific failure is diagnosed
-- Do not re-run ZTF/ATLAS queries for discovery purposes
+- Do not query live ZTF/ATLAS alert streams for discovery purposes
+  (archival ZTF DR24 historical replay is the exception — see above)
+- Do not claim the new pipeline is production-capable before Phase 0/1/2
+  are complete and new gates are defined
 
 If the highest-priority step is blocked by a human decision, say so and stop.
 Do not fill the gap with busywork.

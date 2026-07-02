@@ -1,18 +1,22 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.90.11
+**Current version**: v0.90.12
 **Last updated**: 2026-07-02
 **Purpose**: Mandatory read at session start (per MANDATORY SESSION-START PROTOCOL).  
 Every planning cycle must name the highest-priority unresolved production-capability gate and show how proposed steps close or directly unblock it.
 
 **Also mandatory at session start**: `docs/near_earth_objects_research_brief.md` — canonical primer on ranked space assets (WISE/NEOWISE #2, NEO Surveyor #1, Gaia #3), frontier AI methods (THOR, HelioLinC3D), submission best practices, and key literature. Required to keep agents aligned on the discovery-paper data strategy (step 5 of CLAUDE.md §MANDATORY SESSION-START PROTOCOL).
 
-**Authoritative workflow brief**: `docs/neo_discovery_agent_brief.md` is now
-authoritative for candidate language, source verification, historical replay,
-time-aware known-object masking, no future-catalog leakage, pretrained-model
-audits, and auditable candidate-ranker design. `docs/MISSION.md` records how
-that brief is reconciled with the active WISE/DECam/TESS production discovery
-path.
+**PIVOT NOTICE (2026-07-02, operator decision)**: `docs/neo_discovery_agent_brief.md`
+now supersedes WISE/DECam/TESS as the primary discovery strategy. See
+`docs/MISSION.md §Operator Decision (2026-07-02)` for the full record. **The
+gate register below (P1–P5) describes the now-secondary WISE/DECam/TESS
+pipeline.** Those gates remain CLOSED as an accurate historical record of
+verified work, but closing them does **not** establish production readiness
+for the new primary pipeline (ZTF DR24 historical replay). New gates for
+that pipeline have not yet been defined — do the Phase 0 source-verification
+work from `docs/MISSION.md` first, then define new gates once Phase 1 exists
+to evaluate.
 
 ---
 
