@@ -189,12 +189,11 @@ that the operator actually runs.
 ## Immediate Next Steps (ordered, per the brief's phased plan)
 
 1. **Phase 0 — Source verification** (required before any ingestion code is
-   written): verify ZTF DR24/public archive access, Fink API auth/schema
-   (`swagger.json`), JPL SBDB query behavior, MPC observation API behavior,
-   and IRSA ZTF image metadata access. Produce
-   `data_sources_verified.md`, `auth_requirements.md`, and
-   `pretrained_model_audit.md` (even if the answer is "no third-party
-   pretrained model in use yet").
+   written): **materially complete as of v0.90.18** in
+   `docs/evidence/phase0/`. JPL SBDB, MPC get-obs, and IRSA ZTF image metadata
+   are live-verified; Fink schema access is blocked externally at TLS
+   handshake; pretrained model use is deferred. Do not invent Fink schema
+   behavior. Refresh these artifacts only when source behavior changes.
 2. **Phase 1 — ZTF DR24 + Fink/SNAPS historical replay prototype**: bounded
    historical time window, known-object exclusion, rule-based quality
    filters, handcrafted tabular features, linear tracklet linker, logistic

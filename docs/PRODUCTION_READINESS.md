@@ -1,6 +1,6 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.90.17
+**Current version**: v0.90.18
 **Last updated**: 2026-07-02
 **Purpose**: Mandatory read at session start (per MANDATORY SESSION-START PROTOCOL).  
 Every planning cycle must name the highest-priority unresolved production-capability gate and show how proposed steps close or directly unblock it.
@@ -13,10 +13,13 @@ now supersedes WISE/DECam/TESS as the primary discovery strategy. See
 gate register below (P1–P5) describes the now-secondary WISE/DECam/TESS
 pipeline.** Those gates remain CLOSED as an accurate historical record of
 verified work, but closing them does **not** establish production readiness
-for the new primary pipeline (ZTF DR24 historical replay). New gates for
-that pipeline have not yet been defined — do the Phase 0 source-verification
-work from `docs/MISSION.md` first, then define new gates once Phase 1 exists
-to evaluate.
+for the new primary pipeline (ZTF DR24 historical replay). Phase 0
+source-verification evidence is now recorded in `docs/evidence/phase0/`:
+JPL SBDB, MPC get-obs, and IRSA ZTF image metadata are live-verified; Fink
+schema access is externally blocked at TLS handshake; pretrained model use is
+deferred. New production gates for the ZTF DR24 path have not yet been
+defined — define them next, then build a bounded Phase 1 historical-replay
+prototype.
 
 **Phase 0 status (2026-07-02)**: 3 of 4 cited sources live-verified working
 via `Skills/verify_ztf_dr24_sources.py` — IRSA ZTF image metadata (200, no

@@ -679,7 +679,36 @@ See `docs/MISSION.md` for the authoritative data strategy. The prior "blocked
 until expert review" guardrail was removed by operator decision on 2026-06-21;
 MPC/NEOCP/Scout is the expert review system.
 
-### Handoff state as of 2026-07-02 v9 (CURRENT)
+### Handoff state as of 2026-07-02 v10 (CURRENT)
+
+**Phase 0 source verification is materially complete except for the external
+Fink TLS blocker.** The current committed evidence packet is
+`docs/evidence/phase0/`:
+
+- `data_sources_verified.md`: JPL SBDB, MPC get-obs, and IRSA ZTF metadata
+  returned HTTP 200 in real operator-observed runs. Fink schema/swagger still
+  fail before HTTP response during TLS handshake.
+- `auth_requirements.md`: JPL/MPC/IRSA required no credentials for the tested
+  read-only calls. Fink auth remains unknown because no HTTP response was
+  reached.
+- `phase0_probe_results.json`: raw captured headers/body previews; MPC
+  get-obs uses GET with JSON body `{"desigs": ["433"]}` and JPL SBDB uses
+  `sb-group=neo`.
+- `schema_snapshot/README.md`, `sample_ingest_report.md`, and
+  `pretrained_model_audit.md` complete the brief's required Phase 0 artifact
+  set without inventing ingestion or approving pretrained models.
+- `2026-07-02-root-cause-findings.md`: root causes recorded. JPL `neo=Y` was
+  invalid, MPC get-obs requires a JSON body, Fink is external, and v0.90.17
+  fixed stale checkpoint reuse by hashing full probe definitions.
+
+**Next production action**: define new production-capability gates for the ZTF
+DR24 historical-replay pipeline, then build Phase 1 as a bounded prototype:
+IRSA ZTF metadata access, time-aware known-object exclusion, Fink-FAT-style
+linear linking, handcrafted features, and a logistic-regression baseline before
+LightGBM/XGBoost. Do not block on Fink unless the specific Phase 1 task needs
+Fink schema access; use the verified IRSA/JPL/MPC path first.
+
+### Handoff state as of 2026-07-02 v9
 
 **Root cause found and fixed for JPL SBDB; MPC narrowed; Fink is external** —
 see `docs/evidence/phase0/2026-07-02-root-cause-findings.md` for full detail.
@@ -693,22 +722,17 @@ documentation review (this sandbox cannot reach these domains directly).
   vs. 1,556,924 for the unfiltered query). `Skills/verify_ztf_dr24_sources.py`
   and `docs/neo_discovery_agent_brief.md` both corrected to use
   `sb-group=neo`.
-- **MPC get-obs — narrowed, not yet fixed**: the API needs an actual JSON
-  request body even for GET (query-string params alone → HTTP 501/400 with
-  errors that literally say "Content-Type not supported, use
-  application/json" then "Failed to decode JSON object: Expecting value").
-  Awaiting operator confirmation that `-d '{"desigs": ["433"]}'` with the
-  JSON content-type header returns 200 before changing `_probe_one()` to
-  send a body — do not guess this works without seeing it.
+- **MPC get-obs — fixed in v0.90.16**: the API needs an actual JSON request
+  body even for GET. Operator verification showed `{"desigs": ["433"]}`
+  returns HTTP 200 with ADES observation data; `Skills/verify_ztf_dr24_sources.py`
+  now sends that body.
 - **Fink API — external blocker, not our bug**: `curl` with the operator's
   native LibreSSL failed identically to Python's `requests` (`SSL_ERROR_SYSCALL`
   immediately after ClientHello, from two independent TLS stacks on the
   operator's real network). This rules out a client-side fix. No code
   change applies; retry later or treat as unavailable for Phase 1.
-- **NEXT PRODUCTION ACTION — NOT YET DONE**: get the MPC get-obs body-request
-  confirmation from the operator, apply that fix, then Phase 0 is
-  effectively complete (2 of 4 verified sources reachable and correct: IRSA,
-  JPL SBDB; MPC pending final confirmation; Fink blocked externally).
+- **Status update v0.90.18**: MPC is no longer pending. Phase 0 evidence is
+  committed; Fink remains the only unavailable source and is external.
 
 ### Handoff state as of 2026-07-02 v8
 
@@ -827,12 +851,10 @@ this. No code changed; this is a documentation/framing fix only.
   written MPC confirmation for archival WISE/NEOWISE C51 submission
   authority (see `docs/MPC_SUBMISSION_POLICY.md §TODO for Future Agents`).
 - **Next production action for a coding agent**: with all code-addressable
-  production-capability gates closed, the highest-value remaining work is
-  either (a) the two Gate P2 follow-ups explicitly left open — a WISE
-  sentinel-magnitude (`mag=99.0`) rejection filter, or DECam/TESS live
-  endpoint verification — or (b) waiting on Jerome's Gate P4 correspondence
-  before any live WISE run for actual discovery purposes. Do not invent new
-  gates or new public helper APIs; the PRIMARY DIRECTIVE gate still applies.
+  production-capability gates closed, the historical v4 next-action framing
+  below was later corrected by v5 and superseded by v10. Do not wait on
+  Jerome's Gate P4 correspondence today; there is no candidate yet. Current
+  work is the ZTF DR24 Phase 1 path described in the v10 handoff above.
 
 ### Handoff state as of 2026-07-02 v3
 
@@ -852,13 +874,11 @@ this. No code changed; this is a documentation/framing fix only.
   by code inspection).
 - Evidence: `docs/evidence/prod-loop/2026-07-02-gate-p3-no-submission-drill.md`;
   `docs/PRODUCTION_READINESS.md` Gate P3 marked CLOSED.
-- **Next production action**: Gate P4 — MPC submission protocol. This is
-  **human-gated**: Jerome must obtain written MPC confirmation that this
-  independent archival pipeline may submit WISE/NEOWISE remeasurements under
-  station code C51 before any live submission code path can be exercised.
-  No further code work can close P4 alone. Gate P5 (operator go/no-go
-  runbook) is the remaining code-addressable gate and can be worked next
-  while P4 awaits Jerome's MPC correspondence.
+- **Historical next action (superseded by v5/v10)**: This section originally
+  framed Gate P4 as an active MPC-correspondence task. That framing is no
+  longer current; there is no candidate yet, so there is nothing to submit or
+  ask MPC about today. Keep the fail-closed submission controls, and follow
+  the current ZTF DR24 Phase 1 path above.
 
 ### Handoff state as of 2026-07-02 v2
 
@@ -1149,12 +1169,15 @@ filter them before any external submission:
 those streams. See `docs/MISSION.md §The Two-Part Data Strategy`.
 Default is now `--surveys WISE` which is correct for discovery.
 
-**Two human-gated blockers remain**:
-1. **MPC observatory code**: Jerome must contact MPC to determine how a data-analysis
-   pipeline (not an observing telescope) can submit observation reports.
-   See `docs/MPC_SUBMISSION_POLICY.md §TODO for Future Agents — Archival WISE Submission Authority`.
-2. **Actual candidate discovery**: The pipeline must find at least one candidate that
-   survives both adversarial review and operator review before a discovery paper is possible.
+**Current blocker status (updated by v0.90.18 handoff above)**:
+1. There is no active MPC-contact task today because there is no candidate yet.
+   MPC submission protocol becomes relevant only after a real candidate survives
+   automated adversarial review and operator review.
+2. The current production path is ZTF DR24 historical replay, not WISE/DECam/TESS.
+   Phase 0 is materially complete except for the external Fink TLS blocker.
+   Next code-addressable work is to define ZTF DR24 production gates and start
+   the bounded Phase 1 historical-replay prototype using verified IRSA/JPL/MPC
+   behavior.
 
 **Progress tracker**: `docs/evidence/prod-loop/LOOP_PROGRESS.md` — read this
 at session start to avoid repeating completed work.

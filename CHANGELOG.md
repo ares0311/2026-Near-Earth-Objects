@@ -3,6 +3,34 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.18 — Commit Phase 0 ZTF DR24 evidence packet and handoff sync (2026-07-02)
+
+### Added
+- `docs/evidence/phase0/schema_snapshot/README.md`: schema/metadata snapshot
+  status derived only from captured Phase 0 probe responses.
+- `docs/evidence/phase0/sample_ingest_report.md`: records that Phase 0 was
+  probe-only, with observed row/response counts and evidence-file hashes.
+- `docs/evidence/phase0/pretrained_model_audit.md`: defers all third-party
+  pretrained model use until a Phase 1 baseline exists and a model-specific
+  audit is written.
+
+### Changed
+- `README.md`, `AGENTS.md`, `CLAUDE.md`, `docs/MISSION.md`, and
+  `docs/PRODUCTION_READINESS.md` now describe the current v0.90.18 state:
+  ZTF DR24 historical replay is primary; WISE/DECam/TESS are secondary; Phase
+  0 verifies JPL SBDB, MPC get-obs, and IRSA ZTF metadata; Fink remains an
+  external TLS blocker.
+- `docs/evidence/prod-loop/LOOP_PROGRESS.md` now records the v0.90.12-v0.90.18
+  pivot/fix sequence so future agents do not re-enter the old WISE loop or
+  re-ask for the already-fixed MPC request-body confirmation.
+- `docs/evidence/phase0/2026-07-02-root-cause-findings.md` now reflects that
+  the checkpoint-content fix has been operator-verified by the refreshed
+  Phase 0 evidence artifacts.
+- Completes the follow-up from PR #157 by committing the generated
+  `data_sources_verified.md`, `auth_requirements.md`, and
+  `phase0_probe_results.json` files referenced by
+  `docs/evidence/phase0/2026-07-02-second-live-probe-console.md`.
+
 ## v0.90.17 — Fix stale checkpoint reuse on probe content changes (2026-07-02)
 
 ### Fixed

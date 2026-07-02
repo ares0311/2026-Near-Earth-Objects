@@ -130,16 +130,13 @@ automatically, so a code fix to a probe is guaranteed to be re-probed on
 the next run rather than silently resumed from a stale cache — while
 probes that are genuinely unchanged still resume correctly.
 
-**Status**: fix applied, not yet operator-verified. Predicted result of the
-next run: this is a *new* checkpoint filename (the old file is now orphaned
-and harmless — `Logs/**` is git-ignored), so all 5 probes will print
-`[verify]` (not `[resume]`) and make live network calls again, with a
-nonzero `elapsed` value. Expect `jpl_sbdb_neo_query`, `mpc_get_obs`, and
-`irsa_ztf_sci_metadata` to report HTTP 200; `fink_schema`/`fink_swagger`
-are expected to still fail (5 retries with 2/4/8/16/32s backoff each,
-consistent with the confirmed external Fink TLS blocker above) — if Fink
-instead succeeds, or the other three fail, the fix is not what we think it
-is.
+**Status**: fix applied and operator-verified by the generated evidence files
+committed with this packet. The fresh `docs/evidence/phase0/phase0_probe_results.json`
+contains corrected live results: `jpl_sbdb_neo_query`, `mpc_get_obs`, and
+`irsa_ztf_sci_metadata` all returned HTTP 200; `fink_schema` and
+`fink_swagger` still failed during TLS handshake, consistent with the external
+Fink blocker above. The old checkpoint file under `Logs/**` is orphaned and
+harmless because operational logs are git-ignored.
 
 **No code fix is applicable here.** This is recorded as an external service
 availability issue, not a defect in `Skills/verify_ztf_dr24_sources.py`.

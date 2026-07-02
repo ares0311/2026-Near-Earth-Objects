@@ -1,0 +1,74 @@
+{
+  "fink_schema": {
+    "id": "fink_schema",
+    "brief_section": "Concrete Starting API Calls > Fink API Discovery",
+    "url": "https://api.fink-portal.org/api/v1/schema",
+    "status_code": null,
+    "headers": {},
+    "body_preview": "",
+    "body_truncated": false,
+    "error": "SSLError: HTTPSConnectionPool(host='api.fink-portal.org', port=443): Max retries exceeded with url: /api/v1/schema (Caused by SSLError(SSLEOFError(8, '[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1081)')))"
+  },
+  "fink_swagger": {
+    "id": "fink_swagger",
+    "brief_section": "Concrete Starting API Calls > Fink API Discovery",
+    "url": "https://api.fink-portal.org/swagger.json",
+    "status_code": null,
+    "headers": {},
+    "body_preview": "",
+    "body_truncated": false,
+    "error": "SSLError: HTTPSConnectionPool(host='api.fink-portal.org', port=443): Max retries exceeded with url: /swagger.json (Caused by SSLError(SSLEOFError(8, '[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1081)')))"
+  },
+  "jpl_sbdb_neo_query": {
+    "id": "jpl_sbdb_neo_query",
+    "brief_section": "Concrete Starting API Calls > JPL SBDB Query: NEO-Only (corrected)",
+    "url": "https://ssd-api.jpl.nasa.gov/sbdb_query.api?fields=spkid,pdes,full_name,class,neo,pha,moid,H,epoch,e,a,q,i,om,w,ma&sb-group=neo&full-prec=true&limit=3",
+    "status_code": 200,
+    "headers": {
+      "Date": "Thu, 02 Jul 2026 07:31:20 GMT",
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Server": "nginx",
+      "X-Robots-Tag": "noindex, nofollow, noarchive",
+      "Set-Cookie": "AWSALBAPP-0=_remove_; Expires=Thu, 09 Jul 2026 07:31:20 GMT; Path=/, AWSALBAPP-1=_remove_; Expires=Thu, 09 Jul 2026 07:31:20 GMT; Path=/, AWSALBAPP-2=_remove_; Expires=Thu, 09 Jul 2026 07:31:20 GMT; Path=/, AWSALBAPP-3=_remove_; Expires=Thu, 09 Jul 2026 07:31:20 GMT; Path=/"
+    },
+    "body_preview": "{\"signature\":{\"source\":\"NASA/JPL SBDB (Small-Body DataBase) Query API\",\"version\":\"1.0\"},\"fields\":[\"spkid\",\"pdes\",\"full_name\",\"class\",\"neo\",\"pha\",\"moid\",\"H\",\"epoch\",\"e\",\"a\",\"q\",\"i\",\"om\",\"w\",\"ma\"],\"data\":[[20000433,\"433\",\"   433 Eros (A898 PA)\",\"AMO\",\"Y\",\"N\",\".148798\",\"10.40\",\"2461200.5\",\".2228779627700761\",\"1.458243716760167\",\"1.133233327946397\",\"10.82854410314273\",\"304.2679713350896\",\"178.9181319135911\",\"62.51145501986792\"],[20000719,\"719\",\"   719 Albert (A911 TB)\",\"AMO\",\"Y\",\"N\",\".201591\",\"15.59\",\"2461200.5\",\".54659281141853\",\"2.636949566436567\",\"1.19561188934913\",\"11.57235893021322\",\"183.8602907856791\",\"156.1759693786955\",\"286.6772166822684\"],[20000887,\"887\",\"   887 Alinda (A918 AA)\",\"AMO\",\"Y\",\"N\",\".080116\",\"13.82\",\"2461200.5\",\".5710841391815443\",\"2.473998953398223\",\"1.061137390760757\",\"9.399997659652634\",\"110.4059976344421\",\"350.5493927253791\",\"132.1789097744492\"]],\"count\":42153}",
+    "body_truncated": false,
+    "error": null
+  },
+  "mpc_get_obs": {
+    "id": "mpc_get_obs",
+    "brief_section": "Concrete Starting API Calls > MPC Observations API (corrected)",
+    "url": "https://data.minorplanetcenter.net/api/get-obs",
+    "status_code": 200,
+    "headers": {
+      "Server": "nginx/1.30.2",
+      "Date": "Thu, 02 Jul 2026 07:29:39 GMT",
+      "Content-Type": "application/json",
+      "Content-Length": "9909354",
+      "Connection": "keep-alive",
+      "Access-Control-Allow-Origin": "*"
+    },
+    "body_preview": "[\n  {\n    \"ADES_DF\": null,\n    \"OBS80\": null,\n    \"OBS_DF\": null,\n    \"XML\": \"<?xml version=\\\"1.0\\\" encoding=\\\"UTF-8\\\"?>\\n<ades version=\\\"2022\\\">\\n  <optical>\\n    <permID>433</permID>\\n    <obsID>00000000_00_00045Qb</obsID>\\n    <trkID>00000aA-Kw</trkID>\\n    <mode>UNK</mode>\\n    <stn>802</stn>\\n    <obsTime>1893-10-29T09:55:00.480Z</obsTime>\\n    <ra>92.24717</ra>\\n    <dec>53.65117</dec>\\n    <astCat>UNK</astCat>\\n    <ref>AnHar 53</ref>\\n    <subFrm>B1950.0</subFrm>\\n    <subFmt>M92</subFmt>\\n    <precTime>100</precTime>\\n    <precRA>0.01</precRA>\\n    <precDec>0.1</precDec>\\n  </optical>\\n  <optical>\\n    <permID>433</permID>\\n    <obsID>00000000_00_00045Qc</obsID>\\n    <trkID>00000aA-Kx</trkID>\\n    <mode>UNK</mode>\\n    <stn>802</stn>\\n    <obsTime>1893-10-31T08:17:57.120Z</obsTime>\\n    <ra>93.69925</ra>\\n    <dec>54.07761</dec>\\n    <astCat>UNK</astCat>\\n    <ref>AnHar 53</ref>\\n    <subFrm>B1950.0</subFrm>\\n    <subFmt>M92</subFmt>\\n    <precTime>100</precTime>\\n    <precRA>0.01</precRA>\\n    <precDec>0.1</precDec>\\n  </optical>\\n  <optical>\\n    <permID>433</permID>\\n    <obsID>00000000_00_00045Qd</obsID>\\n    <trkID>00000aA-Ky</trkID>\\n    <mode>UNK</mode>\\n    <stn>802</stn>\\n    <obsTime>1893-11-01T09:21:01.440Z</obsTime>\\n    <ra>94.47525</ra>\\n    <dec>54.29800</dec>\\n    <astCat>UNK</astCat>\\n    <ref>AnHar 53</ref>\\n    <subFrm>B1950.0</subFrm>\\n    <subFmt>M92</subFmt>\\n    <precTime>100</precTime>\\n    <precRA>0.01</precRA>\\n    <precDec>0.1</precDec>\\n  </optical>\\n  <optical>\\n    <permID>433</permID>\\n    <obsID>00000000_00_00045Qe</obsID>\\n    <trkID>00000aA-Kz</trkID>\\n    <mode>UNK</mode>\\n    <stn>802</stn>\\n    <obsTime>1893-11-27T08:26:00.960Z</obsTime>\\n    <ra>112.01083</ra>\\n    <dec>57.57997</dec>\\n    <astCat>UNK</astCat>\\n    <ref>AnHar 53</ref>\\n    <subFrm>B1950.0</subFrm>\\n    <subFmt>M92</subFmt>\\n    <precTime>100</precTime>\\n    <precRA>0.01</precRA>\\n    <precDec>0.1</precDec>\\n  </optical>\\n  <optical>\\n    <permID>433</pe",
+    "body_truncated": true,
+    "error": null
+  },
+  "irsa_ztf_sci_metadata": {
+    "id": "irsa_ztf_sci_metadata",
+    "brief_section": "Concrete Starting API Calls > IRSA ZTF Image Metadata Search",
+    "url": "https://irsa.ipac.caltech.edu/ibe/search/ztf/products/sci?POS=358.3,25.6",
+    "status_code": 200,
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 02 Jul 2026 07:31:36 GMT",
+      "Content-Type": "text/plain",
+      "Content-Length": "2124761",
+      "Connection": "keep-alive",
+      "Set-Cookie": "anonymous=cc/ca/605fae688cade5f33bde3869e6b4"
+    },
+    "body_preview": "\\fixlen = T\n\\RowsRetrieved = 3277\n\\QUERY_STATUS = 'OK'\n\\ in_row_id\n\\ in_ra\n\\ in_dec\n\\ ra (deg)\n\\ ___ Right ascension of image center\n\\ dec (deg)\n\\ ___ Declination of image center\n\\ infobits\n\\ ___ Info bit flags\n\\ field\n\\ ___ ZTF field number\n\\ ccdid\n\\ ___ CCD number (1..16)\n\\ qid\n\\ ___ Quadrant ID (1..4)\n\\ rcid\n\\ ___ Readout-channel ID (0..63)\n\\ fid\n\\ ___ Filter ID\n\\ filtercode\n\\ ___ Filter code (abbreviated name)\n\\ pid\n\\ ___ Science product ID\n\\ nid\n\\ ___ Day/night ID\n\\ expid\n\\ ___ Exposure ID\n\\ itid\n\\ ___ Image type ID\n\\ imgtype\n\\ ___ Image type name\n\\ imgtypecode\n\\ ___ Single letter image type code\n\\ obsdate\n\\ ___ Observation UT date/time\n\\ obsjd (d)\n\\ ___ Observation Julian day\n\\ exptime (s)\n\\ ___ Exposure time\n\\ filefracday\n\\ ___ Integer (YYYYMMDDdddddd) used in product file names\n\\ seeing (arcsec)\n\\ ___ Seeing FWHM\n\\ airmass\n\\ ___ Telescope airmass\n\\ moonillf\n\\ ___ Moon illuminated fraction\n\\ moonesb\n\\ ___ Moon excess in sky brightness\n\\ maglimit (mag)\n\\ ___ Magnitude limit\n\\ crpix1 (pix)\n\\ ___ Reference pixel value for axis 1\n\\ crpix2 (pix)\n\\ ___ Reference pixel value for axis 2\n\\ crval1 (deg)\n\\ ___ Reference position right ascension at crpix1,crpix2\n\\ crval2 (deg)\n\\ ___ Reference position declination at crpix1,crpix2\n\\ cd11 (deg/pix)\n\\ ___ CD matrix element 1,1\n\\ cd12 (deg/pix)\n\\ ___ CD matrix element 1,2\n\\ cd21 (deg/pix)\n\\ ___ CD matrix element 2,1\n\\ cd22 (deg/pix)\n\\ ___ CD matrix element 2,2\n\\ ra1 (deg)\n\\ ___ Right ascension of first image corner\n\\ dec1 (deg)\n\\ ___ Declination of first image corner\n\\ ra2 (deg)\n\\ ___ Right ascension of second image corner\n\\ dec2 (deg)\n\\ ___ Declination of second image corner\n\\ ra3 (deg)\n\\ ___ Right ascension of third image corner\n\\ dec3 (deg)\n\\ ___ Declination of third image corner\n\\ ra4 (deg)\n\\ ___ Right ascension of fourth image corner\n\\ dec4 (deg)\n\\ ___ Declination of fourth image corner\n\\ ipac_pub_date\n\\ ___ UT date/time of raw product release\n\\ ipac_gid\n\\ ___ IPAC Group ID\n|in_row_id|             in_ra|            in_d",
+    "body_truncated": true,
+    "error": null
+  }
+}

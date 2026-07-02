@@ -562,15 +562,15 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.10)
+## Current State (v0.90.18)
 
-All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
-2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
-coverage target. All three ML tiers have trained weights and all calibration KPIs
-have passed. **All T1 production gaps are CLOSED.** The discovery fetch layer
-targeting WISE/NEOWISE, DECam/NOIRLab, and TESS FFIs is complete (PR #119,
-2026-06-27). The pipeline is ready to search unreviewed archival data for NEO
-candidates. `run_pipeline.py` default survey is now `WISE`.
+All 10 legacy pipeline modules are complete. The offline suite passes on Python
+3.14, all three legacy ML tiers have trained weights, and the WISE/DECam/TESS
+production-capability gates P1/P2/P3/P5 are closed as historical evidence.
+However, the operator pivot on 2026-07-02 makes ZTF DR24 archival historical
+replay the current primary discovery path. The WISE/DECam/TESS path is
+secondary/paused and must not be treated as proof that the new ZTF DR24 path is
+production-capable.
 Console output is now fully compliant with `docs/CONSOLE_OUTPUT_SPEC.md` —
 every stage print includes `elapsed {M}m{S:02d}s` and ETA is computed from
 a measurable quantity (surveys done/total, tracklets done/total).
@@ -609,7 +609,39 @@ a measurable quantity (surveys done/total, tracklets done/total).
 
 See `docs/PRODUCTION_READINESS.md` for the full gap register.
 
-### Handoff notes (2026-07-02) — v0.90.12 (CURRENT) — MAJOR PIVOT
+### Handoff notes (2026-07-02) — v0.90.18 (CURRENT)
+
+**Phase 0 source verification for the ZTF DR24 historical-replay pipeline is
+now materially complete except for the external Fink TLS blocker.** Evidence is
+committed under `docs/evidence/phase0/`:
+
+- `data_sources_verified.md`: live operator-observed results show JPL SBDB,
+  MPC get-obs, and IRSA ZTF image metadata all returning HTTP 200.
+- `auth_requirements.md`: those three probes required no credentials for the
+  tested read-only calls; Fink auth remains unknown because both Fink probes
+  failed before HTTP response.
+- `phase0_probe_results.json`: raw captured headers/body previews. MPC get-obs
+  uses a GET with JSON body `{"desigs": ["433"]}`; JPL SBDB uses
+  `sb-group=neo`.
+- `schema_snapshot/README.md`, `sample_ingest_report.md`, and
+  `pretrained_model_audit.md`: complete the brief's Phase 0 deliverable set
+  without inventing ingestion or approving pretrained models.
+- `2026-07-02-root-cause-findings.md`: root causes recorded. JPL's brief
+  example `neo=Y` was wrong; MPC get-obs requires a JSON body; Fink is an
+  external TLS-handshake failure reproduced across Python and curl; v0.90.17
+  fixed stale checkpoint reuse by hashing full probe definitions; v0.90.18
+  commits the refreshed evidence packet and missing Phase 0 deliverables.
+
+**Highest-priority next production work**: define the new ZTF DR24
+production-capability gates and then start Phase 1 with a bounded historical
+replay prototype: IRSA ZTF metadata access, no-future-catalog-leakage known
+object exclusion, Fink-FAT-style linear linking, auditable handcrafted
+features, and a logistic-regression baseline before any LightGBM/XGBoost or
+pretrained model work. Do not block on Fink unless a Phase 1 task specifically
+requires Fink schema access; the verified IRSA/JPL/MPC path is enough to begin
+bounded prototype design.
+
+### Handoff notes (2026-07-02) — v0.90.12 — MAJOR PIVOT
 
 **Operator decision: ZTF DR24 historical replay is now the primary discovery
 pipeline, superseding WISE/DECam/TESS.** Full record: `docs/MISSION.md
@@ -628,10 +660,9 @@ pipeline, superseding WISE/DECam/TESS.** Full record: `docs/MISSION.md
   WISE/DECam/TESS pipeline and do not establish readiness for the new ZTF
   DR24 pipeline. New gates are needed before claiming that pipeline is
   production-capable.
-- **Next production action**: Phase 0 source verification (ZTF DR24/Fink/JPL
-  SBDB/MPC access, auth, schema) per the brief — required before any
-  ingestion code is written. Produce `data_sources_verified.md`,
-  `auth_requirements.md`, `pretrained_model_audit.md`.
+- **Status update v0.90.18**: Phase 0 verification is now recorded under
+  `docs/evidence/phase0/`. JPL/MPC/IRSA are live-verified; Fink remains an
+  external TLS blocker; pretrained models are deferred.
 
 ### Handoff notes (2026-07-02) — v0.90.11
 
