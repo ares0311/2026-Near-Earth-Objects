@@ -656,7 +656,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.28)
+## Current State (v0.90.29)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -685,7 +685,35 @@ provider is real bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-02 v14 (CURRENT)
+### Handoff state as of 2026-07-02 v15 (CURRENT)
+
+**classify() hang CONFIRMED RESOLVED (v0.90.29)** ✓ — operator re-ran the
+Gate Z3 recheck command on `main` and it completed cleanly: 200/200
+injection-recovery items in 5s (no hang, no heartbeat needed — model files
+were already locally cached), 100% detection/link/score rate, and
+`Skills/adversarial_review.py --offline` correctly processed all 200 full
+review packets (`SURVIVE=0 BORDERLINE=0 REJECT=200` — expected for synthetic
+short-arc injections with no fitted orbit, not a defect). Full evidence:
+`docs/evidence/prod-loop/2026-07-02-classify-hang-root-cause-resolved.md`.
+This closes out the multi-session hang-diagnosis saga (v0.90.23 → v0.90.24 →
+v0.90.28 → v0.90.29); the true root cause was `_load_xgb_model()`'s
+unprotected file read, not the CNN loader that was patched twice before it.
+**This does NOT close Gate Z3** — it's a synthetic-data pipeline-mechanics
+confirmation, not real ZTF DR24 archival data. Gate Z3's real blocker is
+unchanged: a verified per-source ZTF DR24 detection source (Gate Z1 only
+fetches image metadata today).
+
+**Next production action**: resume Gate Z3 source verification — research
+a documented, officially-verified public API for real per-source ZTF DR24
+moving-object detections (not the ALeRCE static-lightcurve endpoint already
+ruled insufficient in `docs/evidence/phase0/alerce_source_detection_assessment.md`,
+and not the Gate Z1 image-metadata-only endpoint). Do not invent or guess an
+endpoint; if no verified source can be found without live network access
+this sandbox lacks, delegate the lookup to the operator's research agent or
+ask the operator to verify a specific candidate URL/API before any ingestion
+code is written against it.
+
+### Handoff state as of 2026-07-02 v14
 
 **v0.90.24's CNN-warmup fix (PR #163) did NOT resolve the injection_recovery
 hang — root cause was misdiagnosed until per-stage diagnostic prints
