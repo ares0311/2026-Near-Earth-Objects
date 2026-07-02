@@ -1,0 +1,16 @@
+{
+  "n_injected": 50,
+  "mission": "WISE",
+  "n_detected": 50,
+  "n_linked": 50,
+  "n_scored": 50,
+  "detection_rate": 1.0,
+  "link_rate": 1.0,
+  "score_rate": 1.0,
+  "hazard_flag_counts": {
+    "unknown": 50,
+    "close_approach": 0,
+    "nominal": 0,
+    "pha_candidate": 0
+  }
+}

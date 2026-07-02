@@ -3,6 +3,25 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.6 — Gate P1 WISE discovery-source positive control (2026-07-02)
+
+### Added
+- `Skills/injection_recovery.py`: `--survey WISE` mode injects a source-native
+  NEOWISE-visit-cadence synthetic tracklet (single-epoch W1 exposures, no
+  native real/bogus score, ~1 arcsec astrometric jitter, 0.08 mag photometric
+  noise) through the real `detect.py` discovery-archive singleton path,
+  `link.py`, `classify.py`, and `score.py`. Verified 100% detection/link/score
+  recovery (n=50, seed=42); baseline committed at
+  `data/injection_recovery_wise_baseline.json`.
+- `.github/workflows/e2e.yml`: new `wise-injection` job runs the WISE
+  positive control on every push/PR and fails closed if recovery drops to 0.
+
+### Changed
+- `docs/PRODUCTION_READINESS.md`: Gate P1 (discovery-source positive control)
+  marked CLOSED with evidence at
+  `docs/evidence/prod-loop/2026-07-02-gate-p1-wise-injection-recovery.md`.
+  Gate P2 (survey-native confidence policy) remains open.
+
 ## v0.90.5 — WISE parent-field probe selector (2026-06-30)
 
 ### Added

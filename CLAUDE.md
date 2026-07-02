@@ -663,7 +663,33 @@ See `docs/MISSION.md` for the authoritative data strategy. The prior "blocked
 until expert review" guardrail was removed by operator decision on 2026-06-21;
 MPC/NEOCP/Scout is the expert review system.
 
-### Handoff state as of 2026-06-30 (CURRENT)
+### Handoff state as of 2026-07-02 (CURRENT)
+
+**Gate P1 CLOSED (2026-07-02)** ✓ — WISE/NEOWISE discovery-source positive control:
+- `Skills/injection_recovery.py` gained `--survey WISE`: injects a source-native
+  NEOWISE-visit-cadence synthetic tracklet (single-epoch W1 exposures over a
+  54-hour, 3-distinct-night visit; no native real/bogus score; ~1 arcsec
+  astrometric jitter; 0.08 mag photometric noise) through the real production
+  `detect.py` discovery-archive singleton path, `link.py`, `classify.py`, and
+  `score.py` — not a mocked/parallel path.
+- Verified 100% detection/link/score rate (n=50, seed=42) in an isolated
+  Python 3.11 sanity venv (this sandbox cannot run the pinned Python 3.14 venv;
+  CI is authoritative). Default `--survey ZTF` path unchanged, still matches
+  committed `data/injection_recovery_n200.json` baseline (no regression).
+- New CI job `wise-injection` in `.github/workflows/e2e.yml` runs the WISE
+  positive control on every push/PR and fails closed if `n_linked` or
+  `n_scored` drops to 0.
+- Evidence: `docs/evidence/prod-loop/2026-07-02-gate-p1-wise-injection-recovery.md`;
+  `docs/PRODUCTION_READINESS.md` Gate P1 marked CLOSED.
+- **This closes the "no more live WISE runs until P1/P2 supplies a measured
+  reason" block from the 2026-06-30 handoff.** Gate P2 (survey-native confidence
+  policy) remains open — the WISE positive-control packets score `hazard_flag:
+  unknown` because there is no WISE-native real/bogus or quality signal yet.
+- **Next production action**: work Gate P2 — document quantitative WISE/DECam/TESS
+  confidence thresholds so archive candidates don't rely on absent ZTF-style
+  real/bogus evidence. See `docs/PRODUCTION_READINESS.md` Gate P2.
+
+### Handoff state as of 2026-06-30
 
 **v0.90.5 patch status**:
 - `Skills/select_survey_fields.py --wise-archive-probes` now enriches ranked
