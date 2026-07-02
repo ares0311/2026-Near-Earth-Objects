@@ -80,10 +80,10 @@ definition.
   the observatory-code strategy is resolved and `NEO_MPC_SUBMISSION_APPROVED=1`
   is intentionally set with a real non-placeholder MPC code.
 
-### I. Version coherence ✓ DONE (current v0.90.18)
-- [x] `src/__init__.py`, `pyproject.toml`, `uv.lock` → 0.90.18
+### I. Version coherence ✓ DONE (current v0.90.19)
+- [x] `src/__init__.py`, `pyproject.toml`, `uv.lock` → 0.90.19
 - [x] `README.md`, `AGENTS.md`, `CLAUDE.md`, `docs/PRODUCTION_READINESS.md`
-      describe the v0.90.18 state: ZTF DR24 historical replay is primary,
+      describe the v0.90.19 state: ZTF DR24 historical replay is primary,
       Phase 0 evidence is recorded, and WISE/DECam/TESS gates are secondary
       historical evidence.
 - [x] Recent PR history through #156 confirms clear forward progress rather
@@ -203,4 +203,5 @@ so there is no pending operator task.**
 | 37 | 2026-07-02 | v0.90.13-v0.90.14 added `Skills/verify_ztf_dr24_sources.py` and recorded the first live Phase 0 probe outputs. IRSA worked; JPL/MPC request formats needed correction; Fink failed during TLS handshake. | Diagnose JPL/MPC from real response bodies; do not guess URL/body formats |
 | 38 | 2026-07-02 | v0.90.15-v0.90.16 fixed JPL SBDB with `sb-group=neo` and MPC get-obs with a GET JSON body `{"desigs":["433"]}`; Fink remained an external TLS blocker verified across Python and curl. | Ensure checkpointing re-probes changed request definitions |
 | 39 | 2026-07-02 | v0.90.17 fixed stale Phase 0 checkpoint reuse by hashing full probe definitions (`id`, `url`, `method`, `body`) instead of IDs only. | Commit refreshed Phase 0 artifacts and update stale handoff state |
-| 40 | 2026-07-02 | v0.90.18 completes the PR #157 follow-up by committing the generated Phase 0 evidence packet: `data_sources_verified.md`, `auth_requirements.md`, `phase0_probe_results.json`, `schema_snapshot/README.md`, `sample_ingest_report.md`, and `pretrained_model_audit.md`; README/AGENTS/CLAUDE/MISSION/PRODUCTION_READINESS now point to the ZTF DR24 Phase 1 path. | Define ZTF DR24 production gates, then build the bounded Phase 1 historical-replay prototype |
+| 40 | 2026-07-02 | v0.90.18 completes the PR #157 follow-up by committing the generated Phase 0 evidence packet: `data_sources_verified.md`, `auth_requirements.md`, `phase0_probe_results.json`, `schema_snapshot/README.md`, `sample_ingest_report.md`, and `pretrained_model_audit.md`; README/AGENTS/CLAUDE/MISSION/PRODUCTION_READINESS now point to the ZTF DR24 Phase 1 path. | Historical next action was to define ZTF DR24 gates; completed in row 41 |
+| 41 | 2026-07-02 | v0.90.19 defines the ZTF DR24 production gates in `docs/ZTF_DR24_PRODUCTION_GATES.md`: Z0 Phase 0 verification, Z1 bounded replay ingest, Z2 time-aware known-object exclusion, Z3 source-native linking, Z4 auditable ranking baseline, Z5 retrospective validation, Z6 no-submission package drill, and Z7 runbook update. | Work Gate Z1: bounded ZTF DR24 historical-replay ingest prototype |

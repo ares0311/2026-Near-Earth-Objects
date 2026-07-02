@@ -1,6 +1,6 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.90.18
+**Current version**: v0.90.19
 **Last updated**: 2026-07-02
 **Purpose**: Mandatory read at session start (per MANDATORY SESSION-START PROTOCOL).  
 Every planning cycle must name the highest-priority unresolved production-capability gate and show how proposed steps close or directly unblock it.
@@ -17,9 +17,9 @@ for the new primary pipeline (ZTF DR24 historical replay). Phase 0
 source-verification evidence is now recorded in `docs/evidence/phase0/`:
 JPL SBDB, MPC get-obs, and IRSA ZTF image metadata are live-verified; Fink
 schema access is externally blocked at TLS handshake; pretrained model use is
-deferred. New production gates for the ZTF DR24 path have not yet been
-defined — define them next, then build a bounded Phase 1 historical-replay
-prototype.
+deferred. The ZTF DR24 production gates are now defined in
+`docs/ZTF_DR24_PRODUCTION_GATES.md`; the next implementation step is Gate Z1,
+a bounded historical-replay ingest prototype.
 
 **Phase 0 status (2026-07-02)**: 3 of 4 cited sources live-verified working
 via `Skills/verify_ztf_dr24_sources.py` — IRSA ZTF image metadata (200, no

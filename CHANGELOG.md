@@ -3,6 +3,21 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.19 — Define ZTF DR24 production gates (2026-07-02)
+
+### Added
+- `docs/ZTF_DR24_PRODUCTION_GATES.md`: new gate register for the current
+  primary ZTF DR24 historical-replay path. Gates Z0-Z7 cover Phase 0 source
+  verification, bounded replay ingest, time-aware known-object exclusion,
+  source-native linking, auditable ranking, retrospective validation,
+  no-submission package drill, and operator runbook updates.
+
+### Changed
+- `docs/MISSION.md`, `docs/PRODUCTION_READINESS.md`, `README.md`,
+  `AGENTS.md`, `CLAUDE.md`, and `docs/evidence/prod-loop/LOOP_PROGRESS.md`
+  now point future work at Gate Z1 instead of leaving the ZTF DR24 gates
+  undefined.
+
 ## v0.90.18 — Commit Phase 0 ZTF DR24 evidence packet and handoff sync (2026-07-02)
 
 ### Added

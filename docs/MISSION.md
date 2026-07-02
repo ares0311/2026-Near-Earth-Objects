@@ -200,10 +200,10 @@ that the operator actually runs.
    regression baseline, then LightGBM/XGBoost candidate ranker.
 3. **Phase 2 — Validation**: compare against later MPC/JPL outcomes; recall
    and purity@K; logistic regression vs. LightGBM/XGBoost ablation.
-4. **Define new production-capability gates** for this pipeline (the
-   existing P1–P5 register describes the now-secondary WISE/DECam/TESS
-   path) before claiming production readiness for ZTF DR24 historical
-   replay.
+4. **Use the ZTF DR24 production-capability gates** in
+   `docs/ZTF_DR24_PRODUCTION_GATES.md`. The existing P1–P5 register describes
+   the now-secondary WISE/DECam/TESS path; the Z0-Z7 gates control production
+   readiness for ZTF DR24 historical replay.
 
 ---
 
@@ -218,8 +218,8 @@ the phases above, do not do it. Specifically:
 - Do not re-train ML models unless a specific failure is diagnosed
 - Do not query live ZTF/ATLAS alert streams for discovery purposes
   (archival ZTF DR24 historical replay is the exception — see above)
-- Do not claim the new pipeline is production-capable before Phase 0/1/2
-  are complete and new gates are defined
+- Do not claim the new pipeline is production-capable before the Z0-Z7 gates in
+  `docs/ZTF_DR24_PRODUCTION_GATES.md` are closed
 
 If the highest-priority step is blocked by a human decision, say so and stop.
 Do not fill the gap with busywork.

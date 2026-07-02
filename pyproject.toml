@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "neo-detection"
-version = "0.90.18"
+version = "0.90.19"
 description = "Near-Earth Object Detection and Ranking Pipeline"
 requires-python = ">=3.11"
 dependencies = [

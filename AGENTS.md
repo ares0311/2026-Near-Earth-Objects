@@ -562,7 +562,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.18)
+## Current State (v0.90.19)
 
 All 10 legacy pipeline modules are complete. The offline suite passes on Python
 3.14, all three legacy ML tiers have trained weights, and the WISE/DECam/TESS
@@ -609,7 +609,7 @@ a measurable quantity (surveys done/total, tracklets done/total).
 
 See `docs/PRODUCTION_READINESS.md` for the full gap register.
 
-### Handoff notes (2026-07-02) — v0.90.18 (CURRENT)
+### Handoff notes (2026-07-02) — v0.90.19 (CURRENT)
 
 **Phase 0 source verification for the ZTF DR24 historical-replay pipeline is
 now materially complete except for the external Fink TLS blocker.** Evidence is
@@ -632,10 +632,10 @@ committed under `docs/evidence/phase0/`:
   fixed stale checkpoint reuse by hashing full probe definitions; v0.90.18
   commits the refreshed evidence packet and missing Phase 0 deliverables.
 
-**Highest-priority next production work**: define the new ZTF DR24
-production-capability gates and then start Phase 1 with a bounded historical
-replay prototype: IRSA ZTF metadata access, no-future-catalog-leakage known
-object exclusion, Fink-FAT-style linear linking, auditable handcrafted
+**Highest-priority next production work**: work Gate Z1 from
+`docs/ZTF_DR24_PRODUCTION_GATES.md` by starting a bounded ZTF DR24 historical
+replay ingest prototype: IRSA ZTF metadata access, no-future-catalog-leakage
+known-object exclusion, Fink-FAT-style linear linking, auditable handcrafted
 features, and a logistic-regression baseline before any LightGBM/XGBoost or
 pretrained model work. Do not block on Fink unless a Phase 1 task specifically
 requires Fink schema access; the verified IRSA/JPL/MPC path is enough to begin

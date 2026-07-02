@@ -701,8 +701,8 @@ Fink TLS blocker.** The current committed evidence packet is
   invalid, MPC get-obs requires a JSON body, Fink is external, and v0.90.17
   fixed stale checkpoint reuse by hashing full probe definitions.
 
-**Next production action**: define new production-capability gates for the ZTF
-DR24 historical-replay pipeline, then build Phase 1 as a bounded prototype:
+**Next production action**: work Gate Z1 from
+`docs/ZTF_DR24_PRODUCTION_GATES.md` by building Phase 1 as a bounded prototype:
 IRSA ZTF metadata access, time-aware known-object exclusion, Fink-FAT-style
 linear linking, handcrafted features, and a logistic-regression baseline before
 LightGBM/XGBoost. Do not block on Fink unless the specific Phase 1 task needs
@@ -1175,9 +1175,8 @@ Default is now `--surveys WISE` which is correct for discovery.
    automated adversarial review and operator review.
 2. The current production path is ZTF DR24 historical replay, not WISE/DECam/TESS.
    Phase 0 is materially complete except for the external Fink TLS blocker.
-   Next code-addressable work is to define ZTF DR24 production gates and start
-   the bounded Phase 1 historical-replay prototype using verified IRSA/JPL/MPC
-   behavior.
+   Next code-addressable work is Gate Z1: start the bounded Phase 1
+   historical-replay ingest prototype using verified IRSA/JPL/MPC behavior.
 
 **Progress tracker**: `docs/evidence/prod-loop/LOOP_PROGRESS.md` — read this
 at session start to avoid repeating completed work.
