@@ -562,7 +562,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.25)
+## Current State (v0.90.26)
 
 All 10 legacy pipeline modules are complete. The offline suite passes on Python
 3.14, all three legacy ML tiers have trained weights, and the WISE/DECam/TESS
@@ -577,7 +577,10 @@ verification. Gate Z3 is not blocked on linker scaffolding: the existing
 linear-motion linker already satisfies the Fink-FAT-style tracklet-linking
 shape. The active blocker is finding and verifying a per-source ZTF DR24
 detection source that yields real candidate detections (RA/Dec/time/magnitude)
-instead of only image/exposure metadata. v0.90.24 also ported the missing
+instead of only image/exposure metadata. The older ALeRCE-backed ZTF provider
+is real bounded-pilot evidence, but it does not close the DR24 Gate Z3 source
+question unless verified for the current historical-replay protocol. v0.90.24
+also ported the missing
 macOS CNN model-load warmups into `src/classify.py`; that fix needs one
 operator Mac re-run before it is field-confirmed.
 Console output is now fully compliant with `docs/CONSOLE_OUTPUT_SPEC.md` —
@@ -618,7 +621,7 @@ a measurable quantity (surveys done/total, tracklets done/total).
 
 See `docs/PRODUCTION_READINESS.md` for the full gap register.
 
-### Handoff notes (2026-07-02) — v0.90.25 (CURRENT)
+### Handoff notes (2026-07-02) — v0.90.26 (CURRENT)
 
 **Current merged state through PR #163**:
 
@@ -639,11 +642,14 @@ See `docs/PRODUCTION_READINESS.md` for the full gap register.
   `src/classify.py`, fixing the likely real operator deadlock path. This
   cannot be field-confirmed in the Linux sandbox and needs one Mac operator
   re-run.
-- v0.90.25 synchronizes the durable docs with that state. Future agents should
-  continue at Gate Z3 by verifying a per-source ZTF DR24 detection source from
-  official documentation or live evidence. Do not rerun exhausted WISE
-  diagnostics, do not restart Gate Z1 scaffolding, and do not guess endpoints
-  or schemas.
+- v0.90.25 synchronized the durable docs with that state.
+- v0.90.26 resolves the legacy ALeRCE wording trap: ALeRCE remains real
+  source-level ZTF pilot evidence, but it is not current DR24 production
+  evidence until documented as suitable for bounded historical replay.
+  Future agents should continue at Gate Z3 by verifying a per-source ZTF DR24
+  detection source from official documentation or live evidence. Do not rerun
+  exhausted WISE diagnostics, do not restart Gate Z1 scaffolding, and do not
+  guess endpoints or schemas.
 
 ### Handoff notes (2026-07-02) — v0.90.19
 

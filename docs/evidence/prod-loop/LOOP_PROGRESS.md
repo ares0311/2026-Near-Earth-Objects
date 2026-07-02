@@ -80,8 +80,8 @@ definition.
   the observatory-code strategy is resolved and `NEO_MPC_SUBMISSION_APPROVED=1`
   is intentionally set with a real non-placeholder MPC code.
 
-### I. Version coherence ✓ DONE (current v0.90.25)
-- [x] `src/__init__.py`, `pyproject.toml`, `uv.lock` → 0.90.25
+### I. Version coherence ✓ DONE (current v0.90.26)
+- [x] `src/__init__.py`, `pyproject.toml`, `uv.lock` → 0.90.26
 - [x] `README.md`, `AGENTS.md`, `CLAUDE.md`, `docs/PRODUCTION_READINESS.md`,
       and `docs/ZTF_DR24_PRODUCTION_GATES.md` describe the current ZTF DR24
       state: Z1 bounded ingest and Z2 time-aware known-object exclusion are
@@ -215,3 +215,4 @@ so there is no pending operator task.**
 | 45 | 2026-07-02 | v0.90.23 fixes silent `Skills/injection_recovery.py` progress output so model-load delays report elapsed time and ETA instead of appearing hung. | Field-confirm long local runs no longer go silent |
 | 46 | 2026-07-02 | v0.90.24 ports the missing macOS CNN-load matmul and conv2d warmups into shared `src/classify.py`, addressing the likely real operator deadlock path. | Operator Mac re-runs the affected injection/CNN path once to field-confirm the fix |
 | 47 | 2026-07-02 | v0.90.25 synchronizes handoff docs, version metadata, and the production-loop ledger with merged PRs through #163. | Continue Gate Z3 source verification; ask the operator only for live commands that cannot be run from the coding-agent environment |
+| 48 | 2026-07-02 | v0.90.26 resolves the legacy ALeRCE-vs-DR24 documentation conflict: ALeRCE is real source-level ZTF pilot evidence, but it does not close current Gate Z3 unless verified for the DR24 historical-replay protocol. | Continue Gate Z3 source verification without assuming legacy ALeRCE support is sufficient |

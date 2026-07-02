@@ -1,3 +1,3 @@
 """NEO Detection and Ranking Pipeline."""
 
-__version__ = "0.90.25"  # pragma: no cover
+__version__ = "0.90.26"  # pragma: no cover

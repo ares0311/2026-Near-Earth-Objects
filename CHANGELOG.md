@@ -3,6 +3,17 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.26 — Resolve legacy ALeRCE vs ZTF DR24 Gate Z3 wording (2026-07-02)
+
+### Changed
+- Clarified that the existing ALeRCE-backed ZTF source-detection provider is
+  real legacy evidence from the earlier bounded ZTF pilot, but it does not by
+  itself close the current ZTF DR24 historical-replay Gate Z3. Gate Z3 still
+  needs a verified per-source DR24-compatible detection source with documented
+  schema, bounds, and no-future-catalog-leakage implications.
+- Updated the README roadmap and handoff docs so future agents do not mistake
+  old ALeRCE pilot evidence for the current primary DR24 production path.
+
 ## v0.90.25 — Sync ZTF DR24 handoff after Gate Z1-Z3 progress (2026-07-02)
 
 ### Changed
