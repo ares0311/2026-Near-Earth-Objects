@@ -137,8 +137,17 @@ def _probe_one(probe: dict) -> dict:
     }
 
 
+def _fmt_duration(seconds: float) -> str:
+    m, s = divmod(int(seconds), 60)
+    return f"{m}m{s:02d}s"
+
+
 def run_verification() -> dict:
-    """Run all probes with checkpoint/resume, printing live progress."""
+    """Run all probes with checkpoint/resume, printing live progress and ETA.
+
+    ETA is computed from a measurable quantity (probes completed / total),
+    not an elapsed-only heartbeat, per the standing progress-output directive.
+    """
     checkpoint = _load_checkpoint()
     results: dict = dict(checkpoint)
     total = len(_PROBES)
@@ -152,21 +161,28 @@ def run_verification() -> dict:
             )
             continue
         elapsed = time.monotonic() - t0
-        m, s = divmod(int(elapsed), 60)
+        per_probe = elapsed / max(i - 1, 1)
+        eta = per_probe * (total - (i - 1))
         print(
             f"[verify] ({i}/{total}) Probing {probe['id']} -> {probe['url']}  "
-            f"elapsed {m}m{s:02d}s",
+            f"elapsed {_fmt_duration(elapsed)}  ETA {_fmt_duration(eta)}",
             flush=True,
         )
         result = _probe_one(probe)
         results[probe["id"]] = result
         _save_checkpoint(results)
+        elapsed = time.monotonic() - t0
+        per_probe = elapsed / i
+        eta = per_probe * (total - i)
         status = result["status_code"] if result["status_code"] else f"ERROR: {result['error']}"
-        print(f"[verify] ({i}/{total}) {probe['id']}: {status}", flush=True)
+        print(
+            f"[verify] ({i}/{total}) {probe['id']}: {status}  "
+            f"elapsed {_fmt_duration(elapsed)}  ETA {_fmt_duration(eta)}",
+            flush=True,
+        )
 
     elapsed = time.monotonic() - t0
-    m, s = divmod(int(elapsed), 60)
-    print(f"[verify] Complete: {total} probe(s)  elapsed {m}m{s:02d}s", flush=True)
+    print(f"[verify] Complete: {total} probe(s)  elapsed {_fmt_duration(elapsed)}", flush=True)
     return results
 
 
