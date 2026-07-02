@@ -45,12 +45,18 @@ _PROBES: list[dict] = [
         "method": "GET",
     },
     {
+        # Corrected 2026-07-02 from live verification: the brief's example URL
+        # used "neo=Y", which the live API rejects with HTTP 400
+        # ("one or more query parameter was not recognized"). Operator-run
+        # curl confirmed "sb-group=neo" returns real NEO records (e.g. 433
+        # Eros, class AMO) -- see
+        # docs/evidence/phase0/2026-07-02-first-live-probe-console.md.
         "id": "jpl_sbdb_neo_query",
-        "brief_section": "Concrete Starting API Calls > JPL SBDB Query: NEO-Only Current Catalog",
+        "brief_section": "Concrete Starting API Calls > JPL SBDB Query: NEO-Only (corrected)",
         "url": (
             "https://ssd-api.jpl.nasa.gov/sbdb_query.api"
             "?fields=spkid,pdes,full_name,class,neo,pha,moid,H,epoch,e,a,q,i,om,w,ma"
-            "&neo=Y&full-prec=true&limit=3"
+            "&sb-group=neo&full-prec=true&limit=3"
         ),
         "method": "GET",
     },

@@ -679,7 +679,38 @@ See `docs/MISSION.md` for the authoritative data strategy. The prior "blocked
 until expert review" guardrail was removed by operator decision on 2026-06-21;
 MPC/NEOCP/Scout is the expert review system.
 
-### Handoff state as of 2026-07-02 v8 (CURRENT)
+### Handoff state as of 2026-07-02 v9 (CURRENT)
+
+**Root cause found and fixed for JPL SBDB; MPC narrowed; Fink is external** —
+see `docs/evidence/phase0/2026-07-02-root-cause-findings.md` for full detail.
+Every finding below is from a real command the operator ran, not
+documentation review (this sandbox cannot reach these domains directly).
+
+- **JPL SBDB — FIXED**: the brief's `neo=Y` filter parameter is rejected by
+  the live API (HTTP 400, "query parameter was not recognized"). Operator
+  `curl` confirmed `sb-group=neo` is the correct filter — returned real NEO
+  records (433 Eros, 719 Albert, 887 Alinda, all `class: AMO`, count 42,153
+  vs. 1,556,924 for the unfiltered query). `Skills/verify_ztf_dr24_sources.py`
+  and `docs/neo_discovery_agent_brief.md` both corrected to use
+  `sb-group=neo`.
+- **MPC get-obs — narrowed, not yet fixed**: the API needs an actual JSON
+  request body even for GET (query-string params alone → HTTP 501/400 with
+  errors that literally say "Content-Type not supported, use
+  application/json" then "Failed to decode JSON object: Expecting value").
+  Awaiting operator confirmation that `-d '{"desigs": ["433"]}'` with the
+  JSON content-type header returns 200 before changing `_probe_one()` to
+  send a body — do not guess this works without seeing it.
+- **Fink API — external blocker, not our bug**: `curl` with the operator's
+  native LibreSSL failed identically to Python's `requests` (`SSL_ERROR_SYSCALL`
+  immediately after ClientHello, from two independent TLS stacks on the
+  operator's real network). This rules out a client-side fix. No code
+  change applies; retry later or treat as unavailable for Phase 1.
+- **NEXT PRODUCTION ACTION — NOT YET DONE**: get the MPC get-obs body-request
+  confirmation from the operator, apply that fix, then Phase 0 is
+  effectively complete (2 of 4 verified sources reachable and correct: IRSA,
+  JPL SBDB; MPC pending final confirmation; Fink blocked externally).
+
+### Handoff state as of 2026-07-02 v8
 
 **First live Phase 0 probe run (2026-07-02, operator Mac, `main` @ `d4f3f908`)**:
 5 probes run, elapsed 3m23s. Results:
