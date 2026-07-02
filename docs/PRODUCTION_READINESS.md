@@ -1,7 +1,7 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.90.5
-**Last updated**: 2026-07-01
+**Current version**: v0.90.6
+**Last updated**: 2026-07-02
 **Purpose**: Mandatory read at session start (per MANDATORY SESSION-START PROTOCOL).  
 Every planning cycle must name the highest-priority unresolved production-capability gate and show how proposed steps close or directly unblock it.
 
@@ -892,11 +892,10 @@ was run from merged `main`. It fetched `690` WISE rows, passed `686/690`,
 detected `686` singleton candidates, linked `58596` seed pairs, and produced
 `0` tracklets and `0` full review packets. The pipeline correctly printed the
 skip-adversarial-review instruction because there was no reviewable `ScoredNEO`
-input. This is valid diagnostic evidence, not a runtime failure, but it does
-not close P1. Next production-capability step: close P1/P2 by building a
-discovery-source positive-control path or a documented source-native
-injection/recovery harness, and by documenting WISE/DECam/TESS confidence
-metrics before further live operator runs.
+input. This is valid diagnostic evidence, not a runtime failure. It is
+historical context for the v0.90.6 WISE positive-control harness that later
+closed Gate P1. Next production-capability step: close Gate P2 by documenting
+WISE/DECam/TESS confidence metrics before further live operator runs.
 
 ### Gate D2: Operator Review
 - [ ] Jerome W. Lindsey III reviews SURVIVE/BORDERLINE candidates

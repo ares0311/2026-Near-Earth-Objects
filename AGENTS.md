@@ -537,7 +537,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.5)
+## Current State (v0.90.6)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -584,17 +584,32 @@ a measurable quantity (surveys done/total, tracklets done/total).
 
 See `docs/PRODUCTION_READINESS.md` for the full gap register.
 
-### Handoff notes (2026-07-01) — v0.90.5 (CURRENT)
+### Handoff notes (2026-07-02) — v0.90.6 (CURRENT)
 
 **Current production definition**:
 - Production readiness now means demonstrated capability to find, score,
   reject, review, and package candidates from unreviewed archival discovery
   data with defensible, industry-standard confidence controls. It does not
   require that the project has already found a genuinely new NEO.
-- Highest-priority open gates are P1/P2 in
-  `docs/PRODUCTION_READINESS.md`: discovery-source positive control and
-  survey-native confidence policy. Actual candidate survival is a later
+- Gate P1 in `docs/PRODUCTION_READINESS.md` is CLOSED by the WISE/NEOWISE
+  discovery-source positive-control harness added in v0.90.6. Gate P2
+  (survey-native confidence policy for WISE/DECam/TESS) is the next
+  highest-priority open production gate. Actual candidate survival is a later
   event-driven discovery gate.
+
+**Gate P1 CLOSED (2026-07-02)**:
+- `Skills/injection_recovery.py --survey WISE` injects a source-native
+  NEOWISE-visit-cadence synthetic tracklet through the real production
+  `detect.py` discovery-archive singleton path, `link.py`, `classify.py`, and
+  `score.py`.
+- Verified 100% detection/link/score rate (n=50, seed=42); baseline committed
+  at `data/injection_recovery_wise_baseline.json`; CI job `wise-injection`
+  fails closed if recovery drops to zero.
+- Evidence:
+  `docs/evidence/prod-loop/2026-07-02-gate-p1-wise-injection-recovery.md`.
+- **NEXT PRODUCTION ACTION — NOT YET DONE**: work Gate P2 by documenting
+  quantitative WISE/DECam/TESS confidence thresholds so archive candidates do
+  not rely on absent ZTF-style real/bogus evidence.
 
 **v0.90.5 patch status**:
 - `Skills/select_survey_fields.py --wise-archive-probes` now enriches ranked
@@ -621,14 +636,11 @@ See `docs/PRODUCTION_READINESS.md` for the full gap register.
   rows, passed `686/690`, detected `686` singleton candidates, linked `58596`
   seed pairs, and produced `0` tracklets and `0` review packets. The pipeline
   correctly instructed the operator to skip adversarial review. This is valid
-  diagnostic evidence, not a crash, but P1 remains open because no full
-  `ScoredNEO` packet was produced.
-- **NEXT PRODUCTION ACTION — NOT YET DONE**: close P1/P2 by implementing or
-  documenting a discovery-source positive-control path (known-object recovery
-  through WISE/DECam/TESS or a source-native injection/recovery harness) and a
-  source-native confidence policy for WISE/DECam/TESS. Do not ask the operator
-  for another live WISE run until that path or policy supplies a measured,
-  non-guesswork reason.
+  diagnostic evidence, not a crash; it is historical context for why the v0.90.6
+  WISE positive-control harness was needed to close Gate P1.
+- This historical v0.90.5 diagnostic no longer blocks Gate P1; the v0.90.6 WISE
+  positive-control harness closed P1. Do not ask the operator for another live
+  WISE run until Gate P2 supplies a measured, non-guesswork confidence policy.
 
 **v0.90.4 patch status**:
 - `detect.py`, `link.py`, and `Skills/audit_real_run.py` now share the

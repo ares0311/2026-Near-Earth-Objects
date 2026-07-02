@@ -640,7 +640,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.5)
+## Current State (v0.90.6)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -716,14 +716,11 @@ MPC/NEOCP/Scout is the expert review system.
   rows, passed `686/690`, detected `686` singleton candidates, linked `58596`
   seed pairs, and produced `0` tracklets and `0` review packets. The pipeline
   correctly instructed the operator to skip adversarial review. This is valid
-  diagnostic evidence, not a crash, but P1 remains open because no full
-  `ScoredNEO` packet was produced.
-- **NEXT PRODUCTION ACTION — NOT YET DONE**: close P1/P2 by implementing or
-  documenting a discovery-source positive-control path (known-object recovery
-  through WISE/DECam/TESS or a source-native injection/recovery harness) and a
-  source-native confidence policy for WISE/DECam/TESS. Do not ask the operator
-  for another live WISE run until that path or policy supplies a measured,
-  non-guesswork reason.
+  diagnostic evidence, not a crash; it is historical context for why the v0.90.6
+  WISE positive-control harness was needed to close Gate P1.
+- This historical v0.90.5 diagnostic no longer blocks Gate P1; the v0.90.6 WISE
+  positive-control harness closed P1. Do not ask the operator for another live
+  WISE run until Gate P2 supplies a measured, non-guesswork confidence policy.
 
 **v0.90.4 patch status**:
 - `detect.py`, `link.py`, and `Skills/audit_real_run.py` now share the
