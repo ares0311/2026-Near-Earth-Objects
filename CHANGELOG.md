@@ -3,6 +3,25 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.34 — Confirm rb field name; document SSO cross-match finding (2026-07-02)
+
+### Changed
+- **Confirmed the real-bogus score field name is `rb`, not `drb`**, via
+  operator's `--dump-all-fields` run against a real 2018-era packet. `drb`
+  is entirely absent from that packet's schema. Any Gate Z3 ingest tool
+  must use `rb` and must not assume `drb` availability without checking
+  `schemavsn` first.
+- Documented an unplanned finding: the packet already contains ZTF's own
+  solar-system cross-match fields (`ssnamenr`, `ssdistnr`, `ssmagnr`) —
+  flagged for future research, explicitly NOT wired into known-object
+  exclusion logic yet, since the catalog's provenance and update cadence
+  relative to the no-future-leakage requirement has not been researched.
+- Updated `docs/ZTF_DR24_PRODUCTION_GATES.md`'s "Next Coding Step" with the
+  confirmed field names, unblocking the next step: a bounded multi-night
+  real-detection ingest tool.
+- Updated `docs/evidence/phase0/2026-07-02-gate-z3-uw-alert-archive-candidate.md`
+  with the full field-dump analysis.
+
 ## v0.90.33 — Add --dump-all-fields to Gate Z3 probe (2026-07-02)
 
 ### Added

@@ -66,12 +66,26 @@ loop), checkpoint/resume, retry-with-backoff, and a sample ingest report.
 Given real nightly file sizes range up to 73G, do not naively download and
 fully parse whole nights -- the tool should stream-parse each night's tar
 (as `Skills/probe_ztf_alert_archive_file.py` already does for one file) and
-extract only the fields the pipeline's `Observation` schema needs
-(`ra`, `dec`, `jd`, `magpsf`/`mag`, `sigmapsf`/`mag_err`, `fid`/`filter_band`,
-and likely `rb`/`drb` if present in the full 100-field candidate record --
-confirm their exact field names from a real packet before using them, do
-not guess). Once real per-source `Observation` objects exist for >=2 real
-nights, run them through the existing `src/link.py` linker for Z3's
-"known-object positive control": pick a real, documented multi-night NEO
-detection window (cross-checked against MPC) and confirm the linker
-recovers a matching tracklet from the real archived alerts.
+extract only the fields the pipeline's `Observation` schema needs: `ra`,
+`dec`, `jd`, `magpsf`/`mag`, `sigmapsf`/`mag_err`, `fid`/`filter_band`, and
+`rb` for real_bogus_score (all six field names confirmed live via
+`--dump-all-fields`, see
+`docs/evidence/phase0/2026-07-02-gate-z3-uw-alert-archive-candidate.md`).
+**`drb` is NOT present in the 2018-era packet checked** -- do not assume it
+exists on other nights without checking `schemavsn` first; fall back to
+`rb`-only if `drb` is absent, do not fail closed on its absence alone since
+`rb` alone is already a valid real_bogus_score input.
+
+The same dump also revealed the packet includes ZTF's own solar-system
+cross-match fields (`ssnamenr`/`ssdistnr`/`ssmagnr`) -- do NOT wire these
+into known-object exclusion logic yet; their catalog provenance and
+update-cadence relative to no-future-leakage requirements has not been
+researched. Continue using `src/known_object_exclusion.py`'s existing JPL
+SBDB `first_obs` approach as the only currently-verified mechanism for that
+gate.
+
+Once real per-source `Observation` objects exist for >=2 real nights, run
+them through the existing `src/link.py` linker for Z3's "known-object
+positive control": pick a real, documented multi-night NEO detection window
+(cross-checked against MPC) and confirm the linker recovers a matching
+tracklet from the real archived alerts.
