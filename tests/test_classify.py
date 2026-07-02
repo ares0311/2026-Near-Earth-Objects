@@ -412,6 +412,31 @@ class TestBuildCnnModel:
         monkeypatch.setattr(cls_mod, "_MODEL_DIR", tmp_path)
         assert cls_mod._load_cnn_model() is None
 
+    def test_cnn_heartbeat_prints_while_waiting(self, capsys):
+        """The macOS-deadlock heartbeat (see _load_cnn_model) must actually
+        print while its wrapped call is still running -- a real model load
+        completes faster than the 5s default interval, so this exercises
+        the loop body directly with a tiny interval instead of relying on
+        load timing to be slow enough to hit it."""
+        import threading
+
+        stop = threading.Event()
+        hb = threading.Thread(
+            target=cls_mod._cnn_heartbeat, args=("test warmup", stop, 0.01)
+        )
+        hb.start()
+        # Give the heartbeat thread time to print at least one line before
+        # stopping it -- 0.01s interval vs. a much longer sleep here.
+        import time
+
+        time.sleep(0.1)
+        stop.set()
+        hb.join(timeout=1.0)
+
+        captured = capsys.readouterr()
+        assert "test warmup" in captured.out
+        assert "still working" in captured.out
+
 
 class TestBuildTransformerModel:
     def test_returns_model_with_torch(self):
