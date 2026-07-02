@@ -18,6 +18,21 @@ that pipeline have not yet been defined — do the Phase 0 source-verification
 work from `docs/MISSION.md` first, then define new gates once Phase 1 exists
 to evaluate.
 
+**Phase 0 status (2026-07-02)**: 3 of 4 cited sources live-verified working
+via `Skills/verify_ztf_dr24_sources.py` — IRSA ZTF image metadata (200, no
+auth), JPL SBDB NEO query (200, `sb-group=neo` not the brief's `neo=Y`), MPC
+get-obs (200, requires a JSON request body, not query-string params). Fink
+API is an external TLS-handshake blocker confirmed via two independent TLS
+stacks (Python `ssl` and the operator's native LibreSSL) failing identically
+from a real network — not fixable from this codebase. See
+`docs/evidence/phase0/2026-07-02-root-cause-findings.md` and
+`2026-07-02-second-live-probe-console.md` for full detail. **NOT YET DONE**:
+operator needs to commit the three generated files
+(`data_sources_verified.md`, `auth_requirements.md`,
+`phase0_probe_results.json`) from their local run, plus the brief's other
+Phase 0 deliverables (`schema_snapshot/`, `sample_ingest_report.md`,
+`pretrained_model_audit.md`) before Phase 1 work begins.
+
 ---
 
 ## What Is Complete
