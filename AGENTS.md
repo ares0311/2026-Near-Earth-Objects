@@ -44,13 +44,18 @@ It contains the facts a coding agent needs to work productively without re-readi
   Two review stages gate every submission: (1) automated adversarial review
   (`Skills/adversarial_review.py` — 13 challenges, tries to REJECT each
   candidate), then (2) operator review. Only SURVIVE/BORDERLINE candidates
-  proceed to MPC submission. See `docs/MISSION.md` (authoritative) and
+  proceed to MPC submission. See `docs/MISSION.md` and
+  `docs/neo_discovery_agent_brief.md` (jointly authoritative) plus
   `docs/MPC_SUBMISSION_POLICY.md` for the full submission policy.
   Do NOT reinstate a "blocked until expert review" guardrail — MPC/NEOCP/Scout
   IS the expert review system. Do NOT frame this as citizen science.
   **MANDATORY READ**: `docs/near_earth_objects_research_brief.md` — ranked
   space assets, frontier AI methods, submission best practices. Read at every
   session start per CLAUDE.md §MANDATORY SESSION-START PROTOCOL.
+  **MANDATORY READ**: `docs/neo_discovery_agent_brief.md` — authoritative
+  workflow brief for candidate language, historical replay, source
+  verification, no future-catalog leakage, pretrained-model audits, and
+  auditable candidate-ranker design.
 - **Repository artifact policy supports `git add .`**: The standard operator
   cadence may use `git add .`, so `.gitignore` must protect local/generated
   outputs by default. Treat `Logs/**` as local operational output and never
@@ -89,10 +94,19 @@ Near-Earth Objects are small solar system bodies with perihelion distances $q < 
 Potentially Hazardous Asteroids (PHAs) are NEOs with absolute magnitude $H \leq 22$ (diameter $\gtrsim 140$ m) and Minimum Orbit Intersection Distance (MOID) $\leq 0.05$ AU. The pipeline must identify and flag PHA candidates.
 
 The global NEO survey is dominated by:
-- **ZTF** (Zwicky Transient Facility) — primary data source; public alert stream
-- **ATLAS** — Asteroid Terrestrial-impact Last Alert System; 24–48 hr warning capability
+- **ZTF** (Zwicky Transient Facility) — training, benchmarking, and
+  historical-replay reference source; public alert/image archive
+- **ATLAS** — training and recovery-evidence source; 24–48 hr warning-capable
+  survey stream already processed for operational discovery
 - **Pan-STARRS** — deep survey; public catalog access
 - **CSS** (Catalina Sky Survey) — MPC-feeding survey
+- **WISE/NEOWISE, DECam, and TESS** — active production discovery-source
+  targets in this repo because they provide less-reviewed archival data paths
+
+`docs/neo_discovery_agent_brief.md` adds the authoritative rule that ZTF/Fink,
+Fink-FAT, and SNAPS are methodology, benchmark, source-verification, and
+candidate-ranker references unless a future documented production decision
+proves a non-duplicative discovery-submission path.
 
 As of 2026, approximately 35,000 NEOs are known. Rubin/LSST is expected to discover 100,000+ more over its 10-year survey.
 
@@ -537,7 +551,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.6)
+## Current State (v0.90.7)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -584,13 +598,17 @@ a measurable quantity (surveys done/total, tracklets done/total).
 
 See `docs/PRODUCTION_READINESS.md` for the full gap register.
 
-### Handoff notes (2026-07-02) — v0.90.6 (CURRENT)
+### Handoff notes (2026-07-02) — v0.90.7 (CURRENT)
 
 **Current production definition**:
 - Production readiness now means demonstrated capability to find, score,
   reject, review, and package candidates from unreviewed archival discovery
   data with defensible, industry-standard confidence controls. It does not
   require that the project has already found a genuinely new NEO.
+- `docs/neo_discovery_agent_brief.md` is now authoritative workflow guidance
+  and must be applied to Gate P2 and later production work: source verification,
+  no future-catalog leakage, historical replay discipline, pretrained-model
+  audits, and auditable ranker design are required, not optional.
 - Gate P1 in `docs/PRODUCTION_READINESS.md` is CLOSED by the WISE/NEOWISE
   discovery-source positive-control harness added in v0.90.6. Gate P2
   (survey-native confidence policy for WISE/DECam/TESS) is the next
@@ -609,7 +627,9 @@ See `docs/PRODUCTION_READINESS.md` for the full gap register.
   `docs/evidence/prod-loop/2026-07-02-gate-p1-wise-injection-recovery.md`.
 - **NEXT PRODUCTION ACTION — NOT YET DONE**: work Gate P2 by documenting
   quantitative WISE/DECam/TESS confidence thresholds so archive candidates do
-  not rely on absent ZTF-style real/bogus evidence.
+  not rely on absent ZTF-style real/bogus evidence. Gate P2 must also fold in
+  the discovery-agent brief's source-verification matrix, no-future-catalog
+  leakage rule, and pretrained-model audit requirement.
 
 **v0.90.5 patch status**:
 - `Skills/select_survey_fields.py --wise-archive-probes` now enriches ranked

@@ -1,11 +1,18 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.90.6
+**Current version**: v0.90.7
 **Last updated**: 2026-07-02
 **Purpose**: Mandatory read at session start (per MANDATORY SESSION-START PROTOCOL).  
 Every planning cycle must name the highest-priority unresolved production-capability gate and show how proposed steps close or directly unblock it.
 
 **Also mandatory at session start**: `docs/near_earth_objects_research_brief.md` — canonical primer on ranked space assets (WISE/NEOWISE #2, NEO Surveyor #1, Gaia #3), frontier AI methods (THOR, HelioLinC3D), submission best practices, and key literature. Required to keep agents aligned on the discovery-paper data strategy (step 5 of CLAUDE.md §MANDATORY SESSION-START PROTOCOL).
+
+**Authoritative workflow brief**: `docs/neo_discovery_agent_brief.md` is now
+authoritative for candidate language, source verification, historical replay,
+time-aware known-object masking, no future-catalog leakage, pretrained-model
+audits, and auditable candidate-ranker design. `docs/MISSION.md` records how
+that brief is reconciled with the active WISE/DECam/TESS production discovery
+path.
 
 ---
 
@@ -567,10 +574,26 @@ a new NEO.
       source. In particular, a missing or non-native ZTF real/bogus score must
       fail closed or be replaced by a source-appropriate evidence term; it must
       not silently pass as production confidence.
+- [ ] Apply `docs/neo_discovery_agent_brief.md` as the authoritative workflow
+      brief for Gate P2. The policy must include a source-verification matrix
+      for each production discovery source, record any auth/schema/rate-limit
+      findings before ingestion code depends on them, and state how historical
+      replay will avoid future-catalog leakage.
+- [ ] Treat ZTF DR24, Fink/Fink-FAT, and SNAPS as authoritative methodology,
+      benchmarking, and candidate-ranker references from the brief, not as an
+      automatic MPC discovery-submission stream. Any future ZTF/Fink discovery
+      claim must first prove that it is not duplicating already processed survey
+      submissions and must be documented as a new production decision.
+- [ ] Before any pretrained model contributes to production scoring, create the
+      audit artifact required by the brief (`pretrained_model_audit.md` or a
+      versioned equivalent under `docs/evidence/`), including exact model ID,
+      source URL, license, download size, preprocessing, cache path, use mode,
+      and decision (`use`, `defer`, or `reject`).
 - Current status: **open**. Existing calibration KPIs close the ZTF-trained ML
       calibration gap, but WISE/NEOWISE archive detections still need an
       explicit source-native confidence policy before production capability can
-      be declared.
+      be declared. As of v0.90.7, the new discovery-agent brief is folded into
+      this gate and is mandatory input for the next production cycle.
 
 ### Gate P3: No-submission package drill
 - [ ] Run an end-to-end dry drill from a P1 positive-control packet through

@@ -3,6 +3,25 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.7 — Fold discovery-agent brief into production workflow (2026-07-02)
+
+### Changed
+- `docs/neo_discovery_agent_brief.md` is now part of the authoritative project
+  workflow. `docs/MISSION.md` reconciles the brief with the active
+  WISE/DECam/TESS production discovery path.
+- `CLAUDE.md` and `AGENTS.md` now require agents to read the discovery-agent
+  brief at session start.
+- Gate P2 in `docs/PRODUCTION_READINESS.md` now requires source-verification,
+  no-future-catalog-leakage, historical-replay, and pretrained-model audit
+  practices from the brief.
+
+### Safety
+- ZTF/Fink/SNAPS are treated as methodology, benchmark, and ranker-validation
+  references unless a future documented decision proves a non-duplicative
+  discovery-submission path.
+- No external submission path was enabled.
+- No impact-probability claims or confirmed-object claims were introduced.
+
 ## v0.90.6 — Gate P1 WISE discovery-source positive control (2026-07-02)
 
 ### Added

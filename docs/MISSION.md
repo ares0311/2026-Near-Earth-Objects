@@ -1,8 +1,9 @@
 # MISSION.md — Authoritative Project Goal and Pipeline Strategy
 
-**Read this before reading anything else. This file overrides any conflicting guidance.**
+**Read this before reading anything else. This file and
+`docs/neo_discovery_agent_brief.md` are jointly authoritative.**
 
-Last updated: 2026-06-26
+Last updated: 2026-07-02
 
 ---
 
@@ -14,6 +15,37 @@ review are submitted to the Minor Planet Center (MPC). If confirmed, this suppor
 a publishable scientific paper.
 
 We do NOT claim discovery. We claim to have found **candidates for expert review**.
+
+## Authoritative Brief Integration
+
+`docs/neo_discovery_agent_brief.md` is now an authoritative workflow brief for
+how agents should design, validate, and evaluate NEO candidate discovery work.
+It governs:
+
+- Candidate language: use "candidate NEO," "candidate moving object,"
+  "unassociated moving-source candidate," or equivalent non-confirming terms.
+- Historical replay discipline: no future-catalog leakage, time-aware MPC/JPL
+  known-object masking, and retrospective validation against later outcomes.
+- Source-verification discipline: verify public APIs, auth requirements, schema
+  behavior, rate limits, and current counts before building ingestion jobs.
+- Model discipline: use auditable rankers first, treat pretrained/deep models
+  as feature extractors or baselines until verified, and create a
+  `pretrained_model_audit.md` record before using any pretrained model in
+  training or evaluation.
+
+Where this file and the brief appear to differ, use this reconciliation:
+
+- WISE/NEOWISE, DECam, and TESS remain the active production discovery sources
+  because they are the current unreviewed-archive implementation path.
+- ZTF DR24, Fink/Fink-FAT, and SNAPS from the brief are authoritative
+  historical-replay, benchmarking, feature-engineering, source-verification, and
+  candidate-ranker references. They may be used to validate methodology and
+  rankers, but they must not become an MPC discovery-submission stream unless a
+  future documented decision proves the work is not duplicating already
+  processed ZTF/ATLAS survey submissions.
+- Any source claim, API schema, URL, credential assumption, or dataset count in
+  the brief must still be verified before operator commands or ingestion code
+  depend on it.
 
 ---
 

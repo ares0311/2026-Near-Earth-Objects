@@ -20,8 +20,12 @@ It contains the facts a coding agent needs to work productively without re-readi
    AI methods (THOR, HelioLinC3D, CNN streak detection), submission best
    practices, and key literature. Must be re-read each session to keep agents
    current on the discovery-paper data strategy.
+6. Call `Read` on `docs/neo_discovery_agent_brief.md` — the authoritative
+   workflow brief for candidate language, historical replay, source
+   verification, no future-catalog leakage, pretrained-model audits, and
+   auditable candidate-ranker design.
 
-These steps are non-negotiable. No planning or code changes may happen before all six are complete.
+These steps are non-negotiable. No planning or code changes may happen before all seven are complete.
 
 ---
 
@@ -81,6 +85,7 @@ If the highest-priority T1 gap cannot be resolved because a human blocker is unr
   (`Skills/adversarial_review.py` — 13 challenges, tries to REJECT each
   candidate), then (2) operator review. Only SURVIVE/BORDERLINE candidates
   proceed to MPC submission. See `docs/MISSION.md` (authoritative) and
+  `docs/neo_discovery_agent_brief.md` (authoritative workflow brief) plus
   `docs/MPC_SUBMISSION_POLICY.md` for the full submission policy.
   Do NOT reinstate a "blocked until expert review" guardrail — MPC/NEOCP/Scout
   IS the expert review system. Do NOT frame this as citizen science.
@@ -640,7 +645,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.6)
+## Current State (v0.90.7)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -664,6 +669,16 @@ until expert review" guardrail was removed by operator decision on 2026-06-21;
 MPC/NEOCP/Scout is the expert review system.
 
 ### Handoff state as of 2026-07-02 (CURRENT)
+
+**Discovery-agent brief folded into workflow (v0.90.7)** ✓:
+- `docs/neo_discovery_agent_brief.md` is now authoritative workflow guidance
+  and must be read at session start.
+- Gate P2 must apply the brief's source-verification matrix, no-future-catalog
+  leakage rule, historical-replay discipline, pretrained-model audit
+  requirement, and auditable candidate-ranker guidance.
+- ZTF/Fink/SNAPS are authoritative methodology, benchmark, and ranker-validation
+  references, but not an automatic MPC discovery-submission stream unless a
+  future documented decision proves a non-duplicative path.
 
 **Gate P1 CLOSED (2026-07-02)** ✓ — WISE/NEOWISE discovery-source positive control:
 - `Skills/injection_recovery.py` gained `--survey WISE`: injects a source-native
