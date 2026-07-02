@@ -3,6 +3,22 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.22 — Gate Z3 status: identify real-detection dependency gap (2026-07-02)
+
+### Changed
+- `docs/ZTF_DR24_PRODUCTION_GATES.md`: Gate Z3 status corrected from "Open"
+  to an accurate finding. `src/link.py`'s existing production linear-motion
+  tracklet linker already satisfies the "Fink-FAT-inspired linear linker"
+  requirement (it is not new code -- same linker used by every prior
+  gate), and `data/injection_recovery_n200.json` is an existing passing
+  ZTF-cadence synthetic positive control (100% detection/link/score, n=200),
+  but that evidence predates the ZTF DR24 primacy pivot and needs
+  re-confirmation under current code. Identified the real blocker: Gate Z1
+  ingests ZTF image/exposure *metadata* only, not per-source moving-object
+  detections, so there is nothing real yet to link for a known-object
+  positive control. No code changed -- this is an evidence-based gate
+  register correction, not new scaffolding.
+
 ## v0.90.21 — Gate Z2: time-aware known-object exclusion (2026-07-02)
 
 ### Added
