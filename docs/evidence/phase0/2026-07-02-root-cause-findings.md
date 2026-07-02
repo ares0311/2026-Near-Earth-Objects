@@ -60,11 +60,20 @@ request body (e.g. `{"desigs": ["433"]}`), not query-string parameters, even
 though the request is a GET. This is unusual but is exactly what the request
 body content-negotiation error describes.
 
-**Status**: awaiting one more operator confirmation —
-`curl -X GET -H "Content-Type: application/json" -d '{"desigs": ["433"]}' "https://data.minorplanetcenter.net/api/get-obs"`
-— before changing the Skill script, since `_probe_one()` currently only
-sends bodyless GET requests and needs a body-sending branch added. Will not
-guess this works without an observed 200 response first.
+**Status**: CONFIRMED AND FIXED. Operator ran
+`curl -sS -X GET -H "Content-Type: application/json" -d '{"desigs": ["433"]}' "https://data.minorplanetcenter.net/api/get-obs"`
+and got HTTP 200 with a full ADES XML observation history for 433 Eros
+(hundreds of `<optical>` records spanning 2026-01-24 through 2026-06-30,
+multiple stations/surveys, `MPEC` references). The response is large simply
+because Eros has a long observation history, not because of an error --
+this is the correct, expected shape of a successful `get-obs` response.
+
+**Fix applied**: `Skills/verify_ztf_dr24_sources.py`'s `mpc_get_obs` probe
+now carries a `"body": {"desigs": ["433"]}` key, and `_probe_one()` sends it
+via `requests.request("GET", url, json=body, timeout=30)` when a probe
+defines a body (falls back to plain `requests.get()` otherwise). The
+existing `_BODY_PREVIEW_CHARS = 2000` truncation already caps how much of
+large responses like this one get written into `phase0_probe_results.json`.
 
 ## Fink API — external blocker, not a bug in our code
 

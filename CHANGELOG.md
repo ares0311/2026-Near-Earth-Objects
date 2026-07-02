@@ -3,6 +3,25 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.16 — Fix MPC get-obs JSON-body requirement (2026-07-02)
+
+### Fixed
+- `Skills/verify_ztf_dr24_sources.py`: `mpc_get_obs` probe now sends a JSON
+  request body (`{"desigs": ["433"]}`) via `requests.request("GET", url,
+  json=body)` instead of query-string parameters. Operator-verified: live
+  `curl` with a JSON body returned HTTP 200 with a full ADES observation
+  history for 433 Eros (previously HTTP 501/400 with query-string-only
+  requests). `_probe_one()` now supports an optional per-probe `"body"` key,
+  falling back to a plain GET when absent.
+- `docs/evidence/phase0/2026-07-02-root-cause-findings.md`: MPC get-obs
+  status updated from "awaiting confirmation" to "confirmed and fixed."
+
+Phase 0 source verification is now substantively complete: IRSA ZTF image
+metadata (200, no auth), JPL SBDB NEO query (200, `sb-group=neo`), and MPC
+get-obs (200, JSON body) are all live-verified and working. Fink API remains
+an external TLS-handshake blocker outside this project's control (see prior
+entry) — not required for the other three sources to proceed.
+
 ## v0.90.15 — Fix JPL SBDB filter param; diagnose MPC/Fink (2026-07-02)
 
 ### Fixed
