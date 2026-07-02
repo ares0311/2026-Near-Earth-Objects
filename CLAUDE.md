@@ -679,7 +679,21 @@ See `docs/MISSION.md` for the authoritative data strategy. The prior "blocked
 until expert review" guardrail was removed by operator decision on 2026-06-21;
 MPC/NEOCP/Scout is the expert review system.
 
-### Handoff state as of 2026-07-02 v6 (CURRENT) — MAJOR PIVOT
+### Handoff state as of 2026-07-02 v7 (CURRENT)
+
+**Phase 0 tool built (v0.90.13)**: `Skills/verify_ztf_dr24_sources.py` probes
+the exact endpoints cited in `docs/neo_discovery_agent_brief.md` (Fink
+schema/swagger, JPL SBDB NEO query, MPC get-obs, IRSA ZTF image metadata) —
+GET-only, checkpoint/resume, retry-with-backoff, writes
+`docs/evidence/phase0/data_sources_verified.md` and `auth_requirements.md`
+from real observed HTTP responses. This sandbox's network proxy blocks these
+domains outright (policy denial at the CONNECT level, confirmed via
+`$HTTPS_PROXY/__agentproxy/status`), so the probes could not be run from
+here — the operator must run this on their Mac, which has normal internet
+access. **Next operator action**: run the command in the handoff-state
+message below and paste the output.
+
+### Handoff state as of 2026-07-02 v6 — MAJOR PIVOT
 
 **Operator decision: ZTF DR24 historical replay is now the primary discovery
 pipeline, superseding WISE/DECam/TESS.** See `docs/MISSION.md §Operator
@@ -1252,6 +1266,7 @@ succeeded and produced the trained Tier 3 weights now recorded under T1-A.
 | `Skills/batch_score.py` | Score a list of tracklets from a JSON file; print ranked table |
 | `Skills/run_pipeline.py` | Full end-to-end pipeline run |
 | `Skills/injection_recovery.py` | Injection-recovery test: injects synthetic NEOs, measures detection/link/score rates |
+| `Skills/verify_ztf_dr24_sources.py` | Phase 0 source verification for the ZTF DR24 pipeline: probes the exact endpoints cited in `docs/neo_discovery_agent_brief.md`, writes `data_sources_verified.md`/`auth_requirements.md` |
 | `Skills/check_mpc_known.py` | Cross-match candidate observations against MPC known object catalog |
 | `Skills/build_recovery_manifest.py` | Build checkpointed MPC+Horizons expected-known manifests for T1-C recovery audits |
 | `Skills/visualize_tracklets.py` | Plot sky positions and light curves for a tracklet JSON file |
