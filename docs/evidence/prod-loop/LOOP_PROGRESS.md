@@ -103,9 +103,13 @@ definition.
       injection/recovery harness through the real detect/link/classify/score
       path, 100% recovery (n=50), new CI job `wise-injection`. Evidence:
       `docs/evidence/prod-loop/2026-07-02-gate-p1-wise-injection-recovery.md`.
-- [ ] P2: document quantitative source-native confidence gates for discovery
+- [x] P2: document quantitative source-native confidence gates for discovery
       data. WISE/DECam/TESS candidates must not rely solely on ZTF-style
       real/bogus evidence.
+      **CLOSED 2026-07-02**: `docs/SURVEY_NATIVE_CONFIDENCE_POLICY.md`
+      documents the source-verification matrix, confirms the existing
+      fail-closed alert-pathway gate on missing real/bogus, and flags TESS's
+      fetch path as TIC-reference-star placeholders, not real detections.
 - [ ] P3: run a no-submission package drill from a P1 packet through
       adversarial review, operator packet generation, and MPC-compatible export.
 - [ ] P4: resolve archival WISE/NEOWISE MPC submission authority before any
@@ -168,4 +172,6 @@ definition.
 | 28 | 2026-06-30 | Rank 1 v0.90.5 support-positive subfield RA `209.5`, Dec `-14.9`, radius `0.0303` fetched `690` rows, linked `58596` seed pairs, produced `0` tracklets and `0` review packets | Treat this as a valid diagnostic, not a crash; v0.90.6 later closed P1 with a WISE source-native positive-control harness |
 | 29 | 2026-07-01 | Production definition updated: readiness means demonstrated capability to find, score, review, reject, and package candidates; an actual new NEO is a discovery event, not a production prerequisite | Close P1/P2 next: discovery-source positive control and source-native confidence policy |
 | 30 | 2026-07-02 | Gate P1 CLOSED: WISE-cadence injection/recovery harness added to `Skills/injection_recovery.py` (`--survey WISE`), 100% recovery through the real detect/link/classify/score path, new `wise-injection` CI job, evidence recorded | Work Gate P2: document WISE/DECam/TESS source-native confidence thresholds since archive candidates have no ZTF-style real/bogus score |
+| 31 | 2026-07-02 | Operator folded `docs/neo_discovery_agent_brief.md` into the workflow directly (v0.90.7): MISSION.md/CLAUDE.md/AGENTS.md/PRODUCTION_READINESS.md updated; ZTF/Fink/SNAPS reconciled as reference-only | Apply the brief's requirements to close Gate P2 |
+| 32 | 2026-07-02 | Gate P2 CLOSED (v0.90.8): `docs/SURVEY_NATIVE_CONFIDENCE_POLICY.md` added — source-verification matrix, confirmed existing fail-closed real/bogus gate, found TESS returns TIC placeholder stars not real detections, `run_pipeline.py` now warns on `--surveys DECam/TESS` | Work Gate P3: no-submission package drill from a Gate P1 packet through adversarial review, operator packet generation, and ADES export |
 | 31 | 2026-07-02 | v0.90.7 handoff prepared: `docs/neo_discovery_agent_brief.md` is authoritative workflow guidance and is reconciled with `docs/MISSION.md`; mandatory reads and Gate P2 now require source verification, no future-catalog leakage, historical replay discipline, pretrained-model audits, and auditable ranker design | Next agent should work Gate P2 first; do not run another live WISE diagnostic or add ZTF/Fink discovery-submission code until the source-native confidence policy exists |

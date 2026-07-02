@@ -668,7 +668,42 @@ See `docs/MISSION.md` for the authoritative data strategy. The prior "blocked
 until expert review" guardrail was removed by operator decision on 2026-06-21;
 MPC/NEOCP/Scout is the expert review system.
 
-### Handoff state as of 2026-07-02 (CURRENT)
+### Handoff state as of 2026-07-02 v2 (CURRENT)
+
+**Gate P2 CLOSED (v0.90.8)** ✓ — Survey-native confidence policy:
+- New `docs/SURVEY_NATIVE_CONFIDENCE_POLICY.md` documents, per source
+  (WISE/DECam/TESS): a source-verification matrix (WISE live-verified across
+  many runs; DECam and TESS are code-complete but have **never** been
+  live-verified against their real endpoints), the quantitative confidence
+  thresholds already enforced in code (motion-rate window, real/bogus gate,
+  structural tracklet requirements, satellite-trail rejection, known-object
+  exclusion), the no-future-catalog-leakage statement for the current
+  live-discovery pipeline, ZTF/Fink/SNAPS reference-only reaffirmation, and
+  the pretrained-model-audit requirement (not yet applicable — no third-party
+  pretrained model is in production scoring today).
+- **Key finding confirmed from code, not assumed**: `score.py:_determine_alert_pathway`
+  already fails closed on a missing real/bogus score (`rb is None or rb < 0.90`
+  → `internal_candidate`), so every WISE/DECam/TESS candidate is structurally
+  barred from `mpc_submission`/`neocp_followup`/`nasa_pdco_notify` regardless
+  of any other feature. This is why Gate P1's WISE positive-control packets
+  score `hazard_flag: unknown` — that is the correct, already-existing
+  fail-closed behavior, not a defect.
+- **Key finding — TESS is not a real per-epoch detection source as coded**:
+  `fetch_tess_ffis` returns TIC catalog star positions replicated per sector
+  epoch, not genuine FFI difference-image detections (`preprocess.py` has zero
+  FFI/TESS-specific source-extraction logic). `Skills/run_pipeline.py` now
+  prints an operator-visible `[fetch] WARNING` when `--surveys DECam` or
+  `--surveys TESS` is selected, pointing to the policy doc. Default surveys
+  remains `["WISE"]` only.
+- Two items remain explicitly open for future work (not blocking): a WISE
+  sentinel-magnitude (`mag=99.0`) rejection filter, and DECam/TESS live
+  endpoint verification per the discovery-agent brief's Phase 0.
+- **Next production action**: Gate P3 — no-submission package drill from a
+  Gate P1 positive-control packet through `Skills/adversarial_review.py`,
+  operator review packet generation, and MPC-compatible export
+  (`Skills/export_ades_report.py`).
+
+### Handoff state as of 2026-07-02 (v1)
 
 **Discovery-agent brief folded into workflow (v0.90.7)** ✓:
 - `docs/neo_discovery_agent_brief.md` is now authoritative workflow guidance

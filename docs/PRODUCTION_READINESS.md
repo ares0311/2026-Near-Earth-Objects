@@ -1,6 +1,6 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.90.7
+**Current version**: v0.90.8
 **Last updated**: 2026-07-02
 **Purpose**: Mandatory read at session start (per MANDATORY SESSION-START PROTOCOL).  
 Every planning cycle must name the highest-priority unresolved production-capability gate and show how proposed steps close or directly unblock it.
@@ -565,35 +565,44 @@ a new NEO.
       block P1 once the positive-control harness proves the path itself works.
 
 ### Gate P2: Survey-native confidence policy
-- [ ] Document quantitative confidence thresholds for WISE/NEOWISE, DECam, and
+- [x] Document quantitative confidence thresholds for WISE/NEOWISE, DECam, and
       TESS discovery candidates. The policy must cover astrometric residuals,
       timing provenance, signal-to-noise or photometric quality, static-source
       rejection, satellite/artifact rejection, known-object checks, motion-rate
       plausibility, and orbit/link residuals.
-- [ ] The policy must explain how existing ML outputs map onto each discovery
+- [x] The policy must explain how existing ML outputs map onto each discovery
       source. In particular, a missing or non-native ZTF real/bogus score must
       fail closed or be replaced by a source-appropriate evidence term; it must
       not silently pass as production confidence.
-- [ ] Apply `docs/neo_discovery_agent_brief.md` as the authoritative workflow
+- [x] Apply `docs/neo_discovery_agent_brief.md` as the authoritative workflow
       brief for Gate P2. The policy must include a source-verification matrix
       for each production discovery source, record any auth/schema/rate-limit
       findings before ingestion code depends on them, and state how historical
       replay will avoid future-catalog leakage.
-- [ ] Treat ZTF DR24, Fink/Fink-FAT, and SNAPS as authoritative methodology,
+- [x] Treat ZTF DR24, Fink/Fink-FAT, and SNAPS as authoritative methodology,
       benchmarking, and candidate-ranker references from the brief, not as an
       automatic MPC discovery-submission stream. Any future ZTF/Fink discovery
       claim must first prove that it is not duplicating already processed survey
       submissions and must be documented as a new production decision.
-- [ ] Before any pretrained model contributes to production scoring, create the
+- [x] Before any pretrained model contributes to production scoring, create the
       audit artifact required by the brief (`pretrained_model_audit.md` or a
       versioned equivalent under `docs/evidence/`), including exact model ID,
       source URL, license, download size, preprocessing, cache path, use mode,
       and decision (`use`, `defer`, or `reject`).
-- Current status: **open**. Existing calibration KPIs close the ZTF-trained ML
-      calibration gap, but WISE/NEOWISE archive detections still need an
-      explicit source-native confidence policy before production capability can
-      be declared. As of v0.90.7, the new discovery-agent brief is folded into
-      this gate and is mandatory input for the next production cycle.
+- Current status: **CLOSED (2026-07-02)**. `docs/SURVEY_NATIVE_CONFIDENCE_POLICY.md`
+      documents the source-verification matrix (WISE live-verified across
+      multiple runs; DECam and TESS code-complete but never live-verified),
+      confirms `score.py:_determine_alert_pathway` already fails closed on the
+      missing WISE/DECam/TESS real/bogus score (routes to `internal_candidate`
+      unconditionally), records the no-future-catalog-leakage statement for the
+      current live-discovery pipeline, reaffirms ZTF/Fink/SNAPS as
+      reference-only per `docs/MISSION.md`, and records the pretrained-model
+      audit requirement as not-yet-applicable (no third-party pretrained model
+      is used in production scoring today). `Skills/run_pipeline.py` now prints
+      an operator-visible warning when `--surveys DECam` or `--surveys TESS` is
+      selected. Two items remain explicitly open for future work: a WISE
+      sentinel-magnitude (`mag=99.0`) rejection filter, and DECam/TESS live
+      endpoint verification.
 
 ### Gate P3: No-submission package drill
 - [ ] Run an end-to-end dry drill from a P1 positive-control packet through
