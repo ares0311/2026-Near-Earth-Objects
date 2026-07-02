@@ -3,6 +3,27 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.30 — Bounded single-file probe for UW ZTF alert archive candidate (2026-07-02)
+
+### Added
+- `Skills/probe_ztf_alert_archive_file.py`: bounded, checkpointed,
+  single-file download-and-verify probe for the Gate Z3 candidate source
+  identified in `docs/evidence/phase0/2026-07-02-gate-z3-uw-alert-archive-candidate.md`
+  (`https://ztf.uw.edu/alerts/public/`). Downloads exactly one named
+  archive file (default: `ztf_public_20180809.tar.gz`, 31M), retries with
+  exponential backoff, skips re-download if the local file already matches
+  the remote size (checkpoint/resume), and verifies it is a valid gzip/tar
+  archive containing `.avro` members without extracting or parsing their
+  content. No new AVRO-parsing dependency added.
+
+### Changed
+- Updated the Gate Z3 UW alert archive evidence doc with the real,
+  operator-captured directory listing (`docs/Alert Archive.pdf`, commit
+  `b6de270`): confirmed file naming convention
+  (`ztf_public_YYYYMMDD.tar.gz`), confirmed coverage (2018-06-01 through
+  present), confirmed file size range (up to 73G per night), and confirmed
+  no visible authentication barrier.
+
 ## v0.90.29 — Add checkpoint/resume to injection_recovery.py (2026-07-02)
 
 ### Fixed
