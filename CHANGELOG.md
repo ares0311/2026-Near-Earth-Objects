@@ -3,6 +3,47 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.29 — Add checkpoint/resume to injection_recovery.py (2026-07-02)
+
+### Fixed
+- **Standing-rule compliance gap**: `Skills/injection_recovery.py` processes
+  items in a loop but had zero checkpoint/resume support, violating the
+  checkpoint/resume standing rule ("any Skills script that... processes
+  items in a loop MUST survive a network drop, machine sleep, or process
+  kill without losing work"). Found during a pre-run compliance check on the
+  Gate Z3 recheck command requested after PR #164 merged, before the
+  operator ran it.
+- Added a stable, param-derived checkpoint key (`n_inject`/`seed`/`mission`,
+  matching the pattern already used by `Skills/ztf_dr24_bounded_ingest.py`)
+  written atomically to `Logs/pipeline_runs/injection_recovery/<key>/checkpoint.json`
+  after every item. The checkpoint captures `numpy.random.Generator`'s own
+  serializable bit-generator state (confirmed to be plain JSON-safe Python
+  ints, not numpy scalar types), so a kill mid-run and re-running the
+  identical command resumes from the next un-completed item and produces
+  **byte-identical results** to an uninterrupted run — not just "makes
+  progress again," but the exact same synthetic objects, detection/link/
+  score outcomes, and hazard flags. No new CLI flag is needed; resume is
+  automatic on re-running the same command, per the standing rule's
+  requirement that "the operator must never need to edit the command to
+  resume."
+- Fixed a related bug the resume logic would otherwise have introduced: the
+  existing per-item ETA calculation divided this-run elapsed time by the
+  *absolute* item index, which after a resume starting well above item 0
+  would have produced a wildly wrong near-zero ETA immediately after
+  resuming. Now divides by items completed in the current process instead.
+- `review_packets` now accumulate internally on every scored item
+  unconditionally (previously gated on `--review-packet-out` being passed),
+  so a checkpoint saved by a run without that flag can still be correctly
+  resumed by a later run that does request it.
+- 8 new tests in `tests/test_injection_recovery.py`, including an explicit
+  equivalence test that simulates a kill after item 3 of a 6-item run and
+  asserts the resumed run's `n_detected`/`n_linked`/`n_scored`/
+  `hazard_flag_counts` exactly match an uninterrupted 6-item run with the
+  same seed.
+- `ruff check` clean; no changes to `src/` so the 100% `--cov=src` CI gate
+  is unaffected (`Skills/` is not covered by that gate, matching the
+  existing `Skills/ztf_dr24_bounded_ingest.py` precedent).
+
 ## v0.90.28 — Fix silent hang in classify(): unprotected Tier 1/3 model file reads (2026-07-02)
 
 ### Fixed

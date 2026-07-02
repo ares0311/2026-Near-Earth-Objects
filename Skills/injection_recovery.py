@@ -11,6 +11,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 import time
@@ -154,11 +155,32 @@ def _fmt_duration(seconds: float) -> str:
     return f"{m}m{s:02d}s"
 
 
+_CHECKPOINT_ROOT = Path("Logs/pipeline_runs/injection_recovery")
+
+
+def _checkpoint_key(n_inject: int, seed: int, mission: str) -> str:
+    """Stable checkpoint key from the exact run parameters, so re-running the
+    identical command finds and resumes the existing checkpoint instead of
+    starting over (checkpoint/resume standing rule)."""
+    payload = json.dumps({"n_inject": n_inject, "seed": seed, "mission": mission}, sort_keys=True)
+    return hashlib.md5(payload.encode()).hexdigest()[:12]
+
+
+def _atomic_write_json(path: Path, payload: dict) -> None:
+    """Write a checkpoint atomically (write-then-rename) so a kill mid-write
+    never leaves a corrupt/unparseable checkpoint file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, indent=2))
+    tmp.replace(path)
+
+
 def run_injection_recovery(
     n_inject: int = 20,
     seed: int = 0,
     mission: str = "ZTF",
     review_packet_out: Path | None = None,
+    checkpoint_root: Path | None = None,
 ) -> dict:
     """Run the injection-recovery test and return summary statistics.
 
@@ -172,7 +194,17 @@ def run_injection_recovery(
     format ``Skills/run_pipeline.py --review-packet-out`` produces, so the
     output can feed ``Skills/adversarial_review.py`` and
     ``Skills/export_ades_report.py`` for the Gate P3 no-submission drill.
+
+    Checkpoints after every item to ``<checkpoint_root>/<key>/checkpoint.json``
+    (key derived from n_inject/seed/mission), including the RNG's own
+    serializable bit-generator state, so a kill/sleep mid-run and re-running
+    the identical command resumes from the next un-completed item instead of
+    losing prior work or silently diverging from a from-scratch run.
     """
+    root = checkpoint_root if checkpoint_root is not None else _CHECKPOINT_ROOT
+    key = _checkpoint_key(n_inject, seed, mission)
+    checkpoint_path = root / key / "checkpoint.json"
+
     rng = np.random.default_rng(seed)
 
     n_detected = 0
@@ -180,11 +212,33 @@ def run_injection_recovery(
     n_scored = 0
     hazard_flags: list[str] = []
     review_packets: list[dict] = []
+    start_i = 0
+
+    if checkpoint_path.exists():
+        state = json.loads(checkpoint_path.read_text())
+        start_i = state["completed"]
+        n_detected = state["n_detected"]
+        n_linked = state["n_linked"]
+        n_scored = state["n_scored"]
+        hazard_flags = state["hazard_flags"]
+        review_packets = state["review_packets"]
+        rng.bit_generator.state = state["rng_state"]
+        print(
+            f"[resume] loaded checkpoint: {start_i}/{n_inject} items already "
+            f"completed, continuing from item {start_i + 1}",
+            flush=True,
+        )
+
     t0 = time.monotonic()
 
-    for i in range(n_inject):
+    for i in range(start_i, n_inject):
         elapsed = time.monotonic() - t0
-        per_item = elapsed / max(i, 1)
+        # Use items completed in THIS run (not the absolute index) for the
+        # rate estimate -- after a resume, i starts far above 0 while
+        # elapsed restarts at 0, so dividing by i would produce a wildly
+        # wrong near-zero ETA immediately after resuming.
+        items_done_this_run = i - start_i
+        per_item = elapsed / max(items_done_this_run, 1)
         eta = per_item * (n_inject - i)
         print(
             f"[injection] ({i + 1}/{n_inject}) mission={mission}  "
@@ -230,8 +284,26 @@ def run_injection_recovery(
             scored = score(t, features_cls, posterior, orbital)
             n_scored += 1
             hazard_flags.append(scored.hazard.hazard_flag)
-            if review_packet_out is not None:
-                review_packets.append(scored.model_dump(mode="json"))
+            # Always accumulate internally (not gated on review_packet_out)
+            # so a checkpoint saved on a run without --review-packet-out can
+            # still be resumed correctly by a later run that requests it.
+            review_packets.append(scored.model_dump(mode="json"))
+
+        _atomic_write_json(
+            checkpoint_path,
+            {
+                "n_inject": n_inject,
+                "seed": seed,
+                "mission": mission,
+                "completed": i + 1,
+                "n_detected": n_detected,
+                "n_linked": n_linked,
+                "n_scored": n_scored,
+                "hazard_flags": hazard_flags,
+                "review_packets": review_packets,
+                "rng_state": rng.bit_generator.state,
+            },
+        )
 
     print(
         f"[injection] Complete: {n_inject} injected  "
