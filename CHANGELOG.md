@@ -3,6 +3,32 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.15 — Fix JPL SBDB filter param; diagnose MPC/Fink (2026-07-02)
+
+### Fixed
+- `Skills/verify_ztf_dr24_sources.py`: JPL SBDB probe used `neo=Y`, which the
+  live API rejects (HTTP 400, "query parameter was not recognized").
+  Operator-verified fix: `sb-group=neo` (confirmed via live `curl` returning
+  real NEO records — 433 Eros, 719 Albert, 887 Alinda, all `class: AMO`).
+- `docs/neo_discovery_agent_brief.md`: JPL SBDB example section corrected
+  with the live-verified working URL, per the brief's own rule that live
+  behavior supersedes its documentation text.
+
+### Diagnosed (not yet fixed)
+- MPC get-obs: root cause narrowed to "requires an actual JSON request body,
+  not query-string params" via two rounds of real error messages. Awaiting
+  one more operator confirmation before changing the probe script.
+- Fink API: two independent TLS stacks (Python `requests`/urllib3 and the
+  operator's native LibreSSL via `curl`) both fail identically
+  (`SSL_ERROR_SYSCALL` immediately after ClientHello) from the operator's
+  real network. Determined to be an external server-side issue, not a
+  client bug — no code fix applies.
+
+### Added
+- `docs/evidence/phase0/2026-07-02-root-cause-findings.md`: full root-cause
+  record for all three issues, sourced entirely from real commands the
+  operator ran (this sandbox cannot reach these domains directly).
+
 ## v0.90.14 — Record first live Phase 0 probe results (2026-07-02)
 
 ### Added

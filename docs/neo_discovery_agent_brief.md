@@ -244,10 +244,26 @@ Purpose:
 - Evaluation/enrichment only.
 - Do not use this as the main training dataset for discovery.
 
-Example:
+**Correction (2026-07-02, live-verified)**: the `neo=Y` parameter below is
+**incorrect** and is rejected by the live API with HTTP 400
+(`"one or more query parameter was not recognized"`). The verified working
+filter parameter is `sb-group=neo`, confirmed via a live operator `curl` call
+that returned real NEO records (e.g. 433 Eros, `class: AMO`). Evidence:
+`docs/evidence/phase0/2026-07-02-first-live-probe-console.md`. Per this
+brief's own §Assumption Audit rule ("If any Phase 0 check conflicts with
+this brief, the code must follow the live verified source behavior and
+update the docs"), use `sb-group=neo`, not `neo=Y`.
+
+Example (original brief text, kept for reference — do not use `neo=Y` as written):
 
 ```text
 https://ssd-api.jpl.nasa.gov/sbdb_query.api?fields=spkid,pdes,full_name,class,neo,pha,moid,H,epoch,e,a,q,i,om,w,ma&neo=Y&full-prec=true
+```
+
+Corrected, live-verified example:
+
+```text
+https://ssd-api.jpl.nasa.gov/sbdb_query.api?fields=spkid,pdes,full_name,class,neo,pha,moid,H,epoch,e,a,q,i,om,w,ma&sb-group=neo&full-prec=true
 ```
 
 ### MPC Observations API: Published Observations for One Designation
