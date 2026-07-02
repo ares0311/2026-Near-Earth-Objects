@@ -656,7 +656,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.32)
+## Current State (v0.90.35)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -689,7 +689,78 @@ bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-02 v19 (CURRENT)
+### Handoff state as of 2026-07-02 v21 (CURRENT)
+
+**Bounded multi-night ingest tool built for Gate Z3** —
+`Skills/ztf_alert_archive_ingest.py` (v0.90.35) builds real `Observation`
+objects from real UW ZTF alert archive detections, using only the field
+names confirmed live in the v20 handoff (`ra`/`dec`/`jd`/`magpsf`/
+`sigmapsf`/`fid`-mapped-to-band/`rb`/`field`/`diffmaglim`; cutouts left
+unmapped since their AVRO structure is unverified). Streams each night's
+archive file directly through gzip/tar decode (never buffers a full night,
+up to 73G) with a real-bogus threshold and optional sky-box filter applied
+per-record, checkpointed per night, retried with backoff, bounded to at
+most 10 nights per invocation. Verified offline against a synthetic
+archive matching the real schema: sky-box filtering, real-bogus filtering,
+and Observation field mapping all confirmed correct; the exact real field
+values from the v19/v20 handoffs were confirmed to construct a valid
+`Observation` object.
+
+**Not yet run against the real archive** (no live internet access in this
+sandbox). `docs/ZTF_DR24_PRODUCTION_GATES.md`'s Gate Z3 row and "Next
+Coding Step" updated with the operator command and rationale (sky box
+centered on the real position already confirmed present in
+`ztf_public_20180809.tar.gz`, so a first run is guaranteed at least one
+match).
+
+**Next production action (NOT YET DONE)**: operator runs the ingest tool
+against 2 real nights, then a follow-up step (not yet built) loads the
+resulting checkpoint JSON and runs it through `src/detect.py` ->
+`src/link.py` for Z3's "known-object positive control" — do not build that
+follow-up step until the ingest tool itself has been confirmed working
+against the real archive first.
+
+```bash
+git pull origin main
+export PYTHONPATH=src
+caffeinate -i uv run --python 3.14 python Skills/ztf_alert_archive_ingest.py \
+    --nights 20180809 20180810 \
+    --ra 232.6 --dec -8.4 --radius-deg 2.0 --min-rb 0.5
+```
+
+### Handoff state as of 2026-07-02 v20
+
+**Real-bogus field name confirmed: `rb`, not `drb`** — operator ran
+`Skills/probe_ztf_alert_archive_file.py --inspect-first-packet --dump-all-fields`
+on `main` @ v0.90.33, dumping all 100 real `candidate` fields from the
+checked packet. `rb: 0.7766666412353516` is present; **`drb` is absent
+entirely** from this 2018-era packet's schema (`rbversion: 't8_f5_c3'`).
+Any Gate Z3 ingest tool must use `rb` and must not assume `drb` availability
+without checking `schemavsn` first.
+
+**Unplanned finding, flagged for future research, NOT wired in yet**: the
+packet already contains ZTF's own solar-system cross-match fields
+(`ssnamenr: '72966'`, `ssdistnr: 1.0`, `ssmagnr: 19.5`) — this specific
+detection was already matched to a known minor planet by ZTF's own
+pipeline at alert-generation time. This *could* simplify Gate Z2's
+known-object exclusion, but must NOT be used for that purpose without first
+researching the cross-match catalog's provenance and update cadence
+relative to the no-future-leakage requirement — `src/known_object_exclusion.py`'s
+existing JPL SBDB `first_obs` approach remains the only currently-verified
+mechanism. Full details:
+`docs/evidence/phase0/2026-07-02-gate-z3-uw-alert-archive-candidate.md`.
+`docs/ZTF_DR24_PRODUCTION_GATES.md`'s "Next Coding Step" updated with the
+confirmed field names.
+
+**Next production action (NOT YET DONE)**: design and build the bounded,
+checkpointed, multi-night real-detection ingest tool described in
+`docs/ZTF_DR24_PRODUCTION_GATES.md`'s Next Coding Step — this is now
+unblocked on all fronts (source verified, schema verified, field names
+confirmed). Do not research the SSO cross-match provenance question unless
+explicitly asked; it's a documented future optimization, not blocking
+current work.
+
+### Handoff state as of 2026-07-02 v19
 
 **Gate Z3 source-verification blocker CLOSED** ✓ — operator ran
 `Skills/probe_ztf_alert_archive_file.py --inspect-first-packet` on `main` @

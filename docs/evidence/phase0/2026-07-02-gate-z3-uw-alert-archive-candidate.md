@@ -203,3 +203,60 @@ researched real/bogus-classification-ready alert schema. See
 the concrete next coding step (a bounded multi-night ingest tool, not yet
 built — Gate Z3 as a whole is not fully closed, only its source-verification
 sub-problem).
+
+## RESOLVED 2026-07-02: full field dump — real-bogus field name confirmed, plus a significant unplanned finding
+
+Operator ran `--inspect-first-packet --dump-all-fields` on `main` @
+v0.90.33. The `candidate` record's real field count is exactly 100 (matches
+the earlier count). Two results matter for Gate Z3/Z2 design:
+
+**1. Real-bogus score field name confirmed: `rb`, NOT `drb`.**
+`rb: 0.7766666412353516` is present. **`drb` (the deep-learning real-bogus
+score from Duev et al. 2019) is absent from this packet's schema entirely**
+— every one of the 100 real field names was checked, `drb` is not among
+them. This is a 2018-era alert (`rbversion: 't8_f5_c3'`), and `drb` may
+only exist in later ZTF alert-schema versions (`schemavsn` in the top-level
+record — not yet checked for this packet, should be recorded before
+assuming `drb` availability varies by night/era). **Any Gate Z3 ingest tool
+must use `rb`, and must not assume `drb` is present without checking
+`schemavsn` first** — do not guess which schema version a given archived
+night uses.
+
+**2. Unplanned finding: the packet already includes ZTF's own solar-system
+cross-match fields.** `ssnamenr: '72966'`, `ssdistnr: 1.0`, `ssmagnr: 19.5`
+are present and populated — meaning ZTF's own alert-processing pipeline
+already cross-matched this specific detection against a minor-planet
+catalog *at alert-generation time in 2018* and found a match (asteroid
+72966, matched within 1.0 arcsec, predicted mag 19.5). This was not
+anticipated in the original schema research.
+
+**Why this matters and why it must NOT be used naively**: this looks like
+it could simplify Gate Z2's time-aware known-object exclusion (treat
+`ssnamenr` presence as "known object, skip it" directly from the packet,
+no external JPL SBDB query needed) — but doing so without further analysis
+risks violating the no-future-catalog-leakage requirement, because:
+- It is not yet confirmed what catalog ZTF's own pipeline used for this
+  cross-match, when that catalog was last updated relative to this alert's
+  `jd`, or whether the *archived* packet reflects the cross-match as it was
+  computed in 2018 or some later reprocessing.
+- `ssnamenr` populated is a positive signal of "known," but `ssnamenr`
+  *absent* is not necessarily a reliable signal of "unknown" for
+  historical-replay purposes without confirming ZTF's own catalog's
+  completeness and update cadence.
+
+**Do not wire `ssnamenr`/`ssdistnr`/`ssmagnr` into any known-object
+exclusion logic without first researching ZTF's own SSO cross-match
+methodology and update history (a new, separate research question from
+what's been verified so far) — the existing `src/known_object_exclusion.py`
+JPL SBDB `first_obs`-based approach remains the only currently-verified
+no-future-leakage mechanism.** This finding is recorded as a candidate
+future optimization/cross-check, not a replacement for Gate Z2's existing
+design.
+
+Full real field list (100 fields) is preserved in the operator's terminal
+output for this run; representative fields beyond the six already
+researched: `classtar` (star/galaxy score), `isdiffpos` (t/f difference
+sign), `ndethist`/`ncovhist` (detection/coverage history counts),
+`distnr`/`magnr` (nearest reference-catalog source), `field`/`rcid`/`pid`
+(ZTF field/readout-channel/processing IDs), `programid`/`programpi`
+(survey program metadata).

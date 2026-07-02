@@ -3,6 +3,47 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.35 — Bounded multi-night ingest tool for Gate Z3 (2026-07-02)
+
+### Added
+- `Skills/ztf_alert_archive_ingest.py`: bounded, checkpointed, multi-night
+  real-detection ingest from the UW public ZTF alert archive. Builds real
+  `src/schemas.py` `Observation` objects using only field names confirmed
+  live (`ra`/`dec`/`jd`/`magpsf`/`sigmapsf`/`fid`-mapped-to-band/`rb`/
+  `field`/`diffmaglim`). Image cutouts deliberately left unmapped (AVRO
+  structure unverified). Streams each night directly through gzip/tar
+  decode with a real-bogus threshold and optional sky-box filter applied
+  per-record -- never buffers a full night (up to 73G). Checkpointed per
+  night, retried with backoff, bounded to at most 10 nights per invocation.
+- Verified offline against a synthetic archive matching the real schema:
+  sky-box filtering, real-bogus filtering, Observation field mapping, and
+  checkpoint/resume all confirmed correct via unit tests. The exact real
+  field values from the previously-confirmed packet were confirmed to
+  construct a valid `Observation` object. Not yet run against the real
+  archive (no live internet access in this sandbox) -- requires an
+  operator run.
+- Updated `docs/ZTF_DR24_PRODUCTION_GATES.md`'s Gate Z3 row and "Next
+  Coding Step" with the operator command and next steps.
+
+## v0.90.34 — Confirm rb field name; document SSO cross-match finding (2026-07-02)
+
+### Changed
+- **Confirmed the real-bogus score field name is `rb`, not `drb`**, via
+  operator's `--dump-all-fields` run against a real 2018-era packet. `drb`
+  is entirely absent from that packet's schema. Any Gate Z3 ingest tool
+  must use `rb` and must not assume `drb` availability without checking
+  `schemavsn` first.
+- Documented an unplanned finding: the packet already contains ZTF's own
+  solar-system cross-match fields (`ssnamenr`, `ssdistnr`, `ssmagnr`) —
+  flagged for future research, explicitly NOT wired into known-object
+  exclusion logic yet, since the catalog's provenance and update cadence
+  relative to the no-future-leakage requirement has not been researched.
+- Updated `docs/ZTF_DR24_PRODUCTION_GATES.md`'s "Next Coding Step" with the
+  confirmed field names, unblocking the next step: a bounded multi-night
+  real-detection ingest tool.
+- Updated `docs/evidence/phase0/2026-07-02-gate-z3-uw-alert-archive-candidate.md`
+  with the full field-dump analysis.
+
 ## v0.90.33 — Add --dump-all-fields to Gate Z3 probe (2026-07-02)
 
 ### Added
