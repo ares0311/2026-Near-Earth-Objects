@@ -656,7 +656,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.34)
+## Current State (v0.90.35)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -689,7 +689,46 @@ bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-02 v20 (CURRENT)
+### Handoff state as of 2026-07-02 v21 (CURRENT)
+
+**Bounded multi-night ingest tool built for Gate Z3** —
+`Skills/ztf_alert_archive_ingest.py` (v0.90.35) builds real `Observation`
+objects from real UW ZTF alert archive detections, using only the field
+names confirmed live in the v20 handoff (`ra`/`dec`/`jd`/`magpsf`/
+`sigmapsf`/`fid`-mapped-to-band/`rb`/`field`/`diffmaglim`; cutouts left
+unmapped since their AVRO structure is unverified). Streams each night's
+archive file directly through gzip/tar decode (never buffers a full night,
+up to 73G) with a real-bogus threshold and optional sky-box filter applied
+per-record, checkpointed per night, retried with backoff, bounded to at
+most 10 nights per invocation. Verified offline against a synthetic
+archive matching the real schema: sky-box filtering, real-bogus filtering,
+and Observation field mapping all confirmed correct; the exact real field
+values from the v19/v20 handoffs were confirmed to construct a valid
+`Observation` object.
+
+**Not yet run against the real archive** (no live internet access in this
+sandbox). `docs/ZTF_DR24_PRODUCTION_GATES.md`'s Gate Z3 row and "Next
+Coding Step" updated with the operator command and rationale (sky box
+centered on the real position already confirmed present in
+`ztf_public_20180809.tar.gz`, so a first run is guaranteed at least one
+match).
+
+**Next production action (NOT YET DONE)**: operator runs the ingest tool
+against 2 real nights, then a follow-up step (not yet built) loads the
+resulting checkpoint JSON and runs it through `src/detect.py` ->
+`src/link.py` for Z3's "known-object positive control" — do not build that
+follow-up step until the ingest tool itself has been confirmed working
+against the real archive first.
+
+```bash
+git pull origin main
+export PYTHONPATH=src
+caffeinate -i uv run --python 3.14 python Skills/ztf_alert_archive_ingest.py \
+    --nights 20180809 20180810 \
+    --ra 232.6 --dec -8.4 --radius-deg 2.0 --min-rb 0.5
+```
+
+### Handoff state as of 2026-07-02 v20
 
 **Real-bogus field name confirmed: `rb`, not `drb`** — operator ran
 `Skills/probe_ztf_alert_archive_file.py --inspect-first-packet --dump-all-fields`

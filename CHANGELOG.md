@@ -3,6 +3,28 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.35 — Bounded multi-night ingest tool for Gate Z3 (2026-07-02)
+
+### Added
+- `Skills/ztf_alert_archive_ingest.py`: bounded, checkpointed, multi-night
+  real-detection ingest from the UW public ZTF alert archive. Builds real
+  `src/schemas.py` `Observation` objects using only field names confirmed
+  live (`ra`/`dec`/`jd`/`magpsf`/`sigmapsf`/`fid`-mapped-to-band/`rb`/
+  `field`/`diffmaglim`). Image cutouts deliberately left unmapped (AVRO
+  structure unverified). Streams each night directly through gzip/tar
+  decode with a real-bogus threshold and optional sky-box filter applied
+  per-record -- never buffers a full night (up to 73G). Checkpointed per
+  night, retried with backoff, bounded to at most 10 nights per invocation.
+- Verified offline against a synthetic archive matching the real schema:
+  sky-box filtering, real-bogus filtering, Observation field mapping, and
+  checkpoint/resume all confirmed correct via unit tests. The exact real
+  field values from the previously-confirmed packet were confirmed to
+  construct a valid `Observation` object. Not yet run against the real
+  archive (no live internet access in this sandbox) -- requires an
+  operator run.
+- Updated `docs/ZTF_DR24_PRODUCTION_GATES.md`'s Gate Z3 row and "Next
+  Coding Step" with the operator command and next steps.
+
 ## v0.90.34 — Confirm rb field name; document SSO cross-match finding (2026-07-02)
 
 ### Changed
