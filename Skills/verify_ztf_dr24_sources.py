@@ -61,10 +61,19 @@ _PROBES: list[dict] = [
         "method": "GET",
     },
     {
+        # Corrected 2026-07-02 from live verification: this endpoint parses
+        # the request body as JSON regardless of HTTP method and rejects an
+        # empty body (HTTP 400 "Expecting value: line 1 column 1"). Query
+        # string alone (no Content-Type header) fails closed with HTTP 501
+        # "Content-Type not supported, use application/json". Operator-run
+        # curl with an actual JSON body returned HTTP 200 with a full ADES
+        # observation history for 433 Eros -- see
+        # docs/evidence/phase0/2026-07-02-root-cause-findings.md.
         "id": "mpc_get_obs",
-        "brief_section": "Concrete Starting API Calls > MPC Observations API",
-        "url": "https://data.minorplanetcenter.net/api/get-obs?desigs=433&output_format=XML",
+        "brief_section": "Concrete Starting API Calls > MPC Observations API (corrected)",
+        "url": "https://data.minorplanetcenter.net/api/get-obs",
         "method": "GET",
+        "body": {"desigs": ["433"]},
     },
     {
         "id": "irsa_ztf_sci_metadata",
@@ -107,9 +116,18 @@ def _probe_one(probe: dict) -> dict:
     with status, headers, and a truncated body -- never raises on HTTP-level
     errors (403/404/etc. are recorded as findings, not exceptions)."""
     last_exc: Exception | None = None
+    body = probe.get("body")
     for attempt in range(1, _MAX_ATTEMPTS + 1):
         try:
-            resp = requests.get(probe["url"], timeout=30)
+            if body is not None:
+                # MPC get-obs requires a JSON request body even for GET --
+                # confirmed live 2026-07-02, see docs/evidence/phase0/
+                # 2026-07-02-root-cause-findings.md.
+                resp = requests.request(
+                    "GET", probe["url"], json=body, timeout=30
+                )
+            else:
+                resp = requests.get(probe["url"], timeout=30)
             body_preview = resp.text[:_BODY_PREVIEW_CHARS]
             return {
                 "id": probe["id"],
