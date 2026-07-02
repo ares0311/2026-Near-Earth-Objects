@@ -3,6 +3,25 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.9 — Gate P3 no-submission package drill (2026-07-02)
+
+### Added
+- `Skills/injection_recovery.py`: `--review-packet-out PATH` flag writes full
+  `ScoredNEO` packets from injection runs (same format as
+  `Skills/run_pipeline.py --review-packet-out`), so a Gate P1 positive-control
+  run can directly feed a Gate P3 drill without a live sky run.
+- `docs/evidence/prod-loop/2026-07-02-gate-p3-no-submission-drill.md`: records
+  a full drill — 5 synthetic WISE packets through `Skills/adversarial_review.py
+  --offline` (5/5 REJECT, expected for a packet with no real/bogus score) and
+  `Skills/export_ades_report.py` twice (default args, then `--obs-code C51`
+  without the confirmation flag), both failing closed with no `.psv` file
+  written and no network access at any step.
+
+### Changed
+- `docs/PRODUCTION_READINESS.md`: Gate P3 (no-submission package drill)
+  marked CLOSED. Gate P4 (MPC submission protocol) is next and is
+  human-gated.
+
 ## v0.90.8 — Gate P2 survey-native confidence policy (2026-07-02)
 
 ### Added

@@ -668,7 +668,33 @@ See `docs/MISSION.md` for the authoritative data strategy. The prior "blocked
 until expert review" guardrail was removed by operator decision on 2026-06-21;
 MPC/NEOCP/Scout is the expert review system.
 
-### Handoff state as of 2026-07-02 v2 (CURRENT)
+### Handoff state as of 2026-07-02 v3 (CURRENT)
+
+**Gate P3 CLOSED (v0.90.9)** ✓ — No-submission package drill:
+- `Skills/injection_recovery.py` gained `--review-packet-out` to write full
+  `ScoredNEO` packets from injection runs (same format as
+  `Skills/run_pipeline.py --review-packet-out`).
+- Drilled a 5-candidate Gate P1 WISE positive-control packet through
+  `Skills/adversarial_review.py --offline` (5/5 `REJECT` — expected for a
+  synthetic packet with no real/bogus score and a short-arc orbit fit; this
+  drills the mechanism, not a submission claim) and
+  `Skills/export_ades_report.py` twice: default args (fails closed — WISE
+  requires `stn=C51`) and `--obs-code C51` without the confirmation flag
+  (fails closed independently — requires
+  `--mpc-confirmed-wise-c51-submission`). No `.psv` file was written in
+  either case; no network call occurs anywhere in the export path (verified
+  by code inspection).
+- Evidence: `docs/evidence/prod-loop/2026-07-02-gate-p3-no-submission-drill.md`;
+  `docs/PRODUCTION_READINESS.md` Gate P3 marked CLOSED.
+- **Next production action**: Gate P4 — MPC submission protocol. This is
+  **human-gated**: Jerome must obtain written MPC confirmation that this
+  independent archival pipeline may submit WISE/NEOWISE remeasurements under
+  station code C51 before any live submission code path can be exercised.
+  No further code work can close P4 alone. Gate P5 (operator go/no-go
+  runbook) is the remaining code-addressable gate and can be worked next
+  while P4 awaits Jerome's MPC correspondence.
+
+### Handoff state as of 2026-07-02 v2
 
 **Gate P2 CLOSED (v0.90.8)** ✓ — Survey-native confidence policy:
 - New `docs/SURVEY_NATIVE_CONFIDENCE_POLICY.md` documents, per source

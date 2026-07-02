@@ -1,6 +1,6 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.90.8
+**Current version**: v0.90.9
 **Last updated**: 2026-07-02
 **Purpose**: Mandatory read at session start (per MANDATORY SESSION-START PROTOCOL).  
 Every planning cycle must name the highest-priority unresolved production-capability gate and show how proposed steps close or directly unblock it.
@@ -605,14 +605,25 @@ a new NEO.
       endpoint verification.
 
 ### Gate P3: No-submission package drill
-- [ ] Run an end-to-end dry drill from a P1 positive-control packet through
+- [x] Run an end-to-end dry drill from a P1 positive-control packet through
       `Skills/adversarial_review.py`, operator review packet generation, and
       MPC-compatible export (`Skills/export_ades_report.py` preferred).
-- [ ] Verify the drill records no external submission, no impact-probability
+- [x] Verify the drill records no external submission, no impact-probability
       claim, and fail-closed behavior unless the operator has intentionally set
       every live-submission approval control.
-- Current status: **open**. Export tools and fail-closed guards exist, but this
-      drill depends on a P1 packet and the P2 confidence policy.
+- Current status: **CLOSED (2026-07-02)**. `Skills/injection_recovery.py` gained
+      `--review-packet-out` to produce full `ScoredNEO` packets from the Gate P1
+      WISE positive control. The drill piped a 5-candidate packet through
+      `Skills/adversarial_review.py --offline` (5/5 `REJECT`, expected for a
+      synthetic packet lacking a real/bogus score and short-arc orbit fit),
+      then attempted `Skills/export_ades_report.py` twice: once with default
+      arguments (failed closed — WISE requires station code C51), and once
+      with `--obs-code C51` but no confirmation flag (failed closed
+      independently — requires `--mpc-confirmed-wise-c51-submission`). No
+      `.psv` file was written in either case; no network call occurred at any
+      step (verified by code inspection — `export_ades_report.py` only
+      imports the pure-string `format_mpc_ades_psv`). Evidence:
+      `docs/evidence/prod-loop/2026-07-02-gate-p3-no-submission-drill.md`.
 
 ### Gate P4: MPC submission protocol
 - [ ] Resolve and document the submission pathway for archival WISE/NEOWISE

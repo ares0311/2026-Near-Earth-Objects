@@ -551,7 +551,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.8)
+## Current State (v0.90.9)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -598,7 +598,7 @@ a measurable quantity (surveys done/total, tracklets done/total).
 
 See `docs/PRODUCTION_READINESS.md` for the full gap register.
 
-### Handoff notes (2026-07-02) — v0.90.8 (CURRENT)
+### Handoff notes (2026-07-02) — v0.90.9 (CURRENT)
 
 **Current production definition**:
 - Production readiness now means demonstrated capability to find, score,
@@ -609,9 +609,25 @@ See `docs/PRODUCTION_READINESS.md` for the full gap register.
   and has been applied to close Gate P2: source verification, no future-catalog
   leakage, historical replay discipline, pretrained-model audits, and
   auditable ranker design are recorded in `docs/SURVEY_NATIVE_CONFIDENCE_POLICY.md`.
-- Gates P1 and P2 in `docs/PRODUCTION_READINESS.md` are CLOSED. Gate P3
-  (no-submission package drill) is the next highest-priority open production
-  gate. Actual candidate survival is a later event-driven discovery gate.
+- Gates P1, P2, and P3 in `docs/PRODUCTION_READINESS.md` are CLOSED. Gate P4
+  (MPC submission protocol) is next and is **human-gated** — Jerome must
+  obtain written MPC confirmation for archival WISE C51 submission authority
+  before any further code work can close it. Gate P5 (operator go/no-go
+  runbook) can be worked in parallel. Actual candidate survival is a later
+  event-driven discovery gate.
+
+**Gate P3 CLOSED (2026-07-02)**:
+- `Skills/injection_recovery.py --review-packet-out` writes full `ScoredNEO`
+  packets from injection runs, feeding the drill directly from a Gate P1 run.
+- Drilled 5 synthetic WISE packets through `Skills/adversarial_review.py
+  --offline` (5/5 `REJECT`, expected) and `Skills/export_ades_report.py`
+  twice — default args and `--obs-code C51` without confirmation — both
+  failed closed with no `.psv` file written and no network call.
+- Evidence: `docs/evidence/prod-loop/2026-07-02-gate-p3-no-submission-drill.md`.
+- **NEXT PRODUCTION ACTION — NOT YET DONE**: Gate P4 requires Jerome to
+  contact MPC in writing about archival WISE/NEOWISE submission authority
+  under station code C51 (see `docs/MPC_SUBMISSION_POLICY.md §TODO for Future
+  Agents`). No code path can substitute for this.
 
 **Gate P2 CLOSED (2026-07-02)**:
 - `docs/SURVEY_NATIVE_CONFIDENCE_POLICY.md` documents the source-verification
