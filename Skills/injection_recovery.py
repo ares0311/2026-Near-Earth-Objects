@@ -215,31 +215,19 @@ def run_injection_recovery(
                 mag=float(mag),
             )
 
-        print(f"    [detect] calling detect()...", flush=True)
         detect_result = detect(obs, mpc_cross_match=False)
-        print(f"    [detect] returned {len(detect_result.candidates)} candidates", flush=True)
         if detect_result.candidates:
             n_detected += 1
 
-        print(f"    [link] calling link()...", flush=True)
         link_result = link(tuple(detect_result.candidates), min_nights=2, min_observations=3)
-        print(f"    [link] returned {len(link_result.tracklets)} tracklets", flush=True)
         if link_result.tracklets:
             n_linked += 1
 
             t = link_result.tracklets[0]
-            print(f"    [features] calling extract_features()...", flush=True)
             features = extract_features(t)
-            print(f"    [features] returned", flush=True)
-            print(f"    [orbit] calling fit_orbit()...", flush=True)
             orbital = fit_orbit(t)
-            print(f"    [orbit] returned", flush=True)
-            print(f"    [classify] calling classify()...", flush=True)
             features_cls, posterior = classify(t, features)
-            print(f"    [classify] returned", flush=True)
-            print(f"    [score] calling score()...", flush=True)
             scored = score(t, features_cls, posterior, orbital)
-            print(f"    [score] returned", flush=True)
             n_scored += 1
             hazard_flags.append(scored.hazard.hazard_flag)
             if review_packet_out is not None:

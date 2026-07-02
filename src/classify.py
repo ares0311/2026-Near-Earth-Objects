@@ -151,6 +151,47 @@ def _features_to_array(features: CandidateFeatures) -> np.ndarray:
     return np.array([v if v is not None else 0.0 for v in vals], dtype=np.float32)
 
 
+def _read_file_with_heartbeat(path: Any, label: str, interval: float = 5.0) -> bytes:
+    """Read a file into memory in 64 KB chunks, printing a heartbeat every
+    `interval` seconds if the read is slow.
+
+    A bare path-based load (xgboost's ``load_model(str(path))``, or
+    ``torch.load(str(path))`` which mmaps and defers reads) can block
+    silently and indefinitely if `path` lives on a cloud-synced directory
+    (e.g. Dropbox) that has not finished downloading the file locally --
+    the OS read() call blocks on the network fetch with zero visible
+    progress, indistinguishable from a true hang. This was diagnosed and
+    fixed for the CNN loader (BytesIO pre-read); this shared helper applies
+    the identical fix to every other model loader in this module.
+    """
+    import threading
+    import time as _time
+
+    stop = threading.Event()
+
+    def _heartbeat() -> None:
+        t0 = _time.monotonic()
+        while not stop.wait(interval):
+            elapsed = int(_time.monotonic() - t0)
+            m, s = divmod(elapsed, 60)
+            print(f"  reading {label} … still working ({m}m{s:02d}s elapsed)", flush=True)
+
+    hb = threading.Thread(target=_heartbeat, daemon=True)
+    hb.start()
+    try:
+        buf = bytearray()
+        with open(path, "rb") as fh:
+            while True:
+                chunk = fh.read(65536)
+                if not chunk:
+                    break
+                buf.extend(chunk)
+        return bytes(buf)
+    finally:
+        stop.set()
+        hb.join(timeout=1.0)
+
+
 def _load_xgb_model() -> Any:
     model_path = _MODEL_DIR / "tier1_xgb.json"
     if not model_path.exists():
@@ -158,8 +199,14 @@ def _load_xgb_model() -> Any:
     try:
         import xgboost as xgb  # type: ignore[import]
 
+        # Pre-read with a heartbeat -- see _read_file_with_heartbeat. This
+        # is the model loaded FIRST inside classify() (Tier 1 runs before
+        # Tier 2/3), so an unprotected read here blocks before any other
+        # tier's deadlock mitigation is ever reached.
+        raw = _read_file_with_heartbeat(model_path, "Tier 1 XGBoost model")
+
         clf = xgb.XGBClassifier()
-        clf.load_model(str(model_path))
+        clf.load_model(bytearray(raw))
         return clf
     except Exception:
         return None
@@ -508,12 +555,45 @@ def _load_transformer_model() -> Any:
     if not model_path.exists():
         return None
     try:
+        import io
+        import os
+        import threading
+
+        os.environ.setdefault("OMP_NUM_THREADS", "1")
+        os.environ.setdefault("MKL_NUM_THREADS", "1")
+
         import torch
+
+        torch.set_num_threads(1)
+
+        # Pre-read with a heartbeat -- see _read_file_with_heartbeat. If no
+        # image cutouts are present, Tier 2's CNN never loads and this is
+        # the FIRST torch model load in the process, so it needs the same
+        # protection independently rather than relying on Tier 2 having
+        # already warmed things up.
+        raw = _read_file_with_heartbeat(model_path, "Tier 3 Transformer model")
+        buf = io.BytesIO(raw)
 
         model = _build_transformer_model()
         if model is None:
             return None
-        model.load_state_dict(torch.load(str(model_path), map_location="cpu"))
+
+        # Warm up ATen/Accelerate lazy init with a dummy matmul before the
+        # real load_state_dict, same rationale as the CNN loader.
+        stop = threading.Event()
+        hb = threading.Thread(
+            target=_cnn_heartbeat, args=("PyTorch matmul warmup (Tier 3)", stop), daemon=True
+        )
+        hb.start()
+        try:
+            _w = torch.zeros(256, 256)
+            _ = _w @ _w
+            del _w, _
+        finally:
+            stop.set()
+            hb.join(timeout=1.0)
+
+        model.load_state_dict(torch.load(buf, map_location="cpu"))
         model.eval()
         return model
     except Exception:

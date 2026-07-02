@@ -376,7 +376,52 @@ class TestLoadXgbModel:
 
         result = _load_xgb_model()
         assert result is mock_clf
+        # Root-cause fix: the loader must pre-read the file itself (not hand
+        # xgboost a bare path) so a slow/blocking read on a cloud-synced
+        # directory is visible via _read_file_with_heartbeat's heartbeat
+        # instead of blocking silently inside xgboost's own file I/O.
         mock_clf.load_model.assert_called_once()
+        (called_arg,) = mock_clf.load_model.call_args.args
+        assert isinstance(called_arg, bytearray)
+        assert bytes(called_arg) == b"{}"
+
+
+class TestReadFileWithHeartbeat:
+    def test_reads_full_file_contents(self, tmp_path):
+        f = tmp_path / "data.bin"
+        payload = b"x" * 200_000  # multiple 64KB chunks
+        f.write_bytes(payload)
+        result = cls_mod._read_file_with_heartbeat(f, "test file", interval=999)
+        assert result == payload
+
+    def test_prints_heartbeat_while_reading(self, tmp_path, capsys, monkeypatch):
+        """A slow read must surface a heartbeat line instead of blocking
+        silently -- this is the exact fix for the Tier 1 XGBoost loader hang
+        (classify() called first, hung with zero output before this fix)."""
+        import time
+
+        f = tmp_path / "slow.bin"
+        f.write_bytes(b"abc")
+
+        real_open = open
+
+        def slow_open(*args, **kwargs):
+            fh = real_open(*args, **kwargs)
+            real_read = fh.read
+
+            def slow_read(*a, **k):
+                time.sleep(0.05)
+                return real_read(*a, **k)
+
+            fh.read = slow_read
+            return fh
+
+        monkeypatch.setattr("builtins.open", slow_open)
+        result = cls_mod._read_file_with_heartbeat(f, "slow test file", interval=0.01)
+        assert result == b"abc"
+        captured = capsys.readouterr()
+        assert "slow test file" in captured.out
+        assert "still working" in captured.out
 
 
 class TestBuildCnnModel:
