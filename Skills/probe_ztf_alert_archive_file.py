@@ -130,12 +130,19 @@ def _download_with_retry(url: str, dest: Path) -> None:
     raise RuntimeError(f"GET {url} failed after {_MAX_ATTEMPTS} attempts") from last_exc
 
 
-def _inspect_first_packet(dest: Path, member_name: str) -> dict:
+def _inspect_first_packet(
+    dest: Path, member_name: str, dump_all_fields: bool = False
+) -> dict:
     """Extract exactly one named .avro member from the tar archive and parse
     its `candidate` record with fastavro, printing the field names/values so
     the real schema can be compared against the WebSearch-sourced research
     (ra, dec, jd, magpsf, sigmapsf) without guessing. Reads into memory --
-    a single alert packet is a few KB, not a bulk-extraction operation."""
+    a single alert packet is a few KB, not a bulk-extraction operation.
+
+    With dump_all_fields=True, also prints every candidate field name/value
+    (not just the six already researched) -- needed to find the real field
+    name for real-bogus scores (e.g. rb/drb) before using it in any ingest
+    tool, per the standing rule against guessing field names."""
     import fastavro
 
     print(f"[probe] parsing AVRO packet {member_name}...", flush=True)
@@ -162,22 +169,32 @@ def _inspect_first_packet(dest: Path, member_name: str) -> dict:
         mark = "✓" if present else "✗ MISSING"
         print(f"  {field}: {value!r}  [{mark}]", flush=True)
 
+    if dump_all_fields:
+        print(f"[probe] ALL {len(candidate)} candidate field(s):", flush=True)
+        for name in sorted(candidate.keys()):
+            print(f"  {name}: {candidate[name]!r}", flush=True)
+
     return {
         "member_name": member_name,
         "top_level_keys": sorted(record.keys()),
         "candidate_field_count": len(candidate),
         "expected_fields_present": {f: f in candidate for f in expected_fields},
+        "all_candidate_fields": dict(candidate) if dump_all_fields else None,
     }
 
 
 def run_probe(
-    filename: str, out_dir: Path, inspect_first_packet: bool = False
+    filename: str,
+    out_dir: Path,
+    inspect_first_packet: bool = False,
+    dump_all_fields: bool = False,
 ) -> dict:
     """Download exactly one named file from the UW ZTF alert archive and
     verify it is a real gzip/tar archive of AVRO alert packets. Returns a
     summary dict. With inspect_first_packet=True, also parses the first
     .avro member's real AVRO content -- otherwise member content is never
-    extracted or parsed."""
+    extracted or parsed. dump_all_fields additionally prints every real
+    candidate field name/value, not just the six already researched."""
     url = f"{_ARCHIVE_BASE_URL}{filename}"
     dest = out_dir / filename
 
@@ -230,7 +247,9 @@ def run_probe(
     if inspect_first_packet:
         if first_avro_member is None:
             raise RuntimeError(f"{dest} contained no .avro members to inspect")
-        result["packet_inspection"] = _inspect_first_packet(dest, first_avro_member)
+        result["packet_inspection"] = _inspect_first_packet(
+            dest, first_avro_member, dump_all_fields=dump_all_fields
+        )
 
     return result
 
@@ -262,9 +281,21 @@ def main() -> None:
             "matches research (ra/dec/jd/magpsf/sigmapsf) without guessing."
         ),
     )
+    parser.add_argument(
+        "--dump-all-fields",
+        action="store_true",
+        help=(
+            "With --inspect-first-packet, also print every real candidate "
+            "field name/value (not just the six already researched) -- "
+            "needed to find the real field name for real-bogus scores "
+            "(e.g. rb/drb) before using it in any ingest tool."
+        ),
+    )
     args = parser.parse_args()
 
-    result = run_probe(args.filename, args.out_dir, args.inspect_first_packet)
+    result = run_probe(
+        args.filename, args.out_dir, args.inspect_first_packet, args.dump_all_fields
+    )
     print()
     print(f"avro_member_count: {result['avro_member_count']}")
     print(f"local_path: {result['local_path']}")
