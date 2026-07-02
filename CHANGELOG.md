@@ -3,6 +3,21 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.23 — Fix silent injection_recovery.py (2026-07-02)
+
+### Fixed
+- `Skills/injection_recovery.py`: violated the standing live-progress rule
+  -- printed a header, then nothing at all until the final summary,
+  regardless of `--n-inject`. Root cause confirmed empirically (not
+  guessed): a background n=5 run showed iteration 1->2 taking 73 seconds
+  (one-time torch/model cold-start inside `classify()`'s first call,
+  loading Tier 1/2/3 weights) with zero output during that window, then
+  every subsequent iteration near-instant. Operator reported the n=200
+  run "went silent" after the header, consistent with this same gap.
+  Added a `[injection] (i/n) ... elapsed Xm YYs  ETA Xm YYs` print before
+  each item and a completion line, matching the project's established
+  progress-output format.
+
 ## v0.90.22 — Gate Z3 status: identify real-detection dependency gap (2026-07-02)
 
 ### Changed
