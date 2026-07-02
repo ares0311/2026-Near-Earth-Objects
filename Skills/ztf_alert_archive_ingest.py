@@ -220,6 +220,25 @@ def ingest_one_night(
                     continue
                 for record in fastavro.reader(fh):
                     scanned += 1
+
+                    # Progress must fire on every scanned record, BEFORE any
+                    # filter `continue` below -- a narrow sky box or a strict
+                    # rb threshold can reject the overwhelming majority of
+                    # records, and a print placed after those `continue`
+                    # statements would silently never fire for the length of
+                    # a night's file (up to 73G) when few or no records pass.
+                    if scanned % _PROGRESS_EVERY == 0:
+                        elapsed = time.monotonic() - t0
+                        frac = counting_reader.bytes_read / total_bytes if total_bytes else 0
+                        eta = (elapsed / frac - elapsed) if frac > 0 else 0
+                        print(
+                            f"[ingest] {night}: scanned={scanned} kept={len(kept)}  "
+                            f"{_fmt_bytes(counting_reader.bytes_read)}/{_fmt_bytes(total_bytes)} "
+                            f"({100 * frac:.1f}%)  elapsed {_fmt_duration(elapsed)}  "
+                            f"ETA {_fmt_duration(eta)}",
+                            flush=True,
+                        )
+
                     candidate = record.get("candidate", {})
                     rb = candidate.get("rb")
                     if rb is None or rb < min_rb:
@@ -233,18 +252,6 @@ def ingest_one_night(
                     obs = _packet_to_observation_dict(candidate, record)
                     if obs is not None:
                         kept.append(obs)
-
-                    if scanned % _PROGRESS_EVERY == 0:
-                        elapsed = time.monotonic() - t0
-                        frac = counting_reader.bytes_read / total_bytes if total_bytes else 0
-                        eta = (elapsed / frac - elapsed) if frac > 0 else 0
-                        print(
-                            f"[ingest] {night}: scanned={scanned} kept={len(kept)}  "
-                            f"{_fmt_bytes(counting_reader.bytes_read)}/{_fmt_bytes(total_bytes)} "
-                            f"({100 * frac:.1f}%)  elapsed {_fmt_duration(elapsed)}  "
-                            f"ETA {_fmt_duration(eta)}",
-                            flush=True,
-                        )
                 if len(kept) >= max_per_night:
                     break
     finally:

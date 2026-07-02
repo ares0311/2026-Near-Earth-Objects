@@ -3,6 +3,26 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.36 — Fix silent progress in Gate Z3 ingest tool (2026-07-02)
+
+### Fixed
+- `Skills/ztf_alert_archive_ingest.py`: the live-progress print in
+  `ingest_one_night()` was placed after the real-bogus and sky-box filter
+  `continue` statements, so it only fired for records that passed both
+  filters. With the documented operator command's narrow 2-degree sky box,
+  the overwhelming majority of scanned records never reach that line --
+  progress could go silent for the full length of a night's archive file
+  (up to 73G) even though records were actively being scanned. Root cause:
+  the print was gated on `kept`-adjacent control flow instead of `scanned`,
+  which is incremented unconditionally at the top of the loop. Fixed by
+  moving the progress print to fire immediately after `scanned += 1`,
+  before any filter `continue`.
+- `tests/test_ztf_alert_archive_ingest.py` (new): 5 regression tests,
+  including two that build synthetic archives where every record fails the
+  sky-box or real-bogus filter and assert progress still prints at the
+  expected `scanned` counts -- these would have caught the bug before it
+  reached an operator run.
+
 ## v0.90.35 — Bounded multi-night ingest tool for Gate Z3 (2026-07-02)
 
 ### Added

@@ -59,9 +59,19 @@ Gate Z3 row above,
 `Skills/ztf_alert_archive_ingest.py`. Do not repeat the source search, the
 schema-field research, or rebuild the ingest tool from scratch.
 
-The ingest tool is code-complete and offline-verified but has **not yet been
-run against the real archive** (this sandbox has no live internet access).
-The next step is an **operator live run**, e.g.:
+**2026-07-02 update**: the operator flagged that the first version of this
+tool was not System Directive compliant -- its progress print was placed
+after the real-bogus and sky-box filter `continue` statements, so with the
+narrow 2-degree sky box in the command below, progress would go silent for
+the length of a whole night's archive file (up to 73G) since almost no
+record would ever reach the print. Fixed in v0.90.36 (progress now fires on
+every scanned record, before any filter); regression-tested in
+`tests/test_ztf_alert_archive_ingest.py`.
+
+The ingest tool is code-complete and offline-verified (including the fixed
+progress behavior) but has **not yet been run against the real archive**
+(this sandbox has no live internet access). The next step is an **operator
+live run**, e.g.:
 
 ```bash
 caffeinate -i uv run --python 3.14 python Skills/ztf_alert_archive_ingest.py \

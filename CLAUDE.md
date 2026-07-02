@@ -656,7 +656,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.35)
+## Current State (v0.90.36)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -689,7 +689,50 @@ bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-02 v21 (CURRENT)
+### Handoff state as of 2026-07-02 v22 (CURRENT)
+
+**System Directive compliance fix for the Gate Z3 ingest tool (v0.90.36)** —
+operator flagged before running v0.90.35's `Skills/ztf_alert_archive_ingest.py`
+that its progress print was not System Directive compliant: the print was
+placed after the real-bogus and sky-box filter `continue` statements inside
+the per-record loop, so it only fired for records that passed both filters.
+With the documented operator command's narrow 2-degree sky box, the
+overwhelming majority of scanned records would never reach that line —
+progress could go completely silent for the length of a whole night's
+archive file (which can be up to 73G) even while actively scanning. Fixed
+by moving the progress print to fire immediately after `scanned += 1`,
+before any filter `continue`, so it now fires deterministically every
+`_PROGRESS_EVERY` (500) scanned records regardless of filter outcome.
+
+Added `tests/test_ztf_alert_archive_ingest.py` (5 tests, new file — this
+script previously had no committed tests, only ad hoc sandbox verification):
+two tests build synthetic archives where every record fails the sky-box or
+real-bogus filter respectively and assert progress still prints at the
+expected `scanned` counts (these would have caught the bug), plus filtering/
+field-mapping and checkpoint/resume coverage. All pass locally (via a
+sandbox-only `typing._eval_type` shim needed for this environment's
+Python 3.14.0rc2 vs. the pinned 3.14.3 — not a code issue, not committed).
+
+This was caught before any live operator run consumed real archive data, so
+no wasted download occurred. The operator command is unchanged and now
+correctly compliant:
+
+```bash
+git pull origin main
+export PYTHONPATH=src
+caffeinate -i uv run --python 3.14 python Skills/ztf_alert_archive_ingest.py \
+    --nights 20180809 20180810 \
+    --ra 232.6 --dec -8.4 --radius-deg 2.0 --min-rb 0.5
+```
+
+**Next production action (NOT YET DONE)**: operator runs the ingest tool
+above against 2 real nights. Then a follow-up step (not yet built) loads
+the resulting checkpoint JSON and runs it through `src/detect.py` ->
+`src/link.py` for Z3's "known-object positive control" — do not build that
+follow-up step until the ingest tool itself has been confirmed working
+against the real archive first.
+
+### Handoff state as of 2026-07-02 v21
 
 **Bounded multi-night ingest tool built for Gate Z3** —
 `Skills/ztf_alert_archive_ingest.py` (v0.90.35) builds real `Observation`
