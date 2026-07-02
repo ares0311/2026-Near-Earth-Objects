@@ -271,6 +271,26 @@ def _build_cnn_model() -> Any:
         return None
 
 
+def _cnn_heartbeat(label: str, stop_event: Any, interval: float = 5.0) -> None:
+    """Print an elapsed-time line every `interval` seconds until `stop_event`
+    is set. Run on a plain Python thread -- unrelated to and does not
+    interact with ATen's internal thread pool, so it cannot itself
+    contribute to the deadlock it exists to make visible.
+
+    Mirrors Skills/evaluate_calibration.py's `_heartbeat`: a blocking torch
+    call on a Dropbox-backed path or a lazy CNN-kernel compile can stall for
+    minutes with zero output, indistinguishable from a true hang, without
+    this.
+    """
+    import time as _time
+
+    t0 = _time.monotonic()
+    while not stop_event.wait(interval):
+        elapsed = int(_time.monotonic() - t0)
+        m, s = divmod(elapsed, 60)
+        print(f"  {label} … still working ({m}m{s:02d}s elapsed)", flush=True)
+
+
 def _load_cnn_model() -> Any:
     model_path = _MODEL_DIR / "tier2_cnn.pt"
     if not model_path.exists():
@@ -278,6 +298,7 @@ def _load_cnn_model() -> Any:
     try:
         import io
         import os
+        import threading
 
         # Set thread limits before importing torch to prevent ATen thread-pool
         # deadlock on macOS (same fix as evaluate_calibration.py v0.87.7).
@@ -304,8 +325,52 @@ def _load_cnn_model() -> Any:
         model = _build_cnn_model()
         if model is None:
             return None
+
+        # Warm up PyTorch's Accelerate/BLAS/thread-pool lazy initialisation
+        # with a dummy matmul BEFORE load_state_dict. On macOS (Apple Silicon
+        # + Accelerate), the first tensor compute in a new process triggers
+        # this init and can take 15-30s+; if it happens inside
+        # load_state_dict instead, the caller sees a silent hang. This exact
+        # mitigation already existed in Skills/evaluate_calibration.py
+        # (PR #93) but was never ported into this shared module, which is
+        # why every other caller of classify() -- including
+        # Skills/injection_recovery.py -- remained exposed to the deadlock.
+        stop = threading.Event()
+        hb = threading.Thread(
+            target=_cnn_heartbeat, args=("PyTorch matmul warmup", stop), daemon=True
+        )
+        hb.start()
+        try:
+            _w = torch.zeros(256, 256)
+            _ = _w @ _w  # forces ATen dispatch into Accelerate
+            del _w, _
+        finally:
+            stop.set()
+            hb.join(timeout=1.0)
+
         model.load_state_dict(torch.load(buf, map_location="cpu"))
         model.eval()
+
+        # Force conv2d kernel initialisation with a dummy forward pass before
+        # any real inference. The matmul warmup above only activates ATen's
+        # BLAS paths; the first torch.nn.Conv2d call goes through a separate
+        # dispatch route (FBGEMM/oneDNN/nnpack on macOS CPU) that can take
+        # many minutes to lazily compile on first use (PR #94, also never
+        # previously ported here).
+        stop = threading.Event()
+        hb = threading.Thread(
+            target=_cnn_heartbeat, args=("CNN conv warmup", stop), daemon=True
+        )
+        hb.start()
+        try:
+            with torch.no_grad():
+                _dummy = torch.zeros(1, 1, 63, 63)
+                model(_dummy, _dummy, _dummy)
+                del _dummy
+        finally:
+            stop.set()
+            hb.join(timeout=1.0)
+
         return model
     except Exception:
         return None

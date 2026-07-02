@@ -3,6 +3,33 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.24 — Fix real macOS CNN-load deadlock in classify.py (2026-07-02)
+
+### Fixed
+- `src/classify.py`: `_load_cnn_model()` had only 2 of the 4 historical
+  macOS ATen thread-pool deadlock mitigations (BytesIO pre-read + thread
+  env vars) -- the matmul warmup and conv2d warmup fixes (originally PRs
+  #93/#94) existed only inside `Skills/evaluate_calibration.py`'s own
+  bespoke loading code and were never ported into this shared module,
+  leaving every other caller of `classify()` -- including
+  `Skills/injection_recovery.py` -- exposed to the same silent hang v0.90.23
+  was mistakenly diagnosed as fixing. Confirmed root cause by the operator
+  reproducing the identical hang, at the identical point (`(1/200)` then
+  nothing), four times in a row on a real Mac after v0.90.23 was live --
+  proof the prior "one-time 73s cold start" diagnosis (verified only in
+  this sandbox's Linux environment, which cannot reproduce Apple's
+  Accelerate/ATen lazy-init deadlock at all) was incomplete. Ported the
+  missing matmul warmup (before `load_state_dict`) and conv2d warmup
+  (after `.eval()`, before any real inference) from
+  `evaluate_calibration.py`, each wrapped in a daemon-thread heartbeat that
+  prints an elapsed-time line every 5s so neither warmup step can ever be
+  silent again, matching the standing rule.
+- **Not independently verified on macOS from this sandbox** -- this
+  environment cannot reproduce the underlying deadlock at all, only
+  confirm the new code path executes without regressions (verified: the
+  real `models/tier2_cnn.pt` loads successfully via the new warmup path in
+  ~3s on Linux). Needs one real operator re-run to confirm.
+
 ## v0.90.23 — Fix silent injection_recovery.py (2026-07-02)
 
 ### Fixed
