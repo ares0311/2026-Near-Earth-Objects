@@ -679,7 +679,49 @@ See `docs/MISSION.md` for the authoritative data strategy. The prior "blocked
 until expert review" guardrail was removed by operator decision on 2026-06-21;
 MPC/NEOCP/Scout is the expert review system.
 
-### Handoff state as of 2026-07-02 v9 (CURRENT)
+### Handoff state as of 2026-07-02 v10 (CURRENT)
+
+**Phase 0 substantively complete: 3 of 4 cited sources live-verified working
+end-to-end, on a genuinely fresh (non-cached) request.** Sequence since v9:
+
+- **MPC get-obs — FIXED (PR #155)**: confirmed root cause was correct —
+  the endpoint requires an actual JSON request body
+  (`{"desigs": ["433"]}`), not query-string params, even for GET. Operator
+  `curl` with a JSON body returned HTTP 200 with a full ADES observation
+  history for 433 Eros. `Skills/verify_ztf_dr24_sources.py`'s `mpc_get_obs`
+  probe now sends this via `requests.request("GET", url, json=body)`.
+- **Checkpoint bug found and fixed (PR #156)**: after the JPL SBDB (PR
+  #154) and MPC (PR #155) fixes landed, the operator's first re-run printed
+  `[resume]` on all 5 probes and completed in `elapsed 0m00s` — a
+  physically impossible value for live HTTPS calls, per the standing
+  diagnostic-signal rule. Root cause: `_checkpoint_path()` hashed only
+  probe **IDs**, not `url`/`method`/`body`; since both fixes kept probe IDs
+  unchanged (for traceability), the checkpoint filename never changed and
+  the script silently resumed a **pre-fix** cached checkpoint instead of
+  re-probing. Fixed by hashing the full probe definition, so any probe
+  edit now forces a fresh checkpoint file automatically.
+- **Second live run confirms both fixes for real (operator-run, PR #157
+  evidence)**: re-ran after the checkpoint fix. Result: genuine re-probe
+  (`[verify]` not `[resume]`, `elapsed 3m22s`). `jpl_sbdb_neo_query`,
+  `mpc_get_obs`, and `irsa_ztf_sci_metadata` all **200**. `fink_schema`/
+  `fink_swagger` still fail identically after 5 retries each
+  (`SSLEOFError`) — reconfirms the external, non-fixable Fink TLS blocker.
+- Evidence: `docs/evidence/phase0/2026-07-02-root-cause-findings.md`
+  (all three root causes + fixes) and
+  `2026-07-02-second-live-probe-console.md` (the confirming re-run).
+- **NEXT PRODUCTION ACTION — NOT YET DONE**: the three files the script
+  generates locally (`docs/evidence/phase0/data_sources_verified.md`,
+  `auth_requirements.md`, `phase0_probe_results.json`) exist only on the
+  operator's Mac, not in git — the console transcripts above substitute for
+  narrative evidence but the brief names these exact files as required
+  Phase 0 deliverables. Operator needs to `git add`/commit them. The brief
+  also requires `schema_snapshot/`, `sample_ingest_report.md`, and
+  `pretrained_model_audit.md`, none of which exist yet and cannot be
+  synthesized without the operator's raw response bodies (this sandbox
+  cannot reach these domains directly). Do not write ingestion code before
+  these deliverables exist — this is an explicit brief requirement.
+
+### Handoff state as of 2026-07-02 v9
 
 **Root cause found and fixed for JPL SBDB; MPC narrowed; Fink is external** —
 see `docs/evidence/phase0/2026-07-02-root-cause-findings.md` for full detail.

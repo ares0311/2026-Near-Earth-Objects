@@ -609,7 +609,44 @@ a measurable quantity (surveys done/total, tracklets done/total).
 
 See `docs/PRODUCTION_READINESS.md` for the full gap register.
 
-### Handoff notes (2026-07-02) — v0.90.12 (CURRENT) — MAJOR PIVOT
+### Handoff notes (2026-07-02) — v0.90.17 (CURRENT) — Phase 0 source verification
+
+**Phase 0 substantively complete: 3 of 4 cited sources live-verified
+working end-to-end** via `Skills/verify_ztf_dr24_sources.py` (PRs
+#152–#157, building on the MAJOR PIVOT below):
+
+- **JPL SBDB fixed**: brief's `neo=Y` filter is rejected (HTTP 400); live
+  API needs `sb-group=neo` instead — confirmed via operator `curl`
+  returning real NEO records (433 Eros class AMO, count 42,153).
+- **MPC get-obs fixed**: endpoint requires an actual JSON request body
+  (`{"desigs": ["433"]}`), not query-string params, even for GET —
+  confirmed via operator `curl` returning HTTP 200 with a full ADES
+  observation history for 433 Eros.
+- **Checkpoint bug found and fixed**: after both fixes above landed, the
+  checkpoint key hashed only probe IDs (unchanged across the fixes), so a
+  re-run silently resumed the pre-fix cached checkpoint instead of
+  re-probing (`elapsed 0m00s` — a physically impossible value for live
+  HTTPS, caught per the diagnostic-signal rule). Fixed by hashing the full
+  probe definition (id, url, method, body).
+- **Confirmed on a genuine re-probe**: second operator run after the
+  checkpoint fix — `elapsed 3m22s`, `[verify]` not `[resume]` on all 5
+  probes. `jpl_sbdb_neo_query`, `mpc_get_obs`, `irsa_ztf_sci_metadata` all
+  **200**. `fink_schema`/`fink_swagger` fail identically after 5 retries
+  each — confirms Fink is an external, non-fixable TLS-handshake blocker
+  (verified via two independent TLS stacks from the operator's real
+  network).
+- Evidence: `docs/evidence/phase0/2026-07-02-root-cause-findings.md`,
+  `2026-07-02-second-live-probe-console.md`.
+- **NEXT PRODUCTION ACTION — NOT YET DONE**: the three generated files
+  (`data_sources_verified.md`, `auth_requirements.md`,
+  `phase0_probe_results.json`) exist only on the operator's local
+  checkout, not in git. Operator needs to commit them. The brief's other
+  two Phase 0 deliverables (`schema_snapshot/`, `sample_ingest_report.md`,
+  `pretrained_model_audit.md`) do not exist yet and cannot be synthesized
+  without the operator's raw response bodies. Do not write Phase 1
+  ingestion code before all five deliverables exist.
+
+### Handoff notes (2026-07-02) — v0.90.12 — MAJOR PIVOT
 
 **Operator decision: ZTF DR24 historical replay is now the primary discovery
 pipeline, superseding WISE/DECam/TESS.** Full record: `docs/MISSION.md
