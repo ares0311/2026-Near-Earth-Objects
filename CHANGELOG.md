@@ -3,6 +3,18 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.33 — Add --dump-all-fields to Gate Z3 probe (2026-07-02)
+
+### Added
+- `Skills/probe_ztf_alert_archive_file.py --inspect-first-packet --dump-all-fields`:
+  prints every real `candidate` field name/value from a real downloaded
+  packet (not just the six already-researched fields), needed to find the
+  real field name for real-bogus scores (e.g. `rb`/`drb`) before using it
+  in any Gate Z3 ingest tool, per the standing rule against guessing field
+  names.
+- Verified locally against a synthetic AVRO packet with `rb`/`drb` fields
+  added to the schema — the dump correctly surfaces both.
+
 ## v0.90.32 — Close Gate Z3 source-verification blocker (2026-07-02)
 
 ### Changed
