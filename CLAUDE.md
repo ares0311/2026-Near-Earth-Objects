@@ -685,7 +685,38 @@ provider is real bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-02 v15 (CURRENT)
+### Handoff state as of 2026-07-02 v16 (CURRENT)
+
+**Gate Z3 new candidate source found reachable (2026-07-02)** — the
+University of Washington's public ZTF alert archive
+(`https://ztf.uw.edu/alerts/public/`) was probed live by the operator via
+`Skills/verify_ztf_dr24_sources.py` (new probe id
+`uw_ztf_alert_archive_listing`, added in the docs-only PR #166) and returned
+**HTTP 200, no authentication required**. The response body matches prior
+WebSearch research word-for-word: a bulk, static, historical (not
+live-stream) tar-per-UTC-night archive of the full unfiltered 5-sigma ZTF
+alert stream since 2018-06-04, in AVRO format, with per-packet `ra`, `dec`,
+`jd`, `magpsf`, `sigmapsf` fields from real difference-image detections —
+i.e. genuine per-epoch positions capable of representing a moving tracklet,
+unlike IRSA's coadd-keyed Objects/Lightcurves catalogs (see
+`docs/evidence/phase0/2026-07-02-gate-z3-uw-alert-archive-candidate.md` for
+the full research trail and why those standard IRSA products cannot close
+Gate Z3). Raw probe response committed at `f3dc9c24`
+(`docs/evidence/phase0/phase0_probe_results.json`).
+
+**Remaining gap before any ingestion code**: the probe tool's body preview
+was consumed by the page's descriptive text before reaching the actual
+directory listing, so the real per-night file naming convention is still
+unconfirmed (`body_truncated: true`). Guessing a filename pattern would
+violate the standing rule against inventing endpoints. **Next production
+action (NOT YET DONE)**: ask the operator to open
+`https://ztf.uw.edu/alerts/public/` in a browser and report a few real
+file names/dates from the listing. Only once a real filename is known can
+a bounded single-night download test, real AVRO packet parsing, and an
+archive-volume estimate (ZTF processes ~100,000+ alerts/night at peak) be
+scoped without guessing — do not design a Gate Z3 ingest tool before that.
+
+### Handoff state as of 2026-07-02 v15
 
 **classify() hang CONFIRMED RESOLVED (v0.90.29)** ✓ — operator re-ran the
 Gate Z3 recheck command on `main` and it completed cleanly: 200/200

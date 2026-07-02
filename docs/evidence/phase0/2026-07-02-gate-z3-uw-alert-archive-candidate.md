@@ -54,47 +54,47 @@ the last 30 days — useful context but not a substitute for the archive
 itself, since Gate Z3 needs full-field coverage, not single-position
 history.
 
-## Why this is not yet verified and must not be built against
+## RESOLVED 2026-07-02: operator live probe confirms reachability
 
-1. **This sandbox cannot reach the domain.** Both direct `curl` and the
-   `WebFetch` tool return HTTP 403 at the network proxy level for
-   `ztf.uw.edu`, `irsa.ipac.caltech.edu`, and `zwickytransientfacility.github.io`
-   alike — this appears to be a broad proxy policy affecting many external
-   domains from this sandbox, not something specific to this one candidate.
-   Only `WebSearch` (routed differently) produced any information.
-2. **All findings above come from WebSearch result summaries**, not a
-   fetched page — the actual page content, real HTTP status, actual file
-   listing, and any authentication requirement are unconfirmed.
-3. Per the discovery brief's Phase 0 requirement and the standing rule
-   against inventing/guessing endpoints, **no ingestion code should be
-   written against this source** until either:
-   - the operator (real internet access) runs the probe added to
-     `Skills/verify_ztf_dr24_sources.py` (id: `uw_ztf_alert_archive_listing`)
-     and confirms a real HTTP 200 with an actual file listing, or
-   - the operator's research agent independently verifies reachability,
-     authentication requirements, and the real per-night file naming
-     convention.
+Operator ran `Skills/verify_ztf_dr24_sources.py` on `main` (real internet
+access, this sandbox does not have it). Result for
+`uw_ztf_alert_archive_listing`: **HTTP 200**, no authentication required,
+served by `Apache/2.4.6 (CentOS)` at `ztf.uw.edu`. The returned HTML body
+matches the WebSearch summary word-for-word: *"compressed tar archives of
+ZTF event alerts (observations detected in image differences). Each tar
+file contains alerts collected in the given night (UTC-based), with each
+alert stored in a separate file in the AVRO format... The files provided
+contain a full, unfiltered, 5-sigma alert stream."* Full raw response
+recorded in `docs/evidence/phase0/phase0_probe_results.json` (probe id
+`uw_ztf_alert_archive_listing`), committed at `f3dc9c24`.
 
-## Next step
+**Confirmed**: reachable, unauthenticated, real content matching the
+research above (not a guess).
 
-Operator command (read-only, checkpointed, retry-with-backoff — reuses the
-existing Phase 0 probe tool rather than an ad hoc `curl`):
+**Not yet confirmed**: the actual per-night file listing / naming
+convention. The probe tool's 2000-character body preview was consumed by
+the page's descriptive text before reaching the directory-listing HTML
+(`body_truncated: true`), so no real filename has been observed yet. This
+is a minor remaining gap, not a reachability or authentication concern —
+see "Next step" below for the simplest way to close it.
 
-```bash
-git pull origin main
-export PYTHONPATH=src
-uv run --python 3.14 python Skills/verify_ztf_dr24_sources.py
-```
+## Why no ingestion code has been written yet
 
-This re-runs all five existing Phase 0 probes plus the new
-`uw_ztf_alert_archive_listing` probe, and writes results to
-`docs/evidence/phase0/data_sources_verified.md` and `auth_requirements.md`
-from the real observed HTTP response — not from this summary.
+Per the discovery brief's Phase 0 requirement and the standing rule against
+inventing/guessing endpoints: reachability and content are now confirmed,
+but the real per-night file naming pattern is still unknown, and any
+ingestion code would need to construct URLs to specific files. Guessing a
+filename pattern (e.g. `YYYYMMDD.tar.gz`) without seeing a real example
+would violate that rule.
 
-If the listing page is reachable, the follow-up work (not yet started, not
-yet designed) would be: verify one specific night's tar file downloads
-correctly, verify the AVRO schema by actually parsing one packet, and
-confirm total archive size / bandwidth implications for the "unfiltered
-5-sigma" volume across a multi-night bounded window (this is a firehose —
-ZTF processes ~100,000+ alerts/night at peak — before proposing any bounded
-Gate Z3 ingest window design against it.
+## Next step (NOT YET DONE)
+
+Ask the operator to open `https://ztf.uw.edu/alerts/public/` directly in a
+browser (fastest, zero-code way to see the actual file listing — no need
+for more probe-tool code for this one-time lookup) and report back a small
+number of real file names/dates from the visible listing. Once a real
+filename is known, the following becomes possible to scope without
+guessing: one bounded single-night download test, real AVRO packet
+parsing, and an estimate of total archive size for a bounded multi-night
+Gate Z3 ingest window (ZTF processes ~100,000+ alerts/night at peak, so
+volume/bandwidth must be sized before any ingest tool is designed).
