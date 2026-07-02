@@ -3,6 +3,31 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.21 — Gate Z2: time-aware known-object exclusion (2026-07-02)
+
+### Added
+- `src/known_object_exclusion.py`: implements the brief's
+  `known_object_catalog_snapshots`/`known_objects` schema verbatim, plus
+  `known_as_of(objects, cutoff)` -- a fail-closed filter that uses each
+  catalog object's own `first_obs` date (a documented JPL SBDB Query API
+  field, confirmed via official SBDB docs and a live astroquery example
+  output, not guessed) so a single current-day snapshot can correctly
+  serve any historical replay cutoff without needing true point-in-time
+  catalog snapshots. Missing `first_obs` is never treated as
+  confirmed-known (under-suppression, not over-suppression, is the safe
+  failure direction for a discovery-paper pipeline). Also adds
+  `validate_snapshot_usable_for_replay()`, a second independent fail-closed
+  guard on the snapshot's own `valid_for_replay_before_utc` field.
+- `tests/test_known_object_exclusion.py`: 9 offline tests covering every
+  boundary case (exact-cutoff equality, missing-date fail-closed, snapshot
+  validity, frozen-model immutability).
+- `docs/ZTF_DR24_PRODUCTION_GATES.md`: Gate Z2 updated to "core mechanism
+  code complete, pending operator field verification" -- not yet closed;
+  needs live confirmation that `first_obs` actually returns real dates
+  when added to the already-verified JPL SBDB `sb-group=neo` query, plus
+  Gate Z3 (tracklet linking) before it can be exercised against real
+  candidates.
+
 ## v0.90.20 — Gate Z1: bounded ZTF DR24 replay ingest tool (2026-07-02)
 
 ### Added
