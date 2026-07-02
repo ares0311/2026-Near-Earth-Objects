@@ -668,7 +668,32 @@ See `docs/MISSION.md` for the authoritative data strategy. The prior "blocked
 until expert review" guardrail was removed by operator decision on 2026-06-21;
 MPC/NEOCP/Scout is the expert review system.
 
-### Handoff state as of 2026-07-02 v3 (CURRENT)
+### Handoff state as of 2026-07-02 v4 (CURRENT)
+
+**Gate P5 CLOSED (v0.90.10)** ✓ — Operator go/no-go runbook:
+- New `docs/OPERATOR_GO_NO_GO_RUNBOOK.md`: one-page flow for the day a real
+  candidate appears — review-packet location, the exact
+  `Skills/adversarial_review.py` and `Skills/export_ades_report.py` commands
+  (verified against the Gate P3 drill, not invented), an operator-review
+  checklist, the Gate P4 human-gated MPC-authority check, and the permanent
+  forbidden-communications list (no PDCO contact, no impact-probability
+  statements, no "confirmed NEO," no lowering `ready_for_submission()` gates).
+  States explicitly that `SURVIVE`/`BORDERLINE` means "candidate may be
+  reviewed for MPC submission," never a confirmation.
+- **Production capability gates P1, P2, P3, P5 are now all CLOSED.** Only
+  Gate P4 (MPC submission protocol) remains open, and it is **human-gated**
+  — no further coding-agent work can close it. It requires Jerome to obtain
+  written MPC confirmation for archival WISE/NEOWISE C51 submission
+  authority (see `docs/MPC_SUBMISSION_POLICY.md §TODO for Future Agents`).
+- **Next production action for a coding agent**: with all code-addressable
+  production-capability gates closed, the highest-value remaining work is
+  either (a) the two Gate P2 follow-ups explicitly left open — a WISE
+  sentinel-magnitude (`mag=99.0`) rejection filter, or DECam/TESS live
+  endpoint verification — or (b) waiting on Jerome's Gate P4 correspondence
+  before any live WISE run for actual discovery purposes. Do not invent new
+  gates or new public helper APIs; the PRIMARY DIRECTIVE gate still applies.
+
+### Handoff state as of 2026-07-02 v3
 
 **Gate P3 CLOSED (v0.90.9)** ✓ — No-submission package drill:
 - `Skills/injection_recovery.py` gained `--review-packet-out` to write full

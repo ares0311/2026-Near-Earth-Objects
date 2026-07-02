@@ -3,6 +3,23 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.10 — Gate P5 operator go/no-go runbook (2026-07-02)
+
+### Added
+- `docs/OPERATOR_GO_NO_GO_RUNBOOK.md`: one-page operator flow for the day a
+  real candidate appears — review-packet location, the exact
+  `Skills/adversarial_review.py` and `Skills/export_ades_report.py` commands
+  (verified against the Gate P3 drill), an operator-review checklist, the
+  Gate P4 human-gated MPC-authority check, and the permanent
+  forbidden-communications list. States explicitly that
+  `SURVIVE`/`BORDERLINE` means "candidate may be reviewed for MPC
+  submission," never "confirmed NEO."
+
+### Changed
+- `docs/PRODUCTION_READINESS.md`: Gate P5 marked CLOSED. Production
+  capability gates P1, P2, P3, and P5 are now all closed; only Gate P4 (MPC
+  submission protocol) remains open, and it is human-gated.
+
 ## v0.90.9 — Gate P3 no-submission package drill (2026-07-02)
 
 ### Added

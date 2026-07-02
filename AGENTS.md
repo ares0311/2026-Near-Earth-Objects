@@ -551,7 +551,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.9)
+## Current State (v0.90.10)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -598,7 +598,7 @@ a measurable quantity (surveys done/total, tracklets done/total).
 
 See `docs/PRODUCTION_READINESS.md` for the full gap register.
 
-### Handoff notes (2026-07-02) — v0.90.9 (CURRENT)
+### Handoff notes (2026-07-02) — v0.90.10 (CURRENT)
 
 **Current production definition**:
 - Production readiness now means demonstrated capability to find, score,
@@ -609,12 +609,23 @@ See `docs/PRODUCTION_READINESS.md` for the full gap register.
   and has been applied to close Gate P2: source verification, no future-catalog
   leakage, historical replay discipline, pretrained-model audits, and
   auditable ranker design are recorded in `docs/SURVEY_NATIVE_CONFIDENCE_POLICY.md`.
-- Gates P1, P2, and P3 in `docs/PRODUCTION_READINESS.md` are CLOSED. Gate P4
-  (MPC submission protocol) is next and is **human-gated** — Jerome must
-  obtain written MPC confirmation for archival WISE C51 submission authority
-  before any further code work can close it. Gate P5 (operator go/no-go
-  runbook) can be worked in parallel. Actual candidate survival is a later
-  event-driven discovery gate.
+- **Gates P1, P2, P3, and P5 in `docs/PRODUCTION_READINESS.md` are all
+  CLOSED.** Only Gate P4 (MPC submission protocol) remains open, and it is
+  **human-gated** — Jerome must obtain written MPC confirmation for archival
+  WISE C51 submission authority; no further code work can close it. Actual
+  candidate survival is a later event-driven discovery gate.
+
+**Gate P5 CLOSED (2026-07-02)**:
+- `docs/OPERATOR_GO_NO_GO_RUNBOOK.md`: one-page flow with review-packet
+  location, verified `adversarial_review.py`/`export_ades_report.py`
+  commands, an operator-review checklist, the Gate P4 human-gated check, and
+  the permanent forbidden-communications list. States `SURVIVE`/`BORDERLINE`
+  means "candidate may be reviewed for MPC submission," never "confirmed NEO."
+- **NEXT PRODUCTION ACTION for a coding agent**: all code-addressable
+  production-capability gates are closed. Remaining code-addressable work is
+  the two items left open under Gate P2 (WISE sentinel-magnitude rejection
+  filter; DECam/TESS live endpoint verification) — otherwise, wait on
+  Jerome's Gate P4 MPC correspondence before any further live-discovery push.
 
 **Gate P3 CLOSED (2026-07-02)**:
 - `Skills/injection_recovery.py --review-packet-out` writes full `ScoredNEO`
