@@ -595,6 +595,29 @@ def run_pipeline(
         )
         tracklets: list[Tracklet] = [_tracklet_from_dict(d) for d in cp["tracklets"]]
     else:
+        # Gate P2 (docs/SURVEY_NATIVE_CONFIDENCE_POLICY.md): DECam and TESS
+        # fetch code exists but has never been exercised against the live
+        # endpoint. TESS additionally returns TIC reference-catalog star
+        # positions as sector-epoch placeholders (see fetch_tess_ffis
+        # docstring), not genuine per-epoch FFI difference-image detections,
+        # so TESS "candidates" are not evidence of a real moving source.
+        if "DECam" in surveys:
+            print(
+                "[fetch] WARNING: --surveys DECam has not been live-verified "
+                "against datalab.noirlab.edu (see docs/SURVEY_NATIVE_CONFIDENCE_POLICY.md "
+                "Gate P2 source-verification matrix). Treat results as unverified.",
+                flush=True,
+            )
+        if "TESS" in surveys:
+            print(
+                "[fetch] WARNING: --surveys TESS returns MAST/TIC reference-catalog "
+                "star positions as sector-epoch placeholders, not real per-epoch FFI "
+                "difference-image detections (see fetch_tess_ffis docstring and "
+                "docs/SURVEY_NATIVE_CONFIDENCE_POLICY.md Gate P2). TESS 'candidates' "
+                "are not evidence of a genuine moving source.",
+                flush=True,
+            )
+
         # Fetch each survey separately so we can emit per-survey progress with ETA.
         # Measurable quantity: surveys completed / total surveys.
         _fetch_start = time.monotonic()

@@ -551,7 +551,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.7)
+## Current State (v0.90.8)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -598,7 +598,7 @@ a measurable quantity (surveys done/total, tracklets done/total).
 
 See `docs/PRODUCTION_READINESS.md` for the full gap register.
 
-### Handoff notes (2026-07-02) — v0.90.7 (CURRENT)
+### Handoff notes (2026-07-02) — v0.90.8 (CURRENT)
 
 **Current production definition**:
 - Production readiness now means demonstrated capability to find, score,
@@ -606,14 +606,29 @@ See `docs/PRODUCTION_READINESS.md` for the full gap register.
   data with defensible, industry-standard confidence controls. It does not
   require that the project has already found a genuinely new NEO.
 - `docs/neo_discovery_agent_brief.md` is now authoritative workflow guidance
-  and must be applied to Gate P2 and later production work: source verification,
-  no future-catalog leakage, historical replay discipline, pretrained-model
-  audits, and auditable ranker design are required, not optional.
-- Gate P1 in `docs/PRODUCTION_READINESS.md` is CLOSED by the WISE/NEOWISE
-  discovery-source positive-control harness added in v0.90.6. Gate P2
-  (survey-native confidence policy for WISE/DECam/TESS) is the next
-  highest-priority open production gate. Actual candidate survival is a later
-  event-driven discovery gate.
+  and has been applied to close Gate P2: source verification, no future-catalog
+  leakage, historical replay discipline, pretrained-model audits, and
+  auditable ranker design are recorded in `docs/SURVEY_NATIVE_CONFIDENCE_POLICY.md`.
+- Gates P1 and P2 in `docs/PRODUCTION_READINESS.md` are CLOSED. Gate P3
+  (no-submission package drill) is the next highest-priority open production
+  gate. Actual candidate survival is a later event-driven discovery gate.
+
+**Gate P2 CLOSED (2026-07-02)**:
+- `docs/SURVEY_NATIVE_CONFIDENCE_POLICY.md` documents the source-verification
+  matrix (WISE live-verified; DECam/TESS code-complete but never
+  live-verified), confirms `score.py:_determine_alert_pathway` already fails
+  closed on missing real/bogus (routes to `internal_candidate`), records the
+  no-future-catalog-leakage statement, reaffirms ZTF/Fink/SNAPS as
+  reference-only, and records the pretrained-model-audit requirement as not
+  yet applicable.
+- Finding: TESS's `fetch_tess_ffis` returns TIC catalog star positions, not
+  genuine FFI difference-image detections — `preprocess.py` has no FFI source
+  extraction. `Skills/run_pipeline.py` now warns operators when `--surveys
+  DECam` or `--surveys TESS` is selected.
+- **NEXT PRODUCTION ACTION — NOT YET DONE**: work Gate P3 — run an end-to-end
+  no-submission package drill from a Gate P1 positive-control packet through
+  `Skills/adversarial_review.py`, operator review packet generation, and
+  `Skills/export_ades_report.py`, verifying no external submission occurs.
 
 **Gate P1 CLOSED (2026-07-02)**:
 - `Skills/injection_recovery.py --survey WISE` injects a source-native

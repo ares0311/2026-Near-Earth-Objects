@@ -3,6 +3,25 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.8 — Gate P2 survey-native confidence policy (2026-07-02)
+
+### Added
+- `docs/SURVEY_NATIVE_CONFIDENCE_POLICY.md`: source-verification matrix for
+  WISE/DECam/TESS (WISE live-verified across many runs; DECam/TESS
+  code-complete but never live-verified), a table of quantitative confidence
+  thresholds already enforced in `detect.py`/`link.py`/`score.py`, the
+  no-future-catalog-leakage statement for the current live-discovery
+  pipeline, ZTF/Fink/SNAPS reference-only reaffirmation, and the
+  pretrained-model-audit requirement for future work.
+- `Skills/run_pipeline.py`: prints an operator-visible `[fetch] WARNING` when
+  `--surveys DECam` or `--surveys TESS` is selected, since DECam is
+  unverified against its live endpoint and TESS returns TIC reference-catalog
+  star positions rather than genuine per-epoch FFI detections.
+
+### Changed
+- `docs/PRODUCTION_READINESS.md`: Gate P2 (survey-native confidence policy)
+  marked CLOSED.
+
 ## v0.90.7 — Fold discovery-agent brief into production workflow (2026-07-02)
 
 ### Changed
