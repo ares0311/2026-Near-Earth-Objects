@@ -1,7 +1,7 @@
 # 2026 Near-Earth Object Detection & Ranking Pipeline
 
 ![Status](https://img.shields.io/badge/status-active%20development-blue)
-![Version](https://img.shields.io/badge/version-0.90.21-informational)
+![Version](https://img.shields.io/badge/version-0.90.22-informational)
 ![License](https://img.shields.io/badge/license-Apache%202.0-green)
 ![Tests](https://img.shields.io/badge/tests-3500%2B%20passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
@@ -66,7 +66,7 @@ This repository implements a complete, research-grade automated detection and ra
 4. **Independent confirmation before alert** — the NASA PDCO notification pathway is gated on MPC submission *and* independent observatory confirmation, not on pipeline confidence alone.
 5. **No autonomous impact claims** — the system produces ranked candidates and hazard flags; it defers all authoritative impact probability statements to CNEOS Scout and Sentry.
 
-The pipeline follows the build order: `schemas` -> `fetch` -> `preprocess` -> `detect` -> `link` -> `classify` -> `orbit` -> `score` -> `alert` -> `calibration`. Each stage consumes the immutable, typed output of all prior stages. As of v0.90.21, the WISE/DECam/TESS path is a preserved secondary path with closed historical gates, while the primary development path is ZTF DR24 archival historical replay per `docs/MISSION.md` and `docs/neo_discovery_agent_brief.md`. Phase 0 source verification is recorded in `docs/evidence/phase0/`: JPL SBDB, MPC get-obs, and IRSA ZTF metadata are live-verified; Fink remains externally blocked at TLS; pretrained model use is deferred. ZTF DR24 gates are defined in `docs/ZTF_DR24_PRODUCTION_GATES.md`; Gates Z1 (bounded ingest) and Z2 (time-aware known-object exclusion) are code-complete pending operator live verification, and Gate Z3 (tracklet linking) is next. External MPC submission remains fail-closed until a real candidate survives review and the applicable source/submission protocol is satisfied.
+The pipeline follows the build order: `schemas` -> `fetch` -> `preprocess` -> `detect` -> `link` -> `classify` -> `orbit` -> `score` -> `alert` -> `calibration`. Each stage consumes the immutable, typed output of all prior stages. As of v0.90.22, the WISE/DECam/TESS path is a preserved secondary path with closed historical gates, while the primary development path is ZTF DR24 archival historical replay per `docs/MISSION.md` and `docs/neo_discovery_agent_brief.md`. Phase 0 source verification is recorded in `docs/evidence/phase0/`: JPL SBDB, MPC get-obs, and IRSA ZTF metadata are live-verified; Fink remains externally blocked at TLS; pretrained model use is deferred. ZTF DR24 gates are defined in `docs/ZTF_DR24_PRODUCTION_GATES.md`; Gates Z1 (bounded ingest) and Z2 (time-aware known-object exclusion) are code-complete pending operator live verification, and Gate Z3 (tracklet linking) is next. External MPC submission remains fail-closed until a real candidate survives review and the applicable source/submission protocol is satisfied.
 
 ---
 
@@ -118,7 +118,7 @@ The pipeline implements a strict directed acyclic graph (DAG) of processing stag
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    NEO DETECTION PIPELINE  v0.90.21                  │
+│                    NEO DETECTION PIPELINE  v0.90.22                  │
 └─────────────────────────────────────────────────────────────────────┘
 
   External Data Sources
@@ -530,7 +530,7 @@ The diagram below shows how data and artifacts move between the repository's top
 2026-Near-Earth-Objects/
 │
 ├── src/                          # Core pipeline modules (Python 3.11+)
-│   ├── __init__.py               # Package version (0.90.21)
+│   ├── __init__.py               # Package version (0.90.22)
 │   ├── schemas.py                # All Pydantic data models (frozen=True)
 │   ├── fetch.py                  # ZTF/ATLAS/MPC/Horizons data retrieval
 │   ├── preprocess.py             # Difference image handling; Gaia astrometry
