@@ -71,30 +71,64 @@ recorded in `docs/evidence/phase0/phase0_probe_results.json` (probe id
 **Confirmed**: reachable, unauthenticated, real content matching the
 research above (not a guess).
 
-**Not yet confirmed**: the actual per-night file listing / naming
-convention. The probe tool's 2000-character body preview was consumed by
-the page's descriptive text before reaching the directory-listing HTML
-(`body_truncated: true`), so no real filename has been observed yet. This
-is a minor remaining gap, not a reachability or authentication concern —
-see "Next step" below for the simplest way to close it.
+## RESOLVED 2026-07-02: operator captured the real directory listing
+
+The operator opened `https://ztf.uw.edu/alerts/public/` directly in a
+browser and saved it as a PDF (139 pages, committed to the repo at
+`docs/Alert Archive.pdf`, commit `b6de270`). This gives the real, observed
+file listing — not a guess, not a WebSearch summary.
+
+**Confirmed real file naming convention**: `ztf_public_YYYYMMDD.tar.gz`,
+one file per UTC night. Occasional `ztf_public_YYYYMMDD_programid3.tar.gz`
+variants exist for the separate "programid3" (Caltech-time / TESS-sector)
+subset the page's own description mentions.
+
+**Confirmed real coverage**: the listing runs from `ztf_public_20180601.tar.gz`
+(8 years ago, near the service's own stated 2018-06-04 start) through
+`ztf_public_20260702.tar.gz` ("10 hours ago" — i.e. essentially real-time
+archival, not just historical). This is a genuinely complete, gapless-looking
+nightly archive spanning the full ZTF survey era.
+
+**Confirmed file sizes**: highly variable per night, observed from small
+placeholder-looking entries (many nights show a bare `44` or `74` byte size
+— almost certainly an empty/error placeholder rather than real data, e.g.
+during the survey's early commissioning period or scheduled maintenance —
+the page itself warns of scheduled maintenance windows) up to very large
+real nights, e.g. `ztf_public_20181113.tar.gz` at **73G** and several other
+nights above 20-40G. Recent 2026 nights typically run 5-20G. This is a
+genuine data firehose and must be sized carefully before any bounded
+multi-night ingest window is designed.
+
+**Also present**: `MD5SUMS` (202K, updated "10 hours ago" — i.e. actively
+maintained), `VALIDATE` / `VALIDATE.out` housekeeping files. No login
+prompt or authentication barrier is visible in the captured listing —
+consistent with the HTTP 200 unauthenticated probe result above.
 
 ## Why no ingestion code has been written yet
 
-Per the discovery brief's Phase 0 requirement and the standing rule against
-inventing/guessing endpoints: reachability and content are now confirmed,
-but the real per-night file naming pattern is still unknown, and any
-ingestion code would need to construct URLs to specific files. Guessing a
-filename pattern (e.g. `YYYYMMDD.tar.gz`) without seeing a real example
-would violate that rule.
+The real file naming convention is now confirmed from direct observation
+(the operator's browser-captured listing), not guessed. What remains
+undone before any Gate Z3 ingest tool is designed: a single bounded
+download-and-inspect test of one real file, to confirm the tar/AVRO format
+matches expectations, before attempting anything at the scale of a full
+night (up to 73G) or a multi-night window.
 
-## Next step (NOT YET DONE)
+## Next step: bounded single-file download verification (Skill added)
 
-Ask the operator to open `https://ztf.uw.edu/alerts/public/` directly in a
-browser (fastest, zero-code way to see the actual file listing — no need
-for more probe-tool code for this one-time lookup) and report back a small
-number of real file names/dates from the visible listing. Once a real
-filename is known, the following becomes possible to scope without
-guessing: one bounded single-night download test, real AVRO packet
-parsing, and an estimate of total archive size for a bounded multi-night
-Gate Z3 ingest window (ZTF processes ~100,000+ alerts/night at peak, so
-volume/bandwidth must be sized before any ingest tool is designed).
+Added `Skills/probe_ztf_alert_archive_file.py` — downloads exactly ONE
+named file from the confirmed archive (default: `ztf_public_20180809.tar.gz`,
+31M, one of the smallest genuinely-sized files visible in the listing, not
+a `44`/`74`-byte placeholder), with checkpoint/resume and retry-with-backoff
+per the standing rules, verifies it is a valid gzip/tar archive, and lists
+the first N member filenames without extracting or parsing their content
+(no new AVRO-parsing dependency added yet — that is future work once the
+tar structure itself is confirmed). This is a Phase 0/1 verification probe
+only, not the Gate Z3 ingest tool itself.
+
+Operator command:
+
+```bash
+git pull origin main
+export PYTHONPATH=src
+uv run --python 3.14 python Skills/probe_ztf_alert_archive_file.py
+```
