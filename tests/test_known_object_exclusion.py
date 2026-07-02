@@ -9,7 +9,7 @@ is exercised explicitly rather than assumed.
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 import pytest
 
@@ -61,7 +61,7 @@ def _snapshot(valid_before: datetime | None) -> KnownObjectCatalogSnapshot:
         snapshot_id="snap-1",
         source="jpl_sbdb",
         source_url="https://ssd-api.jpl.nasa.gov/sbdb_query.api?sb-group=neo",
-        fetched_at_utc=datetime(2026, 7, 2, tzinfo=timezone.utc),
+        fetched_at_utc=datetime(2026, 7, 2, tzinfo=UTC),
         valid_for_replay_before_utc=valid_before,
         raw_payload_uri="/tmp/snapshot.json",
         record_count=42153,
@@ -69,14 +69,14 @@ def _snapshot(valid_before: datetime | None) -> KnownObjectCatalogSnapshot:
 
 
 def test_validate_snapshot_usable_for_replay_accepts_covering_cutoff():
-    snapshot = _snapshot(datetime(2026, 12, 31, tzinfo=timezone.utc))
+    snapshot = _snapshot(datetime(2026, 12, 31, tzinfo=UTC))
     ok, reason = validate_snapshot_usable_for_replay(snapshot, replay_cutoff=date(2020, 6, 1))
     assert ok is True
     assert "covers" in reason
 
 
 def test_validate_snapshot_usable_for_replay_rejects_cutoff_beyond_validity():
-    snapshot = _snapshot(datetime(2019, 1, 1, tzinfo=timezone.utc))
+    snapshot = _snapshot(datetime(2019, 1, 1, tzinfo=UTC))
     ok, reason = validate_snapshot_usable_for_replay(snapshot, replay_cutoff=date(2020, 6, 1))
     assert ok is False
     assert "only valid for replay before" in reason
