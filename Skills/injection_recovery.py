@@ -11,6 +11,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -146,13 +147,24 @@ def inject_synthetic_neo_wise(
     return tuple(obs)
 
 
-def run_injection_recovery(n_inject: int = 20, seed: int = 0, mission: str = "ZTF") -> dict:
+def run_injection_recovery(
+    n_inject: int = 20,
+    seed: int = 0,
+    mission: str = "ZTF",
+    review_packet_out: Path | None = None,
+) -> dict:
     """Run the injection-recovery test and return summary statistics.
 
     ``mission="ZTF"`` uses the original two-obs-per-night ZTF cadence.
     ``mission="WISE"`` uses the single-visit, multi-exposure NEOWISE cadence
     (Gate P1 discovery-source positive control) with no native real/bogus
     score, routed through detect.py's discovery-archive singleton path.
+
+    If ``review_packet_out`` is given, every recovered candidate's full
+    ``ScoredNEO`` packet is written to that path as a JSON list — the same
+    format ``Skills/run_pipeline.py --review-packet-out`` produces, so the
+    output can feed ``Skills/adversarial_review.py`` and
+    ``Skills/export_ades_report.py`` for the Gate P3 no-submission drill.
     """
     rng = np.random.default_rng(seed)
 
@@ -160,6 +172,7 @@ def run_injection_recovery(n_inject: int = 20, seed: int = 0, mission: str = "ZT
     n_linked = 0
     n_scored = 0
     hazard_flags: list[str] = []
+    review_packets: list[dict] = []
 
     for i in range(n_inject):
         motion = rng.uniform(0.1, 10.0)
@@ -200,6 +213,16 @@ def run_injection_recovery(n_inject: int = 20, seed: int = 0, mission: str = "ZT
             scored = score(t, features_cls, posterior, orbital)
             n_scored += 1
             hazard_flags.append(scored.hazard.hazard_flag)
+            if review_packet_out is not None:
+                review_packets.append(scored.model_dump(mode="json"))
+
+    if review_packet_out is not None:
+        review_packet_out.parent.mkdir(parents=True, exist_ok=True)
+        review_packet_out.write_text(json.dumps(review_packets, indent=2))
+        print(
+            f"Review packets written to {review_packet_out} "
+            f"({len(review_packets)} packet(s))"
+        )
 
     return {
         "n_injected": n_inject,
@@ -218,8 +241,6 @@ def run_injection_recovery(n_inject: int = 20, seed: int = 0, mission: str = "ZT
 
 
 def main() -> None:
-    import json
-
     parser = argparse.ArgumentParser(description="NEO injection-recovery test")
     parser.add_argument("--n-inject", type=int, default=20, help="Number of NEOs to inject")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
@@ -231,6 +252,13 @@ def main() -> None:
         "NEOWISE cadence for Gate P1 discovery-source positive control.",
     )
     parser.add_argument("--json", metavar="PATH", help="Save results as JSON to this path")
+    parser.add_argument(
+        "--review-packet-out",
+        metavar="PATH",
+        help="Write full ScoredNEO review packets (JSON list) to this path, "
+        "consumable by Skills/adversarial_review.py and "
+        "Skills/export_ades_report.py for a Gate P3 no-submission drill.",
+    )
     args = parser.parse_args()
 
     print(
@@ -239,7 +267,12 @@ def main() -> None:
     )
     print("-" * 50)
 
-    results = run_injection_recovery(n_inject=args.n_inject, seed=args.seed, mission=args.survey)
+    results = run_injection_recovery(
+        n_inject=args.n_inject,
+        seed=args.seed,
+        mission=args.survey,
+        review_packet_out=Path(args.review_packet_out) if args.review_packet_out else None,
+    )
 
     n = results["n_injected"]
     print(f"Detection rate:  {results['detection_rate']:.1%}  ({results['n_detected']}/{n})")

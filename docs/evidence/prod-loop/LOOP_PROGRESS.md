@@ -110,10 +110,17 @@ definition.
       documents the source-verification matrix, confirms the existing
       fail-closed alert-pathway gate on missing real/bogus, and flags TESS's
       fetch path as TIC-reference-star placeholders, not real detections.
-- [ ] P3: run a no-submission package drill from a P1 packet through
+- [x] P3: run a no-submission package drill from a P1 packet through
       adversarial review, operator packet generation, and MPC-compatible export.
+      **CLOSED 2026-07-02**: `Skills/injection_recovery.py --review-packet-out`
+      added; drill piped a 5-candidate WISE packet through offline adversarial
+      review (5/5 REJECT, expected) and `export_ades_report.py` twice (default
+      args, then `--obs-code C51` without confirmation), both failing closed
+      with no `.psv` written and no network access. Evidence:
+      `docs/evidence/prod-loop/2026-07-02-gate-p3-no-submission-drill.md`.
 - [ ] P4: resolve archival WISE/NEOWISE MPC submission authority before any
-      live WISE/NEOWISE MPC submission.
+      live WISE/NEOWISE MPC submission. **HUMAN-GATED** — no code path can
+      close this; requires Jerome's written MPC correspondence.
 - [ ] P5: maintain a compact operator go/no-go flow for the day a real
       candidate appears.
 
@@ -175,3 +182,4 @@ definition.
 | 31 | 2026-07-02 | Operator folded `docs/neo_discovery_agent_brief.md` into the workflow directly (v0.90.7): MISSION.md/CLAUDE.md/AGENTS.md/PRODUCTION_READINESS.md updated; ZTF/Fink/SNAPS reconciled as reference-only | Apply the brief's requirements to close Gate P2 |
 | 32 | 2026-07-02 | Gate P2 CLOSED (v0.90.8): `docs/SURVEY_NATIVE_CONFIDENCE_POLICY.md` added — source-verification matrix, confirmed existing fail-closed real/bogus gate, found TESS returns TIC placeholder stars not real detections, `run_pipeline.py` now warns on `--surveys DECam/TESS` | Work Gate P3: no-submission package drill from a Gate P1 packet through adversarial review, operator packet generation, and ADES export |
 | 31 | 2026-07-02 | v0.90.7 handoff prepared: `docs/neo_discovery_agent_brief.md` is authoritative workflow guidance and is reconciled with `docs/MISSION.md`; mandatory reads and Gate P2 now require source verification, no future-catalog leakage, historical replay discipline, pretrained-model audits, and auditable ranker design | Next agent should work Gate P2 first; do not run another live WISE diagnostic or add ZTF/Fink discovery-submission code until the source-native confidence policy exists |
+| 33 | 2026-07-02 | Gate P3 CLOSED (v0.90.9): `Skills/injection_recovery.py --review-packet-out` added; drilled a Gate P1 WISE packet through offline adversarial review (5/5 REJECT, expected) and `export_ades_report.py` twice, both failing closed with no `.psv` written and no network access | Work Gate P4 (human-gated — Jerome must obtain written MPC confirmation for archival WISE C51 authority) or Gate P5 (operator go/no-go runbook, code-addressable) |
