@@ -102,6 +102,45 @@ termination problem, an outage, or a WAF/edge dropping the connection based
 on some property of the handshake (fingerprint, cipher offer, etc.) that is
 outside this project's control.
 
+## Checkpoint key ignored probe content — stale results silently resumed
+
+**Symptom** (operator run, 2026-07-02, after both fixes above landed on
+`main`): re-running `Skills/verify_ztf_dr24_sources.py` printed
+`[resume] (N/5) ...: already probed, skipping` for all 5 probes and
+completed in `elapsed 0m00s`. Zero seconds for a script that makes live
+HTTPS calls is a physically impossible value for real network I/O — per the
+standing diagnostic rule, this meant no network calls happened at all, not
+that the calls were somehow instant.
+
+**Root cause**: `_checkpoint_path()` derived its checkpoint filename by
+hashing only the probe **IDs** (`jpl_sbdb_neo_query`, `mpc_get_obs`, etc.),
+not their URL/method/body. Both the JPL SBDB and MPC get-obs fixes changed
+a probe's `url`/`body` while keeping its `id` the same (deliberately, to
+preserve traceability). That meant the checkpoint filename never changed
+across either fix, so the script kept finding and trusting the *original*
+checkpoint file — written before either bug was diagnosed — and reported
+`[resume]` on every probe instead of re-querying with the corrected
+requests. The console output from that run reflected pre-fix, broken
+responses, not the shipped fixes.
+
+**Fix applied**: `_checkpoint_path()` now hashes the full probe definition
+(`id`, `url`, `method`, `body`) for every probe, not just the ID list.
+Editing any probe's request now produces a new checkpoint filename
+automatically, so a code fix to a probe is guaranteed to be re-probed on
+the next run rather than silently resumed from a stale cache — while
+probes that are genuinely unchanged still resume correctly.
+
+**Status**: fix applied, not yet operator-verified. Predicted result of the
+next run: this is a *new* checkpoint filename (the old file is now orphaned
+and harmless — `Logs/**` is git-ignored), so all 5 probes will print
+`[verify]` (not `[resume]`) and make live network calls again, with a
+nonzero `elapsed` value. Expect `jpl_sbdb_neo_query`, `mpc_get_obs`, and
+`irsa_ztf_sci_metadata` to report HTTP 200; `fink_schema`/`fink_swagger`
+are expected to still fail (5 retries with 2/4/8/16/32s backoff each,
+consistent with the confirmed external Fink TLS blocker above) — if Fink
+instead succeeds, or the other three fail, the fix is not what we think it
+is.
+
 **No code fix is applicable here.** This is recorded as an external service
 availability issue, not a defect in `Skills/verify_ztf_dr24_sources.py`.
 Retry later, or check Fink's own status channels

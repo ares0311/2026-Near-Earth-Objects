@@ -3,6 +3,22 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.17 — Fix stale checkpoint reuse on probe content changes (2026-07-02)
+
+### Fixed
+- `Skills/verify_ztf_dr24_sources.py`: `_checkpoint_path()` hashed only
+  probe **IDs**, not their `url`/`method`/`body`. Since the JPL SBDB and
+  MPC get-obs fixes (v0.90.15, v0.90.16) changed a probe's request while
+  keeping its ID the same, an operator re-run after both fixes landed
+  silently resumed the *pre-fix* checkpoint instead of re-probing — caught
+  because `elapsed 0m00s` for a live-HTTPS script is a physically
+  impossible value, per the standing diagnostic-signal rule. Checkpoint key
+  now hashes the full probe definition, so any probe edit produces a new
+  checkpoint file and is guaranteed to be re-probed on the next run.
+- `docs/evidence/phase0/2026-07-02-root-cause-findings.md`: documented as
+  its own root-cause entry, distinct from the JPL SBDB and MPC fixes it
+  was masking.
+
 ## v0.90.16 — Fix MPC get-obs JSON-body requirement (2026-07-02)
 
 ### Fixed

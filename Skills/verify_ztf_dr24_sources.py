@@ -90,11 +90,23 @@ _BODY_PREVIEW_CHARS = 2000
 
 
 def _checkpoint_path() -> Path:
-    """Stable checkpoint path derived from the probe set, per the
-    checkpoint/resume standing rule -- re-running the identical command
-    resumes instead of re-querying already-probed endpoints."""
+    """Stable checkpoint path derived from the full probe definitions (id,
+    url, method, body) -- not just probe IDs -- per the checkpoint/resume
+    standing rule. Keying on ID alone let a probe's URL/body be corrected in
+    code while the stale pre-fix checkpoint silently kept being resumed,
+    since the ID (and therefore the checkpoint filename) never changed.
+    Hashing the full definition means editing a probe's request produces a
+    new checkpoint file automatically, so re-running the identical command
+    re-probes anything that actually changed and still resumes anything
+    that didn't."""
     key = hashlib.md5(
-        json.dumps([p["id"] for p in _PROBES], sort_keys=True).encode()
+        json.dumps(
+            [
+                {k: p[k] for k in ("id", "url", "method", "body") if k in p}
+                for p in _PROBES
+            ],
+            sort_keys=True,
+        ).encode()
     ).hexdigest()[:12]
     return _CACHE_DIR / f"checkpoint_{key}.json"
 
