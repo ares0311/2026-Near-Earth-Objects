@@ -3,6 +3,47 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.12 — MAJOR PIVOT: ZTF DR24 historical replay supersedes WISE/DECam/TESS (2026-07-02)
+
+### Changed (operator decision)
+- `docs/MISSION.md`: rewritten. `docs/neo_discovery_agent_brief.md` now
+  supersedes the 2026-07-01 reconciliation that kept WISE/DECam/TESS
+  primary. ZTF DR24 archival historical replay (time-aware known-object
+  exclusion, Fink-FAT-style tracklet linking, LightGBM/XGBoost candidate
+  ranker, retrospective validation) is now the primary discovery path.
+  WISE/DECam/TESS code and Gate P1–P5 evidence are preserved as a
+  secondary/paused path, not deleted.
+- `CLAUDE.md`, `AGENTS.md`: DECISION-001 marked superseded; global-survey
+  source list and handoff notes updated; new handoff blocks record the
+  pivot and an explicit self-correction that closing the WISE/DECam/TESS
+  gate register does not establish readiness for the new pipeline.
+- `docs/PRODUCTION_READINESS.md`: pivot notice added. The P1–P5 gate
+  register describes the now-secondary pipeline; new gates are required for
+  ZTF DR24 historical replay before it can be called production-capable.
+- `README.md`: pivot notice added to the abstract; architecture description
+  clarified as describing the secondary path.
+
+### Unchanged (explicitly)
+- Live ZTF alert-stream and live ATLAS discovery remain prohibited — still
+  circular, since ZTF ZAPS/ATLAS already process and submit from those
+  streams in real time. Only bounded, time-aware *archival* ZTF DR24
+  reprocessing is newly permitted.
+- No code was changed in this release — this is a strategy/documentation
+  pivot. Phase 0 source verification (per the brief) is the next step
+  before any ZTF DR24 ingestion code is written.
+
+## v0.90.11 — Correct Gate P4 framing: dormant, not an active operator task (2026-07-02)
+
+### Fixed
+- `docs/PRODUCTION_READINESS.md`, `docs/OPERATOR_GO_NO_GO_RUNBOOK.md`,
+  `CLAUDE.md`, `AGENTS.md`, `README.md`, `docs/evidence/prod-loop/LOOP_PROGRESS.md`:
+  corrected language that described Gate P4 (MPC submission protocol) as an
+  active task requiring the operator to contact MPC now. There is no
+  candidate yet, so there is nothing to submit and nothing to ask MPC about.
+  Gate P4 is dormant and only activates once a real WISE-sourced candidate
+  survives adversarial review and operator review. No code changed — this is
+  a documentation/framing correction only, flagged by the operator.
+
 ## v0.90.10 — Gate P5 operator go/no-go runbook (2026-07-02)
 
 ### Added

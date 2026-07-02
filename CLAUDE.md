@@ -189,15 +189,15 @@ Near-Earth Objects are small solar system bodies with perihelion distances $q < 
 Potentially Hazardous Asteroids (PHAs) are NEOs with absolute magnitude $H \leq 22$ (diameter $\gtrsim 140$ m) and Minimum Orbit Intersection Distance (MOID) $\leq 0.05$ AU. The pipeline must identify and flag PHA candidates.
 
 The global NEO survey is dominated by:
-- **ZTF** (Zwicky Transient Facility) — **training-data source only** (ZTF ZAPS already processes and submits discoveries); public alert stream
+- **ZTF** (Zwicky Transient Facility) — **primary discovery target as of 2026-07-02** via ZTF DR24 archival historical replay (bounded time window, time-aware known-object exclusion, retrospective validation against later MPC/JPL outcomes). Live ZTF alert-stream consumption remains prohibited (ZTF ZAPS already processes and submits from the live stream in real time) — the historical-replay archive path is the exception, not the live stream.
 - **ATLAS** — **training-data source only** (ATLAS pipeline already processes and submits); 24–48 hr warning capability
 - **Pan-STARRS** — deep survey; public catalog access
 - **CSS** (Catalina Sky Survey) — MPC-feeding survey
-- **WISE/NEOWISE** (archival) — **primary discovery target** for this pipeline; infrared detections of 158,000+ minor planets; accessible via IRSA without credentials
+- **WISE/NEOWISE** (archival) — **secondary/paused discovery target** as of 2026-07-02 (was primary through v0.90.10); infrared detections of 158,000+ minor planets; accessible via IRSA without credentials; code and Gate P1–P5 evidence preserved
 - **NEO Surveyor** (launch ≥ 2027) — future dedicated IR discovery mission; not yet available
 - **Rubin/LSST** (upcoming) — will discover 100,000+ NEOs; tracklet-less linking (HelioLinC3D) required
 
-**Key discovery constraint**: This pipeline must target UNREVIEWED archives — TESS FFIs, DECam/NOIRLab, WISE/NEOWISE — NOT ZTF/ATLAS (already processed by their own pipelines). See `docs/MISSION.md` (authoritative) and `docs/near_earth_objects_research_brief.md` for ranked asset details.
+**Key discovery constraint (updated 2026-07-02)**: `docs/neo_discovery_agent_brief.md` supersedes the prior "UNREVIEWED archives only" framing. ZTF DR24 archival historical replay is now the primary discovery path; DECam/NOIRLab, WISE/NEOWISE, and TESS FFIs are secondary/paused. See `docs/MISSION.md §Operator Decision (2026-07-02)` (authoritative) and `docs/near_earth_objects_research_brief.md`/`docs/neo_discovery_agent_brief.md` for full details.
 
 As of 2026, approximately 35,000 NEOs are known. Rubin/LSST is expected to discover 100,000+ more over its 10-year survey.
 
@@ -265,8 +265,19 @@ Build in the order listed. Each module depends on all prior modules.
 
 ## Core Design Decisions
 
-### DECISION-001: WISE/NEOWISE as Primary Discovery Archive (updated 2026-06-27)
-WISE/NEOWISE is the primary discovery target: 158,000+ minor-planet infrared detections in unreviewed archival data accessible via IRSA without credentials. DECam/NOIRLab NSC DR2 and TESS FFIs are secondary discovery targets. ZTF and ATLAS are **training-data sources only** — ZTF ZAPS and the ATLAS pipeline already process those streams and submit discoveries to MPC. The pipeline must never be run in discovery mode against ZTF or ATLAS; use `--surveys WISE` (default), `DECam`, or `TESS`. See `docs/MISSION.md §The Two-Part Data Strategy`.
+### DECISION-001: ZTF DR24 historical replay as primary discovery path (SUPERSEDED 2026-07-02)
+**Superseded by operator decision 2026-07-02**: `docs/neo_discovery_agent_brief.md`
+now supersedes the WISE-primary strategy below. ZTF DR24 archival historical
+replay (bounded time window, time-aware known-object exclusion, Fink-FAT-style
+tracklet linking, LightGBM/XGBoost candidate ranker, retrospective validation)
+is now the primary discovery path. WISE/NEOWISE, DECam, and TESS are demoted
+to secondary/paused — their code and Gate P1–P5 evidence are preserved but are
+not the active development target. Live ZTF alert-stream and live ATLAS
+consumption remain prohibited for discovery (still circular); ZTF DR24
+archival reprocessing is the exception, per the brief's Fink-FAT precedent.
+See `docs/MISSION.md §Operator Decision (2026-07-02)` for the full record.
+
+**Original decision (2026-06-27, now secondary)**: WISE/NEOWISE was the primary discovery target: 158,000+ minor-planet infrared detections in unreviewed archival data accessible via IRSA without credentials. DECam/NOIRLab NSC DR2 and TESS FFIs were secondary discovery targets. ZTF and ATLAS were treated as **training-data sources only**. `--surveys WISE` (default), `DECam`, or `TESS` remain valid CLI options for the now-secondary path; do not delete this code.
 
 ### DECISION-002: Tiered ML Architecture
 Follow the same three-tier approach as the exoplanet pipeline:
@@ -668,7 +679,67 @@ See `docs/MISSION.md` for the authoritative data strategy. The prior "blocked
 until expert review" guardrail was removed by operator decision on 2026-06-21;
 MPC/NEOCP/Scout is the expert review system.
 
-### Handoff state as of 2026-07-02 v4 (CURRENT)
+### Handoff state as of 2026-07-02 v6 (CURRENT) — MAJOR PIVOT
+
+**Operator decision: ZTF DR24 historical replay is now the primary discovery
+pipeline, superseding WISE/DECam/TESS.** See `docs/MISSION.md §Operator
+Decision (2026-07-02)` for the full authoritative record. Summary:
+
+- `docs/neo_discovery_agent_brief.md` supersedes the 2026-07-01 reconciliation
+  that kept WISE/DECam/TESS primary. The brief's own Phase 1 recommendation —
+  ZTF DR24 archival historical replay with time-aware known-object exclusion,
+  a Fink-FAT-style tracklet linker, and a LightGBM/XGBoost candidate ranker —
+  is now the active development target.
+- WISE/DECam/TESS code (`fetch_wise_archive`, `fetch_decam_archive`,
+  `fetch_tess_ffis`) and all Gate P1–P5 evidence are **preserved, not
+  deleted** — they are now a secondary/paused path and a decision record,
+  not the thing to build next.
+- Live ZTF alert-stream and live ATLAS discovery remain prohibited (still
+  circular — ZTF ZAPS/ATLAS already process and submit from those streams in
+  real time). This decision does **not** reverse that prohibition. What
+  changed is specifically: *archival* ZTF DR24 historical reprocessing is now
+  permitted and primary, per the brief's Fink-FAT precedent (111M processed
+  ZTF alerts → 389,530 SSO candidates → 327 new orbits, 65 unreported at
+  publication — proof that ZTF's own real-time processing does not exhaust
+  what's findable in the archive).
+- **The existing `docs/PRODUCTION_READINESS.md` P1–P5 gate register describes
+  the now-secondary WISE/DECam/TESS pipeline.** Those gates stay CLOSED as a
+  historical record but do **not** establish production readiness for the
+  new ZTF DR24 pipeline. New gates must be defined for that pipeline before
+  claiming it is production-capable. Do not conflate "P1–P5 closed" with
+  "the current primary pipeline is production-ready" — it is not yet.
+- **Next production action**: Phase 0 source verification per
+  `docs/neo_discovery_agent_brief.md` — verify ZTF DR24/public archive
+  access, Fink API auth/schema (`swagger.json`), JPL SBDB behavior, and MPC
+  observation API behavior; produce `data_sources_verified.md`,
+  `auth_requirements.md`, and `pretrained_model_audit.md`. Do not write any
+  ingestion code before Phase 0 deliverables exist — this is an explicit
+  brief requirement, not optional sequencing.
+- **Self-correction note**: an earlier same-session response described the
+  production-capability gates (P1–P3, P5 closed) as if that meant the full
+  brief's best practices were satisfied. That was a real gap in framing —
+  gate closure on the WISE/DECam/TESS path does not imply the brief's model
+  (candidate ranker), adapter (JPL SBDB), or completeness-testing
+  requirements were met. Future agents: do not repeat that conflation.
+
+### Handoff state as of 2026-07-02 v5
+
+**Correction to the v4 handoff below (operator-flagged 2026-07-02)**: v4's
+description of Gate P4 as something requiring active operator action ("it is
+human-gated — Jerome must obtain written MPC confirmation... waiting on
+Jerome's Gate P4 correspondence") was wrong in framing, even though the
+underlying facts (C51 attribution is unresolved) were accurate. **There is
+no candidate yet, so there is nothing to tell MPC and no reason to contact
+them.** Gate P4 is **dormant**, not an active to-do for the operator — it
+only becomes relevant once a real WISE-sourced candidate survives
+adversarial review and operator review (`docs/OPERATOR_GO_NO_GO_RUNBOOK.md`
+Step 5). Do not describe Gate P4 as "awaiting operator correspondence" or
+similar in future handoffs; it awaits an actual candidate, not operator
+action. `docs/PRODUCTION_READINESS.md` Gate P4 and
+`docs/OPERATOR_GO_NO_GO_RUNBOOK.md` Step 5 were both corrected to reflect
+this. No code changed; this is a documentation/framing fix only.
+
+### Handoff state as of 2026-07-02 v4
 
 **Gate P5 CLOSED (v0.90.10)** ✓ — Operator go/no-go runbook:
 - New `docs/OPERATOR_GO_NO_GO_RUNBOOK.md`: one-page flow for the day a real
