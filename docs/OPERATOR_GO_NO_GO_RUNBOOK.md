@@ -87,18 +87,20 @@ default** (see `docs/evidence/prod-loop/2026-07-02-gate-p3-no-submission-drill.m
 for a verified drill of exactly this behavior). That is correct — do not work
 around it. It stays fail-closed until Step 5 is done.
 
-## Step 5 — MPC submission authority check (Gate P4 — human-gated)
+## Step 5 — MPC submission authority check (only relevant if you reach this step)
 
-**No code can do this step. It is yours alone.**
+**This step is dormant until a real candidate reaches it. There is nothing
+to do here, and no reason to contact MPC, until Step 3 has actually produced
+a candidate you intend to submit.** Do not treat this as a standing task.
 
-Before any `export_ades_report.py --obs-code C51
---mpc-confirmed-wise-c51-submission` run, you must have **written MPC
+If and when that day comes: before any `export_ades_report.py --obs-code C51
+--mpc-confirmed-wise-c51-submission` run, you need **written MPC
 confirmation** that this independent archival pipeline may submit
-WISE/NEOWISE remeasurements under station code C51. See
+WISE/NEOWISE remeasurements under station code C51 — see
 `docs/MPC_SUBMISSION_POLICY.md §TODO for Future Agents — Archival WISE
 Submission Authority` and `docs/mpc_wise_neowise_archival_astrometry_submission.md`
-for the current state of that correspondence. Until you have that
-confirmation on record, `--mpc-confirmed-wise-c51-submission` must not be
+for what is and isn't already documented from MPC's own sources. Until that
+confirmation is in hand, `--mpc-confirmed-wise-c51-submission` must not be
 set, and no coding agent should ever suggest setting it for you.
 
 For non-WISE sources (once DECam/TESS are live-verified per Gate P2), the

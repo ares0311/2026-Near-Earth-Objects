@@ -598,7 +598,17 @@ a measurable quantity (surveys done/total, tracklets done/total).
 
 See `docs/PRODUCTION_READINESS.md` for the full gap register.
 
-### Handoff notes (2026-07-02) — v0.90.10 (CURRENT)
+### Handoff notes (2026-07-02) — v0.90.11 (CURRENT)
+
+**Correction (operator-flagged 2026-07-02)**: earlier same-day handoff notes
+described Gate P4 as something requiring active operator action ("Jerome
+must obtain written MPC confirmation," "wait on Jerome's Gate P4
+correspondence"). That framing was wrong — **there is no candidate yet, so
+there is nothing to tell MPC and no reason to contact them.** Gate P4 is
+**dormant**, not a pending operator task. It only becomes relevant once a
+real WISE-sourced candidate actually survives adversarial review and
+operator review. Do not describe Gate P4 as "awaiting operator
+correspondence" in future handoffs.
 
 **Current production definition**:
 - Production readiness now means demonstrated capability to find, score,
@@ -610,22 +620,23 @@ See `docs/PRODUCTION_READINESS.md` for the full gap register.
   leakage, historical replay discipline, pretrained-model audits, and
   auditable ranker design are recorded in `docs/SURVEY_NATIVE_CONFIDENCE_POLICY.md`.
 - **Gates P1, P2, P3, and P5 in `docs/PRODUCTION_READINESS.md` are all
-  CLOSED.** Only Gate P4 (MPC submission protocol) remains open, and it is
-  **human-gated** — Jerome must obtain written MPC confirmation for archival
-  WISE C51 submission authority; no further code work can close it. Actual
-  candidate survival is a later event-driven discovery gate.
+  CLOSED.** Gate P4 (MPC submission protocol) is open but dormant — it does
+  not require operator action today; it activates only when a real candidate
+  needs submitting. No further code work can close it either, since the
+  fail-closed guards already exist and were verified in the Gate P3 drill.
+  Actual candidate survival is a later event-driven discovery gate.
 
 **Gate P5 CLOSED (2026-07-02)**:
 - `docs/OPERATOR_GO_NO_GO_RUNBOOK.md`: one-page flow with review-packet
   location, verified `adversarial_review.py`/`export_ades_report.py`
-  commands, an operator-review checklist, the Gate P4 human-gated check, and
+  commands, an operator-review checklist, the dormant Gate P4 check, and
   the permanent forbidden-communications list. States `SURVIVE`/`BORDERLINE`
   means "candidate may be reviewed for MPC submission," never "confirmed NEO."
 - **NEXT PRODUCTION ACTION for a coding agent**: all code-addressable
   production-capability gates are closed. Remaining code-addressable work is
   the two items left open under Gate P2 (WISE sentinel-magnitude rejection
-  filter; DECam/TESS live endpoint verification) — otherwise, wait on
-  Jerome's Gate P4 MPC correspondence before any further live-discovery push.
+  filter; DECam/TESS live endpoint verification). There is no pending
+  operator task to wait on — do not invent one.
 
 **Gate P3 CLOSED (2026-07-02)**:
 - `Skills/injection_recovery.py --review-packet-out` writes full `ScoredNEO`

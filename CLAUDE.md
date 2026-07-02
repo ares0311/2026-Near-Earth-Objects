@@ -668,7 +668,24 @@ See `docs/MISSION.md` for the authoritative data strategy. The prior "blocked
 until expert review" guardrail was removed by operator decision on 2026-06-21;
 MPC/NEOCP/Scout is the expert review system.
 
-### Handoff state as of 2026-07-02 v4 (CURRENT)
+### Handoff state as of 2026-07-02 v5 (CURRENT)
+
+**Correction to the v4 handoff below (operator-flagged 2026-07-02)**: v4's
+description of Gate P4 as something requiring active operator action ("it is
+human-gated — Jerome must obtain written MPC confirmation... waiting on
+Jerome's Gate P4 correspondence") was wrong in framing, even though the
+underlying facts (C51 attribution is unresolved) were accurate. **There is
+no candidate yet, so there is nothing to tell MPC and no reason to contact
+them.** Gate P4 is **dormant**, not an active to-do for the operator — it
+only becomes relevant once a real WISE-sourced candidate survives
+adversarial review and operator review (`docs/OPERATOR_GO_NO_GO_RUNBOOK.md`
+Step 5). Do not describe Gate P4 as "awaiting operator correspondence" or
+similar in future handoffs; it awaits an actual candidate, not operator
+action. `docs/PRODUCTION_READINESS.md` Gate P4 and
+`docs/OPERATOR_GO_NO_GO_RUNBOOK.md` Step 5 were both corrected to reflect
+this. No code changed; this is a documentation/framing fix only.
+
+### Handoff state as of 2026-07-02 v4
 
 **Gate P5 CLOSED (v0.90.10)** ✓ — Operator go/no-go runbook:
 - New `docs/OPERATOR_GO_NO_GO_RUNBOOK.md`: one-page flow for the day a real

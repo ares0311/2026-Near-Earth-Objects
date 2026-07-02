@@ -119,17 +119,21 @@ definition.
       with no `.psv` written and no network access. Evidence:
       `docs/evidence/prod-loop/2026-07-02-gate-p3-no-submission-drill.md`.
 - [ ] P4: resolve archival WISE/NEOWISE MPC submission authority before any
-      live WISE/NEOWISE MPC submission. **HUMAN-GATED** — no code path can
-      close this; requires Jerome's written MPC correspondence.
+      live WISE/NEOWISE MPC submission. **DORMANT, not an active operator
+      task** — there is no candidate yet, so there is nothing to contact MPC
+      about. This activates only if/when a real WISE-sourced candidate
+      survives adversarial + operator review. No code path can close it
+      either; the fail-closed guards already exist and were drilled in P3.
 - [x] P5: maintain a compact operator go/no-go flow for the day a real
       candidate appears.
       **CLOSED 2026-07-02**: `docs/OPERATOR_GO_NO_GO_RUNBOOK.md` — one-page
       flow with review-packet location, verified adversarial-review/export
-      commands, an operator checklist, the P4 human-gated check, and the
+      commands, an operator checklist, the dormant P4 check, and the
       permanent forbidden-communications list.
 
 **All code-addressable production-capability gates (P1, P2, P3, P5) are now
-CLOSED. Only P4 remains open, and it is human-gated.**
+CLOSED. Only P4 remains open, and it is dormant — no candidate exists yet,
+so there is no pending operator task.**
 
 ### L. Discovery-event prerequisite work (not required for production readiness)
 - [ ] At least 1 real candidate survives adversarial review + operator review.
@@ -144,13 +148,14 @@ CLOSED. Only P4 remains open, and it is human-gated.**
   is merged to main and `git pull origin main` is confirmed. This applies even if code
   exists on the feature branch. Commands are blocked until merge.
 
-## One remaining human-gated submission blocker (no code can resolve this)
+## One remaining dormant submission item (not an active task; no code can resolve it either)
 - **MPC archival WISE authority**: MPC sources document `C51` as the WISE station
   code, ADES as the current submission format, and ADES note `Z` for
   non-survey measurer/pipeline survey astrometry. They do not explicitly
   authorize this independent archival pipeline to submit WISE/NEOWISE
-  remeasurements under `C51`. Jerome must obtain written MPC confirmation before
-  any live WISE/NEOWISE submission. See `docs/MPC_SUBMISSION_POLICY.md` and
+  remeasurements under `C51`. This only matters once a real candidate exists
+  to submit — there is nothing to contact MPC about today. See
+  `docs/MPC_SUBMISSION_POLICY.md` and
   `docs/mpc_wise_neowise_archival_astrometry_submission.md`.
 
 ## Iteration log
@@ -191,3 +196,4 @@ CLOSED. Only P4 remains open, and it is human-gated.**
 | 31 | 2026-07-02 | v0.90.7 handoff prepared: `docs/neo_discovery_agent_brief.md` is authoritative workflow guidance and is reconciled with `docs/MISSION.md`; mandatory reads and Gate P2 now require source verification, no future-catalog leakage, historical replay discipline, pretrained-model audits, and auditable ranker design | Next agent should work Gate P2 first; do not run another live WISE diagnostic or add ZTF/Fink discovery-submission code until the source-native confidence policy exists |
 | 33 | 2026-07-02 | Gate P3 CLOSED (v0.90.9): `Skills/injection_recovery.py --review-packet-out` added; drilled a Gate P1 WISE packet through offline adversarial review (5/5 REJECT, expected) and `export_ades_report.py` twice, both failing closed with no `.psv` written and no network access | Work Gate P4 (human-gated — Jerome must obtain written MPC confirmation for archival WISE C51 authority) or Gate P5 (operator go/no-go runbook, code-addressable) |
 | 34 | 2026-07-02 | Gate P5 CLOSED (v0.90.10): `docs/OPERATOR_GO_NO_GO_RUNBOOK.md` added — one-page flow with verified commands, operator checklist, P4 human-gated check, forbidden-communications list. **All code-addressable production-capability gates (P1/P2/P3/P5) are now closed; only P4 remains, and it is human-gated.** | Wait on Jerome's Gate P4 MPC correspondence, or work the two remaining Gate P2 follow-ups (WISE sentinel-magnitude filter, DECam/TESS live verification) |
+| 35 | 2026-07-02 | Operator corrected framing (v0.90.11): Gate P4 was wrongly described as an active operator task ("Jerome must contact MPC," "wait on correspondence"). Corrected — there is no candidate yet, so there is nothing to tell MPC. Gate P4 is dormant, not pending operator action. `PRODUCTION_READINESS.md`, `OPERATOR_GO_NO_GO_RUNBOOK.md`, `CLAUDE.md`, `AGENTS.md` corrected | No pending operator task. Coding-agent work remaining: the two open Gate P2 follow-ups, or wait for a real candidate to appear |

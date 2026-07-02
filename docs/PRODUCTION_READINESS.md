@@ -1,6 +1,6 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.90.10
+**Current version**: v0.90.11
 **Last updated**: 2026-07-02
 **Purpose**: Mandatory read at session start (per MANDATORY SESSION-START PROTOCOL).  
 Every planning cycle must name the highest-priority unresolved production-capability gate and show how proposed steps close or directly unblock it.
@@ -634,9 +634,20 @@ a new NEO.
 - [ ] Keep `alert.py` and `Skills/export_ades_report.py` fail-closed until the
       protocol is recorded in `docs/MPC_SUBMISSION_POLICY.md` and the operator
       explicitly approves live submission.
-- Current status: **open / human-gated**. See
+- Current status: **open, dormant — no candidate exists yet, so there is
+      nothing to contact MPC about**. This is not an active operator task.
+      No real candidate has survived adversarial review, so there is no
+      observation batch to attribute a station code to and no reason to
+      initiate MPC correspondence today. This gate becomes relevant only if
+      and when a real WISE-sourced candidate survives adversarial review and
+      operator review (see `docs/OPERATOR_GO_NO_GO_RUNBOOK.md` Step 5) — at
+      that point, and only then, the operator would contact MPC per
       `docs/MPC_SUBMISSION_POLICY.md §TODO for Future Agents — Archival WISE
-      Submission Authority`.
+      Submission Authority`. The code-level fail-closed guards
+      (`alert.py`, `Skills/export_ades_report.py`) already exist and were
+      verified in the Gate P3 drill, so this gate requires no further code
+      work either — it simply cannot be marked CLOSED until a real
+      submission-ready candidate exists to test the full pathway against.
 
 ### Gate P5: Operator go/no-go runbook
 - [x] Maintain a one-page operator flow for the day a real candidate appears:

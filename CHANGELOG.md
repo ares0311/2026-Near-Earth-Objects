@@ -3,6 +3,18 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.11 — Correct Gate P4 framing: dormant, not an active operator task (2026-07-02)
+
+### Fixed
+- `docs/PRODUCTION_READINESS.md`, `docs/OPERATOR_GO_NO_GO_RUNBOOK.md`,
+  `CLAUDE.md`, `AGENTS.md`, `README.md`, `docs/evidence/prod-loop/LOOP_PROGRESS.md`:
+  corrected language that described Gate P4 (MPC submission protocol) as an
+  active task requiring the operator to contact MPC now. There is no
+  candidate yet, so there is nothing to submit and nothing to ask MPC about.
+  Gate P4 is dormant and only activates once a real WISE-sourced candidate
+  survives adversarial review and operator review. No code changed — this is
+  a documentation/framing correction only, flagged by the operator.
+
 ## v0.90.10 — Gate P5 operator go/no-go runbook (2026-07-02)
 
 ### Added
