@@ -3,6 +3,27 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.32 — Close Gate Z3 source-verification blocker (2026-07-02)
+
+### Changed
+- **Gate Z3's long-standing "verified per-source ZTF DR24 detection
+  source" blocker is closed.** Operator ran
+  `Skills/probe_ztf_alert_archive_file.py --inspect-first-packet` against
+  the real downloaded UW ZTF alert archive file and confirmed all six
+  researched schema fields (`ra`, `dec`, `jd`, `magpsf`, `sigmapsf`, `fid`)
+  present with real values, plus real image cutout triplets
+  (`cutoutScience`/`cutoutTemplate`/`cutoutDifference`, directly usable by
+  the existing Tier 2 CNN) and `prv_candidates` prior-detection history
+  among the packet's 100 total `candidate` fields.
+- Updated `docs/ZTF_DR24_PRODUCTION_GATES.md` Gate Z3 row and "Next Coding
+  Step": the source is verified; what remains is a bounded multi-night
+  ingest tool and a real known-object positive control through the
+  existing linker. Not fully closed — only the source-verification
+  sub-problem.
+- Updated `docs/evidence/phase0/2026-07-02-gate-z3-uw-alert-archive-candidate.md`
+  with the real observed field values table and the full 100-field packet
+  structure summary.
+
 ## v0.90.31 — Add AVRO packet schema inspection to Gate Z3 probe (2026-07-02)
 
 ### Added

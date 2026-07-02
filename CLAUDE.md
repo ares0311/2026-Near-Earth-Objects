@@ -656,7 +656,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.31)
+## Current State (v0.90.32)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -678,14 +678,50 @@ active path is ZTF DR24 archival historical replay with no future-catalog
 leakage, auditable source verification, and fail-closed submission controls.
 ZTF live alert-stream discovery remains prohibited. Gate Z1 bounded ingest and
 Gate Z2 time-aware known-object exclusion are code-complete pending operator
-live verification; Gate Z3's active blocker is a verified per-source ZTF DR24
-detection source to feed the existing linker. The older ALeRCE-backed source
-provider is real bounded-pilot evidence, but
+live verification. **Gate Z3's source-verification blocker is now CLOSED**
+(2026-07-02): the University of Washington's public ZTF alert archive is a
+real, unauthenticated, schema-verified per-detection source — see the v19
+handoff below. Gate Z3 as a whole remains open pending a bounded multi-night
+ingest tool and a real known-object positive control run through the
+existing linker. The older ALeRCE-backed source provider is real
+bounded-pilot evidence, but
 `docs/evidence/phase0/alerce_source_detection_assessment.md` records that it
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-02 v18 (CURRENT)
+### Handoff state as of 2026-07-02 v19 (CURRENT)
+
+**Gate Z3 source-verification blocker CLOSED** ✓ — operator ran
+`Skills/probe_ztf_alert_archive_file.py --inspect-first-packet` on `main` @
+v0.90.31 and it succeeded completely: all six researched schema fields
+(`ra`, `dec`, `jd`, `magpsf`, `sigmapsf`, `fid`) confirmed present with real
+values in a real downloaded ZTF alert packet
+(`ztf_public_20180809.tar.gz`/`585152193615015014.avro`). The packet
+contains far more than checked — 100 total `candidate` fields, plus real
+`cutoutScience`/`cutoutTemplate`/`cutoutDifference` image triplets (directly
+usable by `classify.py`'s existing Tier 2 CNN input format) and
+`prv_candidates` prior-detection history. Full evidence with the real
+observed values table:
+`docs/evidence/phase0/2026-07-02-gate-z3-uw-alert-archive-candidate.md`.
+
+`docs/ZTF_DR24_PRODUCTION_GATES.md` Gate Z3 row and "Next Coding Step"
+updated to reflect this: the long-standing "verified per-source ZTF DR24
+detection source" blocker is resolved. **Gate Z3 is NOT fully closed** —
+what's still open: a bounded, checkpointed, multi-night real-detection
+ingest tool (the current probe only verifies one file), and a real
+known-object positive control (linking real alerts across ≥2 real archived
+nights into a tracklet through the existing `src/link.py`, matching a
+documented known NEO). Nightly file sizes vary up to 73G, so any multi-night
+ingest tool must stream-parse and filter, not naively download whole nights.
+
+**Next production action (NOT YET DONE)**: design and build the bounded
+multi-night ingest tool described above. Before using any field beyond the
+six already confirmed (e.g. `rb`/`drb` real-bogus scores, very likely
+present among the packet's other 94 unlisted `candidate` fields), confirm
+its exact field name from a real packet — do not assume the name matches
+other ZTF documentation without checking.
+
+### Handoff state as of 2026-07-02 v18
 
 **Gate Z3 UW alert archive candidate: CONFIRMED WORKING END-TO-END** ✓ —
 operator ran `Skills/probe_ztf_alert_archive_file.py` on `main` @ v0.90.30

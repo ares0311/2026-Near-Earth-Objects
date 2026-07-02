@@ -158,3 +158,48 @@ git pull origin main
 export PYTHONPATH=src
 uv run --python 3.14 python Skills/probe_ztf_alert_archive_file.py --inspect-first-packet
 ```
+
+## RESOLVED 2026-07-02: real schema confirmed — Gate Z3 source verification complete
+
+Operator ran the command above on `main` @ v0.90.31. Result: **complete
+success, all six researched fields present with real values** in a real
+packet from the real downloaded archive (`ztf_public_20180809.tar.gz`,
+member `585152193615015014.avro`):
+
+| Field | Real observed value |
+|---|---|
+| `ra` | `232.6075742` |
+| `dec` | `-8.4449086` |
+| `jd` | `2458339.6521991` |
+| `magpsf` | `19.17046356201172` |
+| `sigmapsf` | `0.14355134963989258` |
+| `fid` | `2` |
+
+**The packet contains substantially more than what was checked**: the
+top-level record has 9 keys (`candid`, `candidate`, `cutoutDifference`,
+`cutoutScience`, `cutoutTemplate`, `objectId`, `prv_candidates`,
+`publisher`, `schemavsn`), and the `candidate` sub-record alone has **100
+fields** — only 6 were checked against the research above. Notably present:
+
+- `cutoutScience`, `cutoutTemplate`, `cutoutDifference` — real image cutout
+  triplets, exactly the input format `classify.py`'s existing Tier 2 CNN
+  (`_tier2_predict`) already expects. This was not anticipated in the
+  original research and is a significant bonus: a real Gate Z3 ingest could
+  feed the CNN classifier real image data, not just tabular features.
+- `prv_candidates` — prior-detection history at this sky position, useful
+  context beyond the archive's own cross-night coverage.
+- Very likely (not yet explicitly checked by field name) `rb`/`drb`
+  real-bogus scores among the other 94 unlisted `candidate` fields, given
+  these are standard ZTF alert-packet fields per the schema research — this
+  should be confirmed by field name, not assumed, before being used in any
+  ingest tool.
+
+**This closes Gate Z3's source-verification blocker.** A real,
+unauthenticated, schema-verified, per-detection ZTF candidate source now
+exists and is confirmed end-to-end: reachable, correctly named/dated,
+correctly structured as gzip/tar, and its AVRO content matches the
+researched real/bogus-classification-ready alert schema. See
+`docs/ZTF_DR24_PRODUCTION_GATES.md` Gate Z3 row for the updated status and
+the concrete next coding step (a bounded multi-night ingest tool, not yet
+built — Gate Z3 as a whole is not fully closed, only its source-verification
+sub-problem).
