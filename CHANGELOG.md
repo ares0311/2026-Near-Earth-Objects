@@ -3,6 +3,24 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.31 — Add AVRO packet schema inspection to Gate Z3 probe (2026-07-02)
+
+### Added
+- `Skills/probe_ztf_alert_archive_file.py --inspect-first-packet`: parses
+  one real `.avro` member from the downloaded archive file with `fastavro`
+  and prints the `candidate` record's field names/values, confirming the
+  real schema matches research (`ra`/`dec`/`jd`/`magpsf`/`sigmapsf`/`fid`)
+  rather than guessing. Added `fastavro>=1.9,<2` as a new runtime
+  dependency — the same library the official
+  `ZwickyTransientFacility/ztf-avro-alert` repository's own example
+  notebook uses for reading these packets.
+- Verified in the sandbox: the operator's live run confirmed the archive
+  file is a real gzip/tar containing 715 genuine `.avro` alert packets
+  (not a placeholder); the new inspection logic was unit-tested against a
+  synthetic AVRO packet built with the exact researched schema and
+  correctly extracted all six expected fields. Real-file inspection
+  requires an operator run (this sandbox has no live internet access).
+
 ## v0.90.30 — Bounded single-file probe for UW ZTF alert archive candidate (2026-07-02)
 
 ### Added

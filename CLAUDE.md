@@ -656,7 +656,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.30)
+## Current State (v0.90.31)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -685,7 +685,48 @@ provider is real bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-02 v17 (CURRENT)
+### Handoff state as of 2026-07-02 v18 (CURRENT)
+
+**Gate Z3 UW alert archive candidate: CONFIRMED WORKING END-TO-END** ✓ —
+operator ran `Skills/probe_ztf_alert_archive_file.py` on `main` @ v0.90.30
+and it succeeded completely: downloaded the real 31MiB
+`ztf_public_20180809.tar.gz` in ~3s with visible progress/ETA, confirmed it
+is a valid gzip/tar archive containing **715 real `.avro` alert packets**
+with plausible ZTF `candid`-style numeric filenames. This is not a
+placeholder or error page — it is a genuine per-night archive of real
+per-detection alert data. Full evidence:
+`docs/evidence/phase0/2026-07-02-gate-z3-uw-alert-archive-candidate.md`.
+
+**v0.90.31**: added `--inspect-first-packet` to the same probe script,
+which parses one real `.avro` member with `fastavro` (new dependency,
+added because it's the same library the official
+`ZwickyTransientFacility/ztf-avro-alert` repo's own example notebook uses)
+and prints the `candidate` record's field names/values, to confirm the
+real schema contains `ra`/`dec`/`jd`/`magpsf`/`sigmapsf`/`fid` as researched
+rather than guessed. Verified locally in the sandbox against a synthetic
+AVRO packet built with the exact researched schema — the parsing logic
+correctly extracts and reports all six expected fields. **Not yet run
+against the real downloaded file** (this sandbox has no live internet
+access; the operator's already-downloaded file at
+`Logs/pipeline_runs/ztf_alert_archive_probe/ztf_public_20180809.tar.gz`
+will be reused via the existing checkpoint/resume logic, no re-download
+needed).
+
+**Next production action (NOT YET DONE)**: operator re-runs the probe with
+`--inspect-first-packet` to confirm the real schema. If confirmed, Gate Z3's
+candidate-source verification is essentially complete, and the next work
+becomes designing an actual bounded, checkpointed Gate Z3 ingest tool
+(single bounded night or small multi-night window, with the file-size
+volume risk already documented — up to 73G for a single night) — do not
+skip ahead to that design before this schema confirmation lands.
+
+```bash
+git pull origin main
+export PYTHONPATH=src
+uv run --python 3.14 python Skills/probe_ztf_alert_archive_file.py --inspect-first-packet
+```
+
+### Handoff state as of 2026-07-02 v17
 
 **Gate Z3 UW alert archive candidate: real file listing confirmed** — the
 operator opened `https://ztf.uw.edu/alerts/public/` in a browser and saved

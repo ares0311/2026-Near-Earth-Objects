@@ -113,22 +113,48 @@ download-and-inspect test of one real file, to confirm the tar/AVRO format
 matches expectations, before attempting anything at the scale of a full
 night (up to 73G) or a multi-night window.
 
-## Next step: bounded single-file download verification (Skill added)
+## RESOLVED 2026-07-02: operator confirmed real download and tar structure
 
-Added `Skills/probe_ztf_alert_archive_file.py` — downloads exactly ONE
-named file from the confirmed archive (default: `ztf_public_20180809.tar.gz`,
-31M, one of the smallest genuinely-sized files visible in the listing, not
-a `44`/`74`-byte placeholder), with checkpoint/resume and retry-with-backoff
-per the standing rules, verifies it is a valid gzip/tar archive, and lists
-the first N member filenames without extracting or parsing their content
-(no new AVRO-parsing dependency added yet — that is future work once the
-tar structure itself is confirmed). This is a Phase 0/1 verification probe
-only, not the Gate Z3 ingest tool itself.
+Operator ran `Skills/probe_ztf_alert_archive_file.py` on `main` @ v0.90.30.
+Result: **complete success**.
 
-Operator command:
+- HEAD confirmed remote size 31.0MiB, matching the listing.
+- GET downloaded the full file in ~3s with visible per-MiB progress and ETA.
+- `tarfile.open(..., mode="r:gz")` opened it as a valid gzip/tar archive.
+- **715 `.avro` members** were found inside — real per-detection alert
+  packets, not a placeholder or error page.
+- Sample member names (first 10), e.g. `585152193615015014.avro`,
+  `585153143215010000.avro` — numeric filenames consistent with ZTF alert
+  `candid` values (candidate IDs), matching the expected AVRO alert-packet
+  naming convention from the schema research above.
+
+**This confirms the UW ZTF alert archive is a real, working, unauthenticated,
+per-detection candidate source for Gate Z3** — reachable, correctly
+structured, and populated with the expected volume of real per-night alert
+packets (715 detections for this one August 2018 night, plausible for ZTF's
+alert rate).
+
+**Not yet confirmed**: the internal AVRO schema of an individual packet —
+i.e. that a packet's `candidate` record actually contains the `ra`, `dec`,
+`jd`, `magpsf`, `sigmapsf` fields the WebSearch-sourced schema research
+described. The tar/gzip verification above does not parse AVRO content.
+
+## Next step: parse one real AVRO packet's schema (Skill added)
+
+Extended `Skills/probe_ztf_alert_archive_file.py` with `--inspect-first-packet`,
+which extracts and parses exactly ONE `.avro` member (the first found) using
+`fastavro` (added as a new dependency — the same library the official
+`ZwickyTransientFacility/ztf-avro-alert` repository's own example notebook
+uses for reading these packets, per the schema research above) and prints
+the top-level `candidate` record's field names and values. This is the last
+verification step before any Gate Z3 ingest-tool design work: confirming
+the real schema matches what was researched, not guessed.
+
+Operator command (reuses the already-downloaded file via checkpoint/resume,
+no re-download needed):
 
 ```bash
 git pull origin main
 export PYTHONPATH=src
-uv run --python 3.14 python Skills/probe_ztf_alert_archive_file.py
+uv run --python 3.14 python Skills/probe_ztf_alert_archive_file.py --inspect-first-packet
 ```
