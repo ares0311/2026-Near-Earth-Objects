@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
@@ -147,6 +148,12 @@ def inject_synthetic_neo_wise(
     return tuple(obs)
 
 
+def _fmt_duration(seconds: float) -> str:
+    """Format elapsed seconds as Mm SSs, per the standing progress-output rule."""
+    m, s = divmod(int(seconds), 60)
+    return f"{m}m{s:02d}s"
+
+
 def run_injection_recovery(
     n_inject: int = 20,
     seed: int = 0,
@@ -173,8 +180,18 @@ def run_injection_recovery(
     n_scored = 0
     hazard_flags: list[str] = []
     review_packets: list[dict] = []
+    t0 = time.monotonic()
 
     for i in range(n_inject):
+        elapsed = time.monotonic() - t0
+        per_item = elapsed / max(i, 1)
+        eta = per_item * (n_inject - i)
+        print(
+            f"[injection] ({i + 1}/{n_inject}) mission={mission}  "
+            f"detected={n_detected} linked={n_linked} scored={n_scored}  "
+            f"elapsed {_fmt_duration(elapsed)}  ETA {_fmt_duration(eta)}",
+            flush=True,
+        )
         motion = rng.uniform(0.1, 10.0)
         ra0 = rng.uniform(0.0, 359.0)
         dec0 = rng.uniform(-30.0, 30.0)
@@ -215,6 +232,12 @@ def run_injection_recovery(
             hazard_flags.append(scored.hazard.hazard_flag)
             if review_packet_out is not None:
                 review_packets.append(scored.model_dump(mode="json"))
+
+    print(
+        f"[injection] Complete: {n_inject} injected  "
+        f"elapsed {_fmt_duration(time.monotonic() - t0)}",
+        flush=True,
+    )
 
     if review_packet_out is not None:
         review_packet_out.parent.mkdir(parents=True, exist_ok=True)
