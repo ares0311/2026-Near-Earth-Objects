@@ -3,6 +3,16 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.27 — Record ALeRCE Gate Z3 source assessment (2026-07-02)
+
+### Added
+- `docs/evidence/phase0/alerce_source_detection_assessment.md`: official-doc
+  assessment of ALeRCE as a candidate per-source ZTF detection provider for
+  Gate Z3. ALeRCE is verified as a real ZTF object/detection API with
+  source-level fields, but the cited docs do not establish DR24 static-archive
+  coverage or point-in-time/no-future-leakage suitability. Result: candidate
+  source, not Gate Z3 closure.
+
 ## v0.90.26 — Resolve legacy ALeRCE vs ZTF DR24 Gate Z3 wording (2026-07-02)
 
 ### Changed

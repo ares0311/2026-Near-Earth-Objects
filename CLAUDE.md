@@ -656,7 +656,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.26)
+## Current State (v0.90.27)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -680,10 +680,12 @@ ZTF live alert-stream discovery remains prohibited. Gate Z1 bounded ingest and
 Gate Z2 time-aware known-object exclusion are code-complete pending operator
 live verification; Gate Z3's active blocker is a verified per-source ZTF DR24
 detection source to feed the existing linker. The older ALeRCE-backed source
-provider is real bounded-pilot evidence, but it is not current DR24 production
-evidence until verified for the historical-replay protocol.
+provider is real bounded-pilot evidence, but
+`docs/evidence/phase0/alerce_source_detection_assessment.md` records that it
+is not current DR24 production evidence until verified for the historical-
+replay protocol.
 
-### Handoff state as of 2026-07-02 v12 (CURRENT)
+### Handoff state as of 2026-07-02 v13 (CURRENT)
 
 **Current merged state through PR #163**:
 
@@ -702,13 +704,17 @@ evidence until verified for the historical-replay protocol.
   sandbox can only verify the code path on Linux; one operator Mac re-run is
   required to field-confirm the deadlock fix.
 - v0.90.25 synchronized handoff docs and the production loop ledger.
-- v0.90.26 clarifies that legacy ALeRCE source-level ZTF support does not
+- v0.90.26 clarified that legacy ALeRCE source-level ZTF support does not
   close current DR24 Gate Z3 without explicit verification for historical
-  replay. The next coding work is Gate Z3 source verification for per-source
-  ZTF DR24 detections using official docs or live evidence only; no guessed
-  endpoints, schemas, coordinates, or request bodies.
+  replay.
+- v0.90.27 adds the ALeRCE source-detection assessment under
+  `docs/evidence/phase0/`; official ALeRCE docs verify source-level detection
+  fields but do not prove DR24 static-archive or no-future-leakage suitability.
+  The next coding work is Gate Z3 source verification for per-source ZTF DR24
+  detections using official docs or live evidence only; no guessed endpoints,
+  schemas, coordinates, or request bodies.
 
-### Handoff state as of 2026-07-02 v11
+### Handoff state as of 2026-07-02 v12
 
 **Phase 0 source verification is materially complete except for the external
 Fink TLS blocker.** The current committed evidence packet is
