@@ -81,6 +81,43 @@ _PROBES: list[dict] = [
         "url": "https://irsa.ipac.caltech.edu/ibe/search/ztf/products/sci?POS=358.3,25.6",
         "method": "GET",
     },
+    {
+        # New candidate found 2026-07-02 via WebSearch (this sandbox's
+        # network proxy blocks direct WebFetch/curl to this domain, so it
+        # could not be reached from here -- see
+        # docs/evidence/phase0/2026-07-02-gate-z3-uw-alert-archive-candidate.md
+        # for the full research trail and why it matters for Gate Z3).
+        #
+        # Rationale: IRSA's ZTF "Objects" (coadd) + "Lightcurves" (single
+        # exposure but keyed to a fixed Objects-table position) catalogs are
+        # structurally unsuited to moving-object detection -- a genuine NEO
+        # is not at the same RA/Dec across exposures, so it cannot appear as
+        # a lightcurve keyed to one static position. The University of
+        # Washington's public ZTF alert archive is a bulk, STATIC, historical
+        # (not live-stream) tar-per-night archive of the full unfiltered
+        # 5-sigma alert stream since 2018-06-04, where each AVRO packet's
+        # `candidate` record has real per-detection `ra`, `dec`, `jd`,
+        # `magpsf`, `sigmapsf`, `fid` fields from actual difference-image
+        # processing -- i.e. genuine per-epoch positions that move between
+        # exposures, which is exactly Gate Z3's requirement. Bulk
+        # reprocessing of an already-public historical archive (not
+        # subscribing to the live stream) is the same pattern the brief's
+        # cited Fink-FAT precedent uses.
+        #
+        # This probe only checks that the listing page is reachable and
+        # returns real content -- it does NOT download or parse any alert
+        # data. No ingestion code should be written against this source
+        # until this probe (or an operator-run equivalent) confirms it is
+        # actually reachable, unauthenticated, and lists real per-night files.
+        "id": "uw_ztf_alert_archive_listing",
+        "brief_section": (
+            "NOT in docs/neo_discovery_agent_brief.md -- new candidate found "
+            "via WebSearch 2026-07-02, see "
+            "docs/evidence/phase0/2026-07-02-gate-z3-uw-alert-archive-candidate.md"
+        ),
+        "url": "https://ztf.uw.edu/alerts/public/",
+        "method": "GET",
+    },
 ]
 
 _CACHE_DIR = Path("Logs/pipeline_runs/phase0_source_verification")
