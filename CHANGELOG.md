@@ -3,6 +3,30 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.20 — Gate Z1: bounded ZTF DR24 replay ingest tool (2026-07-02)
+
+### Added
+- `Skills/ztf_dr24_bounded_ingest.py`: bounded, checkpointed, retry-with-backoff
+  ingest of ZTF DR24 science-image metadata from the Phase 0-verified public
+  IRSA endpoint (`ibe/search/ztf/products/sci`). Uses documented IRSA IBE
+  query syntax (`POS`/`SIZE` spatial box, `WHERE obsjd>X+AND+obsjd<Y` time
+  bound, `COLUMNS` projection) confirmed via IRSA's own published API docs,
+  not guessed. Parses the IPAC ASCII response with `astropy.io.ascii`
+  (already a project dependency). Enforces a hard bounded search-box size
+  (<=2 deg) and time window (<=400 days) so the tool can never become an
+  unbounded scrape. Writes a sample ingest report (row count, distinct
+  night/field counts, raw-response sha256) to a checkpoint directory under
+  `Logs/pipeline_runs/` (git-ignored per repository artifact policy).
+- `tests/test_ztf_dr24_bounded_ingest.py`: 8 offline tests against a real
+  astropy-generated IPAC fixture — successful ingest, checkpoint/resume
+  (no re-fetch on identical params), bound enforcement (size/window/
+  inverted-window rejection), retry-then-recover, retry exhaustion, and
+  fail-closed behavior on a non-OK `QUERY_STATUS`.
+- `docs/ZTF_DR24_PRODUCTION_GATES.md`: Gate Z1 updated from "Open" to "code
+  complete, pending operator live verification" — the tool is built and
+  unit-tested offline (this sandbox cannot reach IRSA directly), but closing
+  the gate requires one real operator-run command against the live endpoint.
+
 ## v0.90.19 — Define ZTF DR24 production gates (2026-07-02)
 
 ### Added
