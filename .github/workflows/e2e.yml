@@ -7,6 +7,9 @@ name: End-to-End Pipeline Smoke Tests
 #   smoke      — import + minimal happy-path for every module (Skills/smoke_test.py)
 #   diagnose   — full stage-by-stage synthetic run (Skills/diagnose_pipeline.py)
 #   injection  — small injection-recovery run, n=20, expected 100% rates
+#   wise-injection — Gate P1 discovery-source positive control: WISE/NEOWISE-
+#                    cadence synthetic injection recovery through detect →
+#                    link → classify → score (see docs/PRODUCTION_READINESS.md)
 #
 # These complement the unit-test suite in ci.yml by exercising the full
 # Fetch → Score → Alert call chain rather than individual functions.
@@ -108,6 +111,53 @@ jobs:
             /tmp/e2e_injection_result.json
         env:
           PYTHONPATH: src
+
+  wise-injection:
+    name: WISE injection-recovery (Gate P1 positive control)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv with Python 3.14
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install dependencies (from uv.lock)
+        run: uv sync --extra dev
+
+      # WISE/NEOWISE-cadence positive control for Gate P1: single-visit,
+      # multi-exposure synthetic tracklets with no native real/bogus score,
+      # routed through detect.py's discovery-archive singleton path. Proves
+      # the WISE discovery path can produce full ScoredNEO packets when a
+      # valid moving-object signal is present.
+      - name: WISE injection-recovery run (n=20, seed=42)
+        run: |
+          uv run python Skills/injection_recovery.py \
+            --survey WISE \
+            --n-inject 20 \
+            --seed 42 \
+            --json /tmp/e2e_wise_injection_result.json
+        env:
+          PYTHONPATH: src
+          OMP_NUM_THREADS: "1"
+          MKL_NUM_THREADS: "1"
+
+      # Fail closed if the WISE-cadence positive control cannot detect and
+      # link at least one injected candidate. A zero recovery rate here means
+      # the discovery-archive linking path is broken, not just that a live
+      # sky field lacked a real NEO.
+      - name: Assert non-zero WISE recovery
+        run: |
+          python -c "
+          import json
+          with open('/tmp/e2e_wise_injection_result.json') as f:
+              r = json.load(f)
+          assert r['n_linked'] > 0, f'WISE injection-recovery linked 0/{r[\"n_injected\"]} synthetic tracklets'
+          assert r['n_scored'] > 0, f'WISE injection-recovery scored 0/{r[\"n_injected\"]} synthetic tracklets'
+          print(f'WISE positive control: detected={r[\"n_detected\"]} linked={r[\"n_linked\"]} scored={r[\"n_scored\"]} of {r[\"n_injected\"]}')
+          "
 
   model-weights:
     name: Model weight validation

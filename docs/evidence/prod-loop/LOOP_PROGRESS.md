@@ -95,10 +95,14 @@ definition.
       ahead of event-driven Discovery Gates D1-D7.
 
 ### K. Production capability prerequisite work
-- [ ] P1: prove a WISE/NEOWISE, DECam, or TESS discovery path can produce a
+- [x] P1: prove a WISE/NEOWISE, DECam, or TESS discovery path can produce a
       full `ScoredNEO` packet when a valid moving-object signal is present.
       Known-object recovery through the discovery path or a documented
       source-native injection/recovery harness is acceptable.
+      **CLOSED 2026-07-02**: `Skills/injection_recovery.py --survey WISE`
+      injection/recovery harness through the real detect/link/classify/score
+      path, 100% recovery (n=50), new CI job `wise-injection`. Evidence:
+      `docs/evidence/prod-loop/2026-07-02-gate-p1-wise-injection-recovery.md`.
 - [ ] P2: document quantitative source-native confidence gates for discovery
       data. WISE/DECam/TESS candidates must not rely solely on ZTF-style
       real/bogus evidence.
@@ -163,3 +167,4 @@ definition.
 | 27 | 2026-06-30 | v0.90.5 selector-generated non-Taurus parent field at RA `209.64`, Dec `-15.0`, radius `0.2` fetched `16582` WISE rows and stopped fail-closed at `27845455` seed pairs | Run support-positive diagnostic subfields from the scale plan, then review packets only if non-empty |
 | 28 | 2026-06-30 | Rank 1 v0.90.5 support-positive subfield RA `209.5`, Dec `-14.9`, radius `0.0303` fetched `690` rows, linked `58596` seed pairs, produced `0` tracklets and `0` review packets | Treat this as a valid diagnostic, not a crash; P1 remains open because no full `ScoredNEO` packet was produced |
 | 29 | 2026-07-01 | Production definition updated: readiness means demonstrated capability to find, score, review, reject, and package candidates; an actual new NEO is a discovery event, not a production prerequisite | Close P1/P2 next: discovery-source positive control and source-native confidence policy |
+| 30 | 2026-07-02 | Gate P1 CLOSED: WISE-cadence injection/recovery harness added to `Skills/injection_recovery.py` (`--survey WISE`), 100% recovery through the real detect/link/classify/score path, new `wise-injection` CI job, evidence recorded | Work Gate P2: document WISE/DECam/TESS source-native confidence thresholds since archive candidates have no ZTF-style real/bogus score |

@@ -530,22 +530,32 @@ above. They intentionally do **not** require that the project has already found
 a new NEO.
 
 ### Gate P1: Discovery-source positive control
-- [ ] Demonstrate that at least one unreviewed-archive discovery path
+- [x] Demonstrate that at least one unreviewed-archive discovery path
       (WISE/NEOWISE, DECam, or TESS) can produce a full `ScoredNEO` review
       packet when a valid moving-object signal is present. Acceptable evidence:
       known-object recovery through the discovery path, or a documented
       injection/recovery harness using source-specific cadence, noise,
       astrometry, photometry, and artifact assumptions.
-- [ ] The positive-control packet must satisfy the structural requirements for
+- [x] The positive-control packet must satisfy the structural requirements for
       review: at least 3 detections, at least 2 nights when the source supports
       multi-night linking, orbit-quality code sufficient for the claimed use,
       full provenance, and no external submission.
-- Current status: **open**. The WISE/NEOWISE live diagnostics prove that fetch,
-      preprocessing, seed-pair budgeting, fail-closed review routing, and
-      report writing work, but the most recent v0.90.5 support-positive
-      subfield at RA `209.5`, Dec `-14.9`, radius `0.0303` produced `0`
-      tracklets and `0` review packets after `58596` seed pairs. That is a
-      valid diagnostic result, not a runtime failure, but it does not close P1.
+- Current status: **CLOSED (2026-07-02)**. `Skills/injection_recovery.py --survey WISE`
+      injects a source-native NEOWISE-visit-cadence synthetic tracklet (single-epoch
+      W1 exposures, no native real/bogus score, ~1 arcsec astrometric jitter,
+      0.08 mag photometric noise) through the real `detect.py` discovery-archive
+      singleton path, `link.py`, `classify.py`, and `score.py`. Verified 100%
+      detection/link/score rate (n=50, seed=42); committed baseline
+      `data/injection_recovery_wise_baseline.json`; new CI job `wise-injection`
+      in `.github/workflows/e2e.yml` asserts non-zero recovery on every push/PR.
+      Evidence: `docs/evidence/prod-loop/2026-07-02-gate-p1-wise-injection-recovery.md`.
+      The prior WISE/NEOWISE live diagnostics (most recently the v0.90.5
+      support-positive subfield at RA `209.5`, Dec `-14.9`, radius `0.0303`,
+      `0` tracklets after `58596` seed pairs) remain valid evidence that fetch,
+      preprocessing, seed-pair budgeting, fail-closed review routing, and report
+      writing all work correctly against real archive data — they simply did not
+      contain a real NEO in that field/window, which is expected and does not
+      block P1 once the positive-control harness proves the path itself works.
 
 ### Gate P2: Survey-native confidence policy
 - [ ] Document quantitative confidence thresholds for WISE/NEOWISE, DECam, and
