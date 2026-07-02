@@ -562,7 +562,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.19)
+## Current State (v0.90.25)
 
 All 10 legacy pipeline modules are complete. The offline suite passes on Python
 3.14, all three legacy ML tiers have trained weights, and the WISE/DECam/TESS
@@ -571,6 +571,15 @@ However, the operator pivot on 2026-07-02 makes ZTF DR24 archival historical
 replay the current primary discovery path. The WISE/DECam/TESS path is
 secondary/paused and must not be treated as proof that the new ZTF DR24 path is
 production-capable.
+For the ZTF DR24 path, Gate Z1 bounded ingest and Gate Z2 time-aware
+known-object exclusion are code-complete but still require operator live
+verification. Gate Z3 is not blocked on linker scaffolding: the existing
+linear-motion linker already satisfies the Fink-FAT-style tracklet-linking
+shape. The active blocker is finding and verifying a per-source ZTF DR24
+detection source that yields real candidate detections (RA/Dec/time/magnitude)
+instead of only image/exposure metadata. v0.90.24 also ported the missing
+macOS CNN model-load warmups into `src/classify.py`; that fix needs one
+operator Mac re-run before it is field-confirmed.
 Console output is now fully compliant with `docs/CONSOLE_OUTPUT_SPEC.md` —
 every stage print includes `elapsed {M}m{S:02d}s` and ETA is computed from
 a measurable quantity (surveys done/total, tracklets done/total).
@@ -609,7 +618,34 @@ a measurable quantity (surveys done/total, tracklets done/total).
 
 See `docs/PRODUCTION_READINESS.md` for the full gap register.
 
-### Handoff notes (2026-07-02) — v0.90.19 (CURRENT)
+### Handoff notes (2026-07-02) — v0.90.25 (CURRENT)
+
+**Current merged state through PR #163**:
+
+- v0.90.20 built `Skills/ztf_dr24_bounded_ingest.py` for bounded,
+  checkpointed IRSA ZTF DR24 science-image metadata ingest. It is offline
+  tested but needs one operator live run before Gate Z1 can close.
+- v0.90.21 built `src/known_object_exclusion.py` for time-aware,
+  fail-closed known-object filtering from documented `first_obs` evidence.
+  It needs operator live confirmation that `first_obs` returns real dates on
+  the already-verified JPL SBDB `sb-group=neo` query before Gate Z2 can close.
+- v0.90.22 corrected Gate Z3: do not build another linker just to satisfy the
+  brief. `src/link.py` already provides the linear-motion tracklet linker. The
+  real dependency gap is a verified per-source ZTF DR24 detection source; Gate
+  Z1 currently ingests image/exposure metadata only.
+- v0.90.23 added progress output to `Skills/injection_recovery.py` so long
+  model cold starts are never silent.
+- v0.90.24 ported the missing macOS CNN-load warmups into
+  `src/classify.py`, fixing the likely real operator deadlock path. This
+  cannot be field-confirmed in the Linux sandbox and needs one Mac operator
+  re-run.
+- v0.90.25 synchronizes the durable docs with that state. Future agents should
+  continue at Gate Z3 by verifying a per-source ZTF DR24 detection source from
+  official documentation or live evidence. Do not rerun exhausted WISE
+  diagnostics, do not restart Gate Z1 scaffolding, and do not guess endpoints
+  or schemas.
+
+### Handoff notes (2026-07-02) — v0.90.19
 
 **Phase 0 source verification for the ZTF DR24 historical-replay pipeline is
 now materially complete except for the external Fink TLS blocker.** Evidence is

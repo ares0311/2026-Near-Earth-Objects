@@ -80,14 +80,18 @@ definition.
   the observatory-code strategy is resolved and `NEO_MPC_SUBMISSION_APPROVED=1`
   is intentionally set with a real non-placeholder MPC code.
 
-### I. Version coherence ✓ DONE (current v0.90.19)
-- [x] `src/__init__.py`, `pyproject.toml`, `uv.lock` → 0.90.19
-- [x] `README.md`, `AGENTS.md`, `CLAUDE.md`, `docs/PRODUCTION_READINESS.md`
-      describe the v0.90.19 state: ZTF DR24 historical replay is primary,
-      Phase 0 evidence is recorded, and WISE/DECam/TESS gates are secondary
-      historical evidence.
-- [x] Recent PR history through #156 confirms clear forward progress rather
-      than repeated reruns of exhausted Taurus diagnostics.
+### I. Version coherence ✓ DONE (current v0.90.25)
+- [x] `src/__init__.py`, `pyproject.toml`, `uv.lock` → 0.90.25
+- [x] `README.md`, `AGENTS.md`, `CLAUDE.md`, `docs/PRODUCTION_READINESS.md`,
+      and `docs/ZTF_DR24_PRODUCTION_GATES.md` describe the current ZTF DR24
+      state: Z1 bounded ingest and Z2 time-aware known-object exclusion are
+      code-complete pending operator live verification, and Z3 is blocked on
+      a verified per-source ZTF DR24 detection source rather than on linker
+      scaffolding.
+- [x] Recent local merge history through PR #163 confirms clear forward
+      progress from Z1 -> Z2 -> Z3 root-cause correction -> injection progress
+      output -> macOS CNN-load deadlock mitigation, not repeated reruns of
+      exhausted WISE diagnostics.
 
 ### J. Update docs to reflect discovery paper pathway ✓ DONE
 - [x] `docs/MPC_SUBMISSION_POLICY.md`: §Two-Stage Review Process added with full challenge list
@@ -205,3 +209,9 @@ so there is no pending operator task.**
 | 39 | 2026-07-02 | v0.90.17 fixed stale Phase 0 checkpoint reuse by hashing full probe definitions (`id`, `url`, `method`, `body`) instead of IDs only. | Commit refreshed Phase 0 artifacts and update stale handoff state |
 | 40 | 2026-07-02 | v0.90.18 completes the PR #157 follow-up by committing the generated Phase 0 evidence packet: `data_sources_verified.md`, `auth_requirements.md`, `phase0_probe_results.json`, `schema_snapshot/README.md`, `sample_ingest_report.md`, and `pretrained_model_audit.md`; README/AGENTS/CLAUDE/MISSION/PRODUCTION_READINESS now point to the ZTF DR24 Phase 1 path. | Historical next action was to define ZTF DR24 gates; completed in row 41 |
 | 41 | 2026-07-02 | v0.90.19 defines the ZTF DR24 production gates in `docs/ZTF_DR24_PRODUCTION_GATES.md`: Z0 Phase 0 verification, Z1 bounded replay ingest, Z2 time-aware known-object exclusion, Z3 source-native linking, Z4 auditable ranking baseline, Z5 retrospective validation, Z6 no-submission package drill, and Z7 runbook update. | Work Gate Z1: bounded ZTF DR24 historical-replay ingest prototype |
+| 42 | 2026-07-02 | v0.90.20 implements Gate Z1's bounded, checkpointed IRSA ZTF DR24 science-image metadata ingest tool with offline IPAC-table tests. | Operator live-verifies the bounded ingest before Z1 closes; do not rebuild the ingest scaffold |
+| 43 | 2026-07-02 | v0.90.21 implements Gate Z2's time-aware known-object exclusion from documented `first_obs` evidence, failing closed on missing dates or invalid snapshots. | Operator live-confirms `first_obs` on the already-verified JPL `sb-group=neo` query before Z2 closes |
+| 44 | 2026-07-02 | v0.90.22 corrects Gate Z3 status: the existing `src/link.py` linker already satisfies the Fink-FAT-style linear linking shape; the real blocker is that Z1 ingests image/exposure metadata, not per-source detections. | Verify a per-source ZTF DR24 detection source from official docs/live evidence before adding pipeline code |
+| 45 | 2026-07-02 | v0.90.23 fixes silent `Skills/injection_recovery.py` progress output so model-load delays report elapsed time and ETA instead of appearing hung. | Field-confirm long local runs no longer go silent |
+| 46 | 2026-07-02 | v0.90.24 ports the missing macOS CNN-load matmul and conv2d warmups into shared `src/classify.py`, addressing the likely real operator deadlock path. | Operator Mac re-runs the affected injection/CNN path once to field-confirm the fix |
+| 47 | 2026-07-02 | v0.90.25 synchronizes handoff docs, version metadata, and the production-loop ledger with merged PRs through #163. | Continue Gate Z3 source verification; ask the operator only for live commands that cannot be run from the coding-agent environment |

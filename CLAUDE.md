@@ -656,7 +656,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.7)
+## Current State (v0.90.25)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -671,15 +671,40 @@ T2-D CLOSED 2026-06-21 (model-weight CI job + `Skills/validate_model_weights.py`
 `fetch_decam_archive`, `fetch_tess_ffis`, `fetch_discovery` routing layer added.
 `run_pipeline.py` default survey changed from ZTF → WISE.
 
-**No T1 production blockers remain.** The pipeline is ready to search unreviewed
-archival data (TESS FFIs, DECam/NOIRLab, WISE/NEOWISE) for NEO candidates.
-ZTF/ATLAS are training-data sources only — they are NOT used for discovery (ZTF
-ZAPS and ATLAS pipeline already process those streams and submit to MPC).
-See `docs/MISSION.md` for the authoritative data strategy. The prior "blocked
-until expert review" guardrail was removed by operator decision on 2026-06-21;
-MPC/NEOCP/Scout is the expert review system.
+**No legacy T1 production blockers remain.** The WISE/DECam/TESS path is
+preserved as secondary historical evidence, not the current primary discovery
+target. Per `docs/MISSION.md` and `docs/neo_discovery_agent_brief.md`, the
+active path is ZTF DR24 archival historical replay with no future-catalog
+leakage, auditable source verification, and fail-closed submission controls.
+ZTF live alert-stream discovery remains prohibited. Gate Z1 bounded ingest and
+Gate Z2 time-aware known-object exclusion are code-complete pending operator
+live verification; Gate Z3's active blocker is a verified per-source ZTF DR24
+detection source to feed the existing linker.
 
-### Handoff state as of 2026-07-02 v10 (CURRENT)
+### Handoff state as of 2026-07-02 v11 (CURRENT)
+
+**Current merged state through PR #163**:
+
+- v0.90.20 added the bounded, checkpointed IRSA ZTF DR24 image-metadata ingest
+  tool. It is offline tested and awaits one operator live verification run.
+- v0.90.21 added fail-closed, time-aware known-object exclusion using
+  documented `first_obs` evidence. It awaits operator live confirmation that
+  the already-verified JPL SBDB `sb-group=neo` query returns real `first_obs`
+  dates.
+- v0.90.22 corrected Gate Z3: `src/link.py` already supplies the
+  Fink-FAT-style linear tracklet linker; the real blocker is not linker code
+  but verified per-source ZTF DR24 detections (RA, Dec, time, magnitude).
+- v0.90.23 added visible progress to injection recovery so long model-load
+  gaps are not silent.
+- v0.90.24 ported missing macOS CNN-load warmups into `src/classify.py`. The
+  sandbox can only verify the code path on Linux; one operator Mac re-run is
+  required to field-confirm the deadlock fix.
+- v0.90.25 synchronizes handoff docs and the production loop ledger. The next
+  coding work is Gate Z3 source verification for per-source ZTF DR24
+  detections using official docs or live evidence only; no guessed endpoints,
+  schemas, coordinates, or request bodies.
+
+### Handoff state as of 2026-07-02 v10
 
 **Phase 0 source verification is materially complete except for the external
 Fink TLS blocker.** The current committed evidence packet is

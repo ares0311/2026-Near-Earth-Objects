@@ -3,6 +3,22 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.25 — Sync ZTF DR24 handoff after Gate Z1-Z3 progress (2026-07-02)
+
+### Changed
+- Synchronized `README.md`, `AGENTS.md`, `CLAUDE.md`,
+  `docs/PRODUCTION_READINESS.md`, `docs/ZTF_DR24_PRODUCTION_GATES.md`, and
+  `docs/evidence/prod-loop/LOOP_PROGRESS.md` with the actual merged state
+  through PR #163. The durable docs now say Gate Z1 bounded ingest and Gate
+  Z2 time-aware known-object exclusion are code-complete pending operator
+  live verification, while Gate Z3's real blocker is a verified per-source
+  ZTF DR24 detection source, not more linker scaffolding.
+- Recorded that v0.90.24 fixed the shared macOS CNN model-load warmup path in
+  `src/classify.py` but still needs one operator Mac re-run before the
+  deadlock fix is considered field-confirmed.
+- Updated the production loop ledger so future agents do not restart stale
+  Gate Z1 work or rerun exhausted WISE diagnostics.
+
 ## v0.90.24 — Fix real macOS CNN-load deadlock in classify.py (2026-07-02)
 
 ### Fixed

@@ -52,6 +52,11 @@ Do not stop merely because no candidate has been found.
 
 ## Next Coding Step
 
-Start Z1 with a minimal bounded replay ingest design that uses verified
-IRSA/JPL/MPC behavior, preserves no-future-catalog-leakage controls, and writes
-compact evidence under `docs/evidence/` rather than raw operational logs.
+Work Gate Z3 by verifying a per-source ZTF DR24 detection source before adding
+more linking or ranking code. The existing linker is already adequate for the
+first ZTF-cadence positive controls; the missing input is real source-level
+detections with RA, Dec, observation time, and photometry. Use only official
+documentation or live evidence for endpoint, schema, and request-body choices.
+Do not guess URLs or schemas. Candidate sources must first be documented with
+auth requirements, bounded query limits, sample row schema, and no-future-
+catalog-leakage implications before being wired into the production pipeline.

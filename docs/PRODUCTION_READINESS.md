@@ -1,6 +1,6 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.90.24
+**Current version**: v0.90.25
 **Last updated**: 2026-07-02
 **Purpose**: Mandatory read at session start (per MANDATORY SESSION-START PROTOCOL).  
 Every planning cycle must name the highest-priority unresolved production-capability gate and show how proposed steps close or directly unblock it.
@@ -18,8 +18,11 @@ source-verification evidence is now recorded in `docs/evidence/phase0/`:
 JPL SBDB, MPC get-obs, and IRSA ZTF image metadata are live-verified; Fink
 schema access is externally blocked at TLS handshake; pretrained model use is
 deferred. The ZTF DR24 production gates are now defined in
-`docs/ZTF_DR24_PRODUCTION_GATES.md`; the next implementation step is Gate Z1,
-a bounded historical-replay ingest prototype.
+`docs/ZTF_DR24_PRODUCTION_GATES.md`. Gate Z1 bounded ingest and Gate Z2
+time-aware known-object exclusion are code-complete pending operator live
+verification. Gate Z3 is the current implementation focus: verify a per-source
+ZTF DR24 detection source that can feed the existing linker with real
+RA/Dec/time/magnitude detections instead of only image/exposure metadata.
 
 **Phase 0 status (2026-07-02)**: 3 of 4 cited sources live-verified working
 via `Skills/verify_ztf_dr24_sources.py` — IRSA ZTF image metadata (200, no
@@ -29,12 +32,14 @@ API is an external TLS-handshake blocker confirmed via two independent TLS
 stacks (Python `ssl` and the operator's native LibreSSL) failing identically
 from a real network — not fixable from this codebase. See
 `docs/evidence/phase0/2026-07-02-root-cause-findings.md` and
-`2026-07-02-second-live-probe-console.md` for full detail. **NOT YET DONE**:
-operator needs to commit the three generated files
-(`data_sources_verified.md`, `auth_requirements.md`,
-`phase0_probe_results.json`) from their local run, plus the brief's other
-Phase 0 deliverables (`schema_snapshot/`, `sample_ingest_report.md`,
-`pretrained_model_audit.md`) before Phase 1 work begins.
+`2026-07-02-second-live-probe-console.md` for full detail. The generated Phase
+0 artifacts are committed under `docs/evidence/phase0/`, including
+`data_sources_verified.md`, `auth_requirements.md`,
+`phase0_probe_results.json`, `schema_snapshot/README.md`,
+`sample_ingest_report.md`, and `pretrained_model_audit.md`. Remaining
+operator-run verifications are Gate Z1's live IRSA bounded ingest, Gate Z2's
+live `first_obs` check, and one Mac re-run to field-confirm the v0.90.24
+CNN-load deadlock fix.
 
 ---
 
