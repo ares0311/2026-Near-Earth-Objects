@@ -3,6 +3,21 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.13 — Phase 0 source-verification tool for ZTF DR24 pipeline (2026-07-02)
+
+### Added
+- `Skills/verify_ztf_dr24_sources.py`: GET-only probe of the exact endpoints
+  cited in `docs/neo_discovery_agent_brief.md` (Fink schema/swagger, JPL
+  SBDB NEO query, MPC get-obs, IRSA ZTF image metadata). Checkpoint/resume
+  and retry-with-backoff per standing directives. Writes
+  `docs/evidence/phase0/data_sources_verified.md` and `auth_requirements.md`
+  from real observed HTTP responses — no invented URLs or schemas.
+- Dry-run logic verified locally with mocked HTTP responses (report
+  generation, checkpoint/resume, and probe-list wiring all confirmed
+  correct); this coding-agent sandbox's network proxy blocks these external
+  domains at the policy level, so the actual live probes require the
+  operator's Mac.
+
 ## v0.90.12 — MAJOR PIVOT: ZTF DR24 historical replay supersedes WISE/DECam/TESS (2026-07-02)
 
 ### Changed (operator decision)
