@@ -3,6 +3,23 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.14 — Record first live Phase 0 probe results (2026-07-02)
+
+### Added
+- `docs/evidence/phase0/2026-07-02-first-live-probe-console.md`: durable
+  record of the operator's first live `Skills/verify_ztf_dr24_sources.py`
+  run. IRSA ZTF image metadata confirmed reachable without credentials
+  (HTTP 200). JPL SBDB and MPC get-obs are reachable but rejected the
+  brief's example request (HTTP 400 / 501 respectively) — root cause not
+  yet diagnosed, awaiting response bodies. Fink schema/swagger failed with
+  a TLS handshake error (`SSLEOFError`), not a 4xx — inconclusive, not yet
+  attributable to "no public access."
+
+### Changed
+- `CLAUDE.md`: handoff updated with the live probe results and the explicit
+  next step (get the full response bodies before adjusting any brief-cited
+  URL or writing ingestion code against it).
+
 ## v0.90.13 — Phase 0 source-verification tool for ZTF DR24 pipeline (2026-07-02)
 
 ### Added
