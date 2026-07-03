@@ -43,6 +43,12 @@ re-fetches it over the network):
     caffeinate -i uv run --python 3.14 python Skills/scan_mpc_history_ztf_coverage.py \\
         --designation 72966 --archive-start-jd 2458273.5 --stride 10 \\
         --shard-index 3 --shard-count 4
+
+Once all shard-index tabs above have finished, run this once (fast, no
+network) to combine all shard report files into one compact block that is
+easy to paste back -- instead of pasting all 4 tabs' full transcripts:
+    uv run --python 3.14 python Skills/scan_mpc_history_ztf_coverage.py \\
+        --merge --shard-count 4
 """
 
 from __future__ import annotations
@@ -166,6 +172,56 @@ def run_scan(
     return report
 
 
+def merge_shards(out_dir: Path, shard_count: int) -> dict:
+    """Read all scan_report.shard{i}of{shard_count}.json files already
+    written by a completed parallel run and combine them into one summary
+    -- lets the operator paste a single compact block instead of every
+    shard's full console transcript. Fails closed (raises) if any expected
+    shard file is missing, rather than silently reporting partial results
+    as if the scan were complete."""
+    missing = []
+    all_hits = []
+    total_checked = 0
+    for shard_index in range(shard_count):
+        shard_path = out_dir / f"scan_report.shard{shard_index}of{shard_count}.json"
+        if not shard_path.exists():
+            missing.append(str(shard_path))
+            continue
+        shard_report = json.loads(shard_path.read_text())
+        all_hits.extend(shard_report["hits"])
+        total_checked += shard_report["n_reports_checked"]
+
+    if missing:
+        raise FileNotFoundError(
+            f"Cannot merge: {len(missing)}/{shard_count} shard report(s) missing "
+            f"-- {missing}. Wait for all shards to finish before merging."
+        )
+
+    all_hits.sort(key=lambda h: h["jd"])
+    merged = {
+        "shard_count": shard_count,
+        "n_reports_checked": total_checked,
+        "n_reports_with_ztf_coverage": len(all_hits),
+        "hits": all_hits,
+    }
+    merged_path = out_dir / "scan_report.merged.json"
+    merged_path.write_text(json.dumps(merged, indent=2))
+
+    print(
+        f"[merge] Combined {shard_count} shard(s): {total_checked} MPC report(s) "
+        f"checked, {len(all_hits)} with real ZTF coverage",
+        flush=True,
+    )
+    for hit in all_hits:
+        print(
+            f"[merge]   HIT {hit['night_yyyymmdd']}: RA={hit['ra_deg']:.4f} "
+            f"Dec={hit['dec_deg']:.4f}  ({hit['n_sci_rows']} sci row(s))  jd={hit['jd']:.5f}",
+            flush=True,
+        )
+    print(f"[merge] Wrote {merged_path}", flush=True)
+    return merged
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -218,12 +274,24 @@ def main() -> None:
         help="Total number of shards for parallel runs (default: 1, no "
         "sharding).",
     )
+    parser.add_argument(
+        "--merge",
+        action="store_true",
+        help="Skip scanning; instead combine already-completed "
+        "scan_report.shard{i}of{shard-count}.json files in --out-dir into "
+        "one compact summary (fails closed if any shard hasn't finished yet).",
+    )
     args = parser.parse_args()
+
+    if args.shard_count < 1:
+        raise SystemExit("--shard-count must be >= 1")
+
+    if args.merge:
+        merge_shards(args.out_dir, args.shard_count)
+        return
 
     if args.stride < 1:
         raise SystemExit("--stride must be >= 1")
-    if args.shard_count < 1:
-        raise SystemExit("--shard-count must be >= 1")
     if not (0 <= args.shard_index < args.shard_count):
         raise SystemExit(
             f"--shard-index must be in [0, {args.shard_count}) for "

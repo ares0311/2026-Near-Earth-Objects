@@ -300,9 +300,20 @@ caffeinate -i uv run --python 3.14 python Skills/scan_mpc_history_ztf_coverage.p
 Together these issue the same ~53 cheap Gate Z1 metadata queries (1 per
 10 real in-window MPC reports) as the single-process run, at each
 report's own exact real observed position/date, reporting every real
-night with both an MPC-confirmed detection and real ZTF coverage. Target
-`Skills/ztf_alert_archive_ingest.py` at the two best resulting nights
-(closest in time to each other, to minimize orbit-motion
+night with both an MPC-confirmed detection and real ZTF coverage.
+
+**Update 2026-07-02 (v0.90.46)**: once all 4 tabs finish, run this once
+(fast, no network) instead of pasting all 4 tabs' full transcripts:
+
+```bash
+uv run --python 3.14 python Skills/scan_mpc_history_ztf_coverage.py \
+    --merge --shard-count 4
+```
+
+This combines the 4 shard report files into one compact summary and
+`scan_report.merged.json`. Fails closed if any shard hasn't finished yet.
+Target `Skills/ztf_alert_archive_ingest.py` at the two best resulting
+nights (closest in time to each other, to minimize orbit-motion
 targeting error) for the Gate Z3 positive control attempt.
 
 The same dump also revealed the packet includes ZTF's own solar-system

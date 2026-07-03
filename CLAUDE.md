@@ -656,7 +656,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.45)
+## Current State (v0.90.46)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -689,7 +689,31 @@ bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-02 v34 (CURRENT)
+### Handoff state as of 2026-07-02 v35 (CURRENT)
+
+**Merge mode added for the sharded MPC-history scan (v0.90.46)** —
+operator asked "do I still need to paste all 4 tabs' output?" Answer:
+each shard only writes a local JSON file, not visible to the agent
+without pasting — so yes, unless a merge step is added. Added `--merge`:
+after all 4 shard tabs finish, run one fast, no-network command that
+combines the 4 `scan_report.shard{i}of4.json` files into one compact
+`scan_report.merged.json` and prints a single consolidated summary,
+replacing the need to paste 4 separate transcripts. Fails closed if any
+shard hasn't finished yet. 2 new tests (9 total, all passing).
+
+**Next production action (NOT YET DONE)**: run the 4 parallel shard
+commands from the v34 handoff below, each in its own terminal tab. Once
+all 4 finish, run:
+
+```bash
+uv run --python 3.14 python Skills/scan_mpc_history_ztf_coverage.py \
+    --merge --shard-count 4
+```
+
+and paste that single output block. I'll pick the two best resulting real
+nights and target `Skills/ztf_alert_archive_ingest.py` there next.
+
+### Handoff state as of 2026-07-02 v34
 
 **Parallel sharding added to the MPC-history scan (v0.90.45)** — operator
 asked to parallelize the ~53-query `Skills/scan_mpc_history_ztf_coverage.py`

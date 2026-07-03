@@ -167,3 +167,35 @@ def test_invalid_shard_args_rejected():
             raise AssertionError("expected SystemExit")
         except SystemExit as exc:
             assert "shard-index" in str(exc)
+
+
+def test_merge_shards_combines_all_hits(tmp_path):
+    with patch("fetch.fetch_mpc_observations", return_value=_fake_mpc_observations_large()):
+        with patch("requests.get", return_value=_FakeResponse(_ipac_response_text(1))):
+            for shard_index in range(4):
+                scan_mpc_history_ztf_coverage.run_scan(
+                    "72966", 2458273.5, stride=1, size_deg=2.0, out_dir=tmp_path,
+                    shard_index=shard_index, shard_count=4,
+                )
+
+    merged = scan_mpc_history_ztf_coverage.merge_shards(tmp_path, shard_count=4)
+    assert merged["n_reports_checked"] == 20
+    assert merged["n_reports_with_ztf_coverage"] == 20  # every fake row was a hit
+    assert merged["hits"] == sorted(merged["hits"], key=lambda h: h["jd"])
+    assert (tmp_path / "scan_report.merged.json").exists()
+
+
+def test_merge_shards_fails_closed_when_incomplete(tmp_path):
+    with patch("fetch.fetch_mpc_observations", return_value=_fake_mpc_observations_large()):
+        with patch("requests.get", return_value=_FakeResponse(_ipac_response_text(0))):
+            # Only run 2 of 4 shards -- the other 2 haven't finished yet.
+            for shard_index in range(2):
+                scan_mpc_history_ztf_coverage.run_scan(
+                    "72966", 2458273.5, stride=1, size_deg=2.0, out_dir=tmp_path,
+                    shard_index=shard_index, shard_count=4,
+                )
+    try:
+        scan_mpc_history_ztf_coverage.merge_shards(tmp_path, shard_count=4)
+        raise AssertionError("expected FileNotFoundError")
+    except FileNotFoundError as exc:
+        assert "2/4" in str(exc)

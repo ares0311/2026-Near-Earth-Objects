@@ -3,6 +3,20 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.46 — Merge mode for sharded MPC-history scan (2026-07-02)
+
+### Added
+- `Skills/scan_mpc_history_ztf_coverage.py`: `--merge` flag combines
+  already-completed `scan_report.shard{i}of{n}.json` files into one
+  compact `scan_report.merged.json` and prints a single consolidated
+  summary. Answers the operator's question "do I still need to paste all
+  4 tabs' output?" -- run one fast, no-network merge command after all
+  shards finish and paste just that block instead. Fails closed (raises)
+  if any shard hasn't finished yet, rather than silently reporting partial
+  results as if the scan were complete.
+- 2 new tests: confirms merged output combines and sorts all shard hits,
+  and confirms merging fails closed when shards are still incomplete.
+
 ## v0.90.45 — Parallel sharding for MPC-history scan (2026-07-02)
 
 ### Added
