@@ -160,6 +160,32 @@ that night's predicted RA/Dec as the search center, not the original
 fixed field) -- do not skip straight to the expensive alert-archive step
 without this cheap check first.
 
+**Update 2026-07-02 (real hit found)**: that scan was run live. Real
+result: 2 of 21 checked nights had real ZTF coverage -- night 20180809
+(already known) and **night 20180903** (new, RA 242.0130, Dec -11.6968,
+6 real sci exposure rows) -- found via targeted ephemeris-based scanning,
+not blind guessing. See
+`docs/evidence/live/2026-07-02-gate-z3-track-coverage-scan-hit.md`.
+
+**Next step**: run the alert-archive ingest tool against night 20180903,
+centered on this night's real predicted position (not the stale original
+field used in the earlier failed attempt):
+
+```bash
+git checkout -- uv.lock
+git pull origin main
+export PYTHONPATH=src
+caffeinate -i uv run --python 3.14 python Skills/ztf_alert_archive_ingest.py \
+    --nights 20180903 \
+    --ra 242.0130 --dec -11.6968 --radius-deg 2.0 --min-rb 0.5
+```
+
+Night 20180809's existing cached data (21 kept, centered on RA 232.6/Dec
+-8.4, within ~0.05 deg of 72966's real predicted position that night)
+already covers this object's real location and does not need re-fetching.
+If night 20180903 also yields >=1 kept observation, this project will have
+real per-source detections on 2 real nights for the first time.
+
 Once real per-source `Observation` objects exist for >=2 real nights (the
 ingest tool's checkpoint JSON files under
 `Logs/pipeline_runs/ztf_alert_archive_ingest/`), load them and run them

@@ -689,7 +689,40 @@ bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-02 v28 (CURRENT)
+### Handoff state as of 2026-07-02 v29 (CURRENT)
+
+**Real second night found at object 72966's actual predicted position** ✓
+— operator ran `Skills/scan_neo_track_coverage.py` (stride=5, 100-day
+window). Real result: 2 of 21 checked nights had real ZTF coverage near
+the object's real predicted position — night 20180809 (already known) and
+**night 20180903** (new: RA 242.0130, Dec -11.6968, 6 real sci exposure
+rows). This is the first real, non-guessed second night found via
+targeted ephemeris-based scanning, after two prior blind field-revisit
+attempts (nights 20180810, 20180902) both failed. Full evidence:
+`docs/evidence/live/2026-07-02-gate-z3-track-coverage-scan-hit.md`.
+
+**Next production action (NOT YET DONE)**: run the alert-archive ingest
+tool against night 20180903, centered on this night's real predicted
+position:
+
+```bash
+git checkout -- uv.lock
+git pull origin main
+export PYTHONPATH=src
+caffeinate -i uv run --python 3.14 python Skills/ztf_alert_archive_ingest.py \
+    --nights 20180903 \
+    --ra 242.0130 --dec -11.6968 --radius-deg 2.0 --min-rb 0.5
+```
+
+Night 20180809's cached data (21 kept, from RA 232.6/Dec -8.4, within
+~0.05 deg of 72966's real predicted position that night) already covers
+this object and needs no re-fetch. If night 20180903 also yields >=1 kept
+observation, this project will have real per-source detections on 2 real
+nights for the first time — the next step after that (not yet built) is
+loading both checkpoints through `src/detect.py` -> `src/link.py` for
+Gate Z3's "known-object positive control."
+
+### Handoff state as of 2026-07-02 v28
 
 **Real ephemeris for NEO 72966 explains the second attempt's miss — it was
 a targeting error, not a cadence finding** ✓ — operator ran
