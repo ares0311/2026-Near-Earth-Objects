@@ -67,6 +67,17 @@ It contains the facts a coding agent needs to work productively without re-readi
   rules. Before committing, inspect `git status --short`, the staged filename
   list, and ignore behavior for generated outputs; if `git add .` would capture
   local run debris, fix `.gitignore` and untrack it before committing.
+- **Always evaluate parallelism for operator commands expected to take longer than 3 minutes**:
+  Before handing off any operator command, evaluate whether the work is
+  parallelizable (independent items with no shared mutable state) rather
+  than defaulting to a single sequential run: shard across concurrent
+  terminal tabs for network-bound work, use bounded local multiprocessing
+  for CPU-bound work (sized per `docs/SYSTEM_PROFILE.md`), or — if the
+  tool already checkpoints per-item independently — just tell the
+  operator to run existing commands in separate tabs with no code
+  changes. State explicitly whether parallelism was considered and why it
+  was or wasn't applied. If it's ambiguous whether parallelizing is worth
+  the complexity, ask the operator rather than deciding unilaterally.
 - **Parallel/sharded Skills scripts must write a live-updating shared manifest**:
   Any Skills script supporting concurrent operator-launched processes
   (e.g. `--shard-index`/`--shard-count` for parallel terminal tabs) must

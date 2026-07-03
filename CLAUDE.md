@@ -112,6 +112,32 @@ If the highest-priority T1 gap cannot be resolved because a human blocker is unr
   4. **Wrap all network fetch calls in a retry loop** with exponential backoff: 2 s, 4 s, 8 s, 16 s, 32 s (max 5 attempts). Catch `(ConnectionError, TimeoutError, OSError)`. Print the error and retry count on each failure. Raise after the final attempt.
   5. **The operator must never need to edit the command** to resume — re-running the identical command is the only required action after a sleep/wake or network interruption.
   This is the System Directive standard. Scripts that do not meet it are incomplete.
+- **Always evaluate sharding/multiprocessing/parallelism for any operator command expected to take longer than 3 minutes**:
+  Before handing off any operator command, or building the Skills script
+  behind it, if the total expected run time is more than ~3 minutes you
+  MUST evaluate whether the work is parallelizable — not just default to a
+  single sequential run. Independent items with no shared mutable state
+  (multiple sky positions, multiple nights, multiple designations,
+  multiple report rows, multiple files) are candidates for:
+  1. **Sharding across concurrent terminal tabs** (per the manifest
+     standing rule immediately below) when the work is a series of
+     network-bound calls to the same external service.
+  2. **Bounded local multiprocessing/multithreading within one process**
+     (sized per `docs/SYSTEM_PROFILE.md`'s local resource-sizing rule)
+     when the work is CPU-bound rather than network-bound.
+  3. **Naturally-independent concurrent invocations with no code changes**
+     when a tool already checkpoints per-item with no shared state (e.g.
+     each night/position writes its own file) — in that case, say so
+     explicitly and just tell the operator to run the existing commands in
+     separate tabs, rather than building new sharding scaffolding that
+     isn't needed.
+  State explicitly, every time, whether you evaluated parallelism and why
+  you did or didn't apply it — never silently hand off a long sequential
+  command without considering the alternative first. If it is ambiguous
+  whether parallelizing is worth the added complexity (e.g. rate-limit
+  risk to a shared external API, unclear item independence, a short
+  enough remaining runtime that the overhead isn't worth it), **ask the
+  operator** rather than deciding unilaterally.
 - **Parallel/sharded Skills scripts must write a live-updating shared manifest, not just an isolated per-process report**:
   Any Skills script that supports splitting its work across multiple
   operator-launched concurrent processes (e.g. `--shard-index`/`--shard-count`
