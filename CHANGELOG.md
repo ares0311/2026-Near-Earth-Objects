@@ -3,6 +3,21 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.45 — Parallel sharding for MPC-history scan (2026-07-02)
+
+### Added
+- `Skills/scan_mpc_history_ztf_coverage.py`: `--shard-index`/`--shard-count`
+  flags let the ~53-query scan be split across multiple concurrent
+  processes (e.g. one per terminal tab) to cut wall-clock time. Each
+  shard checks a disjoint subset of the same already-strided report list
+  (`rows[shard_index::shard_count]`), so shards never duplicate or race on
+  a query. The one-time MPC-history fetch itself resumes from the
+  operator's already-cached checkpoint (no network re-fetch per shard).
+  Report files are named `scan_report.shard{i}of{n}.json` when sharded.
+- 3 new tests: confirms shards partition the full row list with zero
+  overlap when all shard-index values are run, confirms the sharded
+  report filename, and confirms invalid shard args are rejected.
+
 ## v0.90.44 — Systematic MPC-history x ZTF-coverage scan (2026-07-02)
 
 ### Added

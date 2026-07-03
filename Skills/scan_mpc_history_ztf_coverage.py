@@ -24,6 +24,25 @@ Usage:
     caffeinate -i uv run --python 3.14 python Skills/scan_mpc_history_ztf_coverage.py \\
         --designation 72966 \\
         --archive-start-jd 2458273.5 --stride 10
+
+Parallel usage (run each in its own terminal tab to cut wall-clock time --
+each shard queries a disjoint subset of the same already-strided report
+list, so no two shards ever hit the same real position/date and there is
+no cache race; the one-time MPC-history fetch itself resumes from the
+already-cached checkpoint on this operator's machine, so no shard
+re-fetches it over the network):
+    caffeinate -i uv run --python 3.14 python Skills/scan_mpc_history_ztf_coverage.py \\
+        --designation 72966 --archive-start-jd 2458273.5 --stride 10 \\
+        --shard-index 0 --shard-count 4
+    caffeinate -i uv run --python 3.14 python Skills/scan_mpc_history_ztf_coverage.py \\
+        --designation 72966 --archive-start-jd 2458273.5 --stride 10 \\
+        --shard-index 1 --shard-count 4
+    caffeinate -i uv run --python 3.14 python Skills/scan_mpc_history_ztf_coverage.py \\
+        --designation 72966 --archive-start-jd 2458273.5 --stride 10 \\
+        --shard-index 2 --shard-count 4
+    caffeinate -i uv run --python 3.14 python Skills/scan_mpc_history_ztf_coverage.py \\
+        --designation 72966 --archive-start-jd 2458273.5 --stride 10 \\
+        --shard-index 3 --shard-count 4
 """
 
 from __future__ import annotations
@@ -63,18 +82,28 @@ def run_scan(
     stride: int,
     size_deg: float,
     out_dir: Path,
+    shard_index: int = 0,
+    shard_count: int = 1,
 ) -> dict:
     """Check real ZTF sci-metadata coverage at a bounded, stride-limited
     subset of a known object's real MPC-confirmed observation positions,
     reusing the already live-verified Gate Z1 metadata tool per candidate
-    report. Never downloads the multi-GB alert archive itself."""
+    report. Never downloads the multi-GB alert archive itself.
+
+    When shard_count > 1, only every shard_count-th row (offset by
+    shard_index) of the already-strided list is checked here -- running
+    all shard_index values 0..shard_count-1 concurrently (e.g. one per
+    terminal tab) covers the full strided list with no overlap between
+    shards, since each shard's rows are disjoint by construction."""
     mpc_lookup = _load_skill("lookup_mpc_observation_history")
     z1 = _load_skill("ztf_dr24_bounded_ingest")
 
     mpc_report = mpc_lookup.run_lookup(designation, archive_start_jd, out_dir / "mpc_history")
-    rows = mpc_report["reports_in_archive_window"][::stride]
+    all_rows = mpc_report["reports_in_archive_window"][::stride]
+    rows = all_rows[shard_index::shard_count] if shard_count > 1 else all_rows
+    shard_label = f" shard {shard_index}/{shard_count}" if shard_count > 1 else ""
     print(
-        f"[scan] Checking {len(rows)} of {mpc_report['n_reports_in_archive_window']} "
+        f"[scan]{shard_label} Checking {len(rows)} of {mpc_report['n_reports_in_archive_window']} "
         f"real in-window MPC report(s) (stride={stride}) for real ZTF coverage",
         flush=True,
     )
@@ -97,7 +126,7 @@ def run_scan(
         elapsed = time.monotonic() - t0
         eta = (elapsed / i) * (len(rows) - i)
         print(
-            f"[scan] ({i}/{len(rows)}) {row['night_yyyymmdd']}: "
+            f"[scan]{shard_label} ({i}/{len(rows)}) {row['night_yyyymmdd']}: "
             f"RA={row['ra_deg']:.4f} Dec={row['dec_deg']:.4f} -> "
             f"{n_rows} real sci exposure row(s)  elapsed {_fmt_duration(elapsed)}  "
             f"ETA {_fmt_duration(eta)}",
@@ -106,28 +135,34 @@ def run_scan(
 
     report = {
         "designation": designation,
+        "shard_index": shard_index,
+        "shard_count": shard_count,
         "n_reports_checked": len(rows),
         "n_reports_with_ztf_coverage": len(hits),
         "hits": hits,
         "elapsed_seconds": round(time.monotonic() - t0, 2),
     }
     out_dir.mkdir(parents=True, exist_ok=True)
-    report_path = out_dir / "scan_report.json"
+    if shard_count <= 1:
+        report_name = "scan_report.json"
+    else:
+        report_name = f"scan_report.shard{shard_index}of{shard_count}.json"
+    report_path = out_dir / report_name
     report_path.write_text(json.dumps(report, indent=2))
 
     print(
-        f"[scan] Complete: {len(hits)}/{len(rows)} checked MPC reports had real "
-        f"ZTF coverage at their exact position/date  "
+        f"[scan]{shard_label} Complete: {len(hits)}/{len(rows)} checked MPC reports "
+        f"had real ZTF coverage at their exact position/date  "
         f"elapsed {_fmt_duration(time.monotonic() - t0)}",
         flush=True,
     )
     for hit in hits:
         print(
-            f"[scan]   HIT {hit['night_yyyymmdd']}: RA={hit['ra_deg']:.4f} "
+            f"[scan]{shard_label}   HIT {hit['night_yyyymmdd']}: RA={hit['ra_deg']:.4f} "
             f"Dec={hit['dec_deg']:.4f}  ({hit['n_sci_rows']} sci row(s))",
             flush=True,
         )
-    print(f"[scan] Wrote {report_path}", flush=True)
+    print(f"[scan]{shard_label} Wrote {report_path}", flush=True)
     return report
 
 
@@ -167,13 +202,37 @@ def main() -> None:
         default=_OUT_DIR,
         help=f"Checkpoint directory (default: {_OUT_DIR}).",
     )
+    parser.add_argument(
+        "--shard-index",
+        type=int,
+        default=0,
+        help="0-based shard index for parallel runs (default: 0). Run one "
+        "process per shard-index value 0..shard-count-1 -- e.g. in separate "
+        "terminal tabs -- to check disjoint subsets of the same strided "
+        "report list concurrently. See module docstring for a 4-shard example.",
+    )
+    parser.add_argument(
+        "--shard-count",
+        type=int,
+        default=1,
+        help="Total number of shards for parallel runs (default: 1, no "
+        "sharding).",
+    )
     args = parser.parse_args()
 
     if args.stride < 1:
         raise SystemExit("--stride must be >= 1")
+    if args.shard_count < 1:
+        raise SystemExit("--shard-count must be >= 1")
+    if not (0 <= args.shard_index < args.shard_count):
+        raise SystemExit(
+            f"--shard-index must be in [0, {args.shard_count}) for "
+            f"--shard-count {args.shard_count}, got {args.shard_index}"
+        )
 
     run_scan(
-        args.designation, args.archive_start_jd, args.stride, args.size_deg, args.out_dir
+        args.designation, args.archive_start_jd, args.stride, args.size_deg, args.out_dir,
+        args.shard_index, args.shard_count,
     )
 
 

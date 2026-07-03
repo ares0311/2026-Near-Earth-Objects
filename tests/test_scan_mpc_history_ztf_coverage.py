@@ -109,3 +109,61 @@ def test_run_scan_writes_report_file(tmp_path):
                 "72966", 2458273.5, stride=5, size_deg=2.0, out_dir=tmp_path
             )
     assert (tmp_path / "scan_report.json").exists()
+
+
+def _fake_mpc_observations_large():
+    return [
+        Observation(
+            obs_id=f"mpc_{i}", ra_deg=225.0 + i * 0.4, dec_deg=-5.0 - i * 0.1,
+            jd=2458308.5 + i, mag=19.0, mag_err=0.1, filter_band="?", mission="MPC",
+        )
+        for i in range(20)
+    ]
+
+
+def test_shards_cover_full_list_with_no_overlap(tmp_path):
+    """Running every shard-index 0..shard_count-1 (as separate parallel
+    processes would) must together check every row exactly once -- this is
+    what makes it safe to run shards concurrently in separate terminal
+    tabs without duplicate or missed queries."""
+    checked_nights_by_shard = []
+    with patch("fetch.fetch_mpc_observations", return_value=_fake_mpc_observations_large()):
+        with patch("requests.get", return_value=_FakeResponse(_ipac_response_text(1))):
+            for shard_index in range(4):
+                report = scan_mpc_history_ztf_coverage.run_scan(
+                    "72966", 2458273.5, stride=1, size_deg=2.0, out_dir=tmp_path,
+                    shard_index=shard_index, shard_count=4,
+                )
+                checked_nights_by_shard.append({h["jd"] for h in report["hits"]})
+
+    all_checked = set().union(*checked_nights_by_shard)
+    # No two shards checked the same jd (disjoint).
+    for a in range(4):
+        for b in range(a + 1, 4):
+            assert checked_nights_by_shard[a].isdisjoint(checked_nights_by_shard[b])
+    # Every real MPC jd in the fake fixture was covered by exactly one shard.
+    all_jds = {2458308.5 + i for i in range(20)}
+    assert all_checked == all_jds
+
+
+def test_shard_report_filename_includes_shard_info(tmp_path):
+    with patch("fetch.fetch_mpc_observations", return_value=_fake_mpc_observations_large()):
+        with patch("requests.get", return_value=_FakeResponse(_ipac_response_text(0))):
+            scan_mpc_history_ztf_coverage.run_scan(
+                "72966", 2458273.5, stride=1, size_deg=2.0, out_dir=tmp_path,
+                shard_index=1, shard_count=3,
+            )
+    assert (tmp_path / "scan_report.shard1of3.json").exists()
+    assert not (tmp_path / "scan_report.json").exists()
+
+
+def test_invalid_shard_args_rejected():
+    with patch.object(
+        sys, "argv",
+        ["scan_mpc_history_ztf_coverage.py", "--shard-index", "5", "--shard-count", "3"],
+    ):
+        try:
+            scan_mpc_history_ztf_coverage.main()
+            raise AssertionError("expected SystemExit")
+        except SystemExit as exc:
+            assert "shard-index" in str(exc)

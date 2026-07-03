@@ -656,7 +656,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.44)
+## Current State (v0.90.45)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -689,7 +689,56 @@ bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-02 v33 (CURRENT)
+### Handoff state as of 2026-07-02 v34 (CURRENT)
+
+**Parallel sharding added to the MPC-history scan (v0.90.45)** — operator
+asked to parallelize the ~53-query `Skills/scan_mpc_history_ztf_coverage.py`
+scan across multiple terminal tabs instead of running sequentially. Added
+`--shard-index`/`--shard-count`: each shard checks a disjoint subset
+(`rows[shard_index::shard_count]`) of the same already-strided report
+list, so no two shards ever duplicate or race on a query. The one-time
+MPC-history fetch resumes from the operator's already-cached checkpoint
+(from the prior `lookup_mpc_observation_history.py` run), so no shard
+re-fetches it over the network — safe to launch all shards at once. 3 new
+tests confirm shards partition the full list with zero overlap. Sharded
+report files are named `scan_report.shard{i}of{n}.json`.
+
+**Next production action (NOT YET DONE)**: run these 4 commands, each in
+its own terminal tab:
+
+```bash
+git checkout -- uv.lock
+git pull origin main
+export PYTHONPATH=src
+```
+
+```bash
+caffeinate -i uv run --python 3.14 python Skills/scan_mpc_history_ztf_coverage.py \
+    --designation 72966 --archive-start-jd 2458273.5 --stride 10 \
+    --shard-index 0 --shard-count 4
+```
+```bash
+caffeinate -i uv run --python 3.14 python Skills/scan_mpc_history_ztf_coverage.py \
+    --designation 72966 --archive-start-jd 2458273.5 --stride 10 \
+    --shard-index 1 --shard-count 4
+```
+```bash
+caffeinate -i uv run --python 3.14 python Skills/scan_mpc_history_ztf_coverage.py \
+    --designation 72966 --archive-start-jd 2458273.5 --stride 10 \
+    --shard-index 2 --shard-count 4
+```
+```bash
+caffeinate -i uv run --python 3.14 python Skills/scan_mpc_history_ztf_coverage.py \
+    --designation 72966 --archive-start-jd 2458273.5 --stride 10 \
+    --shard-index 3 --shard-count 4
+```
+
+Once all 4 tabs complete, read the printed `HIT` lines (or the
+`scan_report.shard{i}of4.json` files) and target
+`Skills/ztf_alert_archive_ingest.py` at the two best resulting real
+nights.
+
+### Handoff state as of 2026-07-02 v33
 
 **First real cross-check of an MPC-confirmed cluster against Gate Z1** —
 only 1 of 4 real MPC-confirmed nights showed ZTF coverage — operator ran

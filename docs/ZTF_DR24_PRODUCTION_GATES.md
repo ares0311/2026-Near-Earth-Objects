@@ -265,25 +265,44 @@ Night 20180713 is the strongest single-night candidate found so far (two
 independent real confirmations), but a second confirmed night is still
 needed.
 
-**Next step (v0.90.44)**: `Skills/scan_mpc_history_ztf_coverage.py`
+**Next step (v0.90.44, parallelized in v0.90.45)**: `Skills/scan_mpc_history_ztf_coverage.py`
 systematically checks a bounded, stride-limited subset of ALL 526 real
 in-window MPC reports against Gate Z1, instead of hand-picking more
-clusters:
+clusters. `--shard-index`/`--shard-count` split the ~53 queries across
+multiple concurrent terminal tabs to cut wall-clock time -- each shard
+checks a disjoint subset of the same strided list, so there is no overlap
+or duplicate querying, and the one-time MPC-history fetch itself resumes
+from the operator's already-cached checkpoint (no re-fetch per shard):
 
 ```bash
 git checkout -- uv.lock
 git pull origin main
 export PYTHONPATH=src
-caffeinate -i uv run --python 3.14 python Skills/scan_mpc_history_ztf_coverage.py \
-    --designation 72966 \
-    --archive-start-jd 2458273.5 --stride 10
 ```
 
-This issues ~53 cheap Gate Z1 metadata queries (1 per 10 real in-window
-MPC reports) at each report's own exact real observed position/date,
-reporting every real night with both an MPC-confirmed detection and real
-ZTF coverage. Target `Skills/ztf_alert_archive_ingest.py` at the two best
-resulting nights (closest in time to each other, to minimize orbit-motion
+Run each of these 4 commands in its own terminal tab:
+
+```bash
+caffeinate -i uv run --python 3.14 python Skills/scan_mpc_history_ztf_coverage.py \
+    --designation 72966 --archive-start-jd 2458273.5 --stride 10 \
+    --shard-index 0 --shard-count 4
+caffeinate -i uv run --python 3.14 python Skills/scan_mpc_history_ztf_coverage.py \
+    --designation 72966 --archive-start-jd 2458273.5 --stride 10 \
+    --shard-index 1 --shard-count 4
+caffeinate -i uv run --python 3.14 python Skills/scan_mpc_history_ztf_coverage.py \
+    --designation 72966 --archive-start-jd 2458273.5 --stride 10 \
+    --shard-index 2 --shard-count 4
+caffeinate -i uv run --python 3.14 python Skills/scan_mpc_history_ztf_coverage.py \
+    --designation 72966 --archive-start-jd 2458273.5 --stride 10 \
+    --shard-index 3 --shard-count 4
+```
+
+Together these issue the same ~53 cheap Gate Z1 metadata queries (1 per
+10 real in-window MPC reports) as the single-process run, at each
+report's own exact real observed position/date, reporting every real
+night with both an MPC-confirmed detection and real ZTF coverage. Target
+`Skills/ztf_alert_archive_ingest.py` at the two best resulting nights
+(closest in time to each other, to minimize orbit-motion
 targeting error) for the Gate Z3 positive control attempt.
 
 The same dump also revealed the packet includes ZTF's own solar-system
