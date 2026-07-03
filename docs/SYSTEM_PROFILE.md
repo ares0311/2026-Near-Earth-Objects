@@ -36,7 +36,7 @@ Prefer these defaults when running project code on this machine:
 
 - Keep default CPU-bound worker counts below full saturation. Start with `12` workers for local batch jobs and increase only after measuring.
 - Keep at least `2` CPU cores free during interactive work.
-- For I/O-heavy work, external-service queries, or live catalog access, use lower concurrency first, usually `4` to `6` workers, because remote service limits and disk throughput can dominate.
+- For I/O-heavy work, external-service queries, or live catalog access, use lower concurrency first, usually `4` to `6` workers, because remote service limits and disk throughput can dominate. This is a conservative **first-batch** starting point, not a permanent ceiling — see "Empirically-Found Concurrency Ceilings" below and the corresponding CLAUDE.md/AGENTS.md standing rule for how to progressively raise it per service once a clean batch establishes headroom.
 - Target peak memory below `48 GB` for routine local runs, leaving about `16 GB` for macOS, browser windows, notebooks, and the editor.
 - Chunk large target or sector sweeps by target, sector, or candidate batch rather than loading all mission data into memory at once.
 - Prefer memory-mapped arrays, columnar files, or streaming reads for large intermediate products.
@@ -49,6 +49,20 @@ Prefer these defaults when running project code on this machine:
   multiprocessing with configurable worker counts. Start from the worker and
   native-thread limits below rather than serial implementations, unless the task
   is too small or determinism requires serial execution.
+
+## Empirically-Found Concurrency Ceilings
+
+Per-service concurrency levels confirmed safe by a real, clean operator
+batch (zero errors, zero rate-limit/429/503 responses, no unusual latency
+degradation) go here, so future sessions start from established ground
+truth instead of re-discovering it from the conservative `4`-`6` default
+every time. Never write an entry here from an assumption — only from a
+real completed batch. A documented rate limit published by the service
+itself always overrides anything recorded here.
+
+| Service | Confirmed safe concurrency | Evidence |
+|---|---|---|
+| *(none recorded yet)* | | |
 
 ---
 
