@@ -689,7 +689,40 @@ bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-02 v31 (CURRENT)
+### Handoff state as of 2026-07-02 v32 (CURRENT)
+
+**MPC observation history for 72966 returned dense real data** ✓ —
+operator ran `Skills/lookup_mpc_observation_history.py`. Real result:
+1332 total MPC-confirmed observations, 526 within the ZTF archive's
+coverage window (JD >= 2458273.5). This is far denser real evidence of
+detection activity than the single `ssnamenr` cross-match that originally
+identified this object. Full evidence:
+`docs/evidence/live/2026-07-02-mpc-observation-history-72966.md`.
+
+**Candidate cluster identified**: a dense real run of 4 report nights in
+July 2018 (20180711, 20180713, 20180714, 20180715, all Dec ~-5, well
+within ZTF's footprint) — a much stronger candidate than prior single-
+night guesses, since MPC independently confirms real detection activity
+across multiple nights here.
+
+**Next production action (NOT YET DONE)**: cross-check this cluster
+against the cheap Gate Z1 ZTF sci-metadata tool before spending bandwidth
+on another multi-GB alert-archive download:
+
+```bash
+git checkout -- uv.lock
+git pull origin main
+export PYTHONPATH=src
+caffeinate -i uv run --python 3.14 python Skills/ztf_dr24_bounded_ingest.py \
+    --ra 225.44 --dec -5.08 --size-deg 2.0 \
+    --start-jd 2458308.5 --end-jd 2458316.5
+```
+
+If this reports >=2 distinct real ZTF nights overlapping the MPC cluster,
+target `Skills/ztf_alert_archive_ingest.py` at those specific real
+nights/positions next.
+
+### Handoff state as of 2026-07-02 v31
 
 **Third real alert-archive attempt (nights 20180809/20180903, the corrected
 pair from targeted ephemeris scanning) came back empty on night 2 again —
