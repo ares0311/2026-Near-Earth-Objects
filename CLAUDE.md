@@ -802,7 +802,40 @@ bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-03 v39 (CURRENT)
+### Handoff state as of 2026-07-03 v40 (CURRENT)
+
+**First real positive-control run: 0 tracklets at default threshold, retry
+with `--min-observations 2` not yet run** — operator ran
+`Skills/run_archive_positive_control.py --nights 20220817 20220819` on
+`main` @ v0.90.49. Real result: 553 real observations loaded (267 + 286),
+all 553 passed preprocessing, `detect()` formed 116 candidates (0 known
+matches), `link()` formed **0 tracklets** at the default
+`min_observations=3`. Not yet conclusive — the same threshold-sensitivity
+finding from v0.90.42 (a genuine 2-night tracklet can be rejected at
+`min_observations=3` if too few of the SAME object's detections land in
+the arc) applies here and must be ruled out before concluding this pair
+does not positively control. Full evidence:
+`docs/evidence/live/2026-07-03-gate-z3-positive-control-first-attempt.md`.
+
+**Next production action (NOT YET DONE)**:
+
+```bash
+git checkout -- uv.lock
+git pull origin main
+export PYTHONPATH=src
+caffeinate -i uv run --python 3.14 python Skills/run_archive_positive_control.py \
+    --nights 20220817 20220819 --min-observations 2 \
+    --out Logs/pipeline_runs/run_archive_positive_control/report_min2.json
+```
+
+If this still reports 0 tracklets, the 116 detect-stage candidates are
+most likely independent real field sources rather than the same object
+observed on both nights (real field crowding in a 2-degree box, not a
+linker defect) — the next escalation would be a tighter sky-box re-ingest
+centered more precisely on the MPC-reported position for this designation,
+not a further linker-threshold change.
+
+### Handoff state as of 2026-07-03 v39
 
 **All 6 parallel-tab nights completed with real results; git-relay manifest
 had a real .gitignore bug that blocked its first live use (v0.90.49)** —
