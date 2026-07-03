@@ -189,6 +189,16 @@ def run_bounded_ingest(
     if "field" in table.colnames:
         fields = {int(v) for v in table["field"]}
 
+    # Map each distinct integer-JD night to its real UTC calendar date
+    # (matching the alert archive's ztf_public_YYYYMMDD.tar.gz naming) so
+    # the operator/next command doesn't have to hand-read the raw IPAC
+    # table to find which real nights had coverage.
+    from astropy.time import Time  # lazy import, matches project convention
+
+    distinct_nights_yyyymmdd = sorted(
+        {Time(jd, format="jd").datetime.strftime("%Y%m%d") for jd in nights}
+    )
+
     raw_hash = hashlib.sha256(raw_text.encode()).hexdigest()
     report = {
         "query": {
@@ -200,6 +210,7 @@ def run_bounded_ingest(
         },
         "n_rows": n_rows,
         "n_distinct_nights": len(nights),
+        "distinct_nights_yyyymmdd": distinct_nights_yyyymmdd,
         "n_distinct_fields": len(fields),
         "raw_response_path": str(raw_path),
         "raw_response_sha256": raw_hash,
@@ -215,6 +226,7 @@ def run_bounded_ingest(
         f"{len(fields)} distinct field(s)  elapsed {_fmt_duration(time.monotonic() - t0)}",
         flush=True,
     )
+    print(f"[ingest] Distinct real nights (YYYYMMDD): {distinct_nights_yyyymmdd}", flush=True)
     print(f"[ingest] Wrote {report_path}", flush=True)
     return report
 

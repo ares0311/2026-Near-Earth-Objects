@@ -77,10 +77,18 @@ this exact sky position. ZTF simply did not point at this field again in
 that window. Blindly trying more individual nights against the multi-GB
 alert archive is no longer justified -- use the metadata tool first.
 
-**Next step**: use `Skills/ztf_dr24_bounded_ingest.py` (Gate Z1, now
-live-verified) with a wider time window at the same sky position to find
-this specific field's true real revisit cadence, before spending any more
-bandwidth on multi-GB alert-archive downloads. Still bounded (`_MAX_WINDOW_DAYS=400`):
+**Update 2026-07-02 (v0.90.38)**: the 100-day-window run above was
+executed live and found a **real second night** -- 14 rows across 2
+distinct nights, 1 field. See
+`docs/evidence/live/2026-07-02-gate-z1-wider-window-second-night.md`. The
+tool's report initially only exposed `n_distinct_nights` as a bare count,
+not which nights -- fixed by adding `distinct_nights_yyyymmdd` (real UTC
+calendar dates, matching the alert archive's `ztf_public_YYYYMMDD.tar.gz`
+naming) to the report, computed from the already-cached raw response with
+no new network call needed.
+
+**Next step**: re-run the identical command (now on v0.90.38+) to read the
+real `distinct_nights_yyyymmdd` list from the cached response:
 
 ```bash
 git pull origin main
@@ -90,17 +98,11 @@ caffeinate -i uv run --python 3.14 python Skills/ztf_dr24_bounded_ingest.py \
     --start-jd 2458339.5 --end-jd 2458439.5
 ```
 
-(100-day window from night 1; well under the 400-day cap.) The report's
-`n_distinct_nights` count and the underlying IPAC table (saved at
-`Logs/pipeline_runs/ztf_dr24_bounded_ingest/<key>/ztf_sci_metadata.ipac`)
-give the real `obsjd` values of every night this field was actually
-imaged -- convert those to `YYYYMMDD` and target `ztf_alert_archive_ingest.py`
-only at nights confirmed to have real coverage, instead of guessing. If
-this field turns out to have very sparse real coverage even over 100 days,
-the next escalation is to run the same metadata query at a different sky
-position (still not guessed -- e.g. a position with a documented denser
-ZTF footprint, or the already Phase-0-verified JPL Horizons/SBDB ephemeris
-for a specific known NEO across dates the archive covers).
+Then target `Skills/ztf_alert_archive_ingest.py --nights <real night 1> <real night 2>`
+(same `--ra 232.6 --dec -8.4 --radius-deg 2.0 --min-rb 0.5`) at exactly
+those two real nights for the Gate Z3 "known-object positive control"
+attempt -- this is the first real, non-guessed pair of nights confirmed to
+both have coverage at this sky position.
 
 Once real per-source `Observation` objects exist for >=2 real nights (the
 ingest tool's checkpoint JSON files under

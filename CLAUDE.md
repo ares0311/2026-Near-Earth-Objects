@@ -656,7 +656,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.37)
+## Current State (v0.90.38)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -689,7 +689,54 @@ bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-02 v24 (CURRENT)
+### Handoff state as of 2026-07-02 v25 (CURRENT)
+
+**Real second night found at the Gate Z3 target field** ✓ — operator ran
+the widened 100-day Gate Z1 metadata query (RA 232.6, Dec -8.4, JD
+2458339.5-2458439.5). Real result: 14 rows across 2 distinct real nights,
+1 field. First real evidence that this field is revisited (just far less
+often than every 3 nights). Evidence:
+`docs/evidence/live/2026-07-02-gate-z1-wider-window-second-night.md`.
+
+**Follow-up fix (v0.90.38)**: the report only exposed `n_distinct_nights`
+as a bare count, not which real nights they were — a real gap blocking
+the very next step (targeting the alert-archive ingest tool at the actual
+second night). Added `distinct_nights_yyyymmdd` to the report, converting
+each `obsjd` to a real UTC calendar date matching the archive's
+`ztf_public_YYYYMMDD.tar.gz` naming convention. Computed from the
+already-cached raw IPAC response on the operator's machine — re-running
+the identical command resumes from checkpoint and re-derives the report
+with **no new network call**. Regression-tested in
+`tests/test_ztf_dr24_bounded_ingest.py` (1 new test, 10 total, all pass).
+
+**Next production action (NOT YET DONE)**: re-run the identical command to
+read the real night-date list, then target the alert-archive ingest tool
+at those two real nights:
+
+```bash
+git pull origin main
+export PYTHONPATH=src
+caffeinate -i uv run --python 3.14 python Skills/ztf_dr24_bounded_ingest.py \
+    --ra 232.6 --dec -8.4 --size-deg 2.0 \
+    --start-jd 2458339.5 --end-jd 2458439.5
+```
+
+Read the printed `[ingest] Distinct real nights (YYYYMMDD): [...]` line,
+then run:
+
+```bash
+caffeinate -i uv run --python 3.14 python Skills/ztf_alert_archive_ingest.py \
+    --nights <night1> <night2> \
+    --ra 232.6 --dec -8.4 --radius-deg 2.0 --min-rb 0.5
+```
+
+substituting the two real dates from the metadata report. This is the
+first real, non-guessed night pair confirmed to both have coverage at this
+sky position — the "known-object positive control" detect.py→link.py
+loader/runner still should not be built until this run produces real
+detections on both nights.
+
+### Handoff state as of 2026-07-02 v24
 
 **Gate Z1 CLOSED — first live run against the real IRSA sci-metadata
 endpoint** ✓ — operator ran `Skills/ztf_dr24_bounded_ingest.py` (RA 232.6,

@@ -77,6 +77,22 @@ def test_run_bounded_ingest_writes_report(tmp_path):
     assert len(report["raw_response_sha256"]) == 64
 
 
+def test_run_bounded_ingest_reports_real_night_dates(tmp_path):
+    """The report must expose which real calendar nights (YYYYMMDD, matching
+    the alert archive's ztf_public_YYYYMMDD.tar.gz naming) had coverage --
+    a bare distinct-night count is not enough to target a follow-up
+    alert-archive ingest run without guessing."""
+    with patch("requests.get", return_value=_FakeResponse(_ipac_response_text(n_rows=2))):
+        report = ztf_dr24_bounded_ingest.run_bounded_ingest(
+            ra=358.3, dec=25.6, size_deg=0.2, start_jd=2460310.5, end_jd=2460312.5, out_dir=tmp_path
+        )
+    # obsjd values 2460310.7 and 2460311.7 in the fixture correspond to real
+    # distinct UTC calendar nights -- confirm both are reported and sorted.
+    assert report["distinct_nights_yyyymmdd"] == sorted(report["distinct_nights_yyyymmdd"])
+    assert len(report["distinct_nights_yyyymmdd"]) == 2
+    assert all(len(d) == 8 and d.isdigit() for d in report["distinct_nights_yyyymmdd"])
+
+
 def test_run_bounded_ingest_resumes_without_network_call(tmp_path):
     """Re-running the identical command must not re-fetch -- it should
     resume from the checkpoint written by the first run."""
