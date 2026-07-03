@@ -43,11 +43,26 @@ re-fetches it over the network):
     caffeinate -i uv run --python 3.14 python Skills/scan_mpc_history_ztf_coverage.py \\
         --designation 72966 --archive-start-jd 2458273.5 --stride 10 \\
         --shard-index 3 --shard-count 4
+
+Each shard, as soon as it finishes, appends one line to a shared
+manifest.jsonl in --out-dir (file-locked, so concurrent shards never
+corrupt each other's entries) -- this can be checked at any time, not
+just after every shard has finished:
+    uv run --python 3.14 python Skills/scan_mpc_history_ztf_coverage.py \\
+        --status --shard-count 4
+
+Once all shard-index tabs above have finished, run this once (fast, no
+network) to combine all shards' manifest entries into one compact block
+that is easy to paste back -- instead of pasting all 4 tabs' full
+transcripts:
+    uv run --python 3.14 python Skills/scan_mpc_history_ztf_coverage.py \\
+        --merge --shard-count 4
 """
 
 from __future__ import annotations
 
 import argparse
+import fcntl
 import importlib.util
 import json
 import sys
@@ -58,6 +73,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 _SKILLS_DIR = Path(__file__).resolve().parent
 _OUT_DIR = Path("Logs/pipeline_runs/scan_mpc_history_ztf_coverage")
+_MANIFEST_NAME = "manifest.jsonl"
 
 
 def _load_skill(name: str):
@@ -74,6 +90,44 @@ def _fmt_duration(seconds: float) -> str:
     """Format elapsed seconds as Mm SSs, per the standing progress-output rule."""
     m, s = divmod(int(seconds), 60)
     return f"{m}m{s:02d}s"
+
+
+def _append_to_manifest(out_dir: Path, entry: dict) -> Path:
+    """Append one shard's completion summary as a JSON line to a shared
+    manifest, so any shard (or the operator/agent) can check overall
+    progress at any time without waiting for every shard to finish.
+    File-locked (fcntl.flock) around the write so concurrent shards
+    finishing at nearly the same moment cannot corrupt or interleave each
+    other's lines -- each shard holds an exclusive lock only for the
+    duration of its own single append."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    manifest_path = out_dir / _MANIFEST_NAME
+    line = json.dumps(entry) + "\n"
+    with open(manifest_path, "a") as f:
+        fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+        try:
+            f.write(line)
+            f.flush()
+        finally:
+            fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+    return manifest_path
+
+
+def _read_manifest(out_dir: Path) -> dict[int, dict]:
+    """Read manifest.jsonl and return the latest entry per shard_index
+    (deduplicated, in case a shard was re-run) -- returns {} if the
+    manifest does not exist yet."""
+    manifest_path = out_dir / _MANIFEST_NAME
+    if not manifest_path.exists():
+        return {}
+    by_shard: dict[int, dict] = {}
+    for line in manifest_path.read_text().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        entry = json.loads(line)
+        by_shard[entry["shard_index"]] = entry
+    return by_shard
 
 
 def run_scan(
@@ -163,7 +217,94 @@ def run_scan(
             flush=True,
         )
     print(f"[scan]{shard_label} Wrote {report_path}", flush=True)
+
+    manifest_path = _append_to_manifest(out_dir, report)
+    print(f"[scan]{shard_label} Updated {manifest_path}", flush=True)
     return report
+
+
+def report_status(out_dir: Path, shard_count: int) -> dict:
+    """Read the shared manifest at any time (even mid-run) and report how
+    many of shard_count shards have reported in so far, which are still
+    missing, and a running combined hit list from the shards that have
+    completed. Never fails closed -- this is an explicitly partial-progress
+    check, unlike merge_shards()."""
+    by_shard = _read_manifest(out_dir)
+    reported = sorted(by_shard)
+    missing = [i for i in range(shard_count) if i not in by_shard]
+    all_hits = sorted(
+        (hit for entry in by_shard.values() for hit in entry["hits"]),
+        key=lambda h: h["jd"],
+    )
+    total_checked = sum(entry["n_reports_checked"] for entry in by_shard.values())
+
+    status = {
+        "shard_count": shard_count,
+        "shards_reported": reported,
+        "shards_missing": missing,
+        "n_reports_checked_so_far": total_checked,
+        "n_reports_with_ztf_coverage_so_far": len(all_hits),
+        "hits_so_far": all_hits,
+    }
+    print(
+        f"[status] {len(reported)}/{shard_count} shard(s) reported in "
+        f"(missing: {missing if missing else 'none'})  "
+        f"{total_checked} MPC report(s) checked so far, "
+        f"{len(all_hits)} with real ZTF coverage so far",
+        flush=True,
+    )
+    for hit in all_hits:
+        print(
+            f"[status]   HIT {hit['night_yyyymmdd']}: RA={hit['ra_deg']:.4f} "
+            f"Dec={hit['dec_deg']:.4f}  ({hit['n_sci_rows']} sci row(s))  jd={hit['jd']:.5f}",
+            flush=True,
+        )
+    return status
+
+
+def merge_shards(out_dir: Path, shard_count: int) -> dict:
+    """Read every shard's entry from the shared manifest and combine them
+    into one final summary -- lets the operator paste a single compact
+    block instead of every shard's full console transcript. Fails closed
+    (raises) if any expected shard hasn't reported in yet, rather than
+    silently reporting partial results as if the scan were complete (use
+    report_status() for an explicitly partial check instead)."""
+    by_shard = _read_manifest(out_dir)
+    missing = [i for i in range(shard_count) if i not in by_shard]
+    if missing:
+        raise FileNotFoundError(
+            f"Cannot merge: {len(missing)}/{shard_count} shard(s) have not "
+            f"reported in yet -- missing shard_index {missing}. Wait for all "
+            f"shards to finish before merging, or use --status for a partial check."
+        )
+
+    all_hits = sorted(
+        (hit for entry in by_shard.values() for hit in entry["hits"]),
+        key=lambda h: h["jd"],
+    )
+    total_checked = sum(by_shard[i]["n_reports_checked"] for i in range(shard_count))
+    merged = {
+        "shard_count": shard_count,
+        "n_reports_checked": total_checked,
+        "n_reports_with_ztf_coverage": len(all_hits),
+        "hits": all_hits,
+    }
+    merged_path = out_dir / "scan_report.merged.json"
+    merged_path.write_text(json.dumps(merged, indent=2))
+
+    print(
+        f"[merge] Combined {shard_count} shard(s): {total_checked} MPC report(s) "
+        f"checked, {len(all_hits)} with real ZTF coverage",
+        flush=True,
+    )
+    for hit in all_hits:
+        print(
+            f"[merge]   HIT {hit['night_yyyymmdd']}: RA={hit['ra_deg']:.4f} "
+            f"Dec={hit['dec_deg']:.4f}  ({hit['n_sci_rows']} sci row(s))  jd={hit['jd']:.5f}",
+            flush=True,
+        )
+    print(f"[merge] Wrote {merged_path}", flush=True)
+    return merged
 
 
 def main() -> None:
@@ -218,12 +359,35 @@ def main() -> None:
         help="Total number of shards for parallel runs (default: 1, no "
         "sharding).",
     )
+    parser.add_argument(
+        "--merge",
+        action="store_true",
+        help="Skip scanning; instead combine every shard's manifest entry "
+        "in --out-dir into one final compact summary (fails closed if any "
+        "shard hasn't reported in yet).",
+    )
+    parser.add_argument(
+        "--status",
+        action="store_true",
+        help="Skip scanning; instead report how many shards have reported "
+        "in to the shared manifest so far, and a running combined hit list "
+        "-- safe to run at any time, even mid-scan, unlike --merge.",
+    )
     args = parser.parse_args()
+
+    if args.shard_count < 1:
+        raise SystemExit("--shard-count must be >= 1")
+
+    if args.merge:
+        merge_shards(args.out_dir, args.shard_count)
+        return
+
+    if args.status:
+        report_status(args.out_dir, args.shard_count)
+        return
 
     if args.stride < 1:
         raise SystemExit("--stride must be >= 1")
-    if args.shard_count < 1:
-        raise SystemExit("--shard-count must be >= 1")
     if not (0 <= args.shard_index < args.shard_count):
         raise SystemExit(
             f"--shard-index must be in [0, {args.shard_count}) for "
