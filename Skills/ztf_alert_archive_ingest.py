@@ -39,6 +39,22 @@ Checkpoint/resume: after each night completes, its kept Observations are
 written to <out-dir>/<night>.json. Re-running the identical command skips
 any night whose checkpoint file already exists.
 
+Cross-machine visibility (fully automatic, no operator git commands and no
+pasting required): every completed night appends a compact (no per-
+observation data) summary line to
+Logs/reports/ztf_alert_archive_ingest_manifest.jsonl -- a path this
+project's .gitignore explicitly does NOT exclude (see the `!Logs/reports/`
+allowlist entry), unlike the rest of Logs/**. At the end of every
+invocation, the script itself commits and pushes just that one manifest
+file (git add/commit/push, with pull-rebase-retry if another concurrent
+tab pushed first) -- the operator does not need to run any git commands.
+Results become readable via a plain `git pull` on the agent side within
+moments of a run finishing. Re-running the same night updates its
+manifest entry (keyed by night) rather than duplicating it. Use --status
+to print recorded nights, or --sync to backfill manifest entries (and
+push them) from checkpoint files already on disk from an earlier run --
+e.g. one started before this auto-push behavior existed.
+
 Usage:
     caffeinate -i uv run --python 3.14 python Skills/ztf_alert_archive_ingest.py \\
         --nights 20180809 20180810 \\
@@ -48,6 +64,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import math
 import sys
@@ -63,6 +80,11 @@ _BACKOFF_SECONDS = (2, 4, 8, 16, 32)
 _OUT_DIR = Path("Logs/pipeline_runs/ztf_alert_archive_ingest")
 _MAX_NIGHTS = 10
 _PROGRESS_EVERY = 500
+# Committed (NOT gitignored) manifest path -- see the module docstring's
+# "Cross-machine visibility" section. Deliberately outside _OUT_DIR, which
+# stays under the gitignored Logs/pipeline_runs/ tree for the (potentially
+# large) full per-observation checkpoint data.
+_MANIFEST_PATH = Path("Logs/reports/ztf_alert_archive_ingest_manifest.jsonl")
 
 # ZTF filter ID -> band letter. Documented in the official ZTF alert schema
 # (confirmed via WebSearch during Phase 0 research, not guessed):
@@ -70,10 +92,110 @@ _PROGRESS_EVERY = 500
 _FID_TO_BAND = {1: "g", 2: "R", 3: "i"}
 
 
+def _append_to_manifest(entry: dict) -> None:
+    """Append one night's compact completion summary (no per-observation
+    data -- that stays local in the gitignored checkpoint) to the shared,
+    committed manifest, file-locked so concurrent tabs finishing near-
+    simultaneously never corrupt or interleave each other's lines. This is
+    the git-relay channel described in the module docstring -- the
+    operator commits and pushes this one file instead of pasting console
+    output from every tab."""
+    _MANIFEST_PATH.parent.mkdir(parents=True, exist_ok=True)
+    line = json.dumps(entry) + "\n"
+    with open(_MANIFEST_PATH, "a") as f:
+        fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+        try:
+            f.write(line)
+            f.flush()
+        finally:
+            fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+
+
+def read_manifest() -> dict[str, dict]:
+    """Read the committed manifest and return the latest entry per night
+    (deduplicated -- re-running a night updates, not duplicates, its
+    entry). Returns {} if the manifest does not exist yet."""
+    if not _MANIFEST_PATH.exists():
+        return {}
+    by_night: dict[str, dict] = {}
+    for line in _MANIFEST_PATH.read_text().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        entry = json.loads(line)
+        by_night[entry["night"]] = entry
+    return by_night
+
+
 def _fmt_duration(seconds: float) -> str:
     """Format elapsed seconds as Mm SSs, per the standing progress-output rule."""
     m, s = divmod(int(seconds), 60)
     return f"{m}m{s:02d}s"
+
+
+def _run_git(args: list[str]) -> tuple[int, str, str]:
+    """Run a git command in the current working directory (the project
+    root, per how this script is documented to be invoked) and return
+    (returncode, stdout, stderr) without raising on a non-zero exit --
+    callers decide what a given exit code means."""
+    import subprocess
+
+    proc = subprocess.run(["git", *args], capture_output=True, text=True)
+    return proc.returncode, proc.stdout, proc.stderr
+
+
+def commit_and_push_manifest() -> bool:
+    """Automatically commit and push ONLY the manifest file -- never any
+    other file -- so results are visible via a plain `git pull` moments
+    after a run finishes, with no operator git commands and no console
+    output to paste. Scoped narrowly: this touches one inert data file,
+    never source code. Retries push with a pull --rebase if another
+    concurrent tab (running the same command in a different terminal tab)
+    already pushed first. Never raises -- a relay failure must not lose or
+    crash real ingest results that are already safely on local disk;
+    instead it prints a clear fallback command for the operator."""
+    if not _MANIFEST_PATH.exists():
+        return False
+
+    rc, _out, err = _run_git(["add", str(_MANIFEST_PATH)])
+    if rc != 0:
+        print(f"[git] add failed: {err.strip()}", flush=True)
+        return False
+
+    rc, _out, _err = _run_git(["diff", "--cached", "--quiet"])
+    if rc == 0:
+        print("[git] manifest unchanged, nothing to commit", flush=True)
+        return True  # already up to date -- not a failure
+
+    rc, _out, err = _run_git(
+        ["commit", "-m", f"Record {_MANIFEST_PATH.name} results (automated)"]
+    )
+    if rc != 0:
+        print(f"[git] commit failed: {err.strip()}", flush=True)
+        return False
+
+    for attempt in range(1, _MAX_ATTEMPTS + 1):
+        rc, _out, err = _run_git(["push"])
+        if rc == 0:
+            print(f"[git] pushed {_MANIFEST_PATH} (attempt {attempt}/{_MAX_ATTEMPTS})", flush=True)
+            return True
+        print(
+            f"[git] push attempt {attempt}/{_MAX_ATTEMPTS} failed "
+            f"(likely a concurrent tab pushed first): {err.strip()}",
+            flush=True,
+        )
+        if attempt < _MAX_ATTEMPTS:
+            rc_pull, _out, err_pull = _run_git(["pull", "--rebase"])
+            if rc_pull != 0:
+                print(f"[git] pull --rebase failed: {err_pull.strip()}", flush=True)
+            time.sleep(_BACKOFF_SECONDS[attempt - 1])
+
+    print(
+        f"[git] Could not push {_MANIFEST_PATH} after {_MAX_ATTEMPTS} attempts. "
+        f"The commit is safe locally -- run `git push` manually when convenient.",
+        flush=True,
+    )
+    return False
 
 
 def _fmt_bytes(n: float) -> str:
@@ -189,6 +311,22 @@ def ingest_one_night(
             f"{state['kept_count']} kept observation(s), skipping",
             flush=True,
         )
+        _append_to_manifest(
+            {
+                "night": night,
+                "scanned_count": state["scanned_count"],
+                "kept_count": state["kept_count"],
+                # Older checkpoints (written before this field existed)
+                # don't store their own ra/dec/radius/min_rb -- fall back to
+                # whatever this invocation was actually passed, which is
+                # real input, not a guess.
+                "ra": state.get("ra", ra),
+                "dec": state.get("dec", dec),
+                "radius_deg": state.get("radius_deg", radius_deg),
+                "min_rb": state.get("min_rb", min_rb),
+                "resumed_from_checkpoint": True,
+            }
+        )
         return state
 
     filename = f"ztf_public_{night}.tar.gz"
@@ -269,13 +407,62 @@ def ingest_one_night(
         "filename": filename,
         "scanned_count": scanned,
         "kept_count": len(kept),
+        "ra": ra,
+        "dec": dec,
+        "radius_deg": radius_deg,
+        "min_rb": min_rb,
         "observations": kept,
     }
     out_dir.mkdir(parents=True, exist_ok=True)
     tmp = checkpoint_path.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(state, indent=2))
     tmp.replace(checkpoint_path)
+
+    _append_to_manifest(
+        {
+            "night": night,
+            "scanned_count": scanned,
+            "kept_count": len(kept),
+            "ra": ra,
+            "dec": dec,
+            "radius_deg": radius_deg,
+            "min_rb": min_rb,
+            "elapsed_seconds": round(elapsed, 2),
+            "resumed_from_checkpoint": False,
+        }
+    )
+    print(f"[ingest] {night}: updated {_MANIFEST_PATH}", flush=True)
     return state
+
+
+def sync_manifest_from_checkpoints(out_dir: Path) -> int:
+    """Backfill manifest entries from checkpoint files already on disk --
+    for nights ingested by an earlier run of this script started before
+    the manifest/auto-push behavior existed (or any other reason the
+    manifest and checkpoints drifted apart). Does not re-download
+    anything; only reads local checkpoint JSON already present. Returns
+    the number of nights (re)synced."""
+    synced = 0
+    for checkpoint_path in sorted(out_dir.glob("*.json")):
+        night = checkpoint_path.stem
+        state = json.loads(checkpoint_path.read_text())
+        print(f"[sync] {night}: found local checkpoint (kept={state['kept_count']})", flush=True)
+        _append_to_manifest(
+            {
+                "night": night,
+                "scanned_count": state["scanned_count"],
+                "kept_count": state["kept_count"],
+                # Fields absent from checkpoints predating this change are
+                # reported as unknown (None) rather than guessed.
+                "ra": state.get("ra"),
+                "dec": state.get("dec"),
+                "radius_deg": state.get("radius_deg"),
+                "min_rb": state.get("min_rb"),
+                "synced_from_existing_checkpoint": True,
+            }
+        )
+        synced += 1
+    return synced
 
 
 def main() -> None:
@@ -288,8 +475,9 @@ def main() -> None:
     parser.add_argument(
         "--nights",
         nargs="+",
-        required=True,
-        help=f"Explicit list of UTC nights to ingest, YYYYMMDD (max {_MAX_NIGHTS}).",
+        default=None,
+        help=f"Explicit list of UTC nights to ingest, YYYYMMDD (max {_MAX_NIGHTS}). "
+        "Required unless --status is passed.",
     )
     parser.add_argument(
         "--out-dir",
@@ -311,8 +499,52 @@ def main() -> None:
         default=5000,
         help="Safety cap on kept observations per night (default: 5000).",
     )
+    parser.add_argument(
+        "--status",
+        action="store_true",
+        help="Skip ingesting; instead print every night recorded in the "
+        "committed manifest (Logs/reports/ztf_alert_archive_ingest_manifest.jsonl) "
+        "-- run `git pull` first, then this, instead of pasting console "
+        "output from concurrent tabs. --nights is ignored in this mode.",
+    )
+    parser.add_argument(
+        "--sync",
+        action="store_true",
+        help="Skip ingesting; instead backfill manifest entries (and push "
+        "them) from checkpoint files already on --out-dir, e.g. from a run "
+        "started before the auto-push behavior existed. --nights is "
+        "ignored in this mode.",
+    )
     args = parser.parse_args()
 
+    if args.status:
+        by_night = read_manifest()
+        if not by_night:
+            print(
+                f"[status] {_MANIFEST_PATH} does not exist yet -- no nights recorded.",
+                flush=True,
+            )
+            return
+        print(f"[status] {len(by_night)} night(s) recorded in {_MANIFEST_PATH}:", flush=True)
+        for night in sorted(by_night):
+            entry = by_night[night]
+            print(
+                f"[status]   {night}: kept={entry['kept_count']} "
+                f"scanned={entry['scanned_count']} "
+                f"RA={entry.get('ra')} Dec={entry.get('dec')} "
+                f"radius_deg={entry.get('radius_deg')} min_rb={entry.get('min_rb')}",
+                flush=True,
+            )
+        return
+
+    if args.sync:
+        synced = sync_manifest_from_checkpoints(args.out_dir)
+        print(f"[sync] Backfilled {synced} night(s) from {args.out_dir}", flush=True)
+        commit_and_push_manifest()
+        return
+
+    if not args.nights:
+        raise SystemExit("--nights is required unless --status/--sync is passed")
     if len(args.nights) > _MAX_NIGHTS:
         raise SystemExit(f"--nights accepts at most {_MAX_NIGHTS} nights, got {len(args.nights)}")
 
@@ -333,6 +565,7 @@ def main() -> None:
     print(f"nights_ingested: {len(args.nights)}")
     print(f"total_kept_observations: {total_kept}")
     print(f"out_dir: {args.out_dir}")
+    commit_and_push_manifest()
 
 
 if __name__ == "__main__":

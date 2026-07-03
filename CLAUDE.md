@@ -166,6 +166,38 @@ If the highest-priority T1 gap cannot be resolved because a human blocker is unr
   This turns a batch of parallel terminal tabs into one thing the operator
   can check on and paste a single compact summary from, instead of
   collecting and pasting every tab's full transcript.
+- **The shared manifest must live in a committed path and be pushed automatically — git is the relay, not the operator's filesystem**:
+  A local manifest file (per the rule above) alone does not solve the
+  "avoid pasting console output" problem, because the coding agent has no
+  access to the operator's local filesystem or terminal — only to what is
+  pushed to the shared GitHub remote. Per the operator's explicit
+  correction ("You don't need access to my Mac... the whole point is for
+  you to know automatically"), any Skills script with a shared manifest
+  must:
+  1. **Write the manifest to a committed path**, not the gitignored
+     `Logs/**` tree — `Logs/reports/` is already allowlisted in
+     `.gitignore` for exactly this. Keep any large/sensitive per-item
+     payload (e.g. full observation lists) in the separate gitignored
+     checkpoint as before; the manifest itself should be a compact summary
+     only.
+  2. **Have the script itself commit and push the manifest** at the end of
+     every invocation (`git add <manifest> && git commit && git push`,
+     using the manifest's own file lock to stay safe under concurrent
+     tabs), so the coding agent can read real results via a plain
+     `git pull` with no operator git commands and no pasted console output.
+     Retry push with `git pull --rebase` on conflict (another concurrent
+     tab pushing first); never raise on final failure — the underlying
+     work is already safe on local disk, so print a manual fallback
+     command instead of crashing the run.
+  3. **Scope the auto-push narrowly**: only ever add/commit the one
+     manifest file, never source code or other paths — this is a
+     deliberate, explicit exception to the normal PR-review workflow
+     used for all code changes, justified only because the payload is an
+     inert data/evidence file, not code.
+  4. **Provide a `--sync` backfill** for manifest entries that predate
+     this behavior (e.g. checkpoints from a run started before the
+     feature existed) — read local checkpoints already on disk and
+     manifest+push them without re-doing the underlying work.
 - **Persist operator command results immediately — no re-run loops**:
   Every time the operator runs a command at your direction and pastes the output,
   you MUST, in the same turn, commit a durable record before replying with the
@@ -710,7 +742,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.47)
+## Current State (v0.90.48)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -743,7 +775,44 @@ bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-02 v37 (CURRENT)
+### Handoff state as of 2026-07-02 v38 (CURRENT)
+
+**Automatic git-relay manifest added to `ztf_alert_archive_ingest.py`
+(v0.90.48)** — operator ran 6 concurrent tabs (3 candidate night pairs)
+and correctly pointed out that pasting console output from 6 tabs is
+exactly the fragile process we were trying to eliminate, and that this
+tool should have had the same git-relay pattern already built for
+`scan_mpc_history_ztf_coverage.py`. Two corrections along the way:
+(1) the manifest must live in a **committed** path (`Logs/reports/`,
+already allowlisted in `.gitignore`) and the script must **auto-commit
+and push it itself** — a local-only manifest still requires either
+filesystem access I don't have or manual pasting, neither of which
+solves the actual problem; (2) git, not the operator's filesystem, is the
+real communication channel.
+
+Every completed night now appends to
+`Logs/reports/ztf_alert_archive_ingest_manifest.jsonl` and the script
+auto-pushes it (retry with `pull --rebase` on conflict). New `--status`
+(read manifest) and `--sync` (backfill from checkpoints already on disk,
+for runs started before this existed — exactly the 6 tabs currently
+running) flags. 9 new tests, 14 total, all passing offline.
+
+**Next production action (NOT YET DONE)**: once the 6 currently-running
+tabs finish (they used the pre-manifest version, so they won't auto-push)
+and this PR is merged, run `--sync` once to backfill and push all 6
+results without re-downloading anything:
+
+```bash
+git checkout -- uv.lock
+git pull origin main
+export PYTHONPATH=src
+uv run --python 3.14 python Skills/ztf_alert_archive_ingest.py --sync
+```
+
+Then I read the results via `git pull` directly — no pasting needed from
+this point forward for this tool.
+
+### Handoff state as of 2026-07-02 v37
 
 **Full systematic MPC-history scan found 30 real hits** ✓ — operator ran
 the (pre-sharding, sequential) `Skills/scan_mpc_history_ztf_coverage.py`

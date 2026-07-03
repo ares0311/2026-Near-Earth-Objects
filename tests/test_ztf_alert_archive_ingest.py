@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import gzip
 import io
+import json
 import sys
 import tarfile
 from pathlib import Path
@@ -112,6 +113,15 @@ def _patch_requests(monkeypatch, data: bytes):
     monkeypatch.setattr(
         ingest.requests, "get", lambda url, timeout=60, stream=True: _FakeStreamResp(data)
     )
+
+
+@pytest.fixture(autouse=True)
+def _isolate_manifest(tmp_path, monkeypatch):
+    """Every test must write to an isolated manifest path, never the real
+    committed Logs/reports/ztf_alert_archive_ingest_manifest.jsonl -- that
+    file is meant to be populated by real operator runs and committed to
+    git, not polluted by test runs."""
+    monkeypatch.setattr(ingest, "_MANIFEST_PATH", tmp_path / "isolated_manifest.jsonl")
 
 
 class TestProgressFiresRegardlessOfFilter:
@@ -218,3 +228,176 @@ class TestCheckpointResume:
 
         assert "[resume]" in captured.out
         assert state["kept_count"] == 1
+
+
+class TestManifest:
+    """Regression coverage for the git-relay manifest: the operator's
+    complaint was that pasting console output from concurrent tabs is
+    fragile. Every completed night must append to a committed (not
+    gitignored) manifest so results are readable via `git pull` alone."""
+
+    def test_fresh_ingest_appends_manifest_entry(self, tmp_path, monkeypatch):
+        records = [(5001, _candidate(ra=257.0809, dec=-10.7456))]
+        data = _build_fake_tar_gz(records)
+        _patch_requests(monkeypatch, data)
+
+        ingest.ingest_one_night(
+            "20220817", tmp_path, min_rb=0.5, ra=257.0809, dec=-10.7456,
+            radius_deg=2.0, max_per_night=5000,
+        )
+
+        by_night = ingest.read_manifest()
+        assert "20220817" in by_night
+        assert by_night["20220817"]["kept_count"] == 1
+        assert by_night["20220817"]["ra"] == 257.0809
+        assert by_night["20220817"]["resumed_from_checkpoint"] is False
+
+    def test_resume_also_appends_manifest_entry(self, tmp_path, monkeypatch):
+        records = [(5002, _candidate())]
+        data = _build_fake_tar_gz(records)
+        _patch_requests(monkeypatch, data)
+
+        ingest.ingest_one_night(
+            "20220819", tmp_path, min_rb=0.5, ra=257.5497, dec=-10.9843,
+            radius_deg=2.0, max_per_night=5000,
+        )
+        # Second call resumes from checkpoint (no network) but must still
+        # record a manifest entry -- this is exactly the case that matters
+        # for a tab that finished, got its manifest entry, and is re-run.
+        ingest.ingest_one_night(
+            "20220819", tmp_path, min_rb=0.5, ra=257.5497, dec=-10.9843,
+            radius_deg=2.0, max_per_night=5000,
+        )
+
+        by_night = ingest.read_manifest()
+        assert by_night["20220819"]["resumed_from_checkpoint"] is True
+        # Re-running must replace, not duplicate, the manifest entry.
+        assert len(ingest._MANIFEST_PATH.read_text().splitlines()) == 2
+
+    def test_state_persists_query_params_for_future_sync(self, tmp_path, monkeypatch):
+        """The checkpoint itself must store ra/dec/radius/min_rb so a later
+        --sync backfill (for checkpoints from a run that predates this
+        feature) can report real values instead of unknown/guessed ones
+        for any run made after this change."""
+        records = [(5003, _candidate())]
+        data = _build_fake_tar_gz(records)
+        _patch_requests(monkeypatch, data)
+
+        state = ingest.ingest_one_night(
+            "20220820", tmp_path, min_rb=0.5, ra=1.0, dec=2.0, radius_deg=3.0, max_per_night=5000
+        )
+        assert state["ra"] == 1.0
+        assert state["dec"] == 2.0
+        assert state["radius_deg"] == 3.0
+        assert state["min_rb"] == 0.5
+
+
+class TestSync:
+    def test_sync_backfills_from_existing_checkpoints(self, tmp_path, monkeypatch):
+        # Simulate a checkpoint written by an older version of this script,
+        # before ra/dec/radius/min_rb were persisted into the state dict.
+        old_style_state = {
+            "night": "20180809",
+            "filename": "ztf_public_20180809.tar.gz",
+            "scanned_count": 715,
+            "kept_count": 21,
+            "observations": [],
+        }
+        (tmp_path / "20180809.json").write_text(json.dumps(old_style_state))
+        monkeypatch.setattr(ingest, "commit_and_push_manifest", lambda: True)
+
+        synced = ingest.sync_manifest_from_checkpoints(tmp_path)
+
+        assert synced == 1
+        by_night = ingest.read_manifest()
+        assert by_night["20180809"]["kept_count"] == 21
+        # Fields absent from the old-style checkpoint are reported as
+        # unknown (None), never guessed.
+        assert by_night["20180809"]["ra"] is None
+
+    def test_sync_reports_zero_for_empty_out_dir(self, tmp_path):
+        assert ingest.sync_manifest_from_checkpoints(tmp_path) == 0
+
+
+class TestCommitAndPushManifest:
+    def test_returns_false_when_manifest_does_not_exist(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(ingest, "_MANIFEST_PATH", tmp_path / "nonexistent.jsonl")
+        assert ingest.commit_and_push_manifest() is False
+
+    def test_skips_commit_when_nothing_changed(self, monkeypatch):
+        calls = []
+
+        def fake_run_git(args):
+            calls.append(args)
+            if args[0] == "diff":
+                return 0, "", ""  # exit 0 == nothing staged
+            return 0, "", ""
+
+        monkeypatch.setattr(ingest, "_run_git", fake_run_git)
+        ingest._MANIFEST_PATH.parent.mkdir(parents=True, exist_ok=True)
+        ingest._MANIFEST_PATH.write_text('{"night": "x"}\n')
+        try:
+            result = ingest.commit_and_push_manifest()
+        finally:
+            ingest._MANIFEST_PATH.unlink(missing_ok=True)
+
+        assert result is True
+        # Check the git subcommand itself (args[0]), not a substring search
+        # across the full joined command -- the isolated tmp_path used by
+        # other tests can legitimately contain "commit" as a substring
+        # (it's derived from this test's own function name).
+        assert all(c[0] != "commit" for c in calls)
+
+    def test_retries_push_after_pull_rebase_on_conflict(self, tmp_path, monkeypatch):
+        manifest = tmp_path / "manifest.jsonl"
+        manifest.write_text('{"night": "x"}\n')
+        monkeypatch.setattr(ingest, "_MANIFEST_PATH", manifest)
+        monkeypatch.setattr(ingest, "_BACKOFF_SECONDS", (0, 0, 0, 0, 0))  # no real sleep in tests
+
+        push_attempts = []
+
+        def fake_run_git(args):
+            if args[0] == "add":
+                return 0, "", ""
+            if args[0] == "diff":
+                return 1, "", ""  # exit 1 == changes staged
+            if args[0] == "commit":
+                return 0, "", ""
+            if args[0] == "push":
+                push_attempts.append(1)
+                if len(push_attempts) < 2:
+                    return 1, "", "! [rejected] (fetch first)"
+                return 0, "", ""
+            if args[0] == "pull":
+                return 0, "", ""
+            raise AssertionError(f"unexpected git command: {args}")
+
+        monkeypatch.setattr(ingest, "_run_git", fake_run_git)
+        result = ingest.commit_and_push_manifest()
+
+        assert result is True
+        assert len(push_attempts) == 2
+
+    def test_gives_up_after_max_attempts_without_raising(self, tmp_path, monkeypatch):
+        manifest = tmp_path / "manifest.jsonl"
+        manifest.write_text('{"night": "x"}\n')
+        monkeypatch.setattr(ingest, "_MANIFEST_PATH", manifest)
+        monkeypatch.setattr(ingest, "_BACKOFF_SECONDS", (0, 0, 0, 0, 0))
+
+        def fake_run_git(args):
+            if args[0] == "add":
+                return 0, "", ""
+            if args[0] == "diff":
+                return 1, "", ""
+            if args[0] == "commit":
+                return 0, "", ""
+            if args[0] == "push":
+                return 1, "", "! [rejected]"
+            if args[0] == "pull":
+                return 0, "", ""
+            raise AssertionError(f"unexpected git command: {args}")
+
+        monkeypatch.setattr(ingest, "_run_git", fake_run_git)
+        result = ingest.commit_and_push_manifest()  # must not raise
+
+        assert result is False

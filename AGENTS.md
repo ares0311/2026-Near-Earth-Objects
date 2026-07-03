@@ -89,6 +89,16 @@ It contains the facts a coding agent needs to work productively without re-readi
   fail closed if any expected shard has not reported in. Re-running a
   shard replaces, not duplicates, its manifest entry. See CLAUDE.md's
   Standing Rules for the full implementation checklist.
+- **The manifest must live in a committed path and be auto-pushed — git is the relay, not the operator's filesystem**:
+  A local-only manifest does not solve "avoid pasting console output"
+  because the agent has no access to the operator's machine, only to what
+  is pushed to GitHub. Write manifests to `Logs/reports/` (already
+  allowlisted in `.gitignore`, unlike the rest of `Logs/**`), and have the
+  script itself `git add`/`commit`/`push` just that one file at the end of
+  every invocation (retry with `pull --rebase` on conflict, never raise on
+  final failure). Scope the auto-push narrowly to that one data file only,
+  never source code. Provide `--sync` to backfill from checkpoints
+  predating this behavior. See CLAUDE.md's Standing Rules for detail.
 
 ---
 
