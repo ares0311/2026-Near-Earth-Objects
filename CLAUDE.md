@@ -769,7 +769,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.48)
+## Current State (v0.90.49)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -802,7 +802,52 @@ bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-02 v38 (CURRENT)
+### Handoff state as of 2026-07-03 v39 (CURRENT)
+
+**All 6 parallel-tab nights completed with real results; git-relay manifest
+had a real .gitignore bug that blocked its first live use (v0.90.49)** —
+the 6-night batch (20220817, 20220819, 20191005, 20191008, 20210106,
+20210111) all completed and were relayed via console paste since they ran
+on `main` @ v0.90.47, before the git-relay auto-push existed. Operator then
+upgraded to v0.90.48 and ran `--sync` to backfill the manifest from the
+11 checkpoints already on disk (6 new + 5 from earlier sessions) — this
+independently reproduced the same `kept` counts from the pasted transcripts,
+confirming they're real. **Real result**: night 20220817 kept 267, night
+20220819 kept 286 — the first time this project has substantial real
+per-source detections on both nights of a candidate pair (2 days apart).
+Secondary pair 20210106/20210111 also positive (272/177 kept). 20191005 and
+20191008 were real negatives (0 kept on both). Full evidence:
+`docs/evidence/live/2026-07-03-gate-z3-six-tab-batch-results.md`.
+
+**Real bug found on first live use of `--sync`**: `git add` on the manifest
+failed with "ignored by .gitignore". Root cause: `.gitignore`'s
+`!Logs/reports/` only un-ignores the directory entry itself; `Logs/**`
+still matched every file inside it except the one pre-existing explicit
+`.gitkeep` exception, so the new manifest file was never actually
+committable. Fixed in v0.90.49 by widening to `!Logs/reports/**`. The
+auto-commit-and-push code path added in v0.90.48 had never actually been
+exercised until this real run — it should work end-to-end on the next
+invocation now that the underlying `.gitignore` bug is fixed.
+
+**Next production action (NOT YET DONE)**: once this PR merges, run the
+Gate Z3 "known-object positive control" against the strongest real pair:
+
+```bash
+git checkout -- uv.lock
+git pull origin main
+export PYTHONPATH=src
+caffeinate -i uv run --python 3.14 python Skills/run_archive_positive_control.py \
+    --nights 20220817 20220819 \
+    --out Logs/pipeline_runs/run_archive_positive_control/report.json
+```
+
+If this reports zero tracklets, re-run with `--min-observations 2` (per the
+v0.90.42 finding that the linker's default `min_observations=3` can reject
+a genuine short-per-night tracklet — real archived data here has far more
+observations per night than the synthetic case that finding was based on,
+so this is a fallback, not the expected outcome).
+
+### Handoff state as of 2026-07-02 v38
 
 **Automatic git-relay manifest added to `ztf_alert_archive_ingest.py`
 (v0.90.48)** — operator ran 6 concurrent tabs (3 candidate night pairs)
