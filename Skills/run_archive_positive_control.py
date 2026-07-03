@@ -136,6 +136,7 @@ def run_positive_control(
     tracklet_summaries = []
     for trk in link_result.tracklets:
         nights_in_trk = sorted({int(o.jd - 0.5) for o in trk.observations})
+        obs_sorted = sorted(trk.observations, key=lambda o: o.jd)
         tracklet_summaries.append(
             {
                 "object_id": trk.object_id,
@@ -143,6 +144,16 @@ def run_positive_control(
                 "n_nights": len(nights_in_trk),
                 "arc_days": trk.arc_days,
                 "motion_rate_arcsec_per_hour": trk.motion_rate_arcsec_per_hour,
+                "motion_pa_degrees": trk.motion_pa_degrees,
+                # Per-observation RA/Dec/JD so a positive control can be checked
+                # against a known object's real reported position, not just
+                # accepted on tracklet count alone -- a broad rate window
+                # (0.05-60 arcsec/hr) with min_observations=2 has no orbit-
+                # consistency check to reject spurious cross-night pairs in a
+                # crowded field, so tracklet count alone is not confirmation.
+                "observations": [
+                    {"ra_deg": o.ra_deg, "dec_deg": o.dec_deg, "jd": o.jd} for o in obs_sorted
+                ],
             }
         )
         print(
