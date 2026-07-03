@@ -717,7 +717,48 @@ bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-02 v36 (CURRENT)
+### Handoff state as of 2026-07-02 v37 (CURRENT)
+
+**Full systematic MPC-history scan found 30 real hits** ✓ — operator ran
+the (pre-sharding, sequential) `Skills/scan_mpc_history_ztf_coverage.py`
+to full completion (53/53 checked, ~12 min). Real result: **30 of 53**
+checked MPC reports had real ZTF sci-exposure coverage at their exact
+position/date — far richer than the earlier hand-picked cluster (1/4).
+Full evidence:
+`docs/evidence/live/2026-07-02-gate-z3-full-mpc-scan-30-hits.md`.
+
+**Selected target pair**: **20220817 and 20220819** (RA 257.08/Dec
+-10.75 and RA 257.55/Dec -10.98) — only 2 real days apart, both with
+substantial independent real sci coverage (16 and 24 rows), both
+independently MPC-confirmed. Strongest candidate pair found so far.
+
+**Next production action (NOT YET DONE)**:
+
+```bash
+git checkout -- uv.lock
+git pull origin main
+export PYTHONPATH=src
+caffeinate -i uv run --python 3.14 python Skills/ztf_alert_archive_ingest.py \
+    --nights 20220817 \
+    --ra 257.0809 --dec -10.7456 --radius-deg 2.0 --min-rb 0.5
+caffeinate -i uv run --python 3.14 python Skills/ztf_alert_archive_ingest.py \
+    --nights 20220819 \
+    --ra 257.5497 --dec -10.9843 --radius-deg 2.0 --min-rb 0.5
+```
+
+If both yield >=1 kept observation, run:
+
+```bash
+caffeinate -i uv run --python 3.14 python Skills/run_archive_positive_control.py \
+    --nights 20220817 20220819 \
+    --out Logs/pipeline_runs/run_archive_positive_control/report.json
+```
+
+Backup candidates if this pair fails: 20191005/20191008 (3 days apart,
+30/24 sci rows) or 20220626/20220628 (2 days apart, but night 2 only has
+2 sci rows — riskier).
+
+### Handoff state as of 2026-07-02 v36
 
 **Live-updating manifest added per operator request (v0.90.47)** —
 operator asked for something "like when a pull request merges": each
