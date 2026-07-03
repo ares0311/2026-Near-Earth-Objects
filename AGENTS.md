@@ -67,6 +67,17 @@ It contains the facts a coding agent needs to work productively without re-readi
   rules. Before committing, inspect `git status --short`, the staged filename
   list, and ignore behavior for generated outputs; if `git add .` would capture
   local run debris, fix `.gitignore` and untrack it before committing.
+- **Parallel/sharded Skills scripts must write a live-updating shared manifest**:
+  Any Skills script supporting concurrent operator-launched processes
+  (e.g. `--shard-index`/`--shard-count` for parallel terminal tabs) must
+  have every process append its completion summary to one shared,
+  file-locked manifest (e.g. `manifest.jsonl`) the moment it finishes —
+  not only write an isolated per-process report. Provide a `--status`
+  check that is safe to run at any time (never fails closed on
+  incomplete progress) and a separate `--merge`/finalize check that does
+  fail closed if any expected shard has not reported in. Re-running a
+  shard replaces, not duplicates, its manifest entry. See CLAUDE.md's
+  Standing Rules for the full implementation checklist.
 
 ---
 

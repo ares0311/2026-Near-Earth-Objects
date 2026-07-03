@@ -112,6 +112,34 @@ If the highest-priority T1 gap cannot be resolved because a human blocker is unr
   4. **Wrap all network fetch calls in a retry loop** with exponential backoff: 2 s, 4 s, 8 s, 16 s, 32 s (max 5 attempts). Catch `(ConnectionError, TimeoutError, OSError)`. Print the error and retry count on each failure. Raise after the final attempt.
   5. **The operator must never need to edit the command** to resume — re-running the identical command is the only required action after a sleep/wake or network interruption.
   This is the System Directive standard. Scripts that do not meet it are incomplete.
+- **Parallel/sharded Skills scripts must write a live-updating shared manifest, not just an isolated per-process report**:
+  Any Skills script that supports splitting its work across multiple
+  operator-launched concurrent processes (e.g. `--shard-index`/`--shard-count`
+  for parallel terminal tabs) must, per the operator's explicit direction
+  ("like when a pull request merges"), have every process append its
+  completion summary to one shared manifest file the moment it finishes —
+  not only write its own isolated report file. The implementation rules are:
+  1. **Append, don't overwrite.** Use a shared append-only file (e.g.
+     `manifest.jsonl`, one JSON line per completed process/shard) so
+     partial progress is visible before every process finishes.
+  2. **Lock the append.** Wrap each write in a file lock (e.g. `fcntl.flock`
+     on POSIX) so two processes finishing near-simultaneously can never
+     corrupt or interleave each other's entries.
+  3. **Provide a `--status` check that never fails closed.** It must be
+     safe to run at any time, including mid-run with some shards still
+     outstanding, and must report which shards have/haven't reported in
+     plus a running combined result — never raise just because the run is
+     incomplete.
+  4. **Provide a `--merge`/finalize check that does fail closed.** Once the
+     operator believes all shards are done, a separate command combines
+     every entry into one final result and must raise if any expected
+     shard has not reported in, rather than silently treating partial
+     results as complete.
+  5. **Re-running the same shard must replace, not duplicate, its entry**
+     (key manifest entries by shard index, not by append order).
+  This turns a batch of parallel terminal tabs into one thing the operator
+  can check on and paste a single compact summary from, instead of
+  collecting and pasting every tab's full transcript.
 - **Persist operator command results immediately — no re-run loops**:
   Every time the operator runs a command at your direction and pastes the output,
   you MUST, in the same turn, commit a durable record before replying with the
