@@ -3,6 +3,25 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.38 — Expose real night dates from Gate Z1 metadata report (2026-07-02)
+
+### Added
+- `Skills/ztf_dr24_bounded_ingest.py`: report now includes
+  `distinct_nights_yyyymmdd`, converting each real `obsjd` value to a UTC
+  calendar date matching the alert archive's `ztf_public_YYYYMMDD.tar.gz`
+  naming. Previously only a bare `n_distinct_nights` count was exposed,
+  which blocked identifying which real night to target for a Gate Z3
+  alert-archive ingest follow-up. Computed from the already-cached raw
+  IPAC response -- no new network call needed for an identical re-run.
+- `tests/test_ztf_dr24_bounded_ingest.py`: 1 new regression test asserting
+  the report exposes sorted, correctly-formatted real night dates.
+
+### Evidence
+- Operator's widened 100-day Gate Z1 metadata query (RA 232.6, Dec -8.4)
+  found a real second night at the Gate Z3 target field: 14 rows across 2
+  distinct nights, 1 field. See
+  `docs/evidence/live/2026-07-02-gate-z1-wider-window-second-night.md`.
+
 ## v0.90.37 — Gate Z1 closed; Gate Z3 root cause confirmed via real metadata (2026-07-02)
 
 ### Changed
