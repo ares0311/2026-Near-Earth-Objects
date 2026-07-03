@@ -3,6 +3,37 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.48 — Automatic git-relay manifest for ztf_alert_archive_ingest.py (2026-07-02)
+
+### Added
+- `Skills/ztf_alert_archive_ingest.py`: every completed night now appends
+  a compact (no per-observation data) summary to
+  `Logs/reports/ztf_alert_archive_ingest_manifest.jsonl` -- a path this
+  project's `.gitignore` explicitly does not exclude (unlike the rest of
+  `Logs/**`) -- and the script itself commits and pushes just that one
+  file at the end of every invocation, with pull-rebase-retry if a
+  concurrent tab pushed first. No operator git commands and no pasted
+  console output required; results become readable via a plain `git pull`
+  on the agent side moments after a run finishes.
+- New `--status` flag prints every night recorded in the manifest.
+- New `--sync` flag backfills manifest entries (and pushes them) from
+  checkpoint files already on disk from an earlier run -- e.g. one
+  started before this auto-push behavior existed. Checkpoints now also
+  persist their own `ra`/`dec`/`radius_deg`/`min_rb`, so future syncs are
+  self-describing; older checkpoints report those fields as unknown
+  (`None`) rather than guessed.
+- 9 new tests covering manifest append (fresh + resume), state
+  persistence, `--sync` backfill, and `commit_and_push_manifest()`'s
+  skip/retry/give-up-without-raising behavior (14 total, all offline/mocked).
+
+### Note
+- This is a deliberate, narrowly-scoped exception to this project's usual
+  PR-review workflow: the script pushes directly to whatever branch is
+  checked out (normally `main`, per the operator-always-runs-from-main
+  rule), but only ever touches this one inert JSONL summary file, never
+  source code. Added at the operator's explicit request after observing
+  that pasting console output from multiple concurrent tabs is fragile.
+
 ## v0.90.47 — Live-updating manifest and status check for sharded scan (2026-07-02)
 
 ### Added
