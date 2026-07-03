@@ -689,7 +689,45 @@ bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-02 v22 (CURRENT)
+### Handoff state as of 2026-07-02 v23 (CURRENT)
+
+**First live run of the Gate Z3 ingest tool — real archive data obtained** ✓
+— operator ran the (pre-v0.90.36) ingest command against real nights
+20180809/20180810. Results: night 20180809 (31.0MiB, 715 real packets)
+scanned in 3s, kept 21 real observations inside the 2-degree sky box with
+`rb >= 0.5`; night 20180810 (5.3GiB, 119,815 real packets) scanned in
+4m47s, kept 0 — no revisit of the same sky patch that night. This is a
+legitimate negative, not a bug: ZTF's documented cadence is ~3 nights per
+field, not nightly. Full evidence:
+`docs/evidence/live/2026-07-02-ztf-alert-archive-ingest-first-live-run.md`.
+
+This run also produced **live confirmation** of the progress-silence bug
+fixed in v0.90.36 (PR #173, merged): the 4m47s/119,815-record scan of night
+2 printed zero progress lines, exactly matching the defect diagnosed from
+code inspection alone before this run. No further action needed on that
+fix — it is already merged and regression-tested.
+
+`docs/ZTF_DR24_PRODUCTION_GATES.md`'s Gate Z3 row and "Next Coding Step"
+updated: the ingest tool is now confirmed working against the real
+archive; the ONLY remaining Z3 blocker is finding 2 real nights with
+detections in the same sky box so `src/link.py` has cross-night pairs.
+
+**Next production action (NOT YET DONE)**: retry with a night spaced by
+ZTF's actual ~3-night cadence instead of night+1, same sky box:
+
+```bash
+git pull origin main
+export PYTHONPATH=src
+caffeinate -i uv run --python 3.14 python Skills/ztf_alert_archive_ingest.py \
+    --nights 20180809 20180812 \
+    --ra 232.6 --dec -8.4 --radius-deg 2.0 --min-rb 0.5
+```
+
+Do not build the detect.py -> link.py loader/runner for the "known-object
+positive control" until a run produces real detections on >=2 nights in
+the same sky box — there is nothing to link otherwise.
+
+### Handoff state as of 2026-07-02 v22
 
 **System Directive compliance fix for the Gate Z3 ingest tool (v0.90.36)** —
 operator flagged before running v0.90.35's `Skills/ztf_alert_archive_ingest.py`
