@@ -656,7 +656,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.42)
+## Current State (v0.90.43)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -689,7 +689,59 @@ bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-02 v30 (CURRENT)
+### Handoff state as of 2026-07-02 v31 (CURRENT)
+
+**Third real alert-archive attempt (nights 20180809/20180903, the corrected
+pair from targeted ephemeris scanning) came back empty on night 2 again —
+real negative, root cause diagnosed** — night 20180903 downloaded 8.5GiB,
+scanned 193,223 real packets over 8m36s with correct progress/ETA, but
+kept 0, despite Gate Z1 confirming 6 real sci exposure rows at this exact
+position that night. **Root cause**: a real science exposure existing
+confirms only that ZTF pointed a camera there — not that a real alert
+(`rb >= 0.5` difference-image detection) was generated at that specific
+sub-position. "Was the sky imaged" and "did a real alert fire" are
+different questions; Gate Z1's metadata check only answers the first.
+Full evidence:
+`docs/evidence/live/2026-07-02-ztf-alert-archive-ingest-third-attempt.md`.
+
+**Pivot (v0.90.43)**: `Skills/lookup_mpc_observation_history.py` queries a
+categorically stronger signal — MPC's own confirmed observation history
+(`src/fetch.py:fetch_mpc_observations`, already Phase-0-verified
+production code, 100% covered). A real MPC-reported observation means a
+real alert-equivalent detection genuinely happened and was credible
+enough to be submitted and accepted by the community, not just that the
+sky was imaged. Wraps the fetch call in its own retry-with-backoff and
+reuses the v0.90.39 JD-to-date fix. Offline-tested (5 tests, mocked); not
+yet run live.
+
+Also merged this handoff: `Skills/run_archive_positive_control.py`
+(v0.90.42, PR #182) — the detect→link loader/runner for the eventual
+positive control, offline-verified against the exact synthetic generator
+already proven in `injection_recovery.py`'s baseline. Found a real
+`min_observations` parameter-sensitivity issue (link()'s default of 3 can
+reject a genuine 2-night tracklet with few observations per night;
+`--min-observations 2` is available to re-check).
+
+**Next production action (NOT YET DONE)**: run the MPC history lookup,
+then cross-check any in-window real report nights against the cheap Gate
+Z1 metadata tool before committing to another multi-GB alert-archive
+download:
+
+```bash
+git checkout -- uv.lock
+git pull origin main
+export PYTHONPATH=src
+caffeinate -i uv run --python 3.14 python Skills/lookup_mpc_observation_history.py \
+    --designation 72966 \
+    --archive-start-jd 2458273.5
+```
+
+If 72966 has very few or no MPC-confirmed reports within the archive
+window (2018-06-04 onward), the next escalation is to pick a different,
+more actively-observed real NEO rather than continuing to chase this
+specific object.
+
+### Handoff state as of 2026-07-02 v30
 
 **Gate Z3 known-object positive control loader/runner built (v0.90.42)** —
 `Skills/run_archive_positive_control.py` loads real per-source
