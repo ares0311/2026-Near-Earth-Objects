@@ -182,21 +182,26 @@ def run_bounded_ingest(
 
     table = _parse_ipac_table(raw_text)
     n_rows = len(table)
-    nights = set()
-    if "obsjd" in table.colnames:
-        nights = {int(float(v)) for v in table["obsjd"]}
     fields = set()
     if "field" in table.colnames:
         fields = {int(v) for v in table["field"]}
 
-    # Map each distinct integer-JD night to its real UTC calendar date
-    # (matching the alert archive's ztf_public_YYYYMMDD.tar.gz naming) so
-    # the operator/next command doesn't have to hand-read the raw IPAC
-    # table to find which real nights had coverage.
+    # Map each row's real UTC calendar date (matching the alert archive's
+    # ztf_public_YYYYMMDD.tar.gz naming) directly from its raw, fractional
+    # obsjd -- NOT from a pre-truncated integer JD. JD increments at NOON
+    # UTC, not midnight, so int(obsjd) silently lands on noon UTC of the
+    # day BEFORE the correct calendar date whenever the fractional part is
+    # < 0.5 (confirmed live: obsjd 2458339.6521991, from the packet already
+    # verified to originate in ztf_public_20180809.tar.gz, truncates to
+    # int 2458339 -- which converts back to 2018-08-08 12:00 UTC, not
+    # 2018-08-09). Deriving the date from each row's full obsjd value
+    # avoids this trap entirely.
     from astropy.time import Time  # lazy import, matches project convention
 
     distinct_nights_yyyymmdd = sorted(
-        {Time(jd, format="jd").datetime.strftime("%Y%m%d") for jd in nights}
+        {Time(float(v), format="jd").datetime.strftime("%Y%m%d") for v in table["obsjd"]}
+        if "obsjd" in table.colnames
+        else set()
     )
 
     raw_hash = hashlib.sha256(raw_text.encode()).hexdigest()
@@ -209,7 +214,7 @@ def run_bounded_ingest(
             "end_jd": end_jd,
         },
         "n_rows": n_rows,
-        "n_distinct_nights": len(nights),
+        "n_distinct_nights": len(distinct_nights_yyyymmdd),
         "distinct_nights_yyyymmdd": distinct_nights_yyyymmdd,
         "n_distinct_fields": len(fields),
         "raw_response_path": str(raw_path),
@@ -222,7 +227,7 @@ def run_bounded_ingest(
     report_path.write_text(json.dumps(report, indent=2))
 
     print(
-        f"[ingest] Parsed {n_rows} rows across {len(nights)} distinct night(s), "
+        f"[ingest] Parsed {n_rows} rows across {len(distinct_nights_yyyymmdd)} distinct night(s), "
         f"{len(fields)} distinct field(s)  elapsed {_fmt_duration(time.monotonic() - t0)}",
         flush=True,
     )

@@ -28,10 +28,15 @@ sys.modules["ztf_dr24_bounded_ingest"] = ztf_dr24_bounded_ingest
 _spec.loader.exec_module(ztf_dr24_bounded_ingest)
 
 
-def _ipac_response_text(query_status: str = "OK", n_rows: int = 2) -> str:
+def _ipac_response_text(
+    query_status: str = "OK", n_rows: int = 2, obsjd_values: list[float] | None = None
+) -> str:
     """Build a realistic IPAC table response using astropy's own writer, with
     the header lines the live IRSA response includes (RowsRetrieved,
     QUERY_STATUS) prepended, matching the captured Phase 0 evidence format."""
+    if obsjd_values is None:
+        obsjd_values = [2460310.7 + i for i in range(n_rows)]
+    n_rows = len(obsjd_values)
     table = Table()
     table["ra"] = [10.0 + 0.1 * i for i in range(n_rows)]
     table["dec"] = [20.0 + 0.1 * i for i in range(n_rows)]
@@ -42,7 +47,7 @@ def _ipac_response_text(query_status: str = "OK", n_rows: int = 2) -> str:
     table["fid"] = [1] * n_rows
     table["filtercode"] = ["zg"] * n_rows
     table["obsdate"] = [f"2024-01-{i + 1:02d} 05:00:00" for i in range(n_rows)]
-    table["obsjd"] = [2460310.7 + i for i in range(n_rows)]
+    table["obsjd"] = obsjd_values
     table["exptime"] = [30.0] * n_rows
     table["seeing"] = [2.1] * n_rows
     table["maglimit"] = [20.5] * n_rows
@@ -91,6 +96,26 @@ def test_run_bounded_ingest_reports_real_night_dates(tmp_path):
     assert report["distinct_nights_yyyymmdd"] == sorted(report["distinct_nights_yyyymmdd"])
     assert len(report["distinct_nights_yyyymmdd"]) == 2
     assert all(len(d) == 8 and d.isdigit() for d in report["distinct_nights_yyyymmdd"])
+
+
+def test_night_date_matches_known_real_archive_night(tmp_path):
+    """Regression test for a real off-by-one: JD increments at NOON UTC, not
+    midnight, so truncating obsjd to an integer before converting to a
+    calendar date silently lands on the day BEFORE the correct one whenever
+    the fractional part is < 0.5. This exact obsjd (2458339.6521991) is a
+    real value from a packet already confirmed (via a live download and
+    schema inspection in an earlier gate) to originate in the real archive
+    file ztf_public_20180809.tar.gz -- so it MUST map to '20180809', not
+    '20180808'. An operator live run hit this exact bug live before this
+    fix (reported '20180808' for a 100-day window starting at this night)."""
+    with patch(
+        "requests.get",
+        return_value=_FakeResponse(_ipac_response_text(obsjd_values=[2458339.6521991])),
+    ):
+        report = ztf_dr24_bounded_ingest.run_bounded_ingest(
+            ra=232.6, dec=-8.4, size_deg=2.0, start_jd=2458339.5, end_jd=2458340.5, out_dir=tmp_path
+        )
+    assert report["distinct_nights_yyyymmdd"] == ["20180809"]
 
 
 def test_run_bounded_ingest_resumes_without_network_call(tmp_path):
