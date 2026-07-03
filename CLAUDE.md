@@ -656,7 +656,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.46)
+## Current State (v0.90.47)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -689,7 +689,37 @@ bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-02 v35 (CURRENT)
+### Handoff state as of 2026-07-02 v36 (CURRENT)
+
+**Live-updating manifest added per operator request (v0.90.47)** —
+operator asked for something "like when a pull request merges": each
+shard updating a shared status as it finishes, instead of only a final
+merge step. Each shard now appends one file-locked JSON line to
+`manifest.jsonl` in `--out-dir` the moment it completes. New `--status`
+flag reports progress (shards reported/missing, running combined hit
+list) safely at any time, even mid-run — `--merge` still exists for the
+final, fail-closed full combine. 5 new tests (13 total).
+
+**Next production action (NOT YET DONE)**: run the 4 parallel shard
+commands from the v34 handoff below, each in its own terminal tab. Check
+progress anytime with:
+
+```bash
+uv run --python 3.14 python Skills/scan_mpc_history_ztf_coverage.py \
+    --status --shard-count 4
+```
+
+Once all 4 report in, run the final combine:
+
+```bash
+uv run --python 3.14 python Skills/scan_mpc_history_ztf_coverage.py \
+    --merge --shard-count 4
+```
+
+and paste that output. I'll pick the two best resulting real nights and
+target `Skills/ztf_alert_archive_ingest.py` there next.
+
+### Handoff state as of 2026-07-02 v35
 
 **Merge mode added for the sharded MPC-history scan (v0.90.46)** —
 operator asked "do I still need to paste all 4 tabs' output?" Answer:

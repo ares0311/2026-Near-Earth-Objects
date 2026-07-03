@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import importlib.util
 import io
+import json
 import sys
 from pathlib import Path
 from unittest.mock import patch
@@ -199,3 +200,62 @@ def test_merge_shards_fails_closed_when_incomplete(tmp_path):
         raise AssertionError("expected FileNotFoundError")
     except FileNotFoundError as exc:
         assert "2/4" in str(exc)
+
+
+def test_run_scan_appends_to_manifest(tmp_path):
+    """Each shard completion must append one entry to the shared manifest
+    -- this is what lets progress be checked at any time, not just after
+    every shard finishes."""
+    with patch("fetch.fetch_mpc_observations", return_value=_fake_mpc_observations_large()):
+        with patch("requests.get", return_value=_FakeResponse(_ipac_response_text(1))):
+            scan_mpc_history_ztf_coverage.run_scan(
+                "72966", 2458273.5, stride=1, size_deg=2.0, out_dir=tmp_path,
+                shard_index=0, shard_count=4,
+            )
+    manifest_path = tmp_path / "manifest.jsonl"
+    assert manifest_path.exists()
+    lines = manifest_path.read_text().splitlines()
+    assert len(lines) == 1
+    entry = json.loads(lines[0])
+    assert entry["shard_index"] == 0
+    assert entry["shard_count"] == 4
+
+
+def test_report_status_reflects_partial_progress(tmp_path):
+    """Status must be checkable mid-run, before all shards finish, and
+    must never raise -- unlike merge_shards()."""
+    with patch("fetch.fetch_mpc_observations", return_value=_fake_mpc_observations_large()):
+        with patch("requests.get", return_value=_FakeResponse(_ipac_response_text(1))):
+            # Only 2 of 4 shards have finished so far.
+            for shard_index in range(2):
+                scan_mpc_history_ztf_coverage.run_scan(
+                    "72966", 2458273.5, stride=1, size_deg=2.0, out_dir=tmp_path,
+                    shard_index=shard_index, shard_count=4,
+                )
+
+    status = scan_mpc_history_ztf_coverage.report_status(tmp_path, shard_count=4)
+    assert status["shards_reported"] == [0, 1]
+    assert status["shards_missing"] == [2, 3]
+    assert status["n_reports_with_ztf_coverage_so_far"] == 10  # 5 rows/shard * 2 shards, all hits
+
+
+def test_report_status_before_any_shard_finishes(tmp_path):
+    """No manifest exists yet -- must report zero progress, not raise."""
+    status = scan_mpc_history_ztf_coverage.report_status(tmp_path, shard_count=4)
+    assert status["shards_reported"] == []
+    assert status["shards_missing"] == [0, 1, 2, 3]
+    assert status["hits_so_far"] == []
+
+
+def test_manifest_survives_rerun_of_same_shard(tmp_path):
+    """Re-running the same shard-index (e.g. after a retry) must replace,
+    not duplicate, its manifest entry."""
+    with patch("fetch.fetch_mpc_observations", return_value=_fake_mpc_observations_large()):
+        with patch("requests.get", return_value=_FakeResponse(_ipac_response_text(1))):
+            for _ in range(2):
+                scan_mpc_history_ztf_coverage.run_scan(
+                    "72966", 2458273.5, stride=1, size_deg=2.0, out_dir=tmp_path,
+                    shard_index=0, shard_count=4,
+                )
+    status = scan_mpc_history_ztf_coverage.report_status(tmp_path, shard_count=4)
+    assert status["shards_reported"] == [0]

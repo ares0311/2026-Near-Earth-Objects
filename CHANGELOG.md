@@ -3,6 +3,25 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.47 — Live-updating manifest and status check for sharded scan (2026-07-02)
+
+### Added
+- `Skills/scan_mpc_history_ztf_coverage.py`: each shard now appends one
+  JSON line to a shared, file-locked `manifest.jsonl` immediately on
+  completion (like a PR-merge notification, per the operator's request),
+  instead of only writing its own isolated report file. `fcntl.flock`
+  around each append ensures concurrent shards finishing near-simultaneously
+  never corrupt or interleave each other's entries.
+- New `--status` flag: reports how many shards have reported in so far and
+  a running combined hit list, safe to run at any time (even mid-scan) --
+  unlike `--merge`, it never fails closed on incompleteness. Re-running the
+  same `--shard-index` replaces (not duplicates) its manifest entry.
+- `merge_shards()` and `report_status()` now both read from the shared
+  manifest as the single source of truth, rather than globbing individual
+  shard report files.
+- 5 new tests (13 total): manifest append on completion, partial-progress
+  status before/mid-run, and manifest entry replacement on shard re-run.
+
 ## v0.90.46 — Merge mode for sharded MPC-history scan (2026-07-02)
 
 ### Added
