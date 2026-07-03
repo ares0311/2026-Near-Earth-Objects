@@ -656,7 +656,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.38)
+## Current State (v0.90.39)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -689,7 +689,43 @@ bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-02 v25 (CURRENT)
+### Handoff state as of 2026-07-02 v26 (CURRENT)
+
+**Real off-by-one bug found and fixed in the v0.90.38 night-date output**
+— the first real run of the fixed metadata report printed
+`['20180808', '20180902']`, but `20180808` contradicted already-established
+ground truth (a packet with that exact `obsjd` was already confirmed, via
+direct download in an earlier gate, to originate in the real archive file
+`ztf_public_20180809.tar.gz`). Root cause: JD increments at noon UTC, not
+midnight; the code truncated `obsjd` to an integer before converting to a
+calendar date, which silently lands on the day *before* the correct date
+whenever the fractional part is < 0.5. Fixed in v0.90.39 by deriving each
+row's date from its full, un-truncated `obsjd`. Regression-tested with the
+exact real value that exposed the bug. Full evidence:
+`docs/evidence/live/2026-07-02-gate-z1-night-date-offbyone-fix.md`.
+
+**Corrected real result**: this sky position's two real observing nights
+within the 100-day window are **20180809** (not 20180808) and **20180902**
+— about 24 days apart. The underlying real data (14 rows, 2 nights, 1
+field) was always correct; only the calendar-date labels were wrong.
+
+**Next production action (NOT YET DONE)**: target the alert-archive ingest
+tool at the corrected real night pair:
+
+```bash
+git checkout -- uv.lock
+git pull origin main
+export PYTHONPATH=src
+caffeinate -i uv run --python 3.14 python Skills/ztf_alert_archive_ingest.py \
+    --nights 20180809 20180902 \
+    --ra 232.6 --dec -8.4 --radius-deg 2.0 --min-rb 0.5
+```
+
+Night 20180809 is already cached locally (21 kept observations from the
+first Gate Z3 run) and will resume without re-download; only 20180902
+needs a fresh fetch.
+
+### Handoff state as of 2026-07-02 v25
 
 **Recurring operational note**: on this operator's Mac, `uv run` locally
 rewrites `uv.lock`'s own `neo-detection` self-version pin after nearly

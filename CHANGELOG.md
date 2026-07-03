@@ -3,6 +3,29 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.39 — Fix JD noon/midnight off-by-one in Gate Z1 night dates (2026-07-02)
+
+### Fixed
+- `Skills/ztf_dr24_bounded_ingest.py`: `distinct_nights_yyyymmdd` (added in
+  v0.90.38) truncated each row's `obsjd` to an integer before converting
+  to a calendar date. JD increments at noon UTC, not midnight, so this
+  silently landed on the day *before* the correct UTC calendar date
+  whenever the fractional part was < 0.5. Live evidence: a real operator
+  run reported `20180808` for a packet already confirmed (via direct
+  download in an earlier gate) to originate in
+  `ztf_public_20180809.tar.gz`. Fixed by deriving each row's calendar date
+  directly from its full, un-truncated `obsjd` value, never truncating
+  first. `n_distinct_nights` is now computed from the same corrected
+  grouping so both fields stay consistent.
+- `tests/test_ztf_dr24_bounded_ingest.py`: 1 new regression test encoding
+  the exact real `obsjd` value that exposed this bug, asserting it maps to
+  the correct real night (`"20180809"`).
+- Full evidence:
+  `docs/evidence/live/2026-07-02-gate-z1-night-date-offbyone-fix.md`. The
+  underlying real data is unchanged (14 rows, 2 distinct nights, 1 field
+  over 100 days) -- only the calendar-date labels were wrong. Corrected
+  real night pair: 20180809 and 20180902 (~24 days apart).
+
 ## v0.90.38 — Expose real night dates from Gate Z1 metadata report (2026-07-02)
 
 ### Added

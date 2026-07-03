@@ -87,22 +87,33 @@ calendar dates, matching the alert archive's `ztf_public_YYYYMMDD.tar.gz`
 naming) to the report, computed from the already-cached raw response with
 no new network call needed.
 
-**Next step**: re-run the identical command (now on v0.90.38+) to read the
-real `distinct_nights_yyyymmdd` list from the cached response:
+**Update 2026-07-02 (v0.90.39)**: the first `distinct_nights_yyyymmdd`
+output (`['20180808', '20180902']`) had a real off-by-one bug -- JD
+increments at noon UTC, not midnight, and the code truncated `obsjd` to an
+integer before converting to a calendar date, silently landing on the day
+before the correct one. Fixed; see
+`docs/evidence/live/2026-07-02-gate-z1-night-date-offbyone-fix.md`. The
+corrected real night pair for this sky position is **20180809** (not
+20180808) and **20180902** -- roughly 24 days apart, confirming this
+specific 2-degree field is genuinely low-cadence, not a bug.
+
+**Next step**: target `Skills/ztf_alert_archive_ingest.py` at exactly the
+two corrected real nights for the Gate Z3 "known-object positive control"
+attempt:
 
 ```bash
+git checkout -- uv.lock
 git pull origin main
 export PYTHONPATH=src
-caffeinate -i uv run --python 3.14 python Skills/ztf_dr24_bounded_ingest.py \
-    --ra 232.6 --dec -8.4 --size-deg 2.0 \
-    --start-jd 2458339.5 --end-jd 2458439.5
+caffeinate -i uv run --python 3.14 python Skills/ztf_alert_archive_ingest.py \
+    --nights 20180809 20180902 \
+    --ra 232.6 --dec -8.4 --radius-deg 2.0 --min-rb 0.5
 ```
 
-Then target `Skills/ztf_alert_archive_ingest.py --nights <real night 1> <real night 2>`
-(same `--ra 232.6 --dec -8.4 --radius-deg 2.0 --min-rb 0.5`) at exactly
-those two real nights for the Gate Z3 "known-object positive control"
-attempt -- this is the first real, non-guessed pair of nights confirmed to
-both have coverage at this sky position.
+Night 20180809's alert-archive data (21 kept observations) is already
+cached locally on the operator's machine from the first Gate Z3 live run
+and will resume without a re-download; only 20180902 needs a fresh fetch
+(size unknown until the run starts).
 
 Once real per-source `Observation` objects exist for >=2 real nights (the
 ingest tool's checkpoint JSON files under
