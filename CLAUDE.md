@@ -656,7 +656,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.41)
+## Current State (v0.90.42)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -689,7 +689,46 @@ bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-02 v29 (CURRENT)
+### Handoff state as of 2026-07-02 v30 (CURRENT)
+
+**Gate Z3 known-object positive control loader/runner built (v0.90.42)** —
+`Skills/run_archive_positive_control.py` loads real per-source
+`Observation` objects from >=2 nights' `ztf_alert_archive_ingest.py`
+checkpoint files and runs the exact production `preprocess()` ->
+`detect()` -> `link()` chain (matching `run_pipeline.py`'s call pattern),
+reporting whether the linker recovers a real multi-night tracklet.
+Diagnostic only — never claims "confirmed NEO."
+
+**Real finding from offline verification**: using the exact synthetic
+generator already proven in `Skills/injection_recovery.py`'s 100%-link
+baseline, 20/20 seeds with a 2-night, 2-obs-per-night tracklet FAILED to
+link at `link()`'s default `min_observations=3`, but 20/20 linked
+successfully at `min_observations=2`. This is not a fundamental "2 nights
+can't work" limitation — it's specifically that too few observations per
+night in the final linked arc trip the default threshold. Real archived
+data has far more observations per night (21 on night 20180809 alone), so
+the default is likely fine, but `--min-observations` is exposed so a
+zero-tracklet result can be re-checked before concluding failure. 5 new
+tests, all passing, including one exercising the real production chain
+end-to-end and one regression-testing this exact finding.
+
+**Next production action (NOT YET DONE)**: this depends on the pending
+night 20180903 alert-archive ingest (see v29 below — not yet run). Once
+that completes:
+
+```bash
+git checkout -- uv.lock
+git pull origin main
+export PYTHONPATH=src
+caffeinate -i uv run --python 3.14 python Skills/run_archive_positive_control.py \
+    --nights 20180809 20180903 \
+    --out Logs/pipeline_runs/run_archive_positive_control/report.json
+```
+
+If this reports zero tracklets, re-run with `--min-observations 2` before
+concluding the positive control failed.
+
+### Handoff state as of 2026-07-02 v29
 
 **Real second night found at object 72966's actual predicted position** ✓
 — operator ran `Skills/scan_neo_track_coverage.py` (stride=5, 100-day
