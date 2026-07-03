@@ -138,6 +138,33 @@ If the highest-priority T1 gap cannot be resolved because a human blocker is unr
   risk to a shared external API, unclear item independence, a short
   enough remaining runtime that the overhead isn't worth it), **ask the
   operator** rather than deciding unilaterally.
+- **Progressively probe toward the safe concurrency ceiling for repeated batches against the same external service — don't stay pinned to the conservative starting point forever**:
+  `docs/SYSTEM_PROFILE.md`'s "usually 4 to 6 workers" for I/O-heavy/external-service
+  work is an explicitly conservative **first-batch** starting point, not a
+  permanent ceiling — it mirrors the same doc's CPU-worker guidance
+  ("increase only after measuring"). The implementation rules are:
+  1. **After a batch completes with zero errors, zero rate-limit/429/503
+     responses, and no unusual per-request latency degradation**, the next
+     batch against that *same* external service may step concurrency up by
+     a bounded increment (roughly +2, or up to ~1.5x) rather than repeating
+     the same conservative number indefinitely.
+  2. **Step back down immediately** to the last known-clean level the
+     moment any batch shows errors, rate-limiting, timeouts, or degraded
+     latency — never keep pushing past a bad signal, and never retry a
+     failed higher-concurrency batch at the same or higher level.
+  3. **A documented rate limit from the service itself is authoritative**
+     and must never be exceeded regardless of how clean prior batches
+     looked — verify the limit via the service's own docs (never guessed)
+     before treating any number above it as safe.
+  4. **Record the empirically-found safe level per service** (not a
+     blanket default) in `docs/SYSTEM_PROFILE.md` or a dated
+     `docs/evidence/` file, so future sessions start from established
+     ground truth instead of re-discovering it from the conservative
+     default every time.
+  5. This does not override the "ask when ambiguous" rule above — if
+     escalating risks overwhelming a small/community-run resource (as
+     opposed to a large commercial CDN sized for bulk concurrent access),
+     confirm with the operator before continuing to increase.
 - **Parallel/sharded Skills scripts must write a live-updating shared manifest, not just an isolated per-process report**:
   Any Skills script that supports splitting its work across multiple
   operator-launched concurrent processes (e.g. `--shard-index`/`--shard-count`

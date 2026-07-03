@@ -78,6 +78,17 @@ It contains the facts a coding agent needs to work productively without re-readi
   changes. State explicitly whether parallelism was considered and why it
   was or wasn't applied. If it's ambiguous whether parallelizing is worth
   the complexity, ask the operator rather than deciding unilaterally.
+- **Progressively probe toward the safe concurrency ceiling — don't stay pinned to the conservative starting point**:
+  `docs/SYSTEM_PROFILE.md`'s "usually 4 to 6 workers" for external-service
+  work is a conservative first-batch starting point, not a permanent
+  ceiling. After a batch completes with zero errors/rate-limiting/latency
+  degradation, the next batch against that same service may step
+  concurrency up by a bounded increment (~+2, up to ~1.5x); step back down
+  immediately on any bad signal; a service's own documented rate limit is
+  always authoritative and must never be exceeded; record the empirically
+  safe level per service in `docs/SYSTEM_PROFILE.md` or a dated evidence
+  file. Still ask the operator before escalating against a small/
+  community-run resource. See CLAUDE.md's Standing Rules for detail.
 - **Parallel/sharded Skills scripts must write a live-updating shared manifest**:
   Any Skills script supporting concurrent operator-launched processes
   (e.g. `--shard-index`/`--shard-count` for parallel terminal tabs) must
