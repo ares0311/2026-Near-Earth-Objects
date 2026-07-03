@@ -1,0 +1,111 @@
+"""Tests for Skills/scan_mpc_history_ztf_coverage.py (Gate Z3 MPC-history x
+ZTF-coverage cross-scan). fetch_mpc_observations and the Gate Z1 IRSA
+request are both mocked -- this project's standing convention for
+external-service tests. Patches target the shared fetch/requests module
+objects (not the dynamically reloaded sibling Skills modules), matching
+the pattern already used in test_scan_neo_track_coverage.py."""
+
+from __future__ import annotations
+
+import importlib.util
+import io
+import sys
+from pathlib import Path
+from unittest.mock import patch
+
+from astropy.io import ascii as ap_ascii
+from astropy.table import Table
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+_MODULE_PATH = (
+    Path(__file__).resolve().parents[1] / "Skills" / "scan_mpc_history_ztf_coverage.py"
+)
+_spec = importlib.util.spec_from_file_location("scan_mpc_history_ztf_coverage", _MODULE_PATH)
+scan_mpc_history_ztf_coverage = importlib.util.module_from_spec(_spec)
+sys.modules["scan_mpc_history_ztf_coverage"] = scan_mpc_history_ztf_coverage
+_spec.loader.exec_module(scan_mpc_history_ztf_coverage)
+
+from schemas import Observation  # noqa: E402
+
+
+def _fake_mpc_observations():
+    return [
+        Observation(
+            obs_id=f"mpc_{i}", ra_deg=225.0 + i * 0.4, dec_deg=-5.0 - i * 0.1,
+            jd=2458308.5 + i, mag=19.0, mag_err=0.1, filter_band="?", mission="MPC",
+        )
+        for i in range(10)
+    ]
+
+
+def _ipac_response_text(n_rows: int) -> str:
+    table = Table()
+    table["ra"] = [10.0] * n_rows
+    table["dec"] = [20.0] * n_rows
+    table["field"] = [100] * n_rows
+    table["ccdid"] = [1] * n_rows
+    table["qid"] = [1] * n_rows
+    table["rcid"] = [0] * n_rows
+    table["fid"] = [1] * n_rows
+    table["filtercode"] = ["zg"] * n_rows
+    table["obsdate"] = ["2024-01-01 05:00:00"] * n_rows
+    table["obsjd"] = [2458308.7] * n_rows
+    table["exptime"] = [30.0] * n_rows
+    table["seeing"] = [2.1] * n_rows
+    table["maglimit"] = [20.5] * n_rows
+    table["infobits"] = [0] * n_rows
+    buf = io.StringIO()
+    ap_ascii.write(table, buf, format="ipac")
+    header = f"\\fixlen = T\n\\RowsRetrieved = {n_rows}\n\\QUERY_STATUS = 'OK'\n"
+    return header + buf.getvalue()
+
+
+class _FakeResponse:
+    def __init__(self, text: str, status: int = 200):
+        self.text = text
+        self.status_code = status
+
+    def raise_for_status(self):
+        pass
+
+
+def test_run_scan_reports_hits(tmp_path):
+    with patch("fetch.fetch_mpc_observations", return_value=_fake_mpc_observations()):
+        with patch("requests.get", return_value=_FakeResponse(_ipac_response_text(2))):
+            report = scan_mpc_history_ztf_coverage.run_scan(
+                "72966", 2458273.5, stride=5, size_deg=2.0, out_dir=tmp_path
+            )
+    assert report["n_reports_checked"] == 2  # 10 rows, stride 5 -> indices 0, 5
+    assert report["n_reports_with_ztf_coverage"] == 2
+    assert all(hit["n_sci_rows"] == 2 for hit in report["hits"])
+
+
+def test_run_scan_reports_no_hits_when_no_coverage(tmp_path):
+    with patch("fetch.fetch_mpc_observations", return_value=_fake_mpc_observations()):
+        with patch("requests.get", return_value=_FakeResponse(_ipac_response_text(0))):
+            report = scan_mpc_history_ztf_coverage.run_scan(
+                "72966", 2458273.5, stride=5, size_deg=2.0, out_dir=tmp_path
+            )
+    assert report["n_reports_checked"] == 2
+    assert report["n_reports_with_ztf_coverage"] == 0
+    assert report["hits"] == []
+
+
+def test_run_scan_rejects_zero_stride():
+    parser_args = ["--stride", "0"]
+    with patch.object(sys, "argv", ["scan_mpc_history_ztf_coverage.py", *parser_args]):
+        try:
+            scan_mpc_history_ztf_coverage.main()
+            raise AssertionError("expected SystemExit")
+        except SystemExit as exc:
+            assert "stride" in str(exc)
+
+
+def test_run_scan_writes_report_file(tmp_path):
+    with patch("fetch.fetch_mpc_observations", return_value=_fake_mpc_observations()):
+        with patch("requests.get", return_value=_FakeResponse(_ipac_response_text(0))):
+            scan_mpc_history_ztf_coverage.run_scan(
+                "72966", 2458273.5, stride=5, size_deg=2.0, out_dir=tmp_path
+            )
+    assert (tmp_path / "scan_report.json").exists()

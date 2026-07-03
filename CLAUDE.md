@@ -656,7 +656,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.43)
+## Current State (v0.90.44)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -689,7 +689,42 @@ bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-02 v32 (CURRENT)
+### Handoff state as of 2026-07-02 v33 (CURRENT)
+
+**First real cross-check of an MPC-confirmed cluster against Gate Z1** —
+only 1 of 4 real MPC-confirmed nights showed ZTF coverage — operator ran
+`Skills/ztf_dr24_bounded_ingest.py` (RA 225.44,
+Dec -5.08, 8-day window). Real result: 9 rows, 1 distinct night
+(20180713), 1 field. Interpretation: MPC's observation history aggregates
+reports from many surveys; this project's `fetch_mpc_observations`
+mapping doesn't expose the reporting observatory, so a real MPC report
+doesn't guarantee it came from ZTF. Night 20180713 is now the strongest
+single-night candidate found so far (two independent real confirmations:
+MPC + Gate Z1) — but still only one night. Full evidence:
+`docs/evidence/live/2026-07-02-gate-z1-mpc-cluster-crosscheck.md`.
+
+**New tool (v0.90.44)**: `Skills/scan_mpc_history_ztf_coverage.py`
+systematically checks a bounded, stride-limited subset of ALL 526 real
+in-window MPC reports against Gate Z1 (instead of hand-picking more
+clusters), at each report's own exact real observed position/date.
+Offline-tested (4 tests, mocked); not yet run live.
+
+**Next production action (NOT YET DONE)**:
+
+```bash
+git checkout -- uv.lock
+git pull origin main
+export PYTHONPATH=src
+caffeinate -i uv run --python 3.14 python Skills/scan_mpc_history_ztf_coverage.py \
+    --designation 72966 \
+    --archive-start-jd 2458273.5 --stride 10
+```
+
+This issues ~53 cheap Gate Z1 queries. Target
+`Skills/ztf_alert_archive_ingest.py` at the two best resulting real
+nights (closest in time to minimize orbit-motion targeting error) next.
+
+### Handoff state as of 2026-07-02 v32
 
 **MPC observation history for 72966 returned dense real data** ✓ —
 operator ran `Skills/lookup_mpc_observation_history.py`. Real result:
