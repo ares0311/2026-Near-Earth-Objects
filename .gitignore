@@ -24,7 +24,7 @@ htmlcov/
 Logs/**
 !Logs/.gitkeep
 !Logs/reports/
-!Logs/reports/.gitkeep
+!Logs/reports/**
 background/config.local.json
 background/live_review_policy.local.json
 coverage.json

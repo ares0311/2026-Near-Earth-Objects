@@ -3,6 +3,21 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.49 — Fix .gitignore blocking the git-relay manifest file (2026-07-03)
+
+### Fixed
+- `.gitignore`: `!Logs/reports/` only un-ignored the directory entry itself,
+  not files inside it -- `Logs/**` still matched every path under
+  `Logs/reports/`, including the new
+  `ztf_alert_archive_ingest_manifest.jsonl` file added in v0.90.48. First
+  real operator run of `--sync` confirmed this live: `git add` failed with
+  "The following paths are ignored by one of your .gitignore files". Fixed
+  by widening the exception to `!Logs/reports/**` so all files under that
+  directory are tracked, not just the directory path and the pre-existing
+  `.gitkeep`. This was the actual root cause blocking the git-relay pattern
+  from ever committing anything -- the auto-push code path itself was never
+  exercised until this run.
+
 ## v0.90.48 — Automatic git-relay manifest for ztf_alert_archive_ingest.py (2026-07-02)
 
 ### Added
