@@ -3,6 +3,31 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.40 — Targeted known-NEO ephemeris lookup for Gate Z3 (2026-07-02)
+
+### Added
+- `Skills/lookup_neo_archive_ephemeris.py`: replaces blind field-revisit
+  guessing for Gate Z3's "known-object positive control" with a targeted
+  approach. Queries the Phase-0-verified `src/fetch.py:fetch_horizons`
+  (JPL Horizons, already 100%-covered production code) for a real, known
+  minor planet's real historical sky position across a date range, so a
+  follow-up alert-archive ingest run can target real predicted positions
+  instead of an arbitrary field. Default designation `72966` is the real
+  `ssnamenr` cross-match already present in a real Gate Z3 alert packet
+  (not a guess). Wraps `fetch_horizons` in its own retry-with-backoff loop
+  (the underlying function has none) and reuses the v0.90.39 full-precision
+  JD-to-calendar-date conversion to avoid reintroducing the noon/midnight
+  off-by-one bug. Checkpointed; offline-tested (4 tests, all mocked).
+
+### Evidence
+- Two consecutive real alert-archive downloads (nights 20180810 and
+  20180902, both confirmed to have real ZTF science exposures via Gate Z1
+  metadata) found zero detections in the fixed 2-degree sky box despite
+  costing 5.3GiB and 8.5GiB of real bandwidth. This is a genuine negative,
+  not a bug -- the progress/ETA output was correct throughout. See
+  `docs/evidence/live/2026-07-02-ztf-alert-archive-ingest-second-attempt.md`.
+  Blind field-revisit sampling is no longer the recommended approach.
+
 ## v0.90.39 — Fix JD noon/midnight off-by-one in Gate Z1 night dates (2026-07-02)
 
 ### Fixed

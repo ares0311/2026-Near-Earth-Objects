@@ -1345,7 +1345,7 @@ wheels = [
 
 [[package]]
 name = "neo-detection"
-version = "0.90.38"
+version = "0.90.39"
 source = { editable = "." }
 dependencies = [
     { name = "alerce" },
