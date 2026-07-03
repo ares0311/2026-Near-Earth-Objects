@@ -656,7 +656,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.40)
+## Current State (v0.90.41)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -689,7 +689,51 @@ bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-02 v27 (CURRENT)
+### Handoff state as of 2026-07-02 v28 (CURRENT)
+
+**Real ephemeris for NEO 72966 explains the second attempt's miss — it was
+a targeting error, not a cadence finding** ✓ — operator ran
+`Skills/lookup_neo_archive_ephemeris.py` (RA/Dec query for designation
+72966, 100-day window from night 20180809). Real result: 101 ephemeris
+points; night 20180809's predicted position (RA 232.5584, Dec -8.4239)
+matches the already-confirmed real detection within 0.05 deg (validates
+the tool). By night 20180902, the real predicted position had moved to
+RA 241.5899, Dec -11.5706 — about 9.4 deg in RA and 3.2 deg in Dec away
+from the original fixed 2-degree search box used in the second alert-
+archive attempt. The earlier Gate Z1 "hit" for that night was a
+coincidental revisit of the *original* field, unrelated to where the
+object actually was — the zero-kept alert-archive result was a targeting
+error (wrong sky position), not further evidence about that field's
+cadence. Full evidence:
+`docs/evidence/live/2026-07-02-neo-72966-ephemeris-and-targeting-error.md`.
+
+**New tool (v0.90.41)**: `Skills/scan_neo_track_coverage.py` fixes the
+targeting error going forward — for a bounded, stride-limited subset of
+real ephemeris points, it re-centers the cheap Gate Z1 metadata check on
+that specific night's real predicted position (not a stale fixed field),
+reporting which real nights have real ZTF coverage near where the object
+actually was. Offline-tested (4 tests, mocked); not yet run live.
+
+**Next production action (NOT YET DONE)**: run the track-coverage scan
+before spending bandwidth on another multi-GB alert-archive download:
+
+```bash
+git checkout -- uv.lock
+git pull origin main
+export PYTHONPATH=src
+caffeinate -i uv run --python 3.14 python Skills/scan_neo_track_coverage.py \
+    --designation 72966 \
+    --start-jd 2458339.5 --end-jd 2458439.5 --step 1d --stride 5
+```
+
+This issues 21 cheap Gate Z1 metadata queries (1 per 5 real nights) at the
+object's real predicted position for each, reporting which nights (if
+any) show real ZTF science exposure there. Only run
+`Skills/ztf_alert_archive_ingest.py` against a night this scan confirms
+has real coverage, using that night's predicted RA/Dec as the search
+center — not the original fixed field.
+
+### Handoff state as of 2026-07-02 v27
 
 **Second real alert-archive attempt (nights 20180809/20180902, the
 corrected pair) came back empty on night 2** — night 20180809 resumed
