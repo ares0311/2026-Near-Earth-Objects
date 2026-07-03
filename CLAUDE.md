@@ -691,6 +691,19 @@ replay protocol.
 
 ### Handoff state as of 2026-07-02 v25 (CURRENT)
 
+**Recurring operational note**: on this operator's Mac, `uv run` locally
+rewrites `uv.lock`'s own `neo-detection` self-version pin after nearly
+every invocation, leaving an uncommitted local diff. Since every recent PR
+also bumps `pyproject.toml`'s version (and therefore `uv.lock` to match),
+the next `git pull origin main` reliably fails with "Your local changes to
+... uv.lock would be overwritten by merge" unless that local diff is
+cleared first. This has now happened twice (before the v0.90.35 and
+v0.90.38 commands). Going forward, **always prepend
+`git checkout -- uv.lock` before `git pull origin main`** in operator
+command blocks for this project — the local diff is machine-generated
+lockfile drift, never manual operator edits, so discarding it is always
+safe.
+
 **Real second night found at the Gate Z3 target field** ✓ — operator ran
 the widened 100-day Gate Z1 metadata query (RA 232.6, Dec -8.4, JD
 2458339.5-2458439.5). Real result: 14 rows across 2 distinct real nights,
