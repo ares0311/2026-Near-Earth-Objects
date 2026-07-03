@@ -128,11 +128,37 @@ caffeinate -i uv run --python 3.14 python Skills/lookup_neo_archive_ephemeris.py
 ```
 
 This prints the object's real predicted RA/Dec on each real calendar night
-in the window. Cross-check a couple of those nights against
-`Skills/ztf_dr24_bounded_ingest.py` (cheap, metadata-only) centered on the
-predicted position before committing to another multi-GB
-`ztf_alert_archive_ingest.py` download -- do not skip straight to the
-expensive alert-archive step without that cheap check first.
+in the window. **That first live run was executed (2026-07-02)** and
+revealed a real targeting error, not just a low-cadence field: by night
+20180902 the object's real predicted position had moved ~9.4 deg in RA
+and ~3.2 deg in Dec from the original fixed 2-degree search box used in
+the second alert-archive attempt -- the earlier "Gate Z1 hit" for that
+night was a coincidental revisit of the *original* field, unrelated to
+where the object actually was. See
+`docs/evidence/live/2026-07-02-neo-72966-ephemeris-and-targeting-error.md`.
+
+**Next step (v0.90.41)**: `Skills/scan_neo_track_coverage.py` re-centers
+the cheap Gate Z1 metadata check on each candidate night's real predicted
+position (not a stale fixed field), for a bounded, stride-limited subset
+of real ephemeris points:
+
+```bash
+git checkout -- uv.lock
+git pull origin main
+export PYTHONPATH=src
+caffeinate -i uv run --python 3.14 python Skills/scan_neo_track_coverage.py \
+    --designation 72966 \
+    --start-jd 2458339.5 --end-jd 2458439.5 --step 1d --stride 5
+```
+
+This checks 1 of every 5 real nights (21 metadata queries, cheap) at the
+object's real predicted position for that night, and reports which (if
+any) had real ZTF science exposure there. Only once a real, non-guessed
+night with confirmed real coverage near the object's real position is
+found should `Skills/ztf_alert_archive_ingest.py` be run against it (using
+that night's predicted RA/Dec as the search center, not the original
+fixed field) -- do not skip straight to the expensive alert-archive step
+without this cheap check first.
 
 Once real per-source `Observation` objects exist for >=2 real nights (the
 ingest tool's checkpoint JSON files under

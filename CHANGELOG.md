@@ -3,6 +3,29 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.41 — Scan a known NEO's real track for real ZTF coverage (2026-07-02)
+
+### Added
+- `Skills/scan_neo_track_coverage.py`: for a bounded, stride-limited subset
+  of a known object's real ephemeris points, re-centers a cheap Gate Z1
+  metadata check on that specific night's real predicted position, so real
+  coverage is checked at the object's actual location instead of a stale
+  fixed field. Reuses `Skills/lookup_neo_archive_ephemeris.py` and the
+  already live-verified `Skills/ztf_dr24_bounded_ingest.py`. Offline-tested
+  (4 tests, mocked); not yet run live.
+- `tests/test_scan_neo_track_coverage.py`: 4 new tests.
+
+### Evidence
+- The first live run of `Skills/lookup_neo_archive_ephemeris.py` (real
+  ephemeris for minor planet 72966) revealed the true cause of the second
+  Gate Z3 alert-archive attempt's zero-kept result: by night 20180902, the
+  object's real predicted position had moved ~9.4 deg in RA and ~3.2 deg in
+  Dec from the original fixed 2-degree search box. The earlier Gate Z1
+  "hit" for that night was a coincidental revisit of the *original* field,
+  unrelated to tracking this specific object -- a targeting error, not a
+  cadence finding. Full evidence:
+  `docs/evidence/live/2026-07-02-neo-72966-ephemeris-and-targeting-error.md`.
+
 ## v0.90.40 — Targeted known-NEO ephemeris lookup for Gate Z3 (2026-07-02)
 
 ### Added
