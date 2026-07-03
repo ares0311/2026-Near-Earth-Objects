@@ -26,7 +26,7 @@ not a precondition for running the production search.
 | Gate | Status | Closure evidence required |
 |---|---|---|
 | Z0: Phase 0 source verification | Closed except Fink external blocker | `docs/evidence/phase0/` contains live evidence for JPL SBDB, MPC get-obs, and IRSA ZTF metadata; Fink TLS failure is documented as external; pretrained model use is deferred. |
-| Z1: Bounded replay ingest | Code complete, pending operator live verification | `Skills/ztf_dr24_bounded_ingest.py` queries only the Phase 0-verified IRSA ZTF sci-metadata endpoint (`POS`/`SIZE`/`WHERE obsjd`/`COLUMNS`, all documented in IRSA's own API docs, not guessed), enforces a bounded search box and time window, checkpoints/resumes, retries with backoff, and writes a sample ingest report with row counts, distinct-night/field counts, and a sha256 of the raw response. Unit-tested offline against an astropy-generated IPAC fixture (8 tests, all passing). Not yet closed: needs one real operator-run command against the live IRSA endpoint to produce a genuine (non-mocked) ingest report before this gate can close. |
+| Z1: Bounded replay ingest | Closed (2026-07-02) | `Skills/ztf_dr24_bounded_ingest.py` queries only the Phase 0-verified IRSA ZTF sci-metadata endpoint (`POS`/`SIZE`/`WHERE obsjd`/`COLUMNS`, all documented in IRSA's own API docs, not guessed), enforces a bounded search box and time window, checkpoints/resumes, retries with backoff, and writes a sample ingest report with row counts, distinct-night/field counts, and a sha256 of the raw response. Unit-tested offline against an astropy-generated IPAC fixture (8 tests, all passing). **Operator live run (2026-07-02)** against the real IRSA endpoint (RA 232.6, Dec -8.4, 2 deg box, 10-day window) returned a real, non-mocked report: 5 rows, 1 distinct night, 1 distinct field -- see `docs/evidence/live/2026-07-02-gate-z1-bounded-ingest-first-live-run.md`. |
 | Z2: Time-aware known-object exclusion | Core mechanism code complete, pending operator field verification | `src/known_object_exclusion.py` implements the brief's `known_object_catalog_snapshots`/`known_objects` schema verbatim and a `known_as_of(objects, cutoff)` filter using each object's own `first_obs` date (a documented JPL SBDB Query API field, confirmed via official docs and a live astroquery example -- not guessed) so a single current-day snapshot can be used correctly for any historical replay cutoff without needing true point-in-time catalog snapshots. Fails closed on missing `first_obs` (never treats an object as confirmed-known without evidence) and on a snapshot missing/violating its own `valid_for_replay_before_utc`. 9 offline tests cover every boundary (exact-cutoff equality, missing-date fail-closed, snapshot validity). Not yet closed: needs operator confirmation that adding `first_obs` to the already-verified `sb-group=neo` JPL SBDB query actually returns real dates live, and Gate Z3's tracklet linker before this can be exercised against real candidates instead of synthetic objects. |
 | Z3: Source-native candidate linking | Ingest tool confirmed working against the real archive (real run, 2026-07-02); real 2-night detection overlap and linking still open | `src/link.py`'s linear-motion tracklet linker is unchanged from prior gates. The real-detection source blocker is resolved (UW ZTF alert archive, confirmed reachable and schema-verified -- see prior column entries and `docs/evidence/phase0/2026-07-02-gate-z3-uw-alert-archive-candidate.md`). `Skills/ztf_alert_archive_ingest.py` builds real `src/schemas.py` `Observation` objects from real per-source alerts, using only field names confirmed live (`ra`/`dec`/`jd`/`magpsf`/`sigmapsf`/`fid`-mapped-to-band/`rb`/`field`/`diffmaglim` -- cutouts deliberately left unmapped, their AVRO structure is unverified). Bounded by design: an explicit night list (max 10), streamed directly through gzip/tar decode with a real-bogus threshold and optional sky-box filter applied per-record (never buffers a full night, which can be up to 73G), checkpointed per night, retried with backoff. **First live run (2026-07-02)** against real nights 20180809 (31.0MiB, 715 real packets scanned, 21 kept) and 20180810 (5.3GiB, 119,815 real packets scanned, 0 kept) confirmed the tool works end-to-end on the real archive -- see `docs/evidence/live/2026-07-02-ztf-alert-archive-ingest-first-live-run.md`. This run also caught a real progress-silence defect (fixed in v0.90.36/PR #173: the progress print was gated behind the rb/sky-box filter `continue` statements, so the 4m47s/119,815-record scan of night 2 produced zero progress output -- confirmed live, not just in the offline regression tests). **Still open**: night 20180810's zero-match result inside the same 2-degree sky box is a legitimate negative (ZTF revisits a given field roughly every 3 nights, not nightly, per `docs/near_earth_objects_research_brief.md`/CLAUDE.md's own "3-night cadence" description) -- no real per-source detections have yet been run through `src/link.py`, and the "known-object positive control" sub-requirement (>=2 real nights of real detections of the same object) has not been attempted successfully. |
 | Z4: Auditable ranking baseline | Open | Handcrafted tabular features plus logistic regression baseline are evaluated before LightGBM/XGBoost. Metrics include recall@K or purity@K, false-positive review burden, calibration error, and ablation against a simple baseline. |
@@ -64,35 +64,43 @@ observations for night 1, 0 for night 2) and does not need to be redone;
 the progress-silence bug that run also caught is separately fixed in
 v0.90.36/PR #173.
 
-**Why night 2 produced zero matches**: `ztf_public_20180810.tar.gz` (5.3GiB,
-119,815 real packets scanned) had zero detections in the same 2-degree sky
-box as night 1. This is a legitimate negative, not a bug -- ZTF's own
-documented cadence is roughly 3 nights per field (see CLAUDE.md's "3-night
-cadence over the full northern sky"), so consecutive nights are not
-expected to both cover the same sky patch.
+**Why nights 2 and 3 produced zero matches -- now confirmed, not just
+inferred**: `ztf_public_20180810.tar.gz` and `ztf_public_20180812.tar.gz`
+both had zero detections in the same 2-degree sky box as night 1. A Gate
+Z1 live run against the real IRSA sci-metadata endpoint (2026-07-02, see
+Gate Z1 row and
+`docs/evidence/live/2026-07-02-gate-z1-bounded-ingest-first-live-run.md`)
+confirms this is not a linking or ingest problem: across the full 10-day
+window from night 1 (JD 2458339.5-2458349.5), IRSA reports **only 1
+distinct night and 1 distinct field** with any real science exposure at
+this exact sky position. ZTF simply did not point at this field again in
+that window. Blindly trying more individual nights against the multi-GB
+alert archive is no longer justified -- use the metadata tool first.
 
-**Next step**: try a night spaced by ZTF's actual ~3-night cadence instead
-of night+1, keeping the same sky box (still centered on the real position
-confirmed present in `ztf_public_20180809.tar.gz`):
+**Next step**: use `Skills/ztf_dr24_bounded_ingest.py` (Gate Z1, now
+live-verified) with a wider time window at the same sky position to find
+this specific field's true real revisit cadence, before spending any more
+bandwidth on multi-GB alert-archive downloads. Still bounded (`_MAX_WINDOW_DAYS=400`):
 
 ```bash
 git pull origin main
 export PYTHONPATH=src
-caffeinate -i uv run --python 3.14 python Skills/ztf_alert_archive_ingest.py \
-    --nights 20180809 20180812 \
-    --ra 232.6 --dec -8.4 --radius-deg 2.0 --min-rb 0.5
+caffeinate -i uv run --python 3.14 python Skills/ztf_dr24_bounded_ingest.py \
+    --ra 232.6 --dec -8.4 --size-deg 2.0 \
+    --start-jd 2458339.5 --end-jd 2458439.5
 ```
 
-If this also comes back empty for night 2, the next escalation (in order of
-preference, cheapest first) is: (a) widen `--radius-deg` moderately (the
-sky box, not the archive scope, so still bounded), (b) try a short
-consecutive run of 3-4 nights around night 1 in one invocation (still under
-the `_MAX_NIGHTS=10` cap) to raise the odds of a revisit, or (c) query the
-already Phase-0-verified JPL Horizons/SBDB endpoints for a specific known
-NEO's real historical ephemeris across 2+ real archive nights and target
-the sky box at that pre-identified position/date pair -- this is more
-setup work but removes the guesswork entirely. Do not invent a plausible-
-sounding second night without one of these justifications.
+(100-day window from night 1; well under the 400-day cap.) The report's
+`n_distinct_nights` count and the underlying IPAC table (saved at
+`Logs/pipeline_runs/ztf_dr24_bounded_ingest/<key>/ztf_sci_metadata.ipac`)
+give the real `obsjd` values of every night this field was actually
+imaged -- convert those to `YYYYMMDD` and target `ztf_alert_archive_ingest.py`
+only at nights confirmed to have real coverage, instead of guessing. If
+this field turns out to have very sparse real coverage even over 100 days,
+the next escalation is to run the same metadata query at a different sky
+position (still not guessed -- e.g. a position with a documented denser
+ZTF footprint, or the already Phase-0-verified JPL Horizons/SBDB ephemeris
+for a specific known NEO across dates the archive covers).
 
 Once real per-source `Observation` objects exist for >=2 real nights (the
 ingest tool's checkpoint JSON files under
