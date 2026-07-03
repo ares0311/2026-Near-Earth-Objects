@@ -656,7 +656,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.39)
+## Current State (v0.90.40)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -689,7 +689,49 @@ bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-02 v26 (CURRENT)
+### Handoff state as of 2026-07-02 v27 (CURRENT)
+
+**Second real alert-archive attempt (nights 20180809/20180902, the
+corrected pair) came back empty on night 2** — night 20180809 resumed
+from cache (21 kept, unchanged); night 20180902 downloaded 8.5GiB, scanned
+192,243 real packets over 7m09s with correct live progress/ETA throughout
+(confirms v0.90.36 and v0.90.39 both work together on a real, large file),
+but kept 0 despite a confirmed real ZTF exposure that night (per Gate Z1
+metadata). This is a genuine negative, not a bug. Full evidence:
+`docs/evidence/live/2026-07-02-ztf-alert-archive-ingest-second-attempt.md`.
+
+**Two real multi-GB downloads (5.3GiB + 8.5GiB) via blind field-revisit
+sampling have now produced zero net progress** toward a linkable 2-night
+detection pair. Blind guessing more individual nights is no longer the
+recommended approach.
+
+**New tool (v0.90.40)**: `Skills/lookup_neo_archive_ephemeris.py` replaces
+blind guessing with a targeted approach — queries the Phase-0-verified
+JPL Horizons endpoint (`src/fetch.py:fetch_horizons`, already 100%-covered
+production code) for a real, known minor planet's real predicted sky
+position across a date range. Default designation `72966` is the real
+`ssnamenr` cross-match already present in a real Gate Z3 alert packet —
+not a guess. Wraps `fetch_horizons` in its own retry-with-backoff (the
+underlying function has none) and reuses the v0.90.39 full-precision
+JD-to-date conversion. Offline-tested (4 tests, all mocked); not yet run
+live (no live network in this sandbox).
+
+**Next production action (NOT YET DONE)**: operator runs the ephemeris
+lookup tool, then cross-checks a couple of the reported real nights
+against the cheap Gate Z1 metadata tool (centered on the object's
+predicted position) before committing to another multi-GB alert-archive
+download:
+
+```bash
+git checkout -- uv.lock
+git pull origin main
+export PYTHONPATH=src
+caffeinate -i uv run --python 3.14 python Skills/lookup_neo_archive_ephemeris.py \
+    --designation 72966 \
+    --start-jd 2458339.5 --end-jd 2458439.5 --step 1d
+```
+
+### Handoff state as of 2026-07-02 v26
 
 **Real off-by-one bug found and fixed in the v0.90.38 night-date output**
 — the first real run of the fixed metadata report printed
