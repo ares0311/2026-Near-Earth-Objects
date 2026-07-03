@@ -3,6 +3,28 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.44 — Systematic MPC-history x ZTF-coverage scan (2026-07-02)
+
+### Added
+- `Skills/scan_mpc_history_ztf_coverage.py`: for a bounded, stride-limited
+  subset of a known object's real MPC-confirmed observation history,
+  checks the cheap Gate Z1 metadata endpoint at each report's own exact
+  real observed position/date, reporting every real night with BOTH an
+  independent MPC-confirmed detection AND real ZTF sci-exposure coverage
+  -- the strongest possible candidate signal available. Reuses
+  `Skills/lookup_mpc_observation_history.py` and the already live-verified
+  `Skills/ztf_dr24_bounded_ingest.py`. Offline-tested (4 tests, mocked);
+  not yet run live.
+
+### Evidence
+- First cross-check of the July 2018 MPC cluster (nights 20180711/13/14/15)
+  against Gate Z1 found real ZTF coverage on only 1 of the 4 real
+  MPC-confirmed nights (20180713) -- most of those specific reports were
+  evidently made by a different observatory/survey, not ZTF. Night
+  20180713 is now the strongest single-night candidate found in this
+  project (two independent real confirmations). See
+  `docs/evidence/live/2026-07-02-gate-z1-mpc-cluster-crosscheck.md`.
+
 ## v0.90.43 — Cross-check known-NEO MPC history against archive coverage (2026-07-02)
 
 ### Added

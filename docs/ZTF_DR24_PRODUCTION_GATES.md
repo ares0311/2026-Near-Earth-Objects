@@ -252,6 +252,40 @@ few or no MPC-confirmed reports within the archive window, the next
 escalation is to pick a different, more actively-observed real NEO rather
 than continuing to chase this specific object.
 
+**Update 2026-07-02 (real result: 1332 total reports, 526 in-window)**:
+this returned real, substantial data -- far denser than the single
+`ssnamenr` cross-match that originally identified this object. See
+`docs/evidence/live/2026-07-02-mpc-observation-history-72966.md`. A dense
+real cluster of 4 report nights in July 2018 (20180711, 20180713,
+20180714, 20180715) was cross-checked against Gate Z1: only night
+20180713 showed real ZTF coverage (9 rows, 1 field) -- most of the other
+reports were evidently made by a different observatory/survey, not ZTF.
+See `docs/evidence/live/2026-07-02-gate-z1-mpc-cluster-crosscheck.md`.
+Night 20180713 is the strongest single-night candidate found so far (two
+independent real confirmations), but a second confirmed night is still
+needed.
+
+**Next step (v0.90.44)**: `Skills/scan_mpc_history_ztf_coverage.py`
+systematically checks a bounded, stride-limited subset of ALL 526 real
+in-window MPC reports against Gate Z1, instead of hand-picking more
+clusters:
+
+```bash
+git checkout -- uv.lock
+git pull origin main
+export PYTHONPATH=src
+caffeinate -i uv run --python 3.14 python Skills/scan_mpc_history_ztf_coverage.py \
+    --designation 72966 \
+    --archive-start-jd 2458273.5 --stride 10
+```
+
+This issues ~53 cheap Gate Z1 metadata queries (1 per 10 real in-window
+MPC reports) at each report's own exact real observed position/date,
+reporting every real night with both an MPC-confirmed detection and real
+ZTF coverage. Target `Skills/ztf_alert_archive_ingest.py` at the two best
+resulting nights (closest in time to each other, to minimize orbit-motion
+targeting error) for the Gate Z3 positive control attempt.
+
 The same dump also revealed the packet includes ZTF's own solar-system
 cross-match fields (`ssnamenr`/`ssdistnr`/`ssmagnr`) -- do NOT wire these
 into known-object exclusion logic yet; their catalog provenance and
