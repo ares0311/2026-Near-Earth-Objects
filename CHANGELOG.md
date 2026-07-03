@@ -3,6 +3,55 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.43 — Cross-check known-NEO MPC history against archive coverage (2026-07-02)
+
+### Added
+- `Skills/lookup_mpc_observation_history.py`: queries MPC's own confirmed
+  observation history (`src/fetch.py:fetch_mpc_observations`, already
+  Phase-0-verified production code) for a known object, filtering to
+  reports within the ZTF alert archive's real coverage window
+  (`>= JD 2458273.5`, 2018-06-04). A real MPC-reported observation means a
+  real astrometric detection was made and credible enough to be submitted
+  and accepted -- a categorically stronger signal than "ZTF pointed a
+  camera there" (Gate Z1 sci-metadata). Wraps `fetch_mpc_observations` in
+  its own retry-with-backoff and reuses the v0.90.39 full-precision
+  JD-to-date conversion. Offline-tested (5 tests, mocked); not yet run
+  live.
+
+### Evidence
+- A third real live alert-archive attempt (night 20180903, ephemeris-
+  targeted at object 72966's real predicted position, Gate Z1-confirmed 6
+  real sci exposure rows there) still found zero kept detections after
+  scanning 193,223 real packets over 8m36s with correct progress/ETA
+  throughout. Root-cause diagnosis: real sci exposure existing does not
+  confirm a real alert (rb >= 0.5 difference-image detection) was
+  generated at that exact sub-position -- a categorically different
+  question than "was the sky imaged." See
+  `docs/evidence/live/2026-07-02-ztf-alert-archive-ingest-third-attempt.md`.
+
+## v0.90.42 — Gate Z3 known-object positive control loader/runner (2026-07-02)
+
+### Added
+- `Skills/run_archive_positive_control.py`: loads real per-source
+  `Observation` objects from `Skills/ztf_alert_archive_ingest.py`'s
+  checkpoint files for >=2 real nights and runs the exact production
+  `preprocess()` -> `detect()` -> `link()` chain (matching
+  `Skills/run_pipeline.py`'s call pattern), reporting whether the linker
+  recovers a multi-night tracklet from real archived alerts. Diagnostic
+  only -- never claims "confirmed NEO."
+- `--min-observations` CLI flag on the new tool: offline verification (the
+  exact synthetic generator already proven in `Skills/injection_recovery.py`'s
+  baseline) found `link()`'s default `min_observations=3` can reject a
+  genuine 2-night tracklet when each night contributes only 1-2
+  observations to the final arc (20/20 synthetic 2-night seeds failed to
+  link at the default; 20/20 linked at `min_observations=2`). Real archived
+  data has far more observations per night, so the default is likely fine,
+  but the parameter is exposed for principled re-checking rather than
+  silently accepting a possible false negative.
+- `tests/test_run_archive_positive_control.py`: 5 new tests, including one
+  exercising the real production chain end-to-end and one regression-
+  testing the `min_observations` finding above.
+
 ## v0.90.41 — Scan a known NEO's real track for real ZTF coverage (2026-07-02)
 
 ### Added

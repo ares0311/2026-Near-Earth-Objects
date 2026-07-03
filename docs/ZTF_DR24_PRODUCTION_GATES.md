@@ -28,7 +28,7 @@ not a precondition for running the production search.
 | Z0: Phase 0 source verification | Closed except Fink external blocker | `docs/evidence/phase0/` contains live evidence for JPL SBDB, MPC get-obs, and IRSA ZTF metadata; Fink TLS failure is documented as external; pretrained model use is deferred. |
 | Z1: Bounded replay ingest | Closed (2026-07-02) | `Skills/ztf_dr24_bounded_ingest.py` queries only the Phase 0-verified IRSA ZTF sci-metadata endpoint (`POS`/`SIZE`/`WHERE obsjd`/`COLUMNS`, all documented in IRSA's own API docs, not guessed), enforces a bounded search box and time window, checkpoints/resumes, retries with backoff, and writes a sample ingest report with row counts, distinct-night/field counts, and a sha256 of the raw response. Unit-tested offline against an astropy-generated IPAC fixture (8 tests, all passing). **Operator live run (2026-07-02)** against the real IRSA endpoint (RA 232.6, Dec -8.4, 2 deg box, 10-day window) returned a real, non-mocked report: 5 rows, 1 distinct night, 1 distinct field -- see `docs/evidence/live/2026-07-02-gate-z1-bounded-ingest-first-live-run.md`. |
 | Z2: Time-aware known-object exclusion | Core mechanism code complete, pending operator field verification | `src/known_object_exclusion.py` implements the brief's `known_object_catalog_snapshots`/`known_objects` schema verbatim and a `known_as_of(objects, cutoff)` filter using each object's own `first_obs` date (a documented JPL SBDB Query API field, confirmed via official docs and a live astroquery example -- not guessed) so a single current-day snapshot can be used correctly for any historical replay cutoff without needing true point-in-time catalog snapshots. Fails closed on missing `first_obs` (never treats an object as confirmed-known without evidence) and on a snapshot missing/violating its own `valid_for_replay_before_utc`. 9 offline tests cover every boundary (exact-cutoff equality, missing-date fail-closed, snapshot validity). Not yet closed: needs operator confirmation that adding `first_obs` to the already-verified `sb-group=neo` JPL SBDB query actually returns real dates live, and Gate Z3's tracklet linker before this can be exercised against real candidates instead of synthetic objects. |
-| Z3: Source-native candidate linking | Ingest tool confirmed working against the real archive; two real nights sampled by blind field revisit both came up empty; targeted known-NEO ephemeris approach built (2026-07-02), not yet run | `src/link.py`'s linear-motion tracklet linker is unchanged from prior gates. The real-detection source blocker is resolved (UW ZTF alert archive, confirmed reachable and schema-verified -- see prior column entries and `docs/evidence/phase0/2026-07-02-gate-z3-uw-alert-archive-candidate.md`). `Skills/ztf_alert_archive_ingest.py` builds real `src/schemas.py` `Observation` objects from real per-source alerts, using only field names confirmed live (`ra`/`dec`/`jd`/`magpsf`/`sigmapsf`/`fid`-mapped-to-band/`rb`/`field`/`diffmaglim` -- cutouts deliberately left unmapped, their AVRO structure is unverified). Bounded by design: an explicit night list (max 10), streamed directly through gzip/tar decode with a real-bogus threshold and optional sky-box filter applied per-record (never buffers a full night, which can be up to 73G), checkpointed per night, retried with backoff. **Two real live runs (2026-07-02)** against nights 20180809 (31.0MiB, 715 real packets, 21 kept), 20180810 (5.3GiB, 119,815 real packets, 0 kept), and 20180902 (8.5GiB, 192,243 real packets, 0 kept, confirmed real exposure via Gate Z1 metadata) confirmed the ingest tool works end-to-end but found no second night with detections via blind field-revisit sampling -- see `docs/evidence/live/2026-07-02-ztf-alert-archive-ingest-first-live-run.md` and `docs/evidence/live/2026-07-02-ztf-alert-archive-ingest-second-attempt.md`. Also caught and fixed a real progress-silence defect (v0.90.36/PR #173) and a real JD noon/midnight off-by-one in night-date conversion (v0.90.39/PR #178). **New (v0.90.40)**: `Skills/lookup_neo_archive_ephemeris.py` replaces blind field-revisit sampling with a targeted approach -- queries the Phase-0-verified JPL Horizons endpoint for a real, known minor planet's real predicted position across a date range, so the next alert-archive attempt targets a specific real object instead of an arbitrary field. Offline-tested; not yet run live. **Still open**: the "known-object positive control" sub-requirement (>=2 real nights of real detections of the same object, run through `src/link.py`) has not been attempted successfully. |
+| Z3: Source-native candidate linking | Three real alert-archive attempts (blind x2, ephemeris-targeted x1) all found zero kept detections; positive-control loader/runner built; pivoting to MPC-confirmed observation history as the targeting signal (2026-07-02) | `src/link.py`'s linear-motion tracklet linker is unchanged from prior gates. The real-detection source blocker is resolved (UW ZTF alert archive, confirmed reachable and schema-verified). Blind field-revisit sampling (nights 20180810, 20180902 at the original fixed field) found zero detections -- diagnosed as a targeting error: real ephemeris for known object 72966 showed the object had moved ~9.4 deg in RA by night 20180902. `Skills/scan_neo_track_coverage.py` (v0.90.41) then found real ZTF coverage at the object's actual predicted position on night 20180903 (6 real sci exposure rows) -- but the alert-archive ingest there **still returned zero kept detections** (8.5GiB, 193,223 real packets scanned). Root-cause diagnosis: a real science exposure existing confirms only that ZTF pointed a camera there, not that a real alert (`rb >= 0.5`) was generated at that exact sub-position -- see `docs/evidence/live/2026-07-02-ztf-alert-archive-ingest-third-attempt.md`. `Skills/run_archive_positive_control.py` (v0.90.42) loads real per-source `Observation` objects from >=2 nights' checkpoint files and runs the exact production `preprocess()` -> `detect()` -> `link()` chain (offline-verified, including a real `min_observations` parameter-sensitivity finding). **New (v0.90.43)**: `Skills/lookup_mpc_observation_history.py` pivots to a categorically stronger signal -- MPC's own confirmed observation history, which proves a real alert-equivalent detection genuinely happened, not just that the sky was imaged. Offline-tested; not yet run live. **Still open**: no real per-source detections exist yet for >=2 real nights of the same object, so the positive control itself has not been attempted against real data. |
 | Z4: Auditable ranking baseline | Open | Handcrafted tabular features plus logistic regression baseline are evaluated before LightGBM/XGBoost. Metrics include recall@K or purity@K, false-positive review burden, calibration error, and ablation against a simple baseline. |
 | Z5: Retrospective validation | Open | Historical replay candidates are evaluated against later MPC/JPL outcomes after the replay window without future leakage. The report must separate recovered known objects, later-confirmed objects, artifacts, and unresolved candidates. |
 | Z6: No-submission package drill | Open | At least one ZTF DR24 review packet, synthetic or recovered-known if needed, passes through adversarial review and ADES/export tooling in dry-run mode with no external submission and no impact-probability claim. |
@@ -186,15 +186,71 @@ already covers this object's real location and does not need re-fetching.
 If night 20180903 also yields >=1 kept observation, this project will have
 real per-source detections on 2 real nights for the first time.
 
-Once real per-source `Observation` objects exist for >=2 real nights (the
-ingest tool's checkpoint JSON files under
-`Logs/pipeline_runs/ztf_alert_archive_ingest/`), load them and run them
-through the existing `src/detect.py` -> `src/link.py` pipeline for Z3's
-"known-object positive control": confirm the linker recovers at least one
-real multi-night tracklet from the real archived alerts. That loader/runner
-script has not been built yet -- do not build it until a run produces
-real detections on >=2 nights in the same sky box, since there is nothing
-to link otherwise.
+**Update 2026-07-02 (loader/runner built, v0.90.42)**: the positive
+control loader/runner is now built --
+`Skills/run_archive_positive_control.py` loads real per-source
+`Observation` objects from >=2 nights' checkpoint files and runs the exact
+production `preprocess()` -> `detect()` -> `link()` chain, reporting
+whether a real multi-night tracklet forms. Offline verification (using
+the exact synthetic generator already proven in
+`Skills/injection_recovery.py`'s baseline) found a real parameter-
+sensitivity issue: `link()`'s default `min_observations=3` can reject a
+genuine 2-night tracklet when each night contributes only 1-2
+observations to the final arc. Real archived data has far more
+observations per night (21 on night 20180809 alone) so the default is
+likely fine, but `--min-observations 2` is available to re-check a
+zero-tracklet result before concluding failure.
+
+Once night 20180903's alert-archive ingest completes (see the command
+above), run:
+
+```bash
+git checkout -- uv.lock
+git pull origin main
+export PYTHONPATH=src
+caffeinate -i uv run --python 3.14 python Skills/run_archive_positive_control.py \
+    --nights 20180809 20180903 \
+    --out Logs/pipeline_runs/run_archive_positive_control/report.json
+```
+
+If this reports zero tracklets, re-run with `--min-observations 2` before
+concluding the positive control failed.
+
+**Update 2026-07-02 (third attempt result -- real negative, root cause
+diagnosed)**: night 20180903's alert-archive ingest was run. Real result:
+8.5GiB, 193,223 real packets scanned over 8m36s with correct progress/ETA,
+but **kept 0**, despite Gate Z1 confirming 6 real sci exposure rows at
+this exact position that night. Root cause: a real science exposure
+existing confirms only that ZTF pointed a camera there -- not that its
+difference-imaging pipeline generated a real alert (`rb >= 0.5`) at that
+specific sub-position. "Was the sky imaged" and "did a real alert fire
+here" are different questions; Gate Z1's metadata check only answers the
+first. See
+`docs/evidence/live/2026-07-02-ztf-alert-archive-ingest-third-attempt.md`.
+
+**Next step (v0.90.43)**: `Skills/lookup_mpc_observation_history.py`
+queries a stronger signal -- MPC's own confirmed observation history
+(`src/fetch.py:fetch_mpc_observations`, already Phase-0-verified
+production code). A real MPC-reported observation means a real
+astrometric detection genuinely happened and was credible enough to be
+submitted and accepted, not just that the sky was imaged:
+
+```bash
+git checkout -- uv.lock
+git pull origin main
+export PYTHONPATH=src
+caffeinate -i uv run --python 3.14 python Skills/lookup_mpc_observation_history.py \
+    --designation 72966 \
+    --archive-start-jd 2458273.5
+```
+
+This reports every real MPC-confirmed observation of 72966 since the ZTF
+archive's coverage began (2018-06-04). Cross-check any in-window nights
+against `Skills/ztf_dr24_bounded_ingest.py` (cheap) before committing to
+another multi-GB alert-archive download. If 72966 turns out to have very
+few or no MPC-confirmed reports within the archive window, the next
+escalation is to pick a different, more actively-observed real NEO rather
+than continuing to chase this specific object.
 
 The same dump also revealed the packet includes ZTF's own solar-system
 cross-match fields (`ssnamenr`/`ssdistnr`/`ssmagnr`) -- do NOT wire these
