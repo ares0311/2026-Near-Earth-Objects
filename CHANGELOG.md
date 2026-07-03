@@ -3,6 +3,26 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.37 — Gate Z1 closed; Gate Z3 root cause confirmed via real metadata (2026-07-02)
+
+### Changed
+- Gate Z1 CLOSED: operator ran `Skills/ztf_dr24_bounded_ingest.py` against
+  the real IRSA ZTF sci-metadata endpoint (RA 232.6, Dec -8.4, 2 deg box,
+  10-day window). Real result: 5 rows, 1 distinct night, 1 distinct field.
+  This is the tool's first genuine, non-mocked live run.
+- This result explains, with real evidence rather than inference, why the
+  Gate Z3 ingest tool found zero matches on nights 20180810 and 20180812:
+  ZTF simply took no science exposures at this exact sky position on
+  either night. Not a linking bug, not a filter bug.
+- `docs/ZTF_DR24_PRODUCTION_GATES.md` Next Coding Step now recommends
+  widening the Gate Z1 metadata query's time window (still bounded) to
+  find a field's true real revisit cadence *before* spending bandwidth on
+  further multi-GB alert-archive downloads, rather than guessing more
+  individual nights.
+- Documented a local-only `uv.lock` conflict encountered during
+  `git pull` (machine-generated lockfile drift, not manual edits);
+  resolved with `git checkout -- uv.lock` before pulling.
+
 ## v0.90.36 — Fix silent progress in Gate Z3 ingest tool (2026-07-02)
 
 ### Fixed
