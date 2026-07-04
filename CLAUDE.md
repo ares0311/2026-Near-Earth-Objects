@@ -769,7 +769,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.50)
+## Current State (v0.90.51)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -802,7 +802,50 @@ bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-03 v41 (CURRENT)
+### Handoff state as of 2026-07-03 v42 (CURRENT)
+
+**Re-run at `--min-observations 2` reproduced the same 88 tracklets (new
+UUIDs, identical rates/arcs) -- still not confirmed as designation
+72966** — operator re-ran the identical command on `main` @ v0.90.50
+(with the per-observation-position fix from PR #192). Real result:
+identical distribution of 88 two-observation tracklets (same arc lengths
+and rates as the prior run, e.g. `068f107d` at 38.10 arcsec/hr,
+`e1454478` at 40.28 arcsec/hr), confirming the run is deterministic, not
+flaky. The console print statement does not surface per-observation
+positions (only the JSON report does), so a follow-up analysis step is
+needed to actually identify a match rather than eyeballing rates.
+
+**New tool (v0.90.51, this PR)**: `Skills/match_positive_control_tracklet.py`
+ranks each tracklet in a `report_min2.json` by real angular offset (arcsec)
+from the two known reference positions, instead of relying on rate
+proximity alone. 6 offline tests confirm it correctly ranks a synthetic
+"close" tracklet above a "far" one and excludes single-observation
+tracklets. Not yet run against the real 88-tracklet report (needs the
+operator's local `report_min2.json` file).
+
+**Next production action (NOT YET DONE)**: run the new matching tool
+against the already-produced local report:
+
+```bash
+git checkout -- uv.lock
+git pull origin main
+export PYTHONPATH=src
+uv run --python 3.14 python Skills/match_positive_control_tracklet.py \
+    Logs/pipeline_runs/run_archive_positive_control/report_min2.json \
+    --ref1 257.0809 -10.7456 \
+    --ref2 257.5497 -10.9843
+```
+
+This is a fast, local, no-network analysis of the file already on disk —
+no re-run of the positive control itself is needed. If the best match's
+total offset is large (many arcmin or more), the 88 tracklets are almost
+certainly combinatorial artifacts and this candidate pair should be
+considered a Gate Z3 negative; if a tracklet's offset is small (sub-arcmin
+to a few arcsec, consistent with real astrometric/orbit-propagation
+error), that specific tracklet is real supporting evidence, not final
+confirmation.
+
+### Handoff state as of 2026-07-03 v41
 
 **`--min-observations 2` produced 88 tracklets, but this is NOT yet
 confirmed evidence of recovering designation 72966** — operator re-ran
@@ -2640,6 +2683,7 @@ succeeded and produced the trained Tier 3 weights now recorded under T1-A.
 | `Skills/get_top_candidates.py` | Top-N candidates by discovery priority from scored NEO JSON; `--n`, `--json` flags |
 | `Skills/validate_model_weights.py` | Load all four committed model files and assert valid calibrated output on synthetic fixtures; `--json` flag; used by `e2e.yml` model-weight CI job |
 | `Skills/validate_alert_protocol.py` | Run `ready_for_submission()` on 14 diverse synthetic NEOs and assert correct gate behavior; `--json` flag; used by `e2e.yml` alert-protocol CI job |
+| `Skills/match_positive_control_tracklet.py` | Rank `run_archive_positive_control.py` report tracklets by angular offset from two known real reference positions, to identify which (if any) tracklet actually matches a known object rather than a combinatorial cross-night pairing; `--ref1`, `--ref2`, `--top-n` flags |
 
 ### Docs
 
