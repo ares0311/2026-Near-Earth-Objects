@@ -769,7 +769,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.49)
+## Current State (v0.90.50)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -802,7 +802,53 @@ bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-03 v40 (CURRENT)
+### Handoff state as of 2026-07-03 v41 (CURRENT)
+
+**`--min-observations 2` produced 88 tracklets, but this is NOT yet
+confirmed evidence of recovering designation 72966** — operator re-ran
+`Skills/run_archive_positive_control.py --nights 20220817 20220819
+--min-observations 2`. Real result: 88 tracklets formed, each with exactly
+2 observations (one per night), arc lengths 1.94-2.02 days, rates from
+~4.5 to ~59.9 arcsec/hr. Root cause of why this is not yet confirmation
+(diagnosed, not guessed): `link()` has no chi-square orbit-consistency
+check for 2-observation arcs (that check only applies at >=3
+observations), so in a crowded 116-candidate field, any two points across
+the two nights whose implied rate falls in the deliberately broad
+0.05-60 arcsec/hr window forms a "tracklet" — 88 is consistent with
+combinatorial cross-matching of unrelated real sources, not confirmation
+of the genuine object. Computed directly (not guessed) from the two real
+MPC-reported center positions that anchored these search boxes
+(257.0809/-10.7456 and 257.5497/-10.9843), designation 72966's real
+implied motion between them is separation=1866.9 arcsec, rate=38.70
+arcsec/hr, PA=117.4 deg. Several of the 88 tracklets have rates near this
+value (e.g. `8633d484` at 39.27 arcsec/hr) but rate proximity alone is not
+sufficient — need per-observation positions to confirm. Full evidence:
+`docs/evidence/live/2026-07-03-gate-z3-positive-control-min2-88-tracklets.md`.
+
+**Fix (v0.90.50, this PR)**: `Skills/run_archive_positive_control.py`'s
+report now includes `motion_pa_degrees` and each tracklet's
+per-observation `[{ra_deg, dec_deg, jd}, ...]` list, so the specific
+tracklet nearest the two known real center positions can be identified by
+angular offset instead of by rate alone.
+
+**Next production action (NOT YET DONE)**: re-run the identical command
+(now with the updated script) and inspect `report_min2.json`'s
+`tracklets[].observations` for the tracklet closest to the two real
+center positions above:
+
+```bash
+git checkout -- uv.lock
+git pull origin main
+export PYTHONPATH=src
+caffeinate -i uv run --python 3.14 python Skills/run_archive_positive_control.py \
+    --nights 20220817 20220819 --min-observations 2 \
+    --out Logs/pipeline_runs/run_archive_positive_control/report_min2.json
+```
+
+Do not treat "88 tracklets" as confirmation of anything until a specific
+tracklet's positions are matched against the two real center coordinates.
+
+### Handoff state as of 2026-07-03 v40
 
 **First real positive-control run: 0 tracklets at default threshold, retry
 with `--min-observations 2` not yet run** — operator ran

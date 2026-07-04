@@ -3,6 +3,23 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.50 — Positive-control report now includes per-observation positions (2026-07-03)
+
+### Added
+- `Skills/run_archive_positive_control.py`: each tracklet in the JSON
+  report now includes `motion_pa_degrees` and a per-observation
+  `[{ra_deg, dec_deg, jd}, ...]` list. Root cause: the first real
+  `--min-observations 2` run against the Gate Z3 target pair
+  (20220817/20220819) formed 88 two-observation tracklets, but `link()`
+  has no chi-square orbit-consistency check for exactly-2-observation
+  arcs, so in a crowded 116-candidate field many of these are likely
+  combinatorial cross-matches of unrelated real sources rather than
+  genuine recoveries of designation 72966. Confirming which (if any)
+  tracklet is the real object requires comparing each tracklet's actual
+  RA/Dec against the object's real MPC-reported position on each night --
+  which the report did not previously expose. See
+  `docs/evidence/live/2026-07-03-gate-z3-positive-control-min2-88-tracklets.md`.
+
 ## v0.90.49 — Fix .gitignore blocking the git-relay manifest file (2026-07-03)
 
 ### Fixed
