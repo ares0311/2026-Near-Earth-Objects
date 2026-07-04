@@ -3,6 +3,18 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.56 — Add --force-refresh-mpc to scan_mpc_history_ztf_coverage.py (2026-07-04)
+
+### Fixed
+- `Skills/scan_mpc_history_ztf_coverage.py` keeps its own nested MPC-
+  history checkpoint separate from `lookup_mpc_observation_history.py`'s
+  default checkpoint path. The operator's first real re-run after
+  v0.90.55 confirmed the sentinel-mag filter engaged correctly, but every
+  `HIT` line still printed `observatory=None` because this scan's own
+  checkpoint predates the v0.90.53 observatory field and was never told
+  to refresh. Added `--force-refresh-mpc`, threaded through to
+  `run_lookup(..., force_refresh=...)`. 1 new regression test.
+
 ## v0.90.55 — Exclude sentinel-magnitude MPC reports from Gate Z3 candidate selection (2026-07-04)
 
 ### Fixed
