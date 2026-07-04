@@ -802,7 +802,40 @@ bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-04 v50 (CURRENT)
+### Handoff state as of 2026-07-04 v51 (CURRENT)
+
+**Third candidate pair (20191030/20191101, same-station I41): one real
+negative, one real strong positive** — operator ingested both nights of
+the new same-station candidate pair selected in v50. Real result: night
+20191030 kept **0** (real negative, 128,214 packets scanned, 5.7GiB),
+night 20191101 kept **234** (real strong positive, 227,496 packets,
+10.2GiB). Since a positive control needs both nights to have data, this
+specific pair cannot support one, even though the same-station selection
+criterion was a real improvement over the prior two attempts. Full
+evidence: `docs/evidence/live/2026-07-04-gate-z3-third-pair-mixed-result.md`.
+
+**Next production action (NOT YET DONE)**: try the backup same-station
+candidate (`G96`, both nights, 6 days apart):
+
+```bash
+git checkout -- uv.lock
+git pull origin main
+export PYTHONPATH=src
+caffeinate -i uv run --python 3.14 python Skills/ztf_alert_archive_ingest.py \
+    --nights 20210105 \
+    --ra 116.3469 --dec 8.5736 --radius-deg 2.0 --min-rb 0.5
+caffeinate -i uv run --python 3.14 python Skills/ztf_alert_archive_ingest.py \
+    --nights 20210111 \
+    --ra 114.9265 --dec 8.8038 --radius-deg 2.0 --min-rb 0.5
+```
+
+Note: 20210111 already has a checkpoint from earlier this session
+(kept=177, centered on a nearly-identical position 114.9238/8.8044) --
+`ztf_alert_archive_ingest.py`'s checkpoint is keyed by night only, so this
+will resume from that existing data rather than re-download; only
+20210105 is a genuinely new ingest for this pair.
+
+### Handoff state as of 2026-07-04 v50
 
 **Re-run with `--force-refresh-mpc` succeeded: real observatory codes now
 visible for all 35 hits; new, more principled candidate pair selected** —
