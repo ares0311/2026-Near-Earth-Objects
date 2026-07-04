@@ -769,7 +769,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.55)
+## Current State (v0.90.56)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -802,7 +802,53 @@ bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-04 v48 (CURRENT)
+### Handoff state as of 2026-07-04 v49 (CURRENT)
+
+**Real re-run of the filtered scan found a genuine bug: every HIT line
+showed `observatory=None`** — operator ran the sentinel-filtered
+`Skills/scan_mpc_history_ztf_coverage.py` (v0.90.55) for the first time.
+Real result: the filter worked (16 sentinel reports excluded, printed
+correctly), and the scan found **35 of 51** checked reports had real ZTF
+coverage — but every single `HIT` line printed `observatory=None`, even
+though the *separate* `lookup_mpc_observation_history.py --force-refresh`
+run earlier this session proved the real data has genuine codes (T05,
+I41, G96, C51, etc.).
+
+**Root cause (found, not guessed)**: `scan_mpc_history_ztf_coverage.py`
+calls `lookup_mpc_observation_history.run_lookup(designation,
+archive_start_jd, out_dir / "mpc_history")` — a **separate nested
+checkpoint path** (`Logs/pipeline_runs/scan_mpc_history_ztf_coverage/mpc_history/`)
+from `lookup_mpc_observation_history.py`'s own default checkpoint
+(`Logs/pipeline_runs/lookup_mpc_observation_history/`). The operator's
+earlier `--force-refresh` only refreshed the *standalone* script's
+checkpoint; the scan's own nested copy was untouched and still predates
+the v0.90.53 observatory field, so it kept silently reusing the old data.
+
+**Fix (v0.90.56, this PR)**: added `--force-refresh-mpc` to
+`scan_mpc_history_ztf_coverage.py`, threaded through to
+`lookup_mpc_observation_history.run_lookup(..., force_refresh=...)`.
+1 new regression test (15 total in this file).
+
+**Next production action (NOT YET DONE)**: re-run the scan once more with
+this new flag to finally get real per-hit observatory codes for the 35
+hits, so a fresh candidate pair can be selected with actual station-code
+visibility:
+
+```bash
+git checkout -- uv.lock
+git pull origin main
+export PYTHONPATH=src
+caffeinate -i uv run --python 3.14 python Skills/scan_mpc_history_ztf_coverage.py \
+    --designation 72966 --archive-start-jd 2458273.5 --stride 10 \
+    --force-refresh-mpc
+```
+
+This will re-issue the same cheap Gate Z1 metadata queries (each already
+cached from the just-completed run, so this should resume quickly/mostly
+from checkpoint) but with a fresh MPC-history fetch that carries the
+observatory field through to the printed `HIT` lines this time.
+
+### Handoff state as of 2026-07-04 v48
 
 **Implemented the recommended cheap fix: sentinel-magnitude MPC reports
 are now excluded from candidate selection (v0.90.55)** —

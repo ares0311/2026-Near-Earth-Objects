@@ -138,6 +138,7 @@ def run_scan(
     out_dir: Path,
     shard_index: int = 0,
     shard_count: int = 1,
+    force_refresh_mpc: bool = False,
 ) -> dict:
     """Check real ZTF sci-metadata coverage at a bounded, stride-limited
     subset of a known object's real MPC-confirmed observation positions,
@@ -148,11 +149,22 @@ def run_scan(
     shard_index) of the already-strided list is checked here -- running
     all shard_index values 0..shard_count-1 concurrently (e.g. one per
     terminal tab) covers the full strided list with no overlap between
-    shards, since each shard's rows are disjoint by construction."""
+    shards, since each shard's rows are disjoint by construction.
+
+    force_refresh_mpc bypasses this scan's own nested MPC-history
+    checkpoint (under out_dir/mpc_history, separate from
+    lookup_mpc_observation_history.py's default checkpoint path) -- needed
+    once after a code change adds a new field to the MPC report (e.g.
+    v0.90.53's observatory field), since a checkpoint written before that
+    change predates the field and would otherwise be silently reused
+    as-is, exactly as happened on this scan's own first real
+    --force-refresh-less re-run."""
     mpc_lookup = _load_skill("lookup_mpc_observation_history")
     z1 = _load_skill("ztf_dr24_bounded_ingest")
 
-    mpc_report = mpc_lookup.run_lookup(designation, archive_start_jd, out_dir / "mpc_history")
+    mpc_report = mpc_lookup.run_lookup(
+        designation, archive_start_jd, out_dir / "mpc_history", force_refresh=force_refresh_mpc
+    )
     # Exclude sentinel/placeholder magnitude reports (mag >= 90, matching this
     # codebase's existing sentinel-mag convention elsewhere) before selecting
     # candidates -- a real Gate Z3 failure (see
@@ -390,6 +402,16 @@ def main() -> None:
         "in to the shared manifest so far, and a running combined hit list "
         "-- safe to run at any time, even mid-scan, unlike --merge.",
     )
+    parser.add_argument(
+        "--force-refresh-mpc",
+        action="store_true",
+        help="Bypass this scan's own nested MPC-history checkpoint (and the "
+        "underlying fetch's disk cache) -- needed to pick up a new report "
+        "field added since the last cached run (e.g. the v0.90.53 "
+        "observatory field, which otherwise stays None in HIT lines even "
+        "after lookup_mpc_observation_history.py's own checkpoint was "
+        "refreshed separately).",
+    )
     args = parser.parse_args()
 
     if args.shard_count < 1:
@@ -413,7 +435,7 @@ def main() -> None:
 
     run_scan(
         args.designation, args.archive_start_jd, args.stride, args.size_deg, args.out_dir,
-        args.shard_index, args.shard_count,
+        args.shard_index, args.shard_count, args.force_refresh_mpc,
     )
 
 

@@ -130,6 +130,24 @@ def test_run_scan_excludes_sentinel_magnitude_reports(tmp_path):
     assert all(hit["mag"] < 90 for hit in report["hits"])
 
 
+def test_run_scan_force_refresh_mpc_threads_through(tmp_path):
+    """force_refresh_mpc must reach the underlying fetch_mpc_observations
+    call -- this was a real gap: the first live --force-refresh-less
+    re-run after v0.90.53 still printed observatory=None in every HIT
+    line because this scan's own nested MPC-history checkpoint (a
+    separate cache from lookup_mpc_observation_history.py's default path)
+    predated the fix and was never told to bypass itself."""
+    with patch(
+        "fetch.fetch_mpc_observations", return_value=_fake_mpc_observations()
+    ) as mock_fetch:
+        with patch("requests.get", return_value=_FakeResponse(_ipac_response_text(0))):
+            scan_mpc_history_ztf_coverage.run_scan(
+                "72966", 2458273.5, stride=5, size_deg=2.0, out_dir=tmp_path,
+                force_refresh_mpc=True,
+            )
+    assert mock_fetch.call_args.kwargs["force_refresh"] is True
+
+
 def test_run_scan_rejects_zero_stride():
     parser_args = ["--stride", "0"]
     with patch.object(sys, "argv", ["scan_mpc_history_ztf_coverage.py", *parser_args]):
