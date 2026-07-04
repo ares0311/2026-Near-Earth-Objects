@@ -802,7 +802,37 @@ bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-04 v53 (CURRENT)
+### Handoff state as of 2026-07-04 v54 (CURRENT)
+
+**Gate Z7 (operator runbook update) is CLOSED** — with Gate Z6 merged
+(PR #204), the next fully code-addressable, non-gambling gate was Z7:
+`docs/OPERATOR_GO_NO_GO_RUNBOOK.md` was written entirely for the secondary
+WISE/DECam/TESS path (Gate P5) and had no ZTF DR24-specific content. Added
+a "ZTF DR24 path" section covering: the real packet location
+(`run_archive_positive_control.py --build-review-packets`'s
+`review_packets` key), the UW ZTF alert archive source-attribution rule
+(already verified in Gate Z3 evidence, not re-derived), the same
+operator review checklist as the WISE path, and an explicit statement
+that ZTF DR24 archival MPC submission authority is **not yet confirmed in
+writing** — the `stn=XXX` default not failing closed (unlike WISE's
+`stn=C51`) does not constitute that confirmation. Cites the real Gate Z6
+drill as the verified basis for every command in the new section. This is
+a docs-only change; no code modified, no version bump.
+
+**Next production action**: with Z6 and Z7 both closed, the remaining open,
+non-gambling ZTF DR24 gates are Z4 (auditable ranking baseline: handcrafted
+features + logistic-regression baseline evaluated before LightGBM/XGBoost,
+with recall@K/purity@K/calibration/ablation metrics) and Z5 (retrospective
+validation against later MPC/JPL outcomes, no future leakage). Both are
+code-and-offline-data tasks — no archival download or operator live run
+required to make initial progress. Z2 remains "pending operator field
+verification" (needs a live JPL SBDB query with `first_obs` added) and Z3
+remains on hold per the standing note below. Recommend starting Z4 next,
+since it is a pure ranking/evaluation exercise runnable against the
+synthetic/injection-recovery data already in `data/` plus the real
+archived tracklets already on disk, without needing operator action.
+
+### Handoff state as of 2026-07-04 v53
 
 **Gate Z6 (no-submission package drill) is CLOSED, with real data** —
 operator ran the full v52 command sequence to completion. Real results:

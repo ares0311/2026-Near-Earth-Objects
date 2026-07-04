@@ -1,9 +1,85 @@
 # Operator Go/No-Go Runbook — What To Do When A Candidate Appears
 
 **Established**: 2026-07-02
-**Status**: Closes `docs/PRODUCTION_READINESS.md` Gate P5
+**Updated**: 2026-07-04 — added the ZTF DR24 path (see below); the original
+steps below remain valid for the secondary WISE/DECam/TESS path.
+**Status**: Closes `docs/PRODUCTION_READINESS.md` Gate P5 (WISE/DECam/TESS
+path) and `docs/ZTF_DR24_PRODUCTION_GATES.md` Gate Z7 (ZTF DR24 path).
 **Audience**: Jerome W. Lindsey III (operator). One page. If you need more
 detail than this, the full references are linked at the bottom.
+
+---
+
+## ZTF DR24 path (current primary discovery path)
+
+This section covers the primary path per `docs/MISSION.md` and
+`docs/neo_discovery_agent_brief.md`: bounded ZTF DR24 archival historical
+replay, not the secondary WISE/DECam/TESS path documented in Steps 1-6
+below (which still applies verbatim if you ever run `--surveys WISE`,
+`DECam`, or `TESS`).
+
+**Source attribution rule**: every ZTF DR24 observation in a review packet
+originates from the University of Washington's public ZTF alert archive
+(`https://ztf.uw.edu/alerts/public/`), a real, unauthenticated,
+schema-verified per-detection source ingested by
+`Skills/ztf_alert_archive_ingest.py` — see
+`docs/evidence/phase0/2026-07-02-gate-z3-uw-alert-archive-candidate.md`.
+Do not treat a ZTF DR24 packet as coming from the live ZTF alert stream or
+from ZAPS; live-stream ZTF discovery remains prohibited (see CLAUDE.md
+DECISION-001).
+
+**Step 1 (ZTF DR24) — Build review packets**:
+
+```bash
+git pull origin main
+export PYTHONPATH=src
+uv run --python 3.14 python Skills/run_archive_positive_control.py \
+    --nights <night1> <night2> [...] --min-observations 2 \
+    --build-review-packets \
+    --out Logs/pipeline_runs/run_archive_positive_control/report.json
+```
+
+Real `ScoredNEO` review packets appear under the `review_packets` key of the
+output JSON, one per linked tracklet. If `n_tracklets_linked` is 0, there is
+nothing to review — stop here, same as the WISE path's Step 1.
+
+**Step 2 (ZTF DR24) — Adversarial review and export**: extract the
+`review_packets` array into its own file, then run the same Step 2 and
+Step 4 commands from the WISE path below against it:
+
+```bash
+uv run --python 3.14 python Skills/adversarial_review.py \
+    <review_packets_file>.json --offline --json
+uv run --python 3.14 python Skills/export_ades_report.py \
+    <review_packets_file>.json --out Logs/reports/<slug>_ades.psv
+```
+
+This exact mechanism was drilled end-to-end on real archived data (Gate
+Z6, 2026-07-04): 88 real review packets from real archived ZTF tracklets,
+correctly `REJECT`ed by adversarial review (they were combinatorial
+cross-night pairings of unrelated sources, not a real single-object
+candidate — see
+`docs/evidence/live/2026-07-04-gate-z6-no-submission-drill-closed.md`),
+then exported as valid dry-run ADES PSV text with zero network calls.
+
+**Step 3 (ZTF DR24) — Your review**: same checklist as Step 3 below,
+substituting the ZTF DR24 source-attribution rule above for the WISE/DECam/
+TESS one.
+
+**Step 5 (ZTF DR24) — MPC submission authority check**: `stn=XXX` (the
+general MPC-documented placeholder for a new observer's first submission,
+`docs/MPC_SUBMISSION_POLICY.md` §Submission Process) is the default and
+`export_ades_report.py` does not fail closed on ZTF-sourced records the way
+it does for WISE/NEOWISE `stn=C51`. **This does not mean ZTF DR24 archival
+submission authority has been separately confirmed in writing with MPC** —
+no such confirmation is currently documented anywhere in this project. Per
+the same standing rule as the WISE path, do not submit externally, and do
+not treat the absence of a code-level fail-closed check as authorization to
+do so, until the operator has obtained and recorded written MPC guidance
+for this specific archival-replay use case.
+
+Steps 6 and "Forbidden communications" below apply identically to both
+paths.
 
 ---
 
@@ -143,3 +219,7 @@ Once you submit, this pipeline's job is done for that candidate:
 - `docs/PRODUCTION_READINESS.md` — full gap register, all gates P1-P5.
 - `docs/ALERT_PROTOCOL.md` — technical reference for the alert-pathway
   decision tree.
+- `docs/ZTF_DR24_PRODUCTION_GATES.md` — full gap register for the current
+  primary ZTF DR24 path, all gates Z0-Z7.
+- `docs/evidence/live/2026-07-04-gate-z6-no-submission-drill-closed.md` —
+  the verified drill the ZTF DR24 section above is based on (Gate Z6).
