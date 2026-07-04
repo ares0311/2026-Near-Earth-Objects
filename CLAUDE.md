@@ -802,7 +802,57 @@ bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-04 v55 (CURRENT)
+### Handoff state as of 2026-07-04 v56 (CURRENT)
+
+**Gate Z5 (retrospective validation) tooling built and offline-tested;
+pending one operator run for a real-data closure result** —
+`Skills/evaluate_retrospective_validation.py` (v0.90.59) evaluates
+historical-replay review packets against the MPC known-object catalog as
+queried *today* (deliberately after the replay window -- that is the
+whole point of retrospective validation, and a distinct, legitimate use
+of "future" data from the no-future-catalog-leakage rule that governs
+replay-time exclusion in `src/known_object_exclusion.py`; nothing here
+feeds back into replay-time candidate selection). Buckets each candidate
+into `recovered_known_object`, `later_confirmed_object`, `artifact`, or
+`unresolved_candidate`, reusing the already-real, already-used
+`Skills/check_mpc_known.py:check_candidates_against_mpc` live sky-position
+cross-match plus each packet's own already-computed `known_object_score`
+— deliberately NOT depending on JPL SBDB's `first_obs` field, which
+`src/known_object_exclusion.py` explicitly flags as not yet
+live-verified (building a new gate on an unverified mechanism would
+compound one guess onto another). 8 new offline tests, all network calls
+injected via an `mpc_lookup_fn` parameter — no real network call is ever
+made in the test suite.
+
+**Next production action (NOT YET DONE)**: run the new tool against real
+review packets (e.g. the ones Gate Z6 already produced) with live MPC
+network access:
+
+```bash
+git checkout -- uv.lock
+git pull origin main
+export PYTHONPATH=src
+uv run --python 3.14 python Skills/evaluate_retrospective_validation.py \
+    --review-packets Logs/pipeline_runs/run_archive_positive_control/report_with_packets.json \
+    --out Logs/reports/retrospective_validation.json
+```
+
+If an `adversarial_review.py --json` verdicts file also exists for the
+same packets, pass it via `--verdicts <file>.json` to get more precise
+`artifact` vs. `unresolved_candidate` bucketing. Read the printed
+`outcome_counts` line to close Gate Z5 with a real result. With this and
+Gate Z4's evaluator both landed, both remaining open ZTF DR24
+production-capability gates (Z4, Z5) now have code-complete, offline-
+tested tooling awaiting only an operator run — no further coding-agent
+scoping work is needed on either until those runs report back.
+
+**Standing note on the Gate Z3 candidate-pair search (unchanged, still in
+force)**: do not propose a 5th apparition of designation 72966, or a
+different NEO designation, without first getting explicit operator
+direction. Wait for their call before resuming that specific
+investigation thread.
+
+### Handoff state as of 2026-07-04 v55
 
 **Gate Z4 (auditable ranking baseline) tooling built and offline-tested;
 pending one operator run for a real-data closure result** —
@@ -3208,6 +3258,7 @@ succeeded and produced the trained Tier 3 weights now recorded under T1-A.
 | `Skills/match_positive_control_tracklet.py` | Rank `run_archive_positive_control.py` report tracklets by angular offset from two known real reference positions, to identify which (if any) tracklet actually matches a known object rather than a combinatorial cross-night pairing; `--ref1`, `--ref2`, `--top-n` flags |
 | `Skills/find_nearest_raw_observation.py` | Rank a single night's raw `ztf_alert_archive_ingest.py` checkpoint observations by angular offset from a known reference position, bypassing detect()/link() entirely, to check whether ZTF's archive recorded any confident detection near a known object's position at all; `--ref`, `--top-n` flags |
 | `Skills/evaluate_ranking_baseline.py` | Gate Z4 auditable ranking baseline: evaluates a handcrafted-feature logistic-regression classifier (out-of-fold, stratified k-fold) against real archived negative tracklets (Gate Z6 evidence) and synthetic positive tracklets (established injection generator), reporting recall@K, purity@K, calibration error, false-positive review burden, and an ablation vs. a naive real-bogus-only baseline; `--n-positive`, `--seed`, `--checkpoint-dir`, `--out` flags |
+| `Skills/evaluate_retrospective_validation.py` | Gate Z5 retrospective validation: evaluates review packets against the MPC catalog as queried today (after the replay window, by design), bucketing each into `recovered_known_object`/`later_confirmed_object`/`artifact`/`unresolved_candidate` using the already-real `check_candidates_against_mpc` live cross-match plus each packet's own `known_object_score`; `--review-packets`, `--verdicts`, `--radius-deg`, `--out` flags |
 
 ### Docs
 
