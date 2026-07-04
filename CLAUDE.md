@@ -769,7 +769,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.54)
+## Current State (v0.90.55)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -802,7 +802,41 @@ bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-04 v47 (CURRENT)
+### Handoff state as of 2026-07-04 v48 (CURRENT)
+
+**Implemented the recommended cheap fix: sentinel-magnitude MPC reports
+are now excluded from candidate selection (v0.90.55)** —
+`Skills/scan_mpc_history_ztf_coverage.py` now filters out MPC reports with
+`mag >= 90` (sentinel/placeholder, not a real detection) before striding
+and selecting candidates, directly addressing the root cause found in the
+20220817/20220819 pair's failure (its night-2 reference position was a
+`mag=99.00` report). 1 new regression test (14 total in this file, all
+passing). `docs/ZTF_DR24_PRODUCTION_GATES.md`'s Gate Z3 row and "Next
+Coding Step" updated to reflect the current real state (pipeline mechanics
+confirmed on real data; single-object match not yet confirmed for either
+tried pair) instead of stale 2026-07-02 content.
+
+**Next production action (NOT YET DONE)**: re-run the systematic MPC scan
+now that sentinel-mag reports are filtered, to select a fresh (third)
+candidate-pair recommendation with higher confidence than the prior two:
+
+```bash
+git checkout -- uv.lock
+git pull origin main
+export PYTHONPATH=src
+caffeinate -i uv run --python 3.14 python Skills/scan_mpc_history_ztf_coverage.py \
+    --designation 72966 --archive-start-jd 2458273.5 --stride 10
+```
+
+This reuses the already-cached MPC history (no new network call for that
+part) and only issues new Gate Z1 metadata queries (cheap, no alert-
+archive download) for the filtered candidate list. Read the printed
+`[scan] Excluded N sentinel/placeholder-magnitude MPC report(s)` line to
+confirm the filter engaged, then evaluate the resulting hit list for a
+new candidate pair before running another multi-GB alert-archive
+ingest.
+
+### Handoff state as of 2026-07-04 v47
 
 **Real observatory codes obtained; partial explanation found, not fully
 resolved** — operator ran the `--force-refresh` lookup and got real

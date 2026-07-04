@@ -3,6 +3,22 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.55 — Exclude sentinel-magnitude MPC reports from Gate Z3 candidate selection (2026-07-04)
+
+### Fixed
+- `Skills/scan_mpc_history_ztf_coverage.py` now excludes MPC reports with
+  `mag >= 90` (sentinel/placeholder, not a real detection) before
+  striding and selecting candidate positions. Root cause: a real Gate Z3
+  candidate pair's failure was traced to exactly this -- its night-2
+  reference position came from a `mag=99.00` MPC report, anchoring the
+  search box on a non-detection rather than a real measured position.
+  1 new regression test.
+- `docs/ZTF_DR24_PRODUCTION_GATES.md`'s Gate Z3 row and "Next Coding
+  Step" updated to reflect the current real state (pipeline mechanics
+  confirmed working on real archived data; single-object match not yet
+  confirmed for either tried candidate pair), replacing stale
+  2026-07-02-era content.
+
 ## v0.90.54 — Add --force-refresh to lookup_mpc_observation_history.py (2026-07-04)
 
 ### Fixed
