@@ -22,10 +22,21 @@ def _git(*args: str) -> str:
 
 
 def test_only_log_placeholders_are_tracked():
-    """Raw operational logs must not be tracked as durable repository state."""
+    """Raw operational logs must not be tracked as durable repository state.
+
+    The one deliberate exception is the git-relay manifest written by
+    Skills/ztf_alert_archive_ingest.py -- a compact, inert per-night
+    summary (no raw observation payloads) that the script itself commits
+    and pushes automatically, per the standing git-relay pattern. See
+    CLAUDE.md's "shared manifest must live in a committed path" rule.
+    """
     tracked_logs = sorted(_git("ls-files", "Logs").splitlines())
 
-    assert tracked_logs == ["Logs/.gitkeep", "Logs/reports/.gitkeep"]
+    assert tracked_logs == [
+        "Logs/.gitkeep",
+        "Logs/reports/.gitkeep",
+        "Logs/reports/ztf_alert_archive_ingest_manifest.jsonl",
+    ]
 
 
 def test_only_allowlisted_model_artifacts_are_tracked():
