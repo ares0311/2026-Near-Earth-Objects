@@ -41,7 +41,9 @@ def separation_arcsec(ra1: float, dec1: float, ra2: float, dec2: float) -> float
     return math.hypot(dra_arcsec, ddec_arcsec)
 
 
-def rank_tracklets(report: dict, ref1: tuple[float, float], ref2: tuple[float, float]) -> list[dict]:
+def rank_tracklets(
+    report: dict, ref1: tuple[float, float], ref2: tuple[float, float]
+) -> list[dict]:
     """Rank each 2-observation tracklet in the report by total angular offset
     from the two reference positions (sorted by observation JD, so
     observations[0] is compared to ref1 and observations[1] to ref2)."""
@@ -71,16 +73,20 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("report_path", type=Path, help="Path to a run_archive_positive_control.py JSON report")
+    parser.add_argument(
+        "report_path", type=Path, help="Path to a run_archive_positive_control.py JSON report"
+    )
     parser.add_argument(
         "--ref1", nargs=2, type=float, required=True, metavar=("RA_DEG", "DEC_DEG"),
-        help="Known real reference position (RA Dec, degrees) for the first night's observation."
+        help="Known real reference position (RA Dec, degrees) for the first night's observation.",
     )
     parser.add_argument(
         "--ref2", nargs=2, type=float, required=True, metavar=("RA_DEG", "DEC_DEG"),
-        help="Known real reference position (RA Dec, degrees) for the second night's observation."
+        help="Known real reference position (RA Dec, degrees) for the second night's observation.",
     )
-    parser.add_argument("--top-n", type=int, default=5, help="Number of closest tracklets to print (default: 5)")
+    parser.add_argument(
+        "--top-n", type=int, default=5, help="Number of closest tracklets to print (default: 5)"
+    )
     args = parser.parse_args()
 
     report = json.loads(args.report_path.read_text())
@@ -90,7 +96,10 @@ def main() -> None:
         print("No 2-observation tracklets found in report -- nothing to rank.", flush=True)
         return
 
-    print(f"Ranked {len(ranked)} tracklet(s) by offset from the real reference positions.", flush=True)
+    print(
+        f"Ranked {len(ranked)} tracklet(s) by offset from the real reference positions.",
+        flush=True,
+    )
     print(f"Top {min(args.top_n, len(ranked))} closest matches:", flush=True)
     for row in ranked[: args.top_n]:
         print(
