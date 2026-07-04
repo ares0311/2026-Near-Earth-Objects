@@ -79,6 +79,22 @@ def test_run_lookup_resumes_without_network_call(tmp_path):
     assert report["n_total_reports"] == 3
 
 
+def test_run_lookup_force_refresh_bypasses_checkpoint(tmp_path):
+    """force_refresh must re-fetch even when a checkpoint already exists --
+    needed after a code change adds a new report field (e.g. v0.90.53's
+    observatory field) that a stale checkpoint predates."""
+    with patch("fetch.fetch_mpc_observations", return_value=_fake_observations()) as mock_fetch:
+        lookup_mpc_observation_history.run_lookup("72966", 2458273.5, tmp_path)
+        assert mock_fetch.call_count == 1
+
+        lookup_mpc_observation_history.run_lookup(
+            "72966", 2458273.5, tmp_path, force_refresh=True
+        )
+        assert mock_fetch.call_count == 2
+        # The underlying fetch must also be told to bypass its own disk cache.
+        assert mock_fetch.call_args.kwargs["force_refresh"] is True
+
+
 def test_fetch_mpc_with_retry_recovers_after_transient_failure():
     with patch("time.sleep"):
         with patch(
