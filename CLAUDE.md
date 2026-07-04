@@ -802,7 +802,50 @@ bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-04 v52 (CURRENT)
+### Handoff state as of 2026-07-04 v53 (CURRENT)
+
+**Gate Z6 (no-submission package drill) is CLOSED, with real data** —
+operator ran the full v52 command sequence to completion. Real results:
+
+1. `Skills/run_archive_positive_control.py --nights 20220817 20220819
+   --min-observations 2 --build-review-packets` built **88 real
+   `ScoredNEO` review packets** from the real archived-ZTF 88-tracklet
+   result already on disk, via the real
+   `classify() -> fit_orbit() -> score() -> process_alert(dry_run=True)`
+   chain, in 25 seconds.
+2. `Skills/adversarial_review.py --offline` on those 88 packets produced
+   **`SURVIVE=0 BORDERLINE=0 REJECT=88`** — the correct outcome, since
+   these tracklets are combinatorial pairings of unrelated real sources in
+   a crowded field (per the v41 handoff below), not real single-object NEO
+   candidates. Every packet failed `orbit_quality` (only 2 observations per
+   tracklet, insufficient for orbit fitting); most also failed
+   `artifact_posterior` and/or `real_bogus`.
+3. `Skills/export_ades_report.py` generated valid ADES PSV-format text for
+   all 88 packets (real RA/Dec/mag/band/obsTime per row, `stn=XXX`
+   throughout), with **zero network calls** — confirmed both by code
+   inspection and by the real run's output.
+
+Full evidence, including the exact commands and a criterion-by-criterion
+closure assessment against Gate Z6's stated requirement:
+`docs/evidence/live/2026-07-04-gate-z6-no-submission-drill-closed.md`.
+`docs/ZTF_DR24_PRODUCTION_GATES.md`'s Z6 row updated to **CLOSED**.
+
+**This is a docs/evidence-only commit — no code changed, no version
+bump** (the code that made this possible, `--build-review-packets`,
+already shipped in v0.90.57/PR #203).
+
+**Next production action**: with Gate Z6 closed and Gate Z3's
+candidate-pair thread still on hold pending explicit operator direction
+(see the standing note in the v52 handoff immediately below — unchanged
+and still in force), the next evidence-tractable, non-gambling gate to
+advance is one of Z4 (auditable ranking baseline), Z5 (retrospective
+validation), or Z7 (operator runbook sync) from
+`docs/ZTF_DR24_PRODUCTION_GATES.md` — none of which require a new
+archival download or hoping a specific night has good data. Do not
+resume the Gate Z3 apparition search without the operator's explicit
+choice of path.
+
+### Handoff state as of 2026-07-04 v52
 
 **Operator called a real doom loop in the Gate Z3 candidate-pair search;
 pivoted to Gate Z6 instead of a 5th pair.** Four candidate pairs of
