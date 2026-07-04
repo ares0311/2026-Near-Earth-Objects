@@ -3,6 +3,16 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.54 — Add --force-refresh to lookup_mpc_observation_history.py (2026-07-04)
+
+### Fixed
+- `Skills/lookup_mpc_observation_history.py`: the v0.90.53 observatory
+  field never appeared in a real operator re-run because the script's
+  checkpoint-exists short-circuit had no way to force a fresh fetch, and
+  the underlying `fetch_mpc_observations` also has its own separate disk
+  cache that would need bypassing too. Added `--force-refresh`, threaded
+  through both cache layers. 1 new regression test.
+
 ## v0.90.53 — Surface MPC reporting-observatory code; second candidate pair also fails (2026-07-04)
 
 ### Fixed

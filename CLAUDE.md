@@ -769,7 +769,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.53)
+## Current State (v0.90.54)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -802,7 +802,44 @@ bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-04 v45 (CURRENT)
+### Handoff state as of 2026-07-04 v46 (CURRENT)
+
+**Stale checkpoint blocked the observatory-code lookup -- missing
+`--force-refresh` flag added (v0.90.54)** — operator re-ran
+`Skills/lookup_mpc_observation_history.py` after v0.90.53 merged, but it
+printed `checkpoint already present, skipping fetch` and returned the
+pre-fix cached report, which does not contain the new `observatory`
+field (that checkpoint was written before v0.90.53 added it). Root cause:
+the script's checkpoint-exists short-circuit had no way to force a
+re-fetch, and even bypassing it would still hit `fetch_mpc_observations`'
+own separate disk cache. Fixed by adding `--force-refresh` (threads
+through to both the script's own checkpoint and the underlying fetch's
+cache). 1 new regression test confirms both cache layers are bypassed
+together. This is a real, necessary unblock, not a speculative feature —
+the prior handoff's instruction to just re-run the lookup command was
+insufficient without this flag.
+
+**Next production action (NOT YET DONE)**: re-run with the new flag to
+get real per-report observatory codes for both nights of each of the two
+failed candidate pairs:
+
+```bash
+git checkout -- uv.lock
+git pull origin main
+export PYTHONPATH=src
+uv run --python 3.14 python Skills/lookup_mpc_observation_history.py \
+    --designation 72966 \
+    --archive-start-jd 2458273.5 \
+    --force-refresh
+```
+
+Inspect the printed `observatory=` value for nights 20220817, 20220819,
+20210106, and 20210111 specifically. If a pair's two nights show
+different codes, that confirms the root-cause hypothesis and the next
+step is filtering `scan_mpc_history_ztf_coverage.py`'s candidate
+selection to same-station pairs before trying a third apparition.
+
+### Handoff state as of 2026-07-04 v45
 
 **Second candidate pair also fails to positively control (69.5 arcmin →
 70.5 arcmin, same pattern); real root cause found and fixed** — operator

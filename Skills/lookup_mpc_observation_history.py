@@ -48,7 +48,7 @@ def _fmt_duration(seconds: float) -> str:
     return f"{m}m{s:02d}s"
 
 
-def _fetch_mpc_with_retry(designation: str):
+def _fetch_mpc_with_retry(designation: str, force_refresh: bool = False):
     """Wrap fetch.fetch_mpc_observations in exponential-backoff retry --
     the underlying function has its own infra-error handling but no sleep-
     based retry loop, so this script supplies one per the standing rule."""
@@ -57,7 +57,9 @@ def _fetch_mpc_with_retry(designation: str):
     last_exc: Exception | None = None
     for attempt in range(1, _MAX_ATTEMPTS + 1):
         try:
-            return fetch_mpc_observations(designation, raise_on_error=True)
+            return fetch_mpc_observations(
+                designation, force_refresh=force_refresh, raise_on_error=True
+            )
         except (ConnectionError, TimeoutError, OSError) as exc:
             last_exc = exc
             print(
@@ -82,23 +84,31 @@ def _night_yyyymmdd(jd: float) -> str:
     return Time(jd, format="jd").datetime.strftime("%Y%m%d")
 
 
-def run_lookup(designation: str, archive_start_jd: float, out_dir: Path) -> dict:
+def run_lookup(
+    designation: str, archive_start_jd: float, out_dir: Path, force_refresh: bool = False
+) -> dict:
     """Fetch a real known object's full MPC observation history and report
     which real reports fall within the ZTF alert archive's real coverage
     window, so a follow-up alert-archive attempt targets a night with
     independently-confirmed real detection evidence, not just imaging
-    coverage."""
+    coverage.
+
+    force_refresh bypasses both this script's own checkpoint and
+    fetch_mpc_observations' disk cache -- needed after a code change adds
+    a new field to the report (e.g. v0.90.53's observatory field), since a
+    pre-existing checkpoint/cache predates that field and would otherwise
+    be silently reused as-is."""
     key = f"{designation}_{archive_start_jd}".replace(" ", "")
     run_dir = out_dir / key
     checkpoint_path = run_dir / "mpc_history_report.json"
 
-    if checkpoint_path.exists():
+    if checkpoint_path.exists() and not force_refresh:
         print(f"[lookup] {key}: checkpoint already present, skipping fetch", flush=True)
         return json.loads(checkpoint_path.read_text())
 
     t0 = time.monotonic()
     print(f"[lookup] Requesting MPC observation history for {designation}", flush=True)
-    observations = _fetch_mpc_with_retry(designation)
+    observations = _fetch_mpc_with_retry(designation, force_refresh=force_refresh)
     print(
         f"[lookup] Received {len(observations)} real MPC-reported observation(s)  "
         f"elapsed {_fmt_duration(time.monotonic() - t0)}",
@@ -178,9 +188,16 @@ def main() -> None:
         default=_OUT_DIR,
         help=f"Checkpoint directory (default: {_OUT_DIR}).",
     )
+    parser.add_argument(
+        "--force-refresh",
+        action="store_true",
+        help="Bypass this script's checkpoint and fetch_mpc_observations' disk "
+        "cache -- needed to pick up a new report field added since the last "
+        "cached run (e.g. the v0.90.53 observatory field).",
+    )
     args = parser.parse_args()
 
-    run_lookup(args.designation, args.archive_start_jd, args.out_dir)
+    run_lookup(args.designation, args.archive_start_jd, args.out_dir, args.force_refresh)
 
 
 if __name__ == "__main__":
