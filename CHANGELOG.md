@@ -3,6 +3,29 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.53 — Surface MPC reporting-observatory code; second candidate pair also fails (2026-07-04)
+
+### Fixed
+- `src/fetch.py:fetch_mpc_observations` now surfaces the already-fetched
+  per-observation reporting-observatory/station code via the existing
+  `field_id` field (no schema change, no new API). Root cause: MPC's
+  observation history aggregates reports from every station/survey that
+  ever reported an object, not just ZTF -- this project's real-world
+  evidence already showed this (`docs/evidence/phase0/2026-07-02-root-cause-findings.md`),
+  but the value was previously discarded after being folded into an
+  internal hash, so no downstream tool could ever filter candidate pairs
+  by whether the MPC report actually came from ZTF.
+- `Skills/lookup_mpc_observation_history.py` and
+  `Skills/scan_mpc_history_ztf_coverage.py` now surface this field in
+  their reports/console output.
+
+### Changed
+- Real result: the second candidate pair (20210106/20210111) also failed
+  to positively control (best tracklet match 70.5 arcmin off; raw
+  observations show a strong match on the first night, none on the
+  second) -- the same pattern as the first pair. See
+  `docs/evidence/live/2026-07-04-gate-z3-second-pair-no-match-plus-observatory-fix.md`.
+
 ## v0.90.52 — Add raw-observation proximity diagnostic; no tracklet matches 72966 (2026-07-04)
 
 ### Added

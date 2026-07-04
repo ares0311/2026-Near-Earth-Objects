@@ -852,6 +852,12 @@ def fetch_mpc_observations(
                     filter_band=band,
                     mission="MPC",
                     real_bogus=1.0,
+                    # Surface the real reporting-observatory/station code (already
+                    # fetched above, previously folded only into obs_hash) via the
+                    # existing field_id field -- a real MPC report does not by
+                    # itself mean ZTF made that observation; this lets callers
+                    # filter observation history to a specific station's reports.
+                    field_id=observatory,
                 )
                 obs_list.append(obs)
             except Exception:

@@ -1329,6 +1329,7 @@ class TestFetchMpcObservationsCacheHit:
         assert result[0].jd == 2460000.5
         assert result[0].filter_band == "V"
         assert result[0].obs_id.startswith("MPC_")
+        assert result[0].field_id == "500"
         mock_mpc_cls.get_observations.assert_called_once_with(desig, cache=True)
 
     def test_force_refresh_bypasses_both_cache_layers(self, tmp_path, monkeypatch):
