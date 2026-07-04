@@ -802,7 +802,45 @@ bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-04 v49 (CURRENT)
+### Handoff state as of 2026-07-04 v50 (CURRENT)
+
+**Re-run with `--force-refresh-mpc` succeeded: real observatory codes now
+visible for all 35 hits; new, more principled candidate pair selected** —
+operator re-ran the scan with the new flag. Real result: 35/51 real
+ZTF-coverage hits, every `HIT` line now shows a real observatory code
+(fix confirmed working). Both previously-tried candidate pairs had
+**different** stations for their two nights; scanning the new 35-hit list
+found two pairs with the **same** station on both nights: **20191030/
+20191101** (2 days apart, both `I41`) and 20210105/20210111 (6 days
+apart, both `G96`). Selected 20191030/20191101 as the primary candidate
+(shorter gap minimizes orbit-motion targeting error). Expected rate
+computed directly from the real hit positions: 35.75 arcsec/hr, PA 241.8
+deg — plausible and consistent with the object's previously observed
+range. Full evidence:
+`docs/evidence/live/2026-07-04-gate-z3-observatory-filtered-scan-35-hits.md`.
+
+**Next production action (NOT YET DONE)**: ingest both nights, each
+centered on their own real matched position:
+
+```bash
+git checkout -- uv.lock
+git pull origin main
+export PYTHONPATH=src
+caffeinate -i uv run --python 3.14 python Skills/ztf_alert_archive_ingest.py \
+    --nights 20191030 \
+    --ra 29.6558 --dec 5.8706 --radius-deg 2.0 --min-rb 0.5
+caffeinate -i uv run --python 3.14 python Skills/ztf_alert_archive_ingest.py \
+    --nights 20191101 \
+    --ra 29.2335 --dec 5.6456 --radius-deg 2.0 --min-rb 0.5
+```
+
+If both yield real kept observations, run the positive control against
+this pair, then `Skills/match_positive_control_tracklet.py` (ref1
+29.6558 5.8706, ref2 29.2335 5.6456), per the now-established sequence.
+Backup candidate if this pair fails: 20210105/20210111 (same-station G96,
+6 days apart).
+
+### Handoff state as of 2026-07-04 v49
 
 **Real re-run of the filtered scan found a genuine bug: every HIT line
 showed `observatory=None`** — operator ran the sentinel-filtered
