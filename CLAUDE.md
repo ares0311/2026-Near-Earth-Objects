@@ -802,7 +802,50 @@ bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-04 v43 (CURRENT)
+### Handoff state as of 2026-07-04 v44 (CURRENT)
+
+**Raw-observation check: night 1 has a plausible near-match, night 2 does
+not -- this candidate pair does not currently support a positive
+control** — operator ran `Skills/find_nearest_raw_observation.py` against
+both nights' existing checkpoints. Real result: night 20220817's closest
+real detection is **74.1 arcsec** from the known reference position
+(`real_bogus=0.85`, plausibly consistent with real astrometric/orbit-
+propagation error). Night 20220819's closest real detection is **615.7
+arcsec (10.3 arcmin)** away -- far too large to be explained by the
+object's own expected motion (~38.7 arcsec/hr would require ~16 hours of
+drift to reach that offset, inconsistent with a single UTC night). Full
+evidence:
+`docs/evidence/live/2026-07-04-gate-z3-raw-observation-check-inconclusive.md`.
+
+**Conclusion**: combined with the prior finding that no linked tracklet
+matches either position
+(`docs/evidence/live/2026-07-04-gate-z3-no-tracklet-matches-72966.md`),
+the 20220817/20220819 pair does not currently support a genuine Gate Z3
+positive control. Continuing to probe this exact pair further (lower
+real-bogus threshold, wider search radius) is a possible future
+refinement, but the more productive next step is trying the other real
+candidate pair already ingested this session.
+
+**Next production action (NOT YET DONE)**: run the positive control
+against the 20210106/20210111 pair (kept=272/177, real per-source data
+already on disk from the six-tab batch, never yet run through
+`run_archive_positive_control.py`):
+
+```bash
+git checkout -- uv.lock
+git pull origin main
+export PYTHONPATH=src
+caffeinate -i uv run --python 3.14 python Skills/run_archive_positive_control.py \
+    --nights 20210106 20210111 --min-observations 2 \
+    --out Logs/pipeline_runs/run_archive_positive_control/report_20210106_20210111.json
+```
+
+Then rank with `Skills/match_positive_control_tracklet.py` against
+reference positions RA/Dec 116.1336/8.6041 (20210106) and
+114.9238/8.8044 (20210111), and if inconclusive, check raw observations
+with `Skills/find_nearest_raw_observation.py` as done for the first pair.
+
+### Handoff state as of 2026-07-04 v43
 
 **No tracklet matches designation 72966's real position -- genuine
 negative, not inconclusive** — operator ran
