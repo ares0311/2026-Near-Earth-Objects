@@ -1,7 +1,10 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.90.27
-**Last updated**: 2026-07-02
+**Current version**: v0.90.57
+**Last updated**: 2026-07-04 (header/sync line only — the P1-P5 gate register
+body below is unchanged historical evidence from 2026-07-02; current gate
+status for the active ZTF DR24 path lives in
+`docs/ZTF_DR24_PRODUCTION_GATES.md`, which is kept current every session)
 **Purpose**: Mandatory read at session start (per MANDATORY SESSION-START PROTOCOL).  
 Every planning cycle must name the highest-priority unresolved production-capability gate and show how proposed steps close or directly unblock it.
 
@@ -545,7 +548,10 @@ software is ready to search for and package candidates under the operator's
 - [x] Guardrail compliance: static scan of all pipeline source confirms zero "confirmed NEO"
       or impact probability assertions ✓ (2026-06-21; all occurrences are negations or
       guardrail enforcement — see `src/background.py:3568` forbidden_phrases check)
-- [x] AGENTS.md and CLAUDE.md synchronized to current version ✓ (2026-06-26, v0.89.3)
+- [x] AGENTS.md and CLAUDE.md synchronized to current version ✓ (2026-06-26,
+      v0.89.3; re-synced 2026-07-04 at v0.90.57 after a ~30-version drift —
+      AGENTS.md's "Current State" now carries a condensed delta paragraph
+      pointing to CLAUDE.md's full handoff and `docs/ZTF_DR24_PRODUCTION_GATES.md`)
 - [x] Console output compliance: every `Skills/run_pipeline.py` stage print includes
       `elapsed {M}m{S:02d}s`; fetch ETA computed from time-per-survey; per-tracklet
       ETA computed from time-per-tracklet ✓ (2026-06-26, PR #116; satisfies CLAUDE.md

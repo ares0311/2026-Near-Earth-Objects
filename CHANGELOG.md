@@ -3,6 +3,26 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.58 — Add Gate Z4 auditable ranking baseline (2026-07-04)
+
+### Added
+- `Skills/evaluate_ranking_baseline.py`: evaluates a handcrafted-feature
+  logistic-regression ranking baseline via out-of-fold stratified k-fold
+  predictions, reporting recall@K, purity@K (precision@K), calibration
+  error (Brier/ECE/log-loss), and false-positive review burden, plus an
+  ablation against a naive real-bogus-only baseline. The negative class
+  reuses real archived tracklets already on disk from Gate Z6's evidence
+  (confirmed combinatorial cross-night artifacts, not real single-object
+  NEOs); the positive class uses the project's established
+  synthetic-injection generator. No new archival download required.
+- `src/classify.py`: added `features_to_vector(features)`, a public
+  wrapper exposing the same ordered handcrafted feature array
+  `_tier1_predict` already fed to XGBoost, for use by the new evaluator.
+- 10 new offline tests (`tests/test_evaluate_ranking_baseline.py`).
+- Directly advances Gate Z4 (auditable ranking baseline) in
+  `docs/ZTF_DR24_PRODUCTION_GATES.md`, which was fully open and required
+  no archival data gambling to advance.
+
 ## v0.90.57 — Add --build-review-packets for Gate Z6 (2026-07-04)
 
 ### Added
