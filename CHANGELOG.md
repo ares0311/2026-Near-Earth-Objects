@@ -3,6 +3,20 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.51 — Add tracklet-to-known-position matching tool (2026-07-03)
+
+### Added
+- `Skills/match_positive_control_tracklet.py`: ranks tracklets in a
+  `run_archive_positive_control.py` JSON report by real angular offset
+  (arcsec) from two known reference positions, so a candidate object's
+  actual match can be identified instead of relying on motion-rate
+  proximity alone. Re-running the Gate Z3 positive control with
+  `--min-observations 2` reproduced the same 88 two-observation tracklets
+  as the prior run (confirming determinism), but the console output does
+  not expose per-observation positions -- this tool reads the JSON report
+  file directly and requires no re-run of the pipeline itself. 6 offline
+  tests.
+
 ## v0.90.50 — Positive-control report now includes per-observation positions (2026-07-03)
 
 ### Added
