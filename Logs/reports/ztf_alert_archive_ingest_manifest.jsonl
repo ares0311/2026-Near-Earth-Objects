@@ -10,3 +10,4 @@
 {"night": "20220817", "scanned_count": 184654, "kept_count": 267, "ra": null, "dec": null, "radius_deg": null, "min_rb": null, "synced_from_existing_checkpoint": true}
 {"night": "20220819", "scanned_count": 264087, "kept_count": 286, "ra": null, "dec": null, "radius_deg": null, "min_rb": null, "synced_from_existing_checkpoint": true}
 {"night": "20191030", "scanned_count": 128214, "kept_count": 0, "ra": 29.6558, "dec": 5.8706, "radius_deg": 2.0, "min_rb": 0.5, "elapsed_seconds": 561.35, "resumed_from_checkpoint": false}
+{"night": "20191101", "scanned_count": 227496, "kept_count": 234, "ra": 29.2335, "dec": 5.6456, "radius_deg": 2.0, "min_rb": 0.5, "elapsed_seconds": 785.35, "resumed_from_checkpoint": false}
