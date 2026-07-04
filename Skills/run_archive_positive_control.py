@@ -84,13 +84,26 @@ def load_observations_from_checkpoints(nights: list[str], checkpoint_dir: Path):
 
 
 def run_positive_control(
-    nights: list[str], checkpoint_dir: Path, min_observations: int = 3
+    nights: list[str],
+    checkpoint_dir: Path,
+    min_observations: int = 3,
+    build_review_packets: bool = False,
 ) -> dict:
     """Run the real preprocess -> detect -> link chain on real per-source
     observations loaded from >=2 real archived nights, reporting whether
     any multi-night tracklet was recovered. min_observations is link()'s
     own default (3) unless overridden -- see the module docstring for why
-    this matters for exactly-2-night arcs."""
+    this matters for exactly-2-night arcs.
+
+    When build_review_packets is True, every linked tracklet is also run
+    through classify() -> fit_orbit() -> score() -> process_alert(dry_run=True)
+    -- the exact same call sequence Skills/run_pipeline.py uses for its
+    production --review-packet-out path -- and the resulting ScoredNEO
+    dicts are included in the report under "review_packets". This never
+    submits anything externally (process_alert is always called with
+    dry_run=True here) and never claims "confirmed NEO"; it produces real
+    review packets from real archived tracklets for Gate Z6's no-submission
+    package drill."""
     from detect import detect
     from link import link
     from preprocess import preprocess
@@ -163,6 +176,32 @@ def run_positive_control(
             flush=True,
         )
 
+    review_packets: list[dict] = []
+    if build_review_packets and n_tracklets > 0:
+        from alert import process_alert
+        from classify import classify
+        from orbit import fit_orbit
+        from score import score
+
+        for i, trk in enumerate(link_result.tracklets, start=1):
+            print(
+                f"[control]   [review-packet] ({i}/{n_tracklets}) {trk.object_id}  "
+                f"elapsed {_fmt_duration(time.monotonic() - t0)}",
+                flush=True,
+            )
+            features, posterior = classify(trk)
+            orbital = fit_orbit(trk)
+            scored = score(trk, features, posterior, orbital)
+            process_alert(scored, dry_run=True)  # never submits; dry_run is fixed True here
+            review_packets.append(scored.model_dump(mode="json"))
+        print(
+            f"[control] Built {len(review_packets)} real ScoredNEO review "
+            "packet(s) from real archived tracklets (dry-run only, no "
+            "external submission)  "
+            f"elapsed {_fmt_duration(time.monotonic() - t0)}",
+            flush=True,
+        )
+
     report = {
         "nights": nights,
         "min_observations": min_observations,
@@ -174,6 +213,8 @@ def run_positive_control(
         "tracklets": tracklet_summaries,
         "elapsed_seconds": round(time.monotonic() - t0, 2),
     }
+    if build_review_packets:
+        report["review_packets"] = review_packets
 
     if n_tracklets == 0:
         print(
@@ -230,6 +271,15 @@ def main() -> None:
         default=None,
         help="Optional path to write the full JSON report.",
     )
+    parser.add_argument(
+        "--build-review-packets",
+        action="store_true",
+        help="Also run every linked tracklet through classify() -> "
+        "fit_orbit() -> score() -> process_alert(dry_run=True) and include "
+        "the resulting real ScoredNEO dicts in the report under "
+        "'review_packets' -- for Gate Z6's no-submission package drill. "
+        "Never submits externally; dry_run is fixed True.",
+    )
     args = parser.parse_args()
 
     if len(args.nights) < 2:
@@ -238,7 +288,9 @@ def main() -> None:
             "(a single night cannot form a multi-night tracklet)."
         )
 
-    report = run_positive_control(args.nights, args.checkpoint_dir, args.min_observations)
+    report = run_positive_control(
+        args.nights, args.checkpoint_dir, args.min_observations, args.build_review_packets
+    )
 
     if args.out is not None:
         args.out.parent.mkdir(parents=True, exist_ok=True)

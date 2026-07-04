@@ -769,7 +769,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.56)
+## Current State (v0.90.57)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -802,38 +802,65 @@ bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-04 v51 (CURRENT)
+### Handoff state as of 2026-07-04 v52 (CURRENT)
 
-**Third candidate pair (20191030/20191101, same-station I41): one real
-negative, one real strong positive** — operator ingested both nights of
-the new same-station candidate pair selected in v50. Real result: night
-20191030 kept **0** (real negative, 128,214 packets scanned, 5.7GiB),
-night 20191101 kept **234** (real strong positive, 227,496 packets,
-10.2GiB). Since a positive control needs both nights to have data, this
-specific pair cannot support one, even though the same-station selection
-criterion was a real improvement over the prior two attempts. Full
-evidence: `docs/evidence/live/2026-07-04-gate-z3-third-pair-mixed-result.md`.
+**Operator called a real doom loop in the Gate Z3 candidate-pair search;
+pivoted to Gate Z6 instead of a 5th pair.** Four candidate pairs of
+designation 72966 have now been tried (20220817/19, 20210106/11,
+20191030/1101, and 20210105/20210111 in progress) with no confirmed
+single-object match — the pattern of "try another apparition, hope this
+one confirms" was not producing new information, just repeating the same
+approach on a diminishing-returns basis. Per the operator's explicit
+"work on evidence only, not hopes" directive, stopped proposing a 5th
+pair and pivoted to the fully-open, evidence-tractable **Gate Z6
+(no-submission package drill)**, which needs no further downloads or
+gambling on archival data luck.
 
-**Next production action (NOT YET DONE)**: try the backup same-station
-candidate (`G96`, both nights, 6 days apart):
+**Gate Z6 tooling built (v0.90.57, this PR)**:
+`Skills/run_archive_positive_control.py --build-review-packets` now runs
+every tracklet linked from real archived ZTF data through the exact same
+real `classify() -> fit_orbit() -> score() -> process_alert(dry_run=True)`
+chain `Skills/run_pipeline.py` uses in production, and includes the
+resulting real `ScoredNEO` dicts in the report as `review_packets`. This
+reuses the real 88-tracklet result already on disk from the
+20220817/20220819 pair -- no new download needed. `process_alert` is
+always called with `dry_run=True` in this path; nothing is ever submitted
+externally. 2 new offline tests (7 total in this file, all passing).
+
+**Next production action (NOT YET DONE)**: build real review packets from
+the real 88 tracklets already on disk, then run them through adversarial
+review and ADES export in dry-run mode:
 
 ```bash
 git checkout -- uv.lock
 git pull origin main
 export PYTHONPATH=src
-caffeinate -i uv run --python 3.14 python Skills/ztf_alert_archive_ingest.py \
-    --nights 20210105 \
-    --ra 116.3469 --dec 8.5736 --radius-deg 2.0 --min-rb 0.5
-caffeinate -i uv run --python 3.14 python Skills/ztf_alert_archive_ingest.py \
-    --nights 20210111 \
-    --ra 114.9265 --dec 8.8038 --radius-deg 2.0 --min-rb 0.5
+uv run --python 3.14 python Skills/run_archive_positive_control.py \
+    --nights 20220817 20220819 --min-observations 2 --build-review-packets \
+    --out Logs/pipeline_runs/run_archive_positive_control/report_with_packets.json
 ```
 
-Note: 20210111 already has a checkpoint from earlier this session
-(kept=177, centered on a nearly-identical position 114.9238/8.8044) --
-`ztf_alert_archive_ingest.py`'s checkpoint is keyed by night only, so this
-will resume from that existing data rather than re-download; only
-20210105 is a genuinely new ingest for this pair.
+Then extract just the `review_packets` array from that JSON into its own
+file and run:
+
+```bash
+uv run --python 3.14 python Skills/adversarial_review.py \
+    <review_packets_file>.json --offline
+uv run --python 3.14 python Skills/export_ades_report.py \
+    <review_packets_file>.json
+```
+
+`export_ades_report.py` defaults to `--obs-code XXX` (the documented
+first-submission placeholder) and never makes a network call -- this is
+a pure text-generation dry run. No candidate from this drill should ever
+be described as "confirmed" or submitted; this is a mechanism test only.
+
+**Standing note on the Gate Z3 candidate-pair search**: do not propose a
+5th apparition of designation 72966, or a different NEO designation,
+without first getting explicit operator direction -- the operator was
+asked to choose a path (different designation / one more try / accept
+current evidence / other) and dismissed the question to think it over.
+Wait for their call before resuming that specific investigation thread.
 
 ### Handoff state as of 2026-07-04 v50
 

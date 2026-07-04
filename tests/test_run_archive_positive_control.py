@@ -119,6 +119,30 @@ class TestRunPositiveControl:
         assert default_report["n_tracklets_linked"] == 0
         assert relaxed_report["n_tracklets_linked"] > 0
 
+    def test_build_review_packets_produces_real_scored_neo_dicts(self, tmp_path):
+        """Gate Z6 no-submission package drill: build_review_packets=True
+        must run every linked tracklet through the real
+        classify -> fit_orbit -> score -> process_alert(dry_run=True) chain
+        and include the resulting ScoredNEO dicts in the report. Never
+        submits externally (process_alert is always called with
+        dry_run=True in this path)."""
+        nights = _write_two_night_checkpoints(tmp_path)
+        report = run_archive_positive_control.run_positive_control(
+            nights, tmp_path, min_observations=2, build_review_packets=True
+        )
+        assert report["n_tracklets_linked"] > 0
+        assert "review_packets" in report
+        assert len(report["review_packets"]) == report["n_tracklets_linked"]
+        packet = report["review_packets"][0]
+        assert "hazard" in packet
+        assert "posterior" in packet
+        assert "metadata" in packet
+
+    def test_build_review_packets_false_omits_key_by_default(self, tmp_path):
+        nights = _write_two_night_checkpoints(tmp_path)
+        report = run_archive_positive_control.run_positive_control(nights, tmp_path)
+        assert "review_packets" not in report
+
     def test_empty_night_raises(self, tmp_path):
         (tmp_path / "20180809.json").write_text(
             json.dumps({"night": "20180809", "kept_count": 0, "observations": []})

@@ -3,6 +3,28 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.57 — Add --build-review-packets for Gate Z6 (2026-07-04)
+
+### Added
+- `Skills/run_archive_positive_control.py --build-review-packets`: runs
+  every tracklet linked from real archived ZTF data through the real
+  `classify() -> fit_orbit() -> score() -> process_alert(dry_run=True)`
+  chain (the same sequence `Skills/run_pipeline.py` uses in production)
+  and includes the resulting real `ScoredNEO` dicts in the report as
+  `review_packets`. Reuses the real 88/54-tracklet results already on
+  disk from Gate Z3's positive-control attempts -- no new download
+  required. Never submits externally; `dry_run` is fixed `True`. 2 new
+  offline tests. Directly serves Gate Z6 (no-submission package drill),
+  which was fully open and did not require any further archival data
+  gambling to advance.
+
+### Changed
+- Pivoted away from repeatedly trying new candidate-pair apparitions of
+  designation 72966 for Gate Z3 (four attempts, no confirmed match) after
+  the operator identified this as a real doom-loop pattern. Standing note
+  added to `CLAUDE.md`: do not propose a 5th apparition or a different
+  designation without explicit operator direction.
+
 ## v0.90.56 — Add --force-refresh-mpc to scan_mpc_history_ztf_coverage.py (2026-07-04)
 
 ### Fixed
