@@ -769,7 +769,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.51)
+## Current State (v0.90.52)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -802,7 +802,59 @@ bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-03 v42 (CURRENT)
+### Handoff state as of 2026-07-04 v43 (CURRENT)
+
+**No tracklet matches designation 72966's real position -- genuine
+negative, not inconclusive** — operator ran
+`Skills/match_positive_control_tracklet.py` against the real
+`report_min2.json`. Real result: best-matching tracklet's total offset
+from the two known reference positions is **4172.4 arcsec (69.5 arcmin,
+1.16 deg)** — far too large to be real astrometric/orbit-propagation
+noise (which would be at most a few arcmin). All 88 tracklets are ruled
+out as a match for designation 72966. Full evidence:
+`docs/evidence/live/2026-07-04-gate-z3-no-tracklet-matches-72966.md`.
+
+**Root cause (diagnosed, not guessed)**: `link()` only checks motion-rate
+consistency between candidate pairs (0.05-60 arcsec/hr window), never
+positional proximity to a target. In a crowded 116-candidate field, the
+real object's two genuine detections (if captured that night) may simply
+never be paired together by a greedy pairing algorithm — a different,
+unrelated candidate can plausibly steal either side of the pair first.
+This means "no tracklet near the known position" does not prove ZTF
+failed to image the object that night; it only proves the linker's
+specific pairing choices didn't recover it.
+
+**New tool (v0.90.52, this PR)**: `Skills/find_nearest_raw_observation.py`
+bypasses detect()/link() entirely and searches a single night's raw kept
+observations (already on disk from `ztf_alert_archive_ingest.py`) for the
+nearest real detection to a known reference position -- a narrower, prior
+question: did ZTF's archive record any confident detection near the real
+position that night at all? 6 offline tests.
+
+**Next production action (NOT YET DONE)**: check both nights' raw
+observations directly (fast, local, no re-run of detect/link needed):
+
+```bash
+git checkout -- uv.lock
+git pull origin main
+export PYTHONPATH=src
+uv run --python 3.14 python Skills/find_nearest_raw_observation.py \
+    Logs/pipeline_runs/ztf_alert_archive_ingest/20220817.json \
+    --ref 257.0809 -10.7456
+uv run --python 3.14 python Skills/find_nearest_raw_observation.py \
+    Logs/pipeline_runs/ztf_alert_archive_ingest/20220819.json \
+    --ref 257.5497 -10.9843
+```
+
+If both nights show a close raw observation (tens of arcsec), the object
+was captured but the linker failed to pair it -- a linker limitation
+(next fix: position-aware linking), not a data-availability problem. If
+neither night shows a close raw observation, this candidate pair should
+be treated as exhausted for Gate Z3 and a different apparition/pair from
+the 30-hit MPC scan should be tried next (e.g. 20191005/20191008 or
+20210106/20210111, both already ingested with real kept observations).
+
+### Handoff state as of 2026-07-03 v42
 
 **Re-run at `--min-observations 2` reproduced the same 88 tracklets (new
 UUIDs, identical rates/arcs) -- still not confirmed as designation
@@ -2684,6 +2736,7 @@ succeeded and produced the trained Tier 3 weights now recorded under T1-A.
 | `Skills/validate_model_weights.py` | Load all four committed model files and assert valid calibrated output on synthetic fixtures; `--json` flag; used by `e2e.yml` model-weight CI job |
 | `Skills/validate_alert_protocol.py` | Run `ready_for_submission()` on 14 diverse synthetic NEOs and assert correct gate behavior; `--json` flag; used by `e2e.yml` alert-protocol CI job |
 | `Skills/match_positive_control_tracklet.py` | Rank `run_archive_positive_control.py` report tracklets by angular offset from two known real reference positions, to identify which (if any) tracklet actually matches a known object rather than a combinatorial cross-night pairing; `--ref1`, `--ref2`, `--top-n` flags |
+| `Skills/find_nearest_raw_observation.py` | Rank a single night's raw `ztf_alert_archive_ingest.py` checkpoint observations by angular offset from a known reference position, bypassing detect()/link() entirely, to check whether ZTF's archive recorded any confident detection near a known object's position at all; `--ref`, `--top-n` flags |
 
 ### Docs
 

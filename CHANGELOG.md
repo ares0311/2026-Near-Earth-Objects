@@ -3,6 +3,23 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.52 — Add raw-observation proximity diagnostic; no tracklet matches 72966 (2026-07-04)
+
+### Added
+- `Skills/find_nearest_raw_observation.py`: bypasses detect()/link()
+  entirely and ranks a single night's raw kept observations (from an
+  existing `ztf_alert_archive_ingest.py` checkpoint) by angular offset
+  from a known reference position. Root cause: the real
+  `Skills/match_positive_control_tracklet.py` run against the 88-tracklet
+  report found a best offset of 4172.4 arcsec (69.5 arcmin) from
+  designation 72966's real reported positions -- far too large to be the
+  same object, ruling out all 88 tracklets as a match. But `link()` only
+  checks motion-rate consistency, never positional proximity, so a
+  linker-pairing failure and a genuine non-detection are indistinguishable
+  from the tracklet report alone. This tool checks the prior, narrower
+  question directly against the raw per-source data. 6 offline tests.
+  See `docs/evidence/live/2026-07-04-gate-z3-no-tracklet-matches-72966.md`.
+
 ## v0.90.51 — Add tracklet-to-known-position matching tool (2026-07-03)
 
 ### Added
