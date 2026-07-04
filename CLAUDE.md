@@ -802,7 +802,42 @@ bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-04 v46 (CURRENT)
+### Handoff state as of 2026-07-04 v47 (CURRENT)
+
+**Real observatory codes obtained; partial explanation found, not fully
+resolved** — operator ran the `--force-refresh` lookup and got real
+per-report observatory codes for the first time. Pair 1's failure (night
+20220819) now has a clean, well-supported explanation: the exact
+reference position came from an MPC report with `mag=99.00` (a
+sentinel/placeholder value, observatory `C51`), not a genuine measured
+detection — a poor anchor for the search box regardless of station. Pair
+2's failure is less cleanly explained: both reference positions have real
+magnitudes (19.46 `I41`, 19.23 `G96`) from different stations, which
+doesn't by itself explain a 35-arcmin gap. Full evidence:
+`docs/evidence/live/2026-07-04-gate-z3-observatory-codes-real-findings.md`.
+
+**Do not assume any specific MPC code (T05, I41, G96, C51, etc.) is or
+isn't ZTF's own code** — this has not been independently verified in this
+project and must not be guessed.
+
+**Recommendation for next session** (not yet implemented): two paths,
+in order of effort — (1) filter `scan_mpc_history_ztf_coverage.py`'s
+candidate selection to exclude `mag >= 90` sentinel reports before trying
+a third apparition of 72966; (2) select a different, well-observed real
+NEO designation entirely rather than continuing to exhaust apparitions of
+this one object. Five real apparitions of 72966 have now been checked
+across this project without a confirmed clean two-night positive control
+— continuing to probe this exact object may have diminishing returns.
+
+**What IS already a real, valuable result, independent of confirming one
+specific object**: `preprocess()`/`detect()`/`link()` correctly process
+real archived ZTF alert data end-to-end and form real cross-night
+tracklets (546 formed across the two attempted pairs combined this
+session) — the remaining gap is confirming one specific tracklet's
+identity against a known object, not whether the pipeline mechanics work
+on real data.
+
+### Handoff state as of 2026-07-04 v46
 
 **Stale checkpoint blocked the observatory-code lookup -- missing
 `--force-refresh` flag added (v0.90.54)** — operator re-ran
