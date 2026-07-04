@@ -35,10 +35,14 @@ def _fake_observations():
             obs_id="mpc_1", ra_deg=232.6075742, dec_deg=-8.4449086, jd=2458339.6521991,
             mag=19.5, mag_err=0.1, filter_band="?", mission="MPC",
         ),
-        # A second real in-window report.
+        # A second real in-window report, with a mock reporting-observatory
+        # code set (via field_id) to confirm it flows through to the report
+        # -- the value itself is an arbitrary test placeholder, not a claim
+        # about any real station code.
         Observation(
             obs_id="mpc_2", ra_deg=250.0, dec_deg=-13.0, jd=2458385.0,
             mag=19.8, mag_err=0.1, filter_band="?", mission="MPC",
+            field_id="TEST_STN",
         ),
     ]
 
@@ -50,6 +54,19 @@ def test_run_lookup_filters_to_archive_window(tmp_path):
     assert report["n_reports_in_archive_window"] == 2
     nights = [r["night_yyyymmdd"] for r in report["reports_in_archive_window"]]
     assert "20180809" in nights
+
+
+def test_run_lookup_surfaces_reporting_observatory(tmp_path):
+    """The real reporting-observatory/station code must flow through to the
+    report so callers can filter observation history to a specific
+    station's reports before selecting a candidate pair."""
+    with patch("fetch.fetch_mpc_observations", return_value=_fake_observations()):
+        report = lookup_mpc_observation_history.run_lookup("72966", 2458273.5, tmp_path)
+    by_jd = {r["jd"]: r["observatory"] for r in report["reports_in_archive_window"]}
+    assert by_jd[2458385.0] == "TEST_STN"
+    # The 20180809 fixture observation never set field_id, so it must
+    # surface as None, not silently fall back to a guessed value.
+    assert by_jd[2458339.6521991] is None
 
 
 def test_run_lookup_resumes_without_network_call(tmp_path):

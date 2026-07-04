@@ -769,7 +769,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.52)
+## Current State (v0.90.53)
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -802,7 +802,62 @@ bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-04 v44 (CURRENT)
+### Handoff state as of 2026-07-04 v45 (CURRENT)
+
+**Second candidate pair also fails to positively control (69.5 arcmin →
+70.5 arcmin, same pattern); real root cause found and fixed** — operator
+ran the full run_archive_positive_control.py → match_positive_control_tracklet.py
+→ find_nearest_raw_observation.py sequence against 20210106/20210111 (the
+other real candidate pair with substantial kept data). Real result: 54
+tracklets formed, best match 4231.5 arcsec (70.5 arcmin) off -- ruled out,
+same as the first pair. Raw-observation check: night 20210106 has a
+strong match at 14.1 arcsec; night 20210111's closest is 2103.1 arcsec
+(35.1 arcmin) away -- too far. **Both of the two candidate pairs tried so
+far show this exact pattern: strong match on the pair's first night, no
+match on the second.**
+
+**Root cause (found, not guessed)**: `docs/evidence/phase0/2026-07-02-root-cause-findings.md`
+already recorded that MPC's `get-obs` API returns observations from
+"multiple stations/surveys" for a real designation -- MPC's observation
+history is NOT ZTF-exclusive. `src/fetch.py:fetch_mpc_observations`
+already extracted the real per-observation `observatory` code from
+astroquery but only used it internally for a hash string -- it was never
+exposed on the returned `Observation`, so every tool that selected these
+candidate pairs (`scan_mpc_history_ztf_coverage.py`) could only confirm
+"ZTF has sci-exposure metadata here" + "MPC has *some* report here," never
+"this MPC report specifically came from ZTF." A non-ZTF station reporting
+the object's real position, combined with ZTF separately imaging near
+that position the same night (routine, since ZTF resurveys the whole sky
+every ~3 nights), produces a false-positive scan "hit."
+
+**Fix (v0.90.53, this PR)**: `fetch_mpc_observations` now surfaces the
+already-fetched observatory code via the existing `field_id` field (no
+schema change, no new API). `lookup_mpc_observation_history.py`'s report
+and console output, and `scan_mpc_history_ztf_coverage.py`'s per-hit
+console line, now include it. 2 new regression tests. Full evidence:
+`docs/evidence/live/2026-07-04-gate-z3-second-pair-no-match-plus-observatory-fix.md`.
+
+**Next production action (NOT YET DONE)**: do not select a third
+candidate pair blindly. Re-run the already-cached lookup (no new network
+call) and inspect the new `observatory` field for both nights of each
+tried pair:
+
+```bash
+git checkout -- uv.lock
+git pull origin main
+export PYTHONPATH=src
+uv run --python 3.14 python Skills/lookup_mpc_observation_history.py \
+    --designation 72966 \
+    --archive-start-jd 2458273.5
+```
+
+If the two nights within a pair have different observatory codes, that
+directly explains the observed pattern, and future candidate-pair
+selection (a possible follow-up to `scan_mpc_history_ztf_coverage.py`)
+should filter to matching station codes before spending more download
+bandwidth on another apparition.
+
+### Handoff state as of 2026-07-04 v44
 
 **Raw-observation check: night 1 has a plausible near-match, night 2 does
 not -- this candidate pair does not currently support a positive

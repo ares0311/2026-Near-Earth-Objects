@@ -113,6 +113,13 @@ def run_lookup(designation: str, archive_start_jd: float, out_dir: Path) -> dict
                 "ra_deg": obs.ra_deg,
                 "dec_deg": obs.dec_deg,
                 "mag": obs.mag,
+                # Real reporting-observatory/station code from MPC's own data
+                # (src/fetch.py surfaces it via field_id) -- a real MPC report
+                # does not by itself mean ZTF made that observation; some
+                # in-window "hits" from Gate Z1 metadata alone may actually be
+                # non-ZTF stations that happened to observe near the same
+                # position/date.
+                "observatory": obs.field_id,
                 "night_yyyymmdd": _night_yyyymmdd(obs.jd),
                 "in_archive_window": obs.jd >= archive_start_jd,
             }
@@ -140,7 +147,8 @@ def run_lookup(designation: str, archive_start_jd: float, out_dir: Path) -> dict
     for row in in_window:
         print(
             f"[lookup]   {row['night_yyyymmdd']}: RA={row['ra_deg']:.4f} "
-            f"Dec={row['dec_deg']:.4f} mag={row['mag']:.2f}  (jd={row['jd']:.5f})",
+            f"Dec={row['dec_deg']:.4f} mag={row['mag']:.2f} "
+            f"observatory={row['observatory']}  (jd={row['jd']:.5f})",
             flush=True,
         )
     print(f"[lookup] Wrote {checkpoint_path}", flush=True)

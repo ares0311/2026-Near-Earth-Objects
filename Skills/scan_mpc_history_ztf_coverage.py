@@ -213,7 +213,8 @@ def run_scan(
     for hit in hits:
         print(
             f"[scan]{shard_label}   HIT {hit['night_yyyymmdd']}: RA={hit['ra_deg']:.4f} "
-            f"Dec={hit['dec_deg']:.4f}  ({hit['n_sci_rows']} sci row(s))",
+            f"Dec={hit['dec_deg']:.4f}  ({hit['n_sci_rows']} sci row(s), "
+            f"MPC-reporting observatory={hit.get('observatory')})",
             flush=True,
         )
     print(f"[scan]{shard_label} Wrote {report_path}", flush=True)
