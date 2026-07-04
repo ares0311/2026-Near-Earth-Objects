@@ -605,7 +605,36 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.27)
+## Current State (v0.90.57)
+
+**This section was last synced 2026-07-02 through v0.90.27; the detail below
+is historical and accurate as of that date but does not reflect
+v0.90.28-v0.90.57.** For the full blow-by-blow, `CLAUDE.md`'s handoff section
+is kept current every session; this paragraph gives the condensed delta so
+AGENTS.md stays usable without reading all of CLAUDE.md.
+
+**Delta since v0.90.27 (2026-07-02) through v0.90.57 (2026-07-04)**: Gate
+Z3 (source-native candidate linking) had its real-detection-source blocker
+resolved (UW ZTF public alert archive, confirmed reachable/schema-verified)
+and its ingest/positive-control/matching tooling built and run for real
+against four candidate-pair apparitions of designation 72966. Pipeline
+mechanics (`preprocess()`->`detect()`->`link()`) are confirmed working
+correctly on real archived ZTF data (546 real cross-night tracklets formed
+across two full pairs), but no pair has yet produced a confirmed
+single-object match — see `docs/ZTF_DR24_PRODUCTION_GATES.md` Gate Z3 row
+for the full real-data trail. **The candidate-pair search is intentionally
+paused**: after four attempts with no confirmation, the operator identified
+this as a real doom-loop pattern and directed a pivot to evidence-only,
+non-gambling work; do not propose a fifth apparition or a different NEO
+designation without explicit operator direction. Gate Z6 (no-submission
+package drill) and Gate Z7 (operator runbook update) are both **CLOSED**
+(2026-07-04) using only data already verified real and on disk — see
+`docs/ZTF_DR24_PRODUCTION_GATES.md` and
+`docs/evidence/live/2026-07-04-gate-z6-no-submission-drill-closed.md`. Gates
+Z4 (auditable ranking baseline) and Z5 (retrospective validation) remain
+open and are the recommended next code-only, non-gambling work.
+
+### Historical state (as synced 2026-07-02, v0.90.27)
 
 All 10 legacy pipeline modules are complete. The offline suite passes on Python
 3.14, all three legacy ML tiers have trained weights, and the WISE/DECam/TESS
