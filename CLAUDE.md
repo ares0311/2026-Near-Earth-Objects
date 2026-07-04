@@ -802,7 +802,56 @@ bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-04 v54 (CURRENT)
+### Handoff state as of 2026-07-04 v55 (CURRENT)
+
+**Gate Z4 (auditable ranking baseline) tooling built and offline-tested;
+pending one operator run for a real-data closure result** —
+`Skills/evaluate_ranking_baseline.py` (v0.90.58) evaluates a
+handcrafted-feature logistic-regression ranking baseline (via
+`classify.extract_features`/the new public `classify.features_to_vector`,
+out-of-fold stratified k-fold, never scored on data it was fit on)
+against real archived negative tracklets (reusing the Gate Z6-evidenced
+20220817/20220819 and 20210106/20210111 checkpoints already on disk — no
+new download) and synthetic positive tracklets (the project's established
+injection generator). Reports recall@K, purity@K, calibration error
+(Brier/ECE/log-loss), false-positive review burden, and an ablation vs. a
+naive real-bogus-only baseline — exactly Gate Z4's stated closure
+requirement. 10 new offline tests pass against synthetic fixtures
+(`tests/test_evaluate_ranking_baseline.py`).
+
+**Also synced this session**: `AGENTS.md` and `docs/PRODUCTION_READINESS.md`
+had drifted ~30 versions stale (still described v0.90.27/2026-07-02)
+despite being mandatory session-start docs; both now carry a condensed
+delta paragraph pointing at this file's full handoff and
+`docs/ZTF_DR24_PRODUCTION_GATES.md` for current gate status, without
+rewriting their preserved historical detail.
+
+**Next production action (NOT YET DONE)**: run the new tool against the
+real archived checkpoints already on disk from the Gate Z3/Z6 work (no new
+network access, no new download):
+
+```bash
+git checkout -- uv.lock
+git pull origin main
+export PYTHONPATH=src
+uv run --python 3.14 python Skills/evaluate_ranking_baseline.py \
+    --n-positive 200 --seed 42 \
+    --out Logs/reports/ranking_baseline.json
+```
+
+This defaults to the two real night-pairs already ingested this project
+(`20220817`/`20220819` and `20210106`/`20210111`) as the negative class and
+200 synthetic injected tracklets as the positive class. Read the printed
+recall@K/purity@K/ECE lines for both the logistic-regression baseline and
+the naive real-bogus-only ablation to close Gate Z4 with a real result.
+
+**Standing note on the Gate Z3 candidate-pair search (unchanged, still in
+force)**: do not propose a 5th apparition of designation 72966, or a
+different NEO designation, without first getting explicit operator
+direction. Wait for their call before resuming that specific
+investigation thread.
+
+### Handoff state as of 2026-07-04 v54
 
 **Gate Z7 (operator runbook update) is CLOSED** — with Gate Z6 merged
 (PR #204), the next fully code-addressable, non-gambling gate was Z7:
@@ -3158,6 +3207,7 @@ succeeded and produced the trained Tier 3 weights now recorded under T1-A.
 | `Skills/validate_alert_protocol.py` | Run `ready_for_submission()` on 14 diverse synthetic NEOs and assert correct gate behavior; `--json` flag; used by `e2e.yml` alert-protocol CI job |
 | `Skills/match_positive_control_tracklet.py` | Rank `run_archive_positive_control.py` report tracklets by angular offset from two known real reference positions, to identify which (if any) tracklet actually matches a known object rather than a combinatorial cross-night pairing; `--ref1`, `--ref2`, `--top-n` flags |
 | `Skills/find_nearest_raw_observation.py` | Rank a single night's raw `ztf_alert_archive_ingest.py` checkpoint observations by angular offset from a known reference position, bypassing detect()/link() entirely, to check whether ZTF's archive recorded any confident detection near a known object's position at all; `--ref`, `--top-n` flags |
+| `Skills/evaluate_ranking_baseline.py` | Gate Z4 auditable ranking baseline: evaluates a handcrafted-feature logistic-regression classifier (out-of-fold, stratified k-fold) against real archived negative tracklets (Gate Z6 evidence) and synthetic positive tracklets (established injection generator), reporting recall@K, purity@K, calibration error, false-positive review burden, and an ablation vs. a naive real-bogus-only baseline; `--n-positive`, `--seed`, `--checkpoint-dir`, `--out` flags |
 
 ### Docs
 

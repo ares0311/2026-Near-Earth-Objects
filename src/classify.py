@@ -4,6 +4,7 @@ from __future__ import annotations
 
 __all__ = [
     "extract_features",
+    "features_to_vector",
     "classify",
     "classify_batch",
     "ensemble_predict",
@@ -149,6 +150,16 @@ def _features_to_array(features: CandidateFeatures) -> np.ndarray:
         features.known_object_score,
     ]
     return np.array([v if v is not None else 0.0 for v in vals], dtype=np.float32)
+
+
+def features_to_vector(features: CandidateFeatures) -> np.ndarray:
+    """Public wrapper for the handcrafted Tier 1 feature vector.
+
+    Exposes the same ordered array `_tier1_predict` feeds to the XGBoost
+    model, for use by evaluators (e.g. Gate Z4's ranking-baseline drill)
+    that need the raw handcrafted features rather than a tier prediction.
+    """
+    return _features_to_array(features)
 
 
 def _read_file_with_heartbeat(path: Any, label: str, interval: float = 5.0) -> bytes:

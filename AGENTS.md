@@ -631,8 +631,11 @@ package drill) and Gate Z7 (operator runbook update) are both **CLOSED**
 (2026-07-04) using only data already verified real and on disk — see
 `docs/ZTF_DR24_PRODUCTION_GATES.md` and
 `docs/evidence/live/2026-07-04-gate-z6-no-submission-drill-closed.md`. Gates
-Z4 (auditable ranking baseline) and Z5 (retrospective validation) remain
-open and are the recommended next code-only, non-gambling work.
+Z4 (auditable ranking baseline)'s tooling is built and offline-tested
+(`Skills/evaluate_ranking_baseline.py`, v0.90.58) and needs one operator
+run against the real archived checkpoints already on disk for a real-data
+closure result. Z5 (retrospective validation) remains fully open and is
+the recommended next code-only, non-gambling work.
 
 ### Historical state (as synced 2026-07-02, v0.90.27)
 
