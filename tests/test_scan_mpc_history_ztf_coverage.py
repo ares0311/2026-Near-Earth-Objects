@@ -93,6 +93,43 @@ def test_run_scan_reports_no_hits_when_no_coverage(tmp_path):
     assert report["hits"] == []
 
 
+def _fake_mpc_observations_with_sentinel_mags():
+    """Half the reports have a real magnitude, half have the sentinel/
+    placeholder value (mag=99.0) that root-caused a real Gate Z3 candidate-
+    pair failure -- see
+    docs/evidence/live/2026-07-04-gate-z3-observatory-codes-real-findings.md."""
+    obs = []
+    for i in range(10):
+        obs.append(
+            Observation(
+                obs_id=f"mpc_{i}",
+                ra_deg=225.0 + i * 0.4,
+                dec_deg=-5.0 - i * 0.1,
+                jd=2458308.5 + i,
+                mag=99.0 if i % 2 == 0 else 19.0,
+                mag_err=0.1,
+                filter_band="?",
+                mission="MPC",
+            )
+        )
+    return obs
+
+
+def test_run_scan_excludes_sentinel_magnitude_reports(tmp_path):
+    """Reports with mag >= 90 (sentinel/placeholder, not a real detection)
+    must never be selected as candidates, even before striding."""
+    with patch(
+        "fetch.fetch_mpc_observations", return_value=_fake_mpc_observations_with_sentinel_mags()
+    ):
+        with patch("requests.get", return_value=_FakeResponse(_ipac_response_text(1))):
+            report = scan_mpc_history_ztf_coverage.run_scan(
+                "72966", 2458273.5, stride=1, size_deg=2.0, out_dir=tmp_path
+            )
+    # 10 reports, 5 sentinel (even indices) excluded -> only 5 real reports remain.
+    assert report["n_reports_checked"] == 5
+    assert all(hit["mag"] < 90 for hit in report["hits"])
+
+
 def test_run_scan_rejects_zero_stride():
     parser_args = ["--stride", "0"]
     with patch.object(sys, "argv", ["scan_mpc_history_ztf_coverage.py", *parser_args]):

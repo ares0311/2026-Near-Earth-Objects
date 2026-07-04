@@ -153,7 +153,23 @@ def run_scan(
     z1 = _load_skill("ztf_dr24_bounded_ingest")
 
     mpc_report = mpc_lookup.run_lookup(designation, archive_start_jd, out_dir / "mpc_history")
-    all_rows = mpc_report["reports_in_archive_window"][::stride]
+    # Exclude sentinel/placeholder magnitude reports (mag >= 90, matching this
+    # codebase's existing sentinel-mag convention elsewhere) before selecting
+    # candidates -- a real Gate Z3 failure (see
+    # docs/evidence/live/2026-07-04-gate-z3-observatory-codes-real-findings.md)
+    # was root-caused to exactly this: a mag=99.00 MPC report was used as a
+    # 2-night pair's reference position, anchoring the search box on a
+    # non-detection rather than a real measured position.
+    windowed = mpc_report["reports_in_archive_window"]
+    quality_rows = [r for r in windowed if r["mag"] < 90]
+    n_excluded = len(windowed) - len(quality_rows)
+    if n_excluded:
+        print(
+            f"[scan] Excluded {n_excluded} sentinel/placeholder-magnitude "
+            f"MPC report(s) (mag >= 90) from candidate selection",
+            flush=True,
+        )
+    all_rows = quality_rows[::stride]
     rows = all_rows[shard_index::shard_count] if shard_count > 1 else all_rows
     shard_label = f" shard {shard_index}/{shard_count}" if shard_count > 1 else ""
     print(
