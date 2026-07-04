@@ -3,6 +3,24 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.59 — Add Gate Z5 retrospective validation (2026-07-04)
+
+### Added
+- `Skills/evaluate_retrospective_validation.py`: evaluates historical-replay
+  review packets against the MPC known-object catalog *as queried today*
+  (deliberately after the replay window -- retrospective validation's
+  whole point, distinct from the no-future-catalog-leakage rule that
+  governs replay-time exclusion), bucketing each candidate into
+  `recovered_known_object`, `later_confirmed_object`, `artifact`, or
+  `unresolved_candidate`. Reuses the already-real, already-used
+  `Skills/check_mpc_known.py:check_candidates_against_mpc` live
+  cross-match rather than depending on JPL SBDB's `first_obs` field,
+  which `src/known_object_exclusion.py` explicitly flags as not yet
+  live-verified. 8 new offline tests, all network calls injected via a
+  `mpc_lookup_fn` parameter.
+- Directly advances Gate Z5 (retrospective validation) in
+  `docs/ZTF_DR24_PRODUCTION_GATES.md`, which was fully open.
+
 ## v0.90.58 — Add Gate Z4 auditable ranking baseline (2026-07-04)
 
 ### Added
