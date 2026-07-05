@@ -1,0 +1,54 @@
+{
+  "n_positive": 200,
+  "n_negative": 142,
+  "n_splits": 5,
+  "seed": 42,
+  "logistic_regression_handcrafted": {
+    "n_samples": 342,
+    "mean_prob": 0.584799,
+    "fraction_positive": 0.584795,
+    "brier_score": 0.001972,
+    "ece": 0.04367,
+    "log_loss": 0.044688,
+    "name": "logistic_regression_handcrafted",
+    "recall_at_k": {
+      "5": 0.025,
+      "10": 0.05,
+      "20": 0.1,
+      "50": 0.25
+    },
+    "purity_at_k": {
+      "5": 1.0,
+      "10": 1.0,
+      "20": 1.0,
+      "50": 1.0
+    }
+  },
+  "naive_real_bogus_only": {
+    "n_samples": 342,
+    "mean_prob": 0.898233,
+    "fraction_positive": 0.584795,
+    "brier_score": 0.317807,
+    "ece": 0.313438,
+    "log_loss": 0.939417,
+    "name": "naive_real_bogus_only",
+    "recall_at_k": {
+      "5": 0.0,
+      "10": 0.0,
+      "20": 0.0,
+      "50": 0.07
+    },
+    "purity_at_k": {
+      "5": 0.0,
+      "10": 0.0,
+      "20": 0.0,
+      "50": 0.28
+    }
+  },
+  "false_positive_review_burden": {
+    "threshold": 0.5,
+    "n_flagged": 200,
+    "n_false_positive": 0
+  },
+  "elapsed_s": 5.712802958005341
+}
