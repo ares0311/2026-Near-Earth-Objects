@@ -627,17 +627,13 @@ paused**: after four attempts with no confirmation, the operator identified
 this as a real doom-loop pattern and directed a pivot to evidence-only,
 non-gambling work; do not propose a fifth apparition or a different NEO
 designation without explicit operator direction. Gate Z6 (no-submission
-package drill) and Gate Z7 (operator runbook update) are both **CLOSED**
-(2026-07-04) using only data already verified real and on disk — see
+package drill), Gate Z7 (operator runbook update), Gate Z4 (auditable
+ranking baseline), and Gate Z5 (retrospective validation) are all
+**CLOSED** (2026-07-04) with real data — see
 `docs/ZTF_DR24_PRODUCTION_GATES.md` and
-`docs/evidence/live/2026-07-04-gate-z6-no-submission-drill-closed.md`. Gates
-Z4 (auditable ranking baseline) and Z5 (retrospective validation) both
-have code-complete, offline-tested tooling
-(`Skills/evaluate_ranking_baseline.py`, v0.90.58;
-`Skills/evaluate_retrospective_validation.py`, v0.90.59) and each need one
-operator run for a real-data closure result. No further coding-agent
-scoping work is needed on either open ZTF DR24 gate until those runs
-report back.
+`docs/evidence/live/2026-07-04-gate-z4-z5-closed.md`. The only remaining
+open ZTF DR24 gates are Z2 (pending one live JPL SBDB `first_obs` query
+verification) and Z3 (paused, see above).
 
 ### Historical state (as synced 2026-07-02, v0.90.27)
 
