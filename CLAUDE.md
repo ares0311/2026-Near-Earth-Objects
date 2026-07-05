@@ -802,7 +802,58 @@ bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-04 v56 (CURRENT)
+### Handoff state as of 2026-07-04 v57 (CURRENT)
+
+**Gate Z4 and Gate Z5 are both CLOSED with real data** — operator ran
+both new evaluators to completion. Real results:
+
+1. `Skills/evaluate_ranking_baseline.py --n-positive 200 --seed 42`:
+   200 synthetic positives + 142 real archived negatives (88 from
+   20220817/20220819, 54 from 20210106/20210111), completed in 5.7s. The
+   handcrafted-feature logistic-regression baseline scored ECE=0.044,
+   Brier=0.00197, and **perfect purity@K (1.0) at K=5/10/20/50 with 0/200
+   false positives** at the 0.5 threshold — vs. the naive real-bogus-only
+   baseline's ECE=0.313 and purity@5/10/20=0.0. Real finding: real
+   archived negative tracklets already pass the `rb >= 0.5` real/bogus
+   gate (they're genuine detections, just mis-paired across nights), so
+   real_bogus alone cannot separate them from true positives — exactly
+   the ablation value Gate Z4 asks the handcrafted multi-feature model to
+   demonstrate.
+2. `Skills/evaluate_retrospective_validation.py` against the real
+   88-candidate Gate Z6 review-packet set, with 88 real live
+   `MPC.query_objects_in_region` calls: `{"recovered_known_object": 0,
+   "later_confirmed_object": 0, "artifact": 88, "unresolved_candidate":
+   0}` — the correct, expected result, since these 88 are already known
+   (Gate Z6) to be combinatorial cross-night artifacts, not real objects.
+
+Both report JSONs are committed at `Logs/reports/ranking_baseline.json`
+and `Logs/reports/retrospective_validation.json` (this directory is
+allowlisted in `.gitignore` for exactly this). Full evidence and
+closure assessment: `docs/evidence/live/2026-07-04-gate-z4-z5-closed.md`.
+`docs/ZTF_DR24_PRODUCTION_GATES.md`'s Z4 and Z5 rows both updated to
+**CLOSED**.
+
+**This is a docs/evidence-only commit — no code changed, no version
+bump** (the code that made this possible already shipped in
+v0.90.58/v0.90.59, PRs #205/#206).
+
+**Next production action**: with Z1, Z4, Z6, Z7 all CLOSED and Z5 also
+CLOSED, the only remaining open ZTF DR24 gates are **Z2** (time-aware
+known-object exclusion — code-complete, needs one live JPL SBDB query
+confirming the `first_obs` field is actually returned; the exact query
+syntax is not yet verified in this codebase and should not be guessed —
+needs official JPL SBDB Query API doc research first, ideally via the
+operator's research agent) and **Z3** (candidate-pair search — still
+paused pending explicit operator direction, per the standing note below,
+unchanged). No further coding-agent scoping work remains on Z4/Z5/Z6/Z7.
+
+**Standing note on the Gate Z3 candidate-pair search (unchanged, still in
+force)**: do not propose a 5th apparition of designation 72966, or a
+different NEO designation, without first getting explicit operator
+direction. Wait for their call before resuming that specific
+investigation thread.
+
+### Handoff state as of 2026-07-04 v56
 
 **Gate Z5 (retrospective validation) tooling built and offline-tested;
 pending one operator run for a real-data closure result** —
