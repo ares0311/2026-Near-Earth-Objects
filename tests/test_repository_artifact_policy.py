@@ -24,17 +24,21 @@ def _git(*args: str) -> str:
 def test_only_log_placeholders_are_tracked():
     """Raw operational logs must not be tracked as durable repository state.
 
-    The one deliberate exception is the git-relay manifest written by
-    Skills/ztf_alert_archive_ingest.py -- a compact, inert per-night
-    summary (no raw observation payloads) that the script itself commits
-    and pushes automatically, per the standing git-relay pattern. See
-    CLAUDE.md's "shared manifest must live in a committed path" rule.
+    Deliberate exceptions under Logs/reports/ are compact, inert summary
+    artifacts -- never raw observation payloads -- that are either
+    auto-committed by a script (the ztf_alert_archive_ingest.py git-relay
+    manifest; see CLAUDE.md's "shared manifest must live in a committed
+    path" rule) or a small evidence JSON promoted by the operator to
+    support a specific dated Gate closure (the Gate Z4/Z5 evaluator
+    reports; see docs/evidence/live/2026-07-04-gate-z4-z5-closed.md).
     """
     tracked_logs = sorted(_git("ls-files", "Logs").splitlines())
 
     assert tracked_logs == [
         "Logs/.gitkeep",
         "Logs/reports/.gitkeep",
+        "Logs/reports/ranking_baseline.json",
+        "Logs/reports/retrospective_validation.json",
         "Logs/reports/ztf_alert_archive_ingest_manifest.jsonl",
     ]
 
