@@ -24,11 +24,10 @@ that use this to suppress candidates as "already known" will therefore
 under-suppress on missing data, not over-suppress; a human reviewer sees
 the candidate rather than having it silently discarded.
 
-NOT YET LIVE-VERIFIED: whether `first_obs` is actually returned when added
-to the already-verified `sb-group=neo` query's field list has not been
-confirmed against the live API from this sandbox (network-blocked). See
-docs/ZTF_DR24_PRODUCTION_GATES.md Gate Z2 for the pending operator
-verification command.
+LIVE-VERIFIED (2026-07-05): appending `first_obs` to the already-verified
+`sb-group=neo` query's field list was confirmed live -- real populated
+dates returned for all sampled NEOs. See
+docs/evidence/live/2026-07-05-gate-z2-first-obs-verified.md.
 """
 
 from __future__ import annotations

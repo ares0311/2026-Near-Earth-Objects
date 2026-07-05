@@ -802,7 +802,53 @@ bounded-pilot evidence, but
 is not current DR24 production evidence until verified for the historical-
 replay protocol.
 
-### Handoff state as of 2026-07-04 v57 (CURRENT)
+### Handoff state as of 2026-07-05 v58 (CURRENT)
+
+**Gate Z2 is CLOSED** — operator ran a live JPL SBDB query appending
+`first_obs` to the already-verified `sb-group=neo` query (exact base URL
+reused from `Skills/verify_ztf_dr24_sources.py`, no new endpoint or
+schema guessed):
+
+```bash
+curl -s "https://ssd-api.jpl.nasa.gov/sbdb_query.api?fields=spkid,pdes,full_name,first_obs&sb-group=neo&full-prec=true&limit=3"
+```
+
+Real result: `first_obs` returned populated with real dates for all 3
+sampled NEOs (433 Eros: 1893-10-29; 719 Albert: 1911-10-04; 887 Alinda:
+1918-02-09) out of 42,153 total NEOs matched — not null, not a
+placeholder. This confirms the mechanism `src/known_object_exclusion.py`'s
+`known_as_of()` depends on is real and live-working, not just
+documented-but-unverified. `src/known_object_exclusion.py`'s docstring
+updated to remove the "NOT YET LIVE-VERIFIED" warning. Full evidence:
+`docs/evidence/live/2026-07-05-gate-z2-first-obs-verified.md`.
+`docs/ZTF_DR24_PRODUCTION_GATES.md`'s Z2 row updated to **CLOSED**.
+
+**Research note**: this sandbox's egress policy blocks direct
+`WebFetch`/`curl` access to `ssd-api.jpl.nasa.gov` (403 at the proxy —
+an organization policy denial, correctly not routed around). The exact
+`fields=` query-parameter syntax was instead confirmed via `WebSearch`
+against the official SBDB Query API docs before handing the operator a
+command, rather than guessing it.
+
+**This is a docs/evidence + docstring-only commit — no functional code
+changed, no version bump.**
+
+**Next production action**: with Z1, Z2, Z4, Z6, Z7 all CLOSED and Z5
+also CLOSED, the only remaining open ZTF DR24 gate is **Z3** (candidate-
+pair search), still paused pending explicit operator direction per the
+standing note below. Exercising Z2's `known_as_of()` end-to-end against
+a real linked tracklet (rather than the field-return check just done)
+still depends on Z3 resuming. No further coding-agent scoping work
+remains on any gate except Z3, and Z3 must not be resumed without the
+operator's explicit choice of path.
+
+**Standing note on the Gate Z3 candidate-pair search (unchanged, still in
+force)**: do not propose a 5th apparition of designation 72966, or a
+different NEO designation, without first getting explicit operator
+direction. Wait for their call before resuming that specific
+investigation thread.
+
+### Handoff state as of 2026-07-04 v57
 
 **Gate Z4 and Gate Z5 are both CLOSED with real data** — operator ran
 both new evaluators to completion. Real results:

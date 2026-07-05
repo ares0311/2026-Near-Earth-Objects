@@ -626,14 +626,14 @@ for the full real-data trail. **The candidate-pair search is intentionally
 paused**: after four attempts with no confirmation, the operator identified
 this as a real doom-loop pattern and directed a pivot to evidence-only,
 non-gambling work; do not propose a fifth apparition or a different NEO
-designation without explicit operator direction. Gate Z6 (no-submission
-package drill), Gate Z7 (operator runbook update), Gate Z4 (auditable
-ranking baseline), and Gate Z5 (retrospective validation) are all
-**CLOSED** (2026-07-04) with real data — see
-`docs/ZTF_DR24_PRODUCTION_GATES.md` and
-`docs/evidence/live/2026-07-04-gate-z4-z5-closed.md`. The only remaining
-open ZTF DR24 gates are Z2 (pending one live JPL SBDB `first_obs` query
-verification) and Z3 (paused, see above).
+designation without explicit operator direction. Gates Z2 (time-aware
+known-object exclusion), Z6 (no-submission package drill), Z7 (operator
+runbook update), Z4 (auditable ranking baseline), and Z5 (retrospective
+validation) are all **CLOSED** (2026-07-04/05) with real data — see
+`docs/ZTF_DR24_PRODUCTION_GATES.md`,
+`docs/evidence/live/2026-07-04-gate-z4-z5-closed.md`, and
+`docs/evidence/live/2026-07-05-gate-z2-first-obs-verified.md`. The only
+remaining open ZTF DR24 gate is Z3 (paused, see above).
 
 ### Historical state (as synced 2026-07-02, v0.90.27)
 
