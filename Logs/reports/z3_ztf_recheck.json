@@ -1,0 +1,16 @@
+{
+  "n_injected": 200,
+  "mission": "ZTF",
+  "n_detected": 200,
+  "n_linked": 200,
+  "n_scored": 200,
+  "detection_rate": 1.0,
+  "link_rate": 1.0,
+  "score_rate": 1.0,
+  "hazard_flag_counts": {
+    "nominal": 0,
+    "close_approach": 0,
+    "unknown": 200,
+    "pha_candidate": 0
+  }
+}

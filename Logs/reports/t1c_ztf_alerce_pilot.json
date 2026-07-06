@@ -1,0 +1,24 @@
+[
+  {
+    "object_id": "7cb29d31-bf35-4c9c-b03d-0f6c5dff37d0",
+    "neo_probability": 0.10804411950073088,
+    "hazard_flag": "unknown",
+    "alert_pathway": "internal_candidate",
+    "moid_au": null,
+    "discovery_priority": 0.05402205975036544,
+    "alert_actions": [
+      "No external reporting: pathway=internal_candidate"
+    ]
+  },
+  {
+    "object_id": "459489ba-0e7f-4a72-a055-de35d5e78541",
+    "neo_probability": 0.01005353542504085,
+    "hazard_flag": "unknown",
+    "alert_pathway": "internal_candidate",
+    "moid_au": null,
+    "discovery_priority": 0.005026767712520425,
+    "alert_actions": [
+      "No external reporting: pathway=internal_candidate"
+    ]
+  }
+]

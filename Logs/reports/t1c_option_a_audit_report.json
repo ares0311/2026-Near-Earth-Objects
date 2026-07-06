@@ -1,0 +1,328 @@
+{
+  "schema_version": "real-run-audit-v2",
+  "run_dir": "Logs/pipeline_runs/atlas_recovery_c1712df0f32c",
+  "run_id": "atlas_recovery_c1712df0f32c",
+  "run_summary": {
+    "run_id": "atlas_recovery_c1712df0f32c",
+    "run_dir": "Logs/pipeline_runs/atlas_recovery_c1712df0f32c",
+    "expected_known": "Logs/reports/t1c_option_a_prequalified_manifest.json",
+    "atlas_audit_expected_known": "Logs/pipeline_runs/atlas_recovery_c1712df0f32c/expected_known_atlas_forced.json",
+    "n_manifest_rows": 5,
+    "n_samples": 23,
+    "n_recovered_samples": 16,
+    "n_tracklets": 5,
+    "n_failures": 0,
+    "n_pending_samples": 0,
+    "fallback_type": "atlas_forced_photometry_targeted_known_object_recovery",
+    "limitations": [
+      "Targeted forced photometry is supporting recovery evidence, not blind discovery.",
+      "This tool performs no external submission and makes no impact claim.",
+      "Promotion remains controlled by audit_real_run.py and operator review."
+    ],
+    "safety": {
+      "no_external_submission": true,
+      "no_impact_probability_claim": true,
+      "mpc_nasa_alert_pathway_triggered": false
+    }
+  },
+  "checkpoint_last_stage": "atlas_forced_recovery",
+  "n_tracklets": 5,
+  "n_review_rows": 5,
+  "review_rows": [
+    {
+      "object_id": "atlas_recovery:121",
+      "review_priority": "standard",
+      "review_flags": [],
+      "n_observations": 3,
+      "n_nights": 3,
+      "start_jd": 2461187.023842,
+      "end_jd": 2461211.652749,
+      "arc_days": 24.628907000180334,
+      "motion_rate_arcsec_per_hour": 26.282577310079372,
+      "motion_pa_degrees": 268.6264180490505,
+      "min_mag": 20.273,
+      "median_mag": 20.574,
+      "max_mag": 20.741,
+      "mean_real_bogus": null,
+      "mean_deep_real_bogus": null,
+      "missions": {
+        "ATLAS": 3
+      },
+      "filters": {
+        "o": 2,
+        "c": 1
+      },
+      "alerce_object_ids": [
+        "ATLAS_FORCED:121"
+      ],
+      "neo_probability": null,
+      "hazard_flag": "unknown",
+      "alert_pathway": "known_object",
+      "moid_au": null,
+      "discovery_priority": 0.0,
+      "human_review_status": "required"
+    },
+    {
+      "object_id": "atlas_recovery:2140",
+      "review_priority": "standard",
+      "review_flags": [],
+      "n_observations": 3,
+      "n_nights": 3,
+      "start_jd": 2461199.690981,
+      "end_jd": 2461211.670614,
+      "arc_days": 11.979632999747992,
+      "motion_rate_arcsec_per_hour": 29.89306510619554,
+      "motion_pa_degrees": 287.13856272740355,
+      "min_mag": 18.981,
+      "median_mag": 20.148,
+      "max_mag": 20.502,
+      "mean_real_bogus": null,
+      "mean_deep_real_bogus": null,
+      "missions": {
+        "ATLAS": 3
+      },
+      "filters": {
+        "o": 2,
+        "c": 1
+      },
+      "alerce_object_ids": [
+        "ATLAS_FORCED:2140"
+      ],
+      "neo_probability": null,
+      "hazard_flag": "unknown",
+      "alert_pathway": "known_object",
+      "moid_au": null,
+      "discovery_priority": 0.0,
+      "human_review_status": "required"
+    },
+    {
+      "object_id": "atlas_recovery:2172",
+      "review_priority": "standard",
+      "review_flags": [],
+      "n_observations": 3,
+      "n_nights": 3,
+      "start_jd": 2461182.543846,
+      "end_jd": 2461199.695072,
+      "arc_days": 17.15122599992901,
+      "motion_rate_arcsec_per_hour": 31.73841084300648,
+      "motion_pa_degrees": 273.76731930581184,
+      "min_mag": 18.107,
+      "median_mag": 19.854,
+      "max_mag": 20.683,
+      "mean_real_bogus": null,
+      "mean_deep_real_bogus": null,
+      "missions": {
+        "ATLAS": 3
+      },
+      "filters": {
+        "o": 3
+      },
+      "alerce_object_ids": [
+        "ATLAS_FORCED:2172"
+      ],
+      "neo_probability": null,
+      "hazard_flag": "unknown",
+      "alert_pathway": "known_object",
+      "moid_au": null,
+      "discovery_priority": 0.0,
+      "human_review_status": "required"
+    },
+    {
+      "object_id": "atlas_recovery:5650",
+      "review_priority": "standard",
+      "review_flags": [],
+      "n_observations": 4,
+      "n_nights": 4,
+      "start_jd": 2461187.023842,
+      "end_jd": 2461211.652749,
+      "arc_days": 24.628907000180334,
+      "motion_rate_arcsec_per_hour": 35.50061733010534,
+      "motion_pa_degrees": 297.7823425199163,
+      "min_mag": 20.569,
+      "median_mag": 20.669,
+      "max_mag": 20.843,
+      "mean_real_bogus": null,
+      "mean_deep_real_bogus": null,
+      "missions": {
+        "ATLAS": 4
+      },
+      "filters": {
+        "o": 3,
+        "c": 1
+      },
+      "alerce_object_ids": [
+        "ATLAS_FORCED:5650"
+      ],
+      "neo_probability": null,
+      "hazard_flag": "unknown",
+      "alert_pathway": "known_object",
+      "moid_au": null,
+      "discovery_priority": 0.0,
+      "human_review_status": "required"
+    },
+    {
+      "object_id": "atlas_recovery:954",
+      "review_priority": "standard",
+      "review_flags": [],
+      "n_observations": 3,
+      "n_nights": 3,
+      "start_jd": 2461187.015336,
+      "end_jd": 2461205.682671,
+      "arc_days": 18.667334999889135,
+      "motion_rate_arcsec_per_hour": 28.575805709143616,
+      "motion_pa_degrees": 277.24685510943056,
+      "min_mag": 18.572,
+      "median_mag": 20.194,
+      "max_mag": 20.504,
+      "mean_real_bogus": null,
+      "mean_deep_real_bogus": null,
+      "missions": {
+        "ATLAS": 3
+      },
+      "filters": {
+        "o": 3
+      },
+      "alerce_object_ids": [
+        "ATLAS_FORCED:954"
+      ],
+      "neo_probability": null,
+      "hazard_flag": "unknown",
+      "alert_pathway": "known_object",
+      "moid_au": null,
+      "discovery_priority": 0.0,
+      "human_review_status": "required"
+    }
+  ],
+  "expected_known_matches": [
+    {
+      "expected_key": "121",
+      "designation": "121",
+      "status": "matched",
+      "matched_object_id": "atlas_recovery:121",
+      "candidate_object_ids": [
+        "atlas_recovery:121"
+      ],
+      "best_separation_arcsec": 0.0,
+      "best_time_delta_days": 0.306228999979794,
+      "matched_samples": 3,
+      "required_samples": 1,
+      "matched_by": "sky_time"
+    },
+    {
+      "expected_key": "954",
+      "designation": "954",
+      "status": "matched",
+      "matched_object_id": "atlas_recovery:954",
+      "candidate_object_ids": [
+        "atlas_recovery:954"
+      ],
+      "best_separation_arcsec": 0.0,
+      "best_time_delta_days": 0.2839919999241829,
+      "matched_samples": 3,
+      "required_samples": 1,
+      "matched_by": "sky_time"
+    },
+    {
+      "expected_key": "2140",
+      "designation": "2140",
+      "status": "matched",
+      "matched_object_id": "atlas_recovery:2140",
+      "candidate_object_ids": [
+        "atlas_recovery:2140"
+      ],
+      "best_separation_arcsec": 0.0,
+      "best_time_delta_days": 0.28901899978518486,
+      "matched_samples": 3,
+      "required_samples": 1,
+      "matched_by": "sky_time"
+    },
+    {
+      "expected_key": "2172",
+      "designation": "2172",
+      "status": "matched",
+      "matched_object_id": "atlas_recovery:2172",
+      "candidate_object_ids": [
+        "atlas_recovery:2172"
+      ],
+      "best_separation_arcsec": 0.0,
+      "best_time_delta_days": 0.2849280000664294,
+      "matched_samples": 3,
+      "required_samples": 1,
+      "matched_by": "sky_time"
+    },
+    {
+      "expected_key": "5650",
+      "designation": "5650",
+      "status": "matched",
+      "matched_object_id": "atlas_recovery:5650",
+      "candidate_object_ids": [
+        "atlas_recovery:5650"
+      ],
+      "best_separation_arcsec": 0.0,
+      "best_time_delta_days": 0.28901899978518486,
+      "matched_samples": 4,
+      "required_samples": 1,
+      "matched_by": "sky_time"
+    }
+  ],
+  "known_object_recovery_gate": {
+    "status": "evaluated",
+    "threshold": 0.9,
+    "recovered": 5,
+    "expected": 5,
+    "recovery_rate": 1.0,
+    "ambiguous": 0,
+    "invalid": 0,
+    "unmatched": 0,
+    "passed": true
+  },
+  "same_night_diagnostic_subgate": {
+    "n_candidates": 5,
+    "n_same_night": 0,
+    "n_multi_night": 5,
+    "fraction_same_night": 0.0,
+    "subgate_applies": false,
+    "subgate_passed": false,
+    "limitations": [
+      "Same-night detection evidence only; does not satisfy multi-night production recovery gate.",
+      "This subgate is citizen-science diagnostic evidence.",
+      "No external submission authorized. No MPC report generated."
+    ]
+  },
+  "human_false_positive_review": {
+    "status": "blocked_no_operator_review",
+    "n_candidates_for_review": 5,
+    "reviewer": "Jerome W. Lindsey III, citizen-science project operator",
+    "decision": null,
+    "limitations": "Operator review is citizen-science QA, not professional planetary-defense validation.",
+    "gate": {
+      "status": "blocked_no_operator_review",
+      "reviewed": 0,
+      "required": 5,
+      "missing_object_ids": [
+        "atlas_recovery:121",
+        "atlas_recovery:2140",
+        "atlas_recovery:2172",
+        "atlas_recovery:5650",
+        "atlas_recovery:954"
+      ],
+      "passed": false
+    }
+  },
+  "citizen_science_limitations": [
+    "No professional domain-expert validation is recorded.",
+    "This packet does not authorize MPC submission or hazard notification.",
+    "All impact-probability statements remain deferred to MPC/CNEOS."
+  ],
+  "safety": {
+    "no_external_submission": true,
+    "no_mpc_submission": true,
+    "no_nasa_pdco_notification": true,
+    "no_impact_probability_asserted": true
+  },
+  "production_promotion_allowed": false,
+  "production_promotion_blockers": [
+    "citizen_science_operator_review_not_passed"
+  ],
+  "production_promotion_notes": []
+}

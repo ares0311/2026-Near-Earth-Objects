@@ -1,0 +1,129 @@
+{
+  "schema_version": "real-run-audit-v1",
+  "run_dir": "Logs/pipeline_runs/011dd53aa7f4",
+  "run_id": "011dd53aa7f4",
+  "run_summary": {
+    "run_id": "011dd53aa7f4",
+    "timestamp_utc": "20260616_231055_UTC",
+    "ra_deg": 83.8221,
+    "dec_deg": -5.3911,
+    "radius_deg": 1.0,
+    "start_jd": 2458850.0,
+    "end_jd": 2461120.0,
+    "surveys": [
+      "ZTF"
+    ],
+    "max_candidates": 80,
+    "dry_run": true,
+    "n_results": 2,
+    "elapsed_seconds": 68.21,
+    "cache_files_downloaded": [
+      "0271f663f818e07543ec1bcabc602f7d.json",
+      "c45ba6dec4e204d2735ac875135164b8.json",
+      "e654309d3dfb1535da41429975ba96fc.json",
+      "mpc_orbit_catalog.json",
+      "neocp_confirmed.json"
+    ],
+    "cache_files_deleted": [
+      "0271f663f818e07543ec1bcabc602f7d.json",
+      "c45ba6dec4e204d2735ac875135164b8.json",
+      "e654309d3dfb1535da41429975ba96fc.json",
+      "mpc_orbit_catalog.json",
+      "neocp_confirmed.json"
+    ]
+  },
+  "checkpoint_last_stage": "partial",
+  "n_tracklets": 2,
+  "n_review_rows": 2,
+  "review_rows": [
+    {
+      "object_id": "7cb29d31-bf35-4c9c-b03d-0f6c5dff37d0",
+      "review_priority": "high",
+      "review_flags": [
+        "below_min_solar_system_motion",
+        "long_arc_near_stationary"
+      ],
+      "n_observations": 18,
+      "n_nights": 18,
+      "start_jd": 2459150.9573148,
+      "end_jd": 2459874.9585648,
+      "arc_days": 724.0012500002049,
+      "motion_rate_arcsec_per_hour": 1.0369697922130833e-05,
+      "motion_pa_degrees": 342.7505493920415,
+      "min_mag": 17.1744,
+      "median_mag": 18.41035,
+      "max_mag": 19.7926,
+      "mean_real_bogus": 0.8701587305555555,
+      "mean_deep_real_bogus": 0.9999161266666666,
+      "missions": {
+        "ZTF": 18
+      },
+      "filters": {
+        "g": 10,
+        "r": 8
+      },
+      "alerce_object_ids": [],
+      "neo_probability": 0.10804411950073088,
+      "hazard_flag": "unknown",
+      "alert_pathway": "internal_candidate",
+      "moid_au": null,
+      "discovery_priority": 0.05402205975036544,
+      "human_review_status": "required"
+    },
+    {
+      "object_id": "459489ba-0e7f-4a72-a055-de35d5e78541",
+      "review_priority": "high",
+      "review_flags": [
+        "below_min_solar_system_motion",
+        "long_arc_near_stationary"
+      ],
+      "n_observations": 4,
+      "n_nights": 4,
+      "start_jd": 2459167.9133796,
+      "end_jd": 2459205.7739583,
+      "arc_days": 37.860578699968755,
+      "motion_rate_arcsec_per_hour": 0.00031649147584402853,
+      "motion_pa_degrees": 163.5150607502828,
+      "min_mag": 14.9746,
+      "median_mag": 15.973949999999999,
+      "max_mag": 16.8348,
+      "mean_real_bogus": 0.724643,
+      "mean_deep_real_bogus": null,
+      "missions": {
+        "ZTF": 4
+      },
+      "filters": {
+        "g": 2,
+        "r": 2
+      },
+      "alerce_object_ids": [],
+      "neo_probability": 0.01005353542504085,
+      "hazard_flag": "unknown",
+      "alert_pathway": "internal_candidate",
+      "moid_au": null,
+      "discovery_priority": 0.005026767712520425,
+      "human_review_status": "required"
+    }
+  ],
+  "known_object_recovery_gate": {
+    "status": "blocked_no_expected_known_manifest",
+    "threshold": 0.9,
+    "recovered": 0,
+    "expected": 0,
+    "recovery_rate": null,
+    "passed": false
+  },
+  "human_false_positive_review": {
+    "status": "required",
+    "n_candidates_for_review": 2,
+    "reviewer": null,
+    "decision": null
+  },
+  "safety": {
+    "no_external_submission": true,
+    "no_mpc_submission": true,
+    "no_nasa_pdco_notification": true,
+    "no_impact_probability_asserted": true
+  },
+  "production_promotion_allowed": false
+}

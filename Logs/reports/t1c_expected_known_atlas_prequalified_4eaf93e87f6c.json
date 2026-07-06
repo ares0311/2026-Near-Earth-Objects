@@ -1,0 +1,195 @@
+[
+  {
+    "designation": "481",
+    "samples": [
+      {
+        "jd": 2461180.0,
+        "ra_deg": 254.51016,
+        "dec_deg": -23.57404,
+        "mag": 13.409
+      },
+      {
+        "jd": 2461187.475,
+        "ra_deg": 252.81973,
+        "dec_deg": -23.71707,
+        "mag": 13.226
+      },
+      {
+        "jd": 2461194.95,
+        "ra_deg": 251.0249,
+        "dec_deg": -23.82697,
+        "mag": 13.01
+      },
+      {
+        "jd": 2461202.425,
+        "ra_deg": 249.21817,
+        "dec_deg": -23.90504,
+        "mag": 13.207
+      }
+    ],
+    "tolerance_arcsec": 5.0,
+    "tolerance_days": 0.02,
+    "min_samples": 1,
+    "source": "mpc_asteroid_orbit_projection_fixed_field_plus_jpl_horizons_atlas_prequalified",
+    "prequalification": {
+      "rule": "include only expected-known objects with at least 3 recovered ATLAS samples across at least 2 distinct nights in screening run atlas_recovery_4eaf93e87f6c",
+      "screening_run_id": "atlas_recovery_4eaf93e87f6c",
+      "screening_run_dir": "Logs/pipeline_runs/atlas_recovery_4eaf93e87f6c",
+      "min_recovered_samples": 3,
+      "min_nights": 2,
+      "designation": "481",
+      "recovered_sample_count": 3,
+      "recovered_observation_count": 8,
+      "recovered_night_count": 5,
+      "recovered_night_keys": [
+        2461180,
+        2461186,
+        2461187,
+        2461201,
+        2461202
+      ]
+    }
+  },
+  {
+    "designation": "1950",
+    "samples": [
+      {
+        "jd": 2461180.0,
+        "ra_deg": 255.29719,
+        "dec_deg": -22.56145,
+        "mag": 16.243
+      },
+      {
+        "jd": 2461187.475,
+        "ra_deg": 253.28302,
+        "dec_deg": -22.63403,
+        "mag": 16.028
+      },
+      {
+        "jd": 2461194.95,
+        "ra_deg": 251.12462,
+        "dec_deg": -22.6675,
+        "mag": 15.707
+      },
+      {
+        "jd": 2461202.425,
+        "ra_deg": 248.97786,
+        "dec_deg": -22.66741,
+        "mag": 16.047
+      }
+    ],
+    "tolerance_arcsec": 5.0,
+    "tolerance_days": 0.02,
+    "min_samples": 1,
+    "source": "mpc_asteroid_orbit_projection_fixed_field_plus_jpl_horizons_atlas_prequalified",
+    "prequalification": {
+      "rule": "include only expected-known objects with at least 3 recovered ATLAS samples across at least 2 distinct nights in screening run atlas_recovery_4eaf93e87f6c",
+      "screening_run_id": "atlas_recovery_4eaf93e87f6c",
+      "screening_run_dir": "Logs/pipeline_runs/atlas_recovery_4eaf93e87f6c",
+      "min_recovered_samples": 3,
+      "min_nights": 2,
+      "designation": "1950",
+      "recovered_sample_count": 3,
+      "recovered_observation_count": 5,
+      "recovered_night_count": 4,
+      "recovered_night_keys": [
+        2461180,
+        2461186,
+        2461187,
+        2461201
+      ]
+    }
+  },
+  {
+    "designation": "2172",
+    "samples": [
+      {
+        "jd": 2461180.0,
+        "ra_deg": 254.08468,
+        "dec_deg": -21.4568,
+        "mag": 17.161
+      },
+      {
+        "jd": 2461187.475,
+        "ra_deg": 252.53771,
+        "dec_deg": -21.37208,
+        "mag": 16.984
+      },
+      {
+        "jd": 2461194.95,
+        "ra_deg": 250.90548,
+        "dec_deg": -21.27133,
+        "mag": 16.766
+      },
+      {
+        "jd": 2461202.425,
+        "ra_deg": 249.27072,
+        "dec_deg": -21.16125,
+        "mag": 16.985
+      }
+    ],
+    "tolerance_arcsec": 5.0,
+    "tolerance_days": 0.02,
+    "min_samples": 1,
+    "source": "mpc_asteroid_orbit_projection_fixed_field_plus_jpl_horizons_atlas_prequalified",
+    "prequalification": {
+      "rule": "include only expected-known objects with at least 3 recovered ATLAS samples across at least 2 distinct nights in screening run atlas_recovery_4eaf93e87f6c",
+      "screening_run_id": "atlas_recovery_4eaf93e87f6c",
+      "screening_run_dir": "Logs/pipeline_runs/atlas_recovery_4eaf93e87f6c",
+      "min_recovered_samples": 3,
+      "min_nights": 2,
+      "designation": "2172",
+      "recovered_sample_count": 3,
+      "recovered_observation_count": 6,
+      "recovered_night_count": 3,
+      "recovered_night_keys": [
+        2461187,
+        2461194,
+        2461202
+      ]
+    }
+  },
+  {
+    "designation": "2973",
+    "samples": [
+      {
+        "jd": 2461180.0,
+        "ra_deg": 253.53391,
+        "dec_deg": -24.96513,
+        "mag": 17.254
+      },
+      {
+        "jd": 2461187.475,
+        "ra_deg": 251.71407,
+        "dec_deg": -24.79449,
+        "mag": 17.06
+      },
+      {
+        "jd": 2461194.95,
+        "ra_deg": 249.79878,
+        "dec_deg": -24.56934,
+        "mag": 16.889
+      }
+    ],
+    "tolerance_arcsec": 5.0,
+    "tolerance_days": 0.02,
+    "min_samples": 1,
+    "source": "mpc_asteroid_orbit_projection_fixed_field_plus_jpl_horizons_atlas_prequalified",
+    "prequalification": {
+      "rule": "include only expected-known objects with at least 3 recovered ATLAS samples across at least 2 distinct nights in screening run atlas_recovery_4eaf93e87f6c",
+      "screening_run_id": "atlas_recovery_4eaf93e87f6c",
+      "screening_run_dir": "Logs/pipeline_runs/atlas_recovery_4eaf93e87f6c",
+      "min_recovered_samples": 3,
+      "min_nights": 2,
+      "designation": "2973",
+      "recovered_sample_count": 3,
+      "recovered_observation_count": 4,
+      "recovered_night_count": 3,
+      "recovered_night_keys": [
+        2461180,
+        2461187,
+        2461194
+      ]
+    }
+  }
+]

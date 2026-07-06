@@ -1,0 +1,13 @@
+[
+  {
+    "object_id": "5d2b21b6-a059-406d-92aa-d22562913cce",
+    "neo_probability": 0.05978606160197192,
+    "hazard_flag": "unknown",
+    "alert_pathway": "internal_candidate",
+    "moid_au": null,
+    "discovery_priority": 0.02989303080098596,
+    "alert_actions": [
+      "No external reporting: pathway=internal_candidate"
+    ]
+  }
+]

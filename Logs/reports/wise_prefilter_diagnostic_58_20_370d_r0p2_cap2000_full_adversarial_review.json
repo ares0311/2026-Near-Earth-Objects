@@ -1,0 +1,2123 @@
+[
+  {
+    "object_id": "4d497c75-9161-47ad-a606-9427408729a5",
+    "verdict": "REJECT",
+    "challenges": [
+      {
+        "name": "orbit_quality",
+        "outcome": "FAIL",
+        "reason": "No orbital elements computed \u2014 cannot assess orbit quality.",
+        "details": {
+          "quality_code": null
+        }
+      },
+      {
+        "name": "arc_length",
+        "outcome": "PASS",
+        "reason": "Arc length 1.112 d \u2265 1.0 d.",
+        "details": {
+          "arc_days": 1.1115336497314274
+        }
+      },
+      {
+        "name": "multi_night",
+        "outcome": "PASS",
+        "reason": "3 distinct nights, 3 observations.",
+        "details": {
+          "n_nights": 3,
+          "n_obs": 3
+        }
+      },
+      {
+        "name": "real_bogus",
+        "outcome": "FAIL",
+        "reason": "real_bogus_score None is None or < 0.9 \u2014 fails submission gate.",
+        "details": {
+          "real_bogus_score": null,
+          "gate": 0.9
+        }
+      },
+      {
+        "name": "known_object_posterior",
+        "outcome": "PASS",
+        "reason": "known_object posterior 0.006 below warning threshold.",
+        "details": {
+          "known_object_prob": 0.006190534597545496
+        }
+      },
+      {
+        "name": "artifact_posterior",
+        "outcome": "FAIL",
+        "reason": "stellar_artifact posterior 0.990 \u2265 0.3 \u2014 classifier indicates this is likely an instrumental artifact.",
+        "details": {
+          "stellar_artifact_prob": 0.9895012244194634
+        }
+      },
+      {
+        "name": "neo_dominance",
+        "outcome": "FAIL",
+        "reason": "neo_candidate posterior 0.001 < 0.3 \u2014 classifier does not favour novel NEO hypothesis.",
+        "details": {
+          "neo_candidate_prob": 0.0010594803833460422
+        }
+      },
+      {
+        "name": "mba_confusion",
+        "outcome": "PASS",
+        "reason": "main_belt_asteroid posterior 0.001 below warning threshold.",
+        "details": {
+          "main_belt_asteroid_prob": 0.0009694930803693066
+        }
+      },
+      {
+        "name": "motion_rate",
+        "outcome": "PASS",
+        "reason": "Motion rate 26.785 arcsec/hr within typical NEO range.",
+        "details": {
+          "rate_arcsec_hr": 26.78489673359226
+        }
+      },
+      {
+        "name": "moid_arc_consistency",
+        "outcome": "PASS",
+        "reason": "MOID > 0.10 AU or not computed \u2014 no PHA claim to scrutinise.",
+        "details": {
+          "moid_au": null,
+          "arc_days": 1.1115336497314274
+        }
+      },
+      {
+        "name": "motion_consistency",
+        "outcome": "PASS",
+        "reason": "motion_consistency_score 0.977 \u2265 0.60.",
+        "details": {
+          "motion_consistency_score": 0.9773583981240311
+        }
+      }
+    ],
+    "fail_count": 4,
+    "warning_count": 0,
+    "summary": "REJECTED: 4 disqualifying challenge(s) failed \u2014 ['orbit_quality', 'real_bogus', 'artifact_posterior', 'neo_dominance']. Do not advance to operator review.",
+    "reviewed_at_utc": "2026-06-29T00:17:49.259352+00:00"
+  },
+  {
+    "object_id": "26a44bfb-71ec-4324-9821-f18777c10b16",
+    "verdict": "REJECT",
+    "challenges": [
+      {
+        "name": "orbit_quality",
+        "outcome": "FAIL",
+        "reason": "No orbital elements computed \u2014 cannot assess orbit quality.",
+        "details": {
+          "quality_code": null
+        }
+      },
+      {
+        "name": "arc_length",
+        "outcome": "PASS",
+        "reason": "Arc length 1.111 d \u2265 1.0 d.",
+        "details": {
+          "arc_days": 1.1114063300192356
+        }
+      },
+      {
+        "name": "multi_night",
+        "outcome": "PASS",
+        "reason": "3 distinct nights, 3 observations.",
+        "details": {
+          "n_nights": 3,
+          "n_obs": 3
+        }
+      },
+      {
+        "name": "real_bogus",
+        "outcome": "FAIL",
+        "reason": "real_bogus_score None is None or < 0.9 \u2014 fails submission gate.",
+        "details": {
+          "real_bogus_score": null,
+          "gate": 0.9
+        }
+      },
+      {
+        "name": "known_object_posterior",
+        "outcome": "PASS",
+        "reason": "known_object posterior 0.006 below warning threshold.",
+        "details": {
+          "known_object_prob": 0.006198744602168133
+        }
+      },
+      {
+        "name": "artifact_posterior",
+        "outcome": "FAIL",
+        "reason": "stellar_artifact posterior 0.989 \u2265 0.3 \u2014 classifier indicates this is likely an instrumental artifact.",
+        "details": {
+          "stellar_artifact_prob": 0.9894955955158922
+        }
+      },
+      {
+        "name": "neo_dominance",
+        "outcome": "FAIL",
+        "reason": "neo_candidate posterior 0.001 < 0.3 \u2014 classifier does not favour novel NEO hypothesis.",
+        "details": {
+          "neo_candidate_prob": 0.001058009917217404
+        }
+      },
+      {
+        "name": "mba_confusion",
+        "outcome": "PASS",
+        "reason": "main_belt_asteroid posterior 0.001 below warning threshold.",
+        "details": {
+          "main_belt_asteroid_prob": 0.0009682656881944373
+        }
+      },
+      {
+        "name": "motion_rate",
+        "outcome": "PASS",
+        "reason": "Motion rate 29.000 arcsec/hr within typical NEO range.",
+        "details": {
+          "rate_arcsec_hr": 29.00025261159969
+        }
+      },
+      {
+        "name": "moid_arc_consistency",
+        "outcome": "PASS",
+        "reason": "MOID > 0.10 AU or not computed \u2014 no PHA claim to scrutinise.",
+        "details": {
+          "moid_au": null,
+          "arc_days": 1.1114063300192356
+        }
+      },
+      {
+        "name": "motion_consistency",
+        "outcome": "PASS",
+        "reason": "motion_consistency_score 0.986 \u2265 0.60.",
+        "details": {
+          "motion_consistency_score": 0.9863146556898963
+        }
+      }
+    ],
+    "fail_count": 4,
+    "warning_count": 0,
+    "summary": "REJECTED: 4 disqualifying challenge(s) failed \u2014 ['orbit_quality', 'real_bogus', 'artifact_posterior', 'neo_dominance']. Do not advance to operator review.",
+    "reviewed_at_utc": "2026-06-29T00:17:49.259868+00:00"
+  },
+  {
+    "object_id": "f4e8f917-9b7f-46a9-9a5c-d4e0afe18bfd",
+    "verdict": "REJECT",
+    "challenges": [
+      {
+        "name": "orbit_quality",
+        "outcome": "FAIL",
+        "reason": "No orbital elements computed \u2014 cannot assess orbit quality.",
+        "details": {
+          "quality_code": null
+        }
+      },
+      {
+        "name": "arc_length",
+        "outcome": "PASS",
+        "reason": "Arc length 1.112 d \u2265 1.0 d.",
+        "details": {
+          "arc_days": 1.1115336497314274
+        }
+      },
+      {
+        "name": "multi_night",
+        "outcome": "PASS",
+        "reason": "3 distinct nights, 3 observations.",
+        "details": {
+          "n_nights": 3,
+          "n_obs": 3
+        }
+      },
+      {
+        "name": "real_bogus",
+        "outcome": "FAIL",
+        "reason": "real_bogus_score None is None or < 0.9 \u2014 fails submission gate.",
+        "details": {
+          "real_bogus_score": null,
+          "gate": 0.9
+        }
+      },
+      {
+        "name": "known_object_posterior",
+        "outcome": "PASS",
+        "reason": "known_object posterior 0.006 below warning threshold.",
+        "details": {
+          "known_object_prob": 0.006179808878294959
+        }
+      },
+      {
+        "name": "artifact_posterior",
+        "outcome": "FAIL",
+        "reason": "stellar_artifact posterior 0.990 \u2265 0.3 \u2014 classifier indicates this is likely an instrumental artifact.",
+        "details": {
+          "stellar_artifact_prob": 0.9895142202288155
+        }
+      },
+      {
+        "name": "neo_dominance",
+        "outcome": "FAIL",
+        "reason": "neo_candidate posterior 0.001 < 0.3 \u2014 classifier does not favour novel NEO hypothesis.",
+        "details": {
+          "neo_candidate_prob": 0.0010635434354706742
+        }
+      },
+      {
+        "name": "mba_confusion",
+        "outcome": "PASS",
+        "reason": "main_belt_asteroid posterior 0.001 below warning threshold.",
+        "details": {
+          "main_belt_asteroid_prob": 0.0009674109554719242
+        }
+      },
+      {
+        "name": "motion_rate",
+        "outcome": "PASS",
+        "reason": "Motion rate 40.215 arcsec/hr within typical NEO range.",
+        "details": {
+          "rate_arcsec_hr": 40.214850760786945
+        }
+      },
+      {
+        "name": "moid_arc_consistency",
+        "outcome": "PASS",
+        "reason": "MOID > 0.10 AU or not computed \u2014 no PHA claim to scrutinise.",
+        "details": {
+          "moid_au": null,
+          "arc_days": 1.1115336497314274
+        }
+      },
+      {
+        "name": "motion_consistency",
+        "outcome": "PASS",
+        "reason": "motion_consistency_score 0.984 \u2265 0.60.",
+        "details": {
+          "motion_consistency_score": 0.9837042084412485
+        }
+      }
+    ],
+    "fail_count": 4,
+    "warning_count": 0,
+    "summary": "REJECTED: 4 disqualifying challenge(s) failed \u2014 ['orbit_quality', 'real_bogus', 'artifact_posterior', 'neo_dominance']. Do not advance to operator review.",
+    "reviewed_at_utc": "2026-06-29T00:17:49.259880+00:00"
+  },
+  {
+    "object_id": "cb00eda0-06ad-4541-a310-fb8dea048170",
+    "verdict": "REJECT",
+    "challenges": [
+      {
+        "name": "orbit_quality",
+        "outcome": "FAIL",
+        "reason": "No orbital elements computed \u2014 cannot assess orbit quality.",
+        "details": {
+          "quality_code": null
+        }
+      },
+      {
+        "name": "arc_length",
+        "outcome": "PASS",
+        "reason": "Arc length 1.112 d \u2265 1.0 d.",
+        "details": {
+          "arc_days": 1.1115336497314274
+        }
+      },
+      {
+        "name": "multi_night",
+        "outcome": "PASS",
+        "reason": "3 distinct nights, 3 observations.",
+        "details": {
+          "n_nights": 3,
+          "n_obs": 3
+        }
+      },
+      {
+        "name": "real_bogus",
+        "outcome": "FAIL",
+        "reason": "real_bogus_score None is None or < 0.9 \u2014 fails submission gate.",
+        "details": {
+          "real_bogus_score": null,
+          "gate": 0.9
+        }
+      },
+      {
+        "name": "known_object_posterior",
+        "outcome": "PASS",
+        "reason": "known_object posterior 0.006 below warning threshold.",
+        "details": {
+          "known_object_prob": 0.006195744502134386
+        }
+      },
+      {
+        "name": "artifact_posterior",
+        "outcome": "FAIL",
+        "reason": "stellar_artifact posterior 0.989 \u2265 0.3 \u2014 classifier indicates this is likely an instrumental artifact.",
+        "details": {
+          "stellar_artifact_prob": 0.9894966684763149
+        }
+      },
+      {
+        "name": "neo_dominance",
+        "outcome": "FAIL",
+        "reason": "neo_candidate posterior 0.001 < 0.3 \u2014 classifier does not favour novel NEO hypothesis.",
+        "details": {
+          "neo_candidate_prob": 0.001058133627984032
+        }
+      },
+      {
+        "name": "mba_confusion",
+        "outcome": "PASS",
+        "reason": "main_belt_asteroid posterior 0.001 below warning threshold.",
+        "details": {
+          "main_belt_asteroid_prob": 0.0009706583336227453
+        }
+      },
+      {
+        "name": "motion_rate",
+        "outcome": "PASS",
+        "reason": "Motion rate 11.111 arcsec/hr within typical NEO range.",
+        "details": {
+          "rate_arcsec_hr": 11.110824201010555
+        }
+      },
+      {
+        "name": "moid_arc_consistency",
+        "outcome": "PASS",
+        "reason": "MOID > 0.10 AU or not computed \u2014 no PHA claim to scrutinise.",
+        "details": {
+          "moid_au": null,
+          "arc_days": 1.1115336497314274
+        }
+      },
+      {
+        "name": "motion_consistency",
+        "outcome": "PASS",
+        "reason": "motion_consistency_score 0.977 \u2265 0.60.",
+        "details": {
+          "motion_consistency_score": 0.9767955641442407
+        }
+      }
+    ],
+    "fail_count": 4,
+    "warning_count": 0,
+    "summary": "REJECTED: 4 disqualifying challenge(s) failed \u2014 ['orbit_quality', 'real_bogus', 'artifact_posterior', 'neo_dominance']. Do not advance to operator review.",
+    "reviewed_at_utc": "2026-06-29T00:17:49.259889+00:00"
+  },
+  {
+    "object_id": "e1539942-f4bf-4046-9089-6aa61dadbc74",
+    "verdict": "REJECT",
+    "challenges": [
+      {
+        "name": "orbit_quality",
+        "outcome": "FAIL",
+        "reason": "No orbital elements computed \u2014 cannot assess orbit quality.",
+        "details": {
+          "quality_code": null
+        }
+      },
+      {
+        "name": "arc_length",
+        "outcome": "PASS",
+        "reason": "Arc length 1.112 d \u2265 1.0 d.",
+        "details": {
+          "arc_days": 1.1115336497314274
+        }
+      },
+      {
+        "name": "multi_night",
+        "outcome": "PASS",
+        "reason": "3 distinct nights, 3 observations.",
+        "details": {
+          "n_nights": 3,
+          "n_obs": 3
+        }
+      },
+      {
+        "name": "real_bogus",
+        "outcome": "FAIL",
+        "reason": "real_bogus_score None is None or < 0.9 \u2014 fails submission gate.",
+        "details": {
+          "real_bogus_score": null,
+          "gate": 0.9
+        }
+      },
+      {
+        "name": "known_object_posterior",
+        "outcome": "PASS",
+        "reason": "known_object posterior 0.006 below warning threshold.",
+        "details": {
+          "known_object_prob": 0.006187494974336936
+        }
+      },
+      {
+        "name": "artifact_posterior",
+        "outcome": "FAIL",
+        "reason": "stellar_artifact posterior 0.990 \u2265 0.3 \u2014 classifier indicates this is likely an instrumental artifact.",
+        "details": {
+          "stellar_artifact_prob": 0.9895051527637041
+        }
+      },
+      {
+        "name": "neo_dominance",
+        "outcome": "FAIL",
+        "reason": "neo_candidate posterior 0.001 < 0.3 \u2014 classifier does not favour novel NEO hypothesis.",
+        "details": {
+          "neo_candidate_prob": 0.0010606294392104044
+        }
+      },
+      {
+        "name": "mba_confusion",
+        "outcome": "PASS",
+        "reason": "main_belt_asteroid posterior 0.001 below warning threshold.",
+        "details": {
+          "main_belt_asteroid_prob": 0.0009712180785516301
+        }
+      },
+      {
+        "name": "motion_rate",
+        "outcome": "PASS",
+        "reason": "Motion rate 51.720 arcsec/hr within typical NEO range.",
+        "details": {
+          "rate_arcsec_hr": 51.720076458189865
+        }
+      },
+      {
+        "name": "moid_arc_consistency",
+        "outcome": "PASS",
+        "reason": "MOID > 0.10 AU or not computed \u2014 no PHA claim to scrutinise.",
+        "details": {
+          "moid_au": null,
+          "arc_days": 1.1115336497314274
+        }
+      },
+      {
+        "name": "motion_consistency",
+        "outcome": "PASS",
+        "reason": "motion_consistency_score 0.983 \u2265 0.60.",
+        "details": {
+          "motion_consistency_score": 0.9831722846742844
+        }
+      }
+    ],
+    "fail_count": 4,
+    "warning_count": 0,
+    "summary": "REJECTED: 4 disqualifying challenge(s) failed \u2014 ['orbit_quality', 'real_bogus', 'artifact_posterior', 'neo_dominance']. Do not advance to operator review.",
+    "reviewed_at_utc": "2026-06-29T00:17:49.259897+00:00"
+  },
+  {
+    "object_id": "9338a72b-8994-4eee-90c9-c09ba9ce194b",
+    "verdict": "REJECT",
+    "challenges": [
+      {
+        "name": "orbit_quality",
+        "outcome": "FAIL",
+        "reason": "No orbital elements computed \u2014 cannot assess orbit quality.",
+        "details": {
+          "quality_code": null
+        }
+      },
+      {
+        "name": "arc_length",
+        "outcome": "PASS",
+        "reason": "Arc length 1.112 d \u2265 1.0 d.",
+        "details": {
+          "arc_days": 1.1115336497314274
+        }
+      },
+      {
+        "name": "multi_night",
+        "outcome": "PASS",
+        "reason": "3 distinct nights, 3 observations.",
+        "details": {
+          "n_nights": 3,
+          "n_obs": 3
+        }
+      },
+      {
+        "name": "real_bogus",
+        "outcome": "FAIL",
+        "reason": "real_bogus_score None is None or < 0.9 \u2014 fails submission gate.",
+        "details": {
+          "real_bogus_score": null,
+          "gate": 0.9
+        }
+      },
+      {
+        "name": "known_object_posterior",
+        "outcome": "PASS",
+        "reason": "known_object posterior 0.006 below warning threshold.",
+        "details": {
+          "known_object_prob": 0.006188690104927579
+        }
+      },
+      {
+        "name": "artifact_posterior",
+        "outcome": "FAIL",
+        "reason": "stellar_artifact posterior 0.990 \u2265 0.3 \u2014 classifier indicates this is likely an instrumental artifact.",
+        "details": {
+          "stellar_artifact_prob": 0.9895038705233067
+        }
+      },
+      {
+        "name": "neo_dominance",
+        "outcome": "FAIL",
+        "reason": "neo_candidate posterior 0.001 < 0.3 \u2014 classifier does not favour novel NEO hypothesis.",
+        "details": {
+          "neo_candidate_prob": 0.001060225699420222
+        }
+      },
+      {
+        "name": "mba_confusion",
+        "outcome": "PASS",
+        "reason": "main_belt_asteroid posterior 0.001 below warning threshold.",
+        "details": {
+          "main_belt_asteroid_prob": 0.0009703956326058376
+        }
+      },
+      {
+        "name": "motion_rate",
+        "outcome": "PASS",
+        "reason": "Motion rate 14.748 arcsec/hr within typical NEO range.",
+        "details": {
+          "rate_arcsec_hr": 14.747758124833142
+        }
+      },
+      {
+        "name": "moid_arc_consistency",
+        "outcome": "PASS",
+        "reason": "MOID > 0.10 AU or not computed \u2014 no PHA claim to scrutinise.",
+        "details": {
+          "moid_au": null,
+          "arc_days": 1.1115336497314274
+        }
+      },
+      {
+        "name": "motion_consistency",
+        "outcome": "PASS",
+        "reason": "motion_consistency_score 0.990 \u2265 0.60.",
+        "details": {
+          "motion_consistency_score": 0.9900967308712398
+        }
+      }
+    ],
+    "fail_count": 4,
+    "warning_count": 0,
+    "summary": "REJECTED: 4 disqualifying challenge(s) failed \u2014 ['orbit_quality', 'real_bogus', 'artifact_posterior', 'neo_dominance']. Do not advance to operator review.",
+    "reviewed_at_utc": "2026-06-29T00:17:49.259903+00:00"
+  },
+  {
+    "object_id": "d949cded-d978-48ed-bde7-bc7ee0c29ec2",
+    "verdict": "REJECT",
+    "challenges": [
+      {
+        "name": "orbit_quality",
+        "outcome": "FAIL",
+        "reason": "No orbital elements computed \u2014 cannot assess orbit quality.",
+        "details": {
+          "quality_code": null
+        }
+      },
+      {
+        "name": "arc_length",
+        "outcome": "PASS",
+        "reason": "Arc length 1.112 d \u2265 1.0 d.",
+        "details": {
+          "arc_days": 1.1115336497314274
+        }
+      },
+      {
+        "name": "multi_night",
+        "outcome": "PASS",
+        "reason": "3 distinct nights, 3 observations.",
+        "details": {
+          "n_nights": 3,
+          "n_obs": 3
+        }
+      },
+      {
+        "name": "real_bogus",
+        "outcome": "FAIL",
+        "reason": "real_bogus_score None is None or < 0.9 \u2014 fails submission gate.",
+        "details": {
+          "real_bogus_score": null,
+          "gate": 0.9
+        }
+      },
+      {
+        "name": "known_object_posterior",
+        "outcome": "PASS",
+        "reason": "known_object posterior 0.006 below warning threshold.",
+        "details": {
+          "known_object_prob": 0.00618873827529651
+        }
+      },
+      {
+        "name": "artifact_posterior",
+        "outcome": "FAIL",
+        "reason": "stellar_artifact posterior 0.990 \u2265 0.3 \u2014 classifier indicates this is likely an instrumental artifact.",
+        "details": {
+          "stellar_artifact_prob": 0.9895040278894173
+        }
+      },
+      {
+        "name": "neo_dominance",
+        "outcome": "FAIL",
+        "reason": "neo_candidate posterior 0.001 < 0.3 \u2014 classifier does not favour novel NEO hypothesis.",
+        "details": {
+          "neo_candidate_prob": 0.001060353246342498
+        }
+      },
+      {
+        "name": "mba_confusion",
+        "outcome": "PASS",
+        "reason": "main_belt_asteroid posterior 0.001 below warning threshold.",
+        "details": {
+          "main_belt_asteroid_prob": 0.0009690380342303588
+        }
+      },
+      {
+        "name": "motion_rate",
+        "outcome": "PASS",
+        "reason": "Motion rate 13.913 arcsec/hr within typical NEO range.",
+        "details": {
+          "rate_arcsec_hr": 13.913312723690353
+        }
+      },
+      {
+        "name": "moid_arc_consistency",
+        "outcome": "PASS",
+        "reason": "MOID > 0.10 AU or not computed \u2014 no PHA claim to scrutinise.",
+        "details": {
+          "moid_au": null,
+          "arc_days": 1.1115336497314274
+        }
+      },
+      {
+        "name": "motion_consistency",
+        "outcome": "PASS",
+        "reason": "motion_consistency_score 0.978 \u2265 0.60.",
+        "details": {
+          "motion_consistency_score": 0.9776976016003519
+        }
+      }
+    ],
+    "fail_count": 4,
+    "warning_count": 0,
+    "summary": "REJECTED: 4 disqualifying challenge(s) failed \u2014 ['orbit_quality', 'real_bogus', 'artifact_posterior', 'neo_dominance']. Do not advance to operator review.",
+    "reviewed_at_utc": "2026-06-29T00:17:49.259910+00:00"
+  },
+  {
+    "object_id": "1e556b36-e34b-4a5c-b636-29b17e89502e",
+    "verdict": "REJECT",
+    "challenges": [
+      {
+        "name": "orbit_quality",
+        "outcome": "FAIL",
+        "reason": "No orbital elements computed \u2014 cannot assess orbit quality.",
+        "details": {
+          "quality_code": null
+        }
+      },
+      {
+        "name": "arc_length",
+        "outcome": "PASS",
+        "reason": "Arc length 1.112 d \u2265 1.0 d.",
+        "details": {
+          "arc_days": 1.1115336497314274
+        }
+      },
+      {
+        "name": "multi_night",
+        "outcome": "PASS",
+        "reason": "3 distinct nights, 3 observations.",
+        "details": {
+          "n_nights": 3,
+          "n_obs": 3
+        }
+      },
+      {
+        "name": "real_bogus",
+        "outcome": "FAIL",
+        "reason": "real_bogus_score None is None or < 0.9 \u2014 fails submission gate.",
+        "details": {
+          "real_bogus_score": null,
+          "gate": 0.9
+        }
+      },
+      {
+        "name": "known_object_posterior",
+        "outcome": "PASS",
+        "reason": "known_object posterior 0.006 below warning threshold.",
+        "details": {
+          "known_object_prob": 0.006182560368896696
+        }
+      },
+      {
+        "name": "artifact_posterior",
+        "outcome": "FAIL",
+        "reason": "stellar_artifact posterior 0.990 \u2265 0.3 \u2014 classifier indicates this is likely an instrumental artifact.",
+        "details": {
+          "stellar_artifact_prob": 0.9895109604152292
+        }
+      },
+      {
+        "name": "neo_dominance",
+        "outcome": "FAIL",
+        "reason": "neo_candidate posterior 0.001 < 0.3 \u2014 classifier does not favour novel NEO hypothesis.",
+        "details": {
+          "neo_candidate_prob": 0.0010624868058023186
+        }
+      },
+      {
+        "name": "mba_confusion",
+        "outcome": "PASS",
+        "reason": "main_belt_asteroid posterior 0.001 below warning threshold.",
+        "details": {
+          "main_belt_asteroid_prob": 0.0009674571709148663
+        }
+      },
+      {
+        "name": "motion_rate",
+        "outcome": "PASS",
+        "reason": "Motion rate 17.275 arcsec/hr within typical NEO range.",
+        "details": {
+          "rate_arcsec_hr": 17.274820850281774
+        }
+      },
+      {
+        "name": "moid_arc_consistency",
+        "outcome": "PASS",
+        "reason": "MOID > 0.10 AU or not computed \u2014 no PHA claim to scrutinise.",
+        "details": {
+          "moid_au": null,
+          "arc_days": 1.1115336497314274
+        }
+      },
+      {
+        "name": "motion_consistency",
+        "outcome": "PASS",
+        "reason": "motion_consistency_score 0.971 \u2265 0.60.",
+        "details": {
+          "motion_consistency_score": 0.9710659062949786
+        }
+      }
+    ],
+    "fail_count": 4,
+    "warning_count": 0,
+    "summary": "REJECTED: 4 disqualifying challenge(s) failed \u2014 ['orbit_quality', 'real_bogus', 'artifact_posterior', 'neo_dominance']. Do not advance to operator review.",
+    "reviewed_at_utc": "2026-06-29T00:17:49.259918+00:00"
+  },
+  {
+    "object_id": "c2d6ab7f-4a9f-4c71-a793-61f2e7349108",
+    "verdict": "REJECT",
+    "challenges": [
+      {
+        "name": "orbit_quality",
+        "outcome": "FAIL",
+        "reason": "No orbital elements computed \u2014 cannot assess orbit quality.",
+        "details": {
+          "quality_code": null
+        }
+      },
+      {
+        "name": "arc_length",
+        "outcome": "PASS",
+        "reason": "Arc length 1.112 d \u2265 1.0 d.",
+        "details": {
+          "arc_days": 1.1115336497314274
+        }
+      },
+      {
+        "name": "multi_night",
+        "outcome": "PASS",
+        "reason": "3 distinct nights, 3 observations.",
+        "details": {
+          "n_nights": 3,
+          "n_obs": 3
+        }
+      },
+      {
+        "name": "real_bogus",
+        "outcome": "FAIL",
+        "reason": "real_bogus_score None is None or < 0.9 \u2014 fails submission gate.",
+        "details": {
+          "real_bogus_score": null,
+          "gate": 0.9
+        }
+      },
+      {
+        "name": "known_object_posterior",
+        "outcome": "PASS",
+        "reason": "known_object posterior 0.006 below warning threshold.",
+        "details": {
+          "known_object_prob": 0.006185124644382655
+        }
+      },
+      {
+        "name": "artifact_posterior",
+        "outcome": "FAIL",
+        "reason": "stellar_artifact posterior 0.990 \u2265 0.3 \u2014 classifier indicates this is likely an instrumental artifact.",
+        "details": {
+          "stellar_artifact_prob": 0.9895087803641749
+        }
+      },
+      {
+        "name": "neo_dominance",
+        "outcome": "FAIL",
+        "reason": "neo_candidate posterior 0.001 < 0.3 \u2014 classifier does not favour novel NEO hypothesis.",
+        "details": {
+          "neo_candidate_prob": 0.0010619097797276947
+        }
+      },
+      {
+        "name": "mba_confusion",
+        "outcome": "PASS",
+        "reason": "main_belt_asteroid posterior 0.001 below warning threshold.",
+        "details": {
+          "main_belt_asteroid_prob": 0.0009660553805893122
+        }
+      },
+      {
+        "name": "motion_rate",
+        "outcome": "PASS",
+        "reason": "Motion rate 16.450 arcsec/hr within typical NEO range.",
+        "details": {
+          "rate_arcsec_hr": 16.45047042252436
+        }
+      },
+      {
+        "name": "moid_arc_consistency",
+        "outcome": "PASS",
+        "reason": "MOID > 0.10 AU or not computed \u2014 no PHA claim to scrutinise.",
+        "details": {
+          "moid_au": null,
+          "arc_days": 1.1115336497314274
+        }
+      },
+      {
+        "name": "motion_consistency",
+        "outcome": "PASS",
+        "reason": "motion_consistency_score 0.982 \u2265 0.60.",
+        "details": {
+          "motion_consistency_score": 0.9819072489850242
+        }
+      }
+    ],
+    "fail_count": 4,
+    "warning_count": 0,
+    "summary": "REJECTED: 4 disqualifying challenge(s) failed \u2014 ['orbit_quality', 'real_bogus', 'artifact_posterior', 'neo_dominance']. Do not advance to operator review.",
+    "reviewed_at_utc": "2026-06-29T00:17:49.259925+00:00"
+  },
+  {
+    "object_id": "4f4f3b19-323a-4f3d-9146-8af606ce1317",
+    "verdict": "REJECT",
+    "challenges": [
+      {
+        "name": "orbit_quality",
+        "outcome": "FAIL",
+        "reason": "No orbital elements computed \u2014 cannot assess orbit quality.",
+        "details": {
+          "quality_code": null
+        }
+      },
+      {
+        "name": "arc_length",
+        "outcome": "PASS",
+        "reason": "Arc length 1.112 d \u2265 1.0 d.",
+        "details": {
+          "arc_days": 1.1115336497314274
+        }
+      },
+      {
+        "name": "multi_night",
+        "outcome": "PASS",
+        "reason": "3 distinct nights, 3 observations.",
+        "details": {
+          "n_nights": 3,
+          "n_obs": 3
+        }
+      },
+      {
+        "name": "real_bogus",
+        "outcome": "FAIL",
+        "reason": "real_bogus_score None is None or < 0.9 \u2014 fails submission gate.",
+        "details": {
+          "real_bogus_score": null,
+          "gate": 0.9
+        }
+      },
+      {
+        "name": "known_object_posterior",
+        "outcome": "PASS",
+        "reason": "known_object posterior 0.006 below warning threshold.",
+        "details": {
+          "known_object_prob": 0.0061888196746824
+        }
+      },
+      {
+        "name": "artifact_posterior",
+        "outcome": "FAIL",
+        "reason": "stellar_artifact posterior 0.990 \u2265 0.3 \u2014 classifier indicates this is likely an instrumental artifact.",
+        "details": {
+          "stellar_artifact_prob": 0.989501971808885
+        }
+      },
+      {
+        "name": "neo_dominance",
+        "outcome": "FAIL",
+        "reason": "neo_candidate posterior 0.001 < 0.3 \u2014 classifier does not favour novel NEO hypothesis.",
+        "details": {
+          "neo_candidate_prob": 0.0010595822774172026
+        }
+      },
+      {
+        "name": "mba_confusion",
+        "outcome": "PASS",
+        "reason": "main_belt_asteroid posterior 0.001 below warning threshold.",
+        "details": {
+          "main_belt_asteroid_prob": 0.0009726937181645569
+        }
+      },
+      {
+        "name": "motion_rate",
+        "outcome": "PASS",
+        "reason": "Motion rate 17.802 arcsec/hr within typical NEO range.",
+        "details": {
+          "rate_arcsec_hr": 17.802318923353905
+        }
+      },
+      {
+        "name": "moid_arc_consistency",
+        "outcome": "PASS",
+        "reason": "MOID > 0.10 AU or not computed \u2014 no PHA claim to scrutinise.",
+        "details": {
+          "moid_au": null,
+          "arc_days": 1.1115336497314274
+        }
+      },
+      {
+        "name": "motion_consistency",
+        "outcome": "PASS",
+        "reason": "motion_consistency_score 0.976 \u2265 0.60.",
+        "details": {
+          "motion_consistency_score": 0.9756408806103042
+        }
+      }
+    ],
+    "fail_count": 4,
+    "warning_count": 0,
+    "summary": "REJECTED: 4 disqualifying challenge(s) failed \u2014 ['orbit_quality', 'real_bogus', 'artifact_posterior', 'neo_dominance']. Do not advance to operator review.",
+    "reviewed_at_utc": "2026-06-29T00:17:49.259931+00:00"
+  },
+  {
+    "object_id": "21fe55da-e6a4-4686-a4bb-92dabd378ec0",
+    "verdict": "REJECT",
+    "challenges": [
+      {
+        "name": "orbit_quality",
+        "outcome": "FAIL",
+        "reason": "No orbital elements computed \u2014 cannot assess orbit quality.",
+        "details": {
+          "quality_code": null
+        }
+      },
+      {
+        "name": "arc_length",
+        "outcome": "PASS",
+        "reason": "Arc length 1.111 d \u2265 1.0 d.",
+        "details": {
+          "arc_days": 1.1114063300192356
+        }
+      },
+      {
+        "name": "multi_night",
+        "outcome": "PASS",
+        "reason": "3 distinct nights, 3 observations.",
+        "details": {
+          "n_nights": 3,
+          "n_obs": 3
+        }
+      },
+      {
+        "name": "real_bogus",
+        "outcome": "FAIL",
+        "reason": "real_bogus_score None is None or < 0.9 \u2014 fails submission gate.",
+        "details": {
+          "real_bogus_score": null,
+          "gate": 0.9
+        }
+      },
+      {
+        "name": "known_object_posterior",
+        "outcome": "PASS",
+        "reason": "known_object posterior 0.006 below warning threshold.",
+        "details": {
+          "known_object_prob": 0.006174296267872091
+        }
+      },
+      {
+        "name": "artifact_posterior",
+        "outcome": "FAIL",
+        "reason": "stellar_artifact posterior 0.990 \u2265 0.3 \u2014 classifier indicates this is likely an instrumental artifact.",
+        "details": {
+          "stellar_artifact_prob": 0.9895195767043472
+        }
+      },
+      {
+        "name": "neo_dominance",
+        "outcome": "FAIL",
+        "reason": "neo_candidate posterior 0.001 < 0.3 \u2014 classifier does not favour novel NEO hypothesis.",
+        "details": {
+          "neo_candidate_prob": 0.0010655066200998425
+        }
+      },
+      {
+        "name": "mba_confusion",
+        "outcome": "PASS",
+        "reason": "main_belt_asteroid posterior 0.001 below warning threshold.",
+        "details": {
+          "main_belt_asteroid_prob": 0.0009617473809184267
+        }
+      },
+      {
+        "name": "motion_rate",
+        "outcome": "PASS",
+        "reason": "Motion rate 24.311 arcsec/hr within typical NEO range.",
+        "details": {
+          "rate_arcsec_hr": 24.310501146154788
+        }
+      },
+      {
+        "name": "moid_arc_consistency",
+        "outcome": "PASS",
+        "reason": "MOID > 0.10 AU or not computed \u2014 no PHA claim to scrutinise.",
+        "details": {
+          "moid_au": null,
+          "arc_days": 1.1114063300192356
+        }
+      },
+      {
+        "name": "motion_consistency",
+        "outcome": "PASS",
+        "reason": "motion_consistency_score 0.988 \u2265 0.60.",
+        "details": {
+          "motion_consistency_score": 0.9875887706875355
+        }
+      }
+    ],
+    "fail_count": 4,
+    "warning_count": 0,
+    "summary": "REJECTED: 4 disqualifying challenge(s) failed \u2014 ['orbit_quality', 'real_bogus', 'artifact_posterior', 'neo_dominance']. Do not advance to operator review.",
+    "reviewed_at_utc": "2026-06-29T00:17:49.259937+00:00"
+  },
+  {
+    "object_id": "857d21bf-b23f-4ecf-9fa1-18cfca3436a7",
+    "verdict": "REJECT",
+    "challenges": [
+      {
+        "name": "orbit_quality",
+        "outcome": "FAIL",
+        "reason": "No orbital elements computed \u2014 cannot assess orbit quality.",
+        "details": {
+          "quality_code": null
+        }
+      },
+      {
+        "name": "arc_length",
+        "outcome": "PASS",
+        "reason": "Arc length 1.112 d \u2265 1.0 d.",
+        "details": {
+          "arc_days": 1.1115336497314274
+        }
+      },
+      {
+        "name": "multi_night",
+        "outcome": "PASS",
+        "reason": "3 distinct nights, 3 observations.",
+        "details": {
+          "n_nights": 3,
+          "n_obs": 3
+        }
+      },
+      {
+        "name": "real_bogus",
+        "outcome": "FAIL",
+        "reason": "real_bogus_score None is None or < 0.9 \u2014 fails submission gate.",
+        "details": {
+          "real_bogus_score": null,
+          "gate": 0.9
+        }
+      },
+      {
+        "name": "known_object_posterior",
+        "outcome": "PASS",
+        "reason": "known_object posterior 0.006 below warning threshold.",
+        "details": {
+          "known_object_prob": 0.006182830744183685
+        }
+      },
+      {
+        "name": "artifact_posterior",
+        "outcome": "FAIL",
+        "reason": "stellar_artifact posterior 0.990 \u2265 0.3 \u2014 classifier indicates this is likely an instrumental artifact.",
+        "details": {
+          "stellar_artifact_prob": 0.9895075897742787
+        }
+      },
+      {
+        "name": "neo_dominance",
+        "outcome": "FAIL",
+        "reason": "neo_candidate posterior 0.001 < 0.3 \u2014 classifier does not favour novel NEO hypothesis.",
+        "details": {
+          "neo_candidate_prob": 0.001061288243767474
+        }
+      },
+      {
+        "name": "mba_confusion",
+        "outcome": "PASS",
+        "reason": "main_belt_asteroid posterior 0.001 below warning threshold.",
+        "details": {
+          "main_belt_asteroid_prob": 0.0009728728574139864
+        }
+      },
+      {
+        "name": "motion_rate",
+        "outcome": "PASS",
+        "reason": "Motion rate 47.974 arcsec/hr within typical NEO range.",
+        "details": {
+          "rate_arcsec_hr": 47.97364520339179
+        }
+      },
+      {
+        "name": "moid_arc_consistency",
+        "outcome": "PASS",
+        "reason": "MOID > 0.10 AU or not computed \u2014 no PHA claim to scrutinise.",
+        "details": {
+          "moid_au": null,
+          "arc_days": 1.1115336497314274
+        }
+      },
+      {
+        "name": "motion_consistency",
+        "outcome": "PASS",
+        "reason": "motion_consistency_score 0.987 \u2265 0.60.",
+        "details": {
+          "motion_consistency_score": 0.9871483683525967
+        }
+      }
+    ],
+    "fail_count": 4,
+    "warning_count": 0,
+    "summary": "REJECTED: 4 disqualifying challenge(s) failed \u2014 ['orbit_quality', 'real_bogus', 'artifact_posterior', 'neo_dominance']. Do not advance to operator review.",
+    "reviewed_at_utc": "2026-06-29T00:17:49.259944+00:00"
+  },
+  {
+    "object_id": "4c42dcca-98cb-4ce3-9400-8b1b4e1a16e9",
+    "verdict": "REJECT",
+    "challenges": [
+      {
+        "name": "orbit_quality",
+        "outcome": "FAIL",
+        "reason": "No orbital elements computed \u2014 cannot assess orbit quality.",
+        "details": {
+          "quality_code": null
+        }
+      },
+      {
+        "name": "arc_length",
+        "outcome": "PASS",
+        "reason": "Arc length 1.111 d \u2265 1.0 d.",
+        "details": {
+          "arc_days": 1.1114063300192356
+        }
+      },
+      {
+        "name": "multi_night",
+        "outcome": "PASS",
+        "reason": "3 distinct nights, 3 observations.",
+        "details": {
+          "n_nights": 3,
+          "n_obs": 3
+        }
+      },
+      {
+        "name": "real_bogus",
+        "outcome": "FAIL",
+        "reason": "real_bogus_score None is None or < 0.9 \u2014 fails submission gate.",
+        "details": {
+          "real_bogus_score": null,
+          "gate": 0.9
+        }
+      },
+      {
+        "name": "known_object_posterior",
+        "outcome": "PASS",
+        "reason": "known_object posterior 0.006 below warning threshold.",
+        "details": {
+          "known_object_prob": 0.006186006915837046
+        }
+      },
+      {
+        "name": "artifact_posterior",
+        "outcome": "FAIL",
+        "reason": "stellar_artifact posterior 0.990 \u2265 0.3 \u2014 classifier indicates this is likely an instrumental artifact.",
+        "details": {
+          "stellar_artifact_prob": 0.9895052435916286
+        }
+      },
+      {
+        "name": "neo_dominance",
+        "outcome": "FAIL",
+        "reason": "neo_candidate posterior 0.001 < 0.3 \u2014 classifier does not favour novel NEO hypothesis.",
+        "details": {
+          "neo_candidate_prob": 0.0010606992153875529
+        }
+      },
+      {
+        "name": "mba_confusion",
+        "outcome": "PASS",
+        "reason": "main_belt_asteroid posterior 0.001 below warning threshold.",
+        "details": {
+          "main_belt_asteroid_prob": 0.000968766693134313
+        }
+      },
+      {
+        "name": "motion_rate",
+        "outcome": "PASS",
+        "reason": "Motion rate 22.747 arcsec/hr within typical NEO range.",
+        "details": {
+          "rate_arcsec_hr": 22.74731557713785
+        }
+      },
+      {
+        "name": "moid_arc_consistency",
+        "outcome": "PASS",
+        "reason": "MOID > 0.10 AU or not computed \u2014 no PHA claim to scrutinise.",
+        "details": {
+          "moid_au": null,
+          "arc_days": 1.1114063300192356
+        }
+      },
+      {
+        "name": "motion_consistency",
+        "outcome": "PASS",
+        "reason": "motion_consistency_score 0.978 \u2265 0.60.",
+        "details": {
+          "motion_consistency_score": 0.9778296307169135
+        }
+      }
+    ],
+    "fail_count": 4,
+    "warning_count": 0,
+    "summary": "REJECTED: 4 disqualifying challenge(s) failed \u2014 ['orbit_quality', 'real_bogus', 'artifact_posterior', 'neo_dominance']. Do not advance to operator review.",
+    "reviewed_at_utc": "2026-06-29T00:17:49.259950+00:00"
+  },
+  {
+    "object_id": "c5782603-11c7-4275-b00d-6c66019cc412",
+    "verdict": "REJECT",
+    "challenges": [
+      {
+        "name": "orbit_quality",
+        "outcome": "FAIL",
+        "reason": "No orbital elements computed \u2014 cannot assess orbit quality.",
+        "details": {
+          "quality_code": null
+        }
+      },
+      {
+        "name": "arc_length",
+        "outcome": "PASS",
+        "reason": "Arc length 1.112 d \u2265 1.0 d.",
+        "details": {
+          "arc_days": 1.1115336497314274
+        }
+      },
+      {
+        "name": "multi_night",
+        "outcome": "PASS",
+        "reason": "3 distinct nights, 3 observations.",
+        "details": {
+          "n_nights": 3,
+          "n_obs": 3
+        }
+      },
+      {
+        "name": "real_bogus",
+        "outcome": "FAIL",
+        "reason": "real_bogus_score None is None or < 0.9 \u2014 fails submission gate.",
+        "details": {
+          "real_bogus_score": null,
+          "gate": 0.9
+        }
+      },
+      {
+        "name": "known_object_posterior",
+        "outcome": "PASS",
+        "reason": "known_object posterior 0.006 below warning threshold.",
+        "details": {
+          "known_object_prob": 0.006184036383707013
+        }
+      },
+      {
+        "name": "artifact_posterior",
+        "outcome": "FAIL",
+        "reason": "stellar_artifact posterior 0.990 \u2265 0.3 \u2014 classifier indicates this is likely an instrumental artifact.",
+        "details": {
+          "stellar_artifact_prob": 0.9895119029980788
+        }
+      },
+      {
+        "name": "neo_dominance",
+        "outcome": "FAIL",
+        "reason": "neo_candidate posterior 0.001 < 0.3 \u2014 classifier does not favour novel NEO hypothesis.",
+        "details": {
+          "neo_candidate_prob": 0.001063071629524054
+        }
+      },
+      {
+        "name": "mba_confusion",
+        "outcome": "PASS",
+        "reason": "main_belt_asteroid posterior 0.001 below warning threshold.",
+        "details": {
+          "main_belt_asteroid_prob": 0.0009640955901022693
+        }
+      },
+      {
+        "name": "motion_rate",
+        "outcome": "PASS",
+        "reason": "Motion rate 40.861 arcsec/hr within typical NEO range.",
+        "details": {
+          "rate_arcsec_hr": 40.8612424956578
+        }
+      },
+      {
+        "name": "moid_arc_consistency",
+        "outcome": "PASS",
+        "reason": "MOID > 0.10 AU or not computed \u2014 no PHA claim to scrutinise.",
+        "details": {
+          "moid_au": null,
+          "arc_days": 1.1115336497314274
+        }
+      },
+      {
+        "name": "motion_consistency",
+        "outcome": "PASS",
+        "reason": "motion_consistency_score 0.972 \u2265 0.60.",
+        "details": {
+          "motion_consistency_score": 0.9724212718660447
+        }
+      }
+    ],
+    "fail_count": 4,
+    "warning_count": 0,
+    "summary": "REJECTED: 4 disqualifying challenge(s) failed \u2014 ['orbit_quality', 'real_bogus', 'artifact_posterior', 'neo_dominance']. Do not advance to operator review.",
+    "reviewed_at_utc": "2026-06-29T00:17:49.259956+00:00"
+  },
+  {
+    "object_id": "ad2f166a-e290-4916-8f5d-837cb5055339",
+    "verdict": "REJECT",
+    "challenges": [
+      {
+        "name": "orbit_quality",
+        "outcome": "FAIL",
+        "reason": "No orbital elements computed \u2014 cannot assess orbit quality.",
+        "details": {
+          "quality_code": null
+        }
+      },
+      {
+        "name": "arc_length",
+        "outcome": "PASS",
+        "reason": "Arc length 1.112 d \u2265 1.0 d.",
+        "details": {
+          "arc_days": 1.1115336497314274
+        }
+      },
+      {
+        "name": "multi_night",
+        "outcome": "PASS",
+        "reason": "3 distinct nights, 3 observations.",
+        "details": {
+          "n_nights": 3,
+          "n_obs": 3
+        }
+      },
+      {
+        "name": "real_bogus",
+        "outcome": "FAIL",
+        "reason": "real_bogus_score None is None or < 0.9 \u2014 fails submission gate.",
+        "details": {
+          "real_bogus_score": null,
+          "gate": 0.9
+        }
+      },
+      {
+        "name": "known_object_posterior",
+        "outcome": "PASS",
+        "reason": "known_object posterior 0.006 below warning threshold.",
+        "details": {
+          "known_object_prob": 0.006185330320880485
+        }
+      },
+      {
+        "name": "artifact_posterior",
+        "outcome": "FAIL",
+        "reason": "stellar_artifact posterior 0.990 \u2265 0.3 \u2014 classifier indicates this is likely an instrumental artifact.",
+        "details": {
+          "stellar_artifact_prob": 0.9895074556665854
+        }
+      },
+      {
+        "name": "neo_dominance",
+        "outcome": "FAIL",
+        "reason": "neo_candidate posterior 0.001 < 0.3 \u2014 classifier does not favour novel NEO hypothesis.",
+        "details": {
+          "neo_candidate_prob": 0.0010613586978630578
+        }
+      },
+      {
+        "name": "mba_confusion",
+        "outcome": "PASS",
+        "reason": "main_belt_asteroid posterior 0.001 below warning threshold.",
+        "details": {
+          "main_belt_asteroid_prob": 0.0009690247731118692
+        }
+      },
+      {
+        "name": "motion_rate",
+        "outcome": "PASS",
+        "reason": "Motion rate 10.337 arcsec/hr within typical NEO range.",
+        "details": {
+          "rate_arcsec_hr": 10.336652530725347
+        }
+      },
+      {
+        "name": "moid_arc_consistency",
+        "outcome": "PASS",
+        "reason": "MOID > 0.10 AU or not computed \u2014 no PHA claim to scrutinise.",
+        "details": {
+          "moid_au": null,
+          "arc_days": 1.1115336497314274
+        }
+      },
+      {
+        "name": "motion_consistency",
+        "outcome": "PASS",
+        "reason": "motion_consistency_score 0.975 \u2265 0.60.",
+        "details": {
+          "motion_consistency_score": 0.9752403952513047
+        }
+      }
+    ],
+    "fail_count": 4,
+    "warning_count": 0,
+    "summary": "REJECTED: 4 disqualifying challenge(s) failed \u2014 ['orbit_quality', 'real_bogus', 'artifact_posterior', 'neo_dominance']. Do not advance to operator review.",
+    "reviewed_at_utc": "2026-06-29T00:17:49.259964+00:00"
+  },
+  {
+    "object_id": "304477c5-0996-4fe8-b514-781fedbdef2f",
+    "verdict": "REJECT",
+    "challenges": [
+      {
+        "name": "orbit_quality",
+        "outcome": "FAIL",
+        "reason": "No orbital elements computed \u2014 cannot assess orbit quality.",
+        "details": {
+          "quality_code": null
+        }
+      },
+      {
+        "name": "arc_length",
+        "outcome": "PASS",
+        "reason": "Arc length 1.112 d \u2265 1.0 d.",
+        "details": {
+          "arc_days": 1.1115336497314274
+        }
+      },
+      {
+        "name": "multi_night",
+        "outcome": "PASS",
+        "reason": "3 distinct nights, 3 observations.",
+        "details": {
+          "n_nights": 3,
+          "n_obs": 3
+        }
+      },
+      {
+        "name": "real_bogus",
+        "outcome": "FAIL",
+        "reason": "real_bogus_score None is None or < 0.9 \u2014 fails submission gate.",
+        "details": {
+          "real_bogus_score": null,
+          "gate": 0.9
+        }
+      },
+      {
+        "name": "known_object_posterior",
+        "outcome": "PASS",
+        "reason": "known_object posterior 0.006 below warning threshold.",
+        "details": {
+          "known_object_prob": 0.006184940890760498
+        }
+      },
+      {
+        "name": "artifact_posterior",
+        "outcome": "FAIL",
+        "reason": "stellar_artifact posterior 0.990 \u2265 0.3 \u2014 classifier indicates this is likely an instrumental artifact.",
+        "details": {
+          "stellar_artifact_prob": 0.9895070363386732
+        }
+      },
+      {
+        "name": "neo_dominance",
+        "outcome": "FAIL",
+        "reason": "neo_candidate posterior 0.001 < 0.3 \u2014 classifier does not favour novel NEO hypothesis.",
+        "details": {
+          "neo_candidate_prob": 0.0010611326733650484
+        }
+      },
+      {
+        "name": "mba_confusion",
+        "outcome": "PASS",
+        "reason": "main_belt_asteroid posterior 0.001 below warning threshold.",
+        "details": {
+          "main_belt_asteroid_prob": 0.0009714025733012414
+        }
+      },
+      {
+        "name": "motion_rate",
+        "outcome": "PASS",
+        "reason": "Motion rate 19.835 arcsec/hr within typical NEO range.",
+        "details": {
+          "rate_arcsec_hr": 19.835480961618742
+        }
+      },
+      {
+        "name": "moid_arc_consistency",
+        "outcome": "PASS",
+        "reason": "MOID > 0.10 AU or not computed \u2014 no PHA claim to scrutinise.",
+        "details": {
+          "moid_au": null,
+          "arc_days": 1.1115336497314274
+        }
+      },
+      {
+        "name": "motion_consistency",
+        "outcome": "PASS",
+        "reason": "motion_consistency_score 0.980 \u2265 0.60.",
+        "details": {
+          "motion_consistency_score": 0.9796083450802013
+        }
+      }
+    ],
+    "fail_count": 4,
+    "warning_count": 0,
+    "summary": "REJECTED: 4 disqualifying challenge(s) failed \u2014 ['orbit_quality', 'real_bogus', 'artifact_posterior', 'neo_dominance']. Do not advance to operator review.",
+    "reviewed_at_utc": "2026-06-29T00:17:49.259970+00:00"
+  },
+  {
+    "object_id": "e928fff9-6b4b-41a0-b925-21bba73effd0",
+    "verdict": "REJECT",
+    "challenges": [
+      {
+        "name": "orbit_quality",
+        "outcome": "FAIL",
+        "reason": "No orbital elements computed \u2014 cannot assess orbit quality.",
+        "details": {
+          "quality_code": null
+        }
+      },
+      {
+        "name": "arc_length",
+        "outcome": "PASS",
+        "reason": "Arc length 1.112 d \u2265 1.0 d.",
+        "details": {
+          "arc_days": 1.1115336497314274
+        }
+      },
+      {
+        "name": "multi_night",
+        "outcome": "PASS",
+        "reason": "3 distinct nights, 3 observations.",
+        "details": {
+          "n_nights": 3,
+          "n_obs": 3
+        }
+      },
+      {
+        "name": "real_bogus",
+        "outcome": "FAIL",
+        "reason": "real_bogus_score None is None or < 0.9 \u2014 fails submission gate.",
+        "details": {
+          "real_bogus_score": null,
+          "gate": 0.9
+        }
+      },
+      {
+        "name": "known_object_posterior",
+        "outcome": "PASS",
+        "reason": "known_object posterior 0.006 below warning threshold.",
+        "details": {
+          "known_object_prob": 0.006183320094001094
+        }
+      },
+      {
+        "name": "artifact_posterior",
+        "outcome": "FAIL",
+        "reason": "stellar_artifact posterior 0.990 \u2265 0.3 \u2014 classifier indicates this is likely an instrumental artifact.",
+        "details": {
+          "stellar_artifact_prob": 0.9895089162820903
+        }
+      },
+      {
+        "name": "neo_dominance",
+        "outcome": "FAIL",
+        "reason": "neo_candidate posterior 0.001 < 0.3 \u2014 classifier does not favour novel NEO hypothesis.",
+        "details": {
+          "neo_candidate_prob": 0.0010618711128045528
+        }
+      },
+      {
+        "name": "mba_confusion",
+        "outcome": "PASS",
+        "reason": "main_belt_asteroid posterior 0.001 below warning threshold.",
+        "details": {
+          "main_belt_asteroid_prob": 0.0009673110137845002
+        }
+      },
+      {
+        "name": "motion_rate",
+        "outcome": "PASS",
+        "reason": "Motion rate 18.012 arcsec/hr within typical NEO range.",
+        "details": {
+          "rate_arcsec_hr": 18.01179109699955
+        }
+      },
+      {
+        "name": "moid_arc_consistency",
+        "outcome": "PASS",
+        "reason": "MOID > 0.10 AU or not computed \u2014 no PHA claim to scrutinise.",
+        "details": {
+          "moid_au": null,
+          "arc_days": 1.1115336497314274
+        }
+      },
+      {
+        "name": "motion_consistency",
+        "outcome": "PASS",
+        "reason": "motion_consistency_score 0.993 \u2265 0.60.",
+        "details": {
+          "motion_consistency_score": 0.993396351770588
+        }
+      }
+    ],
+    "fail_count": 4,
+    "warning_count": 0,
+    "summary": "REJECTED: 4 disqualifying challenge(s) failed \u2014 ['orbit_quality', 'real_bogus', 'artifact_posterior', 'neo_dominance']. Do not advance to operator review.",
+    "reviewed_at_utc": "2026-06-29T00:17:49.259977+00:00"
+  },
+  {
+    "object_id": "7653dab4-1f10-477f-8113-853aad5c814c",
+    "verdict": "REJECT",
+    "challenges": [
+      {
+        "name": "orbit_quality",
+        "outcome": "FAIL",
+        "reason": "No orbital elements computed \u2014 cannot assess orbit quality.",
+        "details": {
+          "quality_code": null
+        }
+      },
+      {
+        "name": "arc_length",
+        "outcome": "PASS",
+        "reason": "Arc length 1.112 d \u2265 1.0 d.",
+        "details": {
+          "arc_days": 1.1115336497314274
+        }
+      },
+      {
+        "name": "multi_night",
+        "outcome": "PASS",
+        "reason": "3 distinct nights, 3 observations.",
+        "details": {
+          "n_nights": 3,
+          "n_obs": 3
+        }
+      },
+      {
+        "name": "real_bogus",
+        "outcome": "FAIL",
+        "reason": "real_bogus_score None is None or < 0.9 \u2014 fails submission gate.",
+        "details": {
+          "real_bogus_score": null,
+          "gate": 0.9
+        }
+      },
+      {
+        "name": "known_object_posterior",
+        "outcome": "PASS",
+        "reason": "known_object posterior 0.006 below warning threshold.",
+        "details": {
+          "known_object_prob": 0.006188588736462629
+        }
+      },
+      {
+        "name": "artifact_posterior",
+        "outcome": "FAIL",
+        "reason": "stellar_artifact posterior 0.990 \u2265 0.3 \u2014 classifier indicates this is likely an instrumental artifact.",
+        "details": {
+          "stellar_artifact_prob": 0.9895043607560031
+        }
+      },
+      {
+        "name": "neo_dominance",
+        "outcome": "FAIL",
+        "reason": "neo_candidate posterior 0.001 < 0.3 \u2014 classifier does not favour novel NEO hypothesis.",
+        "details": {
+          "neo_candidate_prob": 0.0010605615682064843
+        }
+      },
+      {
+        "name": "mba_confusion",
+        "outcome": "PASS",
+        "reason": "main_belt_asteroid posterior 0.001 below warning threshold.",
+        "details": {
+          "main_belt_asteroid_prob": 0.0009667082678567353
+        }
+      },
+      {
+        "name": "motion_rate",
+        "outcome": "PASS",
+        "reason": "Motion rate 12.774 arcsec/hr within typical NEO range.",
+        "details": {
+          "rate_arcsec_hr": 12.774312782233004
+        }
+      },
+      {
+        "name": "moid_arc_consistency",
+        "outcome": "PASS",
+        "reason": "MOID > 0.10 AU or not computed \u2014 no PHA claim to scrutinise.",
+        "details": {
+          "moid_au": null,
+          "arc_days": 1.1115336497314274
+        }
+      },
+      {
+        "name": "motion_consistency",
+        "outcome": "PASS",
+        "reason": "motion_consistency_score 0.995 \u2265 0.60.",
+        "details": {
+          "motion_consistency_score": 0.9951648046482469
+        }
+      }
+    ],
+    "fail_count": 4,
+    "warning_count": 0,
+    "summary": "REJECTED: 4 disqualifying challenge(s) failed \u2014 ['orbit_quality', 'real_bogus', 'artifact_posterior', 'neo_dominance']. Do not advance to operator review.",
+    "reviewed_at_utc": "2026-06-29T00:17:49.259983+00:00"
+  },
+  {
+    "object_id": "190eb311-0611-4883-b64b-faf9882c65f2",
+    "verdict": "REJECT",
+    "challenges": [
+      {
+        "name": "orbit_quality",
+        "outcome": "FAIL",
+        "reason": "No orbital elements computed \u2014 cannot assess orbit quality.",
+        "details": {
+          "quality_code": null
+        }
+      },
+      {
+        "name": "arc_length",
+        "outcome": "PASS",
+        "reason": "Arc length 1.111 d \u2265 1.0 d.",
+        "details": {
+          "arc_days": 1.1114063300192356
+        }
+      },
+      {
+        "name": "multi_night",
+        "outcome": "PASS",
+        "reason": "3 distinct nights, 3 observations.",
+        "details": {
+          "n_nights": 3,
+          "n_obs": 3
+        }
+      },
+      {
+        "name": "real_bogus",
+        "outcome": "FAIL",
+        "reason": "real_bogus_score None is None or < 0.9 \u2014 fails submission gate.",
+        "details": {
+          "real_bogus_score": null,
+          "gate": 0.9
+        }
+      },
+      {
+        "name": "known_object_posterior",
+        "outcome": "PASS",
+        "reason": "known_object posterior 0.006 below warning threshold.",
+        "details": {
+          "known_object_prob": 0.0061806565957832765
+        }
+      },
+      {
+        "name": "artifact_posterior",
+        "outcome": "FAIL",
+        "reason": "stellar_artifact posterior 0.990 \u2265 0.3 \u2014 classifier indicates this is likely an instrumental artifact.",
+        "details": {
+          "stellar_artifact_prob": 0.9895131021235009
+        }
+      },
+      {
+        "name": "neo_dominance",
+        "outcome": "FAIL",
+        "reason": "neo_candidate posterior 0.001 < 0.3 \u2014 classifier does not favour novel NEO hypothesis.",
+        "details": {
+          "neo_candidate_prob": 0.0010632584875642133
+        }
+      },
+      {
+        "name": "mba_confusion",
+        "outcome": "PASS",
+        "reason": "main_belt_asteroid posterior 0.001 below warning threshold.",
+        "details": {
+          "main_belt_asteroid_prob": 0.0009658092692810655
+        }
+      },
+      {
+        "name": "motion_rate",
+        "outcome": "PASS",
+        "reason": "Motion rate 34.151 arcsec/hr within typical NEO range.",
+        "details": {
+          "rate_arcsec_hr": 34.15133266892598
+        }
+      },
+      {
+        "name": "moid_arc_consistency",
+        "outcome": "PASS",
+        "reason": "MOID > 0.10 AU or not computed \u2014 no PHA claim to scrutinise.",
+        "details": {
+          "moid_au": null,
+          "arc_days": 1.1114063300192356
+        }
+      },
+      {
+        "name": "motion_consistency",
+        "outcome": "PASS",
+        "reason": "motion_consistency_score 0.986 \u2265 0.60.",
+        "details": {
+          "motion_consistency_score": 0.9857234627511607
+        }
+      }
+    ],
+    "fail_count": 4,
+    "warning_count": 0,
+    "summary": "REJECTED: 4 disqualifying challenge(s) failed \u2014 ['orbit_quality', 'real_bogus', 'artifact_posterior', 'neo_dominance']. Do not advance to operator review.",
+    "reviewed_at_utc": "2026-06-29T00:17:49.259990+00:00"
+  },
+  {
+    "object_id": "1eb176c3-71d4-4005-b9da-8aa5f37f1a34",
+    "verdict": "REJECT",
+    "challenges": [
+      {
+        "name": "orbit_quality",
+        "outcome": "FAIL",
+        "reason": "No orbital elements computed \u2014 cannot assess orbit quality.",
+        "details": {
+          "quality_code": null
+        }
+      },
+      {
+        "name": "arc_length",
+        "outcome": "PASS",
+        "reason": "Arc length 1.242 d \u2265 1.0 d.",
+        "details": {
+          "arc_days": 1.2423097998835146
+        }
+      },
+      {
+        "name": "multi_night",
+        "outcome": "PASS",
+        "reason": "3 distinct nights, 3 observations.",
+        "details": {
+          "n_nights": 3,
+          "n_obs": 3
+        }
+      },
+      {
+        "name": "real_bogus",
+        "outcome": "FAIL",
+        "reason": "real_bogus_score None is None or < 0.9 \u2014 fails submission gate.",
+        "details": {
+          "real_bogus_score": null,
+          "gate": 0.9
+        }
+      },
+      {
+        "name": "known_object_posterior",
+        "outcome": "PASS",
+        "reason": "known_object posterior 0.006 below warning threshold.",
+        "details": {
+          "known_object_prob": 0.0061972189788848395
+        }
+      },
+      {
+        "name": "artifact_posterior",
+        "outcome": "FAIL",
+        "reason": "stellar_artifact posterior 0.989 \u2265 0.3 \u2014 classifier indicates this is likely an instrumental artifact.",
+        "details": {
+          "stellar_artifact_prob": 0.9894948218625472
+        }
+      },
+      {
+        "name": "neo_dominance",
+        "outcome": "FAIL",
+        "reason": "neo_candidate posterior 0.001 < 0.3 \u2014 classifier does not favour novel NEO hypothesis.",
+        "details": {
+          "neo_candidate_prob": 0.0010574875805194129
+        }
+      },
+      {
+        "name": "mba_confusion",
+        "outcome": "PASS",
+        "reason": "main_belt_asteroid posterior 0.001 below warning threshold.",
+        "details": {
+          "main_belt_asteroid_prob": 0.0009741397542508544
+        }
+      },
+      {
+        "name": "motion_rate",
+        "outcome": "PASS",
+        "reason": "Motion rate 39.136 arcsec/hr within typical NEO range.",
+        "details": {
+          "rate_arcsec_hr": 39.13572735913055
+        }
+      },
+      {
+        "name": "moid_arc_consistency",
+        "outcome": "PASS",
+        "reason": "MOID > 0.10 AU or not computed \u2014 no PHA claim to scrutinise.",
+        "details": {
+          "moid_au": null,
+          "arc_days": 1.2423097998835146
+        }
+      },
+      {
+        "name": "motion_consistency",
+        "outcome": "PASS",
+        "reason": "motion_consistency_score 0.982 \u2265 0.60.",
+        "details": {
+          "motion_consistency_score": 0.9815492938071778
+        }
+      }
+    ],
+    "fail_count": 4,
+    "warning_count": 0,
+    "summary": "REJECTED: 4 disqualifying challenge(s) failed \u2014 ['orbit_quality', 'real_bogus', 'artifact_posterior', 'neo_dominance']. Do not advance to operator review.",
+    "reviewed_at_utc": "2026-06-29T00:17:49.259997+00:00"
+  },
+  {
+    "object_id": "881912f8-914f-4b8d-ba85-0b9a7fe3aa14",
+    "verdict": "REJECT",
+    "challenges": [
+      {
+        "name": "orbit_quality",
+        "outcome": "FAIL",
+        "reason": "No orbital elements computed \u2014 cannot assess orbit quality.",
+        "details": {
+          "quality_code": null
+        }
+      },
+      {
+        "name": "arc_length",
+        "outcome": "PASS",
+        "reason": "Arc length 1.112 d \u2265 1.0 d.",
+        "details": {
+          "arc_days": 1.1115336497314274
+        }
+      },
+      {
+        "name": "multi_night",
+        "outcome": "PASS",
+        "reason": "3 distinct nights, 3 observations.",
+        "details": {
+          "n_nights": 3,
+          "n_obs": 3
+        }
+      },
+      {
+        "name": "real_bogus",
+        "outcome": "FAIL",
+        "reason": "real_bogus_score None is None or < 0.9 \u2014 fails submission gate.",
+        "details": {
+          "real_bogus_score": null,
+          "gate": 0.9
+        }
+      },
+      {
+        "name": "known_object_posterior",
+        "outcome": "PASS",
+        "reason": "known_object posterior 0.006 below warning threshold.",
+        "details": {
+          "known_object_prob": 0.006180623771555773
+        }
+      },
+      {
+        "name": "artifact_posterior",
+        "outcome": "FAIL",
+        "reason": "stellar_artifact posterior 0.990 \u2265 0.3 \u2014 classifier indicates this is likely an instrumental artifact.",
+        "details": {
+          "stellar_artifact_prob": 0.9895105722008154
+        }
+      },
+      {
+        "name": "neo_dominance",
+        "outcome": "FAIL",
+        "reason": "neo_candidate posterior 0.001 < 0.3 \u2014 classifier does not favour novel NEO hypothesis.",
+        "details": {
+          "neo_candidate_prob": 0.0010622425839917633
+        }
+      },
+      {
+        "name": "mba_confusion",
+        "outcome": "PASS",
+        "reason": "main_belt_asteroid posterior 0.001 below warning threshold.",
+        "details": {
+          "main_belt_asteroid_prob": 0.0009710412974728122
+        }
+      },
+      {
+        "name": "motion_rate",
+        "outcome": "PASS",
+        "reason": "Motion rate 49.390 arcsec/hr within typical NEO range.",
+        "details": {
+          "rate_arcsec_hr": 49.38989568241302
+        }
+      },
+      {
+        "name": "moid_arc_consistency",
+        "outcome": "PASS",
+        "reason": "MOID > 0.10 AU or not computed \u2014 no PHA claim to scrutinise.",
+        "details": {
+          "moid_au": null,
+          "arc_days": 1.1115336497314274
+        }
+      },
+      {
+        "name": "motion_consistency",
+        "outcome": "PASS",
+        "reason": "motion_consistency_score 0.985 \u2265 0.60.",
+        "details": {
+          "motion_consistency_score": 0.9852470254861087
+        }
+      }
+    ],
+    "fail_count": 4,
+    "warning_count": 0,
+    "summary": "REJECTED: 4 disqualifying challenge(s) failed \u2014 ['orbit_quality', 'real_bogus', 'artifact_posterior', 'neo_dominance']. Do not advance to operator review.",
+    "reviewed_at_utc": "2026-06-29T00:17:49.260003+00:00"
+  }
+]

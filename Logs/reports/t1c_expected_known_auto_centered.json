@@ -1,0 +1,77 @@
+[
+  {
+    "designation": "6239",
+    "samples": [
+      {
+        "jd": 2461206.5,
+        "ra_deg": 126.13054,
+        "dec_deg": 17.91169,
+        "mag": 20.31
+      },
+      {
+        "jd": 2461208.2,
+        "ra_deg": 127.81354,
+        "dec_deg": 17.35651,
+        "mag": 20.297
+      }
+    ],
+    "tolerance_arcsec": 5.0,
+    "tolerance_days": 0.02,
+    "min_samples": 1,
+    "source": "mpc_orbit_projection_plus_jpl_horizons"
+  },
+  {
+    "designation": "143992",
+    "samples": [
+      {
+        "jd": 2461206.5,
+        "ra_deg": 123.19342,
+        "dec_deg": 18.56658,
+        "mag": 20.776
+      },
+      {
+        "jd": 2461208.2,
+        "ra_deg": 124.02469,
+        "dec_deg": 18.22909,
+        "mag": 20.792
+      },
+      {
+        "jd": 2461209.9,
+        "ra_deg": 124.8479,
+        "dec_deg": 17.89147,
+        "mag": 20.809
+      }
+    ],
+    "tolerance_arcsec": 5.0,
+    "tolerance_days": 0.02,
+    "min_samples": 1,
+    "source": "mpc_orbit_projection_plus_jpl_horizons"
+  },
+  {
+    "designation": "218863",
+    "samples": [
+      {
+        "jd": 2461206.5,
+        "ra_deg": 123.02738,
+        "dec_deg": 18.63158,
+        "mag": 19.036
+      },
+      {
+        "jd": 2461208.2,
+        "ra_deg": 125.00043,
+        "dec_deg": 18.42556,
+        "mag": 19.055
+      },
+      {
+        "jd": 2461209.9,
+        "ra_deg": 126.96026,
+        "dec_deg": 18.19986,
+        "mag": 19.075
+      }
+    ],
+    "tolerance_arcsec": 5.0,
+    "tolerance_days": 0.02,
+    "min_samples": 1,
+    "source": "mpc_orbit_projection_plus_jpl_horizons"
+  }
+]

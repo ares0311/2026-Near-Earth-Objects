@@ -1,0 +1,131 @@
+{
+  "config_path": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Near Earth Objects/background/config.json",
+  "current_policy_path": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Near Earth Objects/background/live_review_policy.example.json",
+  "current_policy_contract_valid": true,
+  "current_policy_blockers": [],
+  "recommended_config_filename": "background/config.local.json",
+  "recommended_policy_filename": "background/live_review_policy.local.json",
+  "recommended_local_file_status": "gitignored_operator_local_files",
+  "recommended_first_dry_run_mode": "ZTF public-only, one bounded query",
+  "recommended_policy_skeleton": {
+    "schema_version": "live-review-policy-v1",
+    "policy_name": "local-ztf-public-dry-run-policy",
+    "reviewer": "REPLACE_WITH_REVIEWER_NAME",
+    "approved_for_live_network": false,
+    "allowed_surveys": [
+      "ZTF"
+    ],
+    "max_queries_per_run": 1,
+    "min_seconds_between_queries": 10,
+    "dry_run_scope": {
+      "ra_deg": 180.0,
+      "dec_deg": 0.0,
+      "radius_deg": 0.1,
+      "start_jd": 2460000.5,
+      "end_jd": 2460001.5
+    },
+    "no_external_submission_confirmed": true,
+    "no_impact_probability_claims": true,
+    "notes": "Template only. Copy to an ignored local policy file, review scope and rate limits, then set approved_for_live_network=true only after explicit operator approval for a bounded dry run."
+  },
+  "operator_checklist": [
+    "copy background/config.json to background/config.local.json",
+    "copy the skeleton to background/live_review_policy.local.json",
+    "replace reviewer with the approving human name",
+    "verify allowed_surveys, query cap, cadence, and sky/time scope",
+    "confirm no external submission and no impact-probability claims",
+    "point background/config.local.json at the local policy file",
+    "set approved_for_live_network=true only after explicit approval",
+    "run live-dry-run-approval-bundle with --config background/config.local.json before any live dry-run execute"
+  ],
+  "approval_blockers": [
+    "COPY_CONFIG_TO_GITIGNORED_LOCAL_CONFIG",
+    "COPY_TEMPLATE_TO_GITIGNORED_LOCAL_POLICY",
+    "REPLACE_REVIEWER_NAME",
+    "REVIEW_AND_BOUND_DRY_RUN_SCOPE",
+    "KEEP_EXTERNAL_SUBMISSION_DISABLED",
+    "KEEP_IMPACT_PROBABILITY_CLAIMS_DISABLED",
+    "SET_LOCAL_CONFIG_TO_LOCAL_POLICY_PATH",
+    "ENABLE_LIVE_NETWORK_ONLY_FOR_APPROVED_DRY_RUN",
+    "ATLAS_TOKEN_MISSING_FOR_ATLAS_SURVEY"
+  ],
+  "credential_inventory": {
+    "config_path": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Near Earth Objects/background/config.json",
+    "required_credential_env": [
+      "ATLAS_TOKEN"
+    ],
+    "missing_credential_env": [
+      "ATLAS_TOKEN"
+    ],
+    "all_required_credentials_present": false,
+    "credential_storage_plan": "Keep tokens outside git; expose only via local environment variables or an operator-managed secret store before an approved dry run.",
+    "inventory": [
+      {
+        "survey": "ZTF",
+        "credential_env": "ZTF_IRSA_USERNAME",
+        "keychain_service": "neo-detection:ZTF_IRSA_USERNAME",
+        "auth_mode": "public",
+        "fetch_api": "fetch_ztf_alerts",
+        "credential_present": false,
+        "credential_source": "missing",
+        "credential_required": false,
+        "required_by_config": false,
+        "storage_recommendation": "Set as a local environment variable or store in macOS Keychain as the listed service name; do not commit.",
+        "secret_value_recorded": false,
+        "network_access_performed": false,
+        "external_submission_enabled": false
+      },
+      {
+        "survey": "ZTF",
+        "credential_env": "ZTF_IRSA_PASSWORD",
+        "keychain_service": "neo-detection:ZTF_IRSA_PASSWORD",
+        "auth_mode": "public",
+        "fetch_api": "fetch_ztf_alerts",
+        "credential_present": false,
+        "credential_source": "missing",
+        "credential_required": false,
+        "required_by_config": false,
+        "storage_recommendation": "Set as a local environment variable or store in macOS Keychain as the listed service name; do not commit.",
+        "secret_value_recorded": false,
+        "network_access_performed": false,
+        "external_submission_enabled": false
+      },
+      {
+        "survey": "ATLAS",
+        "credential_env": "ATLAS_TOKEN",
+        "keychain_service": "neo-detection:ATLAS_TOKEN",
+        "auth_mode": "token",
+        "fetch_api": "fetch_atlas_forced",
+        "credential_present": false,
+        "credential_source": "missing",
+        "credential_required": true,
+        "required_by_config": true,
+        "storage_recommendation": "Set as a local environment variable or store in macOS Keychain as the listed service name; do not commit.",
+        "secret_value_recorded": false,
+        "network_access_performed": false,
+        "external_submission_enabled": false
+      },
+      {
+        "survey": "PanSTARRS",
+        "credential_env": "MAST_API_TOKEN",
+        "keychain_service": "neo-detection:MAST_API_TOKEN",
+        "auth_mode": "public",
+        "fetch_api": "fetch_panstarrs_catalog",
+        "credential_present": false,
+        "credential_source": "missing",
+        "credential_required": false,
+        "required_by_config": false,
+        "storage_recommendation": "Set as a local environment variable or store in macOS Keychain as the listed service name; do not commit.",
+        "secret_value_recorded": false,
+        "network_access_performed": false,
+        "external_submission_enabled": false
+      }
+    ],
+    "secret_values_recorded": false,
+    "network_access_performed": false,
+    "external_submission_enabled": false
+  },
+  "secret_values_recorded": false,
+  "network_access_performed": false,
+  "external_submission_enabled": false
+}

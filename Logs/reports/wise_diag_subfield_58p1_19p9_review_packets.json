@@ -1,0 +1,350 @@
+[
+  {
+    "tracklet": {
+      "object_id": "631750e1-b10e-48cf-9524-4b89d37e6d0e",
+      "observations": [
+        {
+          "obs_id": "20010r139-003245",
+          "ra_deg": 58.0923144,
+          "dec_deg": 19.8803606,
+          "jd": 2459084.63795145,
+          "mag": 15.677000045776367,
+          "mag_err": 0.19599999487400055,
+          "filter_band": "W1",
+          "mission": "WISE",
+          "real_bogus": null,
+          "deep_real_bogus": null,
+          "cutout_science": null,
+          "cutout_reference": null,
+          "cutout_difference": null,
+          "field_id": null,
+          "limiting_mag": null
+        },
+        {
+          "obs_id": "20032r115-006433",
+          "ra_deg": 58.0922052,
+          "dec_deg": 19.8805148,
+          "jd": 2459085.35728194,
+          "mag": 15.85200023651123,
+          "mag_err": 0.4009999930858612,
+          "filter_band": "W1",
+          "mission": "WISE",
+          "real_bogus": null,
+          "deep_real_bogus": null,
+          "cutout_science": null,
+          "cutout_reference": null,
+          "cutout_difference": null,
+          "field_id": null,
+          "limiting_mag": null
+        },
+        {
+          "obs_id": "24875r139-003939",
+          "ra_deg": 58.0695925,
+          "dec_deg": 19.9162082,
+          "jd": 2459243.69764332,
+          "mag": 15.75100040435791,
+          "mag_err": 0.1,
+          "filter_band": "W1",
+          "mission": "WISE",
+          "real_bogus": null,
+          "deep_real_bogus": null,
+          "cutout_science": null,
+          "cutout_reference": null,
+          "cutout_difference": null,
+          "field_id": null,
+          "limiting_mag": null
+        }
+      ],
+      "arc_days": 159.05969187011942,
+      "motion_rate_arcsec_per_hour": 0.039354690842693704,
+      "motion_pa_degrees": 329.2048281865485,
+      "motion_rate_uncertainty": 0.0
+    },
+    "features": {
+      "real_bogus_score": null,
+      "streak_score": null,
+      "psf_quality_score": null,
+      "motion_consistency_score": 0.999510519793337,
+      "arc_coverage_score": 1.0,
+      "nights_observed_score": 0.3333333333333333,
+      "brightness_score": 0.9239999771118164,
+      "color_score": null,
+      "lightcurve_variability_score": 0.14345279660716018,
+      "orbit_quality_score": null,
+      "moid_score": null,
+      "neo_class_confidence": 0.0009277278639614053,
+      "pha_flag_confidence": null,
+      "known_object_score": null,
+      "main_belt_consistency_score": 0.0011751727476071677,
+      "stellar_artifact_score": 0.9880625208147641
+    },
+    "posterior": {
+      "neo_candidate": 0.0009277278639614053,
+      "known_object": 0.006750721895392982,
+      "main_belt_asteroid": 0.0011751727476071677,
+      "stellar_artifact": 0.9880625208147641,
+      "other_solar_system": 0.003083856678274373
+    },
+    "hazard": {
+      "hazard_flag": "unknown",
+      "moid_au": null,
+      "estimated_diameter_m": 2503.000390289846,
+      "absolute_magnitude_h": 15.760000228881836,
+      "neo_class": "unknown",
+      "alert_pathway": "internal_candidate",
+      "explanation": {
+        "summary": "NEO candidate probability: 0.09%. Hazard flag: unknown. MOID: unknown.",
+        "supporting_evidence": [
+          "Multi-night arc (nights score: 0.33)",
+          "Consistent linear motion (score: 1.00)"
+        ],
+        "contra_evidence": [
+          "Non-negligible artifact probability: 0.99"
+        ],
+        "model_version": "0.1.0"
+      },
+      "orbital_elements": null
+    },
+    "metadata": {
+      "scorer_version": "0.1.0",
+      "scored_at_jd": 2461221.819692574,
+      "pipeline_run_id": "425ab140-1e03-4f0a-97cb-404ec079fcf9",
+      "discovery_priority": 0.00046386393198070264,
+      "followup_value": 0.5695999908447266,
+      "scientific_interest": 0.0,
+      "close_approach_au": null
+    }
+  },
+  {
+    "tracklet": {
+      "object_id": "6debdf4f-8c7e-4133-841c-4aec1dd027b7",
+      "observations": [
+        {
+          "obs_id": "20002r138-002436",
+          "ra_deg": 58.0769451,
+          "dec_deg": 19.9387646,
+          "jd": 2459084.37627244,
+          "mag": 15.616000175476074,
+          "mag_err": 0.17499999701976776,
+          "filter_band": "W1",
+          "mission": "WISE",
+          "real_bogus": null,
+          "deep_real_bogus": null,
+          "cutout_science": null,
+          "cutout_reference": null,
+          "cutout_difference": null,
+          "field_id": null,
+          "limiting_mag": null
+        },
+        {
+          "obs_id": "20028r115-001875",
+          "ra_deg": 58.0769704,
+          "dec_deg": 19.9386927,
+          "jd": 2459085.22650613,
+          "mag": 15.430000305175781,
+          "mag_err": 0.16599999368190765,
+          "filter_band": "W1",
+          "mission": "WISE",
+          "real_bogus": null,
+          "deep_real_bogus": null,
+          "cutout_science": null,
+          "cutout_reference": null,
+          "cutout_difference": null,
+          "field_id": null,
+          "limiting_mag": null
+        },
+        {
+          "obs_id": "24859r139-004694",
+          "ra_deg": 58.0814809,
+          "dec_deg": 19.9235035,
+          "jd": 2459243.17453866,
+          "mag": 15.85099983215332,
+          "mag_err": 0.1,
+          "filter_band": "W1",
+          "mission": "WISE",
+          "real_bogus": null,
+          "deep_real_bogus": null,
+          "cutout_science": null,
+          "cutout_reference": null,
+          "cutout_difference": null,
+          "field_id": null,
+          "limiting_mag": null
+        }
+      ],
+      "arc_days": 158.7982662199065,
+      "motion_rate_arcsec_per_hour": 0.014967694972400648,
+      "motion_pa_degrees": 164.38905173921657,
+      "motion_rate_uncertainty": 0.0
+    },
+    "features": {
+      "real_bogus_score": null,
+      "streak_score": null,
+      "psf_quality_score": null,
+      "motion_consistency_score": 0.9995158240014584,
+      "arc_coverage_score": 1.0,
+      "nights_observed_score": 0.3333333333333333,
+      "brightness_score": 0.9367666562398276,
+      "color_score": null,
+      "lightcurve_variability_score": 0.34451988628651253,
+      "orbit_quality_score": null,
+      "moid_score": null,
+      "neo_class_confidence": 0.0009265033874965031,
+      "pha_flag_confidence": null,
+      "known_object_score": null,
+      "main_belt_consistency_score": 0.0011762691425523581,
+      "stellar_artifact_score": 0.9880561448595997
+    },
+    "posterior": {
+      "neo_candidate": 0.0009265033874965031,
+      "known_object": 0.00675710249557521,
+      "main_belt_asteroid": 0.0011762691425523581,
+      "stellar_artifact": 0.9880561448595997,
+      "other_solar_system": 0.003083980114776249
+    },
+    "hazard": {
+      "hazard_flag": "unknown",
+      "moid_au": null,
+      "estimated_diameter_m": 2654.570571965351,
+      "absolute_magnitude_h": 15.632333437601725,
+      "neo_class": "unknown",
+      "alert_pathway": "internal_candidate",
+      "explanation": {
+        "summary": "NEO candidate probability: 0.09%. Hazard flag: unknown. MOID: unknown.",
+        "supporting_evidence": [
+          "Multi-night arc (nights score: 0.33)",
+          "Consistent linear motion (score: 1.00)"
+        ],
+        "contra_evidence": [
+          "Non-negligible artifact probability: 0.99"
+        ],
+        "model_version": "0.1.0"
+      },
+      "orbital_elements": null
+    },
+    "metadata": {
+      "scorer_version": "0.1.0",
+      "scored_at_jd": 2461221.819693145,
+      "pipeline_run_id": "5a73099e-a6c7-4e78-9ec3-98ce5794d5c2",
+      "discovery_priority": 0.00046325169374825153,
+      "followup_value": 0.574706662495931,
+      "scientific_interest": 0.0,
+      "close_approach_au": null
+    }
+  },
+  {
+    "tracklet": {
+      "object_id": "ec5d59c5-ab13-4f58-8a94-53b07da36d9f",
+      "observations": [
+        {
+          "obs_id": "20024r115-004471",
+          "ra_deg": 58.0741065,
+          "dec_deg": 19.9074541,
+          "jd": 2459085.09573036,
+          "mag": 16.68400001525879,
+          "mag_err": 0.1,
+          "filter_band": "W1",
+          "mission": "WISE",
+          "real_bogus": null,
+          "deep_real_bogus": null,
+          "cutout_science": null,
+          "cutout_reference": null,
+          "cutout_difference": null,
+          "field_id": null,
+          "limiting_mag": null
+        },
+        {
+          "obs_id": "24863r139-006392",
+          "ra_deg": 58.082428,
+          "dec_deg": 19.8928605,
+          "jd": 2459243.30531481,
+          "mag": 16.18400001525879,
+          "mag_err": 0.453000009059906,
+          "filter_band": "W1",
+          "mission": "WISE",
+          "real_bogus": null,
+          "deep_real_bogus": null,
+          "cutout_science": null,
+          "cutout_reference": null,
+          "cutout_difference": null,
+          "field_id": null,
+          "limiting_mag": null
+        },
+        {
+          "obs_id": "24889r115-003004",
+          "ra_deg": 58.0824805,
+          "dec_deg": 19.8927831,
+          "jd": 2459244.1552962,
+          "mag": 14.77299976348877,
+          "mag_err": 0.1,
+          "filter_band": "W1",
+          "mission": "WISE",
+          "real_bogus": null,
+          "deep_real_bogus": null,
+          "cutout_science": null,
+          "cutout_reference": null,
+          "cutout_difference": null,
+          "field_id": null,
+          "limiting_mag": null
+        }
+      ],
+      "arc_days": 159.05956583982334,
+      "motion_rate_arcsec_per_hour": 0.015702092376446857,
+      "motion_pa_degrees": 151.77741982298014,
+      "motion_rate_uncertainty": 0.0
+    },
+    "features": {
+      "real_bogus_score": null,
+      "streak_score": null,
+      "psf_quality_score": null,
+      "motion_consistency_score": 0.9996386464166293,
+      "arc_coverage_score": 1.0,
+      "nights_observed_score": 0.3333333333333333,
+      "brightness_score": 0.9119666735331217,
+      "color_score": null,
+      "lightcurve_variability_score": 1.0,
+      "orbit_quality_score": null,
+      "moid_score": null,
+      "neo_class_confidence": 0.0008441339752430775,
+      "pha_flag_confidence": null,
+      "known_object_score": null,
+      "main_belt_consistency_score": 0.0014093008792684563,
+      "stellar_artifact_score": 0.9832877088589048
+    },
+    "posterior": {
+      "neo_candidate": 0.0008441339752430775,
+      "known_object": 0.008615501026489867,
+      "main_belt_asteroid": 0.0014093008792684563,
+      "stellar_artifact": 0.9832877088589048,
+      "other_solar_system": 0.005843355260093864
+    },
+    "hazard": {
+      "hazard_flag": "unknown",
+      "moid_au": null,
+      "estimated_diameter_m": 2368.068768848406,
+      "absolute_magnitude_h": 15.880333264668783,
+      "neo_class": "unknown",
+      "alert_pathway": "internal_candidate",
+      "explanation": {
+        "summary": "NEO candidate probability: 0.08%. Hazard flag: unknown. MOID: unknown.",
+        "supporting_evidence": [
+          "Multi-night arc (nights score: 0.33)",
+          "Consistent linear motion (score: 1.00)"
+        ],
+        "contra_evidence": [
+          "Non-negligible artifact probability: 0.98"
+        ],
+        "model_version": "0.1.0"
+      },
+      "orbital_elements": null
+    },
+    "metadata": {
+      "scorer_version": "0.1.0",
+      "scored_at_jd": 2461221.819693376,
+      "pipeline_run_id": "9bb34af3-1a3a-4d74-b43f-fbab9a99f66f",
+      "discovery_priority": 0.00042206698762153877,
+      "followup_value": 0.5647866694132486,
+      "scientific_interest": 0.0,
+      "close_approach_au": null
+    }
+  }
+]

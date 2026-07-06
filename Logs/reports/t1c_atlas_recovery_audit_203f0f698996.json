@@ -1,0 +1,106 @@
+{
+  "schema_version": "real-run-audit-v2",
+  "run_dir": "Logs/pipeline_runs/atlas_recovery_203f0f698996",
+  "run_id": "atlas_recovery_203f0f698996",
+  "run_summary": {
+    "run_id": "atlas_recovery_203f0f698996",
+    "run_dir": "Logs/pipeline_runs/atlas_recovery_203f0f698996",
+    "expected_known": "Logs/reports/t1c_expected_known_ztf_available_251p66_m22p5_30d.json",
+    "atlas_audit_expected_known": "Logs/pipeline_runs/atlas_recovery_203f0f698996/expected_known_atlas_forced.json",
+    "n_manifest_rows": 3,
+    "n_samples": 10,
+    "n_recovered_samples": 0,
+    "n_tracklets": 0,
+    "n_failures": 0,
+    "fallback_type": "atlas_forced_photometry_targeted_known_object_recovery",
+    "limitations": [
+      "Targeted forced photometry is supporting recovery evidence, not blind discovery.",
+      "This tool performs no external submission and makes no impact claim.",
+      "Promotion remains controlled by audit_real_run.py and operator review."
+    ],
+    "safety": {
+      "no_external_submission": true,
+      "no_impact_probability_claim": true,
+      "mpc_nasa_alert_pathway_triggered": false
+    }
+  },
+  "checkpoint_last_stage": "atlas_forced_recovery",
+  "n_tracklets": 0,
+  "n_review_rows": 0,
+  "review_rows": [],
+  "expected_known_matches": [
+    {
+      "expected_key": "121",
+      "designation": "121",
+      "status": "unmatched",
+      "matched_object_id": null,
+      "candidate_object_ids": [],
+      "best_separation_arcsec": null,
+      "best_time_delta_days": null,
+      "matched_samples": 0,
+      "required_samples": 1
+    },
+    {
+      "expected_key": "296",
+      "designation": "296",
+      "status": "unmatched",
+      "matched_object_id": null,
+      "candidate_object_ids": [],
+      "best_separation_arcsec": null,
+      "best_time_delta_days": null,
+      "matched_samples": 0,
+      "required_samples": 1
+    },
+    {
+      "expected_key": "481",
+      "designation": "481",
+      "status": "unmatched",
+      "matched_object_id": null,
+      "candidate_object_ids": [],
+      "best_separation_arcsec": null,
+      "best_time_delta_days": null,
+      "matched_samples": 0,
+      "required_samples": 1
+    }
+  ],
+  "known_object_recovery_gate": {
+    "status": "evaluated",
+    "threshold": 0.9,
+    "recovered": 0,
+    "expected": 3,
+    "recovery_rate": 0.0,
+    "ambiguous": 0,
+    "invalid": 0,
+    "unmatched": 3,
+    "passed": false
+  },
+  "human_false_positive_review": {
+    "status": "blocked_no_candidates_for_review",
+    "n_candidates_for_review": 0,
+    "reviewer": "Jerome W. Lindsey III, citizen-science project operator",
+    "decision": null,
+    "limitations": "Operator review is citizen-science QA, not professional planetary-defense validation.",
+    "gate": {
+      "status": "blocked_no_candidates_for_review",
+      "reviewed": 0,
+      "required": 0,
+      "passed": false
+    }
+  },
+  "citizen_science_limitations": [
+    "No professional domain-expert validation is recorded.",
+    "This packet does not authorize MPC submission or hazard notification.",
+    "All impact-probability statements remain deferred to MPC/CNEOS."
+  ],
+  "safety": {
+    "no_external_submission": true,
+    "no_mpc_submission": true,
+    "no_nasa_pdco_notification": true,
+    "no_impact_probability_asserted": true
+  },
+  "production_promotion_allowed": false,
+  "production_promotion_blockers": [
+    "known_object_recovery_gate_not_passed",
+    "citizen_science_operator_review_not_passed"
+  ]
+}
