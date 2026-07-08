@@ -1,7 +1,7 @@
 # 2026 Near-Earth Object Detection & Ranking Pipeline
 
 ![Status](https://img.shields.io/badge/status-active%20development-blue)
-![Version](https://img.shields.io/badge/version-0.90.27-informational)
+![Version](https://img.shields.io/badge/version-0.90.60-informational)
 ![License](https://img.shields.io/badge/license-Apache%202.0-green)
 ![Tests](https://img.shields.io/badge/tests-3500%2B%20passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
@@ -19,9 +19,13 @@ are secondary/paused (code and evidence preserved). See
 `docs/MISSION.md §Operator Decision (2026-07-02)`. The abstract and
 architecture description below still describe the WISE/DECam/TESS pipeline
 as implemented through v0.90.11 — that work remains real and functional as
-the secondary path, but is no longer the active development target.
+the secondary path, but is no longer the active development target. As of
+v0.90.60, ZTF DR24 Gates Z1, Z2, Z4, Z5, Z6, and Z7 are closed with real
+evidence. Gate Z3 remains the only open ZTF DR24 production gate, and the
+candidate-pair search is intentionally paused after four low-yield attempts
+unless the operator explicitly restarts that path.
 
-Near-Earth Objects (NEOs) — small solar system bodies with perihelion distances $q < 1.3$ AU — represent both a premier target for planetary science and the only known category of natural disaster that is, in principle, preventable. Despite three decades of systematic survey effort, population completeness models estimate that the majority of NEOs larger than 140 meters remain undetected, sustaining the need for automated, high-throughput discovery pipelines capable of operating at the cadence and scale of modern wide-field photometric surveys. This work presents a research pipeline for the detection, multi-night linking, orbital characterization, and hazard ranking of NEO candidates derived from public training streams and unreviewed archival survey data. The system implements a seven-stage directed acyclic processing graph — fetch, preprocess, detect, link, classify, orbit, score — followed by a mandatory three-step alert protocol governing all external communications. Classification employs a three-tier ensemble architecture: a gradient-boosted tree classifier on tabular features (Tier 1), a convolutional neural network operating on 63×63-pixel ZTF image triplets following the architecture of Duev et al. (2019) (Tier 2), and a BERT-style Transformer trained on multi-night observation sequences following Lin et al. (2022) (Tier 3), with outputs combined by a logistic regression meta-learner and calibrated via Platt scaling or isotonic regression. Hazard assessment follows a Bayesian log-score model over five competing hypotheses with deliberately pessimistic priors for new NEO candidates. Preliminary orbit determination uses Gauss's method with differential correction, and Potentially Hazardous Asteroid (PHA) flags are gated on orbit quality code ≥ 2 and independently confirmed MOID ≤ 0.05 AU. As of version 0.90.27, all ten legacy pipeline modules are implemented, all three ML tiers and the ensemble stacker have passed quantitative calibration KPIs, and the WISE/DECam/TESS path is preserved as secondary evidence. The current primary path is ZTF DR24 archival historical replay. Phase 0 source verification is recorded under `docs/evidence/phase0/`: JPL SBDB, MPC get-obs, and IRSA ZTF image metadata are live-verified; Fink remains externally blocked at TLS; pretrained model use is deferred. ZTF DR24 production gates are defined in `docs/ZTF_DR24_PRODUCTION_GATES.md`; Gate Z1 bounded ingest and Gate Z2 time-aware known-object exclusion are code-complete pending operator live verification, while Gate Z3 is blocked on identifying and verifying a per-source ZTF DR24 detection source rather than on additional linker scaffolding. The older ALeRCE-backed ZTF source-detection provider remains real bounded-pilot evidence and is now assessed in `docs/evidence/phase0/alerce_source_detection_assessment.md`: official docs verify source-level detections, but do not establish DR24 static-archive or no-future-leakage suitability. Background automation provides top-level SQLite audit logs and fail-closed readiness controls. Injection-recovery validation includes the legacy ZTF-shaped synthetic baseline and a WISE/NEOWISE discovery-source positive control; synthetic results are controlled path evidence, not live-sky discovery evidence. The discovery-agent brief is authoritative for source verification, no future-catalog leakage, historical replay, pretrained-model audits, and auditable candidate-ranker design. The pipeline produces MPC-compatible 80-column, ADES PSV, and JSON observation reports and implements a non-negotiable three-step pathway — MPC submission, independent observatory confirmation, and conditional NASA PDCO notification — ensuring that no autonomous impact claim is ever issued. MPC submission remains disabled until a real candidate survives adversarial plus operator review and the applicable source/submission protocol is satisfied.
+Near-Earth Objects (NEOs) — small solar system bodies with perihelion distances $q < 1.3$ AU — represent both a premier target for planetary science and the only known category of natural disaster that is, in principle, preventable. Despite three decades of systematic survey effort, population completeness models estimate that the majority of NEOs larger than 140 meters remain undetected, sustaining the need for automated, high-throughput discovery pipelines capable of operating at the cadence and scale of modern wide-field photometric surveys. This work presents a research pipeline for the detection, multi-night linking, orbital characterization, and hazard ranking of NEO candidates derived from public training streams and unreviewed archival survey data. The system implements a seven-stage directed acyclic processing graph — fetch, preprocess, detect, link, classify, orbit, score — followed by a mandatory three-step alert protocol governing all external communications. Classification employs a three-tier ensemble architecture: a gradient-boosted tree classifier on tabular features (Tier 1), a convolutional neural network operating on 63×63-pixel ZTF image triplets following the architecture of Duev et al. (2019) (Tier 2), and a BERT-style Transformer trained on multi-night observation sequences following Lin et al. (2022) (Tier 3), with outputs combined by a logistic regression meta-learner and calibrated via Platt scaling or isotonic regression. Hazard assessment follows a Bayesian log-score model over five competing hypotheses with deliberately pessimistic priors for new NEO candidates. Preliminary orbit determination uses Gauss's method with differential correction, and Potentially Hazardous Asteroid (PHA) flags are gated on orbit quality code ≥ 2 and independently confirmed MOID ≤ 0.05 AU. As of version 0.90.60, all ten legacy pipeline modules are implemented, all three ML tiers and the ensemble stacker have passed quantitative calibration KPIs, and the WISE/DECam/TESS path is preserved as secondary evidence. The current primary path is ZTF DR24 archival historical replay. Phase 0 source verification is recorded under `docs/evidence/phase0/`: JPL SBDB, MPC get-obs, IRSA ZTF image metadata, and the UW ZTF public alert archive have been verified for their respective roles; Fink remains externally blocked at TLS; pretrained model use is deferred. ZTF DR24 production gates are defined in `docs/ZTF_DR24_PRODUCTION_GATES.md`; Gates Z1, Z2, Z4, Z5, Z6, and Z7 are closed, while Gate Z3 remains open because real archived ZTF detections have formed cross-night tracklets but have not yet produced a confirmed single-object positive-control recovery. Gate Z3 candidate-pair searching is paused to avoid a low-yield doom loop unless the operator explicitly restarts it. Background automation provides top-level SQLite audit logs and fail-closed readiness controls. Injection-recovery validation includes the legacy ZTF-shaped synthetic baseline and a WISE/NEOWISE discovery-source positive control; synthetic results are controlled path evidence, not live-sky discovery evidence. The discovery-agent brief and Astrometrics policy docs are authoritative for source verification, no future-catalog leakage, historical replay, pretrained-model audits, auditable candidate-ranker design, data selection, and storage discipline. The pipeline produces MPC-compatible 80-column, ADES PSV, and JSON observation reports and implements a non-negotiable three-step pathway — MPC submission, independent observatory confirmation, and conditional NASA PDCO notification — ensuring that no autonomous impact claim is ever issued. MPC submission remains disabled until a real candidate survives adversarial plus operator review and the applicable source/submission protocol is satisfied.
 
 **Keywords:** near-Earth objects, planetary defense, asteroid detection, automated pipeline, machine learning, real/bogus classification, orbit determination, Bayesian scoring, ZTF, Minor Planet Center
 
@@ -66,7 +70,7 @@ This repository implements a complete, research-grade automated detection and ra
 4. **Independent confirmation before alert** — the NASA PDCO notification pathway is gated on MPC submission *and* independent observatory confirmation, not on pipeline confidence alone.
 5. **No autonomous impact claims** — the system produces ranked candidates and hazard flags; it defers all authoritative impact probability statements to CNEOS Scout and Sentry.
 
-The pipeline follows the build order: `schemas` -> `fetch` -> `preprocess` -> `detect` -> `link` -> `classify` -> `orbit` -> `score` -> `alert` -> `calibration`. Each stage consumes the immutable, typed output of all prior stages. As of v0.90.27, the WISE/DECam/TESS path is a preserved secondary path with closed historical gates, while the primary development path is ZTF DR24 archival historical replay per `docs/MISSION.md` and `docs/neo_discovery_agent_brief.md`. Phase 0 source verification is recorded in `docs/evidence/phase0/`: JPL SBDB, MPC get-obs, and IRSA ZTF metadata are live-verified; Fink remains externally blocked at TLS; pretrained model use is deferred. ZTF DR24 gates are defined in `docs/ZTF_DR24_PRODUCTION_GATES.md`; Gates Z1 (bounded ingest) and Z2 (time-aware known-object exclusion) are code-complete pending operator live verification, and Gate Z3's current blocker is verified per-source ZTF DR24 detections to feed the existing linker. The older ALeRCE provider proves the code can consume public source-level ZTF detections, but `docs/evidence/phase0/alerce_source_detection_assessment.md` records why it remains only a candidate source for the current DR24 historical-replay protocol. External MPC submission remains fail-closed until a real candidate survives review and the applicable source/submission protocol is satisfied.
+The pipeline follows the build order: `schemas` -> `fetch` -> `preprocess` -> `detect` -> `link` -> `classify` -> `orbit` -> `score` -> `alert` -> `calibration`. Each stage consumes the immutable, typed output of all prior stages. As of v0.90.60, the WISE/DECam/TESS path is a preserved secondary path with closed historical gates, while the primary development path is ZTF DR24 archival historical replay per `docs/MISSION.md` and `docs/neo_discovery_agent_brief.md`. ZTF DR24 gates are defined in `docs/ZTF_DR24_PRODUCTION_GATES.md`; Gates Z1, Z2, Z4, Z5, Z6, and Z7 are closed, and Gate Z3 is paused after real archived ZTF data confirmed pipeline mechanics but failed to confirm a single-object positive-control recovery across four candidate pairs. The next production-safe work is evidence, data-selection, storage, ranking, and validation hardening unless the operator explicitly restarts Gate Z3 candidate-pair selection. External MPC submission remains fail-closed until a real candidate survives review and the applicable source/submission protocol is satisfied.
 
 ---
 
@@ -118,7 +122,7 @@ The pipeline implements a strict directed acyclic graph (DAG) of processing stag
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    NEO DETECTION PIPELINE  v0.90.27                  │
+│                    NEO DETECTION PIPELINE  v0.90.60                  │
 └─────────────────────────────────────────────────────────────────────┘
 
   External Data Sources
@@ -530,7 +534,7 @@ The diagram below shows how data and artifacts move between the repository's top
 2026-Near-Earth-Objects/
 │
 ├── src/                          # Core pipeline modules (Python 3.11+)
-│   ├── __init__.py               # Package version (0.90.27)
+│   ├── __init__.py               # Package version (0.90.60)
 │   ├── schemas.py                # All Pydantic data models (frozen=True)
 │   ├── fetch.py                  # ZTF/ATLAS/MPC/Horizons data retrieval
 │   ├── preprocess.py             # Difference image handling; Gaia astrometry
@@ -1223,11 +1227,11 @@ evidence. MPC submission remains disabled until a real candidate survives
 adversarial plus operator review and the applicable source/submission protocol
 is satisfied.
 
-### 15.1 Current State Snapshot (v0.90.27)
+### 15.1 Current State Snapshot (v0.90.60)
 
 | Area | Status | Notes |
 |---|---|---|
-| Core pipeline modules | **Complete** | All 10 modules: 3600+ tests passing, 100% coverage target, ruff + mypy clean |
+| Core pipeline modules | **Complete** | All 10 modules: offline tests pass on Python 3.14, 100% coverage target, ruff + mypy clean |
 | Synthetic validation | **Complete** | 100% detection/link/score on n=200 synthetic tracklets; 10 adversarial tests in CI |
 | Background automation CLI | **Complete** | `Skills/background.py` — offline scheduler, SQLite audit logs, signoff packets, readiness summaries |
 | Repository artifact hygiene | **Complete** | `git add .` is supported: raw `Logs/**` stay local, production models are filename-allowlisted, and durable evidence is promoted to `docs/evidence/` or `data/evidence/` |
@@ -1238,8 +1242,9 @@ is satisfied.
 | Console output compliance | **Complete** | All `Skills/run_pipeline.py` stage prints include `elapsed {M}m{S:02d}s`; ETA from measurable quantities (per-survey, per-tracklet). |
 | External reporting | **Disabled — fail closed** | No actual submission is made. MPC export/submission remains disabled until a real candidate survives adversarial plus operator review and the applicable source/submission protocol is satisfied. See `docs/MPC_SUBMISSION_POLICY.md`. |
 | WISE/DECam/TESS path | **Secondary historical evidence** | P1, P2 (`docs/SURVEY_NATIVE_CONFIDENCE_POLICY.md`), P3 (`docs/evidence/prod-loop/2026-07-02-gate-p3-no-submission-drill.md`), and P5 (`docs/OPERATOR_GO_NO_GO_RUNBOOK.md`) are closed for the now-secondary path. P4 is dormant because there is no WISE-sourced candidate to submit. |
-| ZTF DR24 production gates | **Primary path in progress** | Z0 is closed except the external Fink TLS blocker. Z1 bounded ingest and Z2 time-aware known-object exclusion are code-complete pending operator live verification. Z3 is the current blocker: identify and verify a per-source ZTF DR24 detection source that can feed the existing linker with real RA/Dec/time/photometry detections. |
-| macOS CNN load path | **Fixed, pending field confirmation** | v0.90.24 ported the missing matmul and conv2d warmups into shared `src/classify.py`. The sandbox verified no Linux regression; one operator Mac re-run is still needed to field-confirm the original deadlock is gone. |
+| ZTF DR24 production gates | **Primary path; all active gates except paused Z3 are closed** | Z1, Z2, Z4, Z5, Z6, and Z7 are closed with real evidence. Z3 pipeline mechanics are confirmed on real archived ZTF detections, but no tested candidate pair has produced a confirmed single-object recovery. The pair search is intentionally paused unless the operator explicitly restarts it. |
+| Astrometrics policy operationalization | **In progress** | `docs/astrometrics_coding_agents_master_guide.md`, `docs/astrometrics_data_selection_policy.md`, and `docs/astrometrics_external_and_cloud_storage_policy.md` now govern future data, storage, evaluation, and agent workflow decisions. Repository scaffolds live under `data_selection/` and `storage/`. |
+| macOS CNN load path | **Fixed** | v0.90.24-v0.90.29 resolved the shared Tier 1/3 file-read hang and macOS model-load warmup path; do not reopen this unless new measured evidence appears. |
 
 ### 15.2 Completed Milestones
 
@@ -1254,6 +1259,13 @@ is satisfied.
 | **M3e** | Unified offline background automation CLI | Complete |
 | **M3f–M3j** | SQLite logs, schema migration, MCP bootstrap, signoff packets | Complete (offline only; not live-search milestones) |
 | **Option B** | Pruned 68 fluff Skills scripts and 30 fluff docs; created `docs/PRODUCTION_READINESS.md` | Complete (2026-06-05) |
+| **Gate Z1** | Bounded ZTF DR24 archive ingest | Complete |
+| **Gate Z2** | Time-aware known-object exclusion | Complete |
+| **Gate Z4** | Auditable candidate ranking baseline | Complete |
+| **Gate Z5** | Retrospective validation evaluator | Complete |
+| **Gate Z6** | Fail-closed no-submission package drill | Complete |
+| **Gate Z7** | Operator runbook update | Complete |
+| **Astrometrics policy adoption** | Data-selection and storage controls anchored in repo-visible files | In progress |
 
 ### 15.3 Production Roadmap
 
@@ -1304,9 +1316,11 @@ is satisfied.
 | **P37** | Complete | Production capability definition | Production is now defined as demonstrated ability to find, score, review, reject, and package candidates with industry-standard confidence controls. Actual discovery is not required for readiness. See `docs/PRODUCTION_READINESS.md §Production Definition`. |
 | **P38** | Complete | ZTF DR24 primary-path pivot | `docs/neo_discovery_agent_brief.md` and `docs/MISSION.md` make ZTF DR24 archival historical replay the current primary path; WISE/DECam/TESS are secondary. |
 | **P39** | Complete | Phase 0 ZTF DR24 source verification | `docs/evidence/phase0/` live-verifies JPL SBDB, MPC get-obs, and IRSA ZTF image metadata; Fink remains an external TLS blocker. |
-| **P40** | Code complete, pending operator live verification | Gate Z1 bounded DR24 metadata ingest | `Skills/ztf_dr24_bounded_ingest.py` is offline-tested; needs one live operator run before Z1 closes. |
-| **P41** | Code complete, pending operator live verification | Gate Z2 time-aware known-object exclusion | `src/known_object_exclusion.py` is offline-tested; needs live `first_obs` confirmation from the already-verified JPL query. |
-| **P42** | In progress | Gate Z3 source-native candidate linking | Existing `src/link.py` satisfies the first linker requirement. Active blocker is a verified per-source ZTF DR24 detection source; legacy ALeRCE evidence is not enough by itself. |
+| **P40** | Complete | Gate Z1 bounded DR24 metadata ingest | Real source/archive work and evidence are recorded in `docs/ZTF_DR24_PRODUCTION_GATES.md`. |
+| **P41** | Complete | Gate Z2 time-aware known-object exclusion | Live JPL SBDB `first_obs` evidence closes the replay-time known-object exclusion mechanism. |
+| **P42** | Paused | Gate Z3 source-native candidate linking | Existing `src/link.py` and real UW ZTF detections form cross-night tracklets; no tested candidate pair has confirmed single-object recovery. Pair selection is paused unless the operator explicitly restarts it. |
+| **P43** | Complete | Gates Z4-Z7 | Ranking baseline, retrospective validation, no-submission package drill, and operator runbook are closed with real evidence. |
+| **P44** | In progress | Astrometrics policy operationalization | Data-selection, storage, and agent-workflow directives are committed; future acquisition/model/scoring work must use `data_selection/` and `storage/` controls. |
 
 ### 15.5 Known Limitations
 

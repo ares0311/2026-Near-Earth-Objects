@@ -27,6 +27,10 @@ Logs/**
 !Logs/reports/**
 background/config.local.json
 background/live_review_policy.local.json
+storage/.env
+storage/*.local.env
 coverage.json
 .DS_Store
+/FETCH_HEAD
+*conflicted copy*
 .claude/

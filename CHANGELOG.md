@@ -3,6 +3,31 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.60 — Operationalize Astrometrics policy docs (2026-07-08)
+
+### Added
+- A stable uppercase entrypoint for the Astrometrics detection-agent guide. The
+  data-selection and external/cloud-storage policies stay at their committed
+  lowercase paths because macOS's case-insensitive filesystem cannot keep
+  uppercase aliases with the same basename as separate files.
+- Initial `data_selection/` controls required before future data acquisition or
+  promotion work: role registry, training/live/acquisition policy stubs,
+  target/follow-up queue headers, batch-manifest directory, and a dated
+  decision-log entry adopting the policies without acquiring new data.
+- Initial `storage/` controls for external SSD/cache/cloud behavior without
+  committing a machine-specific path.
+
+### Changed
+- Synchronized README, production-readiness, AGENTS, and CLAUDE handoff state
+  to v0.90.60 and the current ZTF DR24 gate posture: all active gates except
+  paused Gate Z3 are closed, and Gate Z3 pair-chasing remains intentionally
+  stopped unless the operator explicitly restarts it.
+- Fixed `docs/ZTF_DR24_PRODUCTION_GATES.md`'s next-step paragraph so it no
+  longer contradicts the closed Gate Z2 row.
+- Removed a stray root-level `FETCH_HEAD` artifact and ignored it so the
+  operator's standard `git add .` cadence does not publish local Git debris.
+  Dropbox-style conflicted-copy artifacts are also ignored.
+
 ## v0.90.59 — Add Gate Z5 retrospective validation (2026-07-04)
 
 ### Added

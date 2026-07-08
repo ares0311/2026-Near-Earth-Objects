@@ -1,7 +1,7 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.90.57
-**Last updated**: 2026-07-04 (header/sync line only — the P1-P5 gate register
+**Current version**: v0.90.60
+**Last updated**: 2026-07-08 (header/sync line only — the P1-P5 gate register
 body below is unchanged historical evidence from 2026-07-02; current gate
 status for the active ZTF DR24 path lives in
 `docs/ZTF_DR24_PRODUCTION_GATES.md`, which is kept current every session)
@@ -21,11 +21,12 @@ source-verification evidence is now recorded in `docs/evidence/phase0/`:
 JPL SBDB, MPC get-obs, and IRSA ZTF image metadata are live-verified; Fink
 schema access is externally blocked at TLS handshake; pretrained model use is
 deferred. The ZTF DR24 production gates are now defined in
-`docs/ZTF_DR24_PRODUCTION_GATES.md`. Gate Z1 bounded ingest and Gate Z2
-time-aware known-object exclusion are code-complete pending operator live
-verification. Gate Z3 is the current implementation focus: verify a per-source
-ZTF DR24 detection source that can feed the existing linker with real
-RA/Dec/time/magnitude detections instead of only image/exposure metadata.
+`docs/ZTF_DR24_PRODUCTION_GATES.md`. Gates Z1, Z2, Z4, Z5, Z6, and Z7 are
+closed with real evidence. Gate Z3 is the only remaining open ZTF DR24
+production gate, and its candidate-pair search is intentionally paused after
+four low-yield attempts unless the operator explicitly restarts that path.
+Future work should favor evidence, data-selection, storage, ranking, and
+validation hardening over another candidate-pair run.
 
 **Phase 0 status (2026-07-02)**: 3 of 4 cited sources live-verified working
 via `Skills/verify_ztf_dr24_sources.py` — IRSA ZTF image metadata (200, no

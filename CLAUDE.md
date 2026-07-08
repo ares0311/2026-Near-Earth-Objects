@@ -24,8 +24,19 @@ It contains the facts a coding agent needs to work productively without re-readi
    workflow brief for candidate language, historical replay, source
    verification, no future-catalog leakage, pretrained-model audits, and
    auditable candidate-ranker design.
+7. Call `Read` on `docs/astrometrics_coding_agents_master_guide.md` — the
+   cross-project agent guide for production-first work, evaluation discipline,
+   candidate ledgers, and benchmark controls.
+8. Call `Read` on `docs/astrometrics_data_selection_policy.md` — the
+   cross-project policy for selecting, separating, logging, and promoting data
+   roles. Apply it before any acquisition, labeling, training, validation,
+   replay, or live-search work.
+9. Call `Read` on `docs/astrometrics_external_and_cloud_storage_policy.md` —
+   the cross-project storage policy for external SSDs, local caches, cloud
+   storage, and sync boundaries.
 
-These steps are non-negotiable. No planning or code changes may happen before all seven are complete.
+These steps are non-negotiable. No planning or code changes may happen before
+all ten are complete.
 
 ---
 
@@ -89,6 +100,14 @@ If the highest-priority T1 gap cannot be resolved because a human blocker is unr
   `docs/MPC_SUBMISSION_POLICY.md` for the full submission policy.
   Do NOT reinstate a "blocked until expert review" guardrail — MPC/NEOCP/Scout
   IS the expert review system. Do NOT frame this as citizen science.
+- **Astrometrics policies govern data and storage work**:
+  `docs/astrometrics_coding_agents_master_guide.md`,
+  `docs/astrometrics_data_selection_policy.md`, and
+  `docs/astrometrics_external_and_cloud_storage_policy.md` are mandatory
+  directives. Future data acquisition, model training, scoring, retrospective
+  validation, live search, and storage changes must use the repo-visible
+  controls under `data_selection/` and `storage/`; do not hand the operator a
+  guessed URL, schema, worker count, shard layout, or storage path.
 - **Repository artifact policy supports `git add .`**: The standard operator
   cadence may use `git add .`, so `.gitignore` must protect local/generated
   outputs by default. Treat `Logs/**` as local operational output and never
@@ -769,7 +788,17 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.57)
+## Current State (v0.90.60)
+
+**Latest sync (2026-07-08, v0.90.60)**: The Astrometrics coding-agent,
+data-selection, and external/cloud-storage policy docs are now mandatory
+session-start reads and have repo-local operational scaffolds under
+`data_selection/` and `storage/`. The active ZTF DR24 posture is unchanged:
+Z1, Z2, Z4, Z5, Z6, and Z7 are closed; Z3 is the only open gate and its
+candidate-pair search remains intentionally paused unless the operator
+explicitly restarts that path. The most productive non-blocked work is now
+policy-backed data selection, storage, ranking, validation, and evidence
+hardening, not another unapproved Z3 pair attempt.
 
 All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
 2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
@@ -789,20 +818,17 @@ preserved as secondary historical evidence, not the current primary discovery
 target. Per `docs/MISSION.md` and `docs/neo_discovery_agent_brief.md`, the
 active path is ZTF DR24 archival historical replay with no future-catalog
 leakage, auditable source verification, and fail-closed submission controls.
-ZTF live alert-stream discovery remains prohibited. Gate Z1 bounded ingest and
-Gate Z2 time-aware known-object exclusion are code-complete pending operator
-live verification. **Gate Z3's source-verification blocker is now CLOSED**
-(2026-07-02): the University of Washington's public ZTF alert archive is a
-real, unauthenticated, schema-verified per-detection source — see the v19
-handoff below. Gate Z3 as a whole remains open pending a bounded multi-night
-ingest tool and a real known-object positive control run through the
-existing linker. The older ALeRCE-backed source provider is real
-bounded-pilot evidence, but
-`docs/evidence/phase0/alerce_source_detection_assessment.md` records that it
-is not current DR24 production evidence until verified for the historical-
-replay protocol.
+ZTF live alert-stream discovery remains prohibited. Gates Z1, Z2, Z4, Z5,
+Z6, and Z7 are closed with real evidence. Gate Z3's source-verification
+blocker is closed — the University of Washington's public ZTF alert archive is
+a real, unauthenticated, schema-verified per-detection source — but Gate Z3 as
+a whole remains open because four candidate-pair attempts have not produced a
+confirmed single-object positive-control recovery. The older ALeRCE-backed
+source provider is real bounded-pilot evidence, but
+`docs/evidence/phase0/alerce_source_detection_assessment.md` records why it is
+not the current DR24 production path.
 
-### Handoff state as of 2026-07-05 v58 (CURRENT)
+### Handoff state as of 2026-07-05 v58 (previous current; superseded by v0.90.60 addendum)
 
 **Gate Z2 is CLOSED** — operator ran a live JPL SBDB query appending
 `first_obs` to the already-verified `sb-group=neo` query (exact base URL

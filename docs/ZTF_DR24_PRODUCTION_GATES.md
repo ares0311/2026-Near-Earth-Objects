@@ -52,13 +52,10 @@ Do not stop merely because no candidate has been found.
 
 ## Next Coding Step
 
-**Current as of 2026-07-04 (v0.90.59)**: Gates Z4 (auditable ranking
-baseline), Z6 (no-submission package drill), and Z7 (operator runbook
-update) are all **CLOSED** with real data. Gate Z5 (retrospective
-validation) is also **CLOSED** with a real result -- see all three rows
-above. The only remaining open ZTF DR24 gates are Z2 (pending one live
-JPL SBDB `first_obs` field verification) and Z3 (paused, see below). No
-further coding-agent scoping work remains on Z4/Z5/Z6/Z7. The Gate Z3
+**Current as of 2026-07-08 (v0.90.60)**: Gates Z1, Z2, Z4, Z5, Z6, and
+Z7 are all **CLOSED** with real data -- see the gate rows above. The only
+remaining open ZTF DR24 gate is Z3 (paused, see below). No further
+coding-agent scoping work remains on Z1/Z2/Z4/Z5/Z6/Z7. The Gate Z3
 candidate-pair search below (designation 72966,
 apparitions 1-4) **remains intentionally paused** pending explicit
 operator direction after being identified as a real doom-loop pattern;
