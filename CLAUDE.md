@@ -802,9 +802,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.64)
+## Current State (v0.90.65)
 
-**Latest sync (2026-07-09, v0.90.64)**: The Astrometrics coding-agent,
+**Latest sync (2026-07-09, v0.90.65)**: The Astrometrics coding-agent,
 data-selection, and external/cloud-storage policy docs are now mandatory
 session-start reads and have repo-local operational scaffolds under
 `data_selection/` and `storage/`. The active ZTF DR24 posture is unchanged:
@@ -823,7 +823,9 @@ now has initial grouped split/leakage controls in `src/grouped_splits.py` and
 report wiring remain open. A5 now has a fail-closed canonical regression eval
 engine in `src/canonical_eval.py` and `Skills/run_canonical_evals.py`; frozen
 production suites covering known-NEO recovery, false links, injection-recovery,
-and review-packet examples remain open.
+and review-packet examples remain open. A6 now has synthetic-harness recovery
+curves by magnitude, motion rate, observation count, and night count; image-level
+seeing/background/trail-length curves remain open.
 
 All 10 pipeline modules are complete. The offline suite passes on Python 3.14
 with the 100% coverage target in CI. All three ML tiers have trained weights:

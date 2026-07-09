@@ -25,6 +25,7 @@ from classify import classify, extract_features
 from detect import detect
 from link import link
 from orbit import fit_orbit
+from recovery_curves import recovery_curve_report
 from schemas import Observation
 from score import score
 
@@ -212,6 +213,7 @@ def run_injection_recovery(
     n_scored = 0
     hazard_flags: list[str] = []
     review_packets: list[dict] = []
+    injection_records: list[dict] = []
     start_i = 0
 
     if checkpoint_path.exists():
@@ -222,6 +224,7 @@ def run_injection_recovery(
         n_scored = state["n_scored"]
         hazard_flags = state["hazard_flags"]
         review_packets = state["review_packets"]
+        injection_records = state.get("injection_records", [])
         rng.bit_generator.state = state["rng_state"]
         print(
             f"[resume] loaded checkpoint: {start_i}/{n_inject} items already "
@@ -270,11 +273,14 @@ def run_injection_recovery(
             )
 
         detect_result = detect(obs, mpc_cross_match=False)
-        if detect_result.candidates:
+        detected = bool(detect_result.candidates)
+        if detected:
             n_detected += 1
 
         link_result = link(tuple(detect_result.candidates), min_nights=2, min_observations=3)
-        if link_result.tracklets:
+        linked = bool(link_result.tracklets)
+        scored_packet = False
+        if linked:
             n_linked += 1
 
             t = link_result.tracklets[0]
@@ -283,11 +289,25 @@ def run_injection_recovery(
             features_cls, posterior = classify(t, features)
             scored = score(t, features_cls, posterior, orbital)
             n_scored += 1
+            scored_packet = True
             hazard_flags.append(scored.hazard.hazard_flag)
             # Always accumulate internally (not gated on review_packet_out)
             # so a checkpoint saved on a run without --review-packet-out can
             # still be resumed correctly by a later run that requests it.
             review_packets.append(scored.model_dump(mode="json"))
+
+        injection_records.append({
+            "index": i,
+            "mission": mission,
+            "seed": seed * 1000 + i,
+            "mag": float(mag),
+            "motion_arcsec_per_hr": float(motion),
+            "n_observations": len(obs),
+            "n_nights": len({int(ob.jd) for ob in obs}),
+            "detected": detected,
+            "linked": linked,
+            "scored": scored_packet,
+        })
 
         _atomic_write_json(
             checkpoint_path,
@@ -301,6 +321,7 @@ def run_injection_recovery(
                 "n_scored": n_scored,
                 "hazard_flags": hazard_flags,
                 "review_packets": review_packets,
+                "injection_records": injection_records,
                 "rng_state": rng.bit_generator.state,
             },
         )
@@ -332,6 +353,8 @@ def run_injection_recovery(
             flag: hazard_flags.count(flag)
             for flag in {"pha_candidate", "close_approach", "nominal", "unknown"}
         },
+        "injection_records": injection_records,
+        "recovery_curves": recovery_curve_report(injection_records),
     }
 
 
@@ -354,6 +377,16 @@ def main() -> None:
         "consumable by Skills/adversarial_review.py and "
         "Skills/export_ades_report.py for a Gate P3 no-submission drill.",
     )
+    parser.add_argument(
+        "--curve-json",
+        metavar="PATH",
+        help="Write parameterized injection-recovery curves to this JSON path.",
+    )
+    parser.add_argument(
+        "--checkpoint-root",
+        metavar="PATH",
+        help="Override checkpoint root for tests or isolated operator runs.",
+    )
     args = parser.parse_args()
 
     print(
@@ -367,6 +400,7 @@ def main() -> None:
         seed=args.seed,
         mission=args.survey,
         review_packet_out=Path(args.review_packet_out) if args.review_packet_out else None,
+        checkpoint_root=Path(args.checkpoint_root) if args.checkpoint_root else None,
     )
 
     n = results["n_injected"]
@@ -388,6 +422,12 @@ def main() -> None:
         with out_path.open("w") as f:
             json.dump(results, f, indent=2)
         print(f"Results saved → {args.json}")
+
+    if args.curve_json:
+        curve_path = Path(args.curve_json)
+        curve_path.parent.mkdir(parents=True, exist_ok=True)
+        curve_path.write_text(json.dumps(results["recovery_curves"], indent=2))
+        print(f"Recovery curves saved → {args.curve_json}")
 
 
 if __name__ == "__main__":

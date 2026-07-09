@@ -3,6 +3,24 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.65 — Add injection-recovery curve reports (2026-07-09)
+
+### Added
+- `src/recovery_curves.py`: A6 curve aggregation for per-injection records by
+  magnitude, motion rate, observation count, and night count.
+- `Skills/injection_recovery.py --curve-json`: writes parameterized
+  injection-recovery curve reports alongside the existing scalar summary.
+- `Skills/injection_recovery.py --checkpoint-root`: supports isolated
+  checkpoint roots for tests and bounded operator runs.
+- Tests for recovery-curve binning, missing-dimension fail-closed behavior,
+  checkpointed per-injection records, resume preservation, and CLI curve output.
+
+### Changed
+- Version metadata advanced to v0.90.65.
+- README, production-readiness, AGENTS, and CLAUDE now record A6 as partially
+  implemented for synthetic harness parameters while image-level
+  seeing/background/trail-length curves remain open.
+
 ## v0.90.64 — Add canonical regression eval runner (2026-07-09)
 
 ### Added
