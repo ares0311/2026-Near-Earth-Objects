@@ -87,6 +87,47 @@ T2_UNIFORM: dict[str, float] = {lbl: 1.0 / len(_LABELS) for lbl in _LABELS}
 
 
 # ---------------------------------------------------------------------------
+# Promotion guard helpers
+# ---------------------------------------------------------------------------
+
+def _load_grouped_split_gate(report_path: Path | None) -> dict[str, Any]:
+    """Load the A4 grouped-split report used by production-candidate runs."""
+    if report_path is None:
+        return {
+            "path": None,
+            "passed": False,
+            "blockers": ["grouped_split_report_missing"],
+        }
+    if not report_path.exists():
+        return {
+            "path": str(report_path),
+            "passed": False,
+            "blockers": ["grouped_split_report_missing"],
+        }
+    try:
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        return {
+            "path": str(report_path),
+            "passed": False,
+            "blockers": ["grouped_split_report_invalid_json"],
+            "error": str(exc),
+        }
+    blockers: list[str] = []
+    if report.get("schema_version") != "grouped-split-leakage-v1":
+        blockers.append("grouped_split_report_schema_mismatch")
+    if report.get("passed") is not True:
+        blockers.append("grouped_split_report_not_passing")
+    return {
+        "path": str(report_path),
+        "passed": not blockers,
+        "blockers": blockers,
+        "hard_leakage": report.get("hard_leakage"),
+        "missing_required_splits": report.get("missing_required_splits"),
+    }
+
+
+# ---------------------------------------------------------------------------
 # Progress helper
 # ---------------------------------------------------------------------------
 
@@ -596,6 +637,23 @@ def main() -> None:
         "--dry-run", action="store_true",
         help="Check file availability and exit without training.",
     )
+    parser.add_argument(
+        "--grouped-split-report",
+        type=Path,
+        default=None,
+        help=(
+            "A4 grouped split leakage report from Skills/validate_grouped_splits.py. "
+            "Required when --production-candidate is set."
+        ),
+    )
+    parser.add_argument(
+        "--production-candidate",
+        action="store_true",
+        help=(
+            "Fail closed unless policy-grade promotion prerequisites are present. "
+            "Currently requires a passing grouped split report."
+        ),
+    )
     args = parser.parse_args()
 
     print("=" * 70, flush=True)
@@ -618,9 +676,23 @@ def main() -> None:
           f"{args.xgb_model}", flush=True)
     print(f"  T2 CNN      : {'FOUND' if args.cnn_model.exists() else 'MISSING'} "
           f"{args.cnn_model}", flush=True)
+    grouped_split_gate = _load_grouped_split_gate(args.grouped_split_report)
+    if args.grouped_split_report is not None or args.production_candidate:
+        print("\nGrouped split gate:", flush=True)
+        print(f"  report     : {grouped_split_gate['path']}", flush=True)
+        print(f"  passed     : {str(grouped_split_gate['passed']).lower()}", flush=True)
+        if grouped_split_gate["blockers"]:
+            print(f"  blockers   : {', '.join(grouped_split_gate['blockers'])}", flush=True)
 
     if not can_train:
         print("\nERROR: alerts JSON or T1 XGBoost model not found. Cannot train.", flush=True)
+        sys.exit(1)
+
+    if args.production_candidate and not grouped_split_gate["passed"]:
+        print(
+            "\nERROR: --production-candidate requires a passing grouped split report.",
+            flush=True,
+        )
         sys.exit(1)
 
     if args.dry_run:
@@ -722,9 +794,14 @@ def main() -> None:
         else:
             print(f"  {key:<30} {val}", flush=True)
 
-    promotion = kpis.get("all_kpis_pass", False)
+    promotion = bool(kpis.get("all_kpis_pass", False)) and (
+        not args.production_candidate or grouped_split_gate["passed"]
+    )
     print(f"\n{'=' * 50}", flush=True)
     print(f"  promotion_gate_passed = {str(promotion).lower()}", flush=True)
+    if args.production_candidate:
+        print(f"  grouped_split_gate    = {str(grouped_split_gate['passed']).lower()}",
+              flush=True)
     print(f"  total elapsed: {time.time() - t0:.0f}s", flush=True)
     print(f"{'=' * 50}\n", flush=True)
 

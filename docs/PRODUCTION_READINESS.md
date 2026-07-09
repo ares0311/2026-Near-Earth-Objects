@@ -1,6 +1,6 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.90.67
+**Current version**: v0.90.68
 **Last updated**: 2026-07-09 (header/sync line only — the P1-P5 gate register
 body below is unchanged historical evidence from 2026-07-02; current gate
 status for the active ZTF DR24 path lives in
@@ -64,7 +64,8 @@ launching a materially larger production batch, the project must add:
   not CNN production promotion.
 - Grouped NEO splits by night, sky region, survey/instrument, and object ID;
   random splits are diagnostic only. Initial grouped leakage controls landed
-  in v0.90.63; model-builder adoption and promotion-report wiring remain open.
+  in v0.90.63; stacker production-candidate adoption landed in v0.90.68;
+  broader model-builder adoption and promotion-report wiring remain open.
 - A5 canonical regression eval runner landed in v0.90.64; frozen
   policy-grade suites covering known-NEO recovery, false links,
   injection-recovery, and review-packet examples remain open.

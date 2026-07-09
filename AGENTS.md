@@ -128,6 +128,17 @@ It contains the facts a coding agent needs to work productively without re-readi
   final failure). Scope the auto-push narrowly to that one data file only,
   never source code. Provide `--sync` to backfill from checkpoints
   predating this behavior. See CLAUDE.md's Standing Rules for detail.
+- **MCP servers, when configured/available**: prefer these over guessing or
+  ad hoc web scraping — GitHub MCP for issues, PRs, remote branches, repo
+  metadata, PR review notes, branch health, and PR links; Context7 MCP for
+  current library/framework/API documentation instead of relying on
+  training-data recall; arXiv MCP for preprint lookup and research context;
+  NASA ADS MCP for astronomy/astrophysics literature, bibcodes, citations,
+  references, metrics, and BibTeX export. This project also runs repo-scoped
+  MCP tools (`neo_project_files`, `neo_git_read`, `neo_guard`, configured in
+  `.mcp.json`) for bounded file reads, read-only git inspection, and fixed
+  offline validation commands — prefer these over raw shell equivalents for
+  read-only repo inspection.
 
 ---
 
@@ -623,9 +634,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.67)
+## Current State (v0.90.68)
 
-**Latest sync (2026-07-09, v0.90.67)**: The Astrometrics coding-agent,
+**Latest sync (2026-07-09, v0.90.68)**: The Astrometrics coding-agent,
 data-selection, and external/cloud-storage policy docs are now mandatory
 directives. Repo-local controls have started under `data_selection/` and
 `storage/`. The active ZTF DR24 posture is unchanged from the latest gate
@@ -644,8 +655,10 @@ step is complete:
 `benchmarks/benchmark_cnn_v1/` wraps `models/tier2_cnn.pt` with locked
 preprocessing, config, score/train entrypoints, tests, and a model card. A4
 now has initial grouped split/leakage controls in `src/grouped_splits.py` and
-`Skills/validate_grouped_splits.py`; model-builder adoption and promotion
-report wiring remain open. A5 now has a fail-closed canonical regression eval
+`Skills/validate_grouped_splits.py`; `Skills/train_ensemble_stacker.py` now
+requires a passing grouped split report when `--production-candidate` is set.
+Broader model-builder adoption and promotion report wiring remain open. A5 now
+has a fail-closed canonical regression eval
 engine in `src/canonical_eval.py` and `Skills/run_canonical_evals.py`; frozen
 production suites covering known-NEO recovery, false links, injection-recovery,
 and review-packet examples remain open. The CNN is still not
@@ -747,7 +760,7 @@ See `docs/PRODUCTION_READINESS.md` for the full gap register.
 
 ### Handoff notes (2026-07-02) — v0.90.27 (historical; superseded)
 
-The v0.90.67 addendum above is the current state. This section is preserved
+The v0.90.68 addendum above is the current state. This section is preserved
 only as dated history for the ZTF DR24 pivot.
 
 **Current merged state through PR #163**:
