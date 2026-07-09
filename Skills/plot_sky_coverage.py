@@ -22,6 +22,10 @@ def plot_sky_coverage(
 ) -> None:
     """Plot RA/Dec positions of tracklet observations colour-coded by hazard flag."""
     try:
+        if out:
+            import matplotlib
+
+            matplotlib.use("Agg")
         import matplotlib.pyplot as plt
     except ImportError as exc:
         raise ImportError("matplotlib not installed. Run: pip install matplotlib") from exc
@@ -61,7 +65,8 @@ def plot_sky_coverage(
     ax.set_xlim(0, 360)
     ax.set_ylim(-90, 90)
     ax.invert_xaxis()
-    ax.legend(loc="upper right")
+    if by_flag:
+        ax.legend(loc="upper right")
     ax.grid(True, alpha=0.3)
 
     if out:
