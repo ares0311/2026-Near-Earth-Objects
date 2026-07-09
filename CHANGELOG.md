@@ -3,6 +3,25 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.63 — Add grouped split leakage controls (2026-07-09)
+
+### Added
+- `src/grouped_splits.py`: A4 grouped-split normalizer, deterministic grouped
+  assignment helper, and leakage report for object identity, observing night,
+  sky cell, and survey/instrument source context.
+- `Skills/validate_grouped_splits.py`: CLI validator that emits JSON and fails
+  closed on hard grouped leakage.
+- `data_selection/grouped_splits.README.md`: operator/agent usage notes for
+  policy-grade grouped split CSVs.
+- Tests for group-key derivation, pass/fail leakage reports, CLI validation,
+  and grouped assignment that keeps objects together.
+
+### Changed
+- Version metadata advanced to v0.90.63.
+- README, production-readiness, AGENTS, and CLAUDE now record A4 as partially
+  complete: grouped leakage controls exist, while pipeline/model-builder
+  adoption and promotion reports remain open.
+
 ## v0.90.62 — Freeze Tier 2 CNN benchmark (2026-07-09)
 
 ### Added

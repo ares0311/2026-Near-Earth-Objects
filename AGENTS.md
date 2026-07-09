@@ -623,9 +623,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.62)
+## Current State (v0.90.63)
 
-**Latest sync (2026-07-09, v0.90.62)**: The Astrometrics coding-agent,
+**Latest sync (2026-07-09, v0.90.63)**: The Astrometrics coding-agent,
 data-selection, and external/cloud-storage policy docs are now mandatory
 directives. Repo-local controls have started under `data_selection/` and
 `storage/`. The active ZTF DR24 posture is unchanged from the latest gate
@@ -639,8 +639,11 @@ validator; A2 now has an initial SQLite candidate ledger schema/CLI. Both
 remain partially open until production runs cite manifest IDs and ingest
 candidate packets automatically. A3's freeze step is complete:
 `benchmarks/benchmark_cnn_v1/` wraps `models/tier2_cnn.pt` with locked
-preprocessing, config, score/train entrypoints, tests, and a model card. The
-CNN is still not production-promoted under the new policy; A4-A7 remain open.
+preprocessing, config, score/train entrypoints, tests, and a model card. A4
+now has initial grouped split/leakage controls in `src/grouped_splits.py` and
+`Skills/validate_grouped_splits.py`; model-builder adoption and promotion
+report wiring remain open. The CNN is still not production-promoted under the
+new policy; A5-A7 remain open.
 
 **This section was last synced 2026-07-02 through v0.90.27; the detail below
 is historical and accurate as of that date but does not reflect
@@ -733,7 +736,7 @@ See `docs/PRODUCTION_READINESS.md` for the full gap register.
 
 ### Handoff notes (2026-07-02) — v0.90.27 (historical; superseded)
 
-The v0.90.62 addendum above is the current state. This section is preserved
+The v0.90.63 addendum above is the current state. This section is preserved
 only as dated history for the ZTF DR24 pivot.
 
 **Current merged state through PR #163**:

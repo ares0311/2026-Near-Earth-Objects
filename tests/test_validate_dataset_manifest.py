@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -63,6 +64,7 @@ def test_cli_validates_manifest_file(tmp_path: Path) -> None:
         [
             "uv",
             "run",
+            "--no-sync",
             "--python",
             "3.14",
             "python",
@@ -71,6 +73,7 @@ def test_cli_validates_manifest_file(tmp_path: Path) -> None:
         ],
         check=True,
         capture_output=True,
+        env={**os.environ, "UV_CACHE_DIR": ".uv-cache"},
         text=True,
     )
 
