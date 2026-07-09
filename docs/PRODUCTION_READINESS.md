@@ -1,6 +1,6 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.90.65
+**Current version**: v0.90.66
 **Last updated**: 2026-07-09 (header/sync line only — the P1-P5 gate register
 body below is unchanged historical evidence from 2026-07-02; current gate
 status for the active ZTF DR24 path lives in
@@ -71,6 +71,11 @@ launching a materially larger production batch, the project must add:
 - A6 synthetic-harness recovery curves landed in v0.90.65, covering
   magnitude, motion rate, observation count, and night count. Image-level
   seeing/background/trail-length curves remain open.
+- A7 fail-closed model promotion reports landed in v0.90.66. The report builder
+  cites manifests, grouped split reports, canonical evals, recovery curves,
+  calibration reports, false-discovery estimates, pretrained audits, benchmark
+  model cards, and operator signoff. Actual production promotion still requires
+  real model-specific evidence packets that pass every cited gate.
 - Canonical sample-level regression evals covering known NEO detections, false
   link examples, injected moving-source controls, and review-packet examples.
 - Injection-recovery curves over magnitude, velocity, trail length,

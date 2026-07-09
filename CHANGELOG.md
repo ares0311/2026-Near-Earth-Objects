@@ -3,6 +3,24 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.66 — Add model promotion reports (2026-07-09)
+
+### Added
+- `src/promotion_report.py`: A7 fail-closed model promotion report builder
+  that cites dataset manifests, grouped splits, canonical evals,
+  injection-recovery curves, calibration evidence, false-discovery estimates,
+  pretrained audit notes, benchmark model cards, and operator signoff.
+- `Skills/build_promotion_report.py`: CLI wrapper that writes the JSON report
+  and exits nonzero whenever promotion remains blocked.
+- Tests for passing reports, missing evidence, invalid manifests, schema
+  mismatches, false-discovery overflows, absent signoff, and CLI failure mode.
+
+### Changed
+- Version metadata advanced to v0.90.66.
+- README, production-readiness, AGENTS, and CLAUDE now record A7 as scaffolded
+  while preserving the requirement for real model-specific evidence before any
+  production promotion claim.
+
 ## v0.90.65 — Add injection-recovery curve reports (2026-07-09)
 
 ### Added
