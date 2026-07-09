@@ -47,3 +47,9 @@ Current repository state: `benchmarks/benchmark_cnn_v1/` freezes
 `models/tier2_cnn.pt` as the benchmark artifact. This closes the freeze step
 only; it does not close grouped splits, leakage checks, injection-recovery
 curves, or CNN production promotion.
+
+Grouped split state: `src/grouped_splits.py` and
+`Skills/validate_grouped_splits.py` provide the initial A4 leakage controls for
+object identity, observing night, sky cell, and survey/instrument context.
+Future training and frozen-eval reports must cite the emitted grouped-split
+JSON report before making any promotion claim.

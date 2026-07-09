@@ -1,6 +1,6 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.90.62
+**Current version**: v0.90.63
 **Last updated**: 2026-07-09 (header/sync line only — the P1-P5 gate register
 body below is unchanged historical evidence from 2026-07-02; current gate
 status for the active ZTF DR24 path lives in
@@ -63,7 +63,8 @@ launching a materially larger production batch, the project must add:
   config, and model card landed in v0.90.62; this closes the freeze step only,
   not CNN production promotion.
 - Grouped NEO splits by night, sky region, survey/instrument, and object ID;
-  random splits are diagnostic only.
+  random splits are diagnostic only. Initial grouped leakage controls landed
+  in v0.90.63; model-builder adoption and promotion-report wiring remain open.
 - Canonical sample-level regression evals covering known NEO detections, false
   link examples, injected moving-source controls, and review-packet examples.
 - Injection-recovery curves over magnitude, velocity, trail length,
@@ -71,8 +72,8 @@ launching a materially larger production batch, the project must add:
 
 The current Tier 2 CNN is now frozen as `benchmark_cnn_v1` and remains
 available as a feature source, but it is not production-promoted under the new
-policy until grouped splits, leakage checks, canonical evals,
-injection-recovery curves, and the promotion report close.
+policy until grouped split reports, canonical evals, injection-recovery curves,
+and the promotion report close.
 
 ---
 

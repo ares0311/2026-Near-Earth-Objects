@@ -802,9 +802,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.62)
+## Current State (v0.90.63)
 
-**Latest sync (2026-07-09, v0.90.62)**: The Astrometrics coding-agent,
+**Latest sync (2026-07-09, v0.90.63)**: The Astrometrics coding-agent,
 data-selection, and external/cloud-storage policy docs are now mandatory
 session-start reads and have repo-local operational scaffolds under
 `data_selection/` and `storage/`. The active ZTF DR24 posture is unchanged:
@@ -817,7 +817,10 @@ manifest schema and validator; A2 now has an initial SQLite candidate ledger
 schema/CLI. Both remain partially open until production runs cite manifest IDs
 and ingest candidate packets automatically. A3's freeze step is complete:
 `benchmarks/benchmark_cnn_v1/` wraps `models/tier2_cnn.pt` with locked
-preprocessing, config, score/train entrypoints, tests, and a model card.
+preprocessing, config, score/train entrypoints, tests, and a model card. A4
+now has initial grouped split/leakage controls in `src/grouped_splits.py` and
+`Skills/validate_grouped_splits.py`; model-builder adoption and promotion
+report wiring remain open.
 
 All 10 pipeline modules are complete. The offline suite passes on Python 3.14
 with the 100% coverage target in CI. All three ML tiers have trained weights:
@@ -825,9 +828,9 @@ Tier 1 XGBoost (val_acc=99.95%), Tier 2 CNN (val_acc=91.3%), and Tier 3
 Transformer (val_macro_f1=0.9400, best epoch 17/30). Under the 2026-07-08
 Astrometrics roadmap, trained weights are not the same thing as promotion:
 model promotion now requires the remaining A-gates as applicable. The CNN is
-now frozen as `benchmark_cnn_v1`, but grouped splits, leakage checks,
-canonical evals, injection-recovery curves, and a promotion report are still
-required before any CNN-derived production-promotion claim.
+now frozen as `benchmark_cnn_v1`, but grouped split reports, canonical evals,
+injection-recovery curves, and a promotion report are still required before
+any CNN-derived production-promotion claim.
 **T1-A CLOSED. T1-B CLOSED. T1-C CLOSED. T1-D CLOSED.**
 Ensemble stacker KPIs passed 2026-06-14 (AUC=0.9809, Brier=0.0211, ECE=0.0000).
 T2-C CLOSED 2026-06-21 (operator sign-off by Jerome W. Lindsey III).

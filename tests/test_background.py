@@ -4080,6 +4080,16 @@ class TestKeychainSecretPresent:
         result = background._keychain_secret_present("neo-detection:TEST")
         assert result is False
 
+    def test_subprocess_exception_returns_false(self, monkeypatch):
+        def raise_os_error(*args, **kwargs):
+            raise OSError("mocked missing security command")
+
+        monkeypatch.setattr(background.subprocess, "run", raise_os_error)
+
+        result = background._keychain_secret_present("neo-detection:TEST")
+
+        assert result is False
+
 
 class TestLiveCredentialInventoryNoCredentialProvider:
     """Covers lines 3181-3196: empty credential_rows branch."""
