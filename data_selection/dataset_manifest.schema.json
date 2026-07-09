@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ares0311/2026-Near-Earth-Objects/data_selection/dataset_manifest.schema.json",
+  "title": "Astrometrics dataset manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "dataset_id",
+    "project",
+    "role",
+    "source_name",
+    "source_url",
+    "instrument",
+    "target_ids",
+    "time_range",
+    "cadence",
+    "band_or_frequency",
+    "data_product_type",
+    "downloaded_at",
+    "local_path",
+    "checksum",
+    "license",
+    "label_source",
+    "label_confidence",
+    "preprocessing_version",
+    "known_caveats"
+  ],
+  "properties": {
+    "dataset_id": {
+      "type": "string",
+      "minLength": 3,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "project": {
+      "const": "2026 Near Earth Objects"
+    },
+    "role": {
+      "enum": [
+        "training",
+        "validation",
+        "calibration",
+        "frozen_eval",
+        "live_search",
+        "followup_live_search",
+        "positive_control",
+        "negative_control",
+        "submission_package_evidence"
+      ]
+    },
+    "source_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_url": {
+      "type": "string",
+      "minLength": 1
+    },
+    "instrument": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "time_range": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end", "scale"],
+      "properties": {
+        "start": {
+          "type": "string",
+          "minLength": 1
+        },
+        "end": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scale": {
+          "enum": ["JD", "MJD", "UTC", "TAI", "TDB"]
+        }
+      }
+    },
+    "cadence": {
+      "type": "string",
+      "minLength": 1
+    },
+    "band_or_frequency": {
+      "type": "string",
+      "minLength": 1
+    },
+    "data_product_type": {
+      "type": "string",
+      "minLength": 1
+    },
+    "downloaded_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "local_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "checksum": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "value"],
+      "properties": {
+        "algorithm": {
+          "enum": ["sha256", "sha512", "none"]
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "license": {
+      "type": "string",
+      "minLength": 1
+    },
+    "label_source": {
+      "type": "string",
+      "minLength": 1
+    },
+    "label_confidence": {
+      "enum": ["confirmed", "catalog", "operator_reviewed", "synthetic", "unlabeled", "mixed"]
+    },
+    "preprocessing_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "known_caveats": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}
