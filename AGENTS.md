@@ -623,9 +623,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.64)
+## Current State (v0.90.65)
 
-**Latest sync (2026-07-09, v0.90.64)**: The Astrometrics coding-agent,
+**Latest sync (2026-07-09, v0.90.65)**: The Astrometrics coding-agent,
 data-selection, and external/cloud-storage policy docs are now mandatory
 directives. Repo-local controls have started under `data_selection/` and
 `storage/`. The active ZTF DR24 posture is unchanged from the latest gate
@@ -646,7 +646,9 @@ report wiring remain open. A5 now has a fail-closed canonical regression eval
 engine in `src/canonical_eval.py` and `Skills/run_canonical_evals.py`; frozen
 production suites covering known-NEO recovery, false links, injection-recovery,
 and review-packet examples remain open. The CNN is still not
-production-promoted under the new policy; A6-A7 remain open.
+production-promoted under the new policy. A6 now has synthetic-harness recovery
+curves by magnitude, motion rate, observation count, and night count; image-level
+seeing/background/trail-length curves remain open. A7 remains open.
 
 **This section was last synced 2026-07-02 through v0.90.27; the detail below
 is historical and accurate as of that date but does not reflect
@@ -739,7 +741,7 @@ See `docs/PRODUCTION_READINESS.md` for the full gap register.
 
 ### Handoff notes (2026-07-02) — v0.90.27 (historical; superseded)
 
-The v0.90.64 addendum above is the current state. This section is preserved
+The v0.90.65 addendum above is the current state. This section is preserved
 only as dated history for the ZTF DR24 pivot.
 
 **Current merged state through PR #163**:

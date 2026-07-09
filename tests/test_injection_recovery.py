@@ -5,6 +5,7 @@ must survive a process kill without losing work)."""
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -44,6 +45,10 @@ class TestCheckpointResume:
         assert ckpt.exists()
         state = json.loads(ckpt.read_text())
         assert state["completed"] == 3
+        assert len(state["injection_records"]) == 3
+        assert {"mag", "motion_arcsec_per_hr", "detected", "linked", "scored"} <= set(
+            state["injection_records"][0]
+        )
 
     def test_completed_checkpoint_short_circuits(self, tmp_path, capsys):
         ir.run_injection_recovery(n_inject=3, seed=1, mission="ZTF", checkpoint_root=tmp_path)
@@ -95,6 +100,8 @@ class TestCheckpointResume:
         ):
             assert full_result[key] == resumed_result[key], f"mismatch on {key}"
         assert partial_result["n_injected"] == 3
+        assert len(resumed_result["injection_records"]) == 6
+        assert resumed_result["recovery_curves"]["schema_version"] == "injection-recovery-curves-v1"
 
     def test_review_packets_survive_resume(self, tmp_path):
         """review_packets accumulated before a resume must be preserved even
@@ -123,3 +130,34 @@ class TestCheckpointResume:
         packets = json.loads(out_path.read_text())
         assert len(packets) == result["n_scored"]
         assert partial["n_injected"] == 2
+
+    def test_curve_json_written_by_cli(self, tmp_path):
+        out_path = tmp_path / "curves.json"
+        import subprocess
+
+        result = subprocess.run(
+            [
+                "uv",
+                "run",
+                "--no-sync",
+                "--python",
+                "3.14",
+                "python",
+                "Skills/injection_recovery.py",
+                "--n-inject",
+                "2",
+                "--seed",
+                "5",
+                "--curve-json",
+                str(out_path),
+                "--checkpoint-root",
+                str(tmp_path / "checkpoints"),
+            ],
+            capture_output=True,
+            env={**os.environ, "UV_CACHE_DIR": ".uv-cache", "PYTHONPATH": "src"},
+            text=True,
+            check=True,
+        )
+
+        assert "Recovery curves saved" in result.stdout
+        assert json.loads(out_path.read_text())["schema_version"] == "injection-recovery-curves-v1"
