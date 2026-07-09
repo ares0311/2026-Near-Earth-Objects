@@ -802,9 +802,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.60)
+## Current State (v0.90.61)
 
-**Latest sync (2026-07-08, v0.90.60)**: The Astrometrics coding-agent,
+**Latest sync (2026-07-09, v0.90.61)**: The Astrometrics coding-agent,
 data-selection, and external/cloud-storage policy docs are now mandatory
 session-start reads and have repo-local operational scaffolds under
 `data_selection/` and `storage/`. The active ZTF DR24 posture is unchanged:
@@ -812,7 +812,10 @@ Z1, Z2, Z4, Z5, Z6, and Z7 are closed; Z3 is the only open gate and its
 candidate-pair search remains intentionally paused unless the operator
 explicitly restarts that path. The most productive non-blocked work is now
 policy-backed data selection, storage, ranking, validation, and evidence
-hardening, not another unapproved Z3 pair attempt.
+hardening, not another unapproved Z3 pair attempt. A1 now has a committed
+manifest schema and validator; A2 now has an initial SQLite candidate ledger
+schema/CLI. Both remain partially open until production runs cite manifest IDs
+and ingest candidate packets automatically.
 
 All 10 pipeline modules are complete. The offline suite passes on Python 3.14
 with the 100% coverage target in CI. All three ML tiers have trained weights:

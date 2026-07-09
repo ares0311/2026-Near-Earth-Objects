@@ -25,3 +25,11 @@ Manifest validation:
 - The required schema is `data_selection/dataset_manifest.schema.json`.
 - Validate one or more manifests with
   `uv run --python 3.14 python Skills/validate_dataset_manifest.py <manifest.json>`.
+
+Candidate ledger:
+
+- A local SQLite ledger interface lives in `src/candidate_ledger.py`, with a
+  CLI wrapper at `Skills/candidate_ledger.py`.
+- Ledger usage and required fields are documented in
+  `data_selection/candidate_ledger.README.md`.
+- The ledger database is local operational state and should stay untracked.

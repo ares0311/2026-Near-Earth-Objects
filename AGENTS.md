@@ -623,9 +623,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.60)
+## Current State (v0.90.61)
 
-**Latest sync (2026-07-08, v0.90.60)**: The Astrometrics coding-agent,
+**Latest sync (2026-07-09, v0.90.61)**: The Astrometrics coding-agent,
 data-selection, and external/cloud-storage policy docs are now mandatory
 directives. Repo-local controls have started under `data_selection/` and
 `storage/`. The active ZTF DR24 posture is unchanged from the latest gate
@@ -634,7 +634,10 @@ its candidate-pair search remains intentionally paused unless the operator
 explicitly restarts that path. The highest-priority non-blocked roadmap is now
 A1-A7: dataset manifests, candidate ledger, frozen CNN benchmark, grouped
 splits/leakage checks, canonical regression evals, injection-recovery curves,
-and calibration/promotion reports. The CNN is trained but not
+and calibration/promotion reports. A1 now has a committed manifest schema and
+validator; A2 now has an initial SQLite candidate ledger schema/CLI. Both
+remain partially open until production runs cite manifest IDs and ingest
+candidate packets automatically. The CNN is trained but not
 production-promoted under the new policy.
 
 **This section was last synced 2026-07-02 through v0.90.27; the detail below
@@ -728,7 +731,7 @@ See `docs/PRODUCTION_READINESS.md` for the full gap register.
 
 ### Handoff notes (2026-07-02) — v0.90.27 (historical; superseded)
 
-The v0.90.60 addendum above is the current state. This section is preserved
+The v0.90.61 addendum above is the current state. This section is preserved
 only as dated history for the ZTF DR24 pivot.
 
 **Current merged state through PR #163**:

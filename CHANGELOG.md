@@ -3,6 +3,30 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.61 — Add candidate ledger controls (2026-07-09)
+
+### Added
+- `src/candidate_ledger.py`: SQLite-backed candidate ledger for A2
+  Astrometrics provenance. It records source dataset ID, target ID, time
+  window, raw URI, preprocessing version, generator params, model versions,
+  model/calibrated scores, score quantiles, injection context, nearest known
+  artifacts, review state, regeneration command, timestamps, and the full raw
+  candidate packet JSON.
+- `Skills/candidate_ledger.py`: `init`, `ingest`, and `list` CLI wrapper for
+  operator and agent workflows.
+- `data_selection/candidate_ledger.README.md`: policy-compliant usage notes
+  and required ledger fields.
+- Tests for schema initialization, full `ScoredNEO` packet extraction,
+  compact pipeline-summary ingestion, upsert behavior, and CLI flow.
+
+### Changed
+- Version metadata advanced to v0.90.61.
+- README and production-readiness roadmap now mark A1/A2 as partially complete:
+  schema/validator and SQLite ledger controls exist, while automatic pipeline
+  manifest citation and ledger ingestion remain open.
+- `.gitignore` now keeps local `data_selection/*.sqlite` ledgers out of
+  `git add .`.
+
 ## v0.90.60 — Operationalize Astrometrics policy docs (2026-07-08)
 
 ### Added

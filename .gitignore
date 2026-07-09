@@ -36,4 +36,6 @@ coverage.json
 .DS_Store
 /FETCH_HEAD
 *conflicted copy*
+data_selection/*.sqlite
+data_selection/*.sqlite-*
 .claude/
