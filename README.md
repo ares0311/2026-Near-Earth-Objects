@@ -1235,7 +1235,7 @@ is satisfied.
 | Synthetic validation | **Complete** | 100% detection/link/score on n=200 synthetic tracklets; 10 adversarial tests in CI |
 | Background automation CLI | **Complete** | `Skills/background.py` — offline scheduler, SQLite audit logs, signoff packets, readiness summaries |
 | Repository artifact hygiene | **Complete** | `git add .` is supported: raw `Logs/**` stay local, production models are filename-allowlisted, and durable evidence is promoted to `docs/evidence/` or `data/evidence/` |
-| ML model weights | **Complete** | T1-A closed. Tier 1 XGBoost (99.95%), Tier 2 CNN (91.3%), Tier 3 Transformer (F1=0.9400), ensemble stacker (AUC=0.9809) trained; all calibration KPIs passed. |
+| ML model weights | **Trained; promotion controls being updated** | T1-A remains historically closed. Tier 1 XGBoost, Tier 2 CNN, Tier 3 Transformer, and ensemble stacker are trained, but the new Astrometrics guide adds promotion controls before any model is treated as production-promoted: manifest IDs, grouped splits, frozen evals, injection-recovery curves, and a frozen `benchmark_cnn_v1` for the CNN. |
 | Real survey credentials and live policy | **CONFIGURED + SIGNED** | T1-B closed. Credentials in macOS Keychain; live connection tests passed; bounded live dry-run policy signed; execution remains credential/provider gated and non-submitting. |
 | Real data processed | **T1-C CLOSED** | ATLAS known-object recovery: 5/5 prequalified objects (100%); operator review by Jerome W. Lindsey III, no blocking findings (2026-06-20). Evidence: `docs/evidence/t1c/`. |
 | Production calibration | **Complete** | T1-D closed. Quantitative Brier, ECE, log-loss, ROC AUC, CV ECE, and bootstrap CI gates passed (2026-06-14). |
@@ -1243,7 +1243,7 @@ is satisfied.
 | External reporting | **Disabled — fail closed** | No actual submission is made. MPC export/submission remains disabled until a real candidate survives adversarial plus operator review and the applicable source/submission protocol is satisfied. See `docs/MPC_SUBMISSION_POLICY.md`. |
 | WISE/DECam/TESS path | **Secondary historical evidence** | P1, P2 (`docs/SURVEY_NATIVE_CONFIDENCE_POLICY.md`), P3 (`docs/evidence/prod-loop/2026-07-02-gate-p3-no-submission-drill.md`), and P5 (`docs/OPERATOR_GO_NO_GO_RUNBOOK.md`) are closed for the now-secondary path. P4 is dormant because there is no WISE-sourced candidate to submit. |
 | ZTF DR24 production gates | **Primary path; all active gates except paused Z3 are closed** | Z1, Z2, Z4, Z5, Z6, and Z7 are closed with real evidence. Z3 pipeline mechanics are confirmed on real archived ZTF detections, but no tested candidate pair has produced a confirmed single-object recovery. The pair search is intentionally paused unless the operator explicitly restarts it. |
-| Astrometrics policy operationalization | **In progress** | `docs/astrometrics_coding_agents_master_guide.md`, `docs/astrometrics_data_selection_policy.md`, and `docs/astrometrics_external_and_cloud_storage_policy.md` now govern future data, storage, evaluation, and agent workflow decisions. Repository scaffolds live under `data_selection/` and `storage/`. |
+| Astrometrics policy operationalization | **Primary roadmap track** | `docs/astrometrics_coding_agents_master_guide.md`, `docs/astrometrics_data_selection_policy.md`, and `docs/astrometrics_external_and_cloud_storage_policy.md` now govern future data, storage, evaluation, and agent workflow decisions. Repository scaffolds live under `data_selection/` and `storage/`; remaining work is listed in §15.3. |
 | macOS CNN load path | **Fixed** | v0.90.24-v0.90.29 resolved the shared Tier 1/3 file-read hang and macOS model-load warmup path; do not reopen this unless new measured evidence appears. |
 
 ### 15.2 Completed Milestones
@@ -1276,7 +1276,7 @@ is satisfied.
 | **M4c** | T1-B: Live review policy approved | Reviewer sign-off on `background/live_review_policy.example.json` | **Complete (signed 2026-06-18)** |
 | **M4d** | T1-C: First supervised live ZTF pilot | Manual operator run; no external submission | **Complete (bounded, 2026-06-16)** |
 | **M5a** | T1-A: Download labeled ZTF real/bogus dataset | 10,000 real alerts downloaded | **Complete** |
-| **M5b** | T1-A: Build cutout dataset + train Tier 2 CNN | `models/tier2_cnn.pt`; validation accuracy 91.3% | **Complete** |
+| **M5b** | T1-A: Build cutout dataset + train Tier 2 CNN | `models/tier2_cnn.pt`; validation accuracy 91.3% | **Historically complete; not yet frozen as `benchmark_cnn_v1`** |
 | **M5c** | T1-A: Acquire real multi-night sequences, build dataset, and train Tier 3 Transformer | Five-class policy and 50/class pilot approved; pilot trained | **Complete** |
 | **M5d** | T1-A: Train Tier 1 XGBoost | `models/tier1_xgb.json`; validation accuracy 99.95%, macro AUC 1.000 | **Complete** |
 | **M6a** | T1-D: Quantitative production calibration gate | Held-out real labeled data; all Brier, ECE, log-loss, AUC, cross-validation, and bootstrap-confidence KPIs pass | **Complete** |
@@ -1285,6 +1285,26 @@ is satisfied.
 | **M7** | All T1/T2 engineering gaps closed | Requires M4-M6 complete plus no-submission discovery-paper guardrails | **Complete (2026-06-22)** |
 | **M8** | ZTF DR24 production capability readiness | Requires Z0-Z7 in `docs/ZTF_DR24_PRODUCTION_GATES.md`. The older WISE/DECam/TESS P1-P5 gates are preserved as secondary historical evidence and do not establish current DR24 readiness. | **Open** |
 | **M9** | First MPC submission eligibility | Event-driven; requires a real candidate, adversarial review survival, operator review, and policy-compliant candidate evidence after P4 is resolved | **Blocked until candidate + MPC authority** |
+
+### 15.3.1 Astrometrics Roadmap Overlay
+
+The new Astrometrics policy documents supersede any roadmap interpretation that
+would promote a model or launch a new production batch based only on older
+scalar KPIs. The next production-safe sequence is:
+
+| ID | Workstream | Done When | Status |
+|---|---|---|---|
+| **A1** | Dataset manifest system | Training, scoring, evaluation, live-search, and evidence batches have manifest IDs, validation tests, source/license/role fields, and leakage caveats. | **Open** |
+| **A2** | Candidate ledger | Candidate packets can be regenerated from a SQLite or parquet ledger containing source dataset ID, generator params, model versions, calibrated scores, review status, and regeneration command. | **Open** |
+| **A3** | Freeze CNN benchmark | Current Tier 2 image model is wrapped or moved under `benchmarks/benchmark_cnn_v1/` with locked preprocessing, seeds, split definitions, metrics, and `MODEL_CARD.md`. | **Open** |
+| **A4** | Grouped splits and leakage checks | NEO train/eval splits are grouped by night, sky region, survey/instrument, and object ID; random splits remain diagnostic only. | **Open** |
+| **A5** | Canonical regression evals | Known NEO detections, false link examples, injected moving-source controls, and review-packet examples produce sample-by-sample regression reports. | **Open** |
+| **A6** | Injection-recovery curves | Moving-source injections report recovery curves by magnitude, velocity, trail length, seeing/background, and missed frames, not only scalar success rates. | **Partially complete; legacy synthetic harness exists, policy-grade curves still open** |
+| **A7** | Calibration and promotion report | Any model promotion cites manifests, grouped splits, frozen evals, injection-recovery curves, calibration quantiles, false-discovery estimates, and pretrained-model audits where applicable. | **Open** |
+
+CNN-specific rule: the existing CNN is a benchmark until A1-A7 close for it. It
+may contribute image/artifact features, but it is not the main scientific thesis
+and must not be promoted on random-split accuracy alone.
 
 ### 15.4 Progress Tracker
 
@@ -1297,7 +1317,7 @@ is satisfied.
 | **P20** | Complete | IRSA account and credentials configured | macOS Keychain; live connection test passed |
 | **P21** | Complete | ATLAS token obtained | macOS Keychain; live connection test passed |
 | **P22** | Complete | Labeled ZTF dataset downloaded | 10,000 real ZTF Avro alerts |
-| **P23** | Complete | Tier 2 CNN trained (`models/tier2_cnn.pt`) | Validation accuracy 91.3%; weights committed |
+| **P23** | Historical complete | Tier 2 CNN trained (`models/tier2_cnn.pt`) | Validation accuracy 91.3%; weights committed. New Astrometrics policy requires freezing it as `benchmark_cnn_v1` plus grouped splits and injection-recovery curves before any CNN promotion claim. |
 | **P24** | Complete | Tier 3 Transformer trained (`models/tier3_transformer.pt`) | 50/class five-class pilot; val_macro_f1=0.9400 |
 | **P25** | Complete | Calibration KPI report passes; gates eligible to be armed | T1-D quantitative KPI gate passed |
 | **P26** | Complete, legacy | Public ALeRCE ZTF source-detection provider added | Replaced an earlier bad IRSA metadata-table assumption for the bounded ZTF pilot. This is real source-level ZTF evidence, but it does not close current ZTF DR24 Gate Z3 until documented as suitable for the DR24 historical-replay protocol. |
@@ -1321,12 +1341,16 @@ is satisfied.
 | **P42** | Paused | Gate Z3 source-native candidate linking | Existing `src/link.py` and real UW ZTF detections form cross-night tracklets; no tested candidate pair has confirmed single-object recovery. Pair selection is paused unless the operator explicitly restarts it. |
 | **P43** | Complete | Gates Z4-Z7 | Ranking baseline, retrospective validation, no-submission package drill, and operator runbook are closed with real evidence. |
 | **P44** | In progress | Astrometrics policy operationalization | Data-selection, storage, and agent-workflow directives are committed; future acquisition/model/scoring work must use `data_selection/` and `storage/` controls. |
+| **P45** | Open | Dataset manifests and candidate ledger | Next policy-grade production task: add manifest schema/tests and a candidate ledger before more model promotion or live-search expansion. |
+| **P46** | Open | Frozen CNN benchmark and grouped split checks | Wrap the existing CNN as `benchmark_cnn_v1`; define NEO grouped splits by night, sky region, survey/instrument, and object ID. |
+| **P47** | Open | Canonical evals and injection-recovery curves | Convert legacy scalar validation into policy-grade sample-level evals and parameterized moving-source recovery curves. |
 
 ### 15.5 Known Limitations
 
 - **Legacy ALeRCE evidence is bounded**: The first ALeRCE-backed ZTF pilot processed real detections and produced two internal candidates, but it was capped at 80 linked candidates and predates the DR24 historical-replay pivot. It is useful evidence, not current Gate Z3 closure.
 - **Known-object recovery evidence is complete for T1-C**: The prequalified ATLAS recovery run passed 5/5 objects (100%) and closed the recovery KPI; future discovery sweeps still need their own candidate-level review.
-- **Production readiness is capability-based**: The project still needs the ZTF DR24 Z0-Z7 gates to close. It does not need to find a new NEO before being production-capable.
+- **Production readiness is capability-based**: The project still needs paused ZTF DR24 Gate Z3 or an explicitly approved replacement path, plus the Astrometrics manifest/ledger/benchmark/eval controls above. It does not need to find a new NEO before being production-capable.
+- **CNN is not production-promoted yet**: The existing Tier 2 CNN is trained and useful, but the new Astrometrics policy treats it as a benchmark until it has a frozen `benchmark_cnn_v1` wrapper, grouped splits, leakage checks, canonical evals, and injection-recovery curves.
 - **Operator review remains required for candidates**: Recovered or newly linked candidates need adversarial review plus Jerome W. Lindsey III's operator review before any MPC path is considered.
 - **External expert review happens through MPC/NEOCP/Scout**: Internal production readiness does not authorize MPC submission or hazard notification.
 - **Automated live execution remains gated**: The bounded live dry-run policy is signed, but runs still require provider credential readiness and remain non-submitting.

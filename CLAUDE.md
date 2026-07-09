@@ -46,7 +46,9 @@ all ten are complete.
 
 Before proposing or executing any task, apply this gate:
 
-> *Does this task close or directly unblock a named T1 or T2 gap from `docs/PRODUCTION_READINESS.md`?*
+> *Does this task close or directly unblock a named production gap from
+> `docs/PRODUCTION_READINESS.md`, `docs/ZTF_DR24_PRODUCTION_GATES.md`, or the
+> Astrometrics roadmap below?*
 
 If the answer is NO, do not do it. In particular:
 - **Never add new public helper APIs** unless they directly unblock a named gap. The v0.77–v0.87 API accumulation cycle (110 helpers, zero production impact) must never recur.
@@ -55,7 +57,9 @@ If the answer is NO, do not do it. In particular:
 - **Never propose log modules, schemas, or scaffolding** that do not directly unblock a named T1 or T2 gap.
 - **Never repeat work listed under "What Is Complete"** in `docs/PRODUCTION_READINESS.md`.
 
-If the highest-priority T1 gap cannot be resolved because a human blocker is unresolved, **state that explicitly** and limit scope to T2 gaps or documentation sync.
+If the highest-priority production gap cannot be resolved because a human
+blocker is unresolved, **state that explicitly** and limit scope to the next
+non-blocked ZTF/Astrometrics gate or documentation sync.
 
 ---
 
@@ -108,6 +112,16 @@ If the highest-priority T1 gap cannot be resolved because a human blocker is unr
   validation, live search, and storage changes must use the repo-visible
   controls under `data_selection/` and `storage/`; do not hand the operator a
   guessed URL, schema, worker count, shard layout, or storage path.
+- **Astrometrics production roadmap is now part of the system directives**:
+  Work the following gates in order unless the operator explicitly chooses a
+  different production path:
+  A1 dataset manifest system; A2 candidate ledger; A3 freeze the current CNN
+  as `benchmark_cnn_v1`; A4 grouped NEO splits and leakage checks; A5
+  OpenAI-evals-style canonical regression suite; A6 parameterized
+  injection-recovery curves; A7 calibration/promotion report. Do not promote a
+  model, expand live search, or treat the CNN as production-promoted until the
+  relevant A-gates close. The existing CNN may be used as an image/artifact
+  feature source and benchmark, not as the main scientific thesis.
 - **Repository artifact policy supports `git add .`**: The standard operator
   cadence may use `git add .`, so `.gitignore` must protect local/generated
   outputs by default. Treat `Logs/**` as local operational output and never
@@ -800,11 +814,13 @@ explicitly restarts that path. The most productive non-blocked work is now
 policy-backed data selection, storage, ranking, validation, and evidence
 hardening, not another unapproved Z3 pair attempt.
 
-All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
-2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
-coverage target. All three ML tiers have trained weights: Tier 1 XGBoost
-(val_acc=99.95%), Tier 2 CNN (val_acc=91.3%), and Tier 3 Transformer
-(val_macro_f1=0.9400, best epoch 17/30).
+All 10 pipeline modules are complete. The offline suite passes on Python 3.14
+with the 100% coverage target in CI. All three ML tiers have trained weights:
+Tier 1 XGBoost (val_acc=99.95%), Tier 2 CNN (val_acc=91.3%), and Tier 3
+Transformer (val_macro_f1=0.9400, best epoch 17/30). Under the 2026-07-08
+Astrometrics roadmap, trained weights are not the same thing as promotion:
+model promotion now requires A1-A7 controls as applicable, and the CNN must be
+frozen as `benchmark_cnn_v1` before any CNN-derived promotion claim.
 **T1-A CLOSED. T1-B CLOSED. T1-C CLOSED. T1-D CLOSED.**
 Ensemble stacker KPIs passed 2026-06-14 (AUC=0.9809, Brier=0.0211, ECE=0.0000).
 T2-C CLOSED 2026-06-21 (operator sign-off by Jerome W. Lindsey III).

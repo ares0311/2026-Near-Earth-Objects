@@ -40,10 +40,33 @@ from a real network — not fixable from this codebase. See
 0 artifacts are committed under `docs/evidence/phase0/`, including
 `data_sources_verified.md`, `auth_requirements.md`,
 `phase0_probe_results.json`, `schema_snapshot/README.md`,
-`sample_ingest_report.md`, and `pretrained_model_audit.md`. Remaining
-operator-run verifications are Gate Z1's live IRSA bounded ingest, Gate Z2's
-live `first_obs` check, and one Mac re-run to field-confirm the v0.90.24
-CNN-load deadlock fix.
+`sample_ingest_report.md`, and `pretrained_model_audit.md`. Later evidence
+closed Gate Z1, Gate Z2, and the macOS model-load deadlock investigation. The
+remaining production work is paused Gate Z3 or an explicitly approved
+replacement path, plus the Astrometrics policy controls below.
+
+**Astrometrics policy overlay (2026-07-08)**:
+`docs/astrometrics_coding_agents_master_guide.md` and
+`docs/astrometrics_data_selection_policy.md` add production controls that
+outrank older "trained model exists" wording. Before promoting any model or
+launching a materially larger production batch, the project must add:
+
+- Dataset manifests with validation tests and manifest IDs cited by training,
+  scoring, evaluation, and live-search runs.
+- A candidate ledger that can regenerate every candidate packet from source
+  dataset ID, generator params, model versions, scores, review state, and
+  command provenance.
+- A frozen CNN benchmark (`benchmark_cnn_v1`) with locked preprocessing, seeds,
+  split definitions, metrics, and a model card.
+- Grouped NEO splits by night, sky region, survey/instrument, and object ID;
+  random splits are diagnostic only.
+- Canonical sample-level regression evals covering known NEO detections, false
+  link examples, injected moving-source controls, and review-packet examples.
+- Injection-recovery curves over magnitude, velocity, trail length,
+  seeing/background, and missed frames before model promotion.
+
+The current Tier 2 CNN remains trained and available as a feature source, but
+it is not production-promoted under the new policy until these controls close.
 
 ---
 

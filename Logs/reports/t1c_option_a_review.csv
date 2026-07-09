@@ -1,6 +1,0 @@
-object_id,review_priority,review_flags,n_observations,n_nights,start_jd,end_jd,arc_days,motion_rate_arcsec_per_hour,motion_pa_degrees,min_mag,median_mag,max_mag,mean_real_bogus,mean_deep_real_bogus,neo_probability,hazard_flag,alert_pathway,moid_au,discovery_priority,alerce_object_ids,human_review_status
-atlas_recovery:121,standard,,3,3,2461187.023842,2461211.652749,24.628907000180334,26.282577310079372,268.6264180490505,20.273,20.574,20.741,,,,unknown,known_object,,0.0,ATLAS_FORCED:121,required
-atlas_recovery:2140,standard,,3,3,2461199.690981,2461211.670614,11.979632999747992,29.89306510619554,287.13856272740355,18.981,20.148,20.502,,,,unknown,known_object,,0.0,ATLAS_FORCED:2140,required
-atlas_recovery:2172,standard,,3,3,2461182.543846,2461199.695072,17.15122599992901,31.73841084300648,273.76731930581184,18.107,19.854,20.683,,,,unknown,known_object,,0.0,ATLAS_FORCED:2172,required
-atlas_recovery:5650,standard,,4,4,2461187.023842,2461211.652749,24.628907000180334,35.50061733010534,297.7823425199163,20.569,20.669,20.843,,,,unknown,known_object,,0.0,ATLAS_FORCED:5650,required
-atlas_recovery:954,standard,,3,3,2461187.015336,2461205.682671,18.667334999889135,28.575805709143616,277.24685510943056,18.572,20.194,20.504,,,,unknown,known_object,,0.0,ATLAS_FORCED:954,required

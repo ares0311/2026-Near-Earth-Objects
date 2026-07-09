@@ -14,6 +14,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   promotion work: role registry, training/live/acquisition policy stubs,
   target/follow-up queue headers, batch-manifest directory, and a dated
   decision-log entry adopting the policies without acquiring new data.
+- Added an explicit CNN promotion gate to the repo-local training policy:
+  freeze `benchmark_cnn_v1`, use grouped splits, preserve manifest IDs, run
+  canonical evals and injection-recovery curves, and audit pretrained weights
+  before any CNN-derived score is promoted.
+- Updated the README roadmap and production-readiness register to reflect the
+  new Astrometrics sequence: dataset manifests, candidate ledger, frozen CNN
+  benchmark, grouped splits/leakage checks, canonical evals, injection-recovery
+  curves, and calibration/promotion reports before model promotion.
+- Updated `AGENTS.md` and `CLAUDE.md` so the Astrometrics A1-A7 roadmap and
+  CNN benchmark/promotion rule are system directives, not merely README
+  roadmap text.
 - Initial `storage/` controls for external SSD/cache/cloud behavior without
   committing a machine-specific path.
 
@@ -27,6 +38,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Removed a stray root-level `FETCH_HEAD` artifact and ignored it so the
   operator's standard `git add .` cadence does not publish local Git debris.
   Dropbox-style conflicted-copy artifacts are also ignored.
+- Untracked previously committed raw `Logs/reports/*` operational outputs that
+  violated `tests/test_repository_artifact_policy.py`, and narrowed the
+  `Logs/reports/` allowlist to only the compact evidence files that test
+  explicitly permits.
 
 ## v0.90.59 — Add Gate Z5 retrospective validation (2026-07-04)
 

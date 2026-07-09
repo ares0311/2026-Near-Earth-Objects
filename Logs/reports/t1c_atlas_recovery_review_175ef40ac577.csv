@@ -1,4 +1,0 @@
-object_id,review_priority,review_flags,n_observations,n_nights,start_jd,end_jd,arc_days,motion_rate_arcsec_per_hour,motion_pa_degrees,min_mag,median_mag,max_mag,mean_real_bogus,mean_deep_real_bogus,neo_probability,hazard_flag,alert_pathway,moid_au,discovery_priority,alerce_object_ids,human_review_status
-atlas_recovery:1950,standard,,3,3,2461180.9621449998,2461201.906701,20.944556000176817,41.78160894231853,268.95938343752397,20.371,20.74,20.941,,,,unknown,known_object,,0.0,ATLAS_FORCED:1950,required
-atlas_recovery:2172,standard,,3,3,2461188.391676,2461202.699984,14.308308000210673,31.99278054931743,273.96135740994055,19.113,19.635,20.903,,,,unknown,known_object,,0.0,ATLAS_FORCED:2172,required
-atlas_recovery:481,standard,,3,3,2461180.947168,2461201.943392,20.996224000118673,34.6863388069484,266.09111132319833,16.396,20.205,20.627,,,,unknown,known_object,,0.0,ATLAS_FORCED:481,required

@@ -17,3 +17,28 @@ Required controls:
   notes before use.
 - Training metrics do not authorize MPC submission; they only support the
   scoring and review gates.
+
+## CNN Promotion Gate
+
+The Astrometrics coding-agent guide requires the current image model to be
+treated as a reproducible benchmark, not as the whole scientific thesis.
+
+Before promoting any CNN or CNN-derived score:
+
+- Freeze the current image model as `benchmark_cnn_v1` or document the exact
+  committed model artifact that serves that role.
+- Record the training, validation, calibration, and frozen-eval manifest IDs
+  used to produce the benchmark.
+- Replace random-only train/test splits with grouped splits by object, field,
+  night, source, or another leakage-relevant key.
+- Maintain separate real-only and synthetic-inclusive evaluation reports.
+- Run injection-recovery curves through the downstream detection/link/scoring
+  path, not only image-chip accuracy.
+- Run the canonical evaluation suite and compare against the frozen CNN
+  benchmark before claiming improvement.
+- If pretrained weights or embeddings are used, complete a pretrained-model
+  audit covering source, license, input domain, preprocessing reproducibility,
+  and leakage risk.
+- Keep CNN output as an artifact/image-quality feature unless a later
+  production decision documents why an end-to-end CNN detector is scientifically
+  justified.
