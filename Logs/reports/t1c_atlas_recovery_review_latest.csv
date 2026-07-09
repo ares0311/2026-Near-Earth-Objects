@@ -1,1 +1,0 @@
-object_id,review_priority,review_flags,n_observations,n_nights,start_jd,end_jd,arc_days,motion_rate_arcsec_per_hour,motion_pa_degrees,min_mag,median_mag,max_mag,mean_real_bogus,mean_deep_real_bogus,neo_probability,hazard_flag,alert_pathway,moid_au,discovery_priority,alerce_object_ids,human_review_status

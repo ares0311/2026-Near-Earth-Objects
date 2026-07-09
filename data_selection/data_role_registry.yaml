@@ -1,0 +1,44 @@
+# Role registry for data used by the NEO pipeline.
+# Keep this human-reviewable; scripts may consume it later, but it is not a raw
+# observation inventory.
+roles:
+  training:
+    purpose: "Fit model parameters and feature transforms."
+    may_train_models: true
+    may_evaluate_production_gate: false
+    may_trigger_submission: false
+  validation:
+    purpose: "Tune thresholds and measure held-out model behavior."
+    may_train_models: false
+    may_evaluate_production_gate: true
+    may_trigger_submission: false
+  retrospective_replay:
+    purpose: "Replay historical epochs without future-catalog leakage."
+    may_train_models: false
+    may_evaluate_production_gate: true
+    may_trigger_submission: false
+  live_search:
+    purpose: "Search eligible archival data for reviewable candidates."
+    may_train_models: false
+    may_evaluate_production_gate: true
+    may_trigger_submission: false
+  followup:
+    purpose: "Collect or prioritize observations after a candidate exists."
+    may_train_models: false
+    may_evaluate_production_gate: true
+    may_trigger_submission: false
+  positive_control:
+    purpose: "Verify recovery of known objects or injected objects."
+    may_train_models: false
+    may_evaluate_production_gate: true
+    may_trigger_submission: false
+  negative_control:
+    purpose: "Verify rejection of artifacts, stars, static sources, or known negatives."
+    may_train_models: false
+    may_evaluate_production_gate: true
+    may_trigger_submission: false
+  submission_package_evidence:
+    purpose: "Package observations and review evidence after all gates pass."
+    may_train_models: false
+    may_evaluate_production_gate: true
+    may_trigger_submission: true

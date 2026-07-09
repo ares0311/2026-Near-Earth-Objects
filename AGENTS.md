@@ -56,6 +56,24 @@ It contains the facts a coding agent needs to work productively without re-readi
   workflow brief for candidate language, historical replay, source
   verification, no future-catalog leakage, pretrained-model audits, and
   auditable candidate-ranker design.
+- **Astrometrics policies are mandatory directives**:
+  `docs/astrometrics_coding_agents_master_guide.md`,
+  `docs/astrometrics_data_selection_policy.md`, and
+  `docs/astrometrics_external_and_cloud_storage_policy.md` must be read before
+  planning data acquisition, storage, training, scoring, evaluation,
+  retrospective replay, live search, or submission-package work. Apply their
+  repo-visible controls in `data_selection/` and `storage/`. Do not hand the
+  operator guessed URLs, schemas, worker counts, shard layouts, or storage
+  paths.
+- **Astrometrics production roadmap is mandatory**:
+  Work these gates in order unless the operator explicitly chooses a different
+  production path: A1 dataset manifest system; A2 candidate ledger; A3 freeze
+  the current CNN as `benchmark_cnn_v1`; A4 grouped NEO splits and leakage
+  checks; A5 OpenAI-evals-style canonical regression suite; A6 parameterized
+  injection-recovery curves; A7 calibration/promotion report. Do not promote a
+  model, expand live search, or treat the CNN as production-promoted until the
+  relevant A-gates close. The existing CNN may be used as an image/artifact
+  feature source and benchmark, not as the main scientific thesis.
 - **Repository artifact policy supports `git add .`**: The standard operator
   cadence may use `git add .`, so `.gitignore` must protect local/generated
   outputs by default. Treat `Logs/**` as local operational output and never
@@ -605,7 +623,19 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.57)
+## Current State (v0.90.60)
+
+**Latest sync (2026-07-08, v0.90.60)**: The Astrometrics coding-agent,
+data-selection, and external/cloud-storage policy docs are now mandatory
+directives. Repo-local controls have started under `data_selection/` and
+`storage/`. The active ZTF DR24 posture is unchanged from the latest gate
+evidence: Z1, Z2, Z4, Z5, Z6, and Z7 are closed; Z3 is the only open gate and
+its candidate-pair search remains intentionally paused unless the operator
+explicitly restarts that path. The highest-priority non-blocked roadmap is now
+A1-A7: dataset manifests, candidate ledger, frozen CNN benchmark, grouped
+splits/leakage checks, canonical regression evals, injection-recovery curves,
+and calibration/promotion reports. The CNN is trained but not
+production-promoted under the new policy.
 
 **This section was last synced 2026-07-02 through v0.90.27; the detail below
 is historical and accurate as of that date but does not reflect
@@ -696,7 +726,10 @@ a measurable quantity (surveys done/total, tracklets done/total).
 
 See `docs/PRODUCTION_READINESS.md` for the full gap register.
 
-### Handoff notes (2026-07-02) — v0.90.27 (CURRENT)
+### Handoff notes (2026-07-02) — v0.90.27 (historical; superseded)
+
+The v0.90.60 addendum above is the current state. This section is preserved
+only as dated history for the ZTF DR24 pivot.
 
 **Current merged state through PR #163**:
 

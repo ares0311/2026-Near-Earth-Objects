@@ -1,7 +1,7 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.90.57
-**Last updated**: 2026-07-04 (header/sync line only — the P1-P5 gate register
+**Current version**: v0.90.60
+**Last updated**: 2026-07-08 (header/sync line only — the P1-P5 gate register
 body below is unchanged historical evidence from 2026-07-02; current gate
 status for the active ZTF DR24 path lives in
 `docs/ZTF_DR24_PRODUCTION_GATES.md`, which is kept current every session)
@@ -21,11 +21,12 @@ source-verification evidence is now recorded in `docs/evidence/phase0/`:
 JPL SBDB, MPC get-obs, and IRSA ZTF image metadata are live-verified; Fink
 schema access is externally blocked at TLS handshake; pretrained model use is
 deferred. The ZTF DR24 production gates are now defined in
-`docs/ZTF_DR24_PRODUCTION_GATES.md`. Gate Z1 bounded ingest and Gate Z2
-time-aware known-object exclusion are code-complete pending operator live
-verification. Gate Z3 is the current implementation focus: verify a per-source
-ZTF DR24 detection source that can feed the existing linker with real
-RA/Dec/time/magnitude detections instead of only image/exposure metadata.
+`docs/ZTF_DR24_PRODUCTION_GATES.md`. Gates Z1, Z2, Z4, Z5, Z6, and Z7 are
+closed with real evidence. Gate Z3 is the only remaining open ZTF DR24
+production gate, and its candidate-pair search is intentionally paused after
+four low-yield attempts unless the operator explicitly restarts that path.
+Future work should favor evidence, data-selection, storage, ranking, and
+validation hardening over another candidate-pair run.
 
 **Phase 0 status (2026-07-02)**: 3 of 4 cited sources live-verified working
 via `Skills/verify_ztf_dr24_sources.py` — IRSA ZTF image metadata (200, no
@@ -39,10 +40,33 @@ from a real network — not fixable from this codebase. See
 0 artifacts are committed under `docs/evidence/phase0/`, including
 `data_sources_verified.md`, `auth_requirements.md`,
 `phase0_probe_results.json`, `schema_snapshot/README.md`,
-`sample_ingest_report.md`, and `pretrained_model_audit.md`. Remaining
-operator-run verifications are Gate Z1's live IRSA bounded ingest, Gate Z2's
-live `first_obs` check, and one Mac re-run to field-confirm the v0.90.24
-CNN-load deadlock fix.
+`sample_ingest_report.md`, and `pretrained_model_audit.md`. Later evidence
+closed Gate Z1, Gate Z2, and the macOS model-load deadlock investigation. The
+remaining production work is paused Gate Z3 or an explicitly approved
+replacement path, plus the Astrometrics policy controls below.
+
+**Astrometrics policy overlay (2026-07-08)**:
+`docs/astrometrics_coding_agents_master_guide.md` and
+`docs/astrometrics_data_selection_policy.md` add production controls that
+outrank older "trained model exists" wording. Before promoting any model or
+launching a materially larger production batch, the project must add:
+
+- Dataset manifests with validation tests and manifest IDs cited by training,
+  scoring, evaluation, and live-search runs.
+- A candidate ledger that can regenerate every candidate packet from source
+  dataset ID, generator params, model versions, scores, review state, and
+  command provenance.
+- A frozen CNN benchmark (`benchmark_cnn_v1`) with locked preprocessing, seeds,
+  split definitions, metrics, and a model card.
+- Grouped NEO splits by night, sky region, survey/instrument, and object ID;
+  random splits are diagnostic only.
+- Canonical sample-level regression evals covering known NEO detections, false
+  link examples, injected moving-source controls, and review-packet examples.
+- Injection-recovery curves over magnitude, velocity, trail length,
+  seeing/background, and missed frames before model promotion.
+
+The current Tier 2 CNN remains trained and available as a feature source, but
+it is not production-promoted under the new policy until these controls close.
 
 ---
 

@@ -24,8 +24,19 @@ It contains the facts a coding agent needs to work productively without re-readi
    workflow brief for candidate language, historical replay, source
    verification, no future-catalog leakage, pretrained-model audits, and
    auditable candidate-ranker design.
+7. Call `Read` on `docs/astrometrics_coding_agents_master_guide.md` — the
+   cross-project agent guide for production-first work, evaluation discipline,
+   candidate ledgers, and benchmark controls.
+8. Call `Read` on `docs/astrometrics_data_selection_policy.md` — the
+   cross-project policy for selecting, separating, logging, and promoting data
+   roles. Apply it before any acquisition, labeling, training, validation,
+   replay, or live-search work.
+9. Call `Read` on `docs/astrometrics_external_and_cloud_storage_policy.md` —
+   the cross-project storage policy for external SSDs, local caches, cloud
+   storage, and sync boundaries.
 
-These steps are non-negotiable. No planning or code changes may happen before all seven are complete.
+These steps are non-negotiable. No planning or code changes may happen before
+all ten are complete.
 
 ---
 
@@ -35,7 +46,9 @@ These steps are non-negotiable. No planning or code changes may happen before al
 
 Before proposing or executing any task, apply this gate:
 
-> *Does this task close or directly unblock a named T1 or T2 gap from `docs/PRODUCTION_READINESS.md`?*
+> *Does this task close or directly unblock a named production gap from
+> `docs/PRODUCTION_READINESS.md`, `docs/ZTF_DR24_PRODUCTION_GATES.md`, or the
+> Astrometrics roadmap below?*
 
 If the answer is NO, do not do it. In particular:
 - **Never add new public helper APIs** unless they directly unblock a named gap. The v0.77–v0.87 API accumulation cycle (110 helpers, zero production impact) must never recur.
@@ -44,7 +57,9 @@ If the answer is NO, do not do it. In particular:
 - **Never propose log modules, schemas, or scaffolding** that do not directly unblock a named T1 or T2 gap.
 - **Never repeat work listed under "What Is Complete"** in `docs/PRODUCTION_READINESS.md`.
 
-If the highest-priority T1 gap cannot be resolved because a human blocker is unresolved, **state that explicitly** and limit scope to T2 gaps or documentation sync.
+If the highest-priority production gap cannot be resolved because a human
+blocker is unresolved, **state that explicitly** and limit scope to the next
+non-blocked ZTF/Astrometrics gate or documentation sync.
 
 ---
 
@@ -89,6 +104,24 @@ If the highest-priority T1 gap cannot be resolved because a human blocker is unr
   `docs/MPC_SUBMISSION_POLICY.md` for the full submission policy.
   Do NOT reinstate a "blocked until expert review" guardrail — MPC/NEOCP/Scout
   IS the expert review system. Do NOT frame this as citizen science.
+- **Astrometrics policies govern data and storage work**:
+  `docs/astrometrics_coding_agents_master_guide.md`,
+  `docs/astrometrics_data_selection_policy.md`, and
+  `docs/astrometrics_external_and_cloud_storage_policy.md` are mandatory
+  directives. Future data acquisition, model training, scoring, retrospective
+  validation, live search, and storage changes must use the repo-visible
+  controls under `data_selection/` and `storage/`; do not hand the operator a
+  guessed URL, schema, worker count, shard layout, or storage path.
+- **Astrometrics production roadmap is now part of the system directives**:
+  Work the following gates in order unless the operator explicitly chooses a
+  different production path:
+  A1 dataset manifest system; A2 candidate ledger; A3 freeze the current CNN
+  as `benchmark_cnn_v1`; A4 grouped NEO splits and leakage checks; A5
+  OpenAI-evals-style canonical regression suite; A6 parameterized
+  injection-recovery curves; A7 calibration/promotion report. Do not promote a
+  model, expand live search, or treat the CNN as production-promoted until the
+  relevant A-gates close. The existing CNN may be used as an image/artifact
+  feature source and benchmark, not as the main scientific thesis.
 - **Repository artifact policy supports `git add .`**: The standard operator
   cadence may use `git add .`, so `.gitignore` must protect local/generated
   outputs by default. Treat `Logs/**` as local operational output and never
@@ -769,13 +802,25 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.57)
+## Current State (v0.90.60)
 
-All 10 pipeline modules are complete. The offline suite passes 1573 tests, with
-2 live/integration checks deselected. CI is green on Python 3.14 with the 100%
-coverage target. All three ML tiers have trained weights: Tier 1 XGBoost
-(val_acc=99.95%), Tier 2 CNN (val_acc=91.3%), and Tier 3 Transformer
-(val_macro_f1=0.9400, best epoch 17/30).
+**Latest sync (2026-07-08, v0.90.60)**: The Astrometrics coding-agent,
+data-selection, and external/cloud-storage policy docs are now mandatory
+session-start reads and have repo-local operational scaffolds under
+`data_selection/` and `storage/`. The active ZTF DR24 posture is unchanged:
+Z1, Z2, Z4, Z5, Z6, and Z7 are closed; Z3 is the only open gate and its
+candidate-pair search remains intentionally paused unless the operator
+explicitly restarts that path. The most productive non-blocked work is now
+policy-backed data selection, storage, ranking, validation, and evidence
+hardening, not another unapproved Z3 pair attempt.
+
+All 10 pipeline modules are complete. The offline suite passes on Python 3.14
+with the 100% coverage target in CI. All three ML tiers have trained weights:
+Tier 1 XGBoost (val_acc=99.95%), Tier 2 CNN (val_acc=91.3%), and Tier 3
+Transformer (val_macro_f1=0.9400, best epoch 17/30). Under the 2026-07-08
+Astrometrics roadmap, trained weights are not the same thing as promotion:
+model promotion now requires A1-A7 controls as applicable, and the CNN must be
+frozen as `benchmark_cnn_v1` before any CNN-derived promotion claim.
 **T1-A CLOSED. T1-B CLOSED. T1-C CLOSED. T1-D CLOSED.**
 Ensemble stacker KPIs passed 2026-06-14 (AUC=0.9809, Brier=0.0211, ECE=0.0000).
 T2-C CLOSED 2026-06-21 (operator sign-off by Jerome W. Lindsey III).
@@ -789,20 +834,17 @@ preserved as secondary historical evidence, not the current primary discovery
 target. Per `docs/MISSION.md` and `docs/neo_discovery_agent_brief.md`, the
 active path is ZTF DR24 archival historical replay with no future-catalog
 leakage, auditable source verification, and fail-closed submission controls.
-ZTF live alert-stream discovery remains prohibited. Gate Z1 bounded ingest and
-Gate Z2 time-aware known-object exclusion are code-complete pending operator
-live verification. **Gate Z3's source-verification blocker is now CLOSED**
-(2026-07-02): the University of Washington's public ZTF alert archive is a
-real, unauthenticated, schema-verified per-detection source — see the v19
-handoff below. Gate Z3 as a whole remains open pending a bounded multi-night
-ingest tool and a real known-object positive control run through the
-existing linker. The older ALeRCE-backed source provider is real
-bounded-pilot evidence, but
-`docs/evidence/phase0/alerce_source_detection_assessment.md` records that it
-is not current DR24 production evidence until verified for the historical-
-replay protocol.
+ZTF live alert-stream discovery remains prohibited. Gates Z1, Z2, Z4, Z5,
+Z6, and Z7 are closed with real evidence. Gate Z3's source-verification
+blocker is closed — the University of Washington's public ZTF alert archive is
+a real, unauthenticated, schema-verified per-detection source — but Gate Z3 as
+a whole remains open because four candidate-pair attempts have not produced a
+confirmed single-object positive-control recovery. The older ALeRCE-backed
+source provider is real bounded-pilot evidence, but
+`docs/evidence/phase0/alerce_source_detection_assessment.md` records why it is
+not the current DR24 production path.
 
-### Handoff state as of 2026-07-05 v58 (CURRENT)
+### Handoff state as of 2026-07-05 v58 (previous current; superseded by v0.90.60 addendum)
 
 **Gate Z2 is CLOSED** — operator ran a live JPL SBDB query appending
 `first_obs` to the already-verified `sb-group=neo` query (exact base URL
