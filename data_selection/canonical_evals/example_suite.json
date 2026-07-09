@@ -1,0 +1,36 @@
+{
+  "schema_version": "canonical-eval-suite-v1",
+  "suite_id": "neo-canonical-eval-example-v1",
+  "cases": [
+    {
+      "case_id": "inj-baseline-detect-link-score",
+      "case_type": "injection_recovery",
+      "dataset_id": "example:synthetic-injection",
+      "observed": {
+        "n_injected": 20,
+        "detection_rate": 1.0,
+        "link_rate": 1.0,
+        "score_rate": 1.0
+      },
+      "checks": [
+        {"path": "n_injected", "operator": "gte", "expected": 20},
+        {"path": "detection_rate", "operator": "gte", "expected": 0.95},
+        {"path": "link_rate", "operator": "gte", "expected": 0.95},
+        {"path": "score_rate", "operator": "gte", "expected": 0.95}
+      ]
+    },
+    {
+      "case_id": "false-link-review-blocked",
+      "case_type": "false_link",
+      "dataset_id": "example:false-link-control",
+      "observed": {
+        "adversarial_disposition": "REJECT",
+        "external_submission_ready": false
+      },
+      "checks": [
+        {"path": "adversarial_disposition", "operator": "eq", "expected": "REJECT"},
+        {"path": "external_submission_ready", "operator": "eq", "expected": false}
+      ]
+    }
+  ]
+}
