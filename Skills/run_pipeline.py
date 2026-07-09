@@ -30,6 +30,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from alert import monitor_neocp, process_alert, ready_for_submission, summarise
+from candidate_ledger import (
+    CandidateLedgerDefaults,
+    init_ledger,
+    record_from_packet,
+    upsert_record,
+)
 from classify import classify
 from detect import detect
 from fetch import fetch
@@ -524,6 +530,35 @@ def write_run_summary(log_dir: Path, summary: dict) -> None:
     (log_dir / "run_summary.json").write_text(json.dumps(summary, indent=2))
 
 
+def write_candidate_ledger(
+    db_path: Path,
+    results: list[dict],
+    *,
+    source_dataset_id: str,
+    run_id: str,
+    run_params: dict[str, object],
+    regeneration_command: str,
+    raw_uri: str,
+) -> int:
+    """Write compact pipeline candidates to the SQLite candidate ledger."""
+    if not source_dataset_id.strip():
+        raise ValueError("--source-dataset-id is required when --candidate-ledger-db is set")
+    init_ledger(db_path)
+    defaults = CandidateLedgerDefaults(
+        source_dataset_id=source_dataset_id.strip(),
+        candidate_generator="Skills/run_pipeline.py",
+        regeneration_command=regeneration_command,
+        target_id=f"run:{run_id}",
+        raw_uri=raw_uri,
+        preprocess_version="run_pipeline",
+        review_status="pending_review",
+        candidate_generator_params=run_params,
+    )
+    for packet in results:
+        upsert_record(db_path, record_from_packet(packet, defaults))
+    return len(results)
+
+
 # ── Pipeline ──────────────────────────────────────────────────────────────────
 
 def run_pipeline(
@@ -998,6 +1033,24 @@ def main(argv: list[str] | None = None) -> None:
         ),
     )
     parser.add_argument(
+        "--source-dataset-id",
+        type=str,
+        default="not-recorded",
+        help=(
+            "Dataset manifest ID for this run. Required for policy-grade "
+            "candidate-ledger ingest."
+        ),
+    )
+    parser.add_argument(
+        "--candidate-ledger-db",
+        type=str,
+        default=None,
+        help=(
+            "Optional SQLite candidate ledger path. When set, compact pipeline "
+            "candidate outputs are ingested after the run."
+        ),
+    )
+    parser.add_argument(
         "--no-delete-cache", action="store_true", default=False,
         help="Skip deleting .neo_cache files after the run (default: delete)",
     )
@@ -1062,6 +1115,35 @@ def main(argv: list[str] | None = None) -> None:
         print(f"[link] BLOCKED: {failure_reason}", flush=True)
 
     elapsed = round(time.monotonic() - t_start, 2)
+    run_params: dict[str, object] = {
+        "ra_deg": args.ra,
+        "dec_deg": args.dec,
+        "radius_deg": args.radius,
+        "start_jd": args.start_jd,
+        "end_jd": args.end_jd,
+        "surveys": list(surveys),
+        "max_candidates": args.max_candidates,
+        "dry_run": args.dry_run,
+        "force_refresh": args.force_refresh,
+        "max_link_seed_pairs": args.max_link_seed_pairs,
+    }
+    ledger_records_written = 0
+    ledger_path: Path | None = Path(args.candidate_ledger_db) if args.candidate_ledger_db else None
+    if ledger_path is not None and run_status == "complete":
+        raw_uri = str(run_dir / "run_summary.json") if run_dir is not None else "not-recorded"
+        ledger_records_written = write_candidate_ledger(
+            ledger_path,
+            results,
+            source_dataset_id=args.source_dataset_id,
+            run_id=key,
+            run_params=run_params,
+            regeneration_command=" ".join(sys.argv),
+            raw_uri=raw_uri,
+        )
+        print(
+            f"[ledger] Ingested {ledger_records_written} candidate(s) into {ledger_path}",
+            flush=True,
+        )
 
     # Delete raw cache files so the next run starts fresh
     deleted: list[str] = []
@@ -1090,6 +1172,9 @@ def main(argv: list[str] | None = None) -> None:
             "status": run_status,
             "failure_reason": failure_reason,
             "link_scale_plan_out": args.link_scale_plan_out,
+            "source_dataset_id": args.source_dataset_id,
+            "candidate_ledger_db": str(ledger_path) if ledger_path is not None else None,
+            "candidate_ledger_records_written": ledger_records_written,
             "n_results": len(results),
             "elapsed_seconds": elapsed,
             "cache_files_downloaded": cache_files_before,

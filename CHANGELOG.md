@@ -3,6 +3,23 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.67 — Wire pipeline manifest and ledger outputs (2026-07-09)
+
+### Added
+- `Skills/run_pipeline.py --source-dataset-id`: records the dataset manifest ID
+  in run summaries and candidate-ledger provenance.
+- `Skills/run_pipeline.py --candidate-ledger-db`: optionally ingests compact
+  pipeline candidate outputs into the SQLite candidate ledger after a completed
+  run.
+- Tests for direct ledger writing, missing source-dataset ID failure, and a
+  mocked pipeline run that writes both audit summary fields and candidate
+  ledger rows.
+
+### Changed
+- Version metadata advanced to v0.90.67.
+- README, production-readiness, AGENTS, and CLAUDE now record that A1/A2 have
+  initial pipeline wiring while broader production adoption remains open.
+
 ## v0.90.66 — Add model promotion reports (2026-07-09)
 
 ### Added
