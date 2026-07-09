@@ -42,3 +42,8 @@ Before promoting any CNN or CNN-derived score:
 - Keep CNN output as an artifact/image-quality feature unless a later
   production decision documents why an end-to-end CNN detector is scientifically
   justified.
+
+Current repository state: `benchmarks/benchmark_cnn_v1/` freezes
+`models/tier2_cnn.pt` as the benchmark artifact. This closes the freeze step
+only; it does not close grouped splits, leakage checks, injection-recovery
+curves, or CNN production promotion.

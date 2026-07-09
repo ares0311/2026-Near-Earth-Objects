@@ -3,6 +3,25 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.62 — Freeze Tier 2 CNN benchmark (2026-07-09)
+
+### Added
+- `benchmarks/benchmark_cnn_v1/`: frozen wrapper around the committed
+  `models/tier2_cnn.pt` artifact, including architecture/loader entrypoints,
+  locked preprocessing helpers, scoring delegation, training defaults,
+  `locked_config.yaml`, and `MODEL_CARD.md`.
+- Tests proving the benchmark metadata pins the current artifact SHA-256,
+  preprocessing decodes the locked 63x63 float32 triplet shape, persisted
+  cutouts zero-fill non-finite pixels, wrong shapes fail clearly, and scoring
+  delegates through the Tier 2 prediction contract without loading weights.
+
+### Changed
+- Version metadata advanced to v0.90.62.
+- README, production-readiness, training-data policy, AGENTS, and CLAUDE now
+  mark A3's benchmark-freeze requirement as complete while preserving the
+  remaining CNN promotion blockers: grouped splits, leakage checks, canonical
+  evals, injection-recovery curves, and a calibration/promotion report.
+
 ## v0.90.61 — Add candidate ledger controls (2026-07-09)
 
 ### Added
