@@ -44,6 +44,8 @@ import numpy as np
 # Ensure src/ is importable when run directly
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
+from grouped_splits import load_grouped_split_gate
+
 # ---------------------------------------------------------------------------
 # Feature / label constants matching classify.py
 # ---------------------------------------------------------------------------
@@ -364,6 +366,23 @@ def main() -> None:
         "--dry-run", action="store_true",
         help="Print dataset statistics without training",
     )
+    parser.add_argument(
+        "--grouped-split-report",
+        type=Path,
+        default=None,
+        help=(
+            "A4 grouped split leakage report from Skills/validate_grouped_splits.py. "
+            "Required when --production-candidate is set."
+        ),
+    )
+    parser.add_argument(
+        "--production-candidate",
+        action="store_true",
+        help=(
+            "Fail closed unless policy-grade promotion prerequisites are present. "
+            "Currently requires a passing grouped split report."
+        ),
+    )
     args = parser.parse_args()
 
     rng = np.random.default_rng(args.seed)
@@ -372,6 +391,18 @@ def main() -> None:
     if not args.alerts.exists():
         print(f"ERROR: {args.alerts} not found.")
         print("Run: caffeinate -i python Skills/download_ztf_training_alerts.py")
+        sys.exit(1)
+
+    grouped_split_gate = load_grouped_split_gate(args.grouped_split_report)
+    if args.grouped_split_report is not None or args.production_candidate:
+        print("\nGrouped split gate:")
+        print(f"  report     : {grouped_split_gate['path']}")
+        print(f"  passed     : {str(grouped_split_gate['passed']).lower()}")
+        if grouped_split_gate["blockers"]:
+            print(f"  blockers   : {', '.join(grouped_split_gate['blockers'])}")
+
+    if args.production_candidate and not grouped_split_gate["passed"]:
+        print("\nERROR: --production-candidate requires a passing grouped split report.")
         sys.exit(1)
 
     print(f"Loading ZTF alerts from {args.alerts} ...")
