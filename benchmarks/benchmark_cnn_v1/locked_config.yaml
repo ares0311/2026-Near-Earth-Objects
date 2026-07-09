@@ -1,0 +1,34 @@
+benchmark_id: benchmark_cnn_v1
+status: benchmark_only_not_production_promoted
+model_artifact: models/tier2_cnn.pt
+artifact_sha256: 981a59f6935c51ec66321cd171a4e74d8ac58eaf6fd73ca0e84f79c0ea3218ec
+architecture_source: src/classify.py::_build_cnn_model
+loader_source: src/classify.py::_load_cnn_model
+training_source: Skills/train_tier2_cnn.py
+input_shape: [3, 63, 63]
+cutout_plane_order: [science, reference, difference]
+cutout_dtype: float32
+non_finite_pixel_policy: zero_fill
+random_seed: 42
+validation_fraction: 0.2
+split_policy: random_split_historical_diagnostic_only
+loss: weighted_nll_loss_on_softmax_probabilities
+optimizer: adam
+learning_rate: 0.0001
+epochs: 20
+batch_size: 32
+reported_validation_loss: 0.258
+reported_validation_accuracy: 0.913
+labels:
+  - neo_candidate
+  - known_object
+  - main_belt_asteroid
+  - stellar_artifact
+  - other_solar_system
+promotion_blockers:
+  - grouped_object_field_night_source_splits
+  - leakage_checks
+  - real_only_frozen_eval_manifest
+  - synthetic_inclusive_eval_manifest
+  - downstream_injection_recovery_curves
+  - calibration_and_promotion_report
