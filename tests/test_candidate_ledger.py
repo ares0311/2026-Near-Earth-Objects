@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import closing
 from pathlib import Path
+
+import pytest
 
 from candidate_ledger import (
     CandidateLedgerDefaults,
@@ -12,6 +15,7 @@ from candidate_ledger import (
     main,
     record_from_packet,
     upsert_record,
+    validate_record,
 )
 
 
@@ -20,7 +24,7 @@ def test_init_ledger_records_schema_version(tmp_path: Path) -> None:
 
     init_ledger(db_path)
 
-    with sqlite3.connect(db_path) as conn:
+    with closing(sqlite3.connect(db_path)) as conn:
         row = conn.execute(
             "SELECT value FROM ledger_metadata WHERE key = 'schema_version'"
         ).fetchone()
@@ -57,6 +61,64 @@ def test_record_from_full_scored_packet_extracts_policy_fields() -> None:
     }
     assert json.loads(record["model_versions_json"]) == {"scorer_version": "score-v1"}
     assert json.loads(record["raw_packet_json"]) == packet
+
+
+def test_record_from_packet_supports_candidate_id_and_explicit_time_window() -> None:
+    defaults = CandidateLedgerDefaults(
+        source_dataset_id="manifest-001",
+        candidate_generator="generator",
+        regeneration_command="command",
+        time_window={"start": "2026-01-01", "end": "2026-01-02", "scale": "UTC"},
+    )
+
+    record = record_from_packet({"candidate_id": "C-ID"}, defaults)
+
+    assert record["candidate_id"] == "C-ID"
+    assert json.loads(record["time_window_json"]) == {
+        "start": "2026-01-01",
+        "end": "2026-01-02",
+        "scale": "UTC",
+    }
+
+
+def test_record_from_packet_requires_candidate_identity() -> None:
+    defaults = CandidateLedgerDefaults(
+        source_dataset_id="manifest-001",
+        candidate_generator="generator",
+        regeneration_command="command",
+    )
+
+    with pytest.raises(ValueError, match="candidate packet must include"):
+        record_from_packet({"posterior": {}}, defaults)
+
+
+def test_validate_record_rejects_empty_and_wrong_project() -> None:
+    defaults = CandidateLedgerDefaults(
+        source_dataset_id="manifest-001",
+        candidate_generator="generator",
+        regeneration_command="command",
+    )
+    record = record_from_packet({"object_id": "C-001"}, defaults)
+
+    with pytest.raises(ValueError, match="candidate_id must be a non-empty string"):
+        validate_record({**record, "candidate_id": ""})
+
+    with pytest.raises(ValueError, match="project must be"):
+        validate_record({**record, "project": "wrong-project"})
+
+
+def test_load_rejects_non_object_candidate_entries(tmp_path: Path) -> None:
+    db_path = tmp_path / "candidate_ledger.sqlite"
+    candidate_json = tmp_path / "bad_candidates.json"
+    candidate_json.write_text(json.dumps(["not-an-object"]), encoding="utf-8")
+    defaults = CandidateLedgerDefaults(
+        source_dataset_id="manifest-001",
+        candidate_generator="generator",
+        regeneration_command="command",
+    )
+
+    with pytest.raises(ValueError, match="candidate input must be"):
+        ingest_packets(db_path, candidate_json, defaults)
 
 
 def test_ingest_pipeline_summary_list_upserts_rows(tmp_path: Path) -> None:
@@ -137,3 +199,34 @@ def test_cli_ingest_and_list(tmp_path: Path, capsys) -> None:
     output = json.loads(capsys.readouterr().out)
     assert output[0]["candidate_id"] == "C-CLI"
     assert output[0]["candidate_generator_params"] == {"radius": "0.1"}
+
+
+def test_cli_init_command(tmp_path: Path, capsys) -> None:
+    db_path = tmp_path / "candidate_ledger.sqlite"
+
+    assert main(["init", "--db", str(db_path)]) == 0
+
+    assert "Initialized candidate ledger" in capsys.readouterr().out
+    assert db_path.exists()
+
+
+def test_cli_ingest_rejects_malformed_generator_param(tmp_path: Path) -> None:
+    db_path = tmp_path / "candidate_ledger.sqlite"
+    candidate_json = tmp_path / "candidate.json"
+    candidate_json.write_text(json.dumps({"object_id": "C-CLI"}), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="expected KEY=VALUE"):
+        main([
+            "ingest",
+            str(candidate_json),
+            "--db",
+            str(db_path),
+            "--source-dataset-id",
+            "manifest-cli",
+            "--candidate-generator",
+            "test-generator",
+            "--regeneration-command",
+            "test command",
+            "--candidate-generator-param",
+            "malformed",
+        ])

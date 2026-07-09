@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import sqlite3
+from contextlib import closing
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -58,7 +59,7 @@ def connect(db_path: Path) -> sqlite3.Connection:
 
 
 def init_ledger(db_path: Path) -> None:
-    with connect(db_path) as conn:
+    with closing(connect(db_path)) as conn:
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS ledger_metadata (
@@ -112,6 +113,7 @@ def init_ledger(db_path: Path) -> None:
             """,
             (SCHEMA_VERSION, now),
         )
+        conn.commit()
 
 
 def _packet_candidate_id(packet: dict[str, Any]) -> str:
@@ -236,7 +238,7 @@ def validate_record(record: dict[str, Any]) -> None:
 def upsert_record(db_path: Path, record: dict[str, Any]) -> None:
     validate_record(record)
     init_ledger(db_path)
-    with connect(db_path) as conn:
+    with closing(connect(db_path)) as conn:
         existing = conn.execute(
             "SELECT created_at FROM candidates WHERE candidate_id = ?",
             (record["candidate_id"],),
@@ -256,6 +258,7 @@ def upsert_record(db_path: Path, record: dict[str, Any]) -> None:
             """,
             tuple(record[column] for column in columns),
         )
+        conn.commit()
 
 
 def load_candidate_packets(path: Path) -> list[dict[str, Any]]:
@@ -278,7 +281,7 @@ def ingest_packets(
 
 def list_records(db_path: Path) -> list[dict[str, Any]]:
     init_ledger(db_path)
-    with connect(db_path) as conn:
+    with closing(connect(db_path)) as conn:
         rows = conn.execute("SELECT * FROM candidates ORDER BY candidate_id").fetchall()
     records: list[dict[str, Any]] = []
     for row in rows:
@@ -356,4 +359,4 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "list":
         print(json.dumps(list_records(args.db), indent=2, sort_keys=True))
         return 0
-    raise AssertionError(f"unhandled command {args.command}")
+    raise AssertionError(f"unhandled command {args.command}")  # pragma: no cover
