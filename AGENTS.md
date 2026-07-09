@@ -623,9 +623,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.66)
+## Current State (v0.90.67)
 
-**Latest sync (2026-07-09, v0.90.66)**: The Astrometrics coding-agent,
+**Latest sync (2026-07-09, v0.90.67)**: The Astrometrics coding-agent,
 data-selection, and external/cloud-storage policy docs are now mandatory
 directives. Repo-local controls have started under `data_selection/` and
 `storage/`. The active ZTF DR24 posture is unchanged from the latest gate
@@ -635,9 +635,12 @@ explicitly restarts that path. The highest-priority non-blocked roadmap is now
 A1-A7: dataset manifests, candidate ledger, frozen CNN benchmark, grouped
 splits/leakage checks, canonical regression evals, injection-recovery curves,
 and calibration/promotion reports. A1 now has a committed manifest schema and
-validator; A2 now has an initial SQLite candidate ledger schema/CLI. Both
-remain partially open until production runs cite manifest IDs and ingest
-candidate packets automatically. A3's freeze step is complete:
+validator; `Skills/run_pipeline.py` can now cite a source dataset ID in audit
+summaries. A2 now has an initial SQLite candidate ledger schema/CLI plus
+optional run-pipeline ingestion via `--candidate-ledger-db`. Both remain
+partially open until policy-grade manifests cover every real dataset role and
+operator production runs routinely use the manifest/ledger flags. A3's freeze
+step is complete:
 `benchmarks/benchmark_cnn_v1/` wraps `models/tier2_cnn.pt` with locked
 preprocessing, config, score/train entrypoints, tests, and a model card. A4
 now has initial grouped split/leakage controls in `src/grouped_splits.py` and
@@ -744,7 +747,7 @@ See `docs/PRODUCTION_READINESS.md` for the full gap register.
 
 ### Handoff notes (2026-07-02) — v0.90.27 (historical; superseded)
 
-The v0.90.66 addendum above is the current state. This section is preserved
+The v0.90.67 addendum above is the current state. This section is preserved
 only as dated history for the ZTF DR24 pivot.
 
 **Current merged state through PR #163**:

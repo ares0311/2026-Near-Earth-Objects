@@ -1697,6 +1697,43 @@ class TestRunPipelineAutoDelete:
         loaded = json.loads((log_dir / "run_summary.json").read_text())
         assert loaded["v"] == 2
 
+    # --- candidate ledger integration ---
+
+    def test_write_candidate_ledger_records_compact_result(self, tmp_path):
+        from candidate_ledger import list_records
+
+        mod = self._load_skill()
+        db_path = tmp_path / "candidate_ledger.sqlite"
+        count = mod.write_candidate_ledger(
+            db_path,
+            [{"object_id": "cand-1", "neo_probability": 0.42}],
+            source_dataset_id="manifest:test-live-search",
+            run_id="run-1",
+            run_params={"surveys": ["WISE"]},
+            regeneration_command="uv run --python 3.14 python Skills/run_pipeline.py ...",
+            raw_uri="Logs/pipeline_runs/run-1/run_summary.json",
+        )
+
+        records = list_records(db_path)
+        assert count == 1
+        assert records[0]["candidate_id"] == "cand-1"
+        assert records[0]["source_dataset_id"] == "manifest:test-live-search"
+        assert records[0]["candidate_generator"] == "Skills/run_pipeline.py"
+        assert records[0]["candidate_generator_params"] == {"surveys": ["WISE"]}
+
+    def test_write_candidate_ledger_requires_source_dataset_id(self, tmp_path):
+        mod = self._load_skill()
+        with pytest.raises(ValueError, match="--source-dataset-id"):
+            mod.write_candidate_ledger(
+                tmp_path / "candidate_ledger.sqlite",
+                [],
+                source_dataset_id=" ",
+                run_id="run-1",
+                run_params={},
+                regeneration_command="cmd",
+                raw_uri="not-recorded",
+            )
+
     # --- main() integration: --no-delete-cache and --no-audit-log flags ---
 
     def test_main_writes_audit_log(self, tmp_path, monkeypatch):
@@ -1722,6 +1759,40 @@ class TestRunPipelineAutoDelete:
         assert summary["ra_deg"] == 10.0
         assert summary["dec_deg"] == 5.0
         assert summary["n_results"] == 0
+
+    def test_main_writes_dataset_id_and_candidate_ledger(self, tmp_path, monkeypatch):
+        """main() can cite a dataset manifest ID and ingest candidate rows."""
+        import json
+        from unittest.mock import patch
+
+        from candidate_ledger import list_records
+
+        mod = self._load_skill()
+        ledger_path = tmp_path / "candidate_ledger.sqlite"
+        monkeypatch.setattr(mod, "_LOG_ROOT", tmp_path / "pipeline_runs")
+        monkeypatch.setattr(mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        with patch.object(
+            mod,
+            "run_pipeline",
+            return_value=[{"object_id": "cand-main", "neo_probability": 0.25}],
+        ):
+            mod.main([
+                "--ra", "10.0", "--dec", "5.0",
+                "--start-jd", "2460000.0", "--end-jd", "2460001.0",
+                "--source-dataset-id", "manifest:main-test",
+                "--candidate-ledger-db", str(ledger_path),
+                "--no-delete-cache",
+            ])
+
+        run_dirs = list((tmp_path / "pipeline_runs").iterdir())
+        summary = json.loads((run_dirs[0] / "run_summary.json").read_text())
+        records = list_records(ledger_path)
+        assert summary["source_dataset_id"] == "manifest:main-test"
+        assert summary["candidate_ledger_db"] == str(ledger_path)
+        assert summary["candidate_ledger_records_written"] == 1
+        assert records[0]["candidate_id"] == "cand-main"
+        assert records[0]["source_dataset_id"] == "manifest:main-test"
 
     def test_main_no_audit_log_skips_write(self, tmp_path, monkeypatch):
         """--no-audit-log prevents writing the audit log."""
@@ -1828,6 +1899,8 @@ class TestRunPipelineAutoDelete:
             "run_id", "timestamp_utc", "ra_deg", "dec_deg", "radius_deg",
             "start_jd", "end_jd", "surveys", "dry_run", "n_results",
             "elapsed_seconds", "cache_files_downloaded", "cache_files_deleted",
+            "source_dataset_id", "candidate_ledger_db",
+            "candidate_ledger_records_written",
         }
         assert required.issubset(summary.keys())
 

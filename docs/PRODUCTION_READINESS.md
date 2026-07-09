@@ -1,6 +1,6 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.90.66
+**Current version**: v0.90.67
 **Last updated**: 2026-07-09 (header/sync line only — the P1-P5 gate register
 body below is unchanged historical evidence from 2026-07-02; current gate
 status for the active ZTF DR24 path lives in
@@ -76,6 +76,11 @@ launching a materially larger production batch, the project must add:
   calibration reports, false-discovery estimates, pretrained audits, benchmark
   model cards, and operator signoff. Actual production promotion still requires
   real model-specific evidence packets that pass every cited gate.
+- Initial A1/A2 pipeline wiring landed in v0.90.67: `Skills/run_pipeline.py`
+  accepts `--source-dataset-id` for run summaries and optional
+  `--candidate-ledger-db` ingestion into the SQLite candidate ledger. Full
+  production adoption still requires policy-grade manifests for each real
+  dataset role and routine operator use of those flags.
 - Canonical sample-level regression evals covering known NEO detections, false
   link examples, injected moving-source controls, and review-packet examples.
 - Injection-recovery curves over magnitude, velocity, trail length,

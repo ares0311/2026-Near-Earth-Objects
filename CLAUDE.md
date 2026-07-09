@@ -802,9 +802,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.66)
+## Current State (v0.90.67)
 
-**Latest sync (2026-07-09, v0.90.66)**: The Astrometrics coding-agent,
+**Latest sync (2026-07-09, v0.90.67)**: The Astrometrics coding-agent,
 data-selection, and external/cloud-storage policy docs are now mandatory
 session-start reads and have repo-local operational scaffolds under
 `data_selection/` and `storage/`. The active ZTF DR24 posture is unchanged:
@@ -813,9 +813,12 @@ candidate-pair search remains intentionally paused unless the operator
 explicitly restarts that path. The most productive non-blocked work is now
 policy-backed data selection, storage, ranking, validation, and evidence
 hardening, not another unapproved Z3 pair attempt. A1 now has a committed
-manifest schema and validator; A2 now has an initial SQLite candidate ledger
-schema/CLI. Both remain partially open until production runs cite manifest IDs
-and ingest candidate packets automatically. A3's freeze step is complete:
+manifest schema and validator; `Skills/run_pipeline.py` can now cite a source
+dataset ID in audit summaries. A2 now has an initial SQLite candidate ledger
+schema/CLI plus optional run-pipeline ingestion via `--candidate-ledger-db`.
+Both remain partially open until policy-grade manifests cover every real
+dataset role and operator production runs routinely use the manifest/ledger
+flags. A3's freeze step is complete:
 `benchmarks/benchmark_cnn_v1/` wraps `models/tier2_cnn.pt` with locked
 preprocessing, config, score/train entrypoints, tests, and a model card. A4
 now has initial grouped split/leakage controls in `src/grouped_splits.py` and
