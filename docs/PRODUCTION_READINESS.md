@@ -1,7 +1,7 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.90.60
-**Last updated**: 2026-07-08 (header/sync line only — the P1-P5 gate register
+**Current version**: v0.90.61
+**Last updated**: 2026-07-09 (header/sync line only — the P1-P5 gate register
 body below is unchanged historical evidence from 2026-07-02; current gate
 status for the active ZTF DR24 path lives in
 `docs/ZTF_DR24_PRODUCTION_GATES.md`, which is kept current every session)
@@ -55,7 +55,9 @@ launching a materially larger production batch, the project must add:
   scoring, evaluation, and live-search runs.
 - A candidate ledger that can regenerate every candidate packet from source
   dataset ID, generator params, model versions, scores, review state, and
-  command provenance.
+  command provenance. Initial SQLite schema and CLI landed in v0.90.61; the
+  next closure step is wiring production runs to cite manifest IDs and ingest
+  candidate packets automatically.
 - A frozen CNN benchmark (`benchmark_cnn_v1`) with locked preprocessing, seeds,
   split definitions, metrics, and a model card.
 - Grouped NEO splits by night, sky region, survey/instrument, and object ID;
