@@ -3,6 +3,23 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.64 — Add canonical regression eval runner (2026-07-09)
+
+### Added
+- `src/canonical_eval.py`: A5 sample-level canonical eval engine for
+  known-NEO recovery, false-link, injection-recovery, and review-packet cases.
+- `Skills/run_canonical_evals.py`: fail-closed CLI that writes JSON reports and
+  exits nonzero on regressions.
+- `data_selection/canonical_evals/`: documented example suite showing the
+  expected JSON contract.
+- Tests covering passing, failing, file-backed, malformed, and CLI regression
+  paths.
+
+### Changed
+- Version metadata advanced to v0.90.64.
+- README, AGENTS, and CLAUDE now record A5 as partially scaffolded while
+  preserving the requirement for real frozen canonical suites before promotion.
+
 ## v0.90.63 — Add grouped split leakage controls (2026-07-09)
 
 ### Added
