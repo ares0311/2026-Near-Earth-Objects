@@ -3,6 +3,23 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.68 — Gate stacker promotion on grouped splits (2026-07-09)
+
+### Added
+- `Skills/train_ensemble_stacker.py --grouped-split-report`: accepts an A4
+  grouped split leakage report from `Skills/validate_grouped_splits.py`.
+- `Skills/train_ensemble_stacker.py --production-candidate`: fails closed unless
+  the grouped split report exists, has schema `grouped-split-leakage-v1`, and
+  passes.
+- Tests for passing, missing, invalid, wrong-schema, and failing grouped split
+  reports plus dry-run production-candidate CLI behavior.
+
+### Changed
+- Version metadata advanced to v0.90.68.
+- README, production-readiness, AGENTS, and CLAUDE now record initial A4
+  model-builder adoption for the ensemble stacker while broader production
+  adoption remains open.
+
 ## v0.90.67 — Wire pipeline manifest and ledger outputs (2026-07-09)
 
 ### Added

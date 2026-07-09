@@ -623,9 +623,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.67)
+## Current State (v0.90.68)
 
-**Latest sync (2026-07-09, v0.90.67)**: The Astrometrics coding-agent,
+**Latest sync (2026-07-09, v0.90.68)**: The Astrometrics coding-agent,
 data-selection, and external/cloud-storage policy docs are now mandatory
 directives. Repo-local controls have started under `data_selection/` and
 `storage/`. The active ZTF DR24 posture is unchanged from the latest gate
@@ -644,8 +644,10 @@ step is complete:
 `benchmarks/benchmark_cnn_v1/` wraps `models/tier2_cnn.pt` with locked
 preprocessing, config, score/train entrypoints, tests, and a model card. A4
 now has initial grouped split/leakage controls in `src/grouped_splits.py` and
-`Skills/validate_grouped_splits.py`; model-builder adoption and promotion
-report wiring remain open. A5 now has a fail-closed canonical regression eval
+`Skills/validate_grouped_splits.py`; `Skills/train_ensemble_stacker.py` now
+requires a passing grouped split report when `--production-candidate` is set.
+Broader model-builder adoption and promotion report wiring remain open. A5 now
+has a fail-closed canonical regression eval
 engine in `src/canonical_eval.py` and `Skills/run_canonical_evals.py`; frozen
 production suites covering known-NEO recovery, false links, injection-recovery,
 and review-packet examples remain open. The CNN is still not
@@ -747,7 +749,7 @@ See `docs/PRODUCTION_READINESS.md` for the full gap register.
 
 ### Handoff notes (2026-07-02) — v0.90.27 (historical; superseded)
 
-The v0.90.67 addendum above is the current state. This section is preserved
+The v0.90.68 addendum above is the current state. This section is preserved
 only as dated history for the ZTF DR24 pivot.
 
 **Current merged state through PR #163**:
