@@ -308,6 +308,20 @@ non-blocked ZTF/Astrometrics gate or documentation sync.
   when the quantitative gate in `docs/PRODUCTION_READINESS.md` passes on held-out
   real labeled data. Reliability diagrams are evidence artifacts, not a human
   approval gate. Any failed or missing KPI blocks promotion.
+- **MCP servers, when configured/available**: prefer these over guessing or
+  ad hoc web scraping —
+  - **GitHub MCP** for issues, PRs, remote branches, repo metadata, PR review
+    notes, branch health, and PR links.
+  - **Context7 MCP** for current library/framework/API documentation instead
+    of relying on training-data recall.
+  - **arXiv MCP** for preprint lookup and research context.
+  - **NASA ADS MCP** for astronomy/astrophysics literature, bibcodes,
+    citations, references, metrics, and BibTeX export.
+  This project also runs repo-scoped MCP tools (`neo_project_files`,
+  `neo_git_read`, `neo_guard`, configured in `.mcp.json`) for bounded file
+  reads, read-only git inspection, and fixed offline validation commands —
+  prefer these over raw shell equivalents when doing read-only repo
+  inspection.
 
 ---
 
