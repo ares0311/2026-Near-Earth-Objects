@@ -18,3 +18,10 @@ Current production posture:
 - Data roles must stay separated: training, validation, retrospective replay,
   live search, follow-up, positive control, negative control, and submission
   package evidence are not interchangeable.
+
+Manifest validation:
+
+- Dataset manifests live in `data_selection/dataset_manifests/`.
+- The required schema is `data_selection/dataset_manifest.schema.json`.
+- Validate one or more manifests with
+  `uv run --python 3.14 python Skills/validate_dataset_manifest.py <manifest.json>`.
