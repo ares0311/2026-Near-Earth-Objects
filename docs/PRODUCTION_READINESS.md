@@ -1,6 +1,6 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.90.73
+**Current version**: v0.90.74
 **Last updated**: 2026-07-10 (header/sync line only — the P1-P5 gate register
 body below is unchanged historical evidence from 2026-07-02; current gate
 status for the active ZTF DR24 path lives in
@@ -93,6 +93,27 @@ launching a materially larger production batch, the project must add:
   committed at `data/injection_recovery_image_level_n200.json`
   (detection/link/score rate 7.5%, real per-bin curves for all three new
   dimensions).
+- A7 fail-closed model promotion reports landed in v0.90.66. v0.90.74 closes
+  the acquisition-side root cause behind the `grouped_split_report_missing`
+  blocker: `Skills/download_ztf_training_alerts.py` now captures each real
+  alert's `object_id` (ZTF broker's persistent per-sky-position identifier),
+  `candid`, `jd`, `ra`, `dec`, `fid`, `field`, and the real archive night
+  string -- fields verified present in a real downloaded packet per
+  `docs/evidence/phase0/2026-07-02-gate-z3-uw-alert-archive-candidate.md`,
+  not guessed. `Skills/build_cutout_dataset.py` propagates them into
+  `index.csv`. `Skills/train_tier2_cnn.py` replaces its prior
+  `random_split()` (no leakage guarantee) with a genuine grouped split by
+  `object_id` across train/validation/test, gains `--emit-split-csv` to
+  write a `Skills/validate_grouped_splits.py`-compatible audit file matching
+  the exact split a training run will use, and warns loudly (not silently)
+  when a legacy row lacks `object_id`. This is a **code fix, not a data
+  fix** -- the existing frozen `benchmark_cnn_v1` and its committed
+  `data/ztf_labeled_alerts.json` are untouched; a fresh operator-run
+  download + retrain is required to actually close the blocker with real
+  evidence (see the operator handoff in `CLAUDE.md`'s Current State). 26 new
+  tests cover the field capture, CSV propagation, grouped-split assignment
+  (same object never split across train/val/test), and the CLI's fail-closed
+  behavior on legacy (no-provenance) CSVs.
 - A7 fail-closed model promotion reports landed in v0.90.66. v0.90.73 adds
   four real, committed dataset manifests under `data_selection/dataset_manifests/`
   (`ztf_labeled_alerts_tier2_cnn_v1`, `gate_z4_ranking_baseline_v1`,

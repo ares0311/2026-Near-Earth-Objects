@@ -3,6 +3,43 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.74 — Capture real grouped-split provenance in Tier 2 CNN data pipeline (2026-07-10)
+
+### Added
+- `Skills/download_ztf_training_alerts.py`: `parse_avro_alert()` now captures
+  each real alert's `object_id` (ZTF broker's persistent per-sky-position
+  identifier), `candid`, `jd`, `ra`, `dec`, `fid`, `field`, and the real
+  archive-night string -- fields verified present in a real downloaded
+  packet (`docs/evidence/phase0/2026-07-02-gate-z3-uw-alert-archive-candidate.md`),
+  not guessed. `download_night()` threads the archive night through.
+- `Skills/build_cutout_dataset.py`: propagates the new provenance fields
+  into `index.csv` as `candidate_id`/`object_id`/`jd`/`ra_deg`/`dec_deg`/
+  `source_key` columns when present; legacy inputs without them still
+  produce the original two-column CSV.
+- `Skills/train_tier2_cnn.py`: `assign_grouped_split()` replaces
+  `random_split()` with a genuine grouped train/validation/test split by
+  real `object_id` -- the same physical detection series can never appear
+  in more than one split. `--emit-split-csv` writes a
+  `Skills/validate_grouped_splits.py`-compatible audit CSV using the exact
+  same assignment a training run would use, and `--test-fraction` (new)
+  carves out a held-out test split. Fails closed with a clear error if
+  `--emit-split-csv` is requested against a legacy CSV lacking `object_id`.
+- 26 new tests across `tests/test_download_ztf_training_alerts.py` (new),
+  `tests/test_build_cutout_dataset.py` (new), and
+  `tests/test_train_tier2_cnn_policy.py` (extended) -- all offline, using
+  synthetic AVRO packets built with the project's established fastavro test
+  pattern; no network calls.
+
+### Changed
+- Version metadata advanced to v0.90.74.
+- README, production-readiness, AGENTS, and CLAUDE record this as a **code
+  fix only** -- the frozen `benchmark_cnn_v1` and its committed
+  `data/ztf_labeled_alerts.json` are untouched. CLAUDE.md's Current State
+  has the exact operator command sequence (download -> build -> emit-split
+  -> validate -> retrain -> calibrate) to actually close the
+  `grouped_split_report_missing` and `calibration_report_missing` A7
+  blockers with real evidence.
+
 ## v0.90.73 — Add four real dataset manifests, close one A7 blocker (2026-07-10)
 
 ### Added

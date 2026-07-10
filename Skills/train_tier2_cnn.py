@@ -17,15 +17,28 @@ Three key design choices vs. the naive implementation:
    achieves 85% accuracy while being useless for artifact rejection.  Weights
    are computed from the training split only (not the val split) to avoid leakage.
 
-3. Mini-batch DataLoader + 80/20 val split — stochastic mini-batch updates
-   (batch_size 32) converge much faster than sample-at-a-time updates and
-   the validation split lets us track overfitting and save the best checkpoint.
+3. Mini-batch DataLoader + a grouped train/validation/test split (A4) —
+   stochastic mini-batch updates (batch_size 32) converge much faster than
+   sample-at-a-time updates, and grouping by real ZTF object_id (not a plain
+   random split) guarantees the same physical detection series never appears
+   in both train and validation/test. Requires a labels CSV with
+   object_id/jd/ra_deg/dec_deg columns from Skills/build_cutout_dataset.py
+   fed by Skills/download_ztf_training_alerts.py's provenance-capturing fix;
+   legacy datasets without those columns fall back to singleton per-row
+   groups (no leakage guarantee) with a printed warning.
 
 Usage:
     PYTHONPATH=src caffeinate -i python Skills/train_tier2_cnn.py \\
         --labels data/cutouts/index.csv \\
         --epochs 20 \\
         --out models/tier2_cnn.pt
+
+    # Audit the split before training (A4/A7 evidence):
+    PYTHONPATH=src python Skills/train_tier2_cnn.py \\
+        --labels data/cutouts/index.csv \\
+        --emit-split-csv data/cutouts/grouped_split.csv
+    PYTHONPATH=src python Skills/validate_grouped_splits.py \\
+        data/cutouts/grouped_split.csv > grouped_split_report.json
 """
 
 from __future__ import annotations
@@ -50,6 +63,96 @@ LABEL_NAMES = [
     "stellar_artifact",     # 3 — bogus ZTF detection
     "other_solar_system",   # 4
 ]
+
+
+def assign_grouped_split(
+    rows: list[dict], *, val_fraction: float, test_fraction: float, seed: int
+) -> tuple[list[str], int]:
+    """Assign each row to train/validation/test by real object_id group.
+
+    Rows sharing the same real ZTF `object_id` (the broker's persistent
+    per-sky-position identifier -- see
+    Skills/download_ztf_training_alerts.py) are always assigned to the same
+    split, so the same physical detection series can never appear in both
+    train and validation/test. This replaces the prior `random_split()`,
+    which had no such guarantee and could leak the same object across
+    splits when a short download window (e.g. `--nights 3`) produces
+    multiple alerts for the same object.
+
+    Returns (assignments, n_rows_missing_object_id), aligned with `rows`
+    order. Rows without a usable `object_id` (e.g. legacy datasets
+    downloaded before this fix) each form their own singleton group -- a
+    fallback that avoids crashing, not a leakage guarantee; the caller
+    should warn loudly when this count is nonzero.
+    """
+    import random
+
+    groups: dict[str, list[int]] = {}
+    n_missing = 0
+    for idx, row in enumerate(rows):
+        object_id = (row.get("object_id") or "").strip()
+        if not object_id:
+            n_missing += 1
+            object_id = f"__no_object_id_row_{idx}"
+        groups.setdefault(object_id, []).append(idx)
+
+    group_keys = sorted(groups)  # deterministic order before shuffling
+    rng = random.Random(seed)
+    rng.shuffle(group_keys)
+
+    n_total = len(rows)
+    target_val = max(1, int(round(val_fraction * n_total)))
+    target_test = max(1, int(round(test_fraction * n_total)))
+
+    assignments = ["train"] * n_total
+    n_val_assigned = 0
+    n_test_assigned = 0
+    for key in group_keys:
+        indices = groups[key]
+        if n_test_assigned < target_test:
+            split = "test"
+            n_test_assigned += len(indices)
+        elif n_val_assigned < target_val:
+            split = "validation"
+            n_val_assigned += len(indices)
+        else:
+            break  # remaining groups stay "train" (already the default)
+        for idx in indices:
+            assignments[idx] = split
+
+    return assignments, n_missing
+
+
+def write_grouped_split_csv(rows: list[dict], assignments: list[str], out_path: Path) -> None:
+    """Write a CSV matching Skills/validate_grouped_splits.py's input contract."""
+    fieldnames = [
+        "sample_id",
+        "split",
+        "label",
+        "object_id",
+        "jd",
+        "ra_deg",
+        "dec_deg",
+        "source_key",
+    ]
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with out_path.open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        for row, split in zip(rows, assignments, strict=True):
+            candidate_id = row.get("candidate_id") or row.get("cutout_path", "")
+            writer.writerow(
+                {
+                    "sample_id": candidate_id,
+                    "split": split,
+                    "label": row.get("label", ""),
+                    "object_id": row.get("object_id") or candidate_id,
+                    "jd": row.get("jd", ""),
+                    "ra_deg": row.get("ra_deg", ""),
+                    "dec_deg": row.get("dec_deg", ""),
+                    "source_key": row.get("source_key") or "ZTF:P48",
+                }
+            )
 
 
 def _load_cutout_npz(npz_path: str):  # noqa: ANN201
@@ -123,11 +226,11 @@ def _compute_class_weights(rows: list[dict]) -> Any:
 
 
 def train(labels_csv: str, epochs: int, out_path: str, lr: float,
-          batch_size: int, val_fraction: float) -> None:
+          batch_size: int, val_fraction: float, test_fraction: float) -> None:
     """Train the Tier 2 CNN and save the best checkpoint by val loss."""
     import torch
     import torch.nn as nn
-    from torch.utils.data import DataLoader, random_split
+    from torch.utils.data import DataLoader, Subset
 
     from classify import _build_cnn_model
 
@@ -143,14 +246,37 @@ def train(labels_csv: str, epochs: int, out_path: str, lr: float,
         print("ERROR: empty labels CSV")
         return
 
-    # 80/20 stratified-ish split (random_split preserves label distribution
-    # statistically for large N; for small N consider StratifiedShuffleSplit)
+    # A4 grouped split by real object_id (see assign_grouped_split docstring):
+    # the same physical detection series can never appear in both train and
+    # validation/test, unlike the prior random_split(). The held-out "test"
+    # split is excluded from training entirely; it exists for independent
+    # evaluation (Skills/evaluate_calibration.py or similar), not for this
+    # script to consume.
+    assignments, n_missing_object_id = assign_grouped_split(
+        rows, val_fraction=val_fraction, test_fraction=test_fraction, seed=42
+    )
+    if n_missing_object_id:
+        print(
+            f"WARNING: {n_missing_object_id}/{len(rows)} rows have no real "
+            "object_id (legacy dataset predating Skills/download_ztf_training_alerts.py's "
+            "provenance fix). Each was treated as its own singleton group — "
+            "this does NOT protect against leakage for these specific rows."
+        )
+    train_indices = [i for i, a in enumerate(assignments) if a == "train"]
+    val_indices = [i for i, a in enumerate(assignments) if a == "validation"]
+    test_indices = [i for i, a in enumerate(assignments) if a == "test"]
+    if not train_indices or not val_indices:
+        print("ERROR: grouped split produced an empty train or validation set.")
+        return
+
     dataset = _build_dataset(rows)
-    n_val = max(1, int(val_fraction * len(dataset)))
-    n_train = len(dataset) - n_val
-    train_ds, val_ds = random_split(
-        dataset, [n_train, n_val],
-        generator=torch.Generator().manual_seed(42),  # reproducible split
+    train_ds = Subset(dataset, train_indices)
+    val_ds = Subset(dataset, val_indices)
+    n_train = len(train_indices)
+    n_val = len(val_indices)
+    print(
+        f"Grouped split: {n_train} train / {n_val} validation / "
+        f"{len(test_indices)} test (held out, unused here)"
     )
 
     # Compute class weights from training rows only (avoid val leakage)
@@ -253,9 +379,24 @@ def main() -> None:
                         help="Mini-batch size for DataLoader")
     parser.add_argument("--val-fraction", type=float, default=0.2,
                         help="Fraction of data held out for validation")
+    parser.add_argument("--test-fraction", type=float, default=0.15,
+                        help="Fraction of data held out as a test split (unused by this "
+                             "script; carved out for independent evaluation)")
     parser.add_argument(
         "--dry-run", action="store_true",
         help="Check the labels CSV and grouped split gate; exit without training.",
+    )
+    parser.add_argument(
+        "--emit-split-csv",
+        type=Path,
+        default=None,
+        help=(
+            "Write the real grouped train/validation/test split this run would use "
+            "(by object_id, matching Skills/download_ztf_training_alerts.py's "
+            "provenance) to this CSV path, in the format "
+            "Skills/validate_grouped_splits.py consumes, then exit without training. "
+            "Requires --labels to have object_id/jd/ra_deg/dec_deg columns."
+        ),
     )
     parser.add_argument(
         "--grouped-split-report",
@@ -276,6 +417,37 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    if args.emit_split_csv is not None:
+        labels_path = Path(args.labels)
+        with labels_path.open() as f:
+            rows = list(csv.DictReader(f))
+        if not rows:
+            print("ERROR: empty labels CSV")
+            sys.exit(1)
+        if not any(row.get("object_id") for row in rows):
+            print(
+                "ERROR: --labels has no object_id column populated. "
+                "Re-download with Skills/download_ztf_training_alerts.py and rebuild "
+                "the cutout index with Skills/build_cutout_dataset.py before emitting "
+                "a grouped split — legacy datasets cannot be grouped-split retroactively."
+            )
+            sys.exit(1)
+        assignments, n_missing = assign_grouped_split(
+            rows, val_fraction=args.val_fraction, test_fraction=args.test_fraction, seed=42
+        )
+        write_grouped_split_csv(rows, assignments, args.emit_split_csv)
+        counts = {s: assignments.count(s) for s in ("train", "validation", "test")}
+        print(f"Grouped split CSV written: {args.emit_split_csv}")
+        print(f"  counts: {counts}")
+        if n_missing:
+            print(f"  WARNING: {n_missing} rows lacked object_id (singleton fallback groups)")
+        print(
+            "\nNext step:\n"
+            f"  uv run --python 3.14 python Skills/validate_grouped_splits.py "
+            f"{args.emit_split_csv} > grouped_split_report.json"
+        )
+        return
+
     grouped_split_gate = load_grouped_split_gate(args.grouped_split_report)
     if args.grouped_split_report is not None or args.production_candidate:
         print("\nGrouped split gate:")
@@ -295,7 +467,7 @@ def main() -> None:
         return
 
     train(args.labels, args.epochs, args.out, args.lr,
-          args.batch_size, args.val_fraction)
+          args.batch_size, args.val_fraction, args.test_fraction)
 
 
 if __name__ == "__main__":

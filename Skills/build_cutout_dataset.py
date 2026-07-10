@@ -7,7 +7,10 @@ Reads a JSON file where each entry has observations with base64-encoded cutout f
 4=other_solar_system).
 
 Writes one .npz file per valid triplet to ``output_dir/``, then writes a CSV index with
-columns: ``cutout_path``, ``label``.  The CSV is the expected input for
+columns: ``cutout_path``, ``label``, plus A4 grouped-split provenance columns
+(``candidate_id``, ``object_id``, ``jd``, ``ra_deg``, ``dec_deg``, ``source_key``)
+when the input JSON entries carry them (see
+``Skills/download_ztf_training_alerts.py``). The CSV is the expected input for
 ``Skills/train_tier2_cnn.py``.
 
 Usage:
@@ -63,6 +66,7 @@ def build_cutout_dataset(
 
     rows: list[dict] = []
     n_written = 0
+    has_provenance = False
 
     for entry_idx, entry in enumerate(entries):
         label = int(entry.get("label", 0))
@@ -77,11 +81,32 @@ def build_cutout_dataset(
             npz_name = f"cutout_{entry_idx:06d}_{obs_idx:03d}.npz"
             npz_path = output_dir / npz_name
             np.savez_compressed(str(npz_path), science=sci, reference=ref, difference=diff)
-            rows.append({"cutout_path": str(npz_path), "label": label})
+            row = {"cutout_path": str(npz_path), "label": label}
+
+            # A4 grouped-split provenance -- only present for alerts downloaded
+            # by the field-capturing Skills/download_ztf_training_alerts.py.
+            candid = entry.get("candid")
+            object_id = entry.get("object_id")
+            jd = entry.get("jd")
+            ra = entry.get("ra")
+            dec = entry.get("dec")
+            if candid is not None or object_id is not None or jd is not None:
+                has_provenance = True
+                row["candidate_id"] = candid if candid is not None else npz_name
+                row["object_id"] = object_id if object_id is not None else ""
+                row["jd"] = jd if jd is not None else ""
+                row["ra_deg"] = ra if ra is not None else ""
+                row["dec_deg"] = dec if dec is not None else ""
+                row["source_key"] = "ZTF:P48"
+
+            rows.append(row)
             n_written += 1
 
+    fieldnames = ["cutout_path", "label"]
+    if has_provenance:
+        fieldnames += ["candidate_id", "object_id", "jd", "ra_deg", "dec_deg", "source_key"]
     with csv_path.open("w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=["cutout_path", "label"])
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
 
