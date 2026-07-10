@@ -1,6 +1,6 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.90.68
+**Current version**: v0.90.69
 **Last updated**: 2026-07-09 (header/sync line only — the P1-P5 gate register
 body below is unchanged historical evidence from 2026-07-02; current gate
 status for the active ZTF DR24 path lives in
@@ -66,9 +66,16 @@ launching a materially larger production batch, the project must add:
   random splits are diagnostic only. Initial grouped leakage controls landed
   in v0.90.63; stacker production-candidate adoption landed in v0.90.68;
   broader model-builder adoption and promotion-report wiring remain open.
-- A5 canonical regression eval runner landed in v0.90.64; frozen
-  policy-grade suites covering known-NEO recovery, false links,
-  injection-recovery, and review-packet examples remain open.
+- A5 canonical regression eval runner landed in v0.90.64. v0.90.69 adds
+  `data_selection/canonical_evals/production_suite_v1.json`, a frozen
+  policy-grade suite covering all four case types (`known_neo_recovery`,
+  `false_link`, `injection_recovery`, `review_packet`) with every case's
+  `observed_path` citing real, already-committed evidence (the n=200
+  injection-recovery baseline, the Gate Z4 ranking-baseline purity report,
+  the Gate Z6 retrospective-validation report, and a real Gate Z3
+  known-NEO-recovery attempt that did not confirm a match). This closes A5
+  for model-builder-independent regression protection; per-model canonical
+  suites tied to a specific promoted model remain part of A7.
 - A6 synthetic-harness recovery curves landed in v0.90.65, covering
   magnitude, motion rate, observation count, and night count. Image-level
   seeing/background/trail-length curves remain open.
