@@ -93,6 +93,26 @@ launching a materially larger production batch, the project must add:
   committed at `data/injection_recovery_image_level_n200.json`
   (detection/link/score rate 7.5%, real per-bin curves for all three new
   dimensions).
+- **v0.90.76 (2026-07-10)**: The v0.90.74 handoff was run for real end to
+  end. Result: `grouped_split_report_missing` is still open, but for a new,
+  more precise reason than before. First, a real acquisition bug was found
+  and fixed (`compute_per_night_target()` in
+  `Skills/download_ztf_training_alerts.py`) -- a single night's tarball
+  (40,000+ alerts) could satisfy the whole `--limit` before the loop ever
+  reached night 2/3, so `--nights 3` silently produced single-night data
+  regardless of `--limit`. Fixed and verified: a re-run now genuinely spans
+  3 distinct nights. Second, once real multi-night data existed, a deeper
+  gap surfaced: `train_tier2_cnn.py --emit-split-csv` groups only by
+  `object_id`, but `Skills/validate_grouped_splits.py` independently
+  requires `object_id` AND `night_key` AND `sky_cell` purity. With only 3
+  real nights present, satisfying `night_key` purity requires assigning
+  whole calendar nights to whole splits -- a coarser, statistically weaker
+  split (each split determined by a single night) than the current
+  object-random split. This is a genuine data-acquisition-scale /
+  split-design tradeoff needing operator direction, not a code bug.
+  Evidence: `docs/evidence/a7/2026-07-10-first-attempt-single-night-leakage.md`
+  and
+  `docs/evidence/a7/2026-07-10-second-attempt-object-id-split-still-leaks-night-and-sky.md`.
 - A7 fail-closed model promotion reports landed in v0.90.66. v0.90.74 closes
   the acquisition-side root cause behind the `grouped_split_report_missing`
   blocker: `Skills/download_ztf_training_alerts.py` now captures each real

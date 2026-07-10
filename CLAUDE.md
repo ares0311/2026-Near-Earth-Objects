@@ -818,7 +818,34 @@ and excluded from CI.
 
 ## Current State (v0.90.75)
 
-**Latest sync (2026-07-10, v0.90.75)**: Operator ran step 1 of the v0.90.74
+**Latest sync (2026-07-10, v0.90.76)**: Ran the full v0.90.74 handoff
+command sequence for real (commits `90bf12cc`, `3914824e`, `a9006211`).
+Two real findings, both documented in `docs/evidence/a7/`:
+1. **Fixed and verified**: `download_ztf_training_alerts.py --limit 10000`
+   (and even `--limit 40000`) let a single night's tarball (40,000+ real
+   alerts observed on 2026-07-09) satisfy the whole global limit before the
+   loop ever reached night 2/3 -- `--nights 3` produced single-night data
+   no matter how high `--limit` was raised. Fixed with a new
+   `compute_per_night_target()` helper and `--per-night-limit` flag
+   (default `ceil(--limit / --nights)`); verified a re-run now genuinely
+   spans 3 distinct archive nights (20260707/08/09, ~13,332-13,334 alerts
+   each, 36,038 distinct `object_id`). 3 new regression tests, all pass.
+2. **Found, not yet fixed**: even with genuine 3-night data, the grouped
+   split still fails `Skills/validate_grouped_splits.py` --
+   `train_tier2_cnn.py --emit-split-csv` groups only by `object_id`, but
+   the validator independently requires `object_id` AND `night_key` AND
+   `sky_cell` purity. With only 3 real nights present, `night_key` purity
+   requires assigning whole calendar nights to whole splits -- a coarser,
+   statistically weaker split design (one night entirely determines each
+   split) than the current object-random split. This is a genuine
+   data-acquisition-scale / split-design tradeoff, not a bug: either accept
+   whole-night splits, or acquire enough additional nights that whole-night
+   assignment can put multiple nights in each split. **Flagged to the
+   operator for direction (2026-07-10); not resolved unilaterally.** See
+   `docs/evidence/a7/2026-07-10-second-attempt-object-id-split-still-leaks-night-and-sky.md`
+   for full detail. `grouped_split_report_missing` remains open.
+
+**Earlier sync (2026-07-10, v0.90.75)**: Operator ran step 1 of the v0.90.74
 handoff below and reported total console silence, then killed the process.
 **Root cause (found, not guessed)**: `Skills/download_ztf_training_alerts.py`'s
 `download_night()` read the entire nightly tarball into memory via a single
