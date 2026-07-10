@@ -189,6 +189,43 @@ def assert_no_leakage(records: list[SplitRecord]) -> dict[str, Any]:
     return report
 
 
+def load_grouped_split_gate(report_path: Path | None) -> dict[str, Any]:
+    """Load an A4 grouped-split leakage report for a production-candidate gate.
+
+    Shared by every training Skill that supports ``--production-candidate``
+    (Tier 1 XGBoost, Tier 2 CNN, Tier 3 Transformer, and the ensemble stacker)
+    so the fail-closed contract — missing report, invalid JSON, wrong schema,
+    or a non-passing report all block promotion — is defined in one place.
+    """
+    if report_path is None or not report_path.exists():
+        return {
+            "path": str(report_path) if report_path is not None else None,
+            "passed": False,
+            "blockers": ["grouped_split_report_missing"],
+        }
+    try:
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        return {
+            "path": str(report_path),
+            "passed": False,
+            "blockers": ["grouped_split_report_invalid_json"],
+            "error": str(exc),
+        }
+    blockers: list[str] = []
+    if report.get("schema_version") != "grouped-split-leakage-v1":
+        blockers.append("grouped_split_report_schema_mismatch")
+    if report.get("passed") is not True:
+        blockers.append("grouped_split_report_not_passing")
+    return {
+        "path": str(report_path),
+        "passed": not blockers,
+        "blockers": blockers,
+        "hard_leakage": report.get("hard_leakage"),
+        "missing_required_splits": report.get("missing_required_splits"),
+    }
+
+
 def assign_grouped_splits(
     rows: list[dict[str, Any]],
     *,
