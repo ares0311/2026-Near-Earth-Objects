@@ -816,7 +816,76 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.73)
+## Current State (v0.90.74)
+
+**Latest sync (2026-07-10, v0.90.74)**: Root-caused and fixed the
+acquisition-side gap behind A7's `grouped_split_report_missing` blocker
+(operator confirmed this plan). `Skills/download_ztf_training_alerts.py` now
+captures each real ZTF alert's `object_id`, `candid`, `jd`, `ra`, `dec`,
+`fid`, `field`, and the real archive night -- fields verified present in a
+real downloaded packet (Gate Z3 evidence), not guessed.
+`Skills/build_cutout_dataset.py` propagates them into `index.csv`.
+`Skills/train_tier2_cnn.py` replaces `random_split()` (no leakage guarantee)
+with a genuine grouped train/validation/test split by real `object_id`, and
+gains `--emit-split-csv` to write a `Skills/validate_grouped_splits.py`-
+compatible audit CSV matching the exact split a training run will use. 26
+new tests, all offline (synthetic AVRO/CSV fixtures, no network calls).
+**This is a code fix only** -- the frozen `benchmark_cnn_v1` and its
+committed `data/ztf_labeled_alerts.json` are untouched. Closing the blocker
+for real requires one operator-run download + retrain (not yet done):
+
+```bash
+git pull origin main
+export PYTHONPATH=src
+
+# 1. Download with real provenance captured (expect ~600MB-1GB, well under
+#    the storage ceiling; --nights 3 typically satisfies --limit from the
+#    first night's tarball, so this is usually 1-2 sequential large HTTP
+#    GETs -- not sharded: too few independent units to benefit, and the
+#    script would need explicit-date targeting to shard safely without
+#    duplicate/overlapping night selection).
+caffeinate -i uv run --python 3.14 python Skills/download_ztf_training_alerts.py \
+    --nights 3 --limit 10000 \
+    --output data/ztf_labeled_alerts_v2.json
+
+# 2. Build cutout dataset + provenance-carrying index CSV
+caffeinate -i uv run --python 3.14 python Skills/build_cutout_dataset.py \
+    --input data/ztf_labeled_alerts_v2.json \
+    --output-dir data/cutouts_v2/ \
+    --csv data/cutouts_v2/index.csv
+
+# 3. Emit the real grouped split and validate it (A4 evidence)
+uv run --python 3.14 python Skills/train_tier2_cnn.py \
+    --labels data/cutouts_v2/index.csv \
+    --emit-split-csv data/cutouts_v2/grouped_split.csv
+uv run --python 3.14 python Skills/validate_grouped_splits.py \
+    data/cutouts_v2/grouped_split.csv > Logs/reports/tier2_cnn_grouped_split_report.json
+
+# 4. Retrain, gated on the real passing grouped-split report (not sharded --
+#    single GPU/MPS training job; SYSTEM_PROFILE.md says use full local
+#    compute headroom here, not multiprocessing)
+caffeinate -i uv run --python 3.14 python Skills/train_tier2_cnn.py \
+    --labels data/cutouts_v2/index.csv \
+    --epochs 20 \
+    --out models/tier2_cnn_v2.pt \
+    --grouped-split-report Logs/reports/tier2_cnn_grouped_split_report.json \
+    --production-candidate
+
+# 5. Re-run calibration on the new model (closes the 2nd A7 blocker)
+caffeinate -i uv run --python 3.14 python Skills/evaluate_calibration.py \
+    --alerts data/ztf_labeled_alerts_v2.json \
+    --cutouts-csv data/cutouts_v2/index.csv \
+    --cnn-model models/tier2_cnn_v2.pt \
+    --report-out Logs/reports/calibration_report_v2.json
+```
+
+Naming note: this produces a new candidate (`tier2_cnn_v2`/a future
+`benchmark_cnn_v2`), not a silent overwrite of the frozen `benchmark_cnn_v1`
+-- per A3's freeze policy ("do not keep casually tuning this model"), the
+existing benchmark stays as historical baseline. A follow-up promotion
+report for the new candidate (citing steps 3-5's real outputs) is the next
+coding step once this run completes; `operator_signoff_missing` remains the
+final, inherently human-gated blocker after that.
 
 **Latest sync (2026-07-10, v0.90.73)**: A1 now has four real, committed
 dataset manifests under `data_selection/dataset_manifests/`

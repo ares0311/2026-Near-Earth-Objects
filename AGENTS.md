@@ -634,7 +634,20 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.73)
+## Current State (v0.90.74)
+
+**Latest sync (2026-07-10, v0.90.74)**: Fixed the acquisition-side root
+cause behind A7's `grouped_split_report_missing` blocker (operator-confirmed
+plan). `Skills/download_ztf_training_alerts.py` now captures real per-alert
+`object_id`/`candid`/`jd`/`ra`/`dec`/`fid`/`field`/archive-night (verified
+against a real packet, not guessed); `Skills/build_cutout_dataset.py`
+propagates them; `Skills/train_tier2_cnn.py` replaces `random_split()` with
+a genuine grouped train/validation/test split by `object_id`, plus
+`--emit-split-csv` for a matching audit file. 26 new offline tests. This is
+a **code fix only** — closing the blocker needs one operator-run
+download+retrain; see `CLAUDE.md`'s Current State for the exact command
+sequence (naming: produces a new candidate, not a silent overwrite of the
+frozen `benchmark_cnn_v1`).
 
 **Latest sync (2026-07-10, v0.90.73)**: A1 now has four real, committed
 dataset manifests under `data_selection/dataset_manifests/`

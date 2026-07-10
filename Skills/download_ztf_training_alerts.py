@@ -86,13 +86,25 @@ def _decompress_ztf_stamp(stamp_bytes: bytes) -> bytes | None:
         return None
 
 
-def parse_avro_alert(avro_bytes: bytes) -> dict | None:
+def parse_avro_alert(avro_bytes: bytes, *, archive_night: str | None = None) -> dict | None:
     """Parse a single ZTF Avro alert and return a labeled dict or None.
 
     Returns None if the alert is ambiguous (rb between thresholds),
     missing cutouts, or cannot be parsed.
 
-    ZTF Avro schema fields used:
+    ZTF Avro schema fields used (field names verified against a real
+    downloaded packet — see
+    docs/evidence/phase0/2026-07-02-gate-z3-uw-alert-archive-candidate.md —
+    not guessed):
+        objectId              — ZTF broker's persistent per-sky-position object
+                                 association; the leakage-relevant grouping key
+                                 for A4 grouped splits (same object must not
+                                 appear in both train and validation).
+        candidate.candid       — unique per-detection alert ID
+        candidate.jd            — observation Julian date
+        candidate.ra, .dec      — J2000 sky position [deg]
+        candidate.fid            — filter ID (1=g, 2=r, 3=i)
+        candidate.field           — ZTF field ID
         candidate.rb    — real/bogus score [0, 1]
         candidate.drb   — deep-learning real/bogus score [0, 1]
         cutoutScience.stampData   — 63x63 float32 science image (gzip-compressed)
@@ -144,7 +156,24 @@ def parse_avro_alert(avro_bytes: bytes) -> dict | None:
                 "rb": rb,
                 "drb": drb,
             }
-            return {"label": label, "rb": rb, "drb": drb, "observations": [obs]}
+            return {
+                "label": label,
+                "rb": rb,
+                "drb": drb,
+                # A4/A1 grouped-split provenance — real per-alert metadata,
+                # not derivable after the fact once discarded (see
+                # ztf_labeled_alerts_tier2_cnn_v1.json's known_caveats for
+                # why the original 10,000-alert sample lacks these fields).
+                "object_id": record.get("objectId"),
+                "candid": candidate.get("candid") or record.get("candid"),
+                "jd": candidate.get("jd"),
+                "ra": candidate.get("ra"),
+                "dec": candidate.get("dec"),
+                "fid": candidate.get("fid"),
+                "field": candidate.get("field"),
+                "archive_night": archive_night,
+                "observations": [obs],
+            }
 
     except Exception:
         return None  # malformed Avro — skip silently
@@ -152,12 +181,18 @@ def parse_avro_alert(avro_bytes: bytes) -> dict | None:
     return None
 
 
-def download_night(url: str, limit: int, results: list[dict]) -> int:
+def download_night(url: str, limit: int, results: list[dict], *, archive_night: str) -> int:
     """Download one nightly tarball, parse alerts, append to results.
 
     Returns number of alerts added from this night.
     Skips gracefully if the tarball is not yet available (future date)
     or the server returns an error.
+
+    `archive_night` (the tarball's real YYYYMMDD date) is stamped onto every
+    alert as a robust, independently-verifiable grouping key alongside the
+    per-alert `jd` — this avoids the JD-to-calendar-date off-by-one pitfall
+    already found and fixed once in this project (noon-UTC JD increment,
+    see docs/evidence/live/2026-07-02-gate-z1-night-date-offbyone-fix.md).
     """
     try:
         resp = requests.get(url, timeout=120, stream=True)
@@ -182,7 +217,7 @@ def download_night(url: str, limit: int, results: list[dict]) -> int:
                 fobj = tar.extractfile(member)
                 if fobj is None:
                     continue
-                alert = parse_avro_alert(fobj.read())
+                alert = parse_avro_alert(fobj.read(), archive_night=archive_night)
                 if alert is not None:
                     results.append(alert)
                     n_added += 1
@@ -254,7 +289,7 @@ def main() -> None:
             break
         url = night_tarball_url(d)
         print(f"Downloading {d.strftime('%Y-%m-%d')}: {url}")
-        n = download_night(url, args.limit, results)
+        n = download_night(url, args.limit, results, archive_night=d.strftime("%Y%m%d"))
         n_real = sum(1 for a in results if a["label"] == 0)
         n_bogus = sum(1 for a in results if a["label"] == 3)
         print(f"  +{n} alerts  (total: {len(results)} | real: {n_real} bogus: {n_bogus})")
