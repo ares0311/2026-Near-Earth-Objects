@@ -830,6 +830,28 @@ rate). All five required A6 dimensions (magnitude, velocity, observation
 count, night count, and now seeing/background/trail length) are covered. See
 `docs/PRODUCTION_READINESS.md` for detail.
 
+**Latest sync (2026-07-09, v0.90.70)**: A5 now has a frozen, policy-grade
+canonical eval suite (`data_selection/canonical_evals/production_suite_v1.json`)
+covering all four required case types, every case citing a real,
+already-committed evidence artifact (the n=200 injection-recovery baseline,
+the Gate Z4 ranking-baseline purity/ablation report, the Gate Z6
+retrospective-validation report, and a real, unconfirmed Gate Z3 known-NEO
+recovery attempt transcribed to
+`docs/evidence/canonical_evals/known_neo_recovery_72966_no_match.json`). This
+closes A5 for model-builder-independent regression protection; per-model
+canonical suites remain part of A7. See `docs/PRODUCTION_READINESS.md` for
+detail.
+
+**Latest sync (2026-07-09, v0.90.69)**: All four model-builder Skills
+(`train_tier1_xgboost.py`, `train_tier2_cnn.py`, `train_tier3_transformer.py`,
+and `train_ensemble_stacker.py`) now share the same A4 fail-closed
+`--grouped-split-report`/`--production-candidate` gate via a shared
+`grouped_splits.load_grouped_split_gate` helper. `train_tier2_cnn.py` also
+gained `--dry-run` (previously absent) so the gate can be checked without a
+full CNN training run. This closes "broader model-builder adoption" from the
+v0.90.68 note below; promotion-report wiring with real, model-specific
+evidence packets remains open. See `docs/PRODUCTION_READINESS.md` for detail.
+
 **Latest sync (2026-07-09, v0.90.68)**: The Astrometrics coding-agent,
 data-selection, and external/cloud-storage policy docs are now mandatory
 session-start reads and have repo-local operational scaffolds under

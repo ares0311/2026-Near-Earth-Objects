@@ -7,7 +7,13 @@ from pathlib import Path
 
 import pytest
 
-from canonical_eval import _compare, evaluate_check, evaluate_suite, load_json
+from canonical_eval import (
+    SUPPORTED_CASE_TYPES,
+    _compare,
+    evaluate_check,
+    evaluate_suite,
+    load_json,
+)
 
 
 def _suite() -> dict:
@@ -201,6 +207,21 @@ def test_load_json_reports_invalid_json(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="invalid JSON"):
         load_json(bad)
+
+
+def test_production_suite_passes_against_committed_evidence() -> None:
+    """A5 frozen suite: every case must cite real, already-committed evidence."""
+    repo_root = Path(__file__).resolve().parents[1]
+    suite_path = repo_root / "data_selection" / "canonical_evals" / "production_suite_v1.json"
+    suite = load_json(suite_path)
+
+    report = evaluate_suite(suite, suite_dir=suite_path.parent)
+
+    assert report["passed"] is True
+    assert report["n_cases"] == 4
+    assert {case["case_type"] for case in report["case_results"]} == set(
+        SUPPORTED_CASE_TYPES
+    )
 
 
 def test_cli_writes_report_and_fails_on_regression(tmp_path: Path) -> None:

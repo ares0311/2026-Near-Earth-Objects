@@ -12,6 +12,7 @@ from grouped_splits import (
     assert_no_leakage,
     assign_grouped_splits,
     leakage_report,
+    load_grouped_split_gate,
     record_from_row,
     records_from_csv,
 )
@@ -203,6 +204,53 @@ def test_assign_grouped_splits_keeps_objects_together() -> None:
         splits_by_object.setdefault(str(row["object_id"]), set()).add(str(row["split"]))
     assert all(len(splits) == 1 for splits in splits_by_object.values())
     assert {row["split"] for row in assigned} == {"train", "validation", "test"}
+
+
+def test_load_grouped_split_gate_passes_valid_report(tmp_path: Path) -> None:
+    report_path = tmp_path / "grouped.json"
+    report_path.write_text(
+        json.dumps({
+            "schema_version": "grouped-split-leakage-v1",
+            "passed": True,
+            "hard_leakage": {},
+            "missing_required_splits": [],
+        }),
+        encoding="utf-8",
+    )
+
+    gate = load_grouped_split_gate(report_path)
+
+    assert gate["passed"] is True
+    assert gate["blockers"] == []
+
+
+def test_load_grouped_split_gate_blocks_missing_invalid_and_failing(tmp_path: Path) -> None:
+    invalid = tmp_path / "invalid.json"
+    invalid.write_text("{", encoding="utf-8")
+    failing = tmp_path / "failing.json"
+    failing.write_text(
+        json.dumps({"schema_version": "grouped-split-leakage-v1", "passed": False}),
+        encoding="utf-8",
+    )
+    wrong_schema = tmp_path / "wrong.json"
+    wrong_schema.write_text(
+        json.dumps({"schema_version": "wrong", "passed": True}),
+        encoding="utf-8",
+    )
+
+    assert load_grouped_split_gate(None)["blockers"] == ["grouped_split_report_missing"]
+    assert load_grouped_split_gate(tmp_path / "missing.json")["blockers"] == [
+        "grouped_split_report_missing"
+    ]
+    assert load_grouped_split_gate(invalid)["blockers"] == [
+        "grouped_split_report_invalid_json"
+    ]
+    assert load_grouped_split_gate(failing)["blockers"] == [
+        "grouped_split_report_not_passing"
+    ]
+    assert load_grouped_split_gate(wrong_schema)["blockers"] == [
+        "grouped_split_report_schema_mismatch"
+    ]
 
 
 def test_assign_grouped_splits_rejects_invalid_inputs() -> None:

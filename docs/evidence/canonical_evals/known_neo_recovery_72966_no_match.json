@@ -1,0 +1,11 @@
+{
+  "designation": "72966",
+  "candidate_pair_nights": ["20220817", "20220819"],
+  "n_tracklets_checked": 88,
+  "best_match_offset_arcsec": 4172.4,
+  "confirmed_match": false,
+  "conclusion": "no_tracklet_matches_known_object",
+  "source_evidence": "docs/evidence/live/2026-07-04-gate-z3-no-tracklet-matches-72966.md",
+  "source_tool": "Skills/match_positive_control_tracklet.py",
+  "notes": "Transcribed from the cited evidence file's real match_positive_control_tracklet.py run. This is a real known-NEO recovery ATTEMPT that did NOT confirm a match (Gate Z3 remains open) -- it is not evidence of a successful recovery. The canonical check below only guards against a future regression that would silently start treating a multi-degree offset as a match; it must not be read as a positive control."
+}

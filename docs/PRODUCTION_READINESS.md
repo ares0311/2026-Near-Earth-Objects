@@ -64,11 +64,24 @@ launching a materially larger production batch, the project must add:
   not CNN production promotion.
 - Grouped NEO splits by night, sky region, survey/instrument, and object ID;
   random splits are diagnostic only. Initial grouped leakage controls landed
-  in v0.90.63; stacker production-candidate adoption landed in v0.90.68;
-  broader model-builder adoption and promotion-report wiring remain open.
-- A5 canonical regression eval runner landed in v0.90.64; frozen
-  policy-grade suites covering known-NEO recovery, false links,
-  injection-recovery, and review-packet examples remain open.
+  in v0.90.63; stacker production-candidate adoption landed in v0.90.68.
+  v0.90.69 extends the same fail-closed `--grouped-split-report`/
+  `--production-candidate` gate (backed by a shared
+  `grouped_splits.load_grouped_split_gate`) to the three remaining training
+  Skills: `train_tier1_xgboost.py`, `train_tier2_cnn.py` (which also gained
+  `--dry-run`), and `train_tier3_transformer.py`. All four model-builder
+  Skills now share the same gate. Promotion-report wiring for real,
+  model-specific evidence packets remains open.
+- A5 canonical regression eval runner landed in v0.90.64. v0.90.70 adds
+  `data_selection/canonical_evals/production_suite_v1.json`, a frozen
+  policy-grade suite covering all four case types (`known_neo_recovery`,
+  `false_link`, `injection_recovery`, `review_packet`) with every case's
+  `observed_path` citing real, already-committed evidence (the n=200
+  injection-recovery baseline, the Gate Z4 ranking-baseline purity report,
+  the Gate Z6 retrospective-validation report, and a real Gate Z3
+  known-NEO-recovery attempt that did not confirm a match). This closes A5
+  for model-builder-independent regression protection; per-model canonical
+  suites tied to a specific promoted model remain part of A7.
 - A6 synthetic-harness recovery curves landed in v0.90.65, covering
   magnitude, motion rate, observation count, and night count. v0.90.71 adds
   image-level curves: `Skills/injection_recovery.py --image-level` synthesizes

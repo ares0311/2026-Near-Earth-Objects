@@ -28,6 +28,53 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   (all five required recovery-curve dimensions: magnitude, velocity/motion,
   observation count, night count, and now seeing/background/trail length).
 
+## v0.90.70 — Add frozen A5 canonical regression suite (2026-07-09)
+
+### Added
+- `data_selection/canonical_evals/production_suite_v1.json`: a frozen,
+  policy-grade canonical eval suite covering all four required case types
+  (`known_neo_recovery`, `false_link`, `injection_recovery`,
+  `review_packet`), with every case's `observed_path` citing a real,
+  already-committed evidence artifact instead of inline synthetic data:
+  `data/injection_recovery_n200.json` (n=200 injection baseline),
+  `Logs/reports/ranking_baseline.json` (Gate Z4 purity/ablation evidence),
+  `Logs/reports/retrospective_validation.json` (Gate Z6 review-packet
+  retrospective validation), and a new
+  `docs/evidence/canonical_evals/known_neo_recovery_72966_no_match.json`
+  transcribing the real (unconfirmed) Gate Z3 recovery-attempt evidence.
+- `tests/test_canonical_eval.py::test_production_suite_passes_against_committed_evidence`
+  runs the full frozen suite against the real committed files in CI.
+
+### Changed
+- Version metadata advanced to v0.90.70.
+- README, production-readiness, AGENTS, and CLAUDE now record A5 as complete
+  for model-builder-independent regression protection; per-model canonical
+  suites remain part of A7.
+
+## v0.90.69 — Extend grouped-split gate to all training Skills (2026-07-09)
+
+### Added
+- `grouped_splits.load_grouped_split_gate`: shared A4 grouped-split leakage
+  gate loader (moved out of `train_ensemble_stacker.py`'s private copy) so
+  every training Skill enforces the same fail-closed contract.
+- `Skills/train_tier1_xgboost.py`, `Skills/train_tier2_cnn.py`, and
+  `Skills/train_tier3_transformer.py` all gained `--grouped-split-report` and
+  `--production-candidate`, matching the stacker's v0.90.68 behavior: fail
+  closed unless the cited report exists, has schema
+  `grouped-split-leakage-v1`, and passes.
+- `Skills/train_tier2_cnn.py` gained `--dry-run` (previously absent) so the
+  gate can be checked without launching a full CNN training run.
+- Tests for passing, missing, invalid, wrong-schema, and failing grouped
+  split reports across all three scripts, plus dry-run production-candidate
+  CLI behavior.
+
+### Changed
+- Version metadata advanced to v0.90.69.
+- README, production-readiness, AGENTS, and CLAUDE now record that all four
+  model-builder Skills (stacker + Tier 1/2/3) share the A4 grouped-split
+  gate; promotion-report wiring with real model-specific evidence remains
+  open.
+
 ## v0.90.68 — Gate stacker promotion on grouped splits (2026-07-09)
 
 ### Added
