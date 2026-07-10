@@ -18,6 +18,7 @@ data/ztf_labeled_alerts_v2.json
 data/sequences/
 .mypy_cache/
 .pytest_cache/
+pytest-of-*/
 *.egg-info/
 dist/
 build/

@@ -247,3 +247,34 @@ def test_download_night_prints_progress_with_flush(monkeypatch, capsys):
     assert "scanned=" in out
     assert "ETA" in out
     assert "Done: scanned=3 kept=3" in out
+
+
+def test_compute_per_night_target_caps_a_single_night_below_global_limit():
+    """Regression for the real A4 grouped-split failure: a single night's
+    tarball with 40,000+ alerts must not be allowed to satisfy the entire
+    --limit by itself, or --nights never reaches night 2/3 and every
+    downstream night_key grouped split is trivially all-one-night. See
+    docs/evidence/a7/2026-07-10-first-attempt-single-night-leakage.md."""
+    # Night 1 starts from zero and must stop well short of the 40,000 global
+    # limit so nights 2 and 3 still get a chance to contribute.
+    night_1_target = dl.compute_per_night_target(
+        current_total=0, per_night_limit=13334, global_limit=40000
+    )
+    assert night_1_target == 13334
+    assert night_1_target < 40000
+
+
+def test_compute_per_night_target_never_exceeds_global_limit():
+    """Even on the final night, the target must not exceed --limit, and must
+    account for alerts already collected on prior nights."""
+    night_3_target = dl.compute_per_night_target(
+        current_total=35000, per_night_limit=13334, global_limit=40000
+    )
+    assert night_3_target == 40000  # 35000 + 13334 would exceed the global cap
+
+
+def test_compute_per_night_target_respects_remaining_budget_mid_run():
+    target = dl.compute_per_night_target(
+        current_total=13334, per_night_limit=13334, global_limit=40000
+    )
+    assert target == 26668

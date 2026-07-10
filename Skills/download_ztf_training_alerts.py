@@ -307,17 +307,47 @@ def download_night(url: str, limit: int, results: list[dict], *, archive_night: 
     return n_added
 
 
+def compute_per_night_target(current_total: int, per_night_limit: int, global_limit: int) -> int:
+    """Return the absolute `results` length this night's download_night() call
+    may grow to.
+
+    Bounds how many alerts a single night's tarball may contribute so that a
+    `--nights N` request actually spans N distinct calendar nights instead of
+    one large night's tarball alone satisfying `--limit` and the loop never
+    reaching night 2. This was the real root cause of an A4 grouped-split
+    night_key leakage failure found running this script for real: a single
+    night's public archive tarball can hold 40,000+ real alerts, far above
+    the `--limit 10000` default, so the un-capped per-night pull consumed
+    the whole global limit on night 1 alone. See
+    docs/evidence/a7/2026-07-10-first-attempt-single-night-leakage.md.
+    """
+    return min(global_limit, current_total + per_night_limit)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Download labeled ZTF Avro alerts for ML training (run from Mac)"
     )
     parser.add_argument(
         "--nights", type=int, default=3,
-        help="Number of past nights to download (default: 3; each night ~5000-20000 alerts)"
+        help="Number of past nights to download (default: 3). A single "
+             "night's tarball can hold anywhere from a few thousand to "
+             "40,000+ real alerts, so --per-night-limit (not this count "
+             "alone) governs how many distinct nights actually end up "
+             "represented in the output."
     )
     parser.add_argument(
         "--limit", type=int, default=10000,
         help="Max total alerts to collect across all nights (default: 10000)"
+    )
+    parser.add_argument(
+        "--per-night-limit", type=int, default=None,
+        help="Max alerts to collect from any single night's tarball "
+             "(default: ceil(--limit / --nights)). Without this cap, a "
+             "single large night can satisfy the entire --limit by itself, "
+             "so --nights never actually reaches night 2/3 -- which breaks "
+             "downstream night_key grouped-split leakage checks in "
+             "Skills/validate_grouped_splits.py."
     )
     parser.add_argument(
         "--output", type=Path, default=Path("data/ztf_labeled_alerts.json"),
@@ -329,13 +359,22 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    # Ceil division so every requested night gets a fair, non-zero slice of
+    # the global limit even when args.limit is not an exact multiple of
+    # args.nights.
+    per_night_limit = args.per_night_limit or -(-args.limit // args.nights)
+
     # Build list of dates to download, working backwards from yesterday
     # (today's night may not be packaged yet)
     today = datetime.now(tz=UTC)
     dates = [today - timedelta(days=i + 1) for i in range(args.nights)]
 
     print(f"ZTF public alert archive: {ZTF_ARCHIVE_BASE}", flush=True)
-    print(f"Nights to download: {args.nights}  |  Alert limit: {args.limit}", flush=True)
+    print(
+        f"Nights to download: {args.nights}  |  Alert limit: {args.limit}  |  "
+        f"Per-night limit: {per_night_limit}",
+        flush=True,
+    )
     print(flush=True)
 
     if args.dry_run:
@@ -372,7 +411,8 @@ def main() -> None:
             break
         url = night_tarball_url(d)
         print(f"Downloading {d.strftime('%Y-%m-%d')}: {url}", flush=True)
-        n = download_night(url, args.limit, results, archive_night=d.strftime("%Y%m%d"))
+        night_target = compute_per_night_target(len(results), per_night_limit, args.limit)
+        n = download_night(url, night_target, results, archive_night=d.strftime("%Y%m%d"))
         n_real = sum(1 for a in results if a["label"] == 0)
         n_bogus = sum(1 for a in results if a["label"] == 3)
         print(
