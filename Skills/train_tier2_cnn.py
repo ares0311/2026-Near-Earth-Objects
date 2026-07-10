@@ -40,6 +40,8 @@ from typing import Any
 # Ensure src/ modules (classify.py etc.) are importable when run as a script
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
+from grouped_splits import load_grouped_split_gate
+
 # Human-readable names for the 5 NEOPosterior classes (index = label int)
 LABEL_NAMES = [
     "neo_candidate",        # 0 — real ZTF detection
@@ -231,7 +233,8 @@ def train(labels_csv: str, epochs: int, out_path: str, lr: float,
     print(f"Saved best weights → {out_path}")
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """Parse CLI args, enforce the A4 production-candidate gate, then train."""
     parser = argparse.ArgumentParser(
         description="Train Tier 2 CNN on labeled ZTF cutout dataset",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -250,6 +253,50 @@ if __name__ == "__main__":
                         help="Mini-batch size for DataLoader")
     parser.add_argument("--val-fraction", type=float, default=0.2,
                         help="Fraction of data held out for validation")
+    parser.add_argument(
+        "--dry-run", action="store_true",
+        help="Check the labels CSV and grouped split gate; exit without training.",
+    )
+    parser.add_argument(
+        "--grouped-split-report",
+        type=Path,
+        default=None,
+        help=(
+            "A4 grouped split leakage report from Skills/validate_grouped_splits.py. "
+            "Required when --production-candidate is set."
+        ),
+    )
+    parser.add_argument(
+        "--production-candidate",
+        action="store_true",
+        help=(
+            "Fail closed unless policy-grade promotion prerequisites are present. "
+            "Currently requires a passing grouped split report."
+        ),
+    )
     args = parser.parse_args()
+
+    grouped_split_gate = load_grouped_split_gate(args.grouped_split_report)
+    if args.grouped_split_report is not None or args.production_candidate:
+        print("\nGrouped split gate:")
+        print(f"  report     : {grouped_split_gate['path']}")
+        print(f"  passed     : {str(grouped_split_gate['passed']).lower()}")
+        if grouped_split_gate["blockers"]:
+            print(f"  blockers   : {', '.join(grouped_split_gate['blockers'])}")
+
+    if args.production_candidate and not grouped_split_gate["passed"]:
+        print("\nERROR: --production-candidate requires a passing grouped split report.")
+        sys.exit(1)
+
+    if args.dry_run:
+        labels_path = Path(args.labels)
+        print(f"\nLabels CSV : {'FOUND' if labels_path.exists() else 'MISSING'} {labels_path}")
+        print("Dry run — exiting without training.")
+        return
+
     train(args.labels, args.epochs, args.out, args.lr,
           args.batch_size, args.val_fraction)
+
+
+if __name__ == "__main__":
+    main()

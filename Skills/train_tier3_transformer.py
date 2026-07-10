@@ -24,11 +24,16 @@ import hashlib
 import json
 import random
 import re
+import sys
 from collections import Counter
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+
+from grouped_splits import load_grouped_split_gate
 
 LABEL_NAMES = [
     "neo_candidate",
@@ -354,7 +359,48 @@ def main() -> None:
     )
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument(
+        "--dry-run", action="store_true",
+        help="Check split files and the grouped split gate; exit without training.",
+    )
+    parser.add_argument(
+        "--grouped-split-report",
+        type=Path,
+        default=None,
+        help=(
+            "A4 grouped split leakage report from Skills/validate_grouped_splits.py. "
+            "Required when --production-candidate is set."
+        ),
+    )
+    parser.add_argument(
+        "--production-candidate",
+        action="store_true",
+        help=(
+            "Fail closed unless policy-grade promotion prerequisites are present. "
+            "Currently requires a passing grouped split report."
+        ),
+    )
     args = parser.parse_args()
+
+    grouped_split_gate = load_grouped_split_gate(args.grouped_split_report)
+    if args.grouped_split_report is not None or args.production_candidate:
+        print("\nGrouped split gate:")
+        print(f"  report     : {grouped_split_gate['path']}")
+        print(f"  passed     : {str(grouped_split_gate['passed']).lower()}")
+        if grouped_split_gate["blockers"]:
+            print(f"  blockers   : {', '.join(grouped_split_gate['blockers'])}")
+
+    if args.production_candidate and not grouped_split_gate["passed"]:
+        print("\nERROR: --production-candidate requires a passing grouped split report.")
+        sys.exit(1)
+
+    if args.dry_run:
+        for name, path in (("train", args.train), ("validation", args.validation),
+                           ("test", args.test)):
+            print(f"  {name:<10} : {'FOUND' if path.exists() else 'MISSING'} {path}")
+        print("Dry run — exiting without training.")
+        return
+
     train(
         args.train,
         args.validation,

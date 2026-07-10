@@ -648,6 +648,16 @@ closes A5 for model-builder-independent regression protection; per-model
 canonical suites remain part of A7. See `docs/PRODUCTION_READINESS.md` for
 detail.
 
+**Latest sync (2026-07-09, v0.90.69)**: All four model-builder Skills
+(`train_tier1_xgboost.py`, `train_tier2_cnn.py`, `train_tier3_transformer.py`,
+and `train_ensemble_stacker.py`) now share the same A4 fail-closed
+`--grouped-split-report`/`--production-candidate` gate via a shared
+`grouped_splits.load_grouped_split_gate` helper. `train_tier2_cnn.py` also
+gained `--dry-run` (previously absent) so the gate can be checked without a
+full CNN training run. This closes "broader model-builder adoption" from the
+v0.90.68 note below; promotion-report wiring with real, model-specific
+evidence packets remains open. See `docs/PRODUCTION_READINESS.md` for detail.
+
 **Latest sync (2026-07-09, v0.90.68)**: The Astrometrics coding-agent,
 data-selection, and external/cloud-storage policy docs are now mandatory
 directives. Repo-local controls have started under `data_selection/` and
