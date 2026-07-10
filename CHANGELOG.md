@@ -3,6 +3,37 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.73 — Add four real dataset manifests, close one A7 blocker (2026-07-10)
+
+### Added
+- `data_selection/dataset_manifests/ztf_labeled_alerts_tier2_cnn_v1.json`: real
+  dataset manifest for `data/ztf_labeled_alerts.json`, the frozen
+  `benchmark_cnn_v1` model's real 10,000-alert training source. Populated
+  from a computed sha256 checksum and already-documented project history
+  (real source URL from `Skills/download_ztf_training_alerts.py`, real
+  class-balance figures from T1-A). Explicitly states `"unknown"` for fields
+  that genuinely cannot be determined (exact download night-range) rather
+  than guessing, and documents in `known_caveats` why this dataset cannot
+  support a real grouped-split leakage report: no per-alert RA/Dec/JD/candid
+  was preserved when the file was built.
+- `data_selection/dataset_manifests/gate_z4_ranking_baseline_v1.json`,
+  `gate_z6_retrospective_validation_v1.json`,
+  `a6_injection_recovery_image_level_n200_v1.json`: real manifests for the
+  three frozen-eval evidence files already cited by the A5 canonical eval
+  suite and the A7 promotion report.
+- `tests/test_validate_dataset_manifest.py::test_all_committed_manifests_validate`:
+  regression guard so these real manifests can't silently break against
+  future schema changes.
+
+### Changed
+- Version metadata advanced to v0.90.73.
+- Re-ran `Skills/build_promotion_report.py` for `benchmark_cnn_v1` citing the
+  new training manifest: `docs/evidence/promotion/benchmark_cnn_v1_promotion_report.json`
+  now shows 6/8 evidence checks passing with only 3 real named blockers left
+  (`grouped_split_report_missing`, `calibration_report_missing`,
+  `operator_signoff_missing`), down from 4.
+- README, production-readiness, AGENTS, and CLAUDE synced to record this.
+
 ## v0.90.72 — Run A7 promotion report for real against benchmark_cnn_v1 (2026-07-10)
 
 ### Added

@@ -1,13 +1,15 @@
 {
   "evidence": [
     {
-      "blockers": [
-        "dataset_manifest_missing"
-      ],
-      "details": {},
+      "blockers": [],
+      "details": {
+        "dataset_id": "ztf_labeled_alerts_tier2_cnn_v1",
+        "missing_fields": [],
+        "role": "training"
+      },
       "name": "dataset_manifest",
-      "passed": false,
-      "path": null
+      "passed": true,
+      "path": "data_selection/dataset_manifests/ztf_labeled_alerts_tier2_cnn_v1.json"
     },
     {
       "blockers": [
@@ -88,7 +90,6 @@
   "operator_signoff_id": null,
   "promotion_allowed": false,
   "promotion_blockers": [
-    "dataset_manifest_missing",
     "grouped_split_report_missing",
     "calibration_report_missing",
     "operator_signoff_missing"

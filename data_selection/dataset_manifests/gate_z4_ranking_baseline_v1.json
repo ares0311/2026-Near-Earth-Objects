@@ -1,0 +1,36 @@
+{
+  "dataset_id": "gate_z4_ranking_baseline_v1",
+  "project": "2026 Near Earth Objects",
+  "role": "frozen_eval",
+  "source_name": "Gate Z4 auditable ranking baseline evaluation (real archived ZTF negatives + synthetic positives)",
+  "source_url": "generated locally by Skills/evaluate_ranking_baseline.py from Logs/pipeline_runs/ztf_alert_archive_ingest/ checkpoints (nights 20220817, 20220819, 20210106, 20210111)",
+  "instrument": "ZTF (real archived negatives) + this project's established injection generator (synthetic positives)",
+  "target_ids": [
+    "ztf_night_20210106",
+    "ztf_night_20210111",
+    "ztf_night_20220817",
+    "ztf_night_20220819"
+  ],
+  "time_range": {
+    "start": "2021-01-06",
+    "end": "2022-08-19",
+    "scale": "UTC"
+  },
+  "cadence": "two real archived ZTF night-pairs (2-6 day gaps), not a continuous survey cadence",
+  "band_or_frequency": "ZTF alert-archive bands (not restricted to a single filter)",
+  "data_product_type": "handcrafted-feature logistic-regression ranking baseline evaluation report: recall@K, purity@K, calibration error, false-positive review burden, ablation vs. naive real-bogus-only baseline",
+  "downloaded_at": "n/a (locally generated report, not downloaded)",
+  "local_path": "Logs/reports/ranking_baseline.json",
+  "checksum": {
+    "algorithm": "sha256",
+    "value": "558f2c4dfec866ba81ccc8ba44e15628993e4624342fc2a52cc39ba6fd8efbae"
+  },
+  "license": "n/a -- locally generated evaluation report, not third-party data. Underlying real ZTF observations were sourced from the UW ZTF public alert archive; see ztf_labeled_alerts_tier2_cnn_v1.json's license caveat for that upstream source.",
+  "label_source": "142 real archived negative tracklets (combinatorial cross-night artifacts, confirmed non-single-object per docs/evidence/live/2026-07-04-gate-z3-observatory-codes-real-findings.md) + 200 synthetic injected positive tracklets",
+  "label_confidence": "mixed",
+  "preprocessing_version": "Skills/evaluate_ranking_baseline.py --n-positive 200 --seed 42, regenerable via the documented command in that Skill's docstring",
+  "known_caveats": [
+    "Real result: 0/200 false positives at threshold 0.5 (see false_positive_review_burden in the report itself); do not extrapolate this to a claim of zero false-discovery-rate on live production data -- the negative class here is only the two real archived night-pairs available at Gate Z4 closure time, not a full survey population.",
+    "This is real evidence closing Gate Z4 (2026-07-04); it is now also cited by the A5 frozen canonical eval suite's `false_link` case and by the A7 promotion report's derived false-discovery-report input (Skills/extract_promotion_evidence.py)."
+  ]
+}
