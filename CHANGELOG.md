@@ -3,6 +3,36 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.75 — Fix silent-console hang in ZTF alert download (2026-07-10)
+
+### Fixed
+- `Skills/download_ztf_training_alerts.py`: operator ran step 1 of the
+  v0.90.74 handoff and reported total console silence, then killed it.
+  **Root cause**: `download_night()` buffered the entire nightly tarball via
+  one blocking `resp.content` call with zero progress output, and no
+  `print()` in the file used `flush=True` -- so on any non-TTY stdout,
+  Python's default block buffering withheld everything until the buffer
+  filled or the process exited, producing total silence for a
+  multi-hundred-MB-to-several-GB download that looked identical to a hang.
+- Ported this repo's own proven pattern from
+  `Skills/ztf_alert_archive_ingest.py`: HEAD the URL for `Content-Length`,
+  stream-decode via `tarfile.open(mode="r|gz")` over a new `_CountingReader`
+  wrapping `resp.raw` (never buffers the full tarball), print byte-level
+  progress with a measurable-quantity ETA every 200 scanned members, and add
+  `flush=True` to every print in the file.
+
+### Added
+- `tests/test_download_ztf_training_alerts.py::test_download_night_prints_progress_with_flush`:
+  regression test asserting progress lines actually appear during a
+  download, not just a final summary.
+
+### Changed
+- Version metadata advanced to v0.90.75.
+- README, production-readiness, AGENTS, and CLAUDE record the root cause and
+  the predicted-output check for confirming this fix actually resolved the
+  operator's report (vs. needing re-diagnosis if the console still goes
+  silent after the first `Remote size:` line).
+
 ## v0.90.74 — Capture real grouped-split provenance in Tier 2 CNN data pipeline (2026-07-10)
 
 ### Added
