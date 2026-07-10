@@ -11,8 +11,10 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import json
+import math
 import sys
 import time
 from pathlib import Path
@@ -25,9 +27,95 @@ from classify import classify, extract_features
 from detect import detect
 from link import link
 from orbit import fit_orbit
-from recovery_curves import recovery_curve_report
+from recovery_curves import DEFAULT_BINS, IMAGE_LEVEL_BINS, recovery_curve_report
 from schemas import Observation
 from score import score
+
+# ---------------------------------------------------------------------------
+# Image-level cutout synthesis (A6: seeing/background/trail-length curves)
+# ---------------------------------------------------------------------------
+
+# Pixel scale and FWHM conversion match detect.py's compute_psf_fwhm exactly,
+# so a real run of that function against a synthesized cutout recovers close
+# to the seeing_arcsec used to generate it.
+_PIXEL_SCALE_ARCSEC_PER_PX = 1.01
+_FWHM_FACTOR = 2.3548  # 2 * sqrt(2 * ln 2)
+_CUTOUT_SIZE = 63
+
+# Synthetic-harness flux zeropoint. This is NOT a calibrated ZTF zeropoint --
+# it only fixes an arbitrary flux scale so that the existing 18-21 mag
+# injection range and the background_level/seeing/trail ranges below produce
+# a real_bogus spread that actually crosses the detect.py 0.65 threshold
+# (verified empirically; see docs/PRODUCTION_READINESS.md A6 note).
+_SYNTHETIC_ZEROPOINT_MAG = 26.0
+
+
+def _analytic_real_bogus(
+    mag: float,
+    seeing_arcsec: float,
+    background_level: float,
+    trail_length_arcsec: float,
+) -> float:
+    """Derive a real_bogus proxy from the analytic peak SNR of a synthetic source.
+
+    Models a point source of the given magnitude spread over a 2D Gaussian PSF
+    (sigma from seeing_arcsec) and, if trail_length_arcsec > 0, further
+    elongated along one axis to represent per-exposure trailing loss. Peak
+    amplitude divided by background_level gives an SNR; SNR is mapped to
+    [0, 1] with the same 5-sigma->0.5, 20-sigma->~1 formula preprocess.py's
+    (private) _psf_quality helper uses, so this proxy is consistent with the
+    pipeline's own real image-quality-to-score convention rather than an
+    unrelated invented scale. Using the *analytic* (noise-free) amplitude
+    keeps the curve a function of the swept parameters, not per-injection RNG
+    noise from a single pixel draw.
+    """
+    if background_level <= 0:
+        return 1.0
+    total_flux = 10 ** (-0.4 * (mag - _SYNTHETIC_ZEROPOINT_MAG))
+    sigma_px = seeing_arcsec / _PIXEL_SCALE_ARCSEC_PER_PX / _FWHM_FACTOR
+    trail_px = trail_length_arcsec / _PIXEL_SCALE_ARCSEC_PER_PX
+    sigma_x = math.sqrt(sigma_px**2 + (trail_px / _FWHM_FACTOR) ** 2)
+    sigma_y = sigma_px
+    amplitude = total_flux / (2 * math.pi * sigma_x * sigma_y)
+    snr = amplitude / background_level
+    return float(min(1.0, max(0.0, (snr - 3.0) / 20.0)))
+
+
+def _synthesize_difference_cutout(
+    rng: np.random.Generator,
+    mag: float,
+    seeing_arcsec: float,
+    background_level: float,
+    trail_length_arcsec: float,
+) -> tuple[str, float]:
+    """Build a synthetic 63x63 difference-image cutout and its real_bogus proxy.
+
+    Returns (base64_encoded_cutout, real_bogus). The cutout itself carries
+    genuine Gaussian pixel noise at background_level so detect.py's
+    compute_psf_fwhm/compute_streak_metric measure something real; real_bogus
+    is computed separately from the noise-free analytic SNR (see
+    _analytic_real_bogus) so the recovery curve reflects the swept parameter,
+    not single-draw noise variance.
+    """
+    total_flux = 10 ** (-0.4 * (mag - _SYNTHETIC_ZEROPOINT_MAG))
+    sigma_px = seeing_arcsec / _PIXEL_SCALE_ARCSEC_PER_PX / _FWHM_FACTOR
+    trail_px = trail_length_arcsec / _PIXEL_SCALE_ARCSEC_PER_PX
+    sigma_x = math.sqrt(sigma_px**2 + (trail_px / _FWHM_FACTOR) ** 2)
+    sigma_y = sigma_px
+    amplitude = total_flux / (2 * math.pi * sigma_x * sigma_y)
+
+    size = _CUTOUT_SIZE
+    y, x = np.indices((size, size))
+    cx, cy = size / 2.0, size / 2.0
+    source = amplitude * np.exp(
+        -(((x - cx) ** 2) / (2 * sigma_x**2) + ((y - cy) ** 2) / (2 * sigma_y**2))
+    )
+    noise = rng.normal(0.0, background_level, size=(size, size))
+    arr = (source + noise).astype(np.float32)
+
+    cutout_b64 = base64.b64encode(arr.tobytes()).decode()
+    real_bogus = _analytic_real_bogus(mag, seeing_arcsec, background_level, trail_length_arcsec)
+    return cutout_b64, real_bogus
 
 
 def _make_obs(
@@ -40,6 +128,7 @@ def _make_obs(
     filter_band: str = "r",
     mag_err: float = 0.05,
     real_bogus: float | None = 0.92,
+    cutout_difference: str | None = None,
 ) -> Observation:
     return Observation(
         obs_id=obs_id,
@@ -51,6 +140,7 @@ def _make_obs(
         filter_band=filter_band,
         mission=mission,
         real_bogus=real_bogus,
+        cutout_difference=cutout_difference,
     )
 
 
@@ -88,6 +178,52 @@ def inject_synthetic_neo(
                 mag + rng.normal(0, 0.05),
             )
         )
+    return tuple(obs)
+
+
+def inject_synthetic_neo_image_level(
+    seed: int,
+    n_nights: int = 3,
+    ra0: float = 180.0,
+    dec0: float = 0.0,
+    motion_arcsec_per_hr: float = 1.0,
+    mag: float = 19.5,
+    seeing_arcsec: float = 1.5,
+    background_level: float = 10.0,
+    trail_length_arcsec: float = 0.0,
+) -> tuple[Observation, ...]:
+    """Generate a ZTF-cadence NEO tracklet with synthesized difference cutouts.
+
+    Same cadence as inject_synthetic_neo (2 obs/night), but each observation
+    carries a real synthetic cutout_difference (see
+    _synthesize_difference_cutout) built from the given seeing/background/
+    trail-length, and real_bogus is derived from that cutout instead of a
+    fixed constant -- so detect()'s real/bogus threshold, and detect.py's own
+    compute_psf_fwhm/compute_streak_metric measurements, respond to these
+    image-level parameters for A6 recovery curves.
+    """
+    rng = np.random.default_rng(seed)
+    dra_per_hr = motion_arcsec_per_hr / 3600.0
+    obs = []
+    for night in range(n_nights):
+        jd_base = 2460000.5 + night
+        ra_base = ra0 + night * dra_per_hr * 24
+        for label, dt_hr in (("a", 0.0), ("b", 1.0)):
+            obs_mag = mag + rng.normal(0, 0.05)
+            cutout_b64, real_bogus = _synthesize_difference_cutout(
+                rng, obs_mag, seeing_arcsec, background_level, trail_length_arcsec
+            )
+            obs.append(
+                _make_obs(
+                    f"inj_img_{seed}_n{night}{label}",
+                    jd_base + dt_hr / 24,
+                    ra_base + dt_hr * dra_per_hr + rng.normal(0, 0.5 / 3600.0),
+                    dec0 + rng.normal(0, 0.5 / 3600.0),
+                    obs_mag,
+                    real_bogus=real_bogus,
+                    cutout_difference=cutout_b64,
+                )
+            )
     return tuple(obs)
 
 
@@ -159,11 +295,16 @@ def _fmt_duration(seconds: float) -> str:
 _CHECKPOINT_ROOT = Path("Logs/pipeline_runs/injection_recovery")
 
 
-def _checkpoint_key(n_inject: int, seed: int, mission: str) -> str:
+def _checkpoint_key(
+    n_inject: int, seed: int, mission: str, *, image_level: bool = False
+) -> str:
     """Stable checkpoint key from the exact run parameters, so re-running the
     identical command finds and resumes the existing checkpoint instead of
     starting over (checkpoint/resume standing rule)."""
-    payload = json.dumps({"n_inject": n_inject, "seed": seed, "mission": mission}, sort_keys=True)
+    payload = json.dumps(
+        {"n_inject": n_inject, "seed": seed, "mission": mission, "image_level": image_level},
+        sort_keys=True,
+    )
     return hashlib.md5(payload.encode()).hexdigest()[:12]
 
 
@@ -182,6 +323,7 @@ def run_injection_recovery(
     mission: str = "ZTF",
     review_packet_out: Path | None = None,
     checkpoint_root: Path | None = None,
+    image_level: bool = False,
 ) -> dict:
     """Run the injection-recovery test and return summary statistics.
 
@@ -190,6 +332,12 @@ def run_injection_recovery(
     (Gate P1 discovery-source positive control) with no native real/bogus
     score, routed through detect.py's discovery-archive singleton path.
 
+    ``image_level=True`` (ZTF only) additionally sweeps seeing_arcsec,
+    background_level, and trail_length_arcsec per injection, synthesizing a
+    real difference-image cutout for each observation (see
+    inject_synthetic_neo_image_level) so the A6 recovery curves cover those
+    three image-level dimensions, not just mag/motion/n_observations/n_nights.
+
     If ``review_packet_out`` is given, every recovered candidate's full
     ``ScoredNEO`` packet is written to that path as a JSON list — the same
     format ``Skills/run_pipeline.py --review-packet-out`` produces, so the
@@ -197,13 +345,16 @@ def run_injection_recovery(
     ``Skills/export_ades_report.py`` for the Gate P3 no-submission drill.
 
     Checkpoints after every item to ``<checkpoint_root>/<key>/checkpoint.json``
-    (key derived from n_inject/seed/mission), including the RNG's own
-    serializable bit-generator state, so a kill/sleep mid-run and re-running
-    the identical command resumes from the next un-completed item instead of
-    losing prior work or silently diverging from a from-scratch run.
+    (key derived from n_inject/seed/mission/image_level), including the RNG's
+    own serializable bit-generator state, so a kill/sleep mid-run and
+    re-running the identical command resumes from the next un-completed item
+    instead of losing prior work or silently diverging from a from-scratch run.
     """
+    if image_level and mission != "ZTF":
+        raise ValueError("image_level=True is only supported for mission='ZTF'")
+
     root = checkpoint_root if checkpoint_root is not None else _CHECKPOINT_ROOT
-    key = _checkpoint_key(n_inject, seed, mission)
+    key = _checkpoint_key(n_inject, seed, mission, image_level=image_level)
     checkpoint_path = root / key / "checkpoint.json"
 
     rng = np.random.default_rng(seed)
@@ -252,6 +403,7 @@ def run_injection_recovery(
         motion = rng.uniform(0.1, 10.0)
         ra0 = rng.uniform(0.0, 359.0)
         dec0 = rng.uniform(-30.0, 30.0)
+        seeing = background = trail = None
 
         if mission == "WISE":
             mag = rng.uniform(10.0, 14.0)
@@ -261,6 +413,21 @@ def run_injection_recovery(
                 dec0=dec0,
                 motion_arcsec_per_hr=float(motion),
                 mag=float(mag),
+            )
+        elif image_level:
+            mag = rng.uniform(18.0, 21.0)
+            seeing = rng.uniform(0.8, 3.5)
+            background = rng.uniform(2.0, 40.0)
+            trail = rng.uniform(0.0, 8.0)
+            obs = inject_synthetic_neo_image_level(
+                seed=seed * 1000 + i,
+                ra0=ra0,
+                dec0=dec0,
+                motion_arcsec_per_hr=float(motion),
+                mag=float(mag),
+                seeing_arcsec=float(seeing),
+                background_level=float(background),
+                trail_length_arcsec=float(trail),
             )
         else:
             mag = rng.uniform(18.0, 21.0)
@@ -296,7 +463,7 @@ def run_injection_recovery(
             # still be resumed correctly by a later run that requests it.
             review_packets.append(scored.model_dump(mode="json"))
 
-        injection_records.append({
+        record = {
             "index": i,
             "mission": mission,
             "seed": seed * 1000 + i,
@@ -307,7 +474,12 @@ def run_injection_recovery(
             "detected": detected,
             "linked": linked,
             "scored": scored_packet,
-        })
+        }
+        if image_level:
+            record["seeing_arcsec"] = float(seeing)
+            record["background_level"] = float(background)
+            record["trail_length_arcsec"] = float(trail)
+        injection_records.append(record)
 
         _atomic_write_json(
             checkpoint_path,
@@ -315,6 +487,7 @@ def run_injection_recovery(
                 "n_inject": n_inject,
                 "seed": seed,
                 "mission": mission,
+                "image_level": image_level,
                 "completed": i + 1,
                 "n_detected": n_detected,
                 "n_linked": n_linked,
@@ -353,8 +526,12 @@ def run_injection_recovery(
             flag: hazard_flags.count(flag)
             for flag in {"pha_candidate", "close_approach", "nominal", "unknown"}
         },
+        "image_level": image_level,
         "injection_records": injection_records,
-        "recovery_curves": recovery_curve_report(injection_records),
+        "recovery_curves": recovery_curve_report(
+            injection_records,
+            bins={**DEFAULT_BINS, **IMAGE_LEVEL_BINS} if image_level else None,
+        ),
     }
 
 
@@ -387,11 +564,24 @@ def main() -> None:
         metavar="PATH",
         help="Override checkpoint root for tests or isolated operator runs.",
     )
+    parser.add_argument(
+        "--image-level",
+        action="store_true",
+        help=(
+            "Sweep seeing_arcsec/background_level/trail_length_arcsec per injection "
+            "with synthesized difference-image cutouts, for A6 image-level recovery "
+            "curves. Only supported with --survey ZTF."
+        ),
+    )
     args = parser.parse_args()
+
+    if args.image_level and args.survey != "ZTF":
+        print(f"ERROR: --image-level is only supported with --survey ZTF, got {args.survey}")
+        sys.exit(1)
 
     print(
         f"Injection-recovery test: {args.n_inject} synthetic {args.survey} NEOs "
-        f"(seed={args.seed})"
+        f"(seed={args.seed}, image_level={args.image_level})"
     )
     print("-" * 50)
 
@@ -401,6 +591,7 @@ def main() -> None:
         mission=args.survey,
         review_packet_out=Path(args.review_packet_out) if args.review_packet_out else None,
         checkpoint_root=Path(args.checkpoint_root) if args.checkpoint_root else None,
+        image_level=args.image_level,
     )
 
     n = results["n_injected"]

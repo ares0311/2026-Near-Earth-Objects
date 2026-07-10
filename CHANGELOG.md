@@ -3,6 +3,31 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.71 — Add A6 image-level recovery curves (2026-07-09)
+
+### Added
+- `Skills/injection_recovery.py --image-level`: sweeps `seeing_arcsec`,
+  `background_level`, and `trail_length_arcsec` per injection, synthesizing a
+  real 63x63 difference-image cutout (Gaussian PSF + Gaussian background
+  noise + trail elongation) for each observation and deriving `real_bogus`
+  from its analytic peak SNR, calibrated so the sweep actually crosses
+  `detect.py`'s 0.65 real/bogus threshold instead of a flat 0%/100% curve.
+- `src/recovery_curves.py`: `IMAGE_LEVEL_BINS` for the three new dimensions;
+  `recovery_curve_report`'s `limitations` field now omits the "requires
+  image-level metadata" note once those dimensions are actually populated.
+- `data/injection_recovery_image_level_n200.json`: real committed baseline
+  (n=200, seed=42): 7.5% detection/link/score rate with real per-bin
+  seeing/background/trail-length recovery curves.
+- 8 new tests covering the cutout synthesis, the new injection generator, the
+  `run_injection_recovery(image_level=True)` path (including the ZTF-only
+  guard), and the `--image-level` CLI (including the WISE-survey rejection).
+
+### Changed
+- Version metadata advanced to v0.90.71.
+- README, production-readiness, AGENTS, and CLAUDE now record A6 as complete
+  (all five required recovery-curve dimensions: magnitude, velocity/motion,
+  observation count, night count, and now seeing/background/trail length).
+
 ## v0.90.70 — Add frozen A5 canonical regression suite (2026-07-09)
 
 ### Added

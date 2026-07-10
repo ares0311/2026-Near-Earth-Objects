@@ -816,7 +816,19 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.70)
+## Current State (v0.90.71)
+
+**Latest sync (2026-07-09, v0.90.71)**: A6 now closes the image-level gap:
+`Skills/injection_recovery.py --image-level` synthesizes a real
+difference-image cutout per injection (Gaussian PSF + background noise +
+trail elongation) and derives `real_bogus` from its analytic peak SNR, so
+seeing/background/trail-length sweeps produce real, non-degenerate recovery
+curves through the actual `detect()`/`link()`/`classify()`/`score()` chain.
+A real n=200, seed=42 baseline is committed at
+`data/injection_recovery_image_level_n200.json` (7.5% detection/link/score
+rate). All five required A6 dimensions (magnitude, velocity, observation
+count, night count, and now seeing/background/trail length) are covered. See
+`docs/PRODUCTION_READINESS.md` for detail.
 
 **Latest sync (2026-07-09, v0.90.70)**: A5 now has a frozen, policy-grade
 canonical eval suite (`data_selection/canonical_evals/production_suite_v1.json`)
@@ -3399,7 +3411,7 @@ succeeded and produced the trained Tier 3 weights now recorded under T1-A.
 | `Skills/generate_training_labels.py` | Download Tier 1 labels or build the approved four-class MPC Tier 3 pilot manifest |
 | `Skills/batch_score.py` | Score a list of tracklets from a JSON file; print ranked table |
 | `Skills/run_pipeline.py` | Full end-to-end pipeline run |
-| `Skills/injection_recovery.py` | Injection-recovery test: injects synthetic NEOs, measures detection/link/score rates |
+| `Skills/injection_recovery.py` | Injection-recovery test: injects synthetic NEOs, measures detection/link/score rates; `--image-level` sweeps seeing/background/trail-length via synthesized difference cutouts for A6 recovery curves |
 | `Skills/verify_ztf_dr24_sources.py` | Phase 0 source verification for the ZTF DR24 pipeline: probes the exact endpoints cited in `docs/neo_discovery_agent_brief.md`, writes `data_sources_verified.md`/`auth_requirements.md` |
 | `Skills/check_mpc_known.py` | Cross-match candidate observations against MPC known object catalog |
 | `Skills/build_recovery_manifest.py` | Build checkpointed MPC+Horizons expected-known manifests for T1-C recovery audits |
@@ -3491,6 +3503,7 @@ succeeded and produced the trained Tier 3 weights now recorded under T1-A.
 | `data/README.md` | Data directory documentation and format reference |
 | `data/injection_recovery_baseline.json` | Injection-recovery results (n=50, seed=42): 100% detection, 62% link, 62% score |
 | `data/injection_recovery_n200.json` | Injection-recovery results (n=200, seed=42): 100% detection, 100% link, 100% score |
+| `data/injection_recovery_image_level_n200.json` | A6 image-level injection-recovery results (n=200, seed=42, `--image-level`): 7.5% detection/link/score with real per-bin seeing/background/trail-length recovery curves |
 | `data/stress_test_high_motion.json` | Stress-test results: 100% link rate across all three motion bins |
 | `background/config.json` | Automated offline background automation configuration |
 | `background/config.schema.json` | JSON Schema for background automation config |
