@@ -124,7 +124,7 @@ The pipeline implements a strict directed acyclic graph (DAG) of processing stag
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    NEO DETECTION PIPELINE  v0.90.69                  │
+│                    NEO DETECTION PIPELINE  v0.90.70                  │
 └─────────────────────────────────────────────────────────────────────┘
 
   External Data Sources
@@ -1229,7 +1229,7 @@ evidence. MPC submission remains disabled until a real candidate survives
 adversarial plus operator review and the applicable source/submission protocol
 is satisfied.
 
-### 15.1 Current State Snapshot (v0.90.69)
+### 15.1 Current State Snapshot (v0.90.70)
 
 | Area | Status | Notes |
 |---|---|---|

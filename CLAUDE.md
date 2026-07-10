@@ -816,9 +816,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.69)
+## Current State (v0.90.70)
 
-**Latest sync (2026-07-09, v0.90.69)**: A5 now has a frozen, policy-grade
+**Latest sync (2026-07-09, v0.90.70)**: A5 now has a frozen, policy-grade
 canonical eval suite (`data_selection/canonical_evals/production_suite_v1.json`)
 covering all four required case types, every case citing a real,
 already-committed evidence artifact (the n=200 injection-recovery baseline,

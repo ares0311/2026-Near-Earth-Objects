@@ -3,7 +3,7 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## v0.90.69 — Add frozen A5 canonical regression suite (2026-07-09)
+## v0.90.70 — Add frozen A5 canonical regression suite (2026-07-09)
 
 ### Added
 - `data_selection/canonical_evals/production_suite_v1.json`: a frozen,
@@ -21,7 +21,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   runs the full frozen suite against the real committed files in CI.
 
 ### Changed
-- Version metadata advanced to v0.90.69.
+- Version metadata advanced to v0.90.70.
 - README, production-readiness, AGENTS, and CLAUDE now record A5 as complete
   for model-builder-independent regression protection; per-model canonical
   suites remain part of A7.
