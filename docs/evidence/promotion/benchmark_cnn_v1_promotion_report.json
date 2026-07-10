@@ -1,0 +1,102 @@
+{
+  "evidence": [
+    {
+      "blockers": [
+        "dataset_manifest_missing"
+      ],
+      "details": {},
+      "name": "dataset_manifest",
+      "passed": false,
+      "path": null
+    },
+    {
+      "blockers": [
+        "grouped_split_report_missing"
+      ],
+      "details": {},
+      "name": "grouped_split_report",
+      "passed": false,
+      "path": "data_selection/dataset_manifests/does_not_exist.json"
+    },
+    {
+      "blockers": [],
+      "details": {
+        "passed": true,
+        "schema_version": "canonical-eval-report-v1"
+      },
+      "name": "canonical_eval_report",
+      "passed": true,
+      "path": "docs/evidence/promotion/benchmark_cnn_v1_canonical_eval.json"
+    },
+    {
+      "blockers": [],
+      "details": {
+        "passed": true,
+        "schema_version": "injection-recovery-curves-v1"
+      },
+      "name": "injection_recovery_report",
+      "passed": true,
+      "path": "docs/evidence/promotion/benchmark_cnn_v1_injection_recovery.json"
+    },
+    {
+      "blockers": [
+        "calibration_report_missing"
+      ],
+      "details": {},
+      "name": "calibration_report",
+      "passed": false,
+      "path": "Logs/reports/calibration_report.json"
+    },
+    {
+      "blockers": [],
+      "details": {
+        "false_discovery_rate": 0.0,
+        "max_false_discovery_rate": 0.05
+      },
+      "name": "false_discovery_report",
+      "passed": true,
+      "path": "docs/evidence/promotion/benchmark_cnn_v1_false_discovery.json"
+    },
+    {
+      "blockers": [],
+      "details": {
+        "n_chars": 3257
+      },
+      "name": "pretrained_audit",
+      "passed": true,
+      "path": "docs/evidence/phase0/pretrained_model_audit.md"
+    },
+    {
+      "blockers": [],
+      "details": {
+        "n_chars": 3654
+      },
+      "name": "benchmark_model_card",
+      "passed": true,
+      "path": "benchmarks/benchmark_cnn_v1/MODEL_CARD.md"
+    }
+  ],
+  "limitations": [
+    "This report authorizes only internal model promotion when all evidence passes.",
+    "It does not authorize MPC submission, NASA/PDCO contact, or impact-probability claims."
+  ],
+  "model": {
+    "model_id": "benchmark_cnn_v1",
+    "model_type": "tier2_cnn",
+    "model_version": "1.0.0"
+  },
+  "operator_signoff_id": null,
+  "promotion_allowed": false,
+  "promotion_blockers": [
+    "dataset_manifest_missing",
+    "grouped_split_report_missing",
+    "calibration_report_missing",
+    "operator_signoff_missing"
+  ],
+  "safety": {
+    "mpc_submission_authorized": false,
+    "no_external_submission": true,
+    "no_impact_probability_claim": true
+  },
+  "schema_version": "model-promotion-report-v1"
+}

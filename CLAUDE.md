@@ -816,7 +816,21 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.71)
+## Current State (v0.90.72)
+
+**Latest sync (2026-07-10, v0.90.72)**: A7's promotion-report builder has now
+been run for real against `benchmark_cnn_v1`. New `Skills/extract_promotion_evidence.py`
+derives an injection-recovery report and a false-discovery report from
+already-committed real evidence (A6's image-level baseline and Gate Z4's
+ranking-baseline review-burden counts: 0/200 false positives) without
+inventing any data. `Skills/build_promotion_report.py` then produced a real,
+committed report — `promotion_allowed=false` with 4 real named blockers
+(dataset manifest, grouped-split report, calibration report, operator
+signoff). Root-cause finding: `data/ztf_labeled_alerts.json` (the CNN's
+committed 10,000-alert training source) never captured per-alert RA/Dec/JD
+metadata, so a real grouped split cannot be reconstructed for it — this is
+why A4/A1 remain open for the CNN's training set specifically, not a coding
+gap. See `docs/PRODUCTION_READINESS.md` for detail.
 
 **Latest sync (2026-07-09, v0.90.71)**: A6 now closes the image-level gap:
 `Skills/injection_recovery.py --image-level` synthesizes a real
@@ -3469,6 +3483,7 @@ succeeded and produced the trained Tier 3 weights now recorded under T1-A.
 | `Skills/find_nearest_raw_observation.py` | Rank a single night's raw `ztf_alert_archive_ingest.py` checkpoint observations by angular offset from a known reference position, bypassing detect()/link() entirely, to check whether ZTF's archive recorded any confident detection near a known object's position at all; `--ref`, `--top-n` flags |
 | `Skills/evaluate_ranking_baseline.py` | Gate Z4 auditable ranking baseline: evaluates a handcrafted-feature logistic-regression classifier (out-of-fold, stratified k-fold) against real archived negative tracklets (Gate Z6 evidence) and synthetic positive tracklets (established injection generator), reporting recall@K, purity@K, calibration error, false-positive review burden, and an ablation vs. a naive real-bogus-only baseline; `--n-positive`, `--seed`, `--checkpoint-dir`, `--out` flags |
 | `Skills/evaluate_retrospective_validation.py` | Gate Z5 retrospective validation: evaluates review packets against the MPC catalog as queried today (after the replay window, by design), bucketing each into `recovered_known_object`/`later_confirmed_object`/`artifact`/`unresolved_candidate` using the already-real `check_candidates_against_mpc` live cross-match plus each packet's own `known_object_score`; `--review-packets`, `--verdicts`, `--radius-deg`, `--out` flags |
+| `Skills/extract_promotion_evidence.py` | A7 promotion-report input derivation: pulls the nested `recovery_curves` object out of an `injection_recovery.py --image-level` report and derives a `false-discovery-report-v1` from a `evaluate_ranking_baseline.py` report's real `false_positive_review_burden` counts, without inventing any new data; `--injection-recovery-source/-out`, `--ranking-baseline-source/-model`, `--false-discovery-out` flags |
 
 ### Docs
 
