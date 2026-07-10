@@ -207,6 +207,94 @@ def test_emit_split_csv_cli_writes_file_and_exits_without_training(
     assert len(written_rows) == 20
 
 
+def test_assign_night_based_split_keeps_every_night_in_one_split() -> None:
+    """Regression for the real A4 night_key leakage found running this
+    script against genuine 3-night ZTF data: object_id-only splitting lets
+    one night's alerts scatter across all three splits. See
+    docs/evidence/a7/2026-07-10-second-attempt-object-id-split-still-leaks-night-and-sky.md."""
+    mod = _load_skill()
+    rows = []
+    for night_offset in range(6):  # 6 distinct nights, spaced >1 day apart
+        jd = 2459000.5 + night_offset * 3
+        for obj_idx in range(10):
+            rows.append(_row(f"n{night_offset}o{obj_idx}", jd=jd, ra=10.0 * night_offset))
+
+    assignments, diagnostics = mod.assign_night_based_split(
+        rows, val_fraction=0.2, test_fraction=0.15
+    )
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+    from grouped_splits import _night_key
+
+    night_to_splits: dict[str, set[str]] = {}
+    for row, split in zip(rows, assignments, strict=True):
+        night_to_splits.setdefault(_night_key(row), set()).add(split)
+
+    for night, splits in night_to_splits.items():
+        assert len(splits) == 1, f"night {night} leaked across splits: {splits}"
+    assert diagnostics["n_nights"] == 6
+    assert set(assignments) <= {"train", "validation", "test"}
+
+
+def test_assign_night_based_split_resolves_object_id_conflicts() -> None:
+    """An object observed on two nights assigned to different splits must
+    still end up entirely in one split (object_id purity), with the
+    reassignment counted in diagnostics rather than silently dropped."""
+    mod = _load_skill()
+    rows = [
+        _row("cross_night_obj", jd=2459000.5, ra=10.0),   # night 0
+        _row("cross_night_obj", jd=2459010.5, ra=10.0),   # night 10 (different split)
+    ] + [_row(f"filler{i}", jd=2459000.5 + i, ra=50.0 + i) for i in range(20)]
+
+    assignments, diagnostics = mod.assign_night_based_split(
+        rows, val_fraction=0.2, test_fraction=0.15
+    )
+
+    obj_indices = [i for i, r in enumerate(rows) if r["object_id"] == "cross_night_obj"]
+    obj_splits = {assignments[i] for i in obj_indices}
+    assert len(obj_splits) == 1, f"cross_night_obj leaked across splits: {obj_splits}"
+    assert diagnostics["n_reassigned_for_object_conflict"] >= 1
+
+
+def test_split_strategy_night_cli_produces_night_pure_csv(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    mod = _load_skill()
+    labels_csv = tmp_path / "index.csv"
+    rows = []
+    for night_offset in range(6):
+        jd = 2459000.5 + night_offset * 3
+        for obj_idx in range(10):
+            rows.append(_row(f"n{night_offset}o{obj_idx}", jd=jd, ra=10.0 * night_offset))
+    with labels_csv.open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+        writer.writeheader()
+        writer.writerows(rows)
+    out_csv = tmp_path / "grouped_split.csv"
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "train_tier2_cnn.py",
+            "--labels", str(labels_csv),
+            "--emit-split-csv", str(out_csv),
+            "--split-strategy", "night",
+        ],
+    )
+
+    mod.main()
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+    from grouped_splits import leakage_report, records_from_csv
+
+    records = records_from_csv(out_csv)
+    report = leakage_report(records)
+    assert report["hard_leakage"].get("night_key", {}) == {}
+    assert report["hard_leakage"].get("object_id", {}) == {}
+
+
 def test_emit_split_csv_cli_fails_closed_on_legacy_csv_without_object_id(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

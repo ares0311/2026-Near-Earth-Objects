@@ -123,6 +123,93 @@ def assign_grouped_split(
     return assignments, n_missing
 
 
+def assign_night_based_split(
+    rows: list[dict], *, val_fraction: float, test_fraction: float
+) -> tuple[list[str], dict[str, Any]]:
+    """Assign whole calendar nights to train/validation/test, then resolve
+    any object_id conflicts a whole-night assignment creates.
+
+    `assign_grouped_split()` (object_id-only) guarantees object purity but
+    lets a given night's alerts scatter across every split, which fails
+    Skills/validate_grouped_splits.py's night_key hard-leakage check whenever
+    the source data spans few distinct nights (see
+    docs/evidence/a7/2026-07-10-second-attempt-object-id-split-still-leaks-night-and-sky.md).
+    This function assigns entire nights to entire splits instead, using the
+    exact same `night_key` derivation the validator uses (imported from
+    grouped_splits, not reimplemented, to avoid drift), so night purity is
+    guaranteed by construction. Nights are consumed chronologically test,
+    then validation, then train, tracking *record* counts (not night counts)
+    against val_fraction/test_fraction so split sizes stay close to the
+    requested ratio even when nights have uneven alert counts.
+
+    Whole-night assignment alone does not guarantee object_id purity: a real
+    object detected across two nights assigned to different splits would
+    still leak. Resolved by keeping every row for a given object_id in the
+    split of that object's first-encountered row (rows are chronological by
+    night since Skills/download_ztf_training_alerts.py appends alerts
+    night-by-night) and moving any later rows for the same object into that
+    split, counting how many rows this displaced.
+
+    Returns (assignments, diagnostics) where diagnostics reports per-night
+    split assignment and the object-conflict-resolution count, so callers
+    can print this instead of silently reshaping the requested split sizes.
+    """
+    from collections import Counter
+
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+    from grouped_splits import _night_key  # reuse the validator's own key, not a copy
+
+    night_of_idx = [_night_key(row) for row in rows]
+    counts = Counter(night_of_idx)
+
+    def _night_sort_key(night: str) -> tuple[int, str]:
+        if night.startswith("jdnight:"):
+            return (0, f"{int(night.split(':', 1)[1]):020d}")
+        return (1, night)  # non-standard/explicit night keys sort after, stably
+
+    nights_sorted = sorted(counts, key=_night_sort_key)
+
+    n_total = len(rows)
+    target_test = max(1, round(test_fraction * n_total))
+    target_val = max(1, round(val_fraction * n_total))
+
+    night_split: dict[str, str] = {}
+    running_test = 0
+    running_val = 0
+    for night in nights_sorted:
+        n_records = counts[night]
+        if running_test < target_test:
+            night_split[night] = "test"
+            running_test += n_records
+        elif running_val < target_val:
+            night_split[night] = "validation"
+            running_val += n_records
+        else:
+            night_split[night] = "train"
+
+    assignments = [night_split[night] for night in night_of_idx]
+
+    object_first_split: dict[str, str] = {}
+    n_reassigned = 0
+    for idx, row in enumerate(rows):
+        object_id = (row.get("object_id") or "").strip() or f"__no_object_id_row_{idx}"
+        first_split = object_first_split.setdefault(object_id, assignments[idx])
+        if assignments[idx] != first_split:
+            assignments[idx] = first_split
+            n_reassigned += 1
+
+    diagnostics = {
+        "strategy": "night",
+        "n_nights": len(nights_sorted),
+        "night_split_counts": {
+            night: {"split": split, "n_records": counts[night]}
+            for night, split in night_split.items()
+        },
+        "n_reassigned_for_object_conflict": n_reassigned,
+    }
+    return assignments, diagnostics
+
+
 def write_grouped_split_csv(rows: list[dict], assignments: list[str], out_path: Path) -> None:
     """Write a CSV matching Skills/validate_grouped_splits.py's input contract."""
     fieldnames = [
@@ -399,6 +486,20 @@ def main() -> None:
         ),
     )
     parser.add_argument(
+        "--split-strategy",
+        choices=("object", "night"),
+        default="object",
+        help=(
+            "'object' (default) groups by object_id only -- guarantees object "
+            "purity but can leak night_key/sky_cell when the source data spans "
+            "few distinct nights. 'night' assigns whole calendar nights to "
+            "whole splits (then resolves any resulting object_id conflicts), "
+            "guaranteeing night_key purity by construction -- needed when "
+            "--labels covers only a handful of nights. See "
+            "docs/evidence/a7/2026-07-10-second-attempt-object-id-split-still-leaks-night-and-sky.md."
+        ),
+    )
+    parser.add_argument(
         "--grouped-split-report",
         type=Path,
         default=None,
@@ -432,13 +533,30 @@ def main() -> None:
                 "a grouped split — legacy datasets cannot be grouped-split retroactively."
             )
             sys.exit(1)
-        assignments, n_missing = assign_grouped_split(
-            rows, val_fraction=args.val_fraction, test_fraction=args.test_fraction, seed=42
-        )
+        if args.split_strategy == "night":
+            assignments, diagnostics = assign_night_based_split(
+                rows, val_fraction=args.val_fraction, test_fraction=args.test_fraction
+            )
+            n_missing = 0
+        else:
+            assignments, n_missing = assign_grouped_split(
+                rows, val_fraction=args.val_fraction, test_fraction=args.test_fraction, seed=42
+            )
+            diagnostics = None
         write_grouped_split_csv(rows, assignments, args.emit_split_csv)
         counts = {s: assignments.count(s) for s in ("train", "validation", "test")}
         print(f"Grouped split CSV written: {args.emit_split_csv}")
+        print(f"  strategy: {args.split_strategy}")
         print(f"  counts: {counts}")
+        if diagnostics is not None:
+            print(f"  nights: {diagnostics['n_nights']}")
+            for night, info in sorted(diagnostics["night_split_counts"].items()):
+                print(f"    {night}: {info['split']} ({info['n_records']} records)")
+            print(
+                "  object_id conflict resolution: "
+                f"{diagnostics['n_reassigned_for_object_conflict']} rows moved to "
+                "their object's first-seen split"
+            )
         if n_missing:
             print(f"  WARNING: {n_missing} rows lacked object_id (singleton fallback groups)")
         print(
