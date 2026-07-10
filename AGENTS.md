@@ -634,9 +634,9 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.69)
+## Current State (v0.90.71)
 
-**Latest sync (2026-07-09, v0.90.69)**: A6 now closes the image-level gap:
+**Latest sync (2026-07-09, v0.90.71)**: A6 now closes the image-level gap:
 `Skills/injection_recovery.py --image-level` synthesizes a real
 difference-image cutout per injection (Gaussian PSF + background noise +
 trail elongation) and derives `real_bogus` from its analytic peak SNR, so

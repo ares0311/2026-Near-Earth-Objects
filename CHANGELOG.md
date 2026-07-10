@@ -3,7 +3,7 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## v0.90.69 — Add A6 image-level recovery curves (2026-07-09)
+## v0.90.71 — Add A6 image-level recovery curves (2026-07-09)
 
 ### Added
 - `Skills/injection_recovery.py --image-level`: sweeps `seeing_arcsec`,
@@ -23,7 +23,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   guard), and the `--image-level` CLI (including the WISE-survey rejection).
 
 ### Changed
-- Version metadata advanced to v0.90.69.
+- Version metadata advanced to v0.90.71.
 - README, production-readiness, AGENTS, and CLAUDE now record A6 as complete
   (all five required recovery-curve dimensions: magnitude, velocity/motion,
   observation count, night count, and now seeing/background/trail length).
