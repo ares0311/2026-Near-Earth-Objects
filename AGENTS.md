@@ -634,7 +634,19 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.69)
+## Current State (v0.90.70)
+
+**Latest sync (2026-07-09, v0.90.70)**: A5 now has a frozen, policy-grade
+canonical eval suite (`data_selection/canonical_evals/production_suite_v1.json`)
+covering all four required case types, every case citing a real,
+already-committed evidence artifact (the n=200 injection-recovery baseline,
+the Gate Z4 ranking-baseline purity/ablation report, the Gate Z6
+retrospective-validation report, and a real, unconfirmed Gate Z3 known-NEO
+recovery attempt transcribed to
+`docs/evidence/canonical_evals/known_neo_recovery_72966_no_match.json`). This
+closes A5 for model-builder-independent regression protection; per-model
+canonical suites remain part of A7. See `docs/PRODUCTION_READINESS.md` for
+detail.
 
 **Latest sync (2026-07-09, v0.90.69)**: All four model-builder Skills
 (`train_tier1_xgboost.py`, `train_tier2_cnn.py`, `train_tier3_transformer.py`,

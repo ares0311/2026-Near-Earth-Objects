@@ -3,6 +3,29 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.70 — Add frozen A5 canonical regression suite (2026-07-09)
+
+### Added
+- `data_selection/canonical_evals/production_suite_v1.json`: a frozen,
+  policy-grade canonical eval suite covering all four required case types
+  (`known_neo_recovery`, `false_link`, `injection_recovery`,
+  `review_packet`), with every case's `observed_path` citing a real,
+  already-committed evidence artifact instead of inline synthetic data:
+  `data/injection_recovery_n200.json` (n=200 injection baseline),
+  `Logs/reports/ranking_baseline.json` (Gate Z4 purity/ablation evidence),
+  `Logs/reports/retrospective_validation.json` (Gate Z6 review-packet
+  retrospective validation), and a new
+  `docs/evidence/canonical_evals/known_neo_recovery_72966_no_match.json`
+  transcribing the real (unconfirmed) Gate Z3 recovery-attempt evidence.
+- `tests/test_canonical_eval.py::test_production_suite_passes_against_committed_evidence`
+  runs the full frozen suite against the real committed files in CI.
+
+### Changed
+- Version metadata advanced to v0.90.70.
+- README, production-readiness, AGENTS, and CLAUDE now record A5 as complete
+  for model-builder-independent regression protection; per-model canonical
+  suites remain part of A7.
+
 ## v0.90.69 — Extend grouped-split gate to all training Skills (2026-07-09)
 
 ### Added
