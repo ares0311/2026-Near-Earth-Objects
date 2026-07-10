@@ -634,7 +634,17 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.74)
+## Current State (v0.90.75)
+
+**Latest sync (2026-07-10, v0.90.75)**: Fixed a real operator-reported bug:
+`Skills/download_ztf_training_alerts.py` produced total console silence
+during a download (operator killed it). Root cause: no `flush=True` on any
+print, plus the tarball was read via one blocking `resp.content` call with
+zero progress output. Fixed by porting the proven stream+progress+ETA
+pattern already used in `Skills/ztf_alert_archive_ingest.py` (HEAD for
+Content-Length, `_CountingReader` over `resp.raw`, byte-level progress every
+200 scanned members, `flush=True` everywhere). See `CLAUDE.md`'s Current
+State for the full root-cause writeup and predicted-output check.
 
 **Latest sync (2026-07-10, v0.90.74)**: Fixed the acquisition-side root
 cause behind A7's `grouped_split_report_missing` blocker (operator-confirmed

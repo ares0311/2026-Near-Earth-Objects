@@ -171,14 +171,25 @@ def test_download_night_stamps_archive_night_onto_every_result(monkeypatch):
         ]
     )
 
-    class _FakeResponse:
+    class _FakeHeadResponse:
         status_code = 200
-        content = tar_bytes
+        headers = {"Content-Length": str(len(tar_bytes))}
 
         def raise_for_status(self) -> None:
             return None
 
-    monkeypatch.setattr(dl.requests, "get", lambda *a, **k: _FakeResponse())
+    class _FakeGetResponse:
+        status_code = 200
+        raw = io.BytesIO(tar_bytes)
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def close(self) -> None:
+            return None
+
+    monkeypatch.setattr(dl.requests, "head", lambda *a, **k: _FakeHeadResponse())
+    monkeypatch.setattr(dl.requests, "get", lambda *a, **k: _FakeGetResponse())
 
     results: list[dict] = []
     n_added = dl.download_night(
@@ -191,3 +202,48 @@ def test_download_night_stamps_archive_night_onto_every_result(monkeypatch):
     assert n_added == 2
     assert {r["archive_night"] for r in results} == {"20200601"}
     assert {r["object_id"] for r in results} == {"ZTF20aaa", "ZTF20bbb"}
+
+
+def test_download_night_prints_progress_with_flush(monkeypatch, capsys):
+    """Standing-rule regression: every print in the download path must be
+    flush=True and must fire even when the ambiguous zone/no-op filters
+    inside parse_avro_alert() would otherwise reject a record -- console
+    silence during a multi-hundred-MB download is indistinguishable from a
+    hung process (see the real operator report this fix responds to)."""
+    alerts = [_write_alert(candid=i, object_id=f"ZTF{i}", rb=0.9) for i in range(3)]
+    tar_bytes = _build_fake_tar_gz(alerts)
+
+    class _FakeHeadResponse:
+        status_code = 200
+        headers = {"Content-Length": str(len(tar_bytes))}
+
+        def raise_for_status(self) -> None:
+            return None
+
+    class _FakeGetResponse:
+        status_code = 200
+        raw = io.BytesIO(tar_bytes)
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def close(self) -> None:
+            return None
+
+    monkeypatch.setattr(dl.requests, "head", lambda *a, **k: _FakeHeadResponse())
+    monkeypatch.setattr(dl.requests, "get", lambda *a, **k: _FakeGetResponse())
+    monkeypatch.setattr(dl, "_PROGRESS_EVERY", 1)  # force a progress line per member
+
+    results: list[dict] = []
+    dl.download_night(
+        "https://example.invalid/ztf_public_20200601.tar.gz",
+        limit=10,
+        results=results,
+        archive_night="20200601",
+    )
+
+    out = capsys.readouterr().out
+    assert "Remote size:" in out
+    assert "scanned=" in out
+    assert "ETA" in out
+    assert "Done: scanned=3 kept=3" in out
