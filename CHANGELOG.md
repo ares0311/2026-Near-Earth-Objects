@@ -3,6 +3,32 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.72 — Run A7 promotion report for real against benchmark_cnn_v1 (2026-07-10)
+
+### Added
+- `Skills/extract_promotion_evidence.py`: derives two A7 promotion-report
+  inputs from already-committed real evidence rather than inventing data —
+  an injection-recovery report (lifted from the nested `recovery_curves`
+  object A6 already embeds in `data/injection_recovery_image_level_n200.json`)
+  and a false-discovery report (derived from Gate Z4's
+  `Logs/reports/ranking_baseline.json` `false_positive_review_burden`
+  counts: 0/200 false positives, `false_discovery_rate=0.0`).
+- `docs/evidence/promotion/`: real committed evidence for the first
+  `benchmark_cnn_v1` promotion-report run — canonical eval report (4/4 cases,
+  16/16 checks passed), the two extracted reports above, and the resulting
+  `benchmark_cnn_v1_promotion_report.json` (`promotion_allowed=false` with 4
+  real named blockers: dataset manifest, grouped-split report, calibration
+  report, operator signoff).
+- 9 new tests for the extraction/derivation logic and CLI
+  (`tests/test_extract_promotion_evidence.py`).
+
+### Changed
+- Version metadata advanced to v0.90.72.
+- README, production-readiness, AGENTS, and CLAUDE now record A7's real run
+  and the root-cause finding that `data/ztf_labeled_alerts.json` (the CNN's
+  committed training source) never captured per-alert RA/Dec/JD metadata —
+  explaining why A4/A1 remain open specifically for the CNN's training set.
+
 ## v0.90.71 — Add A6 image-level recovery curves (2026-07-09)
 
 ### Added

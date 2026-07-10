@@ -634,7 +634,21 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.71)
+## Current State (v0.90.72)
+
+**Latest sync (2026-07-10, v0.90.72)**: A7's promotion-report builder has now
+been run for real against `benchmark_cnn_v1`. New `Skills/extract_promotion_evidence.py`
+derives an injection-recovery report and a false-discovery report from
+already-committed real evidence (A6's image-level baseline and Gate Z4's
+ranking-baseline review-burden counts: 0/200 false positives) without
+inventing any data. `Skills/build_promotion_report.py` then produced a real,
+committed report — `promotion_allowed=false` with 4 real named blockers
+(dataset manifest, grouped-split report, calibration report, operator
+signoff). Root-cause finding: `data/ztf_labeled_alerts.json` (the CNN's
+committed 10,000-alert training source) never captured per-alert RA/Dec/JD
+metadata, so a real grouped split cannot be reconstructed for it — this is
+why A4/A1 remain open for the CNN's training set specifically, not a coding
+gap. See `docs/PRODUCTION_READINESS.md` for detail.
 
 **Latest sync (2026-07-09, v0.90.71)**: A6 now closes the image-level gap:
 `Skills/injection_recovery.py --image-level` synthesizes a real

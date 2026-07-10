@@ -1,0 +1,15 @@
+{
+  "false_discovery_rate": 0.0,
+  "limitations": [
+    "Derived from Gate Z4's real archived-negative + synthetic-positive evaluation, not from a live production run.",
+    "n_negative reflects only the archived negative tracklets available at Gate Z4 closure time, not a full survey population."
+  ],
+  "model_evaluated": "logistic_regression_handcrafted",
+  "n_false_positive": 0,
+  "n_flagged": 200,
+  "n_negative": 142,
+  "n_positive": 200,
+  "schema_version": "false-discovery-report-v1",
+  "source_report": "Logs/reports/ranking_baseline.json",
+  "threshold": 0.5
+}

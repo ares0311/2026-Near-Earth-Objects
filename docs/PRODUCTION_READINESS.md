@@ -1,6 +1,6 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.90.71
+**Current version**: v0.90.72
 **Last updated**: 2026-07-09 (header/sync line only — the P1-P5 gate register
 body below is unchanged historical evidence from 2026-07-02; current gate
 status for the active ZTF DR24 path lives in
@@ -93,11 +93,35 @@ launching a materially larger production batch, the project must add:
   committed at `data/injection_recovery_image_level_n200.json`
   (detection/link/score rate 7.5%, real per-bin curves for all three new
   dimensions).
-- A7 fail-closed model promotion reports landed in v0.90.66. The report builder
-  cites manifests, grouped split reports, canonical evals, recovery curves,
-  calibration reports, false-discovery estimates, pretrained audits, benchmark
-  model cards, and operator signoff. Actual production promotion still requires
-  real model-specific evidence packets that pass every cited gate.
+- A7 fail-closed model promotion reports landed in v0.90.66. v0.90.72 runs
+  the builder for real against `benchmark_cnn_v1` for the first time:
+  `Skills/extract_promotion_evidence.py` derives an injection-recovery report
+  and a false-discovery report from already-committed real evidence (A6's
+  image-level baseline and Gate Z4's ranking-baseline review-burden counts —
+  0/200 false positives, `false_discovery_rate=0.0`) without inventing any
+  new data, and `Skills/run_canonical_evals.py --out` persists the A5 suite's
+  real 4/4-case, 16/16-check pass. Feeding all of this into
+  `Skills/build_promotion_report.py` produces a real, committed report at
+  `docs/evidence/promotion/benchmark_cnn_v1_promotion_report.json`:
+  `promotion_allowed=false` with exactly four real, named blockers
+  (`dataset_manifest_missing`, `grouped_split_report_missing`,
+  `calibration_report_missing`, `operator_signoff_missing`) — the correct,
+  honest current state, not a placeholder. **Root-cause finding**: the
+  committed Tier 2 CNN training source, `data/ztf_labeled_alerts.json`
+  (10,000 real ZTF alerts, gitignored/local), stores only
+  `label`/`rb`/`drb`/cutout images per alert — it never captured per-alert
+  RA/Dec/JD/field metadata. This is *why* A4's "policy-grade real split
+  reports" and A1's "manifest coverage" remain open specifically for the CNN's
+  training set: the grouping fields a real grouped split needs
+  (`night_key`, `sky_cell`, `source_key`) cannot be reconstructed from data
+  that was never saved, and must not be fabricated. Closing this requires
+  either re-deriving the original alert metadata from its ZTF source (if
+  still resolvable) or retraining with a data path that captures it going
+  forward — both are real acquisition/retraining decisions, not a coding
+  gap. Actual production promotion still requires those two real evidence
+  packets plus a real calibration-report re-run (T1-D's KPI gate was passed
+  2026-06-14 but only exists locally/gitignored on the operator's Mac) and
+  operator signoff.
 - Initial A1/A2 pipeline wiring landed in v0.90.67: `Skills/run_pipeline.py`
   accepts `--source-dataset-id` for run summaries and optional
   `--candidate-ledger-db` ingestion into the SQLite candidate ledger. Full
