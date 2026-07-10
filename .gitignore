@@ -11,7 +11,9 @@ models/*
 !models/tier3_transformer.pt
 !models/stacker_coef.json
 data/cutouts/
+data/cutouts_v2/
 data/ztf_labeled_alerts.json
+data/ztf_labeled_alerts_v2.json
 # Operator-generated Tier 3 acquisition, split, and training evidence.
 data/sequences/
 .mypy_cache/
