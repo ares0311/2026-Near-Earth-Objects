@@ -1,0 +1,34 @@
+{
+  "dataset_id": "a6_injection_recovery_image_level_n200_v1",
+  "project": "2026 Near Earth Objects",
+  "role": "frozen_eval",
+  "source_name": "A6 image-level injection-recovery baseline (synthetic moving-source injections through the real detect/link/classify/score chain)",
+  "source_url": "generated locally by Skills/injection_recovery.py --image-level --n-inject 200 --seed 42",
+  "instrument": "synthesized 63x63 difference-image cutouts (Gaussian PSF + Gaussian background noise + trail elongation), not a real telescope",
+  "target_ids": [
+    "synthetic_injection_batch_n200_seed42_image_level"
+  ],
+  "time_range": {
+    "start": "2023-02-25",
+    "end": "2023-02-25",
+    "scale": "UTC"
+  },
+  "cadence": "n/a -- synthetic injections use an arbitrary night-bucketing reference epoch (JD 2460000.5, per Skills/injection_recovery.py `jd_base = 2460000.5 + night`); this is not a real observation campaign date range",
+  "band_or_frequency": "synthetic (no real filter band; analytic peak-SNR-derived real_bogus proxy)",
+  "data_product_type": "injection-recovery-curves-v1 report: detection/link/score outcomes and per-bin recovery curves across magnitude, velocity, observation count, night count, seeing, background, and trail-length dimensions",
+  "downloaded_at": "n/a (locally generated synthetic evaluation report)",
+  "local_path": "data/injection_recovery_image_level_n200.json",
+  "checksum": {
+    "algorithm": "sha256",
+    "value": "eabb7f6c503b7b5bde5df280f4a9f2bde2df10fcbb044ea86979868702b506ce"
+  },
+  "license": "n/a -- entirely synthetic, locally generated data. No third-party source.",
+  "label_source": "synthetic; ground truth is the injection generator's own known parameters (magnitude, velocity, seeing, background, trail length)",
+  "label_confidence": "synthetic",
+  "preprocessing_version": "Skills/injection_recovery.py --image-level --n-inject 200 --seed 42, regenerable via the documented command in docs/PRODUCTION_READINESS.md's A6 entry",
+  "known_caveats": [
+    "Real result: 7.5% detection/link/score rate (n=200, seed=42); all five required A6 recovery-curve dimensions (magnitude, velocity, observation count, night count, seeing/background/trail length) are covered with non-degenerate per-bin curves.",
+    "This is synthetic data, not real observations -- it demonstrates pipeline mechanics and sensitivity, not real-world detection performance. Do not cite this dataset as real-world recall/purity evidence.",
+    "This is real evidence closing A6 (2026-07-09); it is now also cited by the A5 frozen canonical eval suite's `injection_recovery` case and by the A7 promotion report's derived injection-recovery-report input (Skills/extract_promotion_evidence.py)."
+  ]
+}

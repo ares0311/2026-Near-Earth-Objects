@@ -1,0 +1,34 @@
+{
+  "dataset_id": "gate_z6_retrospective_validation_v1",
+  "project": "2026 Near Earth Objects",
+  "role": "frozen_eval",
+  "source_name": "Gate Z6 no-submission drill review packets, retrospectively validated against the live MPC catalog",
+  "source_url": "generated locally by Skills/evaluate_retrospective_validation.py from Skills/run_archive_positive_control.py --build-review-packets output for nights 20220817/20220819",
+  "instrument": "ZTF (real archived alerts, linked into 88 tracklets) + live MPC.query_objects_in_region cross-match",
+  "target_ids": [
+    "ztf_night_20220817",
+    "ztf_night_20220819"
+  ],
+  "time_range": {
+    "start": "2022-08-17",
+    "end": "2022-08-19",
+    "scale": "UTC"
+  },
+  "cadence": "single real archived ZTF night-pair (2-day gap)",
+  "band_or_frequency": "ZTF alert-archive bands (not restricted to a single filter)",
+  "data_product_type": "retrospective validation report: each of 88 real ScoredNEO review packets bucketed into recovered_known_object/later_confirmed_object/artifact/unresolved_candidate via a live MPC cross-match run after the replay window",
+  "downloaded_at": "n/a (locally generated report; the live MPC query it depends on ran at evaluation time, 2026-07-04)",
+  "local_path": "Logs/reports/retrospective_validation.json",
+  "checksum": {
+    "algorithm": "sha256",
+    "value": "9bdfa89ec34890dad513854babb49bdad1b3e5a6bd736462c6de178307edfad1"
+  },
+  "license": "n/a -- locally generated evaluation report, not third-party data. Underlying real ZTF observations were sourced from the UW ZTF public alert archive; see ztf_labeled_alerts_tier2_cnn_v1.json's license caveat for that upstream source. MPC cross-match results are from MPC's public query_objects_in_region API.",
+  "label_source": "88 real ScoredNEO review packets from Skills/run_archive_positive_control.py --build-review-packets, each cross-matched against the current MPC known-object catalog",
+  "label_confidence": "confirmed",
+  "preprocessing_version": "Skills/evaluate_retrospective_validation.py, regenerable via the documented command in docs/ZTF_DR24_PRODUCTION_GATES.md Gate Z5 row",
+  "known_caveats": [
+    "Real result: {recovered_known_object: 0, later_confirmed_object: 0, artifact: 88, unresolved_candidate: 0} -- the correct, expected outcome, since these 88 tracklets are already known (Gate Z3/Z6) to be combinatorial cross-night artifacts in a crowded field, not real single-object NEO candidates.",
+    "This is real evidence closing Gate Z5/Z6 (2026-07-04); it is now also cited by the A5 frozen canonical eval suite's `review_packet` case."
+  ]
+}

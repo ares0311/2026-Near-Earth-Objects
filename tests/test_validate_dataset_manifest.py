@@ -56,6 +56,19 @@ def test_live_search_manifest_cannot_have_duplicate_targets() -> None:
         validate_manifest(manifest)
 
 
+def test_all_committed_manifests_validate() -> None:
+    """Every real manifest committed under data_selection/dataset_manifests/
+    must keep validating against the current schema -- this guards real,
+    already-written provenance (checksums, sources, caveats) against silent
+    breakage from future schema changes."""
+    manifest_dir = Path(__file__).resolve().parents[1] / "data_selection" / "dataset_manifests"
+    manifest_paths = sorted(manifest_dir.glob("*.json"))
+    assert manifest_paths, "expected at least one committed dataset manifest"
+    for manifest_path in manifest_paths:
+        data = json.loads(manifest_path.read_text(encoding="utf-8"))
+        validate_manifest(data)
+
+
 def test_cli_validates_manifest_file(tmp_path: Path) -> None:
     manifest_path = tmp_path / "manifest.json"
     manifest_path.write_text(json.dumps(_valid_manifest()), encoding="utf-8")

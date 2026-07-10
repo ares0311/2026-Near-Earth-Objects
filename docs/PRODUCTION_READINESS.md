@@ -1,7 +1,7 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.90.72
-**Last updated**: 2026-07-09 (header/sync line only — the P1-P5 gate register
+**Current version**: v0.90.73
+**Last updated**: 2026-07-10 (header/sync line only — the P1-P5 gate register
 body below is unchanged historical evidence from 2026-07-02; current gate
 status for the active ZTF DR24 path lives in
 `docs/ZTF_DR24_PRODUCTION_GATES.md`, which is kept current every session)
@@ -93,8 +93,19 @@ launching a materially larger production batch, the project must add:
   committed at `data/injection_recovery_image_level_n200.json`
   (detection/link/score rate 7.5%, real per-bin curves for all three new
   dimensions).
-- A7 fail-closed model promotion reports landed in v0.90.66. v0.90.72 runs
-  the builder for real against `benchmark_cnn_v1` for the first time:
+- A7 fail-closed model promotion reports landed in v0.90.66. v0.90.73 adds
+  four real, committed dataset manifests under `data_selection/dataset_manifests/`
+  (`ztf_labeled_alerts_tier2_cnn_v1`, `gate_z4_ranking_baseline_v1`,
+  `gate_z6_retrospective_validation_v1`,
+  `a6_injection_recovery_image_level_n200_v1`), each populated from computed
+  facts (checksums) or already-documented project history (source URLs,
+  gate-closure dates, real result counts), never guessed. Citing the training
+  manifest closes the `dataset_manifest_missing` blocker for real: re-running
+  `Skills/build_promotion_report.py` for `benchmark_cnn_v1` now shows 6/8
+  evidence checks passing with only **three** real named blockers left
+  (`grouped_split_report_missing`, `calibration_report_missing`,
+  `operator_signoff_missing`), down from four. v0.90.72 first ran the builder
+  for real against `benchmark_cnn_v1`:
   `Skills/extract_promotion_evidence.py` derives an injection-recovery report
   and a false-discovery report from already-committed real evidence (A6's
   image-level baseline and Gate Z4's ranking-baseline review-burden counts —

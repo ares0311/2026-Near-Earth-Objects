@@ -124,7 +124,7 @@ The pipeline implements a strict directed acyclic graph (DAG) of processing stag
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    NEO DETECTION PIPELINE  v0.90.72                  │
+│                    NEO DETECTION PIPELINE  v0.90.73                  │
 └─────────────────────────────────────────────────────────────────────┘
 
   External Data Sources
@@ -1229,7 +1229,7 @@ evidence. MPC submission remains disabled until a real candidate survives
 adversarial plus operator review and the applicable source/submission protocol
 is satisfied.
 
-### 15.1 Current State Snapshot (v0.90.72)
+### 15.1 Current State Snapshot (v0.90.73)
 
 | Area | Status | Notes |
 |---|---|---|
@@ -1296,13 +1296,13 @@ scalar KPIs. The next production-safe sequence is:
 
 | ID | Workstream | Done When | Status |
 |---|---|---|---|
-| **A1** | Dataset manifest system | Training, scoring, evaluation, live-search, and evidence batches have manifest IDs, validation tests, source/license/role fields, and leakage caveats. | **Partially complete; schema, validator, and run-pipeline source dataset citation landed; production manifest coverage still open** |
+| **A1** | Dataset manifest system | Training, scoring, evaluation, live-search, and evidence batches have manifest IDs, validation tests, source/license/role fields, and leakage caveats. | **Partially complete; schema, validator, run-pipeline source dataset citation, and 4 real committed manifests landed (`data_selection/dataset_manifests/`) covering the CNN training source and 3 frozen-eval reports; broader coverage across every remaining real dataset role still open** |
 | **A2** | Candidate ledger | Candidate packets can be regenerated from a SQLite or parquet ledger containing source dataset ID, generator params, model versions, calibrated scores, review status, and regeneration command. | **Partially complete; SQLite schema/CLI and optional run-pipeline ingest landed; full production adoption still open** |
 | **A3** | Freeze CNN benchmark | Current Tier 2 image model is wrapped or moved under `benchmarks/benchmark_cnn_v1/` with locked preprocessing, seeds, split definitions, metrics, and `MODEL_CARD.md`. | **Complete for benchmark freeze; CNN promotion still gated by A4-A7** |
 | **A4** | Grouped splits and leakage checks | NEO train/eval splits are grouped by night, sky region, survey/instrument, and object ID; random splits remain diagnostic only. | **Complete for model-builder gating; all four training Skills (Tier 1/2/3 + stacker) share the fail-closed `--production-candidate` gate; policy-grade real split reports for every real dataset role still open** |
 | **A5** | Canonical regression evals | Known NEO detections, false link examples, injected moving-source controls, and review-packet examples produce sample-by-sample regression reports. | **Complete for model-builder-independent regression protection; `production_suite_v1.json` covers all four case types against real committed evidence. Per-model suites remain part of A7.** |
 | **A6** | Injection-recovery curves | Moving-source injections report recovery curves by magnitude, velocity, trail length, seeing/background, and missed frames, not only scalar success rates. | **Complete: synthetic harness emits magnitude/motion/observation/night curves plus image-level seeing/background/trail-length curves (`--image-level`), with a real committed n=200 baseline.** |
-| **A7** | Calibration and promotion report | Any model promotion cites manifests, grouped splits, frozen evals, injection-recovery curves, calibration quantiles, false-discovery estimates, pretrained-model audits, benchmark model cards, and operator signoff where applicable. | **Partially complete; report builder run for real against `benchmark_cnn_v1` — `docs/evidence/promotion/benchmark_cnn_v1_promotion_report.json` correctly reports `promotion_allowed=false` with 4 real named blockers (dataset manifest, grouped-split report, calibration report, operator signoff)** |
+| **A7** | Calibration and promotion report | Any model promotion cites manifests, grouped splits, frozen evals, injection-recovery curves, calibration quantiles, false-discovery estimates, pretrained-model audits, benchmark model cards, and operator signoff where applicable. | **Partially complete; report builder run for real against `benchmark_cnn_v1` — `docs/evidence/promotion/benchmark_cnn_v1_promotion_report.json` now reports `promotion_allowed=false` with only 3 real named blockers left (grouped-split report, calibration report, operator signoff), down from 4 after A1's real dataset manifest landed** |
 
 CNN-specific rule: the existing CNN is a benchmark until A1-A7 close for it. It
 may contribute image/artifact features, but it is not the main scientific thesis

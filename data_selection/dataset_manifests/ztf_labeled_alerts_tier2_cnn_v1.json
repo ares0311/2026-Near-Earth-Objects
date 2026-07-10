@@ -1,0 +1,36 @@
+{
+  "dataset_id": "ztf_labeled_alerts_tier2_cnn_v1",
+  "project": "2026 Near Earth Objects",
+  "role": "training",
+  "source_name": "ZTF public alert archive (University of Washington)",
+  "source_url": "https://ztf.uw.edu/alerts/public/",
+  "instrument": "ZTF camera (Palomar 48-inch Schmidt)",
+  "target_ids": [
+    "bulk_ztf_public_alert_sample_n10000_no_per_alert_ids_preserved"
+  ],
+  "time_range": {
+    "start": "unknown",
+    "end": "unknown",
+    "scale": "UTC"
+  },
+  "cadence": "ZTF source survey uses ~3-night all-sky cadence; this sample was pulled via `Skills/download_ztf_training_alerts.py --nights 3` (most-recent-N-nights at download time), but the exact calendar nights were not separately logged and cannot be recovered from the cached file",
+  "band_or_frequency": "ZTF g/r/i filters; per-alert filter band not preserved in this cached sample",
+  "data_product_type": "difference-image alert cutout triplets (science/reference/difference, base64-encoded FITS) with ZTF broker real/bogus (rb) and deep-learning real/bogus (drb) scores",
+  "downloaded_at": "2026-06-06T10:42:55-0400 (local filesystem mtime of data/ztf_labeled_alerts.json; no separate download-timestamp log exists)",
+  "local_path": "data/ztf_labeled_alerts.json",
+  "checksum": {
+    "algorithm": "sha256",
+    "value": "4887b606fa1f6a0a81a2f13c9f9448c8b72f361bc8a5ac3260a6e63baa00ce06"
+  },
+  "license": "Not independently verified in project records. ZTF public alert archive (ztf.uw.edu) provides unauthenticated public HTTP access; no explicit license file or terms-of-use document was located during Gate Z3 source verification (docs/evidence/phase0/2026-07-02-gate-z3-uw-alert-archive-candidate.md) or during this manifest's creation.",
+  "label_source": "ZTF broker-side real/bogus classifier (Duev et al. 2019 style rb/drb scores), binarized by Skills/download_ztf_training_alerts.py into this dataset's real/bogus label",
+  "label_confidence": "catalog",
+  "preprocessing_version": "Skills/download_ztf_training_alerts.py (gzip-FITS cutouts decompressed to raw float32); consumed by Skills/build_cutout_dataset.py to build data/cutouts/index.csv for models/tier2_cnn.pt training",
+  "known_caveats": [
+    "This is the real, committed-code-produced source for the frozen benchmark_cnn_v1 model's training data, but the raw file itself is gitignored/local-only (637MB) and is not in git history.",
+    "No per-alert RA/Dec/JD/candid/field metadata was preserved when this file was built -- only label, rb, drb, and cutout images per entry (10,000 alerts total, confirmed by direct inspection 2026-07-10).",
+    "This means a genuine grouped-split leakage report (by night/sky-cell/source, per A4) cannot be reconstructed for this dataset without either re-deriving the original per-alert metadata from the ZTF source archive (if still resolvable) or retraining with a data path that captures it going forward -- this is an acquisition/retraining decision, not a coding gap.",
+    "Real class balance per docs/PRODUCTION_READINESS.md T1-A: approximately 8,588 real / 1,412 bogus across the 10,000 alerts.",
+    "The exact `--nights` value's calendar date range at download time is not recoverable from the cached file or from git history (the raw file predates being gitignored and has no commit log)."
+  ]
+}

@@ -816,7 +816,19 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.72)
+## Current State (v0.90.73)
+
+**Latest sync (2026-07-10, v0.90.73)**: A1 now has four real, committed
+dataset manifests under `data_selection/dataset_manifests/`
+(`ztf_labeled_alerts_tier2_cnn_v1`, `gate_z4_ranking_baseline_v1`,
+`gate_z6_retrospective_validation_v1`,
+`a6_injection_recovery_image_level_n200_v1`), each populated from computed
+facts (checksums) or already-documented project history — never guessed.
+Citing the training manifest in the A7 promotion report closes the
+`dataset_manifest_missing` blocker for real: `benchmark_cnn_v1`'s promotion
+report now shows 6/8 evidence checks passing with only **three** real named
+blockers left (grouped-split report, calibration report, operator signoff),
+down from four.
 
 **Latest sync (2026-07-10, v0.90.72)**: A7's promotion-report builder has now
 been run for real against `benchmark_cnn_v1`. New `Skills/extract_promotion_evidence.py`
