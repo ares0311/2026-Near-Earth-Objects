@@ -124,7 +124,7 @@ The pipeline implements a strict directed acyclic graph (DAG) of processing stag
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    NEO DETECTION PIPELINE  v0.90.68                  │
+│                    NEO DETECTION PIPELINE  v0.90.69                  │
 └─────────────────────────────────────────────────────────────────────┘
 
   External Data Sources
@@ -1229,7 +1229,7 @@ evidence. MPC submission remains disabled until a real candidate survives
 adversarial plus operator review and the applicable source/submission protocol
 is satisfied.
 
-### 15.1 Current State Snapshot (v0.90.68)
+### 15.1 Current State Snapshot (v0.90.69)
 
 | Area | Status | Notes |
 |---|---|---|
@@ -1301,7 +1301,7 @@ scalar KPIs. The next production-safe sequence is:
 | **A3** | Freeze CNN benchmark | Current Tier 2 image model is wrapped or moved under `benchmarks/benchmark_cnn_v1/` with locked preprocessing, seeds, split definitions, metrics, and `MODEL_CARD.md`. | **Complete for benchmark freeze; CNN promotion still gated by A4-A7** |
 | **A4** | Grouped splits and leakage checks | NEO train/eval splits are grouped by night, sky region, survey/instrument, and object ID; random splits remain diagnostic only. | **Partially complete; grouped leakage controls and stacker production-candidate gate landed, broader model-builder adoption still open** |
 | **A5** | Canonical regression evals | Known NEO detections, false link examples, injected moving-source controls, and review-packet examples produce sample-by-sample regression reports. | **Partially complete; suite runner and example contract landed, frozen production suites still open** |
-| **A6** | Injection-recovery curves | Moving-source injections report recovery curves by magnitude, velocity, trail length, seeing/background, and missed frames, not only scalar success rates. | **Partially complete; synthetic harness now emits magnitude/motion/observation/night curves, image-level seeing/background/trail curves still open** |
+| **A6** | Injection-recovery curves | Moving-source injections report recovery curves by magnitude, velocity, trail length, seeing/background, and missed frames, not only scalar success rates. | **Complete: synthetic harness emits magnitude/motion/observation/night curves plus image-level seeing/background/trail-length curves (`--image-level`), with a real committed n=200 baseline.** |
 | **A7** | Calibration and promotion report | Any model promotion cites manifests, grouped splits, frozen evals, injection-recovery curves, calibration quantiles, false-discovery estimates, pretrained-model audits, benchmark model cards, and operator signoff where applicable. | **Partially complete; fail-closed report builder and CLI landed, real model-specific evidence packets still open** |
 
 CNN-specific rule: the existing CNN is a benchmark until A1-A7 close for it. It

@@ -4,10 +4,14 @@ must survive a process kill without losing work)."""
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import sys
 from pathlib import Path
+
+import numpy as np
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
@@ -23,6 +27,69 @@ class TestCheckpointKey:
         assert ir._checkpoint_key(10, 42, "ZTF") != ir._checkpoint_key(10, 43, "ZTF")
         assert ir._checkpoint_key(10, 42, "ZTF") != ir._checkpoint_key(11, 42, "ZTF")
         assert ir._checkpoint_key(10, 42, "ZTF") != ir._checkpoint_key(10, 42, "WISE")
+        assert ir._checkpoint_key(10, 42, "ZTF") != ir._checkpoint_key(
+            10, 42, "ZTF", image_level=True
+        )
+
+
+class TestImageLevelSynthesis:
+    """A6: seeing/background/trail-length recovery curves."""
+
+    def test_real_bogus_degrades_with_worse_seeing_background_and_trail(self):
+        baseline = ir._analytic_real_bogus(19.5, 1.5, 10.0, 0.0)
+        worse_seeing = ir._analytic_real_bogus(19.5, 3.0, 10.0, 0.0)
+        worse_background = ir._analytic_real_bogus(19.5, 1.5, 30.0, 0.0)
+        worse_trail = ir._analytic_real_bogus(19.5, 1.5, 10.0, 5.0)
+
+        assert 0.0 < baseline < 1.0
+        assert worse_seeing < baseline
+        assert worse_background < baseline
+        assert worse_trail < baseline
+
+    def test_real_bogus_clipped_to_unit_interval(self):
+        assert ir._analytic_real_bogus(10.0, 1.0, 0.001, 0.0) == 1.0
+        assert ir._analytic_real_bogus(25.0, 4.0, 100.0, 20.0) == 0.0
+
+    def test_synthesize_difference_cutout_shape_and_real_bogus_match(self):
+        rng = np.random.default_rng(0)
+        cutout_b64, real_bogus = ir._synthesize_difference_cutout(rng, 19.5, 1.5, 10.0, 0.0)
+
+        arr = np.frombuffer(base64.b64decode(cutout_b64), dtype=np.float32)
+        assert arr.size == ir._CUTOUT_SIZE * ir._CUTOUT_SIZE
+        assert real_bogus == ir._analytic_real_bogus(19.5, 1.5, 10.0, 0.0)
+
+    def test_inject_synthetic_neo_image_level_sets_cutouts_and_real_bogus(self):
+        obs = ir.inject_synthetic_neo_image_level(
+            seed=1, n_nights=3, seeing_arcsec=1.5, background_level=10.0,
+            trail_length_arcsec=0.0,
+        )
+
+        assert len(obs) == 6
+        for ob in obs:
+            assert ob.cutout_difference is not None
+            assert 0.0 <= ob.real_bogus <= 1.0
+
+    def test_run_injection_recovery_image_level_populates_curves(self, tmp_path):
+        result = ir.run_injection_recovery(
+            n_inject=8, seed=3, mission="ZTF", checkpoint_root=tmp_path, image_level=True
+        )
+
+        assert result["image_level"] is True
+        assert {"seeing_arcsec", "background_level", "trail_length_arcsec"} <= set(
+            result["injection_records"][0]
+        )
+        curves = result["recovery_curves"]["curves"]
+        assert set(curves) >= {"seeing_arcsec", "background_level", "trail_length_arcsec"}
+        assert not any(
+            "require image-level" in limitation
+            for limitation in result["recovery_curves"]["limitations"]
+        )
+
+    def test_run_injection_recovery_image_level_rejects_non_ztf(self, tmp_path):
+        with pytest.raises(ValueError, match="only supported for mission='ZTF'"):
+            ir.run_injection_recovery(
+                n_inject=1, seed=1, mission="WISE", checkpoint_root=tmp_path, image_level=True
+            )
 
 
 class TestAtomicWriteJson:
@@ -161,3 +228,64 @@ class TestCheckpointResume:
 
         assert "Recovery curves saved" in result.stdout
         assert json.loads(out_path.read_text())["schema_version"] == "injection-recovery-curves-v1"
+
+    def test_image_level_cli_writes_curves_with_new_dimensions(self, tmp_path):
+        out_path = tmp_path / "curves.json"
+        import subprocess
+
+        result = subprocess.run(
+            [
+                "uv",
+                "run",
+                "--no-sync",
+                "--python",
+                "3.14",
+                "python",
+                "Skills/injection_recovery.py",
+                "--n-inject",
+                "8",
+                "--seed",
+                "9",
+                "--image-level",
+                "--curve-json",
+                str(out_path),
+                "--checkpoint-root",
+                str(tmp_path / "checkpoints"),
+            ],
+            capture_output=True,
+            env={**os.environ, "UV_CACHE_DIR": ".uv-cache", "PYTHONPATH": "src"},
+            text=True,
+            check=True,
+        )
+
+        curves = json.loads(out_path.read_text())["curves"]
+        assert "image_level=True" in result.stdout
+        assert set(curves) >= {"seeing_arcsec", "background_level", "trail_length_arcsec"}
+
+    def test_image_level_cli_rejects_wise_survey(self, tmp_path):
+        import subprocess
+
+        result = subprocess.run(
+            [
+                "uv",
+                "run",
+                "--no-sync",
+                "--python",
+                "3.14",
+                "python",
+                "Skills/injection_recovery.py",
+                "--n-inject",
+                "1",
+                "--survey",
+                "WISE",
+                "--image-level",
+                "--checkpoint-root",
+                str(tmp_path / "checkpoints"),
+            ],
+            capture_output=True,
+            env={**os.environ, "UV_CACHE_DIR": ".uv-cache", "PYTHONPATH": "src"},
+            text=True,
+        )
+
+        assert result.returncode == 1
+        assert "only supported with --survey ZTF" in result.stdout

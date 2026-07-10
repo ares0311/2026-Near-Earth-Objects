@@ -634,7 +634,19 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.68)
+## Current State (v0.90.69)
+
+**Latest sync (2026-07-09, v0.90.69)**: A6 now closes the image-level gap:
+`Skills/injection_recovery.py --image-level` synthesizes a real
+difference-image cutout per injection (Gaussian PSF + background noise +
+trail elongation) and derives `real_bogus` from its analytic peak SNR, so
+seeing/background/trail-length sweeps produce real, non-degenerate recovery
+curves through the actual `detect()`/`link()`/`classify()`/`score()` chain.
+A real n=200, seed=42 baseline is committed at
+`data/injection_recovery_image_level_n200.json` (7.5% detection/link/score
+rate). All five required A6 dimensions (magnitude, velocity, observation
+count, night count, and now seeing/background/trail length) are covered. See
+`docs/PRODUCTION_READINESS.md` for detail.
 
 **Latest sync (2026-07-09, v0.90.68)**: The Astrometrics coding-agent,
 data-selection, and external/cloud-storage policy docs are now mandatory
@@ -1249,7 +1261,7 @@ PYTHONPATH=src uv run --python 3.14 python Skills/select_survey_fields.py \
 | `Skills/download_ztf_training_alerts.py` | Download labeled ZTF Avro alert tarballs from public archive (ztf.uw.edu); decompresses gzip-FITS cutouts; writes `data/ztf_labeled_alerts.json`; run from Mac with `caffeinate -i` |
 | `Skills/batch_score.py` | Score a list of tracklets from a JSON file; print ranked table |
 | `Skills/run_pipeline.py` | Full end-to-end pipeline run |
-| `Skills/injection_recovery.py` | Injection-recovery test: injects synthetic NEOs, measures detection/link/score rates |
+| `Skills/injection_recovery.py` | Injection-recovery test: injects synthetic NEOs, measures detection/link/score rates; `--image-level` sweeps seeing/background/trail-length via synthesized difference cutouts for A6 recovery curves |
 | `Skills/check_mpc_known.py` | Cross-match candidate observations against MPC known object catalog |
 | `Skills/build_recovery_manifest.py` | Build checkpointed MPC+Horizons expected-known manifests for T1-C recovery audits |
 | `Skills/visualize_tracklets.py` | Plot sky positions and light curves for a tracklet JSON file |
@@ -1368,6 +1380,7 @@ PYTHONPATH=src uv run --python 3.14 python Skills/select_survey_fields.py \
 | `data/README.md` | Data directory documentation and format reference |
 | `data/injection_recovery_baseline.json` | Injection-recovery results (n=50, seed=42): 100% detection, 62% link, 62% score |
 | `data/injection_recovery_n200.json` | Injection-recovery results (n=200, seed=42): 100% detection, 100% link, 100% score |
+| `data/injection_recovery_image_level_n200.json` | A6 image-level injection-recovery results (n=200, seed=42, `--image-level`): 7.5% detection/link/score with real per-bin seeing/background/trail-length recovery curves |
 | `data/stress_test_high_motion.json` | Stress-test results: 100% link rate across all three motion bins |
 | `background/config.json` | Automated offline background automation configuration |
 | `background/config.schema.json` | JSON Schema for background automation config |

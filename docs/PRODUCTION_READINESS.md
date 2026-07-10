@@ -1,6 +1,6 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.90.68
+**Current version**: v0.90.69
 **Last updated**: 2026-07-09 (header/sync line only — the P1-P5 gate register
 body below is unchanged historical evidence from 2026-07-02; current gate
 status for the active ZTF DR24 path lives in
@@ -70,8 +70,16 @@ launching a materially larger production batch, the project must add:
   policy-grade suites covering known-NEO recovery, false links,
   injection-recovery, and review-packet examples remain open.
 - A6 synthetic-harness recovery curves landed in v0.90.65, covering
-  magnitude, motion rate, observation count, and night count. Image-level
-  seeing/background/trail-length curves remain open.
+  magnitude, motion rate, observation count, and night count. v0.90.69 adds
+  image-level curves: `Skills/injection_recovery.py --image-level` synthesizes
+  a real difference-image cutout per injection (Gaussian PSF + Gaussian
+  background noise + trail elongation) and derives real_bogus from its
+  analytic peak SNR (calibrated so mag/seeing/background/trail sweeps
+  actually cross detect.py's 0.65 threshold, not a flat 0%/100%), closing the
+  seeing/background/trail-length gap. A real n=200, seed=42 baseline is
+  committed at `data/injection_recovery_image_level_n200.json`
+  (detection/link/score rate 7.5%, real per-bin curves for all three new
+  dimensions).
 - A7 fail-closed model promotion reports landed in v0.90.66. The report builder
   cites manifests, grouped split reports, canonical evals, recovery curves,
   calibration reports, false-discovery estimates, pretrained audits, benchmark

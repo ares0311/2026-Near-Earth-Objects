@@ -11,6 +11,19 @@ DEFAULT_BINS: dict[str, tuple[float, ...]] = {
     "n_observations": (0.0, 3.0, 6.0, 9.0, 12.0),
     "n_nights": (0.0, 1.0, 2.0, 3.0, 4.0),
 }
+
+# Image-level dimensions, added for records produced by
+# Skills/injection_recovery.py's --image-level mode, which synthesizes a
+# difference-image cutout per injection and derives real_bogus from its
+# analytic peak-SNR (see injection_recovery.py's _synthesize_difference_cutout
+# docstring for the calibration). Bin edges were chosen empirically so a
+# realistic mag/seeing/background/trail-length sweep spans the full
+# detected/not-detected range, not so every bin trivially passes or fails.
+IMAGE_LEVEL_BINS: dict[str, tuple[float, ...]] = {
+    "seeing_arcsec": (0.8, 1.2, 1.6, 2.0, 2.5, 3.0, 3.5),
+    "background_level": (2.0, 5.0, 10.0, 15.0, 20.0, 30.0, 40.0),
+    "trail_length_arcsec": (0.0, 0.5, 1.0, 2.0, 3.0, 5.0, 8.0),
+}
 _OUTCOMES = ("detected", "linked", "scored")
 
 
@@ -91,6 +104,15 @@ def recovery_curve_report(
             missing_dimensions.append(dimension)
         curves[dimension] = [_finalize_bin(row) for row in rows]
 
+    image_level_dims = set(IMAGE_LEVEL_BINS) & set(bins)
+    has_image_level_data = bool(image_level_dims - set(missing_dimensions))
+    limitations = ["Curves summarize synthetic injection records only."]
+    if not has_image_level_data:
+        limitations.append(
+            "Seeing/background/trail-length curves require image-level injection metadata "
+            "(Skills/injection_recovery.py --image-level)."
+        )
+
     return {
         "schema_version": "injection-recovery-curves-v1",
         "n_records": len(records),
@@ -98,8 +120,5 @@ def recovery_curve_report(
         "passed": bool(records) and not missing_dimensions,
         "curves": curves,
         "missing_dimensions": missing_dimensions,
-        "limitations": [
-            "Curves summarize synthetic injection records only.",
-            "Seeing/background/trail-length curves require image-level injection metadata.",
-        ],
+        "limitations": limitations,
     }
