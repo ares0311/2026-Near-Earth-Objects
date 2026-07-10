@@ -816,7 +816,35 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.74)
+## Current State (v0.90.75)
+
+**Latest sync (2026-07-10, v0.90.75)**: Operator ran step 1 of the v0.90.74
+handoff below and reported total console silence, then killed the process.
+**Root cause (found, not guessed)**: `Skills/download_ztf_training_alerts.py`'s
+`download_night()` read the entire nightly tarball into memory via a single
+blocking `resp.content` call with zero progress output during that read, and
+none of the script's `print()` calls used `flush=True` -- so on any stdout
+that isn't a raw interactive TTY (common under `uv run`/wrapped terminals),
+Python's default block buffering withheld everything until the buffer filled
+or the process exited. For a multi-hundred-MB-to-several-GB tarball, that
+produced total silence for the whole download+decode, indistinguishable from
+a hang. Fixed by porting this repo's own proven pattern from
+`Skills/ztf_alert_archive_ingest.py`: HEAD the URL first for `Content-Length`,
+stream-decode via `tarfile.open(mode="r|gz")` over a `_CountingReader`
+wrapping `resp.raw` (never buffers the full tarball), print byte-level
+progress with a measurable-quantity ETA every 200 scanned members
+(`scanned=N kept=M  X/Y (Z%)  elapsed ...  ETA ...`), and add `flush=True` to
+every print in the file. 1 new regression test asserts progress lines
+actually appear. **Predicted operator console after this fix**: immediately
+`ZTF public alert archive: ...` / `Nights to download: ...`, then per night
+`Downloading YYYY-MM-DD: <url>` followed within seconds by `  Remote size:
+<X>`, then periodic `  scanned=...` progress lines throughout the download
+(not just at the end), then `  Done: scanned=... kept=... elapsed ...` and
+the `+N alerts (total: ...)` summary. **If the console still goes silent
+immediately after `Remote size:` and never shows a first `scanned=` line**,
+the root cause was NOT buffering -- re-diagnose from that new symptom (e.g.
+a network-level stall reading the response body) rather than patching this
+same area again.
 
 **Latest sync (2026-07-10, v0.90.74)**: Root-caused and fixed the
 acquisition-side gap behind A7's `grouped_split_report_missing` blocker
