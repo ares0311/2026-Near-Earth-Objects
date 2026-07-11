@@ -1,0 +1,36 @@
+{
+  "dataset_id": "tier3_transformer_pilot_v1",
+  "project": "2026 Near Earth Objects",
+  "role": "training",
+  "source_name": "MPC observation histories (via astroquery.mpc) + ALeRCE bogus-object histories",
+  "source_url": "https://www.minorplanetcenter.net/ ; https://alerce.online/",
+  "instrument": "Multi-instrument -- MPC-aggregated ground-based astrometry for known_object/main_belt_asteroid/neo_candidate/other_solar_system classes; ZTF (via ALeRCE broker) for stellar_artifact class",
+  "target_ids": [
+    "mpc_five_class_pilot_designations_n200",
+    "alerce_bogus_object_histories_n50"
+  ],
+  "time_range": {
+    "start": "unknown",
+    "end": "unknown",
+    "scale": "UTC"
+  },
+  "cadence": "Per-designation MPC observation history (irregular, real observation cadence) for 4 classes; ALeRCE ZTF alert history cadence for stellar_artifact class",
+  "band_or_frequency": "Mixed -- multi-band MPC astrometric history; ZTF g/r/i for ALeRCE-sourced artifact sequences",
+  "data_product_type": "Tokenized observation sequences (RA, Dec, magnitude, time, filter per observation) for Tier 3 Transformer multi-class classification (known_object/main_belt_asteroid/neo_candidate/other_solar_system/stellar_artifact)",
+  "downloaded_at": "2026-06-13T13:19:53Z (created_at_utc of the real training report, data/sequences/pilot/tier3_training_report.json)",
+  "local_path": "data/sequences/tier3_pilot_v2/mpc_sequences.json ; data/sequences/tier3_pilot_v2/alerce_artifacts.json ; data/sequences/tier3_pilot_v2/splits/{train,calibration,test}.csv",
+  "checksum": {
+    "algorithm": "sha256",
+    "value": "174741b1fb8951ed3695c00cb3a08ef511acbae22f1fe06d0cf72c5f769aac7a"
+  },
+  "license": "Not independently verified in project records. MPC and ALeRCE both publish data for public research use; no explicit license file or terms-of-use document was located during this manifest's creation.",
+  "label_source": "Five-class label policy approved by Jerome W. Lindsey III on 2026-06-10: MPC-confirmed known_object/main_belt_asteroid/neo_candidate/other_solar_system designations, plus ALeRCE high-confidence bogus ZTF object histories for stellar_artifact",
+  "label_confidence": "confirmed",
+  "preprocessing_version": "Fifth pilot run (post-v0.87.5, 2026-06-13), executed via Skills/run_tier3_pilot.py: MPC acquisition collected 50 sequences/class across 4 classes in 3m49s; ALeRCE collected 50 stellar_artifact sequences (329 observations, 150 queried); Skills/build_sequence_dataset.py built designation-grouped train/calibration/test splits, consumed by Skills/train_tier3_transformer.py to produce models/tier3_transformer.pt (best epoch 17/30, val_macro_f1=0.9400)",
+  "known_caveats": [
+    "This is the real data behind the currently-trained and calibrated models/tier3_transformer.pt (T1-D KPI gate passed 2026-06-14). The checksum field cites mpc_sequences.json only (schema allows one checksum); alerce_artifacts.json's independent sha256 is b319301edc21d50df9d6fa69f5859a83aa92c6aee04762b8250cc03f2214a778, confirmed 2026-07-11.",
+    "Confirmed real record counts by direct inspection 2026-07-11: mpc_sequences.json has 200 entries (50 per class x 4 classes), alerce_artifacts.json has 50 entries, splits/{train,calibration,test}.csv total 250 data rows (176+36+41 lines including headers) -- all matching data/sequences/pilot/tier3_training_report.json's combined_class_counts (50 per class x 5 classes = 250) exactly.",
+    "IMPORTANT -- do not confuse with superseded files: data/sequences/mpc_pilot.json and data/sequences/alerce_artifact_pilot.json (top level, dated 2026-06-10) are from the FIRST, FAILED pilot attempt documented in CLAUDE.md's T1-A history (28 duplicate comet rows, only 172 unique objects, 103 zero-result MPC queries suppressed as failures) -- confirmed by direct inspection: mpc_pilot.json has 0 entries and every query_log status is 'insufficient_observations'. This manifest's dataset_id and local_path point to the tier3_pilot_v2/ directory specifically to avoid this confusion for future agents.",
+    "data/sequences/tier3_pilot_v2/ also contains ~43 Dropbox 'conflicted copy' files (~2.6MB, from a 2026-06-11 sync conflict) alongside the real files listed in local_path; these conflicted copies are not part of this dataset and were not used in training."
+  ]
+}
