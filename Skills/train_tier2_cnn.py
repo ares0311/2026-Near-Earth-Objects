@@ -27,6 +27,20 @@ Three key design choices vs. the naive implementation:
    legacy datasets without those columns fall back to singleton per-row
    groups (no leakage guarantee) with a printed warning.
 
+4. PyTorch MPS device selection + configurable --num-workers — this script
+   previously never selected a device at all (silently CPU-only even on
+   MPS-capable hardware) and hardcoded num_workers=0 (single-threaded
+   .npz loading). Both are now fixed per docs/SYSTEM_PROFILE.md's mandatory
+   device-selection rule. CutoutDataset had to move from a function-local
+   class to module level for DataLoader worker processes to pickle it.
+   Note: a genuinely sandboxed execution environment may block BOTH MPS
+   (torch.backends.mps.is_available() returns False) AND multiprocess
+   DataLoader workers (torch_shm_manager needs shared-memory socket access
+   the sandbox denies) -- if so, this falls back to
+   --num-workers 0 --device cpu automatically/explicitly and trains
+   correctly, just much slower; run on an unsandboxed terminal for the
+   real speedup.
+
 Usage:
     PYTHONPATH=src caffeinate -i python Skills/train_tier2_cnn.py \\
         --labels data/cutouts/index.csv \\
@@ -283,25 +297,35 @@ def _load_cutout_npz(npz_path: str):  # noqa: ANN201
     return sci, ref, diff
 
 
-def _build_dataset(rows: list[dict]):
-    """Wrap a list of CSV rows in a torch Dataset."""
-    import torch
-    from torch.utils.data import Dataset
+def _build_dataset(rows: list[dict]) -> Any:
+    """Wrap a list of CSV rows in a torch Dataset.
 
-    class CutoutDataset(Dataset):
-        def __init__(self, rows: list[dict]) -> None:
-            self.rows = rows
-
-        def __len__(self) -> int:
-            return len(self.rows)
-
-        def __getitem__(self, idx: int):  # noqa: ANN204
-            row = self.rows[idx]
-            sci, ref, diff = _load_cutout_npz(row["cutout_path"])
-            label = torch.tensor(int(row["label"]), dtype=torch.long)
-            return sci, ref, diff, label
-
+    `CutoutDataset` must be a module-level class (not nested inside this
+    function) so DataLoader worker processes can pickle it -- a
+    function-local class raised `_pickle.PicklingError` the moment
+    `--num-workers` was set above 0, which is why every DataLoader in this
+    file previously ran single-threaded regardless of machine core count.
+    """
     return CutoutDataset(rows)
+
+
+class CutoutDataset:
+    """torch Dataset over cutout CSV rows; must stay picklable (see
+    _build_dataset's docstring) for multiprocess DataLoader workers."""
+
+    def __init__(self, rows: list[dict]) -> None:
+        self.rows = rows
+
+    def __len__(self) -> int:
+        return len(self.rows)
+
+    def __getitem__(self, idx: int) -> tuple[Any, Any, Any, Any]:
+        import torch
+
+        row = self.rows[idx]
+        sci, ref, diff = _load_cutout_npz(row["cutout_path"])
+        label = torch.tensor(int(row["label"]), dtype=torch.long)
+        return sci, ref, diff, label
 
 
 def _compute_class_weights(rows: list[dict]) -> Any:
@@ -327,18 +351,31 @@ def _compute_class_weights(rows: list[dict]) -> Any:
 
 
 def train(labels_csv: str, epochs: int, out_path: str, lr: float,
-          batch_size: int, val_fraction: float, test_fraction: float) -> None:
-    """Train the Tier 2 CNN and save the best checkpoint by val loss."""
+          batch_size: int, val_fraction: float, test_fraction: float,
+          num_workers: int = 4) -> None:
+    """Train the Tier 2 CNN and save the best checkpoint by val loss.
+
+    Per docs/SYSTEM_PROFILE.md's mandatory device-selection rule ("All
+    tensor data must be moved to the device explicitly"), this now targets
+    PyTorch MPS/Metal when available and falls back to CPU with an explicit
+    printed report -- previously this script never selected a device at
+    all, so it silently ran CPU-only even on hardware with a working GPU.
+    """
     import torch
     import torch.nn as nn
     from torch.utils.data import DataLoader, Subset
 
     from classify import _build_cnn_model
 
+    device = torch.device("mps") if torch.backends.mps.is_available() else torch.device("cpu")
+    fallback_note = "" if device.type == "mps" else "  (CPU fallback — MPS unavailable)"
+    print(f"Device: {device}{fallback_note}")
+
     model = _build_cnn_model()
     if model is None:
         print("ERROR: torch not available — cannot train CNN.")
         return
+    model = model.to(device)
 
     # Load all CSV rows
     with open(labels_csv) as f:
@@ -400,15 +437,17 @@ def train(labels_csv: str, epochs: int, out_path: str, lr: float,
     print()
 
     train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True,
-                              num_workers=0, pin_memory=False)
+                              num_workers=num_workers, pin_memory=False,
+                              persistent_workers=num_workers > 0)
     val_loader   = DataLoader(val_ds, batch_size=batch_size, shuffle=False,
-                              num_workers=0, pin_memory=False)
+                              num_workers=num_workers, pin_memory=False,
+                              persistent_workers=num_workers > 0)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     # NLLLoss is correct here because the model already applies Softmax.
     # CrossEntropyLoss would apply LogSoftmax again (double-softmax bug).
-    criterion = nn.NLLLoss(weight=class_weights)
+    criterion = nn.NLLLoss(weight=class_weights.to(device))
 
     best_val_loss = float("inf")
     out_path_obj = pathlib.Path(out_path)
@@ -419,6 +458,8 @@ def train(labels_csv: str, epochs: int, out_path: str, lr: float,
         model.train()
         train_loss = 0.0
         for sci, ref, diff, label in train_loader:
+            sci, ref, diff = sci.to(device), ref.to(device), diff.to(device)
+            label = label.to(device)
             optimizer.zero_grad()
             out = model(sci, ref, diff)
             # log() needed because NLLLoss expects log-probabilities;
@@ -435,6 +476,8 @@ def train(labels_csv: str, epochs: int, out_path: str, lr: float,
         n_correct = 0
         with torch.no_grad():
             for sci, ref, diff, label in val_loader:
+                sci, ref, diff = sci.to(device), ref.to(device), diff.to(device)
+                label = label.to(device)
                 out = model(sci, ref, diff)
                 loss = criterion(torch.log(out.clamp(min=1e-9)), label)
                 val_loss += loss.item() * len(label)
@@ -478,6 +521,17 @@ def main() -> None:
                         help="Adam learning rate")
     parser.add_argument("--batch-size", type=int, default=32,
                         help="Mini-batch size for DataLoader")
+    parser.add_argument(
+        "--num-workers", type=int, default=4,
+        help=(
+            "DataLoader worker processes for cutout loading. Previously "
+            "hardcoded to 0 (single-threaded), which left most of the "
+            "machine's cores idle during .npz loading -- see "
+            "docs/SYSTEM_PROFILE.md's local resource-sizing guidance "
+            "(start conservative, raise after measuring for this project's "
+            "machine). Set 0 to disable multiprocessing entirely."
+        ),
+    )
     parser.add_argument("--val-fraction", type=float, default=0.2,
                         help="Fraction of data held out for validation")
     parser.add_argument("--test-fraction", type=float, default=0.15,
@@ -599,7 +653,8 @@ def main() -> None:
         return
 
     train(args.labels, args.epochs, args.out, args.lr,
-          args.batch_size, args.val_fraction, args.test_fraction)
+          args.batch_size, args.val_fraction, args.test_fraction,
+          num_workers=args.num_workers)
 
 
 if __name__ == "__main__":

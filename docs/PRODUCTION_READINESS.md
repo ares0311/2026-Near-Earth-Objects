@@ -93,6 +93,20 @@ launching a materially larger production batch, the project must add:
   committed at `data/injection_recovery_image_level_n200.json`
   (detection/link/score rate 7.5%, real per-bin curves for all three new
   dimensions).
+- **v0.90.78 (2026-07-10)**: `Skills/train_tier2_cnn.py` gained real device
+  selection (MPS when available, explicit CPU-fallback reporting) and a
+  configurable `--num-workers` DataLoader flag, fixing a real gap versus
+  `docs/SYSTEM_PROFILE.md`'s mandatory device-selection rule (the script
+  previously never selected a device at all). Fixing `--num-workers` also
+  required moving `CutoutDataset` to module level so DataLoader workers can
+  pickle it. This session's sandbox verified it cannot exercise either
+  speedup path (MPS and multiprocess workers are both blocked by sandbox
+  filesystem/framework restrictions, not by the code) -- one real CPU-only
+  epoch on the 90,000-alert v3 batch took ~9.5 minutes, so the actual
+  20-epoch retrain is handed off to an unsandboxed terminal per `CLAUDE.md`'s
+  Current State rather than spending 3+ hours of degraded sandboxed compute.
+  Full suite 1843 passed / 2 deselected, ruff/mypy clean. Evidence:
+  `docs/evidence/a7/2026-07-10-sixth-attempt-device-selection-and-sandbox-training-limits.md`.
 - **v0.90.77 (2026-07-10)**: `grouped_split_report_missing` is **CLOSED**
   with real evidence. A follow-up real 18-night (90,000-alert) scale test of
   the v0.90.76 night-aware split showed leakage getting *worse* with more

@@ -818,7 +818,68 @@ and excluded from CI.
 
 ## Current State (v0.90.75)
 
-**Latest sync (2026-07-10, v0.90.77)**: **`grouped_split_report_missing` is
+**Latest sync (2026-07-10, v0.90.78)**: `Skills/train_tier2_cnn.py` gained
+real PyTorch device selection (MPS when available, explicit CPU-fallback
+reporting otherwise) and a configurable `--num-workers` DataLoader flag —
+it previously never selected a device at all (silently CPU-only always)
+and hardcoded single-threaded `.npz` loading, contradicting
+`docs/SYSTEM_PROFILE.md`'s mandatory device-selection rule. Fixing
+`--num-workers` also required moving `CutoutDataset` from a
+function-local class (unpicklable by DataLoader workers) to module level.
+Full suite 1843 passed / 2 deselected, ruff/mypy clean.
+
+**This session's sandbox cannot validate the speedup**: both
+`torch.backends.mps.is_available()` and multiprocess DataLoader workers
+(`torch_shm_manager` needs shared-memory socket access) are blocked by
+this specific sandboxed execution environment, not by the code or the
+real machine. One real CPU-only, `--num-workers 0` epoch on the full
+90,000-alert v3 batch took ~9.5 minutes (measured, not estimated) — 20
+epochs would be 3+ hours in this degraded mode. Rather than spend 3+ hours
+of sandboxed CPU-only compute, the actual retrain is handed off to an
+**unsandboxed terminal** (this repo's normal operator-command pattern),
+where MPS + parallel workers should make it dramatically faster. Full
+detail: `docs/evidence/a7/2026-07-10-sixth-attempt-device-selection-and-sandbox-training-limits.md`.
+
+**Next command (NOT YET RUN)** — real GPU-accelerated retrain on the
+already-downloaded, already-passing-grouped-split 18-night batch, closing
+`calibration_report_missing`:
+
+```bash
+git pull origin main
+export PYTHONPATH=src
+
+# data/cutouts_v3/index.csv and data/cutouts_v3/grouped_split.csv already
+# exist locally from this session (data/ztf_labeled_alerts_v3.json,
+# ~5.7GB, gitignored) with a real passing grouped-split report at
+# Logs/reports/tier2_cnn_v3_grouped_split_report.json. If those files are
+# not present (e.g. a different machine), re-run the v0.90.74 handoff's
+# steps 1-3 with --nights 18 --limit 90000 first.
+
+caffeinate -i uv run --python 3.14 python Skills/train_tier2_cnn.py \
+    --labels data/cutouts_v3/index.csv \
+    --epochs 20 \
+    --num-workers 8 \
+    --out models/tier2_cnn_v3.pt \
+    --grouped-split-report Logs/reports/tier2_cnn_v3_grouped_split_report.json \
+    --production-candidate
+
+caffeinate -i uv run --python 3.14 python Skills/evaluate_calibration.py \
+    --alerts data/ztf_labeled_alerts_v3.json \
+    --cutouts-csv data/cutouts_v3/index.csv \
+    --cnn-model models/tier2_cnn_v3.pt \
+    --report-out Logs/reports/calibration_report_v3.json
+```
+
+Not sharded: single GPU/MPS training job, not independent parallel units —
+`docs/SYSTEM_PROFILE.md` says use full local compute headroom here, not
+multiprocessing across tabs. Naming: this produces a new candidate
+(`tier2_cnn_v3`), not a silent overwrite of the frozen `benchmark_cnn_v1`,
+per A3's freeze policy. A follow-up promotion report for the new candidate
+(citing the real passing grouped-split report + this calibration report) is
+the next coding step once this run completes; `operator_signoff_missing`
+remains the final, inherently human-gated blocker after that.
+
+**Earlier sync (2026-07-10, v0.90.77)**: **`grouped_split_report_missing` is
 CLOSED with real evidence.** After the v0.90.76 findings below, a real
 18-night (90,000-alert) scale test of the night-aware split showed leakage
 getting *worse*, not better, with more data (15/18 nights leaking vs 2/3;
@@ -1173,15 +1234,20 @@ Pipeline generates candidates → adversarial review filters → operator
 reviews survivors → MPC submission → provisional designation → independent
 confirmation → journal paper.
 
-The concrete next action is the 5-step operator command block in the
-v0.90.74 entry under **Current State** above (download with real
-provenance → build cutout dataset → emit + validate grouped split →
-retrain `tier2_cnn_v2` → recalibrate). That command has **not yet been
-run**. After it completes, the next coding step is a promotion report for
-the new candidate citing the real grouped-split and calibration reports;
-`operator_signoff_missing` remains the final, inherently human-gated
-blocker after that. The superseded WISE/DECam/TESS discovery-sweep
-evidence trail (pre-2026-07-02 pivot) is archived in
+Steps 1-3 of the original v0.90.74 handoff (download with real provenance,
+build cutout dataset, emit + validate grouped split) are now DONE for real
+— see the v0.90.77/78 entries above: `grouped_split_report_missing` is
+CLOSED with a real passing report on an 18-night, 90,000-alert batch. The
+concrete next action is the retrain + recalibrate command block in the
+v0.90.78 entry under **Current State** above. That command has **not yet
+been run** — it needs an unsandboxed terminal with real MPS/GPU access
+(this session's sandbox verified both MPS and multiprocess DataLoader
+workers are blocked here specifically, not by the code or hardware). After
+it completes, the next coding step is a promotion report for the new
+`tier2_cnn_v3` candidate citing the real grouped-split and calibration
+reports; `operator_signoff_missing` remains the final, inherently
+human-gated blocker after that. The superseded WISE/DECam/TESS
+discovery-sweep evidence trail (pre-2026-07-02 pivot) is archived in
 `docs/HANDOFF_HISTORY.md` for historical context only.
 
 ### Version-by-Version Changelog
