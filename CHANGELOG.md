@@ -3,6 +3,52 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.85 — Doc sync: close remaining A1 manifest gaps, A2 ledger default-on, tier2_cnn_v3 operator review packet (2026-07-11)
+
+### Added
+- `data_selection/dataset_manifests/mpc_training_labels_v1.json`: dataset
+  manifest for `data/training_labels.csv` (Tier 1 XGBoost's MPC label
+  input) — closes the last uncovered A1 gap for a trained model's training
+  data. Verified 500 `neo_candidate` + 500 `main_belt_asteroid` rows by
+  direct inspection, matching CLAUDE.md's documented T1-A split.
+- `data_selection/dataset_manifests/tier3_transformer_pilot_v1.json`:
+  dataset manifest for `models/tier3_transformer.pt`'s real training data
+  (`data/sequences/tier3_pilot_v2/`). Documents and guards against a real
+  trap: the top-level `data/sequences/mpc_pilot.json` /
+  `alerce_artifact_pilot.json` files are the first, failed pilot attempt
+  (0 real entries, all `insufficient_observations`), not the data actually
+  used to train the committed model.
+- `docs/evidence/promotion/tier2_cnn_v3_operator_review_packet.md`: a real,
+  readable operator review packet for the `tier2_cnn_v3` promotion decision
+  — training result, all 8 A7 evidence checks with real values, the full
+  calibration KPI table, the one policy judgment call needing explicit
+  operator buy-in (`object_id`-only grouped-split gating), known
+  limitations, an explicit non-authorization list, and an attestation
+  checklist ending in the exact sign-off command to run.
+
+### Changed
+- `Skills/run_pipeline.py`: `--candidate-ledger-db` now defaults to
+  `data_selection/candidate_ledger.sqlite` instead of `None` (A2). Closes a
+  real gap where a run without the flag silently produced candidates with
+  zero ledger provenance, violating
+  `docs/astrometrics_coding_agents_master_guide.md`'s non-negotiable rule 9.
+  Also fixed a `--source-dataset-id="not-recorded"` placeholder-provenance
+  footgun: `main()` now skips ledger ingestion with a printed warning when
+  `--source-dataset-id` is empty or the literal `"not-recorded"` default,
+  instead of writing that placeholder into the ledger as fake provenance.
+  `--candidate-ledger-db ''` still fully disables ledger writes.
+- CLAUDE.md, AGENTS.md, `docs/PRODUCTION_READINESS.md`: synced to reflect
+  the four commits above, which had landed without a docs sync. No change
+  to overall project status — `operator_signoff_missing` remains the sole
+  blocker in the A1-A7 roadmap, now backed by a real review packet instead
+  of a bare CLI command.
+- Version metadata advanced to v0.90.85.
+
+### Verified
+- `ruff check .`: clean.
+- `mypy src`: clean, 18 source files.
+- Full offline suite: 1858 passed, 2 deselected (154.37s).
+
 ## v0.90.75 — Fix silent-console hang in ZTF alert download (2026-07-10)
 
 ### Fixed

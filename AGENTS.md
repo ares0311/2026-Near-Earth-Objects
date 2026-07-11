@@ -636,7 +636,26 @@ and excluded from CI.
 
 ## Current State (v0.90.75)
 
-**Latest sync (2026-07-10, v0.90.75)**: Fixed a real operator-reported bug:
+**Latest sync (2026-07-11, v0.90.85 — doc-sync only)**: Four commits landed
+after this file's last sync without an AGENTS.md update; catching up here.
+`1ca5fecc`/`736a81c5` add real dataset manifests for `models/tier1_xgb.json`
+and `models/tier3_transformer.pt`'s training data, closing the last A1 gaps
+(the Tier 3 manifest also documents a real trap: the top-level
+`data/sequences/mpc_pilot.json` is the failed first pilot attempt — real
+data is `data/sequences/tier3_pilot_v2/`). `41b47fc8` adds
+`docs/evidence/promotion/tier2_cnn_v3_operator_review_packet.md`, a real
+readable review packet (training result, all 8 A7 checks, calibration KPI
+table, the one policy judgment call needing operator buy-in, known
+limitations, attestation checklist) behind the `operator_signoff_missing`
+blocker — read this before recording a signoff decision. `c2a02dac` makes
+`--candidate-ledger-db` default-on in `Skills/run_pipeline.py` (A2), closing
+a real gap where candidates could be produced with zero ledger provenance by
+omitting a flag; also fixed a `--source-dataset-id="not-recorded"` footgun
+that would have written fake provenance into the ledger. Full detail in
+`CLAUDE.md`'s Current State. `operator_signoff_missing` remains the sole
+A1-A7 blocker, now backed by a real review packet.
+
+**Earlier sync (2026-07-10, v0.90.75)**: Fixed a real operator-reported bug:
 `Skills/download_ztf_training_alerts.py` produced total console silence
 during a download (operator killed it). Root cause: no `flush=True` on any
 print, plus the tarball was read via one blocking `resp.content` call with

@@ -93,6 +93,30 @@ launching a materially larger production batch, the project must add:
   committed at `data/injection_recovery_image_level_n200.json`
   (detection/link/score rate 7.5%, real per-bin curves for all three new
   dimensions).
+- **v0.90.85 (2026-07-11, doc-sync)**: Four commits landed after v0.90.81
+  without a readiness-doc sync; recorded here. `mpc_training_labels_v1` and
+  `tier3_transformer_pilot_v1` dataset manifests close the last two A1 gaps
+  — every trained model's real training data now has a manifest (Tier 1
+  XGBoost's `data/training_labels.csv`, verified 500 NEO + 500 MBA rows by
+  direct inspection; Tier 3 Transformer's real `data/sequences/tier3_pilot_v2/`
+  data, verified against `tier3_training_report.json`'s class counts — the
+  manifest also documents that the top-level `data/sequences/mpc_pilot.json`
+  is the failed first pilot attempt, not real data, to prevent future
+  confusion). `Skills/run_pipeline.py --candidate-ledger-db` now defaults to
+  `data_selection/candidate_ledger.sqlite` instead of `None`, closing an A2
+  gap where a run without the flag silently produced candidates with zero
+  ledger provenance — a direct violation of
+  `docs/astrometrics_coding_agents_master_guide.md`'s non-negotiable rule 9.
+  A `--source-dataset-id="not-recorded"` placeholder-provenance footgun was
+  found and fixed in the same change. `docs/evidence/promotion/tier2_cnn_v3_operator_review_packet.md`
+  is a new real, readable review packet (training result, all 8 A7 checks
+  with real values, calibration KPI table, the one policy judgment call
+  needing operator buy-in, known limitations, attestation checklist) —
+  this is the actual justification behind the `operator_signoff_missing`
+  blocker, not just a bare CLI command. **Net status unchanged**:
+  `operator_signoff_missing` remains the sole blocker in the A1-A7 roadmap;
+  it is now backed by real evidence a human can actually review. Re-verified
+  this session: `ruff check .` clean, `mypy src` clean.
 - **v0.90.81 (2026-07-11)**: `Skills/build_promotion_report.py` run for real
   against `tier2_cnn_v3`. **8/8 evidence checks pass** (dataset_manifest,
   grouped_split_report, canonical_eval_report, injection_recovery_report,

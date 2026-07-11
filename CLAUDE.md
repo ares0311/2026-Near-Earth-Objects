@@ -818,7 +818,65 @@ and excluded from CI.
 
 ## Current State (v0.90.75)
 
-**Latest sync (2026-07-11, v0.90.81)**: Ran `Skills/build_promotion_report.py`
+**Latest sync (2026-07-11, v0.90.85 — doc-sync only, no new code)**: Four
+commits landed after the v0.90.81 entry below without a CLAUDE.md sync;
+this entry closes that gap. All four are real, verified work:
+1. `1ca5fecc` — Added `mpc_training_labels_v1` dataset manifest (A1). Closes
+   the last uncovered A1 gap for `models/tier1_xgb.json`'s training inputs:
+   `data/training_labels.csv` (500 MPC-confirmed NEO + 500 MBA labels,
+   verified by direct row-count inspection) had no manifest even though its
+   sibling ZTF-alert input already did.
+2. `736a81c5` — Added `tier3_transformer_pilot_v1` dataset manifest (A1).
+   Closes the same gap for `models/tier3_transformer.pt`. Found and
+   documented a real footgun along the way: the top-level
+   `data/sequences/mpc_pilot.json`/`alerce_artifact_pilot.json` files are
+   the **first, failed** pilot attempt (0 entries, all
+   `insufficient_observations`) — the real training data is
+   `data/sequences/tier3_pilot_v2/{mpc_sequences.json,alerce_artifacts.json,splits/}`
+   (250 rows, verified against `tier3_training_report.json`'s class
+   counts). The manifest points at the real directory and calls out the
+   trap explicitly so no future agent re-manifests the wrong file.
+3. `41b47fc8` — Added
+   `docs/evidence/promotion/tier2_cnn_v3_operator_review_packet.md`. This
+   is the actual, readable review packet behind the bare
+   `operator_signoff_missing` blocker — training result, all 8 A7 evidence
+   checks with real values (not just pass/fail), the full calibration KPI
+   table, the one real policy judgment call needing explicit operator
+   buy-in (§4: `object_id`-only grouped-split gating — `night_key` overlap
+   is 100%, `sky_cell` is 91.3%, neither blocks `passed`), known
+   limitations, an explicit "what this does NOT authorize" list, and an
+   attestation checklist ending in the exact `build_promotion_report.py
+   --operator-signoff-id` command to run once Jerome signs off. **This is
+   the artifact to read before recording a signoff decision** — do not
+   treat a bare signoff ID as sufficient justification going forward.
+4. `c2a02dac` — Made `--candidate-ledger-db` default to
+   `data_selection/candidate_ledger.sqlite` in `Skills/run_pipeline.py`
+   (A2). Real gap matching
+   `docs/astrometrics_coding_agents_master_guide.md`'s non-negotiable rule
+   9 ("Do not accept a candidate without manifest and ledger provenance"):
+   the flag previously defaulted to `None` (opt-in), so a run without it
+   silently produced zero-provenance candidates. Also fixed a sharper bug
+   found along the way: `--source-dataset-id` defaults to the literal
+   string `"not-recorded"`, which would have satisfied
+   `write_candidate_ledger()`'s empty-string check and written that
+   placeholder into the ledger as fake provenance every run. `main()` now
+   skips ledger ingestion with a printed warning when `--source-dataset-id`
+   is empty or `"not-recorded"`, instead of writing fake provenance or
+   crashing post-run. `--candidate-ledger-db ''` still fully disables
+   ledger writes. 3 new regression tests; full suite 1858 passed / 2
+   deselected at that commit.
+
+Net effect: **A1 (dataset manifests) and A2 (candidate ledger) are now
+materially more complete** than the v0.90.81 entry below describes — every
+trained model's real training data has a manifest, and `run_pipeline.py`
+no longer silently produces unprovenanced candidates by default. This does
+not change the bottom line: `operator_signoff_missing` remains the sole
+blocker on `tier2_cnn_v3` promotion, and it is now backed by a real review
+packet rather than a bare CLI command. Re-verified this session: `ruff
+check .` clean, `mypy src` clean (18 files), full offline suite run in
+progress (see next sync for the pass/fail count).
+
+**Sync (2026-07-11, v0.90.81)**: Ran `Skills/build_promotion_report.py`
 for `tier2_cnn_v3` for real. **8/8 evidence checks pass**: dataset_manifest,
 grouped_split_report, canonical_eval_report, injection_recovery_report,
 calibration_report (`promotion_gate_passed: true`), false_discovery_report
