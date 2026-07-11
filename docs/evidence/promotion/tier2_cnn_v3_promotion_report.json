@@ -1,0 +1,103 @@
+{
+  "evidence": [
+    {
+      "blockers": [],
+      "details": {
+        "dataset_id": "ztf_labeled_alerts_tier2_cnn_v3",
+        "missing_fields": [],
+        "role": "training"
+      },
+      "name": "dataset_manifest",
+      "passed": true,
+      "path": "data_selection/dataset_manifests/ztf_labeled_alerts_tier2_cnn_v3.json"
+    },
+    {
+      "blockers": [],
+      "details": {
+        "passed": true,
+        "schema_version": "grouped-split-leakage-v1"
+      },
+      "name": "grouped_split_report",
+      "passed": true,
+      "path": "Logs/reports/tier2_cnn_v3_grouped_split_report.json"
+    },
+    {
+      "blockers": [],
+      "details": {
+        "passed": true,
+        "schema_version": "canonical-eval-report-v1"
+      },
+      "name": "canonical_eval_report",
+      "passed": true,
+      "path": "docs/evidence/promotion/benchmark_cnn_v1_canonical_eval.json"
+    },
+    {
+      "blockers": [],
+      "details": {
+        "passed": true,
+        "schema_version": "injection-recovery-curves-v1"
+      },
+      "name": "injection_recovery_report",
+      "passed": true,
+      "path": "docs/evidence/promotion/benchmark_cnn_v1_injection_recovery.json"
+    },
+    {
+      "blockers": [],
+      "details": {
+        "promotion_gate_passed": true,
+        "tier_count": 2
+      },
+      "name": "calibration_report",
+      "passed": true,
+      "path": "Logs/reports/calibration_report_v3.json"
+    },
+    {
+      "blockers": [],
+      "details": {
+        "false_discovery_rate": 0.0,
+        "max_false_discovery_rate": 0.05
+      },
+      "name": "false_discovery_report",
+      "passed": true,
+      "path": "docs/evidence/promotion/benchmark_cnn_v1_false_discovery.json"
+    },
+    {
+      "blockers": [],
+      "details": {
+        "n_chars": 3257
+      },
+      "name": "pretrained_audit",
+      "passed": true,
+      "path": "docs/evidence/phase0/pretrained_model_audit.md"
+    },
+    {
+      "blockers": [],
+      "details": {
+        "n_chars": 3654
+      },
+      "name": "benchmark_model_card",
+      "passed": true,
+      "path": "benchmarks/benchmark_cnn_v1/MODEL_CARD.md"
+    }
+  ],
+  "limitations": [
+    "This report authorizes only internal model promotion when all evidence passes.",
+    "It does not authorize MPC submission, NASA/PDCO contact, or impact-probability claims."
+  ],
+  "model": {
+    "model_id": "tier2_cnn_v3",
+    "model_type": "tier2_cnn",
+    "model_version": "3.0.0"
+  },
+  "operator_signoff_id": null,
+  "promotion_allowed": false,
+  "promotion_blockers": [
+    "operator_signoff_missing"
+  ],
+  "safety": {
+    "mpc_submission_authorized": false,
+    "no_external_submission": true,
+    "no_impact_probability_claim": true
+  },
+  "schema_version": "model-promotion-report-v1"
+}

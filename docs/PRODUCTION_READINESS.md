@@ -93,6 +93,16 @@ launching a materially larger production batch, the project must add:
   committed at `data/injection_recovery_image_level_n200.json`
   (detection/link/score rate 7.5%, real per-bin curves for all three new
   dimensions).
+- **v0.90.81 (2026-07-11)**: `Skills/build_promotion_report.py` run for real
+  against `tier2_cnn_v3`. **8/8 evidence checks pass** (dataset_manifest,
+  grouped_split_report, canonical_eval_report, injection_recovery_report,
+  calibration_report, false_discovery_report, pretrained_audit,
+  benchmark_model_card). `promotion_allowed: false` with exactly one
+  blocker: `operator_signoff_missing`. This is now the sole remaining
+  blocker in the entire A1-A7 roadmap that real work this session could
+  close -- every other check is real and passing. Report:
+  `docs/evidence/promotion/tier2_cnn_v3_promotion_report.json`. Evidence:
+  `docs/evidence/a7/2026-07-11-ninth-attempt-promotion-report-eight-of-eight-checks-pass.md`.
 - **v0.90.80 (2026-07-10)**: `calibration_report_missing` is **CLOSED**
   with real evidence. Operator re-ran the retrain + calibrate command with
   the v0.90.79 MPS fix merged: both completed in 17m53s total, `Device: mps`

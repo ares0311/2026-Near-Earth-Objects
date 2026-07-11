@@ -818,7 +818,22 @@ and excluded from CI.
 
 ## Current State (v0.90.75)
 
-**Latest sync (2026-07-10, v0.90.80)**: **`calibration_report_missing` is
+**Latest sync (2026-07-11, v0.90.81)**: Ran `Skills/build_promotion_report.py`
+for `tier2_cnn_v3` for real. **8/8 evidence checks pass**: dataset_manifest,
+grouped_split_report, canonical_eval_report, injection_recovery_report,
+calibration_report (`promotion_gate_passed: true`), false_discovery_report
+(`false_discovery_rate: 0.0`), pretrained_audit, benchmark_model_card.
+Report at `docs/evidence/promotion/tier2_cnn_v3_promotion_report.json`.
+`promotion_allowed: false` with exactly one blocker:
+**`operator_signoff_missing`** -- this is now the sole remaining blocker in
+the entire A1-A7 code-and-evidence-closable roadmap. Nothing further can be
+closed by code; the next step is Jerome W. Lindsey III reviewing this
+report and its cited evidence, then supplying
+`--operator-signoff-id` to `Skills/build_promotion_report.py` to record the
+decision. Evidence:
+`docs/evidence/a7/2026-07-11-ninth-attempt-promotion-report-eight-of-eight-checks-pass.md`.
+
+**Earlier sync (2026-07-10, v0.90.80)**: **`calibration_report_missing` is
 CLOSED with real evidence.** Operator re-ran the v0.90.78 retrain +
 calibrate command on their Mac with the v0.90.79 MPS fix merged: both
 commands completed cleanly in 17m53s total (confirming the MPS +
