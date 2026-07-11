@@ -1204,6 +1204,21 @@ consult it only for historical context on a specific gate, blocker, or bug.
 | `Skills/evaluate_ranking_baseline.py` | Gate Z4 auditable ranking baseline: evaluates a handcrafted-feature logistic-regression classifier (out-of-fold, stratified k-fold) against real archived negative tracklets (Gate Z6 evidence) and synthetic positive tracklets (established injection generator), reporting recall@K, purity@K, calibration error, false-positive review burden, and an ablation vs. a naive real-bogus-only baseline; `--n-positive`, `--seed`, `--checkpoint-dir`, `--out` flags |
 | `Skills/evaluate_retrospective_validation.py` | Gate Z5 retrospective validation: evaluates review packets against the MPC catalog as queried today (after the replay window, by design), bucketing each into `recovered_known_object`/`later_confirmed_object`/`artifact`/`unresolved_candidate` using the already-real `check_candidates_against_mpc` live cross-match plus each packet's own `known_object_score`; `--review-packets`, `--verdicts`, `--radius-deg`, `--out` flags |
 | `Skills/extract_promotion_evidence.py` | A7 promotion-report input derivation: pulls the nested `recovery_curves` object out of an `injection_recovery.py --image-level` report and derives a `false-discovery-report-v1` from a `evaluate_ranking_baseline.py` report's real `false_positive_review_burden` counts, without inventing any new data; `--injection-recovery-source/-out`, `--ranking-baseline-source/-model`, `--false-discovery-out` flags |
+| `Skills/validate_dataset_manifest.py` | A1 dataset manifest schema validator; checks one or more manifest JSON files against `data_selection/dataset_manifest.schema.json` |
+| `Skills/candidate_ledger.py` | A2 candidate ledger CLI (thin wrapper over `src/candidate_ledger.py`); `init` creates/migrates the SQLite ledger, `ingest` loads pipeline candidate JSON, `list` prints ledger rows as JSON |
+| `Skills/audit_real_run.py` | Builds a fail-closed T1-C audit packet from a real `run_pipeline.py` checkpoint/run summary; observation-level evidence only, no external contact or submission |
+| `Skills/run_archive_positive_control.py` | Gate Z3 known-object positive control: loads real per-source ZTF alert archive checkpoints for ≥2 real nights and runs them through the real preprocess→detect→link pipeline to check for a genuine known-object recovery |
+| `Skills/lookup_neo_archive_ephemeris.py` | Gate Z3 targeted candidate-night lookup for a real, known NEO against the ZTF alert archive |
+| `Skills/lookup_mpc_observation_history.py` | Gate Z3: cross-checks a known NEO's real MPC-confirmed observation history against the ZTF alert archive's coverage window |
+| `Skills/scan_mpc_history_ztf_coverage.py` | Gate Z3: scans a known NEO's real MPC-confirmed observation history for real ZTF coverage overlap |
+| `Skills/scan_neo_track_coverage.py` | Gate Z3: scans a known NEO's real predicted track for real ZTF coverage |
+| `Skills/probe_ztf_alert_archive_file.py` | Gate Z3: bounded single-file verification probe for the UW public ZTF alert archive |
+| `Skills/ztf_dr24_bounded_ingest.py` | Gate Z1 bounded ZTF DR24 historical replay ingest (dry-run, metadata only) |
+| `Skills/diagnose_wise_query.py` | Diagnostic: probes the IRSA NEOWISE query directly with full error reporting, bypassing the pipeline's caching/retry layers |
+| `Skills/_live_connection_test.py` | Internal helper invoked by `Skills/verify_live_credentials.sh`; tests live ATLAS/ZTF credential connectivity without printing secret values |
+| `Skills/load_credentials.py` | Loads project credentials (ATLAS/ZTF) from macOS Keychain into environment variables; called at the start of any Skill needing live network credentials |
+| `Skills/train_ensemble_stacker.py` | Trains the 10-feature ensemble stacking meta-learner (logistic regression) over Tier 1 XGBoost + Tier 2 CNN outputs; saves `models/stacker_coef.json`; supports `--grouped-split-report`/`--production-candidate` |
+| `Skills/run_canonical_evals.py` | A5 canonical regression eval suite runner; evaluates a frozen `canonical_evals/*.json` suite and reports pass/fail per case with `--out` for a persisted report |
 
 ### Docs
 
