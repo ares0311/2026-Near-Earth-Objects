@@ -818,7 +818,36 @@ and excluded from CI.
 
 ## Current State (v0.90.75)
 
-**Latest sync (2026-07-10, v0.90.79)**: Operator ran the real v0.90.78
+**Latest sync (2026-07-10, v0.90.80)**: **`calibration_report_missing` is
+CLOSED with real evidence.** Operator re-ran the v0.90.78 retrain +
+calibrate command on their Mac with the v0.90.79 MPS fix merged: both
+commands completed cleanly in 17m53s total (confirming the MPS +
+parallel-worker fix delivered the expected speedup versus this session's
+sandboxed ~3-hour CPU-only estimate). `Device: mps` printed, all 20 epochs
+completed with no `RuntimeError`, best checkpoint `val_loss=0.1155`
+`val_acc=0.965` saved to `models/tier2_cnn_v3.pt`. The Tier 2 CNN's real
+calibration KPIs (`Skills/evaluate_calibration.py` against the real
+18-night, 90,000-alert batch): Brier=0.0211, ECE=0.0229 (Isotonic:
+Brier=0.0192, ECE=0.0054), Log-loss=0.0760, ROC AUC=0.9954, CV ECE
+mean=0.0056 (std=0.0010), Bootstrap Brier/ECE CI upper=0.0192/0.0056 — all
+7 T1-D KPIs PASS, `promotion_gate_passed: true`. Report at
+`Logs/reports/calibration_report_v3.json` (local-only on the operator's
+Mac, same convention as the original `benchmark_cnn_v1` T1-D closure).
+Full transcript: `docs/evidence/a7/2026-07-10-eighth-attempt-real-retrain-and-calibration-pass.md`.
+
+**Both A7 blockers that needed a real retrain are now closed**
+(`grouped_split_report_missing` in the v0.90.77 entry below,
+`calibration_report_missing` here). **`operator_signoff_missing` is the
+sole remaining A7 blocker**, and it is inherently human-gated — no further
+coding step can close it. The next coding step is regenerating a
+`benchmark_cnn_v1_promotion_report.json`-style promotion report for the
+new `tier2_cnn_v3` candidate citing this session's real grouped-split and
+calibration reports (see `Skills/build_promotion_report.py` /
+`Skills/extract_promotion_evidence.py`); this sandboxed session cannot run
+that itself because `Logs/reports/calibration_report_v3.json` is
+local-only on the operator's Mac and not present here.
+
+**Earlier sync (2026-07-10, v0.90.79)**: Operator ran the real v0.90.78
 retrain command on their Mac (real MPS device, `Device: mps` printed
 correctly) and hit a genuine PyTorch MPS backend bug on the first training
 batch: `RuntimeError: Adaptive pool MPS: input sizes must be divisible by

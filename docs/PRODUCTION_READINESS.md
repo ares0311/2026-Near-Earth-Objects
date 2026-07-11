@@ -93,6 +93,21 @@ launching a materially larger production batch, the project must add:
   committed at `data/injection_recovery_image_level_n200.json`
   (detection/link/score rate 7.5%, real per-bin curves for all three new
   dimensions).
+- **v0.90.80 (2026-07-10)**: `calibration_report_missing` is **CLOSED**
+  with real evidence. Operator re-ran the retrain + calibrate command with
+  the v0.90.79 MPS fix merged: both completed in 17m53s total, `Device: mps`
+  confirmed, 20/20 epochs, best `val_loss=0.1155` `val_acc=0.965` saved to
+  `models/tier2_cnn_v3.pt`. Real Tier 2 CNN calibration KPIs on the 18-night,
+  90,000-alert batch: Brier=0.0211, ECE=0.0229 (Isotonic: 0.0192/0.0054),
+  Log-loss=0.0760, ROC AUC=0.9954, CV ECE mean=0.0056 (std=0.0010),
+  Bootstrap Brier/ECE CI upper=0.0192/0.0056 -- all 7 T1-D KPIs PASS,
+  `promotion_gate_passed: true`. Both A7 blockers requiring a real retrain
+  (`grouped_split_report_missing`, `calibration_report_missing`) are now
+  closed. **`operator_signoff_missing` is the sole remaining A7 blocker**
+  (inherently human-gated). Next coding step: a promotion report for
+  `tier2_cnn_v3` citing this session's real grouped-split and calibration
+  reports. Evidence:
+  `docs/evidence/a7/2026-07-10-eighth-attempt-real-retrain-and-calibration-pass.md`.
 - **v0.90.79 (2026-07-10)**: Operator's real retrain run (real MPS device)
   hit a genuine upstream PyTorch MPS bug: `AdaptiveAvgPool2d(4)` on a 15×15
   feature map fails on MPS because 15 is not evenly divisible by 4
