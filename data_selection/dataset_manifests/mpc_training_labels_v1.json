@@ -1,0 +1,36 @@
+{
+  "dataset_id": "mpc_training_labels_v1",
+  "project": "2026 Near Earth Objects",
+  "role": "training",
+  "source_name": "Minor Planet Center (MPC) NEO/MBA catalog",
+  "source_url": "https://www.minorplanetcenter.net/",
+  "instrument": "N/A -- catalog metadata, not an image/photometric instrument",
+  "target_ids": [
+    "mpc_confirmed_neo_sample_n500",
+    "mpc_confirmed_mba_sample_n500"
+  ],
+  "time_range": {
+    "start": "unknown",
+    "end": "unknown",
+    "scale": "UTC"
+  },
+  "cadence": "N/A -- static catalog snapshot, not a time-series acquisition",
+  "band_or_frequency": "N/A -- catalog metadata (designation, class, absolute magnitude H), not a photometric band",
+  "data_product_type": "MPC-confirmed object class labels (neo_candidate/main_belt_asteroid) with designation and absolute magnitude H, used as Tier 1 XGBoost training labels alongside data/ztf_labeled_alerts.json real/bogus features",
+  "downloaded_at": "2026-06-06T02:26:00-0400 (local filesystem mtime of data/training_labels.csv; no separate download-timestamp log exists)",
+  "local_path": "data/training_labels.csv",
+  "checksum": {
+    "algorithm": "sha256",
+    "value": "7bbeedf411e5475f74fff9b12b4ff064ba1a81ac5a80b7a36112b71f76a056fd"
+  },
+  "license": "Not independently verified in project records. MPC publishes minor planet catalog data for public research use; no explicit license file or terms-of-use document was located during this manifest's creation.",
+  "label_source": "Minor Planet Center confirmed/numbered object catalog (astroquery.mpc or equivalent), split evenly into confirmed-NEO and confirmed-main-belt-asteroid classes",
+  "label_confidence": "confirmed",
+  "preprocessing_version": "Skills/generate_training_labels.py (or equivalent MPC label-generation path); consumed directly as --mpc-labels by Skills/train_tier1_xgboost.py alongside data/ztf_labeled_alerts.json (see ztf_labeled_alerts_tier2_cnn_v1.json manifest) to produce models/tier1_xgb.json",
+  "known_caveats": [
+    "This is the real, committed-code-produced MPC label source for the trained Tier 1 XGBoost model (models/tier1_xgb.json, val_acc=99.95%, macro AUC=1.000 per T1-A), but the raw CSV file itself is gitignored/local-only and is not in git history.",
+    "Confirmed real class balance by direct inspection 2026-07-11: exactly 500 neo_candidate rows (source=MPC_NEA) and 500 main_belt_asteroid rows (source=MPC_MBA), matching the documented 1000-label split in CLAUDE.md's T1-A section.",
+    "No per-object observation epoch, orbit-fit date, or MPC query timestamp was preserved in this cached file -- only designation, neo_class, h_mag, and source per row -- so time_range cannot be reconstructed and is recorded as 'unknown' rather than guessed.",
+    "Per project label-quality policy, only MPC-numbered/confirmed objects should be treated as high-confidence positives; this file's label_confidence is recorded as 'confirmed' on that basis, consistent with the source column values (MPC_NEA/MPC_MBA)."
+  ]
+}
