@@ -292,6 +292,14 @@ def _build_cnn_model() -> Any:
         class ConvBranch(nn.Module):
             def __init__(self) -> None:
                 super().__init__()
+                # Layer list and order are unchanged from the original
+                # single nn.Sequential so state_dict keys (net.0, net.1, ...)
+                # stay identical -- the frozen benchmark_cnn_v1 checkpoint
+                # (models/tier2_cnn.pt) must keep loading via this same
+                # module structure. forward() below iterates self.net's
+                # children manually (instead of calling self.net(x)
+                # directly) only to route the AdaptiveAvgPool2d step through
+                # CPU on MPS; this does not change parameter registration.
                 self.net = nn.Sequential(
                     nn.Conv2d(1, 32, 3, padding=1), nn.ReLU(),
                     nn.MaxPool2d(2),
@@ -303,7 +311,22 @@ def _build_cnn_model() -> Any:
                 )
 
             def forward(self, x: Any) -> Any:
-                return self.net(x)
+                # PyTorch's MPS backend does not implement adaptive_avg_pool2d
+                # for non-divisible input/output sizes (this branch's conv
+                # stack produces a 15x15 feature map, and 15 is not evenly
+                # divisible by the AdaptiveAvgPool2d(4) target): RuntimeError
+                # "Adaptive pool MPS: input sizes must be divisible by output
+                # sizes. Non-divisible input sizes are not implemented on MPS
+                # device yet." -- https://github.com/pytorch/pytorch/issues/96056.
+                # Per that issue's own suggested workaround, only this one op
+                # is moved to CPU when running on MPS; every other layer runs
+                # on its original device.
+                for layer in self.net:
+                    if isinstance(layer, nn.AdaptiveAvgPool2d) and x.device.type == "mps":
+                        x = layer(x.to("cpu")).to(x.device)
+                    else:
+                        x = layer(x)
+                return x
 
         class TripleCNN(nn.Module):
             def __init__(self) -> None:

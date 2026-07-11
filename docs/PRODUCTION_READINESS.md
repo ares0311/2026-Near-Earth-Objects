@@ -93,6 +93,20 @@ launching a materially larger production batch, the project must add:
   committed at `data/injection_recovery_image_level_n200.json`
   (detection/link/score rate 7.5%, real per-bin curves for all three new
   dimensions).
+- **v0.90.79 (2026-07-10)**: Operator's real retrain run (real MPS device)
+  hit a genuine upstream PyTorch MPS bug: `AdaptiveAvgPool2d(4)` on a 15×15
+  feature map fails on MPS because 15 is not evenly divisible by 4
+  (<https://github.com/pytorch/pytorch/issues/96056>), not a bug in this
+  project. Fixed in `src/classify.py`'s `ConvBranch.forward()` by routing
+  only that op through CPU on MPS. A first fix attempt changed
+  `state_dict()` key names and broke loading the frozen `benchmark_cnn_v1`
+  checkpoint -- caught via `Skills/validate_model_weights.py` before
+  committing; corrected version preserves state_dict keys exactly and
+  `Skills/validate_model_weights.py` reports `ALL PASSED`. 2 new regression
+  tests; full suite 1845 passed / 2 deselected, ruff/mypy clean. No model
+  checkpoint was produced by the failed run, so `calibration_report_missing`
+  remains open pending a re-run with this fix. Evidence:
+  `docs/evidence/a7/2026-07-10-seventh-attempt-mps-adaptive-pool-bug-and-fix.md`.
 - **v0.90.78 (2026-07-10)**: `Skills/train_tier2_cnn.py` gained real device
   selection (MPS when available, explicit CPU-fallback reporting) and a
   configurable `--num-workers` DataLoader flag, fixing a real gap versus

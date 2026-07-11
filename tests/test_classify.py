@@ -457,6 +457,47 @@ class TestBuildCnnModel:
         monkeypatch.setattr(cls_mod, "_MODEL_DIR", tmp_path)
         assert cls_mod._load_cnn_model() is None
 
+    def test_conv_branch_state_dict_keys_unchanged_by_mps_workaround(self):
+        """Regression guard: ConvBranch.forward() was rewritten to route
+        AdaptiveAvgPool2d through CPU on MPS (PyTorch does not implement
+        adaptive_avg_pool2d for non-divisible sizes on MPS -- see
+        https://github.com/pytorch/pytorch/issues/96056), but this must NOT
+        change state_dict key names, or the frozen benchmark_cnn_v1
+        checkpoint (models/tier2_cnn.pt) fails to load. A prior version of
+        this fix split ConvBranch.net into separate conv/pool attributes,
+        which silently broke Skills/validate_model_weights.py
+        (_load_cnn_model() returned None on the real frozen checkpoint)."""
+        from classify import _build_cnn_model
+        model = _build_cnn_model()
+        assert model is not None
+        keys = list(model.state_dict().keys())
+        # Conv2d layers keep their original net.0/net.3/net.6 Sequential
+        # indices (ReLU/MaxPool2d/AdaptiveAvgPool2d/Flatten have no
+        # parameters and so contribute no state_dict keys).
+        for branch in ("branch_sci", "branch_ref", "branch_diff"):
+            assert f"{branch}.net.0.weight" in keys
+            assert f"{branch}.net.3.weight" in keys
+            assert f"{branch}.net.6.weight" in keys
+            assert not any(k.startswith(f"{branch}.conv.") for k in keys)
+            assert not any(k.startswith(f"{branch}.pool.") for k in keys)
+
+    def test_conv_branch_forward_matches_direct_sequential_call_on_cpu(self):
+        """On CPU (device.type != "mps"), the manual per-layer iteration in
+        ConvBranch.forward() must produce bit-identical output to calling
+        self.net(x) directly -- the MPS workaround must be a no-op on CPU."""
+        import torch
+
+        from classify import _build_cnn_model
+        model = _build_cnn_model()
+        assert model is not None
+        torch.manual_seed(0)
+        x = torch.randn(2, 1, 63, 63)
+        branch = model.branch_sci
+        with torch.no_grad():
+            via_forward = branch(x)
+            via_direct_sequential = torch.flatten(branch.net(x), 1)
+        assert torch.equal(via_forward, via_direct_sequential)
+
     def test_cnn_heartbeat_prints_while_waiting(self, capsys):
         """The macOS-deadlock heartbeat (see _load_cnn_model) must actually
         print while its wrapped call is still running -- a real model load

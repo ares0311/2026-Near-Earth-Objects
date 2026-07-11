@@ -818,7 +818,34 @@ and excluded from CI.
 
 ## Current State (v0.90.75)
 
-**Latest sync (2026-07-10, v0.90.78)**: `Skills/train_tier2_cnn.py` gained
+**Latest sync (2026-07-10, v0.90.79)**: Operator ran the real v0.90.78
+retrain command on their Mac (real MPS device, `Device: mps` printed
+correctly) and hit a genuine PyTorch MPS backend bug on the first training
+batch: `RuntimeError: Adaptive pool MPS: input sizes must be divisible by
+output sizes` — `ConvBranch`'s conv stack produces a 15×15 feature map and
+`AdaptiveAvgPool2d(4)` needs evenly-divisible sizes on MPS (15/4 is not
+integer); a real, documented upstream PyTorch limitation
+(<https://github.com/pytorch/pytorch/issues/96056>), not a bug in this
+project's training logic. Fixed in `src/classify.py`'s `ConvBranch.forward()`
+by routing only that one op through CPU when `x.device.type == "mps"`,
+matching the error message's own suggested workaround. **First fix attempt
+was wrong and caught before committing**: splitting `self.net` into
+`self.conv`/`self.pool` changed `state_dict()` key names and broke loading
+the frozen `benchmark_cnn_v1` checkpoint
+(`Skills/validate_model_weights.py` went from `ALL PASSED` to a real
+`FAIL`) — corrected by keeping `self.net` as one unmodified `nn.Sequential`
+and iterating its children manually in `forward()` instead, which
+preserves state_dict keys exactly.
+`Skills/validate_model_weights.py` → `ALL PASSED` again. 2 new regression
+tests guard both the state_dict-key stability and CPU-path numerical
+equivalence. Full suite 1845 passed / 2 deselected, ruff/mypy clean. Full
+detail: `docs/evidence/a7/2026-07-10-seventh-attempt-mps-adaptive-pool-bug-and-fix.md`.
+No model was saved by the failed run (crashed before the first
+`torch.save`), so `calibration_report_missing` is still open —
+**re-run the exact same v0.90.78 retrain + calibrate command block** (now
+with this fix merged) on the operator's Mac.
+
+**Earlier sync (2026-07-10, v0.90.78)**: `Skills/train_tier2_cnn.py` gained
 real PyTorch device selection (MPS when available, explicit CPU-fallback
 reporting otherwise) and a configurable `--num-workers` DataLoader flag —
 it previously never selected a device at all (silently CPU-only always)
