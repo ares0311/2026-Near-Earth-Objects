@@ -740,6 +740,47 @@ def append_fields_to_target_queue(
     return n_written
 
 
+def update_target_queue_status(
+    queue_path: Path, *, rank: int, new_status: str, note_suffix: str = ""
+) -> bool:
+    """Safely update one row's `status` (and append to its `notes`) in the
+    target-priority-queue CSV, keyed by `rank`.
+
+    Rewrites the file via the `csv` module end to end rather than editing
+    the raw text -- a hand-edited row containing literal commas in an
+    unquoted field (e.g. a sentence describing a real run's outcome) breaks
+    `csv.DictReader` for every later row, silently corrupting the queue.
+    This function exists specifically so status updates never repeat that
+    mistake. Returns True if a matching row was found and updated, False
+    otherwise (queue_path missing, or no row with that rank).
+    """
+    import csv
+
+    if not queue_path.exists():
+        return False
+    with queue_path.open(newline="") as f:
+        reader = csv.DictReader(f)
+        fieldnames = reader.fieldnames
+        rows = list(reader)
+
+    updated = False
+    for row in rows:
+        if row.get("rank") == str(rank):
+            row["status"] = new_status
+            if note_suffix:
+                row["notes"] = f"{row.get('notes', '')}; {note_suffix}"
+            updated = True
+
+    if not updated:
+        return False
+
+    with queue_path.open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+    return True
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         description=(
@@ -870,7 +911,53 @@ def main(argv: list[str] | None = None) -> None:
         default="live_search",
         help="data_role value recorded for appended target-queue rows (default: live_search).",
     )
+    parser.add_argument(
+        "--update-status-queue",
+        type=Path,
+        default=None,
+        help=(
+            "Update one row's status in this target-priority-queue CSV (by "
+            "--update-status-rank) instead of running field selection. Use "
+            "this instead of hand-editing the CSV -- see "
+            "update_target_queue_status()'s docstring for why."
+        ),
+    )
+    parser.add_argument(
+        "--update-status-rank", type=int, default=None,
+        help="Rank of the row to update (required with --update-status-queue).",
+    )
+    parser.add_argument(
+        "--update-status-value", default=None,
+        help=(
+            "New status value (required with --update-status-queue), e.g. "
+            "searched, candidate_found, null_result, needs_followup, rejected."
+        ),
+    )
+    parser.add_argument(
+        "--update-status-note", default="",
+        help="Optional text appended to the row's notes describing the real outcome.",
+    )
     args = parser.parse_args(argv)
+
+    if args.update_status_queue is not None:
+        if args.update_status_rank is None or args.update_status_value is None:
+            parser.error(
+                "--update-status-queue requires --update-status-rank and "
+                "--update-status-value"
+            )
+        found = update_target_queue_status(
+            args.update_status_queue,
+            rank=args.update_status_rank,
+            new_status=args.update_status_value,
+            note_suffix=args.update_status_note,
+        )
+        if not found:
+            parser.error(
+                f"No row with rank={args.update_status_rank} found in "
+                f"{args.update_status_queue}"
+            )
+        print(f"Updated rank={args.update_status_rank} status={args.update_status_value!r}")
+        return
 
     if args.jd == "now":
         from astropy.time import Time

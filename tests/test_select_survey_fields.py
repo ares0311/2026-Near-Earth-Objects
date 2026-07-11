@@ -645,3 +645,111 @@ class TestAppendFieldsToTargetQueue:
             rows = list(csv.DictReader(f))
         assert len(rows) == 2
         assert all(r["data_role"] == "recovery_control" for r in rows)
+
+
+class TestUpdateTargetQueueStatus:
+    """Regression coverage: a manual hand-edit of a queue row's notes field
+    containing raw, unescaped commas silently corrupted every later row for
+    csv.DictReader (extra fields land under a None key). This function
+    exists so status updates always go through the csv module instead."""
+
+    def _write_queue(self, path: Path, rows: list[dict]) -> None:
+        import csv
+        fieldnames = [
+            "rank", "priority", "status", "data_role", "source",
+            "selection_rule", "evidence_path", "notes",
+        ]
+        with path.open("w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(rows)
+
+    def test_updates_matching_rank_and_preserves_other_rows(self, tmp_path):
+        queue_path = tmp_path / "queue.csv"
+        self._write_queue(queue_path, [
+            {"rank": "1", "priority": "0.9", "status": "not_searched",
+             "data_role": "live_search", "source": "WISE",
+             "selection_rule": "r1", "evidence_path": "", "notes": "n1"},
+            {"rank": "2", "priority": "0.8", "status": "not_searched",
+             "data_role": "live_search", "source": "WISE",
+             "selection_rule": "r2", "evidence_path": "", "notes": "n2"},
+        ])
+
+        found = ssf.update_target_queue_status(
+            queue_path, rank=1, new_status="null_result",
+            note_suffix="249 candidates, all stellar_artifact-dominated",
+        )
+
+        assert found is True
+        import csv
+        with queue_path.open() as f:
+            rows = list(csv.DictReader(f))
+        assert len(rows) == 2  # no rows lost, no phantom None-keyed overflow
+        assert None not in rows[0]
+        assert rows[0]["status"] == "null_result"
+        assert "249 candidates" in rows[0]["notes"]
+        assert rows[1]["status"] == "not_searched"  # untouched
+
+    def test_notes_containing_commas_do_not_corrupt_the_file(self, tmp_path):
+        """The exact failure mode this function was built to prevent: a
+        real-outcome note with literal commas must round-trip cleanly."""
+        queue_path = tmp_path / "queue.csv"
+        self._write_queue(queue_path, [
+            {"rank": "1", "priority": "0.9", "status": "not_searched",
+             "data_role": "live_search", "source": "WISE",
+             "selection_rule": "r1", "evidence_path": "", "notes": "n1"},
+        ])
+
+        ssf.update_target_queue_status(
+            queue_path, rank=1, new_status="null_result",
+            note_suffix="a, b, c: all dominated by artifact, not genuine, consistent with history",
+        )
+
+        import csv
+        with queue_path.open() as f:
+            rows = list(csv.DictReader(f))
+        assert len(rows) == 1
+        assert None not in rows[0]
+        assert rows[0]["status"] == "null_result"
+
+    def test_returns_false_for_missing_rank(self, tmp_path):
+        queue_path = tmp_path / "queue.csv"
+        self._write_queue(queue_path, [
+            {"rank": "1", "priority": "0.9", "status": "not_searched",
+             "data_role": "live_search", "source": "WISE",
+             "selection_rule": "r1", "evidence_path": "", "notes": "n1"},
+        ])
+
+        assert ssf.update_target_queue_status(queue_path, rank=99, new_status="x") is False
+
+    def test_returns_false_for_missing_file(self, tmp_path):
+        assert ssf.update_target_queue_status(
+            tmp_path / "does_not_exist.csv", rank=1, new_status="x"
+        ) is False
+
+    def test_cli_update_status_flow(self, tmp_path, capsys):
+        queue_path = tmp_path / "queue.csv"
+        self._write_queue(queue_path, [
+            {"rank": "1", "priority": "0.9", "status": "not_searched",
+             "data_role": "live_search", "source": "WISE",
+             "selection_rule": "r1", "evidence_path": "", "notes": "n1"},
+        ])
+
+        ssf.main([
+            "--update-status-queue", str(queue_path),
+            "--update-status-rank", "1",
+            "--update-status-value", "candidate_found",
+            "--update-status-note", "real, comma-containing, note",
+        ])
+
+        import csv
+        with queue_path.open() as f:
+            rows = list(csv.DictReader(f))
+        assert rows[0]["status"] == "candidate_found"
+        assert None not in rows[0]
+
+    def test_cli_update_status_requires_rank_and_value(self, tmp_path):
+        queue_path = tmp_path / "queue.csv"
+        self._write_queue(queue_path, [])
+        with pytest.raises(SystemExit):
+            ssf.main(["--update-status-queue", str(queue_path)])
