@@ -798,6 +798,7 @@ gate or bug. This mirrors, but is not identical to, `CLAUDE.md`'s own
 | `Skills/download_ztf_training_alerts.py` | Download labeled ZTF Avro alert tarballs from public archive (ztf.uw.edu); decompresses gzip-FITS cutouts; writes `data/ztf_labeled_alerts.json`; run from Mac with `caffeinate -i` |
 | `Skills/batch_score.py` | Score a list of tracklets from a JSON file; print ranked table |
 | `Skills/run_pipeline.py` | Full end-to-end pipeline run |
+| `Skills/select_survey_fields.py` | Algorithmically ranks sky fields for `Skills/run_pipeline.py` by known-object density, geometry, and novelty (`--mode recovery` for known-object-rich fields; `--wise-archive-probes` attaches ready-to-run WISE scale-plan commands); `--write-target-queue` appends real, computed selection results to `data_selection/target_priority_queue.csv` — the canonical way to pick a target field |
 | `Skills/injection_recovery.py` | Injection-recovery test: injects synthetic NEOs, measures detection/link/score rates; `--image-level` sweeps seeing/background/trail-length via synthesized difference cutouts for A6 recovery curves |
 | `Skills/check_mpc_known.py` | Cross-match candidate observations against MPC known object catalog |
 | `Skills/build_recovery_manifest.py` | Build checkpointed MPC+Horizons expected-known manifests for T1-C recovery audits |

@@ -690,6 +690,56 @@ def add_wise_archive_probe_commands(
 
 # ── CLI ────────────────────────────────────────────────────────────────────────
 
+def append_fields_to_target_queue(
+    fields: list[dict], queue_path: Path, *, data_role: str
+) -> int:
+    """Append ranked field-selection results to the target-priority-queue CSV.
+
+    Matches the committed `data_selection/target_priority_queue.csv` schema
+    exactly (rank,priority,status,data_role,source,selection_rule,
+    evidence_path,notes) rather than the more elaborate generic schema in
+    `docs/astrometrics_data_selection_policy.md` -- this repo already
+    committed the simplified version, and this function conforms to what is
+    actually on disk. Writes the header only if the file does not yet exist.
+    Every value is derived directly from the selector's own computed score
+    and reason; nothing is invented. Returns the number of rows appended.
+    """
+    import csv
+
+    fieldnames = [
+        "rank", "priority", "status", "data_role", "source",
+        "selection_rule", "evidence_path", "notes",
+    ]
+    file_exists = queue_path.exists()
+    queue_path.parent.mkdir(parents=True, exist_ok=True)
+    with queue_path.open("a", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        if not file_exists:
+            writer.writeheader()
+        n_written = 0
+        for field in fields:
+            source = "WISE" if "wise_scale_probe_command" in field else "sky_field_selector"
+            evidence_path = field.get("wise_scale_plan_out", "")
+            notes = (
+                f"ra_deg={field['ra_deg']} dec_deg={field['dec_deg']} "
+                f"field_radius_deg={field.get('field_radius_deg', _FIELD_RADIUS_DEG)}"
+            )
+            if "wise_scale_probe_command" in field:
+                notes += f"; wise_scale_probe_command={field['wise_scale_probe_command']}"
+            writer.writerow({
+                "rank": field["rank"],
+                "priority": f"{field['score']:.4f}",
+                "status": "not_searched",
+                "data_role": data_role,
+                "source": source,
+                "selection_rule": field["reason"],
+                "evidence_path": evidence_path,
+                "notes": notes,
+            })
+            n_written += 1
+    return n_written
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         description=(
@@ -801,6 +851,25 @@ def main(argv: list[str] | None = None) -> None:
             f"Default: {_WISE_PARENT_RADIUS_DEG}."
         ),
     )
+    parser.add_argument(
+        "--write-target-queue",
+        type=Path,
+        default=None,
+        help=(
+            "Append the ranked field list to this target-priority-queue CSV, "
+            "matching data_selection/target_priority_queue.csv's committed "
+            "schema (rank,priority,status,data_role,source,selection_rule,"
+            "evidence_path,notes) per docs/astrometrics_data_selection_policy.md's "
+            "'every live-search batch needs a documented selection rule before "
+            "execution' requirement. Previously this tool only printed 'copy to "
+            "run_pipeline.py' with no persisted, inspectable selection record."
+        ),
+    )
+    parser.add_argument(
+        "--target-queue-data-role",
+        default="live_search",
+        help="data_role value recorded for appended target-queue rows (default: live_search).",
+    )
     args = parser.parse_args(argv)
 
     if args.jd == "now":
@@ -837,6 +906,15 @@ def main(argv: list[str] | None = None) -> None:
             start_jd=args.start_jd,
             end_jd=args.end_jd,
             radius_deg=args.wise_parent_radius,
+        )
+
+    if args.write_target_queue is not None:
+        n_written = append_fields_to_target_queue(
+            fields, args.write_target_queue, data_role=args.target_queue_data_role
+        )
+        print(
+            f"Appended {n_written} field(s) to {args.write_target_queue}",
+            file=sys.stderr,
         )
 
     if args.json_out:

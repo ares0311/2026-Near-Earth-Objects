@@ -554,3 +554,94 @@ class TestCLI:
                 "--wise-archive-probes",
                 "--json",
             ])
+
+
+class TestAppendFieldsToTargetQueue:
+    """Regression coverage for the target-queue wiring gap: this tool
+    previously only printed 'copy to run_pipeline.py' and left no persisted,
+    inspectable selection record, contradicting
+    docs/astrometrics_data_selection_policy.md's requirement that every
+    live-search batch have a documented selection rule before execution."""
+
+    def test_writes_header_and_real_rows_matching_committed_schema(self, tmp_path):
+        fields = [
+            {
+                "rank": 1, "ra_deg": 276.01, "dec_deg": -22.5, "score": 0.9395,
+                "field_radius_deg": 3.5, "reason": "known-object density 0.93; geometry 0.92",
+            },
+            {
+                "rank": 2, "ra_deg": 267.89, "dec_deg": -22.5, "score": 0.9143,
+                "field_radius_deg": 3.5, "reason": "known-object density 0.89; geometry 0.90",
+            },
+        ]
+        queue_path = tmp_path / "target_priority_queue.csv"
+
+        n_written = ssf.append_fields_to_target_queue(
+            fields, queue_path, data_role="live_search"
+        )
+
+        assert n_written == 2
+        import csv
+        with queue_path.open() as f:
+            rows = list(csv.DictReader(f))
+        assert rows[0].keys() == {
+            "rank", "priority", "status", "data_role", "source",
+            "selection_rule", "evidence_path", "notes",
+        }
+        assert rows[0]["rank"] == "1"
+        assert rows[0]["priority"] == "0.9395"
+        assert rows[0]["status"] == "not_searched"
+        assert rows[0]["data_role"] == "live_search"
+        assert rows[0]["source"] == "sky_field_selector"
+        assert rows[0]["selection_rule"] == "known-object density 0.93; geometry 0.92"
+        assert "ra_deg=276.01" in rows[0]["notes"]
+
+    def test_wise_fields_record_wise_source_and_evidence_path(self, tmp_path):
+        fields = [{
+            "rank": 1, "ra_deg": 276.01, "dec_deg": -22.5, "score": 0.9395,
+            "field_radius_deg": 0.2, "reason": "known-object density 0.93",
+            "wise_scale_plan_out": "Logs/reports/wise_scale_plan_x.json",
+            "wise_scale_probe_command": "uv run ... --surveys WISE ...",
+        }]
+        queue_path = tmp_path / "target_priority_queue.csv"
+
+        ssf.append_fields_to_target_queue(fields, queue_path, data_role="live_search")
+
+        import csv
+        with queue_path.open() as f:
+            rows = list(csv.DictReader(f))
+        assert rows[0]["source"] == "WISE"
+        assert rows[0]["evidence_path"] == "Logs/reports/wise_scale_plan_x.json"
+        assert "wise_scale_probe_command=" in rows[0]["notes"]
+
+    def test_second_call_appends_without_duplicating_header(self, tmp_path):
+        queue_path = tmp_path / "target_priority_queue.csv"
+        field = [{
+            "rank": 1, "ra_deg": 100.0, "dec_deg": 5.0, "score": 0.5,
+            "field_radius_deg": 3.5, "reason": "test",
+        }]
+
+        ssf.append_fields_to_target_queue(field, queue_path, data_role="live_search")
+        ssf.append_fields_to_target_queue(field, queue_path, data_role="live_search")
+
+        lines = queue_path.read_text().splitlines()
+        assert lines[0].startswith("rank,priority,status")
+        assert sum(1 for line in lines if line.startswith("rank,priority,status")) == 1
+        assert len(lines) == 3  # header + 2 appended rows
+
+    def test_cli_write_target_queue_flag(self, tmp_path, capsys):
+        queue_path = tmp_path / "queue.csv"
+        ssf.main([
+            "--jd", "2459065.5",
+            "--mode", "aten",
+            "--top-n", "2",
+            "--write-target-queue", str(queue_path),
+            "--target-queue-data-role", "recovery_control",
+            "--json",
+        ])
+        assert queue_path.exists()
+        import csv
+        with queue_path.open() as f:
+            rows = list(csv.DictReader(f))
+        assert len(rows) == 2
+        assert all(r["data_role"] == "recovery_control" for r in rows)
