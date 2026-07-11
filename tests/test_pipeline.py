@@ -1794,6 +1794,81 @@ class TestRunPipelineAutoDelete:
         assert records[0]["candidate_id"] == "cand-main"
         assert records[0]["source_dataset_id"] == "manifest:main-test"
 
+    def test_candidate_ledger_db_defaults_to_canonical_path(self, tmp_path, monkeypatch):
+        """--candidate-ledger-db is on by default per
+        docs/astrometrics_coding_agents_master_guide.md's non-negotiable
+        'do not accept a candidate without manifest and ledger provenance'
+        rule -- it must no longer default to None/disabled."""
+        import json
+        from unittest.mock import patch
+
+        mod = self._load_skill()
+        monkeypatch.setattr(mod, "_LOG_ROOT", tmp_path / "pipeline_runs")
+        monkeypatch.setattr(mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        with patch.object(mod, "run_pipeline", return_value=[]):
+            mod.main([
+                "--ra", "10.0", "--dec", "5.0",
+                "--start-jd", "2460000.0", "--end-jd", "2460001.0",
+                "--no-delete-cache",
+            ])
+
+        run_dirs = list((tmp_path / "pipeline_runs").iterdir())
+        summary = json.loads((run_dirs[0] / "run_summary.json").read_text())
+        assert summary["candidate_ledger_db"] == "data_selection/candidate_ledger.sqlite"
+
+    def test_main_skips_ledger_ingest_without_real_source_dataset_id(
+        self, tmp_path, monkeypatch, capsys
+    ):
+        """When the ledger path is on (now the default) but no real
+        --source-dataset-id is given, main() must skip ingestion with a
+        printed warning -- not silently write the 'not-recorded' placeholder
+        as fake provenance, and not crash the whole run."""
+        from unittest.mock import patch
+
+        mod = self._load_skill()
+        ledger_path = tmp_path / "candidate_ledger.sqlite"
+        monkeypatch.setattr(mod, "_LOG_ROOT", tmp_path / "pipeline_runs")
+        monkeypatch.setattr(mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        with patch.object(
+            mod, "run_pipeline",
+            return_value=[{"object_id": "cand-x", "neo_probability": 0.1}],
+        ):
+            mod.main([
+                "--ra", "10.0", "--dec", "5.0",
+                "--start-jd", "2460000.0", "--end-jd", "2460001.0",
+                "--candidate-ledger-db", str(ledger_path),
+                "--no-delete-cache",
+            ])
+
+        assert not ledger_path.exists()  # no fake-provenance write happened
+        out = capsys.readouterr().out
+        assert "[ledger] Skipped" in out
+        assert "--source-dataset-id" in out
+
+    def test_main_opt_out_empty_string_disables_ledger_entirely(self, tmp_path, monkeypatch):
+        """Explicit --candidate-ledger-db '' must still fully disable ledger
+        writes, matching the documented opt-out path."""
+        from unittest.mock import patch
+
+        mod = self._load_skill()
+        monkeypatch.setattr(mod, "_LOG_ROOT", tmp_path / "pipeline_runs")
+        monkeypatch.setattr(mod, "_CACHE_DIR", tmp_path / ".neo_cache")
+
+        with patch.object(mod, "run_pipeline", return_value=[]):
+            mod.main([
+                "--ra", "10.0", "--dec", "5.0",
+                "--start-jd", "2460000.0", "--end-jd", "2460001.0",
+                "--candidate-ledger-db", "",
+                "--no-delete-cache",
+            ])
+
+        run_dirs = list((tmp_path / "pipeline_runs").iterdir())
+        import json
+        summary = json.loads((run_dirs[0] / "run_summary.json").read_text())
+        assert summary["candidate_ledger_db"] is None
+
     def test_main_no_audit_log_skips_write(self, tmp_path, monkeypatch):
         """--no-audit-log prevents writing the audit log."""
         from unittest.mock import patch

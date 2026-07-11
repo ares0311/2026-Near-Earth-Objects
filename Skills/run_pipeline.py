@@ -1044,10 +1044,16 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument(
         "--candidate-ledger-db",
         type=str,
-        default=None,
+        default="data_selection/candidate_ledger.sqlite",
         help=(
-            "Optional SQLite candidate ledger path. When set, compact pipeline "
-            "candidate outputs are ingested after the run."
+            "SQLite candidate ledger path; on by default per "
+            "docs/astrometrics_coding_agents_master_guide.md's non-negotiable "
+            "'do not accept a candidate without manifest and ledger "
+            "provenance' rule. Ingestion is skipped (with a printed warning, "
+            "not a crash) if --source-dataset-id is not also set to a real "
+            "value -- set --candidate-ledger-db '' to disable ledger writes "
+            "entirely for this run. Compact pipeline candidate outputs are "
+            "ingested after the run."
         ),
     )
     parser.add_argument(
@@ -1129,7 +1135,18 @@ def main(argv: list[str] | None = None) -> None:
     }
     ledger_records_written = 0
     ledger_path: Path | None = Path(args.candidate_ledger_db) if args.candidate_ledger_db else None
-    if ledger_path is not None and run_status == "complete":
+    has_real_source_dataset_id = bool(
+        args.source_dataset_id.strip() and args.source_dataset_id.strip() != "not-recorded"
+    )
+    if ledger_path is not None and run_status == "complete" and not has_real_source_dataset_id:
+        print(
+            "[ledger] Skipped: --source-dataset-id is not set to a real dataset "
+            "manifest ID (candidate ledger is on by default, but will not "
+            "record fake provenance under the 'not-recorded' placeholder). "
+            "Pass a real --source-dataset-id to ingest candidates for this run.",
+            flush=True,
+        )
+    elif ledger_path is not None and run_status == "complete":
         raw_uri = str(run_dir / "run_summary.json") if run_dir is not None else "not-recorded"
         ledger_records_written = write_candidate_ledger(
             ledger_path,
