@@ -37,7 +37,20 @@ discarded, since nightly files can be up to 73G.
 
 Checkpoint/resume: after each night completes, its kept Observations are
 written to <out-dir>/<night>.json. Re-running the identical command skips
-any night whose checkpoint file already exists.
+any night whose checkpoint file already exists. The checkpoint filename is
+keyed by night only, not by (night, ra, dec, radius_deg, min_rb) -- so a
+resume additionally validates that the new call's query parameters match
+what the checkpoint was actually built with, and fails closed (raises
+SystemExit, does not ingest, does not return data) on any mismatch, rather
+than silently handing back a different query's cached results under the
+new request's label. This was a real bug (found 2026-07-11, not
+hypothetical): re-running this script against an already-ingested night
+with a *different* --ra/--dec silently returned the original field's
+observations with no warning. Checkpoints written before this validation
+existed have no recorded query parameters at all; those resume with a
+printed warning instead of a hard failure, since there is nothing to
+compare against. If you need a second field on an already-ingested night,
+either use a different --out-dir or remove the stale checkpoint file.
 
 Cross-machine visibility (fully automatic, no operator git commands and no
 pasting required): every completed night appends a compact (no per-
@@ -291,6 +304,24 @@ def _packet_to_observation_dict(
     }
 
 
+def _query_params_match(
+    recorded: tuple[float | None, float | None, float | None, float | None],
+    requested: tuple[float | None, float | None, float | None, float | None],
+) -> bool:
+    """True if a checkpoint's recorded (ra, dec, radius_deg, min_rb) matches
+    a new request's, tolerant of float round-tripping through JSON. None is
+    only equal to None (e.g. "no sky-box filter" is itself a distinct query
+    from any specific box)."""
+    for recorded_value, requested_value in zip(recorded, requested):
+        if recorded_value is None or requested_value is None:
+            if recorded_value is not requested_value:
+                return False
+            continue
+        if not math.isclose(recorded_value, requested_value, rel_tol=1e-9, abs_tol=1e-9):
+            return False
+    return True
+
+
 def ingest_one_night(
     night: str,
     out_dir: Path,
@@ -306,6 +337,37 @@ def ingest_one_night(
     checkpoint_path = out_dir / f"{night}.json"
     if checkpoint_path.exists():
         state = json.loads(checkpoint_path.read_text())
+        requested = (ra, dec, radius_deg, min_rb)
+        if "ra" in state:
+            # Checkpoint recorded its own query params (this validation's
+            # normal case going forward) -- refuse to resume with a
+            # different query's cached data.
+            recorded = (
+                state.get("ra"),
+                state.get("dec"),
+                state.get("radius_deg"),
+                state.get("min_rb"),
+            )
+            if not _query_params_match(recorded, requested):
+                raise SystemExit(
+                    f"[FAIL-CLOSED] {night}: existing checkpoint {checkpoint_path} was built "
+                    f"for ra={recorded[0]} dec={recorded[1]} radius_deg={recorded[2]} "
+                    f"min_rb={recorded[3]}, but this run requested ra={requested[0]} "
+                    f"dec={requested[1]} radius_deg={requested[2]} min_rb={requested[3]}. "
+                    "Refusing to silently return a different query's cached results as if "
+                    "they were this one -- use a different --out-dir for this field, or "
+                    "remove the stale checkpoint if you intend to replace it."
+                )
+        else:
+            # Legacy checkpoint predates query-parameter recording entirely
+            # -- nothing to validate against, so warn rather than guess.
+            print(
+                f"[resume] {night}: legacy checkpoint has no recorded query parameters "
+                "(predates this validation) -- cannot verify it matches this request. "
+                "If it was originally ingested for a different field, its cached data "
+                "will be wrong for the current one.",
+                flush=True,
+            )
         print(
             f"[resume] {night}: checkpoint exists with "
             f"{state['kept_count']} kept observation(s), skipping",

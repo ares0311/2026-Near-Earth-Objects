@@ -229,6 +229,78 @@ class TestCheckpointResume:
         assert "[resume]" in captured.out
         assert state["kept_count"] == 1
 
+    def test_resume_with_different_field_fails_closed(self, tmp_path, monkeypatch):
+        """Real bug, found 2026-07-11: checkpoints are keyed by night only.
+        Re-running the same night with a *different* ra/dec must never
+        silently hand back the first field's cached observations under the
+        new request's label -- it must refuse outright."""
+        records = [(6001, _candidate(ra=89.3, dec=22.5))]
+        data = _build_fake_tar_gz(records)
+        _patch_requests(monkeypatch, data)
+
+        ingest.ingest_one_night(
+            "20200914", tmp_path, min_rb=0.5, ra=89.3, dec=22.5,
+            radius_deg=2.0, max_per_night=5000,
+        )
+
+        # A different field on the same night must fail closed, not
+        # silently resume from the first field's checkpoint. No network
+        # patch needed for the second call's HEAD/GET -- it must never
+        # reach them.
+        with pytest.raises(SystemExit, match="FAIL-CLOSED"):
+            ingest.ingest_one_night(
+                "20200914", tmp_path, min_rb=0.5, ra=310.0, dec=-15.0,
+                radius_deg=2.0, max_per_night=5000,
+            )
+
+    def test_resume_with_matching_field_still_succeeds(self, tmp_path, monkeypatch):
+        """The fix must not break the legitimate resume case: identical
+        query params on a re-run should still resume from checkpoint."""
+        records = [(6002, _candidate(ra=89.3, dec=22.5))]
+        data = _build_fake_tar_gz(records)
+        _patch_requests(monkeypatch, data)
+
+        ingest.ingest_one_night(
+            "20200915", tmp_path, min_rb=0.5, ra=89.3, dec=22.5,
+            radius_deg=2.0, max_per_night=5000,
+        )
+
+        def fail_head(*a, **k):
+            raise RuntimeError("no network -- must not be called on a real resume")
+
+        monkeypatch.setattr(ingest.requests, "head", fail_head)
+        state = ingest.ingest_one_night(
+            "20200915", tmp_path, min_rb=0.5, ra=89.3, dec=22.5,
+            radius_deg=2.0, max_per_night=5000,
+        )
+        assert state["kept_count"] == 1
+
+    def test_resume_legacy_checkpoint_without_params_warns_not_fails(
+        self, tmp_path, monkeypatch, capsys
+    ):
+        """Checkpoints written before this validation existed have no
+        recorded ra/dec/radius/min_rb at all -- there is nothing to compare
+        against, so this must warn and resume, not hard-fail (that would
+        break every one of the 14 real nights already ingested before this
+        fix)."""
+        old_style_state = {
+            "night": "20180809",
+            "filename": "ztf_public_20180809.tar.gz",
+            "scanned_count": 715,
+            "kept_count": 21,
+            "observations": [],
+        }
+        (tmp_path / "20180809.json").write_text(json.dumps(old_style_state))
+
+        state = ingest.ingest_one_night(
+            "20180809", tmp_path, min_rb=0.5, ra=1.0, dec=2.0,
+            radius_deg=3.0, max_per_night=5000,
+        )
+        captured = capsys.readouterr()
+
+        assert "legacy checkpoint" in captured.out
+        assert state["kept_count"] == 21
+
 
 class TestManifest:
     """Regression coverage for the git-relay manifest: the operator's
