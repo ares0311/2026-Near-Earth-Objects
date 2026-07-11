@@ -129,15 +129,44 @@ def test_leakage_report_fails_object_overlap() -> None:
     assert report["hard_leakage"]["object_id"] == {"obj-a": ["train", "validation"]}
 
 
-def test_leakage_report_fails_night_overlap() -> None:
+def test_leakage_report_monitors_but_does_not_fail_night_overlap() -> None:
+    """Policy change 2026-07-10: night_key/sky_cell are monitored, not
+    hard-gating, because real ZTF data cannot achieve simultaneous
+    object_id + night_key + sky_cell purity (see
+    docs/evidence/a7/2026-07-10-fourth-attempt-scale-test-confirms-structural-incompatibility.md).
+    Only object_id overlap fails `passed` now."""
     records = [
         record_from_row(_row("s1", "train", "obj-a", 2460000.5, 11.2, -3.4)),
         record_from_row(_row("s2", "validation", "obj-b", 2460000.6, 13.2, -1.4)),
         record_from_row(_row("s3", "test", "obj-c", 2460002.5, 15.2, 1.4)),
     ]
 
-    with pytest.raises(ValueError, match="night_key"):
-        assert_no_leakage(records)
+    report = leakage_report(records)
+
+    assert report["passed"] is True
+    assert report["hard_leakage"] == {}
+    assert "night_key" in report["monitored_leakage"]
+    assert report["monitored_leakage"]["night_key"] == {
+        "jdnight:2460001": ["train", "validation"]
+    }
+    assert report["monitored_leak_rates"]["night_key"]["n_leaking"] == 1
+    assert assert_no_leakage(records)["passed"] is True
+
+
+def test_leakage_report_monitors_but_does_not_fail_sky_cell_overlap() -> None:
+    records = [
+        record_from_row(_row("s1", "train", "obj-a", 2460000.5, 11.2, -3.4)),
+        record_from_row(_row("s2", "validation", "obj-b", 2460010.5, 11.6, -3.1)),
+        record_from_row(_row("s3", "test", "obj-c", 2460020.5, 40.0, 20.0)),
+    ]
+
+    report = leakage_report(records)
+
+    assert report["passed"] is True
+    assert "sky_cell" in report["monitored_leakage"]
+    rates = report["monitored_leak_rates"]["sky_cell"]
+    assert rates["n_leaking"] >= 1
+    assert 0.0 < rates["leak_rate"] <= 1.0
 
 
 def test_leakage_report_fails_empty_and_missing_required_split() -> None:

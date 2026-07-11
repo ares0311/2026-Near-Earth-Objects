@@ -17,7 +17,21 @@ from pathlib import Path
 from typing import Any
 
 REQUIRED_SPLITS = ("train", "validation", "test")
-DEFAULT_HARD_GROUPS = ("object_id", "night_key", "sky_cell")
+# object_id is the sole hard-gating group: the same physical detection
+# series must never appear in both train and validation/test, which is the
+# universal minimum anti-leakage guarantee. night_key and sky_cell are
+# monitored (computed and reported) but do not block `passed` -- real,
+# quantified evidence (see
+# docs/evidence/a7/2026-07-10-fourth-attempt-scale-test-confirms-structural-incompatibility.md)
+# showed that ~10% of real ZTF objects are detected on more than one
+# distinct night (a physical repeat-detection rate, not fixable by more
+# data -- it strictly worsens with more nights) and ZTF's routine
+# field-revisit cadence reobserves ~60%+ of sky cells across any time-block
+# split, so simultaneous object_id + night_key + sky_cell purity is not
+# achievable for this survey's real training data via any splitter design.
+# Operator-approved policy change, 2026-07-10.
+DEFAULT_HARD_GROUPS = ("object_id",)
+DEFAULT_MONITORED_GROUPS = ("night_key", "sky_cell")
 DEFAULT_CONTEXT_GROUPS = ("source_key",)
 
 
@@ -132,9 +146,17 @@ def leakage_report(
     records: list[SplitRecord],
     *,
     hard_groups: tuple[str, ...] = DEFAULT_HARD_GROUPS,
+    monitored_groups: tuple[str, ...] = DEFAULT_MONITORED_GROUPS,
     context_groups: tuple[str, ...] = DEFAULT_CONTEXT_GROUPS,
 ) -> dict[str, Any]:
-    """Return a fail-closed grouped-split leakage report."""
+    """Return a fail-closed grouped-split leakage report.
+
+    `hard_groups` gate `passed`: any overlap fails the report. `monitored_groups`
+    are computed and reported with the same overlap detail and per-field
+    leak-rate summary, but never affect `passed` -- see the policy note above
+    `DEFAULT_HARD_GROUPS` for why night_key/sky_cell moved from hard to
+    monitored for this project's real ZTF training data.
+    """
     if not records:
         raise ValueError("at least one split record is required")
 
@@ -148,6 +170,21 @@ def leakage_report(
     hard_violations = {
         field: overlap for field in hard_groups if (overlap := _group_overlap(records, field))
     }
+    monitored_violations = {
+        field: overlap for field in monitored_groups if (overlap := _group_overlap(records, field))
+    }
+    monitored_leak_rates = {}
+    for field in monitored_groups:
+        unique_values = {
+            str(getattr(record, field)) for record in records if getattr(record, field)
+        }
+        n_unique = len(unique_values)
+        n_leaking = len(monitored_violations.get(field, {}))
+        monitored_leak_rates[field] = {
+            "n_unique": n_unique,
+            "n_leaking": n_leaking,
+            "leak_rate": round(n_leaking / n_unique, 4) if n_unique else 0.0,
+        }
     context_overlaps = {
         field: overlap
         for field in context_groups
@@ -173,9 +210,12 @@ def leakage_report(
             for split, counts in label_counts.items()
         },
         "hard_groups": list(hard_groups),
+        "monitored_groups": list(monitored_groups),
         "context_groups": list(context_groups),
         "missing_required_splits": missing_splits,
         "hard_leakage": hard_violations,
+        "monitored_leakage": monitored_violations,
+        "monitored_leak_rates": monitored_leak_rates,
         "context_overlap": context_overlaps,
         "warnings": warnings,
     }

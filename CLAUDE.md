@@ -818,7 +818,38 @@ and excluded from CI.
 
 ## Current State (v0.90.75)
 
-**Latest sync (2026-07-10, v0.90.76)**: Ran the full v0.90.74 handoff
+**Latest sync (2026-07-10, v0.90.77)**: **`grouped_split_report_missing` is
+CLOSED with real evidence.** After the v0.90.76 findings below, a real
+18-night (90,000-alert) scale test of the night-aware split showed leakage
+getting *worse*, not better, with more data (15/18 nights leaking vs 2/3;
+object-conflict-resolution rows 2,653 -> 10,382) -- decisive, quantified
+evidence that simultaneous `object_id` + `night_key` + `sky_cell` purity is
+structurally unachievable for this survey's real training data: 10.4% of
+real objects (7,645/73,560) are detected on more than one distinct night
+(a physical repeat-detection rate that strictly worsens with more nights),
+and ZTF's routine field-revisit cadence reobserves the majority of sky
+cells across any time-block split. Operator-approved policy change
+(2026-07-10): `src/grouped_splits.py`'s hard-gating groups are now
+`("object_id",)` only; `night_key`/`sky_cell` moved to a new
+`DEFAULT_MONITORED_GROUPS` -- still computed and reported
+(`monitored_leakage`, `monitored_leak_rates`) but no longer block
+`passed`. Re-running the (now sufficient) plain object-random split on the
+real 18-night, 90,000-alert batch produces the first genuinely passing
+report: `Logs/reports/tier2_cnn_v3_grouped_split_report.json`,
+`passed=true`, `hard_leakage={}`, with honest disclosed monitored leak
+rates (`night_key` 100%, `sky_cell` 91.3%). Full trail: five dated evidence
+files in `docs/evidence/a7/` (single-night bug, first split-algorithm gap,
+night-aware split + its own chronological-order bug, the 18-night scale
+test, and this closing pass). Full suite 1843 passed / 2 deselected,
+ruff/mypy clean throughout. **Remaining A7 blockers**:
+`calibration_report_missing` (needs an actual `tier2_cnn_v2`/`v3` retrain +
+`evaluate_calibration.py` run -- the retrain step needs PyTorch MPS/GPU
+acceleration per `docs/SYSTEM_PROFILE.md`, and this sandboxed session found
+`torch.backends.mps.is_available()` False here despite the real M4 Max GPU,
+so a small-scale timing check is needed before committing to a full
+20-epoch run) and `operator_signoff_missing` (inherently human-gated).
+
+**Earlier sync (2026-07-10, v0.90.76)**: Ran the full v0.90.74 handoff
 command sequence for real (commits `90bf12cc`, `3914824e`, `a9006211`).
 Two real findings, both documented in `docs/evidence/a7/`:
 1. **Fixed and verified**: `download_ztf_training_alerts.py --limit 10000`

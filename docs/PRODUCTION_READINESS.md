@@ -93,6 +93,30 @@ launching a materially larger production batch, the project must add:
   committed at `data/injection_recovery_image_level_n200.json`
   (detection/link/score rate 7.5%, real per-bin curves for all three new
   dimensions).
+- **v0.90.77 (2026-07-10)**: `grouped_split_report_missing` is **CLOSED**
+  with real evidence. A follow-up real 18-night (90,000-alert) scale test of
+  the v0.90.76 night-aware split showed leakage getting *worse* with more
+  data (15/18 nights leaking vs 2/3 at 3 nights; object-conflict-resolution
+  rows 2,653 -> 10,382) -- decisive evidence that simultaneous `object_id` +
+  `night_key` + `sky_cell` purity is structurally unachievable for this
+  survey's real data: 10.4% of real objects (7,645/73,560) are detected on
+  more than one distinct night (worsens, not improves, with more nights),
+  and ZTF's routine field-revisit cadence reobserves most sky cells across
+  any time-block split. Operator-approved policy change: `object_id` remains
+  the sole hard gate in `src/grouped_splits.py`; `night_key`/`sky_cell`
+  moved to a new monitored-not-gating category, still computed and reported
+  (`monitored_leakage`, `monitored_leak_rates`) for transparency. Re-running
+  the (now sufficient) plain object-random split on the real 18-night batch
+  produces the first genuinely passing report:
+  `Logs/reports/tier2_cnn_v3_grouped_split_report.json`, `passed=true`,
+  disclosed monitored leak rates `night_key=100%`, `sky_cell=91.3%`. Five
+  dated evidence files in `docs/evidence/a7/` document the full real-data
+  trail. Full suite 1843 passed / 2 deselected, ruff/mypy clean throughout.
+  Remaining A7 blockers: `calibration_report_missing` (needs an actual
+  model retrain on this data, gated on a GPU/MPS feasibility check -- this
+  sandboxed session found `torch.backends.mps.is_available()` False despite
+  the real machine's Apple M4 Max GPU) and `operator_signoff_missing`
+  (inherently human-gated).
 - **v0.90.76 (2026-07-10)**: The v0.90.74 handoff was run for real end to
   end. Result: `grouped_split_report_missing` is still open, but for a new,
   more precise reason than before. First, a real acquisition bug was found
