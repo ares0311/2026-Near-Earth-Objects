@@ -295,6 +295,40 @@ non-blocked ZTF/Astrometrics gate or documentation sync.
 - **State predicted output before submitting a PR**:
   Before opening any PR that fixes a hang or missing output, write explicitly: (a) the root cause in one sentence, (b) what the operator's console WILL show after the fix, and (c) what it will show if the root cause was still wrong. If you cannot answer all three, re-diagnose before writing the PR.
 
+- **Do not inflate caution into artificial readiness/go-live blockers — the same doom-loop discipline this project applies to retries (see Gate Z3) applies to your own status assessments**:
+  When asked "are we ready" or "what's blocking X," name only gates that are
+  actually open and actually relevant to the specific action being asked
+  about right now. Do not cite a gate that is explicitly dormant or
+  contingent on a later step (e.g. Gate D3's MPC observatory-code contact,
+  which `docs/PRODUCTION_READINESS.md` itself marks dormant "no candidate
+  exists yet, so there is nothing to contact MPC about") as if it blocked
+  readiness today. Do not treat "the pipeline hasn't produced an outcome
+  yet" (e.g., no real NEO discovery found) as evidence it isn't ready —
+  `docs/PRODUCTION_READINESS.md`'s operator-approved Production Definition
+  (2026-07-01) explicitly states a real discovery is **not** required for
+  production readiness. Demanding one before declaring readiness is the
+  same circular doom-loop pattern this project already forbids for Gate
+  Z3's real-designation retries, just applied to a status answer instead
+  of a retry counter — capability-readiness (pipeline validated, gated,
+  safe to run) and outcome (has it found something) are different
+  questions; only the former is what "ready" usually means. When a report
+  exists that the operator needs to review before signing off, paste or
+  summarize its actual content in the response — do not only cite the file
+  path and leave them to go find it.
+  **Why**: Operator correction 2026-07-11 — three separate misframings in
+  one "are we ready to go live" answer (a dormant gate cited as a current
+  blocker, an unreviewed signoff packet cited by path instead of content,
+  and "no discovery yet" cited as a readiness gap) that the operator had to
+  individually walk back, after flagging this same general pattern before
+  ("I have lost count of the times I have told you this"). See also the
+  "Progressively probe toward the safe concurrency ceiling" rule above for
+  the same principle applied to a different kind of default-to-caution
+  bias.
+  **How to apply**: Before any readiness/status answer, check each
+  candidate blocker against its own documented current status line (open
+  vs. dormant vs. paused-for-a-different-reason) rather than listing every
+  gate that sounds thematically related.
+
 - **Operator always runs from main — no exceptions**: The operator's Mac always runs code from the `main` branch. Never instruct the operator to `git checkout` a feature branch or `git pull origin <feature-branch>`. Feature branch code must not be given to the operator to run until it is merged to main.
 - **Merge PR before giving operator commands**: Before giving the operator any command that depends on a code fix or new script, the PR containing that fix must be merged to `main` first. Wait for CI to pass, merge the PR, confirm the merge, then give the operator the command.
 - **Always prepend `git pull origin main` to operator command sequences**: Every block of operator commands must begin with `git pull origin main` to ensure the operator has the latest merged code before running anything.
