@@ -145,10 +145,15 @@ def assign_night_based_split(
     Whole-night assignment alone does not guarantee object_id purity: a real
     object detected across two nights assigned to different splits would
     still leak. Resolved by keeping every row for a given object_id in the
-    split of that object's first-encountered row (rows are chronological by
-    night since Skills/download_ztf_training_alerts.py appends alerts
-    night-by-night) and moving any later rows for the same object into that
-    split, counting how many rows this displaced.
+    split of that object's chronologically *earliest* night (determined by
+    actual night_key order, not row order -- an earlier implementation
+    assumed row order was chronological, but
+    Skills/download_ztf_training_alerts.py iterates nights most-recent-first,
+    which silently inverted which occurrence "won" and produced leakage only
+    on the earliest nights; see
+    docs/evidence/a7/2026-07-10-fourth-attempt-object-conflict-resolution-used-file-order-not-chronological-order.md),
+    moving any later-night rows for the same object into that earliest
+    split and counting how many rows this displaced.
 
     Returns (assignments, diagnostics) where diagnostics reports per-night
     split assignment and the object-conflict-resolution count, so callers
@@ -189,13 +194,22 @@ def assign_night_based_split(
 
     assignments = [night_split[night] for night in night_of_idx]
 
-    object_first_split: dict[str, str] = {}
+    # Determine each object's canonical split from its chronologically
+    # earliest night, independent of row order in the input CSV.
+    object_earliest_night: dict[str, str] = {}
+    for idx, row in enumerate(rows):
+        object_id = (row.get("object_id") or "").strip() or f"__no_object_id_row_{idx}"
+        night = night_of_idx[idx]
+        current_earliest = object_earliest_night.get(object_id)
+        if current_earliest is None or _night_sort_key(night) < _night_sort_key(current_earliest):
+            object_earliest_night[object_id] = night
+
     n_reassigned = 0
     for idx, row in enumerate(rows):
         object_id = (row.get("object_id") or "").strip() or f"__no_object_id_row_{idx}"
-        first_split = object_first_split.setdefault(object_id, assignments[idx])
-        if assignments[idx] != first_split:
-            assignments[idx] = first_split
+        canonical_split = night_split[object_earliest_night[object_id]]
+        if assignments[idx] != canonical_split:
+            assignments[idx] = canonical_split
             n_reassigned += 1
 
     diagnostics = {

@@ -256,6 +256,47 @@ def test_assign_night_based_split_resolves_object_id_conflicts() -> None:
     assert diagnostics["n_reassigned_for_object_conflict"] >= 1
 
 
+def test_assign_night_based_split_uses_chronological_order_not_row_order() -> None:
+    """Regression: download_ztf_training_alerts.py iterates nights
+    most-recent-first, so row order in a real labels CSV is the REVERSE of
+    chronological order. An earlier implementation used row-encounter order
+    to pick each object's "canonical" split, which silently picked the
+    LATEST night instead of the earliest for real data, concentrating all
+    leakage onto the earliest (test/validation) nights instead of resolving
+    symmetrically. See
+    docs/evidence/a7/2026-07-10-fourth-attempt-object-conflict-resolution-used-file-order-not-chronological-order.md."""
+    mod = _load_skill()
+    # Row order deliberately reversed: the LATER night (jd=2459010.5) comes
+    # first in the list, exactly like a real download's most-recent-first CSV.
+    rows = [
+        _row("cross_night_obj", jd=2459010.5, ra=10.0),   # later night, first in file
+        _row("cross_night_obj", jd=2459000.5, ra=10.0),   # earlier night, later in file
+    ] + [_row(f"filler{i}", jd=2459000.5 + i, ra=50.0 + i) for i in range(20)]
+
+    assignments, _ = mod.assign_night_based_split(rows, val_fraction=0.2, test_fraction=0.15)
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+    from grouped_splits import _night_key
+
+    # Whichever split the object's chronologically-earliest night (jd=2459000.5)
+    # landed in must be the split for BOTH of its rows, regardless of file order.
+    earliest_night_row = next(r for r in rows if float(r["jd"]) == 2459000.5)
+    earliest_night_split = None
+    for idx, row in enumerate(rows):
+        same_night = _night_key(row) == _night_key(earliest_night_row)
+        if same_night and row["object_id"] != "cross_night_obj":
+            earliest_night_split = assignments[idx]
+            break
+    assert earliest_night_split is not None, "test fixture needs a same-night filler row"
+
+    obj_indices = [i for i, r in enumerate(rows) if r["object_id"] == "cross_night_obj"]
+    obj_splits = {assignments[i] for i in obj_indices}
+    assert obj_splits == {earliest_night_split}, (
+        f"cross_night_obj should land entirely in {earliest_night_split!r} "
+        f"(its earliest night's split), got {obj_splits}"
+    )
+
+
 def test_split_strategy_night_cli_produces_night_pure_csv(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
