@@ -45,16 +45,56 @@ the way; see `docs/evidence/a7/2026-07-10-seventh-attempt-mps-adaptive-pool-bug-
 
 ## 3. A7 promotion evidence — all 8 checks, real values
 
-| Check | Result | Real value |
-|---|---|---|
-| `dataset_manifest` | ✅ pass | `data_selection/dataset_manifests/ztf_labeled_alerts_tier2_cnn_v3.json`, checksum-verified |
-| `grouped_split_report` | ✅ pass | `object_id` purity: 0 leaks (hard-gated). `night_key`/`sky_cell` monitored (not gated) at 100%/91.3% overlap — see §4 below, this is the one item that needs your judgment, not just a pass/fail read |
-| `canonical_eval_report` | ✅ pass | Shared A5 suite, 4/4 case types, 16/16 checks |
-| `injection_recovery_report` | ✅ pass | Shared A6 image-level curves (n=200) |
-| `calibration_report` | ✅ pass | See table below — real, new KPIs for this specific model |
-| `false_discovery_report` | ✅ pass | `false_discovery_rate: 0.0` (shared Gate Z4 evidence, 0/200 false positives) |
-| `pretrained_audit` | ✅ pass | Shared project evidence (no third-party pretrained model used) |
-| `benchmark_model_card` | ✅ pass | `benchmarks/benchmark_cnn_v1/MODEL_CARD.md` (architecture reference, shared since architecture is unchanged) |
+**Read this table with the "Reflects this model?" column, not just the pass column.**
+Three of these eight checks do not exercise `tier2_cnn_v3`'s actual trained
+weights at all — verified by reading the underlying code, not assumed. Full
+explanation in §3a below the table.
+
+| Check | Result | Reflects this model? | Real value |
+|---|---|---|---|
+| `dataset_manifest` | ✅ pass | Yes — model-specific | `data_selection/dataset_manifests/ztf_labeled_alerts_tier2_cnn_v3.json`, checksum-verified |
+| `grouped_split_report` | ✅ pass | Yes — model-specific (validates the training data, not classification behavior) | `object_id` purity: 0 leaks (hard-gated). `night_key`/`sky_cell` monitored (not gated) at 100%/91.3% overlap — see §4 below, this is the one item that needs your judgment, not just a pass/fail read |
+| `canonical_eval_report` | ✅ pass | **No — does not invoke this or any CNN's inference** (see §3a) | Shared A5 suite, 4/4 case types, 16/16 checks — a static regression check against pre-existing pipeline artifacts (`data/injection_recovery_n200.json`, a ranking baseline, Gate Z6 outcome counts), none of which are CNN output |
+| `injection_recovery_report` | ✅ pass | **No — real_bogus is computed by an analytic SNR formula, not CNN inference** (see §3a) | Shared A6 image-level curves (n=200) |
+| `calibration_report` | ✅ pass | **Yes — the strongest evidence in this packet.** Real inference from this model's actual weights on 18,000 real held-out cutouts | See table below — real, new KPIs for this specific model |
+| `false_discovery_report` | ✅ pass | **No — derived from Gate Z4's logistic-regression ranking baseline, not this CNN** | `false_discovery_rate: 0.0` (shared Gate Z4 evidence, 0/200 false positives) |
+| `pretrained_audit` | ✅ pass | N/A by design — a true/false compliance statement (no pretrained model is used by either candidate), not a performance measurement, so sharing it doesn't weaken it | Shared project evidence (no third-party pretrained model used) |
+| `benchmark_model_card` | ✅ pass | Architecture description only, legitimately shared since the architecture is verified unchanged | `benchmarks/benchmark_cnn_v1/MODEL_CARD.md` (architecture reference, shared since architecture is unchanged) |
+
+### 3a. What "shared" actually means here, and the one real open question
+
+Three checks — `canonical_eval_report`, `injection_recovery_report`,
+`false_discovery_report` — were not just reused from `benchmark_cnn_v1`;
+they were never model-specific for *any* CNN candidate. Verified by
+reading the code, not inferred from file paths:
+
+- `src/canonical_eval.py` loads pre-existing JSON files at each case's
+  `observed_path` and compares named fields against expected thresholds.
+  It does not load or run any model. The suite's cases cite
+  `data/injection_recovery_n200.json` (a synthetic baseline that predates
+  both CNN candidates), a logistic-regression ranking baseline, and Gate
+  Z6's tracklet-rejection counts — none of which are CNN output.
+- `Skills/injection_recovery.py`'s `_analytic_real_bogus()` derives its
+  real_bogus score from the analytic peak SNR of the synthesized cutout —
+  an explicit design choice (see its docstring) so recovery curves reflect
+  the swept parameter, not a trained classifier's prediction. The CNN is
+  never invoked.
+- `false_discovery_report` is derived from Gate Z4's ranking-baseline
+  review-burden counts (`Skills/extract_promotion_evidence.py`), which
+  uses a handcrafted-feature logistic regression, not this CNN.
+
+**The open question, for your judgment, not mine to resolve:**
+`docs/astrometrics_coding_agents_master_guide.md`'s own validation rule
+states *"A model cannot be promoted unless **it** has injection-recovery
+curves"* — wording that reads as requiring curves reflecting that specific
+model's behavior. What exists satisfies the promotion report's checklist
+(a report is present and passing) but does not satisfy that reading of the
+rule's intent, since no injection-recovery test in this project has ever
+exercised a CNN's live inference, for this candidate or `benchmark_cnn_v1`.
+This is a real, pre-existing characteristic of how A5/A6 were built, not
+something introduced by this retrain — but it means roughly 3 of the 8
+"pass" checkmarks above should be read as "pipeline capability hasn't
+regressed," not "this model was tested and passed."
 
 ### Calibration KPIs (the real, model-specific result — Isotonic calibration)
 
@@ -119,6 +159,7 @@ longer gates on it.
 
 - [ ] I have read the training result and the 8 evidence checks above.
 - [ ] I understand and accept the `object_id`-only grouped-split policy in §4 (or I am rejecting/revising it — note below).
+- [ ] I understand §3a: only calibration and grouped-split genuinely reflect this model's own behavior; canonical-eval, injection-recovery, and false-discovery are pipeline-level regression checks that have never exercised any CNN candidate's live inference, and I accept that reading of the astrometrics_coding_agents_master_guide.md injection-recovery rule as satisfied at the promotion-report-checklist level (or I am requiring a model-specific injection-recovery re-run before promotion — note below).
 - [ ] I understand the known limitations in §5.
 - [ ] I confirm this does not authorize external submission, live-search expansion, or benchmark replacement.
 - [ ] I approve `tier2_cnn_v3` for internal production promotion.
