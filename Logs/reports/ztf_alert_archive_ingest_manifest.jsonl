@@ -19,3 +19,4 @@
 {"night": "20230914", "scanned_count": 264281, "kept_count": 0, "ra": 97.42, "dec": 22.5, "radius_deg": 2.0, "min_rb": 0.5, "elapsed_seconds": 1188.93, "resumed_from_checkpoint": false}
 {"night": "20230914", "scanned_count": 264281, "kept_count": 83, "ra": 139.76, "dec": 15.0, "radius_deg": 2.0, "min_rb": 0.5, "elapsed_seconds": 1201.81, "resumed_from_checkpoint": false}
 {"night": "20230916", "scanned_count": 291828, "kept_count": 0, "ra": 97.42, "dec": 22.5, "radius_deg": 2.0, "min_rb": 0.5, "elapsed_seconds": 1281.33, "resumed_from_checkpoint": false}
+{"night": "20230916", "scanned_count": 291828, "kept_count": 190, "ra": 139.76, "dec": 15.0, "radius_deg": 2.0, "min_rb": 0.5, "elapsed_seconds": 1383.12, "resumed_from_checkpoint": false}
