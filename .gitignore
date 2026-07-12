@@ -9,6 +9,7 @@ models/*
 !models/.gitkeep
 !models/tier1_xgb.json
 !models/tier2_cnn.pt
+!models/tier2_cnn_v4.pt
 !models/tier3_transformer.pt
 !models/stacker_coef.json
 data/cutouts/

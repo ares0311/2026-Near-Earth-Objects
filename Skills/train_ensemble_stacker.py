@@ -21,7 +21,7 @@ Usage (from repo root on your Mac):
         --mpc-labels data/training_labels.csv \\
         --cutouts-csv data/cutouts/index.csv \\
         --xgb-model models/tier1_xgb.json \\
-        --cnn-model models/tier2_cnn.pt \\
+        --cnn-model models/tier2_cnn_v4.pt \\
         --output models/stacker_coef.json \\
         --seed 42
 """
@@ -398,7 +398,7 @@ def build_stacking_dataset(
     # Run T1 XGBoost on all val features at once
     if val_rows_filtered:
         feature_matrix = np.array([
-            f if (f := _alert_to_features(a)) is not None
+            feature_row if (feature_row := _alert_to_features(a)) is not None
             else np.full(len(FEATURE_COLS), 0.5, dtype=np.float32)
             for a in val_alerts
         ], dtype=np.float32)
@@ -622,8 +622,8 @@ def main() -> None:
         help="Tier 1 XGBoost model (default: models/tier1_xgb.json)",
     )
     parser.add_argument(
-        "--cnn-model", type=Path, default=Path("models/tier2_cnn.pt"),
-        help="Tier 2 CNN model (default: models/tier2_cnn.pt)",
+        "--cnn-model", type=Path, default=Path("models/tier2_cnn_v4.pt"),
+        help="Tier 2 CNN model (default: models/tier2_cnn_v4.pt)",
     )
     parser.add_argument(
         "--output", type=Path, default=Path("models/stacker_coef.json"),

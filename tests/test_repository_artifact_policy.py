@@ -51,6 +51,7 @@ def test_only_allowlisted_model_artifacts_are_tracked():
         "models/stacker_coef.json",
         "models/tier1_xgb.json",
         "models/tier2_cnn.pt",
+        "models/tier2_cnn_v4.pt",
         "models/tier3_transformer.pt",
     ]
 

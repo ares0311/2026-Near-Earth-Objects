@@ -634,22 +634,23 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.86)
+## Current State (v0.90.87)
 
-**Latest sync (2026-07-12, tier2_cnn_v4 promotion evidence)**: V4 now has
+**Latest sync (2026-07-12, tier2_cnn_v4 operator-approved)**: V4 now has
 two validated training manifests (real ZTF plus the deterministic synthetic
 hard-negative supplement), real CNN injection evidence bound to checkpoint
-SHA-256, a 5/5-case and 25/25-check canonical suite, and an unsigned promotion
-report with all nine evidence artifacts passing. It fails closed only on
-`operator_signoff_missing`. Read
-`docs/evidence/promotion/tier2_cnn_v4_operator_review_packet.md` before any
-decision. The corrected harness exposed a material tradeoff: all 14 scored
+SHA-256, a 5/5-case and 25/25-check canonical suite, and a signed promotion
+report with all nine evidence artifacts passing. Jerome W. Lindsey III
+approved internal production promotion under signoff ID
+`jlindsey-2026-07-12-tier2-cnn-v4`. The corrected harness exposed a material
+tradeoff: all 14 scored
 synthetic moving-source injections have `stellar_artifact` as v4's final
 ensemble argmax, identical to `benchmark_cnn_v1` on this harness and more
 conservative than v3 on 8/14 cases. V4 also closes v3's adversarial artifact
 failure (0/200 versus 200/200 false discoveries) and passes all real-data
-calibration KPIs. Do not promote automatically; `benchmark_cnn_v1` remains
-active pending explicit operator signoff.
+calibration KPIs. `tier2_cnn_v4` is now the internally promoted Tier 2
+candidate; `benchmark_cnn_v1` remains the immutable historical benchmark.
+This does not authorize live-search expansion or any external submission.
 
 **Latest sync (2026-07-11, v0.90.85 — doc-sync only)**: Four commits landed
 after this file's last sync without an AGENTS.md update; catching up here.

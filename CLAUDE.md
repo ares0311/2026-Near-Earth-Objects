@@ -850,7 +850,17 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.86)
+## Current State (v0.90.87)
+
+**Latest sync (2026-07-12, tier2_cnn_v4 operator-approved)**: Jerome W.
+Lindsey III approved `tier2_cnn_v4` for internal production promotion after
+reviewing the 0/200 adversarial artifact result, all passing real-data
+calibration KPIs, the 14/14 synthetic moving-source `stellar_artifact`
+tradeoff, and grouped-split limitations. The signed report records
+`jlindsey-2026-07-12-tier2-cnn-v4`, `promotion_allowed: true`, and no blockers.
+`benchmark_cnn_v1` remains the immutable historical benchmark. This approval
+does not authorize live-search expansion, MPC/NEOCP submission, NASA/PDCO
+contact, or any impact-probability claim.
 
 **Latest sync (2026-07-12, tier2_cnn_v4 real retrain — retune SUCCEEDED)**:
 Operator ran the real MPS retrain + acceptance test + recalibration
@@ -868,19 +878,20 @@ same artifact-shape family the model was deliberately trained to reject
 (by design — the calibration KPIs are the independent real-data check):
 `docs/evidence/a7/2026-07-12-tier2_cnn_v4-real-retrain-and-acceptance-test.md`.
 
-`benchmark_cnn_v1` remains the production/frozen model; no promotion
-follows from this evidence alone. `models/tier2_cnn_v4.pt` and its two
-local report JSONs are on the operator's Mac (not yet committed —
-`models/` requires explicit filename allowlisting per this repo's artifact
-policy).
+`benchmark_cnn_v1` remained the production/frozen model at this evidence
+checkpoint; the later operator decision above promotes v4 internally.
+The signed checkpoint `models/tier2_cnn_v4.pt` is explicitly allowlisted and
+committed for reproducible default inference; local raw report JSONs remain
+ignored under `Logs/`.
 
-**V4 promotion evidence is now complete; operator decision pending.** Two
+**V4 promotion evidence was completed before the signed decision above.** Two
 validated training manifests cover the real ZTF source and the deterministic
 3,000-sample synthetic hard-negative supplement. The real CNN injection run
 records the exact v4 checkpoint SHA plus all 14 scored posteriors. The
-per-model canonical suite passes 5/5 cases and 25/25 checks. The unsigned
-promotion report passes all nine evidence artifacts and fails closed only on
-`operator_signoff_missing`. The operator packet is
+per-model canonical suite passes 5/5 cases and 25/25 checks. The original
+unsigned report passed all nine evidence artifacts and failed closed only on
+`operator_signoff_missing`; it has now been regenerated with operator signoff.
+The operator packet is
 `docs/evidence/promotion/tier2_cnn_v4_operator_review_packet.md`.
 
 The corrected evidence harness also exposed a real tradeoff that the prior
@@ -890,7 +901,8 @@ have `stellar_artifact` as v4's final ensemble argmax. This matches
 cases. V4 still closes v3's artifact failure (0/200 versus 200/200 false
 discoveries) and passes all real-data calibration KPIs. Do not promote it
 automatically; the sensitivity/conservatism tradeoff is now an explicit
-operator judgment. `benchmark_cnn_v1` remains active until signoff.
+operator judgment. The operator accepted that tradeoff for internal promotion;
+`benchmark_cnn_v1` remains the historical benchmark.
 
 **Earlier sync (2026-07-12, operator decision)**: `tier2_cnn_v3`
 **REJECTED** for promotion. Operator decision, recorded verbatim: *"Reject

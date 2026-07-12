@@ -3,6 +3,26 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.87 — Approve tier2_cnn_v4 for internal promotion (2026-07-12)
+
+### Changed
+- Recorded Jerome W. Lindsey III's approval under operator signoff ID
+  `jlindsey-2026-07-12-tier2-cnn-v4` after review of the complete v4 evidence
+  packet and its disclosed sensitivity/conservatism tradeoff.
+- Regenerated the promotion report with all nine evidence artifacts passing,
+  `promotion_allowed: true`, and no remaining blockers.
+- Designated `tier2_cnn_v4` as the internally promoted Tier 2 candidate while
+  retaining `benchmark_cnn_v1` as the immutable historical benchmark.
+- Explicitly allowlisted the signed v4 checkpoint and switched default Tier 2
+  inference, calibration, stacker-training, and weight-validation consumers to
+  `models/tier2_cnn_v4.pt`; benchmark tooling remains pinned to
+  `models/tier2_cnn.pt`.
+
+### Safety
+- This internal promotion does not authorize live-search expansion, external
+  submissions, authority notifications, confirmed-NEO language, or impact
+  probability claims.
+
 ## v0.90.86 — Bind tier2_cnn_v4 promotion evidence to real model behavior (2026-07-12)
 
 ### Added

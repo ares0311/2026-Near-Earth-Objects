@@ -373,11 +373,14 @@ def _cnn_heartbeat(label: str, stop_event: Any, interval: float = 5.0) -> None:
 
 
 def _load_cnn_model(model_path: Path | str | None = None) -> Any:
-    """Load Tier 2 CNN weights. Defaults to the frozen benchmark checkpoint
-    (models/tier2_cnn.pt); pass model_path to load a different candidate
-    (e.g. models/tier2_cnn_v3.pt) for injection-recovery or evaluation
-    against a specific, non-default model."""
-    model_path = Path(model_path) if model_path is not None else _MODEL_DIR / "tier2_cnn.pt"
+    """Load Tier 2 CNN weights. Defaults to the operator-promoted v4 checkpoint.
+
+    Pass ``model_path`` to load the frozen benchmark (``models/tier2_cnn.pt``)
+    or another explicit candidate for comparative evaluation.
+    """
+    model_path = (
+        Path(model_path) if model_path is not None else _MODEL_DIR / "tier2_cnn_v4.pt"
+    )
     if not model_path.exists():
         return None
     try:
@@ -1161,7 +1164,6 @@ def compute_calibration_gain(
     eps = 1e-12
     kl = float(np.sum(p * np.log((p + eps) / (q + eps))))
     return round(kl, 6)
-
 
 
 

@@ -447,7 +447,7 @@ class TestBuildCnnModel:
         monkeypatch.setattr(cls_mod, "_MODEL_DIR", tmp_path)
         model = cls_mod._build_cnn_model()
         assert model is not None
-        torch.save(model.state_dict(), str(tmp_path / "tier2_cnn.pt"))
+        torch.save(model.state_dict(), str(tmp_path / "tier2_cnn_v4.pt"))
         loaded = cls_mod._load_cnn_model()
         assert loaded is not None
 
@@ -809,7 +809,7 @@ class TestClassifyErrorPaths:
 
         with tempfile.TemporaryDirectory() as td:
             fake_dir = pathlib.Path(td)
-            (fake_dir / "tier2_cnn.pt").write_bytes(b"dummy")
+            (fake_dir / "tier2_cnn_v4.pt").write_bytes(b"dummy")
             monkeypatch.setattr(cls_mod, "_MODEL_DIR", fake_dir)
             monkeypatch.setattr(cls_mod, "_build_cnn_model", lambda: None)
             result = cls_mod._load_cnn_model()
@@ -822,7 +822,7 @@ class TestClassifyErrorPaths:
 
         with tempfile.TemporaryDirectory() as td:
             fake_dir = pathlib.Path(td)
-            (fake_dir / "tier2_cnn.pt").write_bytes(b"corrupted")
+            (fake_dir / "tier2_cnn_v4.pt").write_bytes(b"corrupted")
             monkeypatch.setattr(cls_mod, "_MODEL_DIR", fake_dir)
             result = cls_mod._load_cnn_model()
             assert result is None
@@ -1383,4 +1383,3 @@ class TestComputeCalibrationGain:
     def test_in_all(self):
         from classify import __all__
         assert "compute_calibration_gain" in __all__
-

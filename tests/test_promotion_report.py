@@ -9,6 +9,8 @@ from pathlib import Path
 
 from promotion_report import PromotionInputs, build_promotion_report
 
+ROOT = Path(__file__).resolve().parents[1]
+
 
 def _write_json(path: Path, payload: object) -> Path:
     path.write_text(json.dumps(payload), encoding="utf-8")
@@ -231,3 +233,18 @@ def test_cli_writes_report_and_returns_failure_for_blockers(tmp_path: Path) -> N
     assert json.loads(out.read_text(encoding="utf-8"))["promotion_blockers"] == [
         "operator_signoff_missing"
     ]
+
+
+def test_committed_tier2_cnn_v4_report_records_operator_approval() -> None:
+    report_path = ROOT / "docs/evidence/promotion/tier2_cnn_v4_promotion_report.json"
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+
+    assert report["model"]["model_id"] == "tier2_cnn_v4"
+    assert report["operator_signoff_id"] == "jlindsey-2026-07-12-tier2-cnn-v4"
+    assert report["promotion_allowed"] is True
+    assert report["promotion_blockers"] == []
+    assert report["safety"] == {
+        "mpc_submission_authorized": False,
+        "no_external_submission": True,
+        "no_impact_probability_claim": True,
+    }
