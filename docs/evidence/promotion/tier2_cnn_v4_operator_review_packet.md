@@ -2,7 +2,7 @@
 
 **Date**: 2026-07-12
 **Prepared for**: Jerome W. Lindsey III
-**Decision status**: Pending operator review
+**Decision status**: Approved for internal production promotion
 **Scope**: Internal model promotion only. This packet does not authorize MPC
 submission, NEOCP escalation, NASA PDCO notification, live-search expansion,
 or any impact-probability claim.
@@ -20,9 +20,8 @@ all 14 scored synthetic moving-source injections are classified with
 which classified 8 of those 14 as `neo_candidate` and then failed the
 adversarial artifact test catastrophically.
 
-No automatic recommendation is substituted for operator judgment. The
-machine-readable report remains fail-closed with exactly one blocker:
-`operator_signoff_missing`.
+The operator accepted this disclosed tradeoff for internal promotion. The
+signed machine-readable report now passes with no blockers.
 
 ## 2. What changed from tier2_cnn_v3
 
@@ -71,8 +70,8 @@ evidence categories.
 Machine-readable result:
 
 ```text
-promotion_allowed=false
-promotion_blockers=operator_signoff_missing
+promotion_allowed=true
+promotion_blockers=[]
 ```
 
 ## 4. Adversarial artifact acceptance test
@@ -161,8 +160,8 @@ as a night/sky holdout.
 
 ## 8. What approval would and would not mean
 
-Approval would authorize use of `tier2_cnn_v4` as the internally promoted
-Tier 2 candidate under the A7 model-governance process.
+Approval authorizes use of `tier2_cnn_v4` as the internally promoted Tier 2
+candidate under the A7 model-governance process.
 
 Approval would not:
 
@@ -177,24 +176,19 @@ Approval would not:
 
 **Operator**: Jerome W. Lindsey III
 
-**Review date**: _pending_
-**Decision**: _pending_
+**Review date**: 2026-07-12
+**Decision**: Approved
+**Operator signoff ID**: `jlindsey-2026-07-12-tier2-cnn-v4`
 
 Attestation:
 
-- [ ] I reviewed the 0/200 adversarial artifact result and its same-family limitation.
-- [ ] I reviewed the real-data calibration KPIs.
-- [ ] I reviewed the 14/14 `stellar_artifact` moving-source injection result.
-- [ ] I understand the `object_id`-only grouped-split hard gate and monitored night/sky overlap.
-- [ ] I understand approval is internal model promotion only and authorizes no external submission or alert.
-- [ ] I approve `tier2_cnn_v4` for internal production promotion.
+- [x] I reviewed the 0/200 adversarial artifact result and its same-family limitation.
+- [x] I reviewed the real-data calibration KPIs.
+- [x] I reviewed the 14/14 `stellar_artifact` moving-source injection result.
+- [x] I understand the `object_id`-only grouped-split hard gate and monitored night/sky overlap.
+- [x] I understand approval is internal model promotion only and authorizes no external submission or alert.
+- [x] I approve `tier2_cnn_v4` for internal production promotion.
 
-If approved, record an operator-selected signoff identifier and regenerate the
-report with the same inputs plus:
-
-```text
---operator-signoff-id "<operator-selected-id>"
-```
-
-Until that explicit decision is recorded, `benchmark_cnn_v1` remains the
-active frozen/production reference and `tier2_cnn_v4` remains unpromoted.
+The signed report records the operator decision. `benchmark_cnn_v1` remains
+the immutable historical benchmark; `tier2_cnn_v4` is the internally promoted
+Tier 2 candidate.

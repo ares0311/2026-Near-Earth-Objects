@@ -1,6 +1,6 @@
-"""validate_model_weights.py — Verify committed model weights load and produce valid output.
+"""validate_model_weights.py — Verify committed production weights load and produce valid output.
 
-Closes T2-D: loads each committed weight file (tier1_xgb.json, tier2_cnn.pt,
+Closes T2-D: loads each committed weight file (tier1_xgb.json, tier2_cnn_v4.pt,
 stacker_coef.json, tier3_transformer.pt) using the same loaders as classify.py,
 runs a small synthetic inference pass, and asserts outputs are structurally valid.
 
@@ -191,19 +191,19 @@ def validate_tier1(model_dir: Path) -> dict:
 
 
 def validate_tier2(model_dir: Path) -> dict:
-    """Load tier2_cnn.pt and run _tier2_predict on a synthetic Tracklet with image cutouts.
+    """Load promoted tier2_cnn_v4.pt and run inference on synthetic cutouts.
 
     Returns a result dict with keys: passed (bool), message (str),
     output (dict|None), skipped (bool).
     """
-    model_path = model_dir / "tier2_cnn.pt"
+    model_path = model_dir / "tier2_cnn_v4.pt"
 
     # Skip gracefully when the file is not committed yet
     if not model_path.exists():
         return {
             "passed": True,
             "skipped": True,
-            "message": f"SKIP tier2_cnn.pt not found at {model_path}",
+            "message": f"SKIP tier2_cnn_v4.pt not found at {model_path}",
             "output": None,
         }
 
@@ -213,7 +213,7 @@ def validate_tier2(model_dir: Path) -> dict:
         # Build a tracklet with synthetic cutouts so the CNN branch is taken
         tracklet = _make_synthetic_tracklet(with_cutouts=True)
 
-        model = _load_cnn_model()
+        model = _load_cnn_model(model_path)
         assert model is not None, "tier2: _load_cnn_model() returned None despite file existing"
 
         result = _tier2_predict(tracklet, model=model)
@@ -225,14 +225,14 @@ def validate_tier2(model_dir: Path) -> dict:
         return {
             "passed": True,
             "skipped": False,
-            "message": "PASS tier2_cnn.pt loaded and produced valid 5-class output",
+            "message": "PASS tier2_cnn_v4.pt loaded and produced valid 5-class output",
             "output": result,
         }
     except Exception as exc:
         return {
             "passed": False,
             "skipped": False,
-            "message": f"FAIL tier2_cnn.pt: {exc}",
+            "message": f"FAIL tier2_cnn_v4.pt: {exc}",
             "output": None,
         }
 

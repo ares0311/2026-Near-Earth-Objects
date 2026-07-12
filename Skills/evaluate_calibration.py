@@ -13,7 +13,7 @@ IMPORTANT: Run from repo root on your Mac, not from the coding agent server.
         --alerts data/ztf_labeled_alerts.json \\
         --xgb-model models/tier1_xgb.json \\
         --cutouts-csv data/cutouts/index.csv \\
-        --cnn-model models/tier2_cnn.pt \\
+        --cnn-model models/tier2_cnn_v4.pt \\
         --report-out Logs/reports/calibration_report.json
 
 T1-D gate thresholds (ALL must pass for promotion_gate_passed=true):
@@ -886,8 +886,8 @@ def main() -> None:
         help="Cutout index CSV from build_cutout_dataset.py (default: data/cutouts/index.csv)",
     )
     parser.add_argument(
-        "--cnn-model", type=Path, default=Path("models/tier2_cnn.pt"),
-        help="Tier 2 CNN model (default: models/tier2_cnn.pt)",
+        "--cnn-model", type=Path, default=Path("models/tier2_cnn_v4.pt"),
+        help="Tier 2 CNN model (default: models/tier2_cnn_v4.pt)",
     )
     parser.add_argument(
         "--seed", type=int, default=42,

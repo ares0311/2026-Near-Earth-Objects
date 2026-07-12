@@ -1,12 +1,20 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.90.86
+**Current version**: v0.90.87
 **Last updated**: 2026-07-12 (header/sync line only — the P1-P5 gate register
 body below is unchanged historical evidence from 2026-07-02; current gate
 status for the active ZTF DR24 path lives in
 `docs/ZTF_DR24_PRODUCTION_GATES.md`, which is kept current every session)
 **Purpose**: Mandatory read at session start (per MANDATORY SESSION-START PROTOCOL).  
 Every planning cycle must name the highest-priority unresolved production-capability gate and show how proposed steps close or directly unblock it.
+
+**Latest decision (2026-07-12)**: Jerome W. Lindsey III approved
+`tier2_cnn_v4` for internal production promotion under signoff ID
+`jlindsey-2026-07-12-tier2-cnn-v4`. The signed A7 report has all nine evidence
+artifacts passing, `promotion_allowed: true`, and no blockers. The disclosed
+14/14 synthetic moving-source `stellar_artifact` tradeoff was accepted.
+`benchmark_cnn_v1` remains the immutable historical benchmark. No external
+submission, alert, live-search expansion, or impact claim is authorized.
 
 **Also mandatory at session start**: `docs/near_earth_objects_research_brief.md` — canonical primer on ranked space assets (WISE/NEOWISE #2, NEO Surveyor #1, Gaia #3), frontier AI methods (THOR, HelioLinC3D), submission best practices, and key literature. Required to keep agents aligned on the discovery-paper data strategy (step 5 of CLAUDE.md §MANDATORY SESSION-START PROTOCOL).
 
@@ -122,13 +130,14 @@ launching a materially larger production batch, the project must add:
   `benchmark_cnn_v1` (15.5%) — and all 7 T1-D calibration KPIs pass on real
   data, with numbers matching or slightly exceeding `tier2_cnn_v3`'s real
   calibration (hard-negative augmentation did not degrade real-world
-  performance). `benchmark_cnn_v1` remains the production model. The
+  performance). `benchmark_cnn_v1` remained the production model at this
+  evidence checkpoint; the later signed decision above promotes v4 internally. The
   v4-specific promotion trail is now complete: two training manifests (real
   plus synthetic), real CNN injection recovery with exact checkpoint SHA and
-  retained posteriors, a 5/5-case and 25/25-check canonical suite, an unsigned
+  retained posteriors, a 5/5-case and 25/25-check canonical suite, an initially unsigned
   promotion report with all nine evidence artifacts passing, and a readable
-  operator packet. The report fails closed only on
-  `operator_signoff_missing`. The corrected injection evidence exposed an
+  operator packet. The report initially failed closed only on
+  `operator_signoff_missing` and has now been signed. The corrected injection evidence exposed an
   important tradeoff: all 14 scored synthetic moving-source injections have
   `stellar_artifact` as v4's final ensemble argmax, identical to
   `benchmark_cnn_v1` on this harness and more conservative than v3 on 8/14

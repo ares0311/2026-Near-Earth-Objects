@@ -100,11 +100,9 @@
     "model_type": "tier2_cnn",
     "model_version": "4.0.0"
   },
-  "operator_signoff_id": null,
-  "promotion_allowed": false,
-  "promotion_blockers": [
-    "operator_signoff_missing"
-  ],
+  "operator_signoff_id": "jlindsey-2026-07-12-tier2-cnn-v4",
+  "promotion_allowed": true,
+  "promotion_blockers": [],
   "safety": {
     "mpc_submission_authorized": false,
     "no_external_submission": true,

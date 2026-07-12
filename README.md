@@ -1,7 +1,7 @@
 # 2026 Near-Earth Object Detection & Ranking Pipeline
 
 ![Status](https://img.shields.io/badge/status-active%20development-blue)
-![Version](https://img.shields.io/badge/version-0.90.86-informational)
+![Version](https://img.shields.io/badge/version-0.90.87-informational)
 ![License](https://img.shields.io/badge/license-Apache%202.0-green)
 ![Tests](https://img.shields.io/badge/tests-3500%2B%20passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
@@ -124,7 +124,7 @@ The pipeline implements a strict directed acyclic graph (DAG) of processing stag
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    NEO DETECTION PIPELINE  v0.90.86                  │
+│                    NEO DETECTION PIPELINE  v0.90.87                  │
 └─────────────────────────────────────────────────────────────────────┘
 
   External Data Sources
@@ -493,9 +493,9 @@ The diagram below shows how data and artifacts move between the repository's top
             │                                    │                      │
             ▼                                    ▼                      ▼
    data/                              Skills/ (utilities)         models/
-   ├─ sample_tracklets.json ◀──────── batch_score.py             ├─ tier2_cnn.pt
-   ├─ injection_recovery_            ├─ run_pipeline.py           └─ tier3_transformer.pt
-   │    baseline.json ◀─────────────  injection_recovery.py            ▲
+   ├─ sample_tracklets.json ◀──────── batch_score.py             ├─ tier2_cnn.pt (benchmark)
+   ├─ injection_recovery_            ├─ run_pipeline.py           ├─ tier2_cnn_v4.pt (promoted)
+   │    baseline.json ◀─────────────  injection_recovery.py       └─ tier3_transformer.pt
    └─ (cached raw alerts)            ├─ train_tier2_cnn.py ────────────┘
                                      ├─ train_tier3_transformer.py ─────┘
                                      ├─ export_mpc_report.py
@@ -536,7 +536,7 @@ The diagram below shows how data and artifacts move between the repository's top
 2026-Near-Earth-Objects/
 │
 ├── src/                          # Core pipeline modules (Python 3.11+)
-│   ├── __init__.py               # Package version (0.90.86)
+│   ├── __init__.py               # Package version (0.90.87)
 │   ├── schemas.py                # All Pydantic data models (frozen=True)
 │   ├── fetch.py                  # ZTF/ATLAS/MPC/Horizons data retrieval
 │   ├── preprocess.py             # Difference image handling; Gaia astrometry
@@ -1229,7 +1229,7 @@ evidence. MPC submission remains disabled until a real candidate survives
 adversarial plus operator review and the applicable source/submission protocol
 is satisfied.
 
-### 15.1 Current State Snapshot (v0.90.86)
+### 15.1 Current State Snapshot (v0.90.87)
 
 | Area | Status | Notes |
 |---|---|---|
@@ -1237,7 +1237,7 @@ is satisfied.
 | Synthetic validation | **Complete** | 100% detection/link/score on n=200 synthetic tracklets; 10 adversarial tests in CI |
 | Background automation CLI | **Complete** | `Skills/background.py` — offline scheduler, SQLite audit logs, signoff packets, readiness summaries |
 | Repository artifact hygiene | **Complete** | `git add .` is supported: raw `Logs/**` stay local, production models are filename-allowlisted, and durable evidence is promoted to `docs/evidence/` or `data/evidence/` |
-| ML model weights | **Trained; benchmark frozen; v4 operator decision pending** | `tier2_cnn_v4` has two validated training manifests, a real grouped split, model-bound injection evidence, a 25-check canonical suite, passing real-data calibration, and an unsigned promotion report with all nine evidence artifacts passing. The corrected injection harness shows 14/14 scored synthetic moving sources classified `stellar_artifact`; read the operator packet before deciding. `benchmark_cnn_v1` remains active until explicit signoff. |
+| ML model weights | **Trained; benchmark frozen; v4 internally promoted** | `tier2_cnn_v4` has two validated training manifests, a real grouped split, model-bound injection evidence, a 25-check canonical suite, passing real-data calibration, and a signed promotion report with all nine evidence artifacts passing. Jerome W. Lindsey III approved internal promotion under signoff ID `jlindsey-2026-07-12-tier2-cnn-v4`, accepting the disclosed 14/14 synthetic moving-source `stellar_artifact` result. `benchmark_cnn_v1` remains the immutable historical benchmark. |
 | Real survey credentials and live policy | **CONFIGURED + SIGNED** | T1-B closed. Credentials in macOS Keychain; live connection tests passed; bounded live dry-run policy signed; execution remains credential/provider gated and non-submitting. |
 | Real data processed | **T1-C CLOSED** | ATLAS known-object recovery: 5/5 prequalified objects (100%); operator review by Jerome W. Lindsey III, no blocking findings (2026-06-20). Evidence: `docs/evidence/t1c/`. |
 | Production calibration | **Complete** | T1-D closed. Quantitative Brier, ECE, log-loss, ROC AUC, CV ECE, and bootstrap CI gates passed (2026-06-14). |
@@ -1302,7 +1302,7 @@ scalar KPIs. The next production-safe sequence is:
 | **A4** | Grouped splits and leakage checks | NEO train/eval splits are grouped by night, sky region, survey/instrument, and object ID; random splits remain diagnostic only. | **Complete for model-builder gating; all four training Skills (Tier 1/2/3 + stacker) share the fail-closed `--production-candidate` gate; policy-grade real split reports for every real dataset role still open** |
 | **A5** | Canonical regression evals | Known NEO detections, false link examples, injected moving-source controls, and review-packet examples produce sample-by-sample regression reports. | **Complete for model-builder-independent regression protection; `production_suite_v1.json` covers all four case types against real committed evidence. Per-model suites remain part of A7.** |
 | **A6** | Injection-recovery curves | Moving-source injections report recovery curves by magnitude, velocity, trail length, seeing/background, and missed frames, not only scalar success rates. | **Complete: synthetic harness emits magnitude/motion/observation/night curves plus image-level seeing/background/trail-length curves (`--image-level`), with a real committed n=200 baseline.** |
-| **A7** | Calibration and promotion report | Any model promotion cites manifests, grouped splits, frozen evals, injection-recovery curves, calibration quantiles, false-discovery estimates, pretrained-model audits, benchmark model cards, and operator signoff where applicable. | **Complete except human decision for `tier2_cnn_v4`: all nine evidence artifacts pass and the unsigned report fails closed only on `operator_signoff_missing`. The operator packet discloses the 0/200 artifact result, passing real-data calibration, and 14/14 synthetic moving-source `stellar_artifact` argmax tradeoff.** |
+| **A7** | Calibration and promotion report | Any model promotion cites manifests, grouped splits, frozen evals, injection-recovery curves, calibration quantiles, false-discovery estimates, pretrained-model audits, benchmark model cards, and operator signoff where applicable. | **Complete for `tier2_cnn_v4`: all nine evidence artifacts pass and the signed report records operator approval. The operator packet preserves the 0/200 artifact result, passing real-data calibration, and accepted 14/14 synthetic moving-source `stellar_artifact` argmax tradeoff.** |
 
 CNN-specific rule: the existing CNN is a benchmark until A1-A7 close for it. It
 may contribute image/artifact features, but it is not the main scientific thesis
