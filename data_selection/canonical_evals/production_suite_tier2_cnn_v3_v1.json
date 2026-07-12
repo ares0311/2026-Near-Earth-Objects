@@ -1,0 +1,83 @@
+{
+  "schema_version": "canonical-eval-suite-v1",
+  "suite_id": "neo-canonical-eval-production-tier2-cnn-v3-v1",
+  "cases": [
+    {
+      "case_id": "injection-recovery-n200-baseline",
+      "case_type": "injection_recovery",
+      "dataset_id": "data/injection_recovery_n200.json",
+      "observed_path": "../../data/injection_recovery_n200.json",
+      "checks": [
+        {"path": "n_injected", "operator": "eq", "expected": 200},
+        {"path": "detection_rate", "operator": "gte", "expected": 0.95},
+        {"path": "link_rate", "operator": "gte", "expected": 0.95},
+        {"path": "score_rate", "operator": "gte", "expected": 0.95}
+      ]
+    },
+    {
+      "case_id": "false-link-gate-z4-ranking-baseline-purity",
+      "case_type": "false_link",
+      "dataset_id": "Logs/reports/ranking_baseline.json",
+      "observed_path": "../../Logs/reports/ranking_baseline.json",
+      "checks": [
+        {
+          "path": "logistic_regression_handcrafted.purity_at_k.5",
+          "operator": "eq",
+          "expected": 1.0
+        },
+        {
+          "path": "logistic_regression_handcrafted.purity_at_k.10",
+          "operator": "eq",
+          "expected": 1.0
+        },
+        {
+          "path": "false_positive_review_burden.n_false_positive",
+          "operator": "eq",
+          "expected": 0
+        },
+        {
+          "path": "naive_real_bogus_only.purity_at_k.5",
+          "operator": "eq",
+          "expected": 0.0
+        }
+      ]
+    },
+    {
+      "case_id": "review-packet-gate-z6-retrospective-validation",
+      "case_type": "review_packet",
+      "dataset_id": "Logs/reports/retrospective_validation.json",
+      "observed_path": "../../Logs/reports/retrospective_validation.json",
+      "checks": [
+        {"path": "n_candidates", "operator": "eq", "expected": 88},
+        {"path": "outcome_counts.recovered_known_object", "operator": "eq", "expected": 0},
+        {"path": "outcome_counts.later_confirmed_object", "operator": "eq", "expected": 0},
+        {"path": "outcome_counts.artifact", "operator": "eq", "expected": 88},
+        {"path": "outcome_counts.unresolved_candidate", "operator": "eq", "expected": 0}
+      ]
+    },
+    {
+      "case_id": "known-neo-recovery-72966-no-false-positive",
+      "case_type": "known_neo_recovery",
+      "dataset_id": "docs/evidence/canonical_evals/known_neo_recovery_72966_no_match.json",
+      "observed_path": "../../docs/evidence/canonical_evals/known_neo_recovery_72966_no_match.json",
+      "checks": [
+        {"path": "n_tracklets_checked", "operator": "eq", "expected": 88},
+        {"path": "confirmed_match", "operator": "eq", "expected": false},
+        {"path": "best_match_offset_arcsec", "operator": "gte", "expected": 1000}
+      ]
+    },
+    {
+      "case_id": "cnn-specific-injection-recovery-tier2-cnn-v3",
+      "case_type": "cnn_injection_recovery",
+      "dataset_id": "docs/evidence/promotion/tier2_cnn_v3_real_cnn_injection_recovery.json",
+      "observed_path": "../../docs/evidence/promotion/tier2_cnn_v3_real_cnn_injection_recovery.json",
+      "checks": [
+        {"path": "schema_version", "operator": "eq", "expected": "injection-recovery-curves-v1"},
+        {"path": "source_report", "operator": "eq", "expected": "Logs/reports/injection_recovery_cnn_tier2_cnn_v3_n200.json"},
+        {"path": "n_records", "operator": "eq", "expected": 200},
+        {"path": "passed", "operator": "eq", "expected": true},
+        {"path": "missing_dimensions", "operator": "eq", "expected": []}
+      ]
+    }
+  ]
+}

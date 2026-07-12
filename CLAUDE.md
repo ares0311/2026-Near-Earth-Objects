@@ -852,7 +852,55 @@ and excluded from CI.
 
 ## Current State (v0.90.75)
 
-**Latest sync (2026-07-12)**: Closed a real evidence-quality gap in the
+**Latest sync (2026-07-12, "close all gaps")**: Closed the remaining two
+A7 evidence gaps (`canonical_eval_report`, `false_discovery_report`) per
+explicit operator direction, and found something more consequential than
+an evidence-quality fix along the way.
+
+`canonical_eval_report`: added a new `cnn_injection_recovery` case type
+(registered in `src/canonical_eval.py`'s `SUPPORTED_CASE_TYPES`) and
+per-model suites
+(`data_selection/canonical_evals/production_suite_{tier2_cnn_v3,benchmark_cnn_v1}_v1.json`)
+that keep the 4 original pipeline-level cases unchanged and add a 5th
+citing each model's real injection-recovery evidence. Real run: 5/5
+cases, 21/21 checks pass for both models. Safe, in-kind substitution —
+same threshold semantics throughout.
+
+`false_discovery_report`: real archived Gate Z4 negative tracklets have no
+cutout images (documented AVRO-mapping limitation, not fabricable) so a
+real-data CNN test isn't possible. Built
+`Skills/evaluate_cnn_false_discovery.py` instead — synthetic-only,
+explicitly labeled as such: artifact tracklets using the proven linear-
+motion generator (guaranteed linkable) but with a sub-pixel-spike cutout
+(not a real PSF) instead of a genuine point source, testing shape
+discrimination the amplitude-blind analytic proxy can't. **Real result,
+n=200 seed=42: `benchmark_cnn_v1` 15.5% false-discovery, `tier2_cnn_v3`
+100% (200/200) — zero discrimination, both in the full ensemble and in
+the CNN alone.** This is a major, real, measured difference between the
+two model candidates, not a minor gap-closure footnote.
+
+Deliberately **not** wired into the automated pass/fail gate: the existing
+`max_false_discovery_rate=0.05` threshold was calibrated against Gate Z4's
+easier real-data test; applying it to this much harder adversarial test
+would silently reinterpret a scientific threshold without operator
+sign-off (`docs/astrometrics_coding_agents_master_guide.md` non-negotiable
+rule 10). Presented instead as prominent, separate evidence — see §0 of
+`docs/evidence/promotion/tier2_cnn_v3_operator_review_packet.md` (rewritten
+to lead with this finding) and full writeup in
+`docs/evidence/a7/2026-07-12-cnn-adversarial-false-discovery.md`.
+Promotion report regenerated with the real canonical-eval evidence
+(`false_discovery_report`'s gate intentionally left citing Gate Z4);
+`operator_signoff_missing` remains the sole automated blocker, but this
+finding is squarely the operator's to weigh before signing off — not
+something the automated report surfaces on its own now that it's not
+gate-wired. Full detail on both fixes:
+`docs/evidence/a7/2026-07-12-real-cnn-injection-recovery.md` (injection-
+recovery + canonical-eval) and
+`docs/evidence/a7/2026-07-12-cnn-adversarial-false-discovery.md`
+(false-discovery + the major finding). Full suite 1881 passed / 2
+deselected, ruff/mypy clean.
+
+**Earlier sync (2026-07-12)**: Closed a real evidence-quality gap in the
 `tier2_cnn_v3` promotion packet, per explicit operator direction. Found
 2026-07-11 while answering "did this model pass all tests the System
 Directives require": `injection_recovery_report` (along with

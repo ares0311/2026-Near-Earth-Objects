@@ -1,0 +1,220 @@
+{
+  "case_results": [
+    {
+      "case_id": "injection-recovery-n200-baseline",
+      "case_type": "injection_recovery",
+      "checks": [
+        {
+          "actual": 200,
+          "expected": 200,
+          "message": "passed",
+          "operator": "eq",
+          "passed": true,
+          "path": "n_injected"
+        },
+        {
+          "actual": 1.0,
+          "expected": 0.95,
+          "message": "passed",
+          "operator": "gte",
+          "passed": true,
+          "path": "detection_rate"
+        },
+        {
+          "actual": 1.0,
+          "expected": 0.95,
+          "message": "passed",
+          "operator": "gte",
+          "passed": true,
+          "path": "link_rate"
+        },
+        {
+          "actual": 1.0,
+          "expected": 0.95,
+          "message": "passed",
+          "operator": "gte",
+          "passed": true,
+          "path": "score_rate"
+        }
+      ],
+      "dataset_id": "data/injection_recovery_n200.json",
+      "passed": true
+    },
+    {
+      "case_id": "false-link-gate-z4-ranking-baseline-purity",
+      "case_type": "false_link",
+      "checks": [
+        {
+          "actual": 1.0,
+          "expected": 1.0,
+          "message": "passed",
+          "operator": "eq",
+          "passed": true,
+          "path": "logistic_regression_handcrafted.purity_at_k.5"
+        },
+        {
+          "actual": 1.0,
+          "expected": 1.0,
+          "message": "passed",
+          "operator": "eq",
+          "passed": true,
+          "path": "logistic_regression_handcrafted.purity_at_k.10"
+        },
+        {
+          "actual": 0,
+          "expected": 0,
+          "message": "passed",
+          "operator": "eq",
+          "passed": true,
+          "path": "false_positive_review_burden.n_false_positive"
+        },
+        {
+          "actual": 0.0,
+          "expected": 0.0,
+          "message": "passed",
+          "operator": "eq",
+          "passed": true,
+          "path": "naive_real_bogus_only.purity_at_k.5"
+        }
+      ],
+      "dataset_id": "Logs/reports/ranking_baseline.json",
+      "passed": true
+    },
+    {
+      "case_id": "review-packet-gate-z6-retrospective-validation",
+      "case_type": "review_packet",
+      "checks": [
+        {
+          "actual": 88,
+          "expected": 88,
+          "message": "passed",
+          "operator": "eq",
+          "passed": true,
+          "path": "n_candidates"
+        },
+        {
+          "actual": 0,
+          "expected": 0,
+          "message": "passed",
+          "operator": "eq",
+          "passed": true,
+          "path": "outcome_counts.recovered_known_object"
+        },
+        {
+          "actual": 0,
+          "expected": 0,
+          "message": "passed",
+          "operator": "eq",
+          "passed": true,
+          "path": "outcome_counts.later_confirmed_object"
+        },
+        {
+          "actual": 88,
+          "expected": 88,
+          "message": "passed",
+          "operator": "eq",
+          "passed": true,
+          "path": "outcome_counts.artifact"
+        },
+        {
+          "actual": 0,
+          "expected": 0,
+          "message": "passed",
+          "operator": "eq",
+          "passed": true,
+          "path": "outcome_counts.unresolved_candidate"
+        }
+      ],
+      "dataset_id": "Logs/reports/retrospective_validation.json",
+      "passed": true
+    },
+    {
+      "case_id": "known-neo-recovery-72966-no-false-positive",
+      "case_type": "known_neo_recovery",
+      "checks": [
+        {
+          "actual": 88,
+          "expected": 88,
+          "message": "passed",
+          "operator": "eq",
+          "passed": true,
+          "path": "n_tracklets_checked"
+        },
+        {
+          "actual": false,
+          "expected": false,
+          "message": "passed",
+          "operator": "eq",
+          "passed": true,
+          "path": "confirmed_match"
+        },
+        {
+          "actual": 4172.4,
+          "expected": 1000,
+          "message": "passed",
+          "operator": "gte",
+          "passed": true,
+          "path": "best_match_offset_arcsec"
+        }
+      ],
+      "dataset_id": "docs/evidence/canonical_evals/known_neo_recovery_72966_no_match.json",
+      "passed": true
+    },
+    {
+      "case_id": "cnn-specific-injection-recovery-benchmark-cnn-v1",
+      "case_type": "cnn_injection_recovery",
+      "checks": [
+        {
+          "actual": "injection-recovery-curves-v1",
+          "expected": "injection-recovery-curves-v1",
+          "message": "passed",
+          "operator": "eq",
+          "passed": true,
+          "path": "schema_version"
+        },
+        {
+          "actual": "Logs/reports/injection_recovery_cnn_benchmark_v1_n200.json",
+          "expected": "Logs/reports/injection_recovery_cnn_benchmark_v1_n200.json",
+          "message": "passed",
+          "operator": "eq",
+          "passed": true,
+          "path": "source_report"
+        },
+        {
+          "actual": 200,
+          "expected": 200,
+          "message": "passed",
+          "operator": "eq",
+          "passed": true,
+          "path": "n_records"
+        },
+        {
+          "actual": true,
+          "expected": true,
+          "message": "passed",
+          "operator": "eq",
+          "passed": true,
+          "path": "passed"
+        },
+        {
+          "actual": [],
+          "expected": [],
+          "message": "passed",
+          "operator": "eq",
+          "passed": true,
+          "path": "missing_dimensions"
+        }
+      ],
+      "dataset_id": "docs/evidence/promotion/benchmark_cnn_v1_real_cnn_injection_recovery.json",
+      "passed": true
+    }
+  ],
+  "failures": [],
+  "n_cases": 5,
+  "n_cases_passed": 5,
+  "n_checks": 21,
+  "n_checks_passed": 21,
+  "passed": true,
+  "schema_version": "canonical-eval-report-v1",
+  "suite_id": "neo-canonical-eval-production-benchmark-cnn-v1-v1"
+}

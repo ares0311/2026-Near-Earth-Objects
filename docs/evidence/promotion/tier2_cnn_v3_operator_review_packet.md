@@ -1,12 +1,36 @@
 # tier2_cnn_v3 Promotion — Operator Review Packet
 
-**Date**: 2026-07-11
+**Date**: 2026-07-11 (updated 2026-07-12)
 **Prepared by**: automated session (Claude Code)
 **Operator review required**: Jerome W. Lindsey III
 **Scope**: Internal model promotion only (A7 gate). Does not authorize MPC
 submission, NEOCP escalation, NASA PDCO notification, or any impact-probability
 claim — those remain governed separately by `docs/MPC_SUBMISSION_POLICY.md`
 and the Alert Protocol.
+
+---
+
+## 0. Read this first: a major finding from 2026-07-12, not in the original 8/8 table
+
+Closing the remaining evidence-quality gaps (per your "close all gaps"
+direction) surfaced something more consequential than an evidence-quality
+fix. A new adversarial test — synthetic sub-pixel-spike artifacts,
+designed to pass `detect()`/`link()` on brightness alone and isolate
+`classify()`'s shape discrimination — found:
+
+| Model | False-discovery rate on this test |
+|---|---|
+| `benchmark_cnn_v1` | 15.5% (31/200) |
+| **`tier2_cnn_v3`** | **100% (200/200) — zero discrimination** |
+
+Full writeup, caveats, and why this is **not** mechanically wired into the
+pass/fail gate below (the existing 5% threshold was calibrated against a
+different, easier test — changing that without your sign-off would be an
+unauthorized scientific-threshold change):
+`docs/evidence/a7/2026-07-12-cnn-adversarial-false-discovery.md`. Read
+that file before the attestation checklist in §7 — this is the one piece
+of evidence most likely to change your decision, and it is real, not
+speculative: measured directly from both models' actual weights.
 
 ---
 
@@ -46,18 +70,22 @@ the way; see `docs/evidence/a7/2026-07-10-seventh-attempt-mps-adaptive-pool-bug-
 ## 3. A7 promotion evidence — all 8 checks, real values
 
 **Read this table with the "Reflects this model?" column, not just the pass column.**
-As of 2026-07-12, injection-recovery is now genuinely model-specific
-(closed, see §3a). Two checks still are not — verified by reading the
-underlying code, not assumed.
+As of 2026-07-12, injection-recovery and canonical-eval are both genuinely
+model-specific (closed, see §3a). `false_discovery_report`'s gate itself
+still cites shared Gate Z4 evidence deliberately (see §3a and §0) — real,
+model-specific false-discovery evidence now exists but is **not**
+mechanically wired into the pass/fail gate, because doing so would
+silently change what the existing 5% threshold means without your
+sign-off.
 
 | Check | Result | Reflects this model? | Real value |
 |---|---|---|---|
 | `dataset_manifest` | ✅ pass | Yes — model-specific | `data_selection/dataset_manifests/ztf_labeled_alerts_tier2_cnn_v3.json`, checksum-verified |
 | `grouped_split_report` | ✅ pass | Yes — model-specific (validates the training data, not classification behavior) | `object_id` purity: 0 leaks (hard-gated). `night_key`/`sky_cell` monitored (not gated) at 100%/91.3% overlap — see §4 below, this is the one item that needs your judgment, not just a pass/fail read |
-| `canonical_eval_report` | ✅ pass | **No — does not invoke this or any CNN's inference** (see §3a) | Shared A5 suite, 4/4 case types, 16/16 checks — a static regression check against pre-existing pipeline artifacts (`data/injection_recovery_n200.json`, a ranking baseline, Gate Z6 outcome counts), none of which are CNN output |
+| `canonical_eval_report` | ✅ pass | **Yes, as of 2026-07-12 — real CNN inference** (see §3a) | `docs/evidence/promotion/tier2_cnn_v3_canonical_eval.json`: the 4 original pipeline-level cases (unchanged) plus a new 5th case citing this model's real injection-recovery evidence. 5/5 cases, 21/21 checks pass |
 | `injection_recovery_report` | ✅ pass | **Yes, as of 2026-07-12 — real CNN inference** (see §3a) | `docs/evidence/promotion/tier2_cnn_v3_real_cnn_injection_recovery.json`: real triplet-cutout synthesis + this model's actual weights, n=200, seed=42. 14/200 scored; posteriors diverge from `benchmark_cnn_v1` on 8/14 (e.g. stellar_artifact 0.771 vs 0.438) — genuine model-specific disagreement, not noise |
 | `calibration_report` | ✅ pass | **Yes.** Real inference from this model's actual weights on 18,000 real held-out cutouts | See table below — real, new KPIs for this specific model |
-| `false_discovery_report` | ✅ pass | **No — derived from Gate Z4's logistic-regression ranking baseline, not this CNN** | `false_discovery_rate: 0.0` (shared Gate Z4 evidence, 0/200 false positives) |
+| `false_discovery_report` | ✅ pass (gate unchanged) | **Gate itself: No — still Gate Z4's logistic-regression baseline.** But see §0 above and `docs/evidence/a7/2026-07-12-cnn-adversarial-false-discovery.md`: real, model-specific adversarial evidence now exists as a *separate* artifact and shows a major difference (`tier2_cnn_v3` 100% vs `benchmark_cnn_v1` 15.5% false-discovery on a synthetic sub-pixel-artifact test) — deliberately not substituted into this gate; read §0 before treating this row's "pass" as the whole story | `false_discovery_rate: 0.0` (shared Gate Z4 evidence, 0/200 false positives, real archived data) |
 | `pretrained_audit` | ✅ pass | N/A by design — a true/false compliance statement (no pretrained model is used by either candidate), not a performance measurement, so sharing it doesn't weaken it | Shared project evidence (no third-party pretrained model used) |
 | `benchmark_model_card` | ✅ pass | Architecture description only, legitimately shared since the architecture is verified unchanged | `benchmarks/benchmark_cnn_v1/MODEL_CARD.md` (architecture reference, shared since architecture is unchanged) |
 
@@ -66,15 +94,33 @@ underlying code, not assumed.
 Originally three checks — `canonical_eval_report`, `injection_recovery_report`,
 `false_discovery_report` — were not just reused from `benchmark_cnn_v1`;
 none were model-specific for *any* CNN candidate. Verified by reading the
-code, not inferred from file paths:
+code, not inferred from file paths. All three now have real,
+model-specific evidence, but they were closed differently:
 
-- `src/canonical_eval.py` loads pre-existing JSON files at each case's
-  `observed_path` and compares named fields against expected thresholds.
-  It does not load or run any model. Still true, still shared/pipeline-level.
-- `false_discovery_report` is derived from Gate Z4's ranking-baseline
-  review-burden counts (`Skills/extract_promotion_evidence.py`), which
-  uses a handcrafted-feature logistic regression, not this CNN. Still
-  true, still shared/pipeline-level.
+- `canonical_eval_report`: `src/canonical_eval.py` is a static regression
+  checker (loads pre-existing JSON at each case's `observed_path`,
+  compares fields to thresholds) — this remains true and by design. Fixed
+  by *adding* a new `cnn_injection_recovery` case type (registered in
+  `SUPPORTED_CASE_TYPES`) and a new per-model suite
+  (`data_selection/canonical_evals/production_suite_tier2_cnn_v3_v1.json`)
+  that keeps the 4 original pipeline-level cases unchanged (still real
+  regression protection) and adds a 5th case citing this model's real
+  injection-recovery evidence. This is a safe substitution — same
+  eq/gte/lte threshold semantics as every other canonical-eval check, no
+  scientific-threshold reinterpretation involved.
+- `injection_recovery_report`: fixed by wiring real CNN inference into
+  `Skills/injection_recovery.py` (see below) — a direct, in-kind fix.
+- `false_discovery_report`: fixed differently, and deliberately **not**
+  substituted into the gate — see §0 above. Real, model-specific evidence
+  exists (`Skills/evaluate_cnn_false_discovery.py`, new script) but
+  applying the existing 5% `max_false_discovery_rate` threshold to this
+  much harder, deliberately adversarial synthetic test (versus Gate Z4's
+  real-archived-data test the threshold was actually calibrated against)
+  would be an unauthorized scientific-threshold reinterpretation. This is
+  presented as separate, disclosed evidence for your judgment, per
+  `docs/astrometrics_coding_agents_master_guide.md`'s non-negotiable rule
+  10.
+
 - `Skills/injection_recovery.py`'s `_analytic_real_bogus()` derived its
   real_bogus score from an analytic SNR formula, never invoking any CNN.
   **This one is now fixed** (operator direction, 2026-07-11): `classify.py`'s
@@ -94,15 +140,20 @@ code, not inferred from file paths:
   input is the durable, committed
   `docs/evidence/promotion/tier2_cnn_v3_real_cnn_injection_recovery.json`.
 
-**Remaining open question, still yours to resolve, now narrower:**
-`docs/astrometrics_coding_agents_master_guide.md`'s validation rule *"a
-model cannot be promoted unless it has injection-recovery curves"* is now
-satisfied in both letter and intent for `injection_recovery_report`.
-`canonical_eval_report` and `false_discovery_report` remain pipeline-level,
-not model-specific — that gap is real but was not part of this session's
-scope (you asked specifically for the injection-recovery fix). Decide
-whether that's acceptable for this promotion or whether those two also
-need a model-specific rebuild before signoff.
+**What remains for your judgment, now precise:**
+1. `injection_recovery_report` and `canonical_eval_report` are now
+   genuinely model-specific, satisfying
+   `docs/astrometrics_coding_agents_master_guide.md`'s "a model cannot be
+   promoted unless it has injection-recovery curves" rule in both letter
+   and intent.
+2. `false_discovery_report`'s *gate* is unchanged (still Gate Z4, real
+   data, 0.0%) — deliberately, per §0/§3a, to avoid an unauthorized
+   threshold reinterpretation. The real, model-specific evidence that
+   *does* exist (§0) is the single most important thing in this packet:
+   `tier2_cnn_v3` showed zero discrimination (100%) against a synthetic
+   adversarial artifact that `benchmark_cnn_v1` partially rejected
+   (15.5%). This is not a checkbox item — it needs your explicit decision,
+   not just an attestation.
 
 ### Calibration KPIs (the real, model-specific result — Isotonic calibration)
 
@@ -146,6 +197,7 @@ longer gates on it.
 
 ## 5. Known limitations (carried over from T2-C, still accurate)
 
+- **New, 2026-07-12, the most significant item on this list**: `tier2_cnn_v3` showed 100% (200/200) false-discovery on a synthetic sub-pixel-artifact adversarial test, versus 15.5% for `benchmark_cnn_v1` on the identical test. See §0 and `docs/evidence/a7/2026-07-12-cnn-adversarial-false-discovery.md`.
 - Distribution shift: training data is from 2026-06-22 to 2026-07-09 (recent), unlike `benchmark_cnn_v1`'s 2019-2020 data — this is newer, not a limitation, but is a real behavioral difference between the two candidates worth knowing about.
 - No external/expert ML or astronomer review has occurred (per T2-C's original citizen-science framing, unchanged).
 - WISE field-sweep testing this session (see `docs/evidence/a7/` for the real classification demo) confirms the pipeline mechanics work end-to-end but continues to find zero genuine NEO candidates in WISE data — expected, matches Gate D1's history, does not affect this promotion decision.
@@ -165,12 +217,13 @@ longer gates on it.
 **Review date**: _____________
 **Operator attestation**:
 
-- [ ] I have read the training result and the 8 evidence checks above.
+- [ ] I have read §0 (the 2026-07-12 adversarial false-discovery finding) and `docs/evidence/a7/2026-07-12-cnn-adversarial-false-discovery.md` in full — this is the item most likely to change my decision.
+- [ ] I have read the training result and the 8 evidence checks in §3.
 - [ ] I understand and accept the `object_id`-only grouped-split policy in §4 (or I am rejecting/revising it — note below).
-- [ ] I understand §3a: calibration, grouped-split, and (as of 2026-07-12) injection-recovery genuinely reflect this model's own behavior. `canonical_eval_report` and `false_discovery_report` remain pipeline-level regression checks that have never exercised any CNN candidate's live inference, and I accept that as satisfying the promotion-report checklist for this promotion (or I am requiring model-specific rebuilds of those two before promotion — note below).
-- [ ] I understand the known limitations in §5.
+- [ ] I understand §3a: calibration, grouped-split, injection-recovery, and canonical-eval now genuinely reflect this model's own behavior. `false_discovery_report`'s automated gate deliberately still cites Gate Z4's real-data evidence (not the new adversarial test) to avoid an unauthorized threshold change — I have made my own judgment about the 100%-vs-15.5% adversarial finding independent of that gate passing (note below).
+- [ ] I understand the known limitations in §5, including the new artifact-discrimination finding.
 - [ ] I confirm this does not authorize external submission, live-search expansion, or benchmark replacement.
-- [ ] I approve `tier2_cnn_v3` for internal production promotion.
+- [ ] I approve `tier2_cnn_v3` for internal production promotion — **despite, and having weighed, the artifact-discrimination finding** (or I am rejecting/deferring promotion pending further investigation — note below).
 
 **Operator notes** (optional free text):
 

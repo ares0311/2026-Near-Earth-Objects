@@ -13,6 +13,12 @@ SUPPORTED_CASE_TYPES = (
     "false_link",
     "injection_recovery",
     "review_packet",
+    # Added 2026-07-12: validates a real, model-specific injection-recovery
+    # report (Skills/injection_recovery.py --cnn-model), as opposed to the
+    # generic "injection_recovery" type above, whose existing cases all cite
+    # pipeline-level artifacts that never invoke any CNN's inference. See
+    # docs/evidence/a7/2026-07-12-real-cnn-injection-recovery.md.
+    "cnn_injection_recovery",
 )
 SUPPORTED_OPERATORS = ("eq", "ne", "gte", "lte", "gt", "lt", "contains")
 

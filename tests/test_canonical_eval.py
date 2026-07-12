@@ -45,6 +45,34 @@ def _suite() -> dict:
     }
 
 
+def test_cnn_injection_recovery_case_type_is_supported() -> None:
+    """Added 2026-07-12 so canonical-eval suites can cite a real, model-
+    specific injection-recovery report (Skills/injection_recovery.py
+    --cnn-model output, via Skills/extract_promotion_evidence.py) rather
+    than only the pre-existing pipeline-level injection_recovery type,
+    whose cases never invoke any CNN's inference."""
+    suite = {
+        "schema_version": "canonical-eval-suite-v1",
+        "suite_id": "test-cnn-suite",
+        "cases": [
+            {
+                "case_id": "cnn-injection-recovery-pass",
+                "case_type": "cnn_injection_recovery",
+                "dataset_id": "test:cnn",
+                "observed": {"n_records": 200, "passed": True, "missing_dimensions": []},
+                "checks": [
+                    {"path": "n_records", "operator": "eq", "expected": 200},
+                    {"path": "passed", "operator": "eq", "expected": True},
+                    {"path": "missing_dimensions", "operator": "eq", "expected": []},
+                ],
+            },
+        ],
+    }
+    report = evaluate_suite(suite)
+    assert report["passed"] is True
+    assert "cnn_injection_recovery" in SUPPORTED_CASE_TYPES
+
+
 def test_evaluate_suite_passes_sample_level_cases() -> None:
     report = evaluate_suite(_suite())
 
@@ -219,7 +247,11 @@ def test_production_suite_passes_against_committed_evidence() -> None:
 
     assert report["passed"] is True
     assert report["n_cases"] == 4
-    assert {case["case_type"] for case in report["case_results"]} == set(
+    # This suite need not use every supported case type (e.g.
+    # cnn_injection_recovery, added 2026-07-12, is used by model-specific
+    # suites, not this shared/pipeline-level one) -- the real invariant is
+    # that every type it DOES use is a real, registered type.
+    assert {case["case_type"] for case in report["case_results"]} <= set(
         SUPPORTED_CASE_TYPES
     )
 

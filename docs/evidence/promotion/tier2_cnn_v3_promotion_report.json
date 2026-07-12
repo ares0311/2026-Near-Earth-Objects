@@ -29,7 +29,7 @@
       },
       "name": "canonical_eval_report",
       "passed": true,
-      "path": "docs/evidence/promotion/benchmark_cnn_v1_canonical_eval.json"
+      "path": "docs/evidence/promotion/tier2_cnn_v3_canonical_eval.json"
     },
     {
       "blockers": [],
