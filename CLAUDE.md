@@ -852,14 +852,66 @@ and excluded from CI.
 
 ## Current State (v0.90.75)
 
-**Latest sync (2026-07-12, operator decision)**: `tier2_cnn_v3` **REJECTED**
-for promotion. Operator decision, recorded verbatim: *"Reject - Retune."*
-Reason: the adversarial false-discovery finding below (100% vs. 15.5%
-false-discovery against `benchmark_cnn_v1` on a synthetic sub-pixel-artifact
-test). `benchmark_cnn_v1` remains the production/frozen model; no
-promotion, no benchmark replacement follows. Recorded in
-`docs/evidence/promotion/tier2_cnn_v3_operator_review_packet.md` §7 and
-`docs/evidence/a7/2026-07-12-model-rejected-retune-required.md`.
+**Latest sync (2026-07-12, hard-negative augmentation implemented)**:
+`Skills/train_tier2_cnn.py` now supports `--n-hard-negatives` — mixes N
+synthetic `stellar_artifact` hard negatives (reusing
+`Skills/evaluate_cnn_false_discovery.py`'s artifact-synthesis math, now
+refactored to accept a configurable `sigma_px` instead of one fixed value)
+into the TRAINING split only, via a new module-level `SyntheticArtifactDataset`.
+Off by default (`--n-hard-negatives 0`, opt-in only, no change to any
+existing invocation). 32 new/updated tests, `ruff`/`mypy` clean, full
+offline suite 1892 passed / 2 deselected. Verified genuinely wired (not a
+no-op) via a bounded in-sandbox CPU smoke test: 20 synthetic hard negatives
++ 26 real train rows → 46 total training samples, class weights
+recomputed to reflect the combined composition. Full detail:
+`docs/evidence/a7/2026-07-12-hard-negative-augmentation-implemented.md`.
+
+**Next command (NOT YET RUN)** — real MPS retrain producing `tier2_cnn_v4`,
+using the already-real, already-passing `tier2_cnn_v3_grouped_split_report.json`
+(hard negatives are added only inside `train()`'s in-memory training set,
+never touching the split CSV, so the existing split report still applies):
+
+```bash
+git pull origin main
+export PYTHONPATH=src
+
+caffeinate -i uv run --python 3.14 python Skills/train_tier2_cnn.py \
+    --labels data/cutouts_v3/index.csv \
+    --epochs 20 \
+    --num-workers 8 \
+    --n-hard-negatives 3000 \
+    --out models/tier2_cnn_v4.pt \
+    --grouped-split-report Logs/reports/tier2_cnn_v3_grouped_split_report.json \
+    --production-candidate
+
+# Acceptance test -- the retune is only "done" when this measured gap
+# closes (tier2_cnn_v3 scored 100% here; benchmark_cnn_v1 scored 15.5%):
+caffeinate -i uv run --python 3.14 python Skills/evaluate_cnn_false_discovery.py \
+    --cnn-model models/tier2_cnn_v4.pt --n-artifacts 200 --seed 42 \
+    --json Logs/reports/cnn_false_discovery_tier2_cnn_v4.json
+
+# Recalibrate (T1-D KPIs repeated for any new candidate):
+caffeinate -i uv run --python 3.14 python Skills/evaluate_calibration.py \
+    --alerts data/ztf_labeled_alerts_v3.json \
+    --cutouts-csv data/cutouts_v3/index.csv \
+    --cnn-model models/tier2_cnn_v4.pt \
+    --report-out Logs/reports/calibration_report_v4.json
+```
+
+`--n-hard-negatives 3000` is a starting recommendation (~16% addition to
+`tier2_cnn_v3`'s real 18,871 bogus training examples), not a tuned
+hyperparameter — the acceptance test above validates it, not the count in
+isolation. Not sharded: single MPS training job, same as every prior
+retrain in this project.
+
+**Earlier sync (2026-07-12, operator decision)**: `tier2_cnn_v3`
+**REJECTED** for promotion. Operator decision, recorded verbatim: *"Reject
+- Retune."* Reason: the adversarial false-discovery finding below (100%
+vs. 15.5% false-discovery against `benchmark_cnn_v1` on a synthetic
+sub-pixel-artifact test). `benchmark_cnn_v1` remains the
+production/frozen model; no promotion, no benchmark replacement follows.
+Recorded in `docs/evidence/promotion/tier2_cnn_v3_operator_review_packet.md`
+§7 and `docs/evidence/a7/2026-07-12-model-rejected-retune-required.md`.
 
 Root-cause investigation (partial, honestly reported as such): checked
 whether `tier2_cnn_v3`'s training data simply has fewer narrow/spike-like
@@ -870,17 +922,6 @@ measured real bogus examples' PSF FWHM using `detect.py`'s own formula.
 rules out "v3 lacks artifact diversity" as the explanation; the true root
 cause remains unresolved (plausibly training-run-specific generalization
 variance, not a clean single cause).
-
-**Proposed retune (not yet implemented)**: hard-negative training
-augmentation — mix synthetic sub-pixel-spike examples (reusing
-`Skills/evaluate_cnn_false_discovery.py`'s cutout synthesis) into Tier 2
-CNN training as explicit `stellar_artifact` hard negatives, producing a
-new `tier2_cnn_v4` candidate (not overwriting v3), with
-`evaluate_cnn_false_discovery.py` as the acceptance test before any future
-promotion attempt. Requires extending `Skills/train_tier2_cnn.py` (not
-started) and a real MPS retrain on an unsandboxed terminal (same pattern
-as every prior retrain in this project). Full plan:
-`docs/evidence/a7/2026-07-12-model-rejected-retune-required.md`.
 
 **Earlier sync (2026-07-12, "close all gaps")**: Closed the remaining two
 A7 evidence gaps (`canonical_eval_report`, `false_discovery_report`) per

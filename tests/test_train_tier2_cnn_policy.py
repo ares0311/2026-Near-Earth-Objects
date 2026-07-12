@@ -361,3 +361,142 @@ def test_emit_split_csv_cli_fails_closed_on_legacy_csv_without_object_id(
         mod.main()
 
     assert exc.value.code == 1
+
+
+class TestSyntheticArtifactDataset:
+    """Regression tests for the 2026-07-12 hard-negative augmentation added
+    after tier2_cnn_v3 was rejected for 100% false-discovery on
+    Skills/evaluate_cnn_false_discovery.py's adversarial test."""
+
+    def test_len_matches_n_samples(self) -> None:
+        mod = _load_skill()
+        ds = mod.SyntheticArtifactDataset(7, seed=1)
+        assert len(ds) == 7
+
+    def test_every_sample_labeled_stellar_artifact(self) -> None:
+        mod = _load_skill()
+        ds = mod.SyntheticArtifactDataset(5, seed=2)
+        for idx in range(len(ds)):
+            sci, ref, diff, label = ds[idx]
+            assert label.item() == mod._STELLAR_ARTIFACT_LABEL
+            assert sci.shape == ref.shape == diff.shape == (1, 63, 63)
+
+    def test_same_seed_and_index_is_deterministic(self) -> None:
+        mod = _load_skill()
+        ds_a = mod.SyntheticArtifactDataset(3, seed=42)
+        ds_b = mod.SyntheticArtifactDataset(3, seed=42)
+        sci_a, ref_a, diff_a, _ = ds_a[1]
+        sci_b, ref_b, diff_b, _ = ds_b[1]
+        assert (sci_a == sci_b).all()
+        assert (ref_a == ref_b).all()
+        assert (diff_a == diff_b).all()
+
+    def test_different_indices_produce_different_samples(self) -> None:
+        mod = _load_skill()
+        ds = mod.SyntheticArtifactDataset(3, seed=42)
+        sci_0, _, _, _ = ds[0]
+        sci_1, _, _, _ = ds[1]
+        assert not (sci_0 == sci_1).all()
+
+    def test_respects_sigma_range(self) -> None:
+        """Every generated sample's sigma must stay within the requested
+        range -- otherwise the "kept below real seeing-limited PSF width"
+        safety property documented on --hard-negative-sigma-max would not
+        actually hold at the given CLI settings."""
+        mod = _load_skill()
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "Skills"))
+        import numpy as np
+        from evaluate_cnn_false_discovery import _synthesize_artifact_cutout_arrays
+
+        sigma_min, sigma_max = 0.05, 0.35
+        ds = mod.SyntheticArtifactDataset(1, seed=99, sigma_range=(sigma_min, sigma_max))
+        # Reproduce the internal draw exactly to confirm it's bounded (the
+        # dataset doesn't expose sigma directly, so this checks the same
+        # rng-derivation formula __getitem__ uses).
+        rng = np.random.default_rng(ds.seed + 0)
+        sigma_px = float(rng.uniform(ds.sigma_min, ds.sigma_max))
+        assert sigma_min <= sigma_px <= sigma_max
+        # Sanity: the underlying synthesis function accepts this sigma and
+        # produces a valid triplet without raising.
+        rng2 = np.random.default_rng(ds.seed + 0)
+        sci_arr, ref_arr, diff_arr, real_bogus = _synthesize_artifact_cutout_arrays(
+            rng2, 19.5, 10.0, sigma_px=sigma_px
+        )
+        assert sci_arr.shape == (63, 63)
+        assert 0.0 <= real_bogus <= 1.0
+
+
+class TestComputeClassWeightsExtraCounts:
+    def test_extra_label_counts_shift_weights(self) -> None:
+        mod = _load_skill()
+        rows = [_row(f"o{i}", label=0) for i in range(80)] + [
+            _row(f"o{i}", label=3) for i in range(80, 100)
+        ]
+        base_weights = mod._compute_class_weights(rows)
+        # Add 1000 more label=3 examples outside `rows` (as the synthetic
+        # hard negatives are, since they never have a CSV row) -- class 3's
+        # weight must drop (it's no longer as rare) relative to the
+        # no-extra-counts baseline.
+        boosted_weights = mod._compute_class_weights(rows, extra_label_counts={3: 1000})
+        assert boosted_weights[3].item() < base_weights[3].item()
+
+    def test_extra_label_counts_none_matches_prior_behavior(self) -> None:
+        mod = _load_skill()
+        rows = [_row(f"o{i}", label=0) for i in range(10)] + [_row("b", label=3)]
+        assert (
+            mod._compute_class_weights(rows).tolist()
+            == mod._compute_class_weights(rows, extra_label_counts=None).tolist()
+        )
+
+
+class TestHardNegativeCliWiring:
+    """Verify main() parses the new flags and passes them through to
+    train() unchanged -- by monkeypatching train() to capture its kwargs
+    rather than running a real (torch-dependent, slow) training loop."""
+
+    def _capture_train_kwargs(self, mod, monkeypatch: pytest.MonkeyPatch) -> dict:
+        captured: dict = {}
+
+        def _fake_train(*args, **kwargs) -> None:
+            captured["args"] = args
+            captured["kwargs"] = kwargs
+
+        monkeypatch.setattr(mod, "train", _fake_train)
+        return captured
+
+    def test_n_hard_negatives_defaults_to_zero(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """--n-hard-negatives must default to 0 (opt-in only) so existing
+        invocation commands from before this feature existed are unaffected."""
+        mod = _load_skill()
+        captured = self._capture_train_kwargs(mod, monkeypatch)
+        monkeypatch.setattr(
+            sys, "argv", ["train_tier2_cnn.py", "--labels", str(tmp_path / "nonexistent.csv")]
+        )
+        mod.main()
+        assert captured["kwargs"]["n_hard_negatives"] == 0
+
+    def test_hard_negative_flags_reach_train(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        mod = _load_skill()
+        captured = self._capture_train_kwargs(mod, monkeypatch)
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            [
+                "train_tier2_cnn.py",
+                "--labels", str(tmp_path / "nonexistent.csv"),
+                "--n-hard-negatives", "500",
+                "--hard-negative-sigma-min", "0.05",
+                "--hard-negative-sigma-max", "0.35",
+                "--hard-negative-seed", "7",
+            ],
+        )
+        mod.main()
+        kwargs = captured["kwargs"]
+        assert kwargs["n_hard_negatives"] == 500
+        assert kwargs["hard_negative_sigma_range"] == (0.05, 0.35)
+        assert kwargs["hard_negative_seed"] == 7

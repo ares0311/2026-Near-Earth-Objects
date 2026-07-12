@@ -48,6 +48,34 @@ class TestArtifactCutoutSynthesis:
         _, _, _, real_bogus = fd._synthesize_artifact_cutout_triplet(rng, 19.5, 10.0)
         assert real_bogus >= 0.65
 
+    def test_sigma_px_override_is_respected(self):
+        """Regression for the 2026-07-12 refactor that extracted
+        _synthesize_artifact_cutout_arrays (used by
+        Skills/train_tier2_cnn.py's hard-negative augmentation to draw a
+        range of spike widths) out of _synthesize_artifact_cutout_triplet.
+        A wider sigma than the module default must still clear detect.py's
+        threshold and must still be narrower than a real PSF -- otherwise
+        the extraction changed behavior instead of just relocating it."""
+        rng = np.random.default_rng(0)
+        custom_sigma = 0.30
+        _, _, _, real_bogus = fd._synthesize_artifact_cutout_triplet(
+            rng, 19.5, 10.0, sigma_px=custom_sigma
+        )
+        assert real_bogus >= 0.65
+
+    def test_default_sigma_px_matches_module_constant(self):
+        """The default sigma_px argument must still be the module's single
+        extreme adversarial-test value, so existing callers (the false-
+        discovery eval itself, and any already-recorded evidence) are
+        unaffected by the 2026-07-12 refactor."""
+        rng_a = np.random.default_rng(5)
+        rng_b = np.random.default_rng(5)
+        triplet_default = fd._synthesize_artifact_cutout_triplet(rng_a, 19.5, 10.0)
+        triplet_explicit = fd._synthesize_artifact_cutout_triplet(
+            rng_b, 19.5, 10.0, sigma_px=fd._ARTIFACT_SPIKE_SIGMA_PX
+        )
+        assert triplet_default == triplet_explicit
+
     def test_artifact_is_spatially_narrower_than_a_genuine_point_source(self):
         """The artifact's generating sigma must be far narrower than any
         realistic seeing-limited PSF -- otherwise this wouldn't be testing

@@ -108,7 +108,17 @@ launching a materially larger production batch, the project must add:
   identical proportions (17.3% vs 16.3%) of spike-like bogus examples; the
   true cause remains open. Proposed retune: hard-negative training
   augmentation with synthetic spike examples, producing a new
-  `tier2_cnn_v4` candidate, not yet implemented. This closure also
+  `tier2_cnn_v4` candidate. **Implemented same day**:
+  `Skills/train_tier2_cnn.py --n-hard-negatives` (opt-in, off by default)
+  mixes N synthetic `stellar_artifact` hard negatives — reusing
+  `Skills/evaluate_cnn_false_discovery.py`'s artifact math with a
+  configurable sigma range rather than one fixed value — into the training
+  split only. 32 new tests, full suite 1892/2 passed/deselected, verified
+  genuinely wired via a bounded in-sandbox smoke test. The real MPS retrain
+  producing `tier2_cnn_v4` and the `evaluate_cnn_false_discovery.py`
+  acceptance-test re-run are still NOT YET DONE — see
+  `docs/evidence/a7/2026-07-12-hard-negative-augmentation-implemented.md`
+  for the exact pending command. This closure also
   resolved the two prior open A7 evidence-quality gaps
   (`canonical_eval_report`, `false_discovery_report` never having
   exercised any CNN's live inference) with real, model-specific evidence

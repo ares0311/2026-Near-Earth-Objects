@@ -77,20 +77,24 @@ from schemas import Observation  # type: ignore[import]
 _ARTIFACT_SPIKE_SIGMA_PX = 0.15
 
 
-def _synthesize_artifact_cutout_triplet(
+def _synthesize_artifact_cutout_arrays(
     rng: np.random.Generator,
     mag: float,
     background_level: float,
-) -> tuple[str, str, str, float]:
-    """Build science/reference/difference cutouts for a synthetic
-    non-astrophysical artifact (unresolved spike) rather than a genuine
-    seeing-limited point source. Returns (science_b64, reference_b64,
-    difference_b64, real_bogus_proxy) -- same tuple shape and same
-    amplitude/background SNR-to-real_bogus mapping as
+    sigma_px: float = _ARTIFACT_SPIKE_SIGMA_PX,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, float]:
+    """Build raw (63,63) float32 science/reference/difference arrays for a
+    synthetic non-astrophysical artifact (unresolved spike) rather than a
+    genuine seeing-limited point source. `sigma_px` defaults to this
+    module's single extreme adversarial-test value but is exposed so
+    callers (e.g. Skills/train_tier2_cnn.py's hard-negative augmentation)
+    can generate a range of spike widths instead of one fixed case.
+    Returns (science_arr, reference_arr, difference_arr, real_bogus_proxy)
+    -- same amplitude/background SNR-to-real_bogus mapping as
     injection_recovery.py's _synthesize_cutout_triplet, so this passes
     detect.py's pre-filter on the same terms a genuine detection would."""
     total_flux = 10 ** (-0.4 * (mag - _SYNTHETIC_ZEROPOINT_MAG))
-    sigma = _ARTIFACT_SPIKE_SIGMA_PX
+    sigma = sigma_px
     amplitude = total_flux / (2 * math.pi * sigma * sigma)
 
     size = _CUTOUT_SIZE
@@ -106,6 +110,21 @@ def _synthesize_artifact_cutout_triplet(
     snr = amplitude / background_level
     real_bogus = float(min(1.0, max(0.0, (snr - 3.0) / 20.0)))
 
+    return science_arr, reference_arr, difference_arr, real_bogus
+
+
+def _synthesize_artifact_cutout_triplet(
+    rng: np.random.Generator,
+    mag: float,
+    background_level: float,
+    sigma_px: float = _ARTIFACT_SPIKE_SIGMA_PX,
+) -> tuple[str, str, str, float]:
+    """Base64-encoded wrapper around _synthesize_artifact_cutout_arrays for
+    Observation cutout_* fields (science_b64, reference_b64, difference_b64,
+    real_bogus_proxy)."""
+    science_arr, reference_arr, difference_arr, real_bogus = _synthesize_artifact_cutout_arrays(
+        rng, mag, background_level, sigma_px=sigma_px
+    )
     reference_b64 = base64.b64encode(reference_arr.tobytes()).decode()
     science_b64 = base64.b64encode(science_arr.tobytes()).decode()
     difference_b64 = base64.b64encode(difference_arr.tobytes()).decode()
@@ -120,6 +139,7 @@ def synthesize_artifact_tracklet(
     motion_arcsec_per_hr: float = 1.0,
     mag: float = 19.5,
     background_level: float = 10.0,
+    sigma_px: float = _ARTIFACT_SPIKE_SIGMA_PX,
 ) -> tuple[Observation, ...]:
     """Same cadence and linear-motion geometry as
     injection_recovery.inject_synthetic_neo_image_level (2 obs/night,
@@ -138,7 +158,7 @@ def synthesize_artifact_tracklet(
         for label, dt_hr in (("a", 0.0), ("b", 1.0)):
             obs_mag = mag + rng.normal(0, 0.05)
             sci_b64, ref_b64, diff_b64, real_bogus = _synthesize_artifact_cutout_triplet(
-                rng, obs_mag, background_level
+                rng, obs_mag, background_level, sigma_px=sigma_px
             )
             obs.append(
                 _make_obs(
