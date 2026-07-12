@@ -852,7 +852,24 @@ and excluded from CI.
 
 ## Current State (v0.90.75)
 
-**Latest sync (2026-07-11, v0.90.85 — doc-sync only, no new code)**: Four
+**Latest sync (2026-07-11/12)**: First genuinely new (non-Z3-tied) ZTF DR24
+discovery sweep run to completion. Field selected via
+`Skills/select_survey_fields.py --mode aten` (RA 89.3, Dec 22.5, score
+0.9238) rather than a known-designation-tracking field. Real UW archive
+ingest for nights 20200914/20200916 (12+316 kept observations); found and
+fixed a real checkpoint-field-mismatch bug in
+`Skills/ztf_alert_archive_ingest.py` along the way (commit `a0fb56e0`).
+`Skills/run_archive_positive_control.py --min-observations 2
+--build-review-packets` formed 12 real tracklets in ~22s; all 12 REJECTED
+by `Skills/adversarial_review.py --offline` (orbit_quality/artifact_posterior/
+real_bogus). Clean, expected null result — matches this project's own
+Production Definition, which does not require a discovery for readiness.
+Target queue rank 1 marked `null_result`. Full detail:
+`docs/evidence/live/2026-07-11-first-new-discovery-sweep.md`. Next: select
+additional new fields via the same process to build a real search
+portfolio (60/30/10 new/follow-up/control per the data-selection policy).
+
+**Earlier sync (2026-07-11, v0.90.85 — doc-sync only, no new code)**: Four
 commits landed after the v0.90.81 entry below without a CLAUDE.md sync;
 this entry closes that gap. All four are real, verified work:
 1. `1ca5fecc` — Added `mpc_training_labels_v1` dataset manifest (A1). Closes
