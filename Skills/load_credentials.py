@@ -28,6 +28,10 @@ _CREDENTIALS: dict[str, str] = {
     "ATLAS_TOKEN": "neo-detection:ATLAS_TOKEN",
     "ZTF_IRSA_USERNAME": "neo-detection:ZTF_IRSA_USERNAME",
     "ZTF_IRSA_PASSWORD": "neo-detection:ZTF_IRSA_PASSWORD",
+    # Lasair broker API key (2026-07-11): needed to verify whether Lasair's
+    # per-detection data is immutable/usable for historical replay, and
+    # later for any live cone-search work if that verification passes.
+    "LASAIR_API_TOKEN": "neo-detection:LASAIR_API_TOKEN",
 }
 
 
