@@ -380,6 +380,7 @@ def _fmt_duration(seconds: float) -> str:
 
 
 _CHECKPOINT_ROOT = Path("Logs/pipeline_runs/injection_recovery")
+_CHECKPOINT_SCHEMA_VERSION = 2
 
 
 def _checkpoint_key(
@@ -403,6 +404,7 @@ def _checkpoint_key(
     """
     payload = json.dumps(
         {
+            "checkpoint_schema_version": _CHECKPOINT_SCHEMA_VERSION,
             "n_inject": n_inject,
             "seed": seed,
             "mission": mission,
@@ -486,6 +488,7 @@ def run_injection_recovery(
     checkpoint_path = root / key / "checkpoint.json"
 
     loaded_cnn = None
+    cnn_model_sha256 = None
     if cnn_model_path is not None:
         # Import lazily -- keeps the non-CNN-scoring path free of a torch
         # dependency, matching classify.py's own lazy-import convention.
@@ -500,6 +503,11 @@ def run_injection_recovery(
                 "(file missing, torch unavailable, or weights failed to load) "
                 "-- refusing to silently fall back to analytic-only scoring."
             )
+        digest = hashlib.sha256()
+        with cnn_model_path.open("rb") as model_file:
+            for chunk in iter(lambda: model_file.read(1024 * 1024), b""):
+                digest.update(chunk)
+        cnn_model_sha256 = digest.hexdigest()
         print(
             "Tier 2 CNN loaded — recovery curves will reflect this model's real inference.",
             flush=True,
@@ -596,6 +604,7 @@ def run_injection_recovery(
         link_result = link(tuple(detect_result.candidates), min_nights=2, min_observations=3)
         linked = bool(link_result.tracklets)
         scored_packet = False
+        posterior_payload = None
         if linked:
             n_linked += 1
 
@@ -604,6 +613,7 @@ def run_injection_recovery(
             orbital = fit_orbit(t)
             features_cls, posterior = classify(t, features, cnn_model=loaded_cnn)
             scored = score(t, features_cls, posterior, orbital)
+            posterior_payload = posterior.model_dump(mode="json")
             n_scored += 1
             scored_packet = True
             hazard_flags.append(scored.hazard.hazard_flag)
@@ -628,11 +638,14 @@ def run_injection_recovery(
             record["seeing_arcsec"] = float(seeing)
             record["background_level"] = float(background)
             record["trail_length_arcsec"] = float(trail)
+        if posterior_payload is not None:
+            record["posterior"] = posterior_payload
         injection_records.append(record)
 
         _atomic_write_json(
             checkpoint_path,
             {
+                "checkpoint_schema_version": _CHECKPOINT_SCHEMA_VERSION,
                 "n_inject": n_inject,
                 "seed": seed,
                 "mission": mission,
@@ -663,6 +676,38 @@ def run_injection_recovery(
             f"({len(review_packets)} packet(s))"
         )
 
+    recovery_curves = recovery_curve_report(
+        injection_records,
+        bins={**DEFAULT_BINS, **IMAGE_LEVEL_BINS} if image_level else None,
+    )
+    if cnn_model_path is not None:
+        model_records = [
+            {
+                "index": record["index"],
+                "posterior": record["posterior"],
+                "argmax_class": max(record["posterior"], key=record["posterior"].get),
+            }
+            for record in injection_records
+            if isinstance(record.get("posterior"), dict)
+        ]
+        argmax_counts = {
+            label: sum(row["argmax_class"] == label for row in model_records)
+            for label in (
+                "neo_candidate",
+                "known_object",
+                "main_belt_asteroid",
+                "stellar_artifact",
+                "other_solar_system",
+            )
+        }
+        recovery_curves["model_behavior"] = {
+            "cnn_model_path": str(cnn_model_path),
+            "cnn_model_sha256": cnn_model_sha256,
+            "n_scored_posteriors": len(model_records),
+            "posterior_argmax_counts": argmax_counts,
+            "records": model_records,
+        }
+
     return {
         "n_injected": n_inject,
         "mission": mission,
@@ -680,10 +725,7 @@ def run_injection_recovery(
         },
         "image_level": image_level,
         "injection_records": injection_records,
-        "recovery_curves": recovery_curve_report(
-            injection_records,
-            bins={**DEFAULT_BINS, **IMAGE_LEVEL_BINS} if image_level else None,
-        ),
+        "recovery_curves": recovery_curves,
     }
 
 

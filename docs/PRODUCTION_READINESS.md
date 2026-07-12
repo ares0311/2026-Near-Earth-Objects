@@ -1,7 +1,7 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.90.75
-**Last updated**: 2026-07-10 (header/sync line only — the P1-P5 gate register
+**Current version**: v0.90.86
+**Last updated**: 2026-07-12 (header/sync line only — the P1-P5 gate register
 body below is unchanged historical evidence from 2026-07-02; current gate
 status for the active ZTF DR24 path lives in
 `docs/ZTF_DR24_PRODUCTION_GATES.md`, which is kept current every session)
@@ -122,10 +122,19 @@ launching a materially larger production batch, the project must add:
   `benchmark_cnn_v1` (15.5%) — and all 7 T1-D calibration KPIs pass on real
   data, with numbers matching or slightly exceeding `tier2_cnn_v3`'s real
   calibration (hard-negative augmentation did not degrade real-world
-  performance). `benchmark_cnn_v1` remains the production model; no
-  promotion follows from this evidence alone — `tier2_cnn_v4` still needs
-  its own promotion evidence trail (injection-recovery, canonical-eval
-  suite, promotion report) before an operator review/signoff decision. See
+  performance). `benchmark_cnn_v1` remains the production model. The
+  v4-specific promotion trail is now complete: two training manifests (real
+  plus synthetic), real CNN injection recovery with exact checkpoint SHA and
+  retained posteriors, a 5/5-case and 25/25-check canonical suite, an unsigned
+  promotion report with all nine evidence artifacts passing, and a readable
+  operator packet. The report fails closed only on
+  `operator_signoff_missing`. The corrected injection evidence exposed an
+  important tradeoff: all 14 scored synthetic moving-source injections have
+  `stellar_artifact` as v4's final ensemble argmax, identical to
+  `benchmark_cnn_v1` on this harness and more conservative than v3 on 8/14
+  cases. This is disclosed for operator judgment rather than hidden behind
+  model-invariant detect/link/score curves. See
+  `docs/evidence/promotion/tier2_cnn_v4_operator_review_packet.md` and
   `docs/evidence/a7/2026-07-12-tier2_cnn_v4-real-retrain-and-acceptance-test.md`.
   This closure also
   resolved the two prior open A7 evidence-quality gaps

@@ -207,6 +207,8 @@ class TestCnnScoring:
             )
 
     def test_real_cnn_run_reports_model_provenance(self, tmp_path, tiny_model_path):
+        import hashlib
+
         result = ir.run_injection_recovery(
             n_inject=3,
             seed=2,
@@ -218,6 +220,12 @@ class TestCnnScoring:
         assert result["cnn_scoring"] is True
         assert result["cnn_model_path"] == str(tiny_model_path)
         assert result["n_injected"] == 3
+        behavior = result["recovery_curves"]["model_behavior"]
+        assert behavior["cnn_model_path"] == str(tiny_model_path)
+        expected_sha256 = hashlib.sha256(tiny_model_path.read_bytes()).hexdigest()
+        assert behavior["cnn_model_sha256"] == expected_sha256
+        assert behavior["n_scored_posteriors"] == len(behavior["records"])
+        assert sum(behavior["posterior_argmax_counts"].values()) == behavior["n_scored_posteriors"]
 
     def test_different_cnn_models_do_not_share_a_checkpoint(self, tmp_path, tiny_model_path):
         """A second model at a different path must not resume from the
@@ -264,6 +272,7 @@ class TestCheckpointResume:
         ckpt = tmp_path / key / "checkpoint.json"
         assert ckpt.exists()
         state = json.loads(ckpt.read_text())
+        assert state["checkpoint_schema_version"] == ir._CHECKPOINT_SCHEMA_VERSION
         assert state["completed"] == 3
         assert len(state["injection_records"]) == 3
         assert {"mag", "motion_arcsec_per_hr", "detected", "linked", "scored"} <= set(

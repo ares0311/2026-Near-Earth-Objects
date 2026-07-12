@@ -81,7 +81,7 @@ from collections.abc import Mapping
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 from schemas import (
     BackgroundConfig,
@@ -201,9 +201,24 @@ def _utc_now() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
+class _ClosingConnection(sqlite3.Connection):
+    """SQLite connection that also closes when its context exits."""
+
+    def __exit__(
+        self,
+        exc_type: Any,
+        exc_value: Any,
+        traceback: Any,
+    ) -> Literal[False]:
+        try:
+            return super().__exit__(exc_type, exc_value, traceback)
+        finally:
+            self.close()
+
+
 def _connect(db_path: Path) -> sqlite3.Connection:
     db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(db_path, factory=_ClosingConnection)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -275,7 +290,11 @@ def background_schema_status_summary(
             "network_access_performed": False,
             "external_submission_enabled": False,
         }
-    with sqlite3.connect(f"{db_path.resolve().as_uri()}?mode=ro", uri=True) as conn:
+    with sqlite3.connect(
+        f"{db_path.resolve().as_uri()}?mode=ro",
+        uri=True,
+        factory=_ClosingConnection,
+    ) as conn:
         conn.row_factory = sqlite3.Row
         return _schema_status_from_connection(conn, db_path, True)
 

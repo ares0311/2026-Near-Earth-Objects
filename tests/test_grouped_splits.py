@@ -127,6 +127,8 @@ def test_leakage_report_fails_object_overlap() -> None:
 
     assert report["passed"] is False
     assert report["hard_leakage"]["object_id"] == {"obj-a": ["train", "validation"]}
+    with pytest.raises(ValueError, match='"passed": false'):
+        assert_no_leakage(records)
 
 
 def test_leakage_report_monitors_but_does_not_fail_night_overlap() -> None:

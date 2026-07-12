@@ -3,6 +3,47 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.86 — Bind tier2_cnn_v4 promotion evidence to real model behavior (2026-07-12)
+
+### Added
+- A second validated training manifest for v4's deterministic 3,000-sample
+  synthetic hard-negative supplement, plus a matching data-selection decision
+  record.
+- A v4-specific canonical suite/report, durable real-CNN injection report,
+  unsigned promotion report, and readable operator review packet.
+- Regression coverage for writable Torch cutout storage, timezone-aware
+  calibration timestamps, checkpoint schema versioning, model-bound injection
+  evidence, and deterministic SQLite connection cleanup.
+
+### Fixed
+- `Skills/injection_recovery.py` now retains scored posteriors and the exact
+  checkpoint SHA-256 in its promotion evidence. Previously its purportedly
+  model-specific report kept only detect/link/score booleans, which are
+  invariant to the CNN's classification result and therefore could not prove
+  which model behavior was exercised.
+- Injection-recovery checkpoint keys now include an evidence-schema version,
+  preventing older model-invariant checkpoints from satisfying the corrected
+  evidence path.
+- `src/classify.py` copies decoded immutable cutout buffers before converting
+  them to Torch tensors, eliminating undefined-behavior warnings.
+- `Skills/evaluate_calibration.py` emits timezone-aware UTC timestamps without
+  Python 3.14's deprecated `datetime.utcnow()`.
+- Codex-launched uv commands use the repository-local `.uv-cache`, which is
+  explicitly ignored by Git.
+- Background SQLite connections now close when their context exits instead of
+  accumulating file descriptors until the process limit is exhausted.
+
+### Evidence
+- V4 canonical suite: 5/5 cases, 25/25 checks pass.
+- Unsigned promotion report: all nine evidence artifacts pass; fail-closed
+  blocker is exactly `operator_signoff_missing`.
+- V4 adversarial artifact test remains 0/200 false discoveries; real held-out
+  calibration KPIs all pass.
+- Corrected model-bound injection evidence records 14/14 scored synthetic
+  moving sources with `stellar_artifact` as final ensemble argmax, identical
+  to `benchmark_cnn_v1` on this harness. This conservatism/sensitivity
+  tradeoff is disclosed for operator judgment rather than auto-promoted.
+
 ## v0.90.85 — Doc sync: close remaining A1 manifest gaps, A2 ledger default-on, tier2_cnn_v3 operator review packet (2026-07-11)
 
 ### Added

@@ -490,7 +490,11 @@ def _tier2_predict(
         import torch
 
         def to_tensor(arr: np.ndarray) -> Any:
-            return torch.from_numpy(arr).unsqueeze(0).unsqueeze(0)  # (1,1,63,63)
+            # Decoded base64 cutouts may be backed by immutable ``bytes``.
+            # PyTorch warns that tensors sharing that storage have undefined
+            # behaviour if written to, so give the tensor writable ownership.
+            writable = np.array(arr, copy=True)
+            return torch.from_numpy(writable).unsqueeze(0).unsqueeze(0)  # (1,1,63,63)
 
         with torch.no_grad():
             proba = model(to_tensor(triplet[0]), to_tensor(triplet[1]), to_tensor(triplet[2]))
@@ -1157,7 +1161,6 @@ def compute_calibration_gain(
     eps = 1e-12
     kl = float(np.sum(p * np.log((p + eps) / (q + eps))))
     return round(kl, 6)
-
 
 
 

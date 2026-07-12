@@ -521,6 +521,36 @@ class TestBuildCnnModel:
             via_direct_sequential = torch.flatten(branch.net(x), 1)
         assert torch.equal(via_forward, via_direct_sequential)
 
+    def test_conv_branch_routes_adaptive_pool_through_cpu_for_mps(self):
+        """Exercise the MPS-only adaptive-pooling workaround without MPS hardware."""
+        import torch
+
+        from classify import _build_cnn_model
+
+        transfers: list[str] = []
+
+        class FakeTensor:
+            def __init__(self, device: str) -> None:
+                self.device = torch.device(device)
+
+            def to(self, device):
+                transfers.append(str(device))
+                return FakeTensor(str(device))
+
+        class FakePool(torch.nn.AdaptiveAvgPool2d):
+            def forward(self, value):
+                assert value.device.type == "cpu"
+                return value
+
+        model = _build_cnn_model()
+        assert model is not None
+        model.branch_sci.net = torch.nn.Sequential(FakePool((4, 4)))
+
+        result = model.branch_sci(FakeTensor("mps"))
+
+        assert result.device.type == "mps"
+        assert transfers == ["cpu", "mps"]
+
     def test_cnn_heartbeat_prints_while_waiting(self, capsys):
         """The macOS-deadlock heartbeat (see _load_cnn_model) must actually
         print while its wrapped call is still running -- a real model load
@@ -602,6 +632,31 @@ class TestTier2PredictWithCutouts:
             "neo_candidate", "known_object", "main_belt_asteroid",
             "stellar_artifact", "other_solar_system",
         }
+
+    def test_tier2_uses_writable_tensor_storage_for_decoded_cutouts(self):
+        """Base64 decoding starts from immutable bytes; Torch inputs must not share it."""
+        import torch
+
+        writable_flags: list[bool] = []
+
+        class InspectingModel:
+            def __call__(self, *inputs):
+                writable_flags.extend(bool(tensor.numpy().flags.writeable) for tensor in inputs)
+                return torch.tensor([[0.2, 0.1, 0.1, 0.5, 0.1]], dtype=torch.float32)
+
+        b64 = self._make_cutout_b64()
+        obs = make_obs(
+            obs_id="t2_writable",
+            cutout_science=b64,
+            cutout_reference=b64,
+            cutout_difference=b64,
+        )
+        tracklet = Tracklet("T2-writable", (obs,), 0.0, 0.0, 0.0)
+
+        result = cls_mod._tier2_predict(tracklet, model=InspectingModel())
+
+        assert result is not None
+        assert writable_flags == [True, True, True]
 
     def test_tier2_no_cutouts_returns_none(self):
         from classify import _build_cnn_model, _tier2_predict
@@ -1328,6 +1383,4 @@ class TestComputeCalibrationGain:
     def test_in_all(self):
         from classify import __all__
         assert "compute_calibration_gain" in __all__
-
-
 

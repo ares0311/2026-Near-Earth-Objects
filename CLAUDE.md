@@ -850,7 +850,7 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.75)
+## Current State (v0.90.86)
 
 **Latest sync (2026-07-12, tier2_cnn_v4 real retrain — retune SUCCEEDED)**:
 Operator ran the real MPS retrain + acceptance test + recalibration
@@ -874,19 +874,23 @@ local report JSONs are on the operator's Mac (not yet committed —
 `models/` requires explicit filename allowlisting per this repo's artifact
 policy).
 
-**Next step (NOT YET DONE)**: build `tier2_cnn_v4`'s own promotion
-evidence trail, mirroring what was done for `tier2_cnn_v3` — a real CNN
-injection-recovery run (`Skills/injection_recovery.py --image-level
---cnn-model models/tier2_cnn_v4.pt`), a per-model canonical-eval suite
-(`data_selection/canonical_evals/production_suite_tier2_cnn_v4_v1.json`,
-same pattern as the v3/benchmark_v1 suites), and a promotion
-report/operator review packet via `Skills/build_promotion_report.py` and
-`Skills/extract_promotion_evidence.py`, citing this session's real
-calibration and false-discovery results plus the reused
-`tier2_cnn_v3_grouped_split_report.json` and `data_selection/dataset_manifest`
-for `data/cutouts_v3/index.csv` (unaffected by hard-negative augmentation,
-still valid for v4). `operator_signoff_missing` will remain the final,
-inherently human-gated blocker after that packet is built.
+**V4 promotion evidence is now complete; operator decision pending.** Two
+validated training manifests cover the real ZTF source and the deterministic
+3,000-sample synthetic hard-negative supplement. The real CNN injection run
+records the exact v4 checkpoint SHA plus all 14 scored posteriors. The
+per-model canonical suite passes 5/5 cases and 25/25 checks. The unsigned
+promotion report passes all nine evidence artifacts and fails closed only on
+`operator_signoff_missing`. The operator packet is
+`docs/evidence/promotion/tier2_cnn_v4_operator_review_packet.md`.
+
+The corrected evidence harness also exposed a real tradeoff that the prior
+model-invariant curves hid: all 14 scored synthetic moving-source injections
+have `stellar_artifact` as v4's final ensemble argmax. This matches
+`benchmark_cnn_v1` exactly on the same harness and differs from v3 on 8/14
+cases. V4 still closes v3's artifact failure (0/200 versus 200/200 false
+discoveries) and passes all real-data calibration KPIs. Do not promote it
+automatically; the sensitivity/conservatism tradeoff is now an explicit
+operator judgment. `benchmark_cnn_v1` remains active until signoff.
 
 **Earlier sync (2026-07-12, operator decision)**: `tier2_cnn_v3`
 **REJECTED** for promotion. Operator decision, recorded verbatim: *"Reject

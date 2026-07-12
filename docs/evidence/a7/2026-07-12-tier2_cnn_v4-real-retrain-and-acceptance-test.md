@@ -117,14 +117,27 @@ performance (all 7 T1-D KPIs pass, comparable to v3).
 Mac (same convention as prior local calibration reports), not committed
 here — this file is the durable evidence record.
 
-## Not yet done
+## Promotion evidence follow-up completed
 
-`tier2_cnn_v4` does not yet have its own promotion report or operator
-review packet (the `tier2_cnn_v3` promotion framework — dataset manifest,
-grouped-split report reuse, canonical-eval suite, real CNN
-injection-recovery, false-discovery evidence, `build_promotion_report.py`
-— has not been re-run for this new candidate). `benchmark_cnn_v1` remains
-the production/frozen model; no promotion, no benchmark replacement, no
-live-search expansion follows from this evidence alone. Operator review
-and explicit signoff are still required before any promotion decision on
-`tier2_cnn_v4`, per this project's two-stage review discipline.
+The v4-specific evidence trail is now built:
+
+- Two validated training manifests cover both the real ZTF source and the
+  3,000-sample deterministic synthetic hard-negative supplement.
+- Real CNN injection recovery ran at n=200, seed=42 and records the exact
+  checkpoint SHA plus all 14 scored posteriors.
+- The per-model canonical suite passes 5/5 cases and 25/25 checks.
+- The unsigned promotion report passes all nine evidence artifacts and fails
+  closed only on `operator_signoff_missing`.
+- `docs/evidence/promotion/tier2_cnn_v4_operator_review_packet.md` presents
+  the full evidence and tradeoffs for operator review.
+
+The corrected injection evidence exposed a material behavior that was hidden
+when the report retained only detect/link/score booleans: all 14 scored
+synthetic moving-source injections have `stellar_artifact` as v4's final
+ensemble argmax. This matches `benchmark_cnn_v1` exactly on the same harness
+and differs from v3 on 8/14 cases. The result is disclosed as an operator
+judgment rather than silently converted into a new threshold.
+
+`benchmark_cnn_v1` remains the production/frozen model. No promotion,
+benchmark replacement, live-search expansion, or external submission follows
+until the operator explicitly reviews and signs the v4 packet.

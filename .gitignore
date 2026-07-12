@@ -1,5 +1,6 @@
 __pycache__/
 .venv/
+.uv-cache/
 *.py[cod]
 *.pyo
 .neo_cache/
