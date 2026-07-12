@@ -13,3 +13,4 @@
 {"night": "20191101", "scanned_count": 227496, "kept_count": 234, "ra": 29.2335, "dec": 5.6456, "radius_deg": 2.0, "min_rb": 0.5, "elapsed_seconds": 785.35, "resumed_from_checkpoint": false}
 {"night": "20210111", "scanned_count": 309952, "kept_count": 177, "ra": 114.9265, "dec": 8.8038, "radius_deg": 2.0, "min_rb": 0.5, "resumed_from_checkpoint": true}
 {"night": "20210105", "scanned_count": 256674, "kept_count": 122, "ra": 116.3469, "dec": 8.5736, "radius_deg": 2.0, "min_rb": 0.5, "elapsed_seconds": 1020.17, "resumed_from_checkpoint": false}
+{"night": "20200916", "scanned_count": 126046, "kept_count": 316, "ra": 89.3, "dec": 22.5, "radius_deg": 2.0, "min_rb": 0.5, "elapsed_seconds": 6174.42, "resumed_from_checkpoint": false}
