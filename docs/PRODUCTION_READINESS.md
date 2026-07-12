@@ -93,6 +93,32 @@ launching a materially larger production batch, the project must add:
   committed at `data/injection_recovery_image_level_n200.json`
   (detection/link/score rate 7.5%, real per-bin curves for all three new
   dimensions).
+- **2026-07-12 (operator decision): `tier2_cnn_v3` REJECTED for
+  promotion.** Operator decision, recorded verbatim: "Reject - Retune."
+  Real, model-specific adversarial evidence
+  (`Skills/evaluate_cnn_false_discovery.py`, new script) found
+  `tier2_cnn_v3` shows 100% (200/200) false-discovery on a synthetic
+  sub-pixel-artifact shape-discrimination test, versus 15.5% (31/200) for
+  the currently frozen `benchmark_cnn_v1` — confirmed both in the full
+  ensemble and in the isolated Tier 2 CNN output, so not an ensemble
+  artifact. `benchmark_cnn_v1` remains the production model. Partial
+  root-cause check (bounded streaming comparison of both models' real
+  bogus training examples' PSF FWHM distributions) ruled out "v3's
+  training data lacks narrow-artifact diversity" — both sets have nearly
+  identical proportions (17.3% vs 16.3%) of spike-like bogus examples; the
+  true cause remains open. Proposed retune: hard-negative training
+  augmentation with synthetic spike examples, producing a new
+  `tier2_cnn_v4` candidate, not yet implemented. This closure also
+  resolved the two prior open A7 evidence-quality gaps
+  (`canonical_eval_report`, `false_discovery_report` never having
+  exercised any CNN's live inference) with real, model-specific evidence
+  — `canonical_eval_report` safely substituted (5/5 cases pass for both
+  models); `false_discovery_report`'s automated gate deliberately left
+  citing Gate Z4's real-data evidence rather than silently reinterpreting
+  its 5% threshold against this much harder adversarial test. Full trail:
+  `docs/evidence/a7/2026-07-12-real-cnn-injection-recovery.md`,
+  `docs/evidence/a7/2026-07-12-cnn-adversarial-false-discovery.md`,
+  `docs/evidence/a7/2026-07-12-model-rejected-retune-required.md`.
 - **v0.90.85 (2026-07-11, doc-sync)**: Four commits landed after v0.90.81
   without a readiness-doc sync; recorded here. `mpc_training_labels_v1` and
   `tier3_transformer_pilot_v1` dataset manifests close the last two A1 gaps

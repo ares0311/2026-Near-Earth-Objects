@@ -852,7 +852,37 @@ and excluded from CI.
 
 ## Current State (v0.90.75)
 
-**Latest sync (2026-07-12, "close all gaps")**: Closed the remaining two
+**Latest sync (2026-07-12, operator decision)**: `tier2_cnn_v3` **REJECTED**
+for promotion. Operator decision, recorded verbatim: *"Reject - Retune."*
+Reason: the adversarial false-discovery finding below (100% vs. 15.5%
+false-discovery against `benchmark_cnn_v1` on a synthetic sub-pixel-artifact
+test). `benchmark_cnn_v1` remains the production/frozen model; no
+promotion, no benchmark replacement follows. Recorded in
+`docs/evidence/promotion/tier2_cnn_v3_operator_review_packet.md` §7 and
+`docs/evidence/a7/2026-07-12-model-rejected-retune-required.md`.
+
+Root-cause investigation (partial, honestly reported as such): checked
+whether `tier2_cnn_v3`'s training data simply has fewer narrow/spike-like
+bogus examples than `benchmark_cnn_v1`'s — streamed both real training
+files (637MB / 5.7GB, bounded, never fully loaded into memory) and
+measured real bogus examples' PSF FWHM using `detect.py`'s own formula.
+**Result: 17.3% vs. 16.3% below 0.3 arcsec — nearly identical.** This
+rules out "v3 lacks artifact diversity" as the explanation; the true root
+cause remains unresolved (plausibly training-run-specific generalization
+variance, not a clean single cause).
+
+**Proposed retune (not yet implemented)**: hard-negative training
+augmentation — mix synthetic sub-pixel-spike examples (reusing
+`Skills/evaluate_cnn_false_discovery.py`'s cutout synthesis) into Tier 2
+CNN training as explicit `stellar_artifact` hard negatives, producing a
+new `tier2_cnn_v4` candidate (not overwriting v3), with
+`evaluate_cnn_false_discovery.py` as the acceptance test before any future
+promotion attempt. Requires extending `Skills/train_tier2_cnn.py` (not
+started) and a real MPS retrain on an unsandboxed terminal (same pattern
+as every prior retrain in this project). Full plan:
+`docs/evidence/a7/2026-07-12-model-rejected-retune-required.md`.
+
+**Earlier sync (2026-07-12, "close all gaps")**: Closed the remaining two
 A7 evidence gaps (`canonical_eval_report`, `false_discovery_report`) per
 explicit operator direction, and found something more consequential than
 an evidence-quality fix along the way.

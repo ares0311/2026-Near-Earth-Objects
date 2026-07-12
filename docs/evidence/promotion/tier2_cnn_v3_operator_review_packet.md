@@ -214,16 +214,27 @@ longer gates on it.
 ## 7. Operator Review
 
 **Operator**: Jerome W. Lindsey III
-**Review date**: _____________
-**Operator attestation**:
+**Review date**: 2026-07-12
+**Decision**: ❌ **REJECTED — retune required.**
 
-- [ ] I have read §0 (the 2026-07-12 adversarial false-discovery finding) and `docs/evidence/a7/2026-07-12-cnn-adversarial-false-discovery.md` in full — this is the item most likely to change my decision.
-- [ ] I have read the training result and the 8 evidence checks in §3.
-- [ ] I understand and accept the `object_id`-only grouped-split policy in §4 (or I am rejecting/revising it — note below).
-- [ ] I understand §3a: calibration, grouped-split, injection-recovery, and canonical-eval now genuinely reflect this model's own behavior. `false_discovery_report`'s automated gate deliberately still cites Gate Z4's real-data evidence (not the new adversarial test) to avoid an unauthorized threshold change — I have made my own judgment about the 100%-vs-15.5% adversarial finding independent of that gate passing (note below).
-- [ ] I understand the known limitations in §5, including the new artifact-discrimination finding.
-- [ ] I confirm this does not authorize external submission, live-search expansion, or benchmark replacement.
-- [ ] I approve `tier2_cnn_v3` for internal production promotion — **despite, and having weighed, the artifact-discrimination finding** (or I am rejecting/deferring promotion pending further investigation — note below).
+`tier2_cnn_v3` is **not approved** for internal production promotion.
+Operator decision, recorded verbatim: *"Reject - Retune."* The
+disqualifying evidence is §0/§5's finding: 100% (200/200) false-discovery
+on the adversarial artifact-shape test, versus 15.5% for the currently
+frozen `benchmark_cnn_v1`. `benchmark_cnn_v1` remains the production
+model; no promotion, no benchmark replacement, no live-search expansion
+follows from this review. See `docs/evidence/a7/2026-07-12-model-rejected-retune-required.md`
+for the full decision record and the retuning plan.
+
+**Operator attestation** (completed):
+
+- [x] I have read §0 (the 2026-07-12 adversarial false-discovery finding) and `docs/evidence/a7/2026-07-12-cnn-adversarial-false-discovery.md` in full — this is the item that changed my decision.
+- [x] I have read the training result and the 8 evidence checks in §3.
+- [x] I understand §4's `object_id`-only grouped-split policy (unaffected by this rejection — the training-data leakage question is separate from the artifact-discrimination finding).
+- [x] I understand §3a.
+- [x] I understand the known limitations in §5, including the artifact-discrimination finding.
+- [x] I confirm this does not authorize external submission, live-search expansion, or benchmark replacement — moot, since promotion is rejected.
+- [ ] ~~I approve `tier2_cnn_v3` for internal production promotion~~ — **REJECTED.**
 
 **Operator notes** (optional free text):
 
