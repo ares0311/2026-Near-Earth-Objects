@@ -114,11 +114,20 @@ launching a materially larger production batch, the project must add:
   `Skills/evaluate_cnn_false_discovery.py`'s artifact math with a
   configurable sigma range rather than one fixed value — into the training
   split only. 32 new tests, full suite 1892/2 passed/deselected, verified
-  genuinely wired via a bounded in-sandbox smoke test. The real MPS retrain
-  producing `tier2_cnn_v4` and the `evaluate_cnn_false_discovery.py`
-  acceptance-test re-run are still NOT YET DONE — see
-  `docs/evidence/a7/2026-07-12-hard-negative-augmentation-implemented.md`
-  for the exact pending command. This closure also
+  genuinely wired via a bounded in-sandbox smoke test.
+  **Real MPS retrain completed same day, retune SUCCEEDED**: operator ran
+  the real retrain + acceptance test + recalibration (19m01s total).
+  `tier2_cnn_v4` scored 0.0% (0/200) false-discovery on the same
+  adversarial test that rejected `tier2_cnn_v3` (100%) — better than
+  `benchmark_cnn_v1` (15.5%) — and all 7 T1-D calibration KPIs pass on real
+  data, with numbers matching or slightly exceeding `tier2_cnn_v3`'s real
+  calibration (hard-negative augmentation did not degrade real-world
+  performance). `benchmark_cnn_v1` remains the production model; no
+  promotion follows from this evidence alone — `tier2_cnn_v4` still needs
+  its own promotion evidence trail (injection-recovery, canonical-eval
+  suite, promotion report) before an operator review/signoff decision. See
+  `docs/evidence/a7/2026-07-12-tier2_cnn_v4-real-retrain-and-acceptance-test.md`.
+  This closure also
   resolved the two prior open A7 evidence-quality gaps
   (`canonical_eval_report`, `false_discovery_report` never having
   exercised any CNN's live inference) with real, model-specific evidence

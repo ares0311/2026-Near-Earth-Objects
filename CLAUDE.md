@@ -852,57 +852,41 @@ and excluded from CI.
 
 ## Current State (v0.90.75)
 
-**Latest sync (2026-07-12, hard-negative augmentation implemented)**:
-`Skills/train_tier2_cnn.py` now supports `--n-hard-negatives` — mixes N
-synthetic `stellar_artifact` hard negatives (reusing
-`Skills/evaluate_cnn_false_discovery.py`'s artifact-synthesis math, now
-refactored to accept a configurable `sigma_px` instead of one fixed value)
-into the TRAINING split only, via a new module-level `SyntheticArtifactDataset`.
-Off by default (`--n-hard-negatives 0`, opt-in only, no change to any
-existing invocation). 32 new/updated tests, `ruff`/`mypy` clean, full
-offline suite 1892 passed / 2 deselected. Verified genuinely wired (not a
-no-op) via a bounded in-sandbox CPU smoke test: 20 synthetic hard negatives
-+ 26 real train rows → 46 total training samples, class weights
-recomputed to reflect the combined composition. Full detail:
-`docs/evidence/a7/2026-07-12-hard-negative-augmentation-implemented.md`.
+**Latest sync (2026-07-12, tier2_cnn_v4 real retrain — retune SUCCEEDED)**:
+Operator ran the real MPS retrain + acceptance test + recalibration
+command block (19m01s total, one terminal tab, sequential). **The retune
+worked**: `tier2_cnn_v4` scored **0.0% (0/200) false-discovery** on
+`Skills/evaluate_cnn_false_discovery.py`'s adversarial test — down from
+`tier2_cnn_v3`'s 100% (the rejection evidence) and better than
+`benchmark_cnn_v1`'s 15.5%. All 7 T1-D calibration KPIs also PASS on real
+data (`promotion_gate_passed: true`), with numbers essentially matching or
+slightly better than `tier2_cnn_v3`'s real-data calibration (Isotonic
+Brier 0.0192 both, ECE 0.0048 vs 0.0054, ROC AUC 0.9950 vs 0.9954) — the
+hard-negative augmentation did not degrade real-world calibration. Full
+detail, including the honest caveat that the 0.0% result is against the
+same artifact-shape family the model was deliberately trained to reject
+(by design — the calibration KPIs are the independent real-data check):
+`docs/evidence/a7/2026-07-12-tier2_cnn_v4-real-retrain-and-acceptance-test.md`.
 
-**Next command (NOT YET RUN)** — real MPS retrain producing `tier2_cnn_v4`,
-using the already-real, already-passing `tier2_cnn_v3_grouped_split_report.json`
-(hard negatives are added only inside `train()`'s in-memory training set,
-never touching the split CSV, so the existing split report still applies):
+`benchmark_cnn_v1` remains the production/frozen model; no promotion
+follows from this evidence alone. `models/tier2_cnn_v4.pt` and its two
+local report JSONs are on the operator's Mac (not yet committed —
+`models/` requires explicit filename allowlisting per this repo's artifact
+policy).
 
-```bash
-git pull origin main
-export PYTHONPATH=src
-
-caffeinate -i uv run --python 3.14 python Skills/train_tier2_cnn.py \
-    --labels data/cutouts_v3/index.csv \
-    --epochs 20 \
-    --num-workers 8 \
-    --n-hard-negatives 3000 \
-    --out models/tier2_cnn_v4.pt \
-    --grouped-split-report Logs/reports/tier2_cnn_v3_grouped_split_report.json \
-    --production-candidate
-
-# Acceptance test -- the retune is only "done" when this measured gap
-# closes (tier2_cnn_v3 scored 100% here; benchmark_cnn_v1 scored 15.5%):
-caffeinate -i uv run --python 3.14 python Skills/evaluate_cnn_false_discovery.py \
-    --cnn-model models/tier2_cnn_v4.pt --n-artifacts 200 --seed 42 \
-    --json Logs/reports/cnn_false_discovery_tier2_cnn_v4.json
-
-# Recalibrate (T1-D KPIs repeated for any new candidate):
-caffeinate -i uv run --python 3.14 python Skills/evaluate_calibration.py \
-    --alerts data/ztf_labeled_alerts_v3.json \
-    --cutouts-csv data/cutouts_v3/index.csv \
-    --cnn-model models/tier2_cnn_v4.pt \
-    --report-out Logs/reports/calibration_report_v4.json
-```
-
-`--n-hard-negatives 3000` is a starting recommendation (~16% addition to
-`tier2_cnn_v3`'s real 18,871 bogus training examples), not a tuned
-hyperparameter — the acceptance test above validates it, not the count in
-isolation. Not sharded: single MPS training job, same as every prior
-retrain in this project.
+**Next step (NOT YET DONE)**: build `tier2_cnn_v4`'s own promotion
+evidence trail, mirroring what was done for `tier2_cnn_v3` — a real CNN
+injection-recovery run (`Skills/injection_recovery.py --image-level
+--cnn-model models/tier2_cnn_v4.pt`), a per-model canonical-eval suite
+(`data_selection/canonical_evals/production_suite_tier2_cnn_v4_v1.json`,
+same pattern as the v3/benchmark_v1 suites), and a promotion
+report/operator review packet via `Skills/build_promotion_report.py` and
+`Skills/extract_promotion_evidence.py`, citing this session's real
+calibration and false-discovery results plus the reused
+`tier2_cnn_v3_grouped_split_report.json` and `data_selection/dataset_manifest`
+for `data/cutouts_v3/index.csv` (unaffected by hard-negative augmentation,
+still valid for v4). `operator_signoff_missing` will remain the final,
+inherently human-gated blocker after that packet is built.
 
 **Earlier sync (2026-07-12, operator decision)**: `tier2_cnn_v3`
 **REJECTED** for promotion. Operator decision, recorded verbatim: *"Reject
