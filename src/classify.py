@@ -372,8 +372,12 @@ def _cnn_heartbeat(label: str, stop_event: Any, interval: float = 5.0) -> None:
         print(f"  {label} … still working ({m}m{s:02d}s elapsed)", flush=True)
 
 
-def _load_cnn_model() -> Any:
-    model_path = _MODEL_DIR / "tier2_cnn.pt"
+def _load_cnn_model(model_path: Path | str | None = None) -> Any:
+    """Load Tier 2 CNN weights. Defaults to the frozen benchmark checkpoint
+    (models/tier2_cnn.pt); pass model_path to load a different candidate
+    (e.g. models/tier2_cnn_v3.pt) for injection-recovery or evaluation
+    against a specific, non-default model."""
+    model_path = Path(model_path) if model_path is not None else _MODEL_DIR / "tier2_cnn.pt"
     if not model_path.exists():
         return None
     try:

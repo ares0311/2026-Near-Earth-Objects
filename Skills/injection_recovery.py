@@ -4,8 +4,25 @@
 Injects synthetic moving objects into a background of real observations and
 measures how many are successfully detected, linked, classified, and scored.
 
+By default (and with --image-level alone), the real_bogus score used
+throughout is an analytic SNR-based proxy (see _analytic_real_bogus) --
+this exercises pipeline mechanics (detect.py's threshold, link.py,
+score.py) but never runs any trained CNN's real inference, since
+classify.py's _tier2_predict requires a full science/reference/difference
+cutout triplet that this mode never synthesizes. Found and documented
+2026-07-11 while investigating whether a promoted model's injection-
+recovery evidence actually reflected its own behavior (it didn't, for any
+CNN candidate to date).
+
+Pass --image-level --cnn-model <path> to synthesize full triplets and run
+real inference through a specific Tier 2 CNN checkpoint (e.g.
+models/tier2_cnn_v3.pt), so recovery curves and hazard-flag outcomes
+reflect that model's actual classification behavior.
+
 Usage:
     PYTHONPATH=src python Skills/injection_recovery.py [--n-inject 50] [--seed 42]
+    PYTHONPATH=src python Skills/injection_recovery.py --image-level \\
+        --cnn-model models/tier2_cnn_v3.pt
 """
 
 from __future__ import annotations
@@ -118,6 +135,56 @@ def _synthesize_difference_cutout(
     return cutout_b64, real_bogus
 
 
+def _synthesize_cutout_triplet(
+    rng: np.random.Generator,
+    mag: float,
+    seeing_arcsec: float,
+    background_level: float,
+    trail_length_arcsec: float,
+) -> tuple[str, str, str, float]:
+    """Build science/reference/difference cutouts for real Tier 2 CNN
+    inference (classify.py's _tier2_predict requires all three).
+
+    The existing image-level harness only ever produced a difference cutout
+    and derived real_bogus analytically (_synthesize_difference_cutout),
+    because that was sufficient for testing detect.py's threshold and
+    pipeline mechanics. It was never sufficient to exercise the trained
+    CNN's own inference, since _tier2_predict returns None unless
+    cutout_science, cutout_reference, and cutout_difference are all present.
+
+    Convention (not claimed to be photometrically exact -- this is a
+    synthetic harness with an arbitrary flux zeropoint, same caveat as
+    _synthesize_difference_cutout): reference = pure background noise, no
+    source. difference = EXACTLY what _synthesize_difference_cutout already
+    produces (source + independent noise at background_level), unchanged,
+    so existing analytic-real_bogus recovery curves and committed baselines
+    stay reproducible. science = reference + difference, which makes
+    science - reference == difference hold exactly by construction, giving
+    the CNN a structurally consistent triplet even though per-pixel noise
+    isn't independently drawn for science vs. difference.
+
+    Returns (science_b64, reference_b64, difference_b64, real_bogus_proxy).
+    The proxy is still computed and returned for detect.py's pre-filter
+    (matching real ZTF pipelines, where detect() gates on the survey's own
+    native real/bogus score, separate from this project's own CNN, which
+    only runs inside classify()).
+    """
+    diff_b64, real_bogus = _synthesize_difference_cutout(
+        rng, mag, seeing_arcsec, background_level, trail_length_arcsec
+    )
+    diff_arr = np.frombuffer(base64.b64decode(diff_b64), dtype=np.float32).reshape(
+        _CUTOUT_SIZE, _CUTOUT_SIZE
+    )
+    reference_arr = rng.normal(0.0, background_level, size=(_CUTOUT_SIZE, _CUTOUT_SIZE)).astype(
+        np.float32
+    )
+    science_arr = reference_arr + diff_arr
+
+    reference_b64 = base64.b64encode(reference_arr.tobytes()).decode()
+    science_b64 = base64.b64encode(science_arr.tobytes()).decode()
+    return science_b64, reference_b64, diff_b64, real_bogus
+
+
 def _make_obs(
     obs_id: str,
     jd: float,
@@ -129,6 +196,8 @@ def _make_obs(
     mag_err: float = 0.05,
     real_bogus: float | None = 0.92,
     cutout_difference: str | None = None,
+    cutout_science: str | None = None,
+    cutout_reference: str | None = None,
 ) -> Observation:
     return Observation(
         obs_id=obs_id,
@@ -141,6 +210,8 @@ def _make_obs(
         mission=mission,
         real_bogus=real_bogus,
         cutout_difference=cutout_difference,
+        cutout_science=cutout_science,
+        cutout_reference=cutout_reference,
     )
 
 
@@ -191,6 +262,7 @@ def inject_synthetic_neo_image_level(
     seeing_arcsec: float = 1.5,
     background_level: float = 10.0,
     trail_length_arcsec: float = 0.0,
+    cnn_scoring: bool = False,
 ) -> tuple[Observation, ...]:
     """Generate a ZTF-cadence NEO tracklet with synthesized difference cutouts.
 
@@ -201,6 +273,13 @@ def inject_synthetic_neo_image_level(
     fixed constant -- so detect()'s real/bogus threshold, and detect.py's own
     compute_psf_fwhm/compute_streak_metric measurements, respond to these
     image-level parameters for A6 recovery curves.
+
+    cnn_scoring=True additionally synthesizes cutout_science/cutout_reference
+    (see _synthesize_cutout_triplet) so classify.py's _tier2_predict has the
+    full triplet it requires to run real CNN inference, rather than the
+    default (cnn_scoring=False) behavior of only ever populating
+    cutout_difference, which _tier2_predict cannot act on. Default is False
+    to keep existing committed baselines exactly reproducible.
     """
     rng = np.random.default_rng(seed)
     dra_per_hr = motion_arcsec_per_hr / 3600.0
@@ -210,9 +289,15 @@ def inject_synthetic_neo_image_level(
         ra_base = ra0 + night * dra_per_hr * 24
         for label, dt_hr in (("a", 0.0), ("b", 1.0)):
             obs_mag = mag + rng.normal(0, 0.05)
-            cutout_b64, real_bogus = _synthesize_difference_cutout(
-                rng, obs_mag, seeing_arcsec, background_level, trail_length_arcsec
-            )
+            if cnn_scoring:
+                sci_b64, ref_b64, diff_b64, real_bogus = _synthesize_cutout_triplet(
+                    rng, obs_mag, seeing_arcsec, background_level, trail_length_arcsec
+                )
+            else:
+                diff_b64, real_bogus = _synthesize_difference_cutout(
+                    rng, obs_mag, seeing_arcsec, background_level, trail_length_arcsec
+                )
+                sci_b64 = ref_b64 = None
             obs.append(
                 _make_obs(
                     f"inj_img_{seed}_n{night}{label}",
@@ -221,7 +306,9 @@ def inject_synthetic_neo_image_level(
                     dec0 + rng.normal(0, 0.5 / 3600.0),
                     obs_mag,
                     real_bogus=real_bogus,
-                    cutout_difference=cutout_b64,
+                    cutout_difference=diff_b64,
+                    cutout_science=sci_b64,
+                    cutout_reference=ref_b64,
                 )
             )
     return tuple(obs)
@@ -296,13 +383,32 @@ _CHECKPOINT_ROOT = Path("Logs/pipeline_runs/injection_recovery")
 
 
 def _checkpoint_key(
-    n_inject: int, seed: int, mission: str, *, image_level: bool = False
+    n_inject: int,
+    seed: int,
+    mission: str,
+    *,
+    image_level: bool = False,
+    cnn_model_path: str | None = None,
 ) -> str:
     """Stable checkpoint key from the exact run parameters, so re-running the
     identical command finds and resumes the existing checkpoint instead of
-    starting over (checkpoint/resume standing rule)."""
+    starting over (checkpoint/resume standing rule).
+
+    cnn_model_path is included deliberately: a real bug found 2026-07-11 in
+    Skills/ztf_alert_archive_ingest.py showed that a checkpoint keyed
+    without one of its defining parameters can silently resume with a
+    *different* run's cached results under the new request's label. Two
+    runs that differ only in which CNN model was scored must never share a
+    checkpoint.
+    """
     payload = json.dumps(
-        {"n_inject": n_inject, "seed": seed, "mission": mission, "image_level": image_level},
+        {
+            "n_inject": n_inject,
+            "seed": seed,
+            "mission": mission,
+            "image_level": image_level,
+            "cnn_model_path": cnn_model_path,
+        },
         sort_keys=True,
     )
     return hashlib.md5(payload.encode()).hexdigest()[:12]
@@ -324,6 +430,7 @@ def run_injection_recovery(
     review_packet_out: Path | None = None,
     checkpoint_root: Path | None = None,
     image_level: bool = False,
+    cnn_model_path: Path | None = None,
 ) -> dict:
     """Run the injection-recovery test and return summary statistics.
 
@@ -338,6 +445,17 @@ def run_injection_recovery(
     inject_synthetic_neo_image_level) so the A6 recovery curves cover those
     three image-level dimensions, not just mag/motion/n_observations/n_nights.
 
+    ``cnn_model_path`` (requires image_level=True) loads that specific Tier 2
+    CNN checkpoint and passes it into every classify() call, and synthesizes
+    full science/reference/difference cutout triplets (not just difference)
+    so classify.py's _tier2_predict actually runs real inference through
+    this model rather than returning None. Without this, injection-recovery
+    never exercised any CNN's live weights at all -- verified 2026-07-11 by
+    reading _tier2_predict's triplet requirement and
+    _analytic_real_bogus's docstring. Recovery curves and hazard-flag
+    outcomes with cnn_model_path set reflect this specific model's actual
+    classification behavior, not just pipeline mechanics.
+
     If ``review_packet_out`` is given, every recovered candidate's full
     ``ScoredNEO`` packet is written to that path as a JSON list — the same
     format ``Skills/run_pipeline.py --review-packet-out`` produces, so the
@@ -345,17 +463,47 @@ def run_injection_recovery(
     ``Skills/export_ades_report.py`` for the Gate P3 no-submission drill.
 
     Checkpoints after every item to ``<checkpoint_root>/<key>/checkpoint.json``
-    (key derived from n_inject/seed/mission/image_level), including the RNG's
-    own serializable bit-generator state, so a kill/sleep mid-run and
-    re-running the identical command resumes from the next un-completed item
-    instead of losing prior work or silently diverging from a from-scratch run.
+    (key derived from n_inject/seed/mission/image_level/cnn_model_path),
+    including the RNG's own serializable bit-generator state, so a kill/sleep
+    mid-run and re-running the identical command resumes from the next
+    un-completed item instead of losing prior work or silently diverging
+    from a from-scratch run. cnn_model_path is part of the key so two runs
+    scoring different models never share a checkpoint.
     """
     if image_level and mission != "ZTF":
         raise ValueError("image_level=True is only supported for mission='ZTF'")
+    if cnn_model_path is not None and not image_level:
+        raise ValueError("cnn_model_path requires image_level=True")
 
     root = checkpoint_root if checkpoint_root is not None else _CHECKPOINT_ROOT
-    key = _checkpoint_key(n_inject, seed, mission, image_level=image_level)
+    key = _checkpoint_key(
+        n_inject,
+        seed,
+        mission,
+        image_level=image_level,
+        cnn_model_path=str(cnn_model_path) if cnn_model_path else None,
+    )
     checkpoint_path = root / key / "checkpoint.json"
+
+    loaded_cnn = None
+    if cnn_model_path is not None:
+        # Import lazily -- keeps the non-CNN-scoring path free of a torch
+        # dependency, matching classify.py's own lazy-import convention.
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+        from classify import _load_cnn_model
+
+        print(f"Loading Tier 2 CNN for real inference: {cnn_model_path}", flush=True)
+        loaded_cnn = _load_cnn_model(cnn_model_path)
+        if loaded_cnn is None:
+            raise ValueError(
+                f"cnn_model_path={cnn_model_path} could not be loaded "
+                "(file missing, torch unavailable, or weights failed to load) "
+                "-- refusing to silently fall back to analytic-only scoring."
+            )
+        print(
+            "Tier 2 CNN loaded — recovery curves will reflect this model's real inference.",
+            flush=True,
+        )
 
     rng = np.random.default_rng(seed)
 
@@ -428,6 +576,7 @@ def run_injection_recovery(
                 seeing_arcsec=float(seeing),
                 background_level=float(background),
                 trail_length_arcsec=float(trail),
+                cnn_scoring=cnn_model_path is not None,
             )
         else:
             mag = rng.uniform(18.0, 21.0)
@@ -453,7 +602,7 @@ def run_injection_recovery(
             t = link_result.tracklets[0]
             features = extract_features(t)
             orbital = fit_orbit(t)
-            features_cls, posterior = classify(t, features)
+            features_cls, posterior = classify(t, features, cnn_model=loaded_cnn)
             scored = score(t, features_cls, posterior, orbital)
             n_scored += 1
             scored_packet = True
@@ -488,6 +637,7 @@ def run_injection_recovery(
                 "seed": seed,
                 "mission": mission,
                 "image_level": image_level,
+                "cnn_model_path": str(cnn_model_path) if cnn_model_path else None,
                 "completed": i + 1,
                 "n_detected": n_detected,
                 "n_linked": n_linked,
@@ -519,6 +669,8 @@ def run_injection_recovery(
         "n_detected": n_detected,
         "n_linked": n_linked,
         "n_scored": n_scored,
+        "cnn_model_path": str(cnn_model_path) if cnn_model_path else None,
+        "cnn_scoring": cnn_model_path is not None,
         "detection_rate": n_detected / max(n_inject, 1),
         "link_rate": n_linked / max(n_inject, 1),
         "score_rate": n_scored / max(n_inject, 1),
@@ -573,15 +725,32 @@ def main() -> None:
             "curves. Only supported with --survey ZTF."
         ),
     )
+    parser.add_argument(
+        "--cnn-model",
+        metavar="PATH",
+        help=(
+            "Path to a specific Tier 2 CNN checkpoint (e.g. models/tier2_cnn_v3.pt). "
+            "Requires --image-level. Synthesizes full science/reference/difference "
+            "cutout triplets and loads this model for real inference inside "
+            "classify(), so recovery curves and hazard-flag outcomes reflect this "
+            "model's actual classification behavior -- not the analytic real_bogus "
+            "proxy used by --image-level alone, which never exercises any CNN's "
+            "live weights."
+        ),
+    )
     args = parser.parse_args()
 
     if args.image_level and args.survey != "ZTF":
         print(f"ERROR: --image-level is only supported with --survey ZTF, got {args.survey}")
         sys.exit(1)
+    if args.cnn_model and not args.image_level:
+        print("ERROR: --cnn-model requires --image-level")
+        sys.exit(1)
 
     print(
         f"Injection-recovery test: {args.n_inject} synthetic {args.survey} NEOs "
-        f"(seed={args.seed}, image_level={args.image_level})"
+        f"(seed={args.seed}, image_level={args.image_level}, "
+        f"cnn_model={args.cnn_model or 'none (analytic proxy only)'})"
     )
     print("-" * 50)
 
@@ -592,6 +761,7 @@ def main() -> None:
         review_packet_out=Path(args.review_packet_out) if args.review_packet_out else None,
         checkpoint_root=Path(args.checkpoint_root) if args.checkpoint_root else None,
         image_level=args.image_level,
+        cnn_model_path=Path(args.cnn_model) if args.cnn_model else None,
     )
 
     n = results["n_injected"]

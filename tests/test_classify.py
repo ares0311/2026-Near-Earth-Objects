@@ -457,6 +457,29 @@ class TestBuildCnnModel:
         monkeypatch.setattr(cls_mod, "_MODEL_DIR", tmp_path)
         assert cls_mod._load_cnn_model() is None
 
+    def test_load_cnn_model_accepts_explicit_path_override(self, tmp_path, monkeypatch):
+        """model_path lets callers load a specific candidate (e.g. a
+        promotion-candidate checkpoint) without touching _MODEL_DIR or the
+        default tier2_cnn.pt -- needed so injection-recovery can evaluate a
+        non-default model like tier2_cnn_v3.pt."""
+        import torch
+
+        # _MODEL_DIR deliberately left pointing at the real repo models/ dir
+        # (unset) to prove the explicit path is what's actually used, not a
+        # coincidental match with the default.
+        model = cls_mod._build_cnn_model()
+        assert model is not None
+        candidate_path = tmp_path / "some_other_candidate.pt"
+        torch.save(model.state_dict(), str(candidate_path))
+
+        loaded = cls_mod._load_cnn_model(candidate_path)
+        assert loaded is not None
+
+    def test_load_cnn_model_explicit_path_missing_returns_none(self, tmp_path):
+        """A non-existent explicit path must fail closed, same as the
+        default-path case."""
+        assert cls_mod._load_cnn_model(tmp_path / "does_not_exist.pt") is None
+
     def test_conv_branch_state_dict_keys_unchanged_by_mps_workaround(self):
         """Regression guard: ConvBranch.forward() was rewritten to route
         AdaptiveAvgPool2d through CPU on MPS (PyTorch does not implement

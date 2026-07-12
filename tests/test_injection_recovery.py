@@ -31,6 +31,21 @@ class TestCheckpointKey:
             10, 42, "ZTF", image_level=True
         )
 
+    def test_different_cnn_model_path_different_key(self):
+        """Real bug precedent (Skills/ztf_alert_archive_ingest.py, 2026-07-11):
+        a checkpoint not keyed on every defining parameter can silently
+        resume with a different run's cached results. Two runs scoring
+        different CNN models must never share a checkpoint."""
+        base = ir._checkpoint_key(10, 42, "ZTF", image_level=True)
+        with_model_a = ir._checkpoint_key(
+            10, 42, "ZTF", image_level=True, cnn_model_path="models/tier2_cnn.pt"
+        )
+        with_model_b = ir._checkpoint_key(
+            10, 42, "ZTF", image_level=True, cnn_model_path="models/tier2_cnn_v3.pt"
+        )
+        assert base != with_model_a != with_model_b
+        assert len({base, with_model_a, with_model_b}) == 3
+
 
 class TestImageLevelSynthesis:
     """A6: seeing/background/trail-length recovery curves."""
@@ -90,6 +105,144 @@ class TestImageLevelSynthesis:
             ir.run_injection_recovery(
                 n_inject=1, seed=1, mission="WISE", checkpoint_root=tmp_path, image_level=True
             )
+
+
+class TestCutoutTriplet:
+    """Real bug found 2026-07-11: classify.py's _tier2_predict requires all
+    three cutouts (science, reference, difference) to run inference at all --
+    the pre-existing --image-level harness only ever populated
+    cutout_difference, so no CNN's live weights were ever exercised by
+    injection-recovery. _synthesize_cutout_triplet closes that gap."""
+
+    def test_science_minus_reference_equals_difference(self):
+        rng = np.random.default_rng(0)
+        sci_b64, ref_b64, diff_b64, real_bogus = ir._synthesize_cutout_triplet(
+            rng, 19.5, 1.5, 10.0, 0.0
+        )
+        sci = np.frombuffer(base64.b64decode(sci_b64), dtype=np.float32)
+        ref = np.frombuffer(base64.b64decode(ref_b64), dtype=np.float32)
+        diff = np.frombuffer(base64.b64decode(diff_b64), dtype=np.float32)
+
+        assert sci.size == ref.size == diff.size == ir._CUTOUT_SIZE * ir._CUTOUT_SIZE
+        np.testing.assert_allclose(sci - ref, diff, rtol=1e-5, atol=1e-5)
+
+    def test_difference_cutout_matches_existing_analytic_function_exactly(self):
+        """The triplet's difference image and real_bogus must be byte-for-
+        byte identical to the pre-existing (unmodified) function, so
+        existing committed baselines stay reproducible when
+        cnn_scoring=False is used elsewhere."""
+        rng_a = np.random.default_rng(5)
+        rng_b = np.random.default_rng(5)
+        expected_diff_b64, expected_rb = ir._synthesize_difference_cutout(
+            rng_a, 19.0, 2.0, 15.0, 1.0
+        )
+        _, _, actual_diff_b64, actual_rb = ir._synthesize_cutout_triplet(
+            rng_b, 19.0, 2.0, 15.0, 1.0
+        )
+        assert actual_diff_b64 == expected_diff_b64
+        assert actual_rb == expected_rb
+
+    def test_inject_synthetic_neo_image_level_cnn_scoring_sets_all_three_cutouts(self):
+        obs = ir.inject_synthetic_neo_image_level(
+            seed=1, n_nights=3, seeing_arcsec=1.5, background_level=10.0,
+            trail_length_arcsec=0.0, cnn_scoring=True,
+        )
+        assert len(obs) == 6
+        for ob in obs:
+            assert ob.cutout_science is not None
+            assert ob.cutout_reference is not None
+            assert ob.cutout_difference is not None
+
+    def test_inject_synthetic_neo_image_level_default_still_omits_triplet(self):
+        """cnn_scoring defaults to False -- existing callers/baselines must
+        see exactly the pre-existing behavior (difference cutout only)."""
+        obs = ir.inject_synthetic_neo_image_level(seed=1, n_nights=3)
+        for ob in obs:
+            assert ob.cutout_science is None
+            assert ob.cutout_reference is None
+            assert ob.cutout_difference is not None
+
+
+class TestCnnScoring:
+    """Real Tier 2 CNN inference wired into injection-recovery, per the
+    2026-07-11 operator direction to close the gap where injection-recovery
+    evidence never reflected any promoted model's actual behavior."""
+
+    @pytest.fixture
+    def tiny_model_path(self, tmp_path):
+        """A real, freshly-initialized (untrained, random-weight) CNN
+        checkpoint -- enough to prove the wiring actually invokes this
+        specific file's weights, without needing a full training run."""
+        import torch
+
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+        from classify import _build_cnn_model
+
+        model = _build_cnn_model()
+        assert model is not None
+        path = tmp_path / "test_candidate.pt"
+        torch.save(model.state_dict(), str(path))
+        return path
+
+    def test_cnn_model_path_requires_image_level(self, tmp_path, tiny_model_path):
+        with pytest.raises(ValueError, match="requires image_level=True"):
+            ir.run_injection_recovery(
+                n_inject=1,
+                seed=1,
+                mission="ZTF",
+                checkpoint_root=tmp_path,
+                image_level=False,
+                cnn_model_path=tiny_model_path,
+            )
+
+    def test_missing_cnn_model_fails_closed(self, tmp_path):
+        with pytest.raises(ValueError, match="could not be loaded"):
+            ir.run_injection_recovery(
+                n_inject=1,
+                seed=1,
+                mission="ZTF",
+                checkpoint_root=tmp_path,
+                image_level=True,
+                cnn_model_path=tmp_path / "does_not_exist.pt",
+            )
+
+    def test_real_cnn_run_reports_model_provenance(self, tmp_path, tiny_model_path):
+        result = ir.run_injection_recovery(
+            n_inject=3,
+            seed=2,
+            mission="ZTF",
+            checkpoint_root=tmp_path,
+            image_level=True,
+            cnn_model_path=tiny_model_path,
+        )
+        assert result["cnn_scoring"] is True
+        assert result["cnn_model_path"] == str(tiny_model_path)
+        assert result["n_injected"] == 3
+
+    def test_different_cnn_models_do_not_share_a_checkpoint(self, tmp_path, tiny_model_path):
+        """A second model at a different path must not resume from the
+        first model's checkpoint, even with identical n_inject/seed."""
+        import torch
+
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+        from classify import _build_cnn_model
+
+        other_model = _build_cnn_model()
+        other_path = tmp_path / "other_candidate.pt"
+        torch.save(other_model.state_dict(), str(other_path))
+
+        ir.run_injection_recovery(
+            n_inject=2, seed=9, mission="ZTF", checkpoint_root=tmp_path,
+            image_level=True, cnn_model_path=tiny_model_path,
+        )
+        key_a = ir._checkpoint_key(
+            2, 9, "ZTF", image_level=True, cnn_model_path=str(tiny_model_path)
+        )
+        key_b = ir._checkpoint_key(
+            2, 9, "ZTF", image_level=True, cnn_model_path=str(other_path)
+        )
+        assert key_a != key_b
+        assert not (tmp_path / key_b / "checkpoint.json").exists()
 
 
 class TestAtomicWriteJson:
