@@ -39,7 +39,7 @@
       },
       "name": "injection_recovery_report",
       "passed": true,
-      "path": "docs/evidence/promotion/benchmark_cnn_v1_injection_recovery.json"
+      "path": "docs/evidence/promotion/tier2_cnn_v3_real_cnn_injection_recovery.json"
     },
     {
       "blockers": [],

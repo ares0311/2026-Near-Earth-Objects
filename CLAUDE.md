@@ -852,7 +852,29 @@ and excluded from CI.
 
 ## Current State (v0.90.75)
 
-**Latest sync (2026-07-11/12)**: First genuinely new (non-Z3-tied) ZTF DR24
+**Latest sync (2026-07-12)**: Closed a real evidence-quality gap in the
+`tier2_cnn_v3` promotion packet, per explicit operator direction. Found
+2026-07-11 while answering "did this model pass all tests the System
+Directives require": `injection_recovery_report` (along with
+`canonical_eval_report`/`false_discovery_report`) never exercised any CNN
+candidate's live inference — `classify.py`'s `_tier2_predict()` requires a
+full science/reference/difference cutout triplet, and the injection-
+recovery harness only ever synthesized `cutout_difference`. Fixed:
+`_load_cnn_model()` now accepts an explicit `model_path`;
+`Skills/injection_recovery.py` gained `--cnn-model` plus real triplet
+synthesis (commit `75899a3d`). Re-ran for real, n=200 seed=42, against
+**both** `tier2_cnn_v3` and `benchmark_cnn_v1` (operator: "if we need to
+roll back and do this for the last CNN then let's do so") — 14/200 scored
+for each, and 8 of those 14 tracklets show genuinely different posteriors
+between the two models (e.g. stellar_artifact 0.771 vs 0.438), confirming
+real, distinct model behavior. Promotion report regenerated citing the new
+real evidence; `operator_signoff_missing` remains the sole blocker
+(unchanged — an evidence-quality gap closure, not the signoff itself).
+`canonical_eval_report`/`false_discovery_report` remain pipeline-level,
+explicitly flagged as still open, out of this session's scope. Full
+detail: `docs/evidence/a7/2026-07-12-real-cnn-injection-recovery.md`.
+
+**Earlier sync (2026-07-11/12)**: First genuinely new (non-Z3-tied) ZTF DR24
 discovery sweep run to completion. Field selected via
 `Skills/select_survey_fields.py --mode aten` (RA 89.3, Dec 22.5, score
 0.9238) rather than a known-designation-tracking field. Real UW archive

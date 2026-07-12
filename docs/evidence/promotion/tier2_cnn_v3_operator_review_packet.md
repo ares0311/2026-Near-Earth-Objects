@@ -46,55 +46,63 @@ the way; see `docs/evidence/a7/2026-07-10-seventh-attempt-mps-adaptive-pool-bug-
 ## 3. A7 promotion evidence — all 8 checks, real values
 
 **Read this table with the "Reflects this model?" column, not just the pass column.**
-Three of these eight checks do not exercise `tier2_cnn_v3`'s actual trained
-weights at all — verified by reading the underlying code, not assumed. Full
-explanation in §3a below the table.
+As of 2026-07-12, injection-recovery is now genuinely model-specific
+(closed, see §3a). Two checks still are not — verified by reading the
+underlying code, not assumed.
 
 | Check | Result | Reflects this model? | Real value |
 |---|---|---|---|
 | `dataset_manifest` | ✅ pass | Yes — model-specific | `data_selection/dataset_manifests/ztf_labeled_alerts_tier2_cnn_v3.json`, checksum-verified |
 | `grouped_split_report` | ✅ pass | Yes — model-specific (validates the training data, not classification behavior) | `object_id` purity: 0 leaks (hard-gated). `night_key`/`sky_cell` monitored (not gated) at 100%/91.3% overlap — see §4 below, this is the one item that needs your judgment, not just a pass/fail read |
 | `canonical_eval_report` | ✅ pass | **No — does not invoke this or any CNN's inference** (see §3a) | Shared A5 suite, 4/4 case types, 16/16 checks — a static regression check against pre-existing pipeline artifacts (`data/injection_recovery_n200.json`, a ranking baseline, Gate Z6 outcome counts), none of which are CNN output |
-| `injection_recovery_report` | ✅ pass | **No — real_bogus is computed by an analytic SNR formula, not CNN inference** (see §3a) | Shared A6 image-level curves (n=200) |
-| `calibration_report` | ✅ pass | **Yes — the strongest evidence in this packet.** Real inference from this model's actual weights on 18,000 real held-out cutouts | See table below — real, new KPIs for this specific model |
+| `injection_recovery_report` | ✅ pass | **Yes, as of 2026-07-12 — real CNN inference** (see §3a) | `docs/evidence/promotion/tier2_cnn_v3_real_cnn_injection_recovery.json`: real triplet-cutout synthesis + this model's actual weights, n=200, seed=42. 14/200 scored; posteriors diverge from `benchmark_cnn_v1` on 8/14 (e.g. stellar_artifact 0.771 vs 0.438) — genuine model-specific disagreement, not noise |
+| `calibration_report` | ✅ pass | **Yes.** Real inference from this model's actual weights on 18,000 real held-out cutouts | See table below — real, new KPIs for this specific model |
 | `false_discovery_report` | ✅ pass | **No — derived from Gate Z4's logistic-regression ranking baseline, not this CNN** | `false_discovery_rate: 0.0` (shared Gate Z4 evidence, 0/200 false positives) |
 | `pretrained_audit` | ✅ pass | N/A by design — a true/false compliance statement (no pretrained model is used by either candidate), not a performance measurement, so sharing it doesn't weaken it | Shared project evidence (no third-party pretrained model used) |
 | `benchmark_model_card` | ✅ pass | Architecture description only, legitimately shared since the architecture is verified unchanged | `benchmarks/benchmark_cnn_v1/MODEL_CARD.md` (architecture reference, shared since architecture is unchanged) |
 
-### 3a. What "shared" actually means here, and the one real open question
+### 3a. What "shared" actually means here, and what changed 2026-07-12
 
-Three checks — `canonical_eval_report`, `injection_recovery_report`,
+Originally three checks — `canonical_eval_report`, `injection_recovery_report`,
 `false_discovery_report` — were not just reused from `benchmark_cnn_v1`;
-they were never model-specific for *any* CNN candidate. Verified by
-reading the code, not inferred from file paths:
+none were model-specific for *any* CNN candidate. Verified by reading the
+code, not inferred from file paths:
 
 - `src/canonical_eval.py` loads pre-existing JSON files at each case's
   `observed_path` and compares named fields against expected thresholds.
-  It does not load or run any model. The suite's cases cite
-  `data/injection_recovery_n200.json` (a synthetic baseline that predates
-  both CNN candidates), a logistic-regression ranking baseline, and Gate
-  Z6's tracklet-rejection counts — none of which are CNN output.
-- `Skills/injection_recovery.py`'s `_analytic_real_bogus()` derives its
-  real_bogus score from the analytic peak SNR of the synthesized cutout —
-  an explicit design choice (see its docstring) so recovery curves reflect
-  the swept parameter, not a trained classifier's prediction. The CNN is
-  never invoked.
+  It does not load or run any model. Still true, still shared/pipeline-level.
 - `false_discovery_report` is derived from Gate Z4's ranking-baseline
   review-burden counts (`Skills/extract_promotion_evidence.py`), which
-  uses a handcrafted-feature logistic regression, not this CNN.
+  uses a handcrafted-feature logistic regression, not this CNN. Still
+  true, still shared/pipeline-level.
+- `Skills/injection_recovery.py`'s `_analytic_real_bogus()` derived its
+  real_bogus score from an analytic SNR formula, never invoking any CNN.
+  **This one is now fixed** (operator direction, 2026-07-11): `classify.py`'s
+  `_load_cnn_model()` accepts an explicit `model_path`, and
+  `injection_recovery.py` gained `--cnn-model` plus real
+  science/reference/difference cutout triplet synthesis (the CNN requires
+  all three; the old harness only ever built `cutout_difference`). Re-run
+  for both `tier2_cnn_v3` and `benchmark_cnn_v1` at n=200, seed=42 — same
+  synthetic injections, same detect/link gating (unchanged, still
+  analytic-proxy-based), but classify() now runs each model's real
+  weights. Result: **8 of the 14 scored tracklets get genuinely different
+  posteriors between the two models** — concrete, non-trivial proof this
+  is exercising real, distinct model behavior, not a no-op. Commit
+  `75899a3d`; real run evidence in
+  `Logs/reports/injection_recovery_cnn_tier2_cnn_v3_n200*.json` and the
+  `benchmark_v1` counterparts (local/gitignored); the promotion-report
+  input is the durable, committed
+  `docs/evidence/promotion/tier2_cnn_v3_real_cnn_injection_recovery.json`.
 
-**The open question, for your judgment, not mine to resolve:**
-`docs/astrometrics_coding_agents_master_guide.md`'s own validation rule
-states *"A model cannot be promoted unless **it** has injection-recovery
-curves"* — wording that reads as requiring curves reflecting that specific
-model's behavior. What exists satisfies the promotion report's checklist
-(a report is present and passing) but does not satisfy that reading of the
-rule's intent, since no injection-recovery test in this project has ever
-exercised a CNN's live inference, for this candidate or `benchmark_cnn_v1`.
-This is a real, pre-existing characteristic of how A5/A6 were built, not
-something introduced by this retrain — but it means roughly 3 of the 8
-"pass" checkmarks above should be read as "pipeline capability hasn't
-regressed," not "this model was tested and passed."
+**Remaining open question, still yours to resolve, now narrower:**
+`docs/astrometrics_coding_agents_master_guide.md`'s validation rule *"a
+model cannot be promoted unless it has injection-recovery curves"* is now
+satisfied in both letter and intent for `injection_recovery_report`.
+`canonical_eval_report` and `false_discovery_report` remain pipeline-level,
+not model-specific — that gap is real but was not part of this session's
+scope (you asked specifically for the injection-recovery fix). Decide
+whether that's acceptable for this promotion or whether those two also
+need a model-specific rebuild before signoff.
 
 ### Calibration KPIs (the real, model-specific result — Isotonic calibration)
 
@@ -159,7 +167,7 @@ longer gates on it.
 
 - [ ] I have read the training result and the 8 evidence checks above.
 - [ ] I understand and accept the `object_id`-only grouped-split policy in §4 (or I am rejecting/revising it — note below).
-- [ ] I understand §3a: only calibration and grouped-split genuinely reflect this model's own behavior; canonical-eval, injection-recovery, and false-discovery are pipeline-level regression checks that have never exercised any CNN candidate's live inference, and I accept that reading of the astrometrics_coding_agents_master_guide.md injection-recovery rule as satisfied at the promotion-report-checklist level (or I am requiring a model-specific injection-recovery re-run before promotion — note below).
+- [ ] I understand §3a: calibration, grouped-split, and (as of 2026-07-12) injection-recovery genuinely reflect this model's own behavior. `canonical_eval_report` and `false_discovery_report` remain pipeline-level regression checks that have never exercised any CNN candidate's live inference, and I accept that as satisfying the promotion-report checklist for this promotion (or I am requiring model-specific rebuilds of those two before promotion — note below).
 - [ ] I understand the known limitations in §5.
 - [ ] I confirm this does not authorize external submission, live-search expansion, or benchmark replacement.
 - [ ] I approve `tier2_cnn_v3` for internal production promotion.
@@ -167,7 +175,11 @@ longer gates on it.
 **Operator notes** (optional free text):
 
 
-**If approved**, run:
+**Note**: `docs/evidence/promotion/tier2_cnn_v3_promotion_report.json` has
+already been regenerated (2026-07-12) citing the real, model-specific
+injection-recovery evidence above — `promotion_allowed: false`,
+`operator_signoff_missing` is still the only blocker. **If approved**, only
+`--operator-signoff-id` needs adding; re-run:
 
 ```bash
 uv run --python 3.14 python Skills/build_promotion_report.py \
@@ -175,12 +187,12 @@ uv run --python 3.14 python Skills/build_promotion_report.py \
     --dataset-manifest data_selection/dataset_manifests/ztf_labeled_alerts_tier2_cnn_v3.json \
     --grouped-split-report Logs/reports/tier2_cnn_v3_grouped_split_report.json \
     --canonical-eval-report docs/evidence/promotion/benchmark_cnn_v1_canonical_eval.json \
-    --injection-recovery-report docs/evidence/promotion/benchmark_cnn_v1_injection_recovery.json \
+    --injection-recovery-report docs/evidence/promotion/tier2_cnn_v3_real_cnn_injection_recovery.json \
     --calibration-report Logs/reports/calibration_report_v3.json \
     --false-discovery-report docs/evidence/promotion/benchmark_cnn_v1_false_discovery.json \
     --pretrained-audit docs/evidence/phase0/pretrained_model_audit.md \
     --benchmark-model-card benchmarks/benchmark_cnn_v1/MODEL_CARD.md \
-    --operator-signoff-id "jlindsey-2026-07-11" \
+    --operator-signoff-id "jlindsey-2026-07-12" \
     --out docs/evidence/promotion/tier2_cnn_v3_promotion_report.json
 ```
 (replace the signoff-id string with whatever identifier/date you want on record)
