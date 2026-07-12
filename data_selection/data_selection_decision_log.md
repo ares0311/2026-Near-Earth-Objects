@@ -82,6 +82,38 @@ Citations: `docs/astrometrics_data_selection_policy.md` (NEO live-search
 
 new_target_search
 
+## 2026-07-12 — tier2_cnn_v4 synthetic hard-negative training supplement
+
+Date: 2026-07-12
+Repo: 2026 Near Earth Objects
+Data: 3,000 deterministic synthetic sub-pixel artifact triplets generated
+  on demand by `SyntheticArtifactDataset`
+Role: training
+Acquisition mode: generated in memory; no download and no persisted payload
+Estimated storage: negligible persistent storage (manifest only)
+Why this data: `tier2_cnn_v3` was rejected after scoring 200/200 synthetic
+  sub-pixel artifacts as false discoveries. The supplement directly targets
+  that measured shape-discrimination failure while leaving validation and
+  test data real-only.
+Why not alternatives: Real bogus examples already contained comparable
+  proportions of spike-like examples in v1 and v3 training data, so simply
+  acquiring more of the same real distribution was not supported by the
+  root-cause evidence. An architecture change was a larger intervention than
+  the demonstrated failure required.
+Generator parameters: n=3000, seed=0, sigma range 0.05-0.35 px, magnitude
+  range 18-21, background range 2-40; every sample labeled
+  `stellar_artifact`.
+Leakage controls: Synthetic samples are appended to the training split only;
+  the 18,000-row validation and 13,500-row test splits remain real-only.
+Manifest: `data_selection/dataset_manifests/tier2_cnn_v4_synthetic_hard_negatives_v1.json`
+Known limitation: The acceptance test uses the same artifact family, so its
+  0/200 result demonstrates closure of the targeted failure mode but is not
+  independent evidence of broad real-world artifact robustness. Real-data
+  calibration remains the independent distribution check.
+Citations: `docs/evidence/a7/2026-07-12-model-rejected-retune-required.md`;
+  `docs/evidence/a7/2026-07-12-hard-negative-augmentation-implemented.md`;
+  `docs/evidence/a7/2026-07-12-tier2_cnn_v4-real-retrain-and-acceptance-test.md`.
+
 ## 2026-07-12 — Second and third new-field selections (aten + ieo diversity)
 
 Date: 2026-07-12

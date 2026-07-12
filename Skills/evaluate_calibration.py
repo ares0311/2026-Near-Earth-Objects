@@ -802,7 +802,7 @@ def _emit_json_report(
     }
 
     report: dict[str, Any] = {
-        "generated_at_utc": datetime.datetime.utcnow().isoformat() + "Z",
+        "generated_at_utc": datetime.datetime.now(datetime.UTC).isoformat().replace("+00:00", "Z"),
         "promotion_gate_passed": all_evaluated_pass,
         "tier3_evaluated": False,
         "tier3_note": (

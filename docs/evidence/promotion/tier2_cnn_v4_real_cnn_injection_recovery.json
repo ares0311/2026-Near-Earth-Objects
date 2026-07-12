@@ -1,0 +1,706 @@
+{
+  "curves": {
+    "background_level": [
+      {
+        "bin": "[2,5)",
+        "detection_rate": 0.45454545454545453,
+        "dimension": "background_level",
+        "link_rate": 0.45454545454545453,
+        "lower": 2.0,
+        "n": 11,
+        "n_detected": 5,
+        "n_linked": 5,
+        "n_scored": 5,
+        "score_rate": 0.45454545454545453,
+        "upper": 5.0
+      },
+      {
+        "bin": "[5,10)",
+        "detection_rate": 0.15625,
+        "dimension": "background_level",
+        "link_rate": 0.125,
+        "lower": 5.0,
+        "n": 32,
+        "n_detected": 5,
+        "n_linked": 4,
+        "n_scored": 4,
+        "score_rate": 0.125,
+        "upper": 10.0
+      },
+      {
+        "bin": "[10,15)",
+        "detection_rate": 0.14285714285714285,
+        "dimension": "background_level",
+        "link_rate": 0.14285714285714285,
+        "lower": 10.0,
+        "n": 21,
+        "n_detected": 3,
+        "n_linked": 3,
+        "n_scored": 3,
+        "score_rate": 0.14285714285714285,
+        "upper": 15.0
+      },
+      {
+        "bin": "[15,20)",
+        "detection_rate": 0.1111111111111111,
+        "dimension": "background_level",
+        "link_rate": 0.07407407407407407,
+        "lower": 15.0,
+        "n": 27,
+        "n_detected": 3,
+        "n_linked": 2,
+        "n_scored": 2,
+        "score_rate": 0.07407407407407407,
+        "upper": 20.0
+      },
+      {
+        "bin": "[20,30)",
+        "detection_rate": 0.0,
+        "dimension": "background_level",
+        "link_rate": 0.0,
+        "lower": 20.0,
+        "n": 58,
+        "n_detected": 0,
+        "n_linked": 0,
+        "n_scored": 0,
+        "score_rate": 0.0,
+        "upper": 30.0
+      },
+      {
+        "bin": "[30,40)",
+        "detection_rate": 0.0,
+        "dimension": "background_level",
+        "link_rate": 0.0,
+        "lower": 30.0,
+        "n": 51,
+        "n_detected": 0,
+        "n_linked": 0,
+        "n_scored": 0,
+        "score_rate": 0.0,
+        "upper": 40.0
+      }
+    ],
+    "mag": [
+      {
+        "bin": "[10,12)",
+        "detection_rate": null,
+        "dimension": "mag",
+        "link_rate": null,
+        "lower": 10.0,
+        "n": 0,
+        "n_detected": 0,
+        "n_linked": 0,
+        "n_scored": 0,
+        "score_rate": null,
+        "upper": 12.0
+      },
+      {
+        "bin": "[12,14)",
+        "detection_rate": null,
+        "dimension": "mag",
+        "link_rate": null,
+        "lower": 12.0,
+        "n": 0,
+        "n_detected": 0,
+        "n_linked": 0,
+        "n_scored": 0,
+        "score_rate": null,
+        "upper": 14.0
+      },
+      {
+        "bin": "[14,16)",
+        "detection_rate": null,
+        "dimension": "mag",
+        "link_rate": null,
+        "lower": 14.0,
+        "n": 0,
+        "n_detected": 0,
+        "n_linked": 0,
+        "n_scored": 0,
+        "score_rate": null,
+        "upper": 16.0
+      },
+      {
+        "bin": "[16,18)",
+        "detection_rate": null,
+        "dimension": "mag",
+        "link_rate": null,
+        "lower": 16.0,
+        "n": 0,
+        "n_detected": 0,
+        "n_linked": 0,
+        "n_scored": 0,
+        "score_rate": null,
+        "upper": 18.0
+      },
+      {
+        "bin": "[18,20)",
+        "detection_rate": 0.12698412698412698,
+        "dimension": "mag",
+        "link_rate": 0.1111111111111111,
+        "lower": 18.0,
+        "n": 126,
+        "n_detected": 16,
+        "n_linked": 14,
+        "n_scored": 14,
+        "score_rate": 0.1111111111111111,
+        "upper": 20.0
+      },
+      {
+        "bin": "[20,22)",
+        "detection_rate": 0.0,
+        "dimension": "mag",
+        "link_rate": 0.0,
+        "lower": 20.0,
+        "n": 74,
+        "n_detected": 0,
+        "n_linked": 0,
+        "n_scored": 0,
+        "score_rate": 0.0,
+        "upper": 22.0
+      }
+    ],
+    "motion_arcsec_per_hr": [
+      {
+        "bin": "[0,0.5)",
+        "detection_rate": 0.0,
+        "dimension": "motion_arcsec_per_hr",
+        "link_rate": 0.0,
+        "lower": 0.0,
+        "n": 6,
+        "n_detected": 0,
+        "n_linked": 0,
+        "n_scored": 0,
+        "score_rate": 0.0,
+        "upper": 0.5
+      },
+      {
+        "bin": "[0.5,1)",
+        "detection_rate": 0.0,
+        "dimension": "motion_arcsec_per_hr",
+        "link_rate": 0.0,
+        "lower": 0.5,
+        "n": 9,
+        "n_detected": 0,
+        "n_linked": 0,
+        "n_scored": 0,
+        "score_rate": 0.0,
+        "upper": 1.0
+      },
+      {
+        "bin": "[1,2)",
+        "detection_rate": 0.08,
+        "dimension": "motion_arcsec_per_hr",
+        "link_rate": 0.04,
+        "lower": 1.0,
+        "n": 25,
+        "n_detected": 2,
+        "n_linked": 1,
+        "n_scored": 1,
+        "score_rate": 0.04,
+        "upper": 2.0
+      },
+      {
+        "bin": "[2,5)",
+        "detection_rate": 0.11290322580645161,
+        "dimension": "motion_arcsec_per_hr",
+        "link_rate": 0.11290322580645161,
+        "lower": 2.0,
+        "n": 62,
+        "n_detected": 7,
+        "n_linked": 7,
+        "n_scored": 7,
+        "score_rate": 0.11290322580645161,
+        "upper": 5.0
+      },
+      {
+        "bin": "[5,10)",
+        "detection_rate": 0.07142857142857142,
+        "dimension": "motion_arcsec_per_hr",
+        "link_rate": 0.061224489795918366,
+        "lower": 5.0,
+        "n": 98,
+        "n_detected": 7,
+        "n_linked": 6,
+        "n_scored": 6,
+        "score_rate": 0.061224489795918366,
+        "upper": 10.0
+      },
+      {
+        "bin": "[10,20)",
+        "detection_rate": null,
+        "dimension": "motion_arcsec_per_hr",
+        "link_rate": null,
+        "lower": 10.0,
+        "n": 0,
+        "n_detected": 0,
+        "n_linked": 0,
+        "n_scored": 0,
+        "score_rate": null,
+        "upper": 20.0
+      },
+      {
+        "bin": "[20,60)",
+        "detection_rate": null,
+        "dimension": "motion_arcsec_per_hr",
+        "link_rate": null,
+        "lower": 20.0,
+        "n": 0,
+        "n_detected": 0,
+        "n_linked": 0,
+        "n_scored": 0,
+        "score_rate": null,
+        "upper": 60.0
+      }
+    ],
+    "n_nights": [
+      {
+        "bin": "[0,1)",
+        "detection_rate": null,
+        "dimension": "n_nights",
+        "link_rate": null,
+        "lower": 0.0,
+        "n": 0,
+        "n_detected": 0,
+        "n_linked": 0,
+        "n_scored": 0,
+        "score_rate": null,
+        "upper": 1.0
+      },
+      {
+        "bin": "[1,2)",
+        "detection_rate": null,
+        "dimension": "n_nights",
+        "link_rate": null,
+        "lower": 1.0,
+        "n": 0,
+        "n_detected": 0,
+        "n_linked": 0,
+        "n_scored": 0,
+        "score_rate": null,
+        "upper": 2.0
+      },
+      {
+        "bin": "[2,3)",
+        "detection_rate": null,
+        "dimension": "n_nights",
+        "link_rate": null,
+        "lower": 2.0,
+        "n": 0,
+        "n_detected": 0,
+        "n_linked": 0,
+        "n_scored": 0,
+        "score_rate": null,
+        "upper": 3.0
+      },
+      {
+        "bin": "[3,4)",
+        "detection_rate": 0.08,
+        "dimension": "n_nights",
+        "link_rate": 0.07,
+        "lower": 3.0,
+        "n": 200,
+        "n_detected": 16,
+        "n_linked": 14,
+        "n_scored": 14,
+        "score_rate": 0.07,
+        "upper": 4.0
+      }
+    ],
+    "n_observations": [
+      {
+        "bin": "[0,3)",
+        "detection_rate": null,
+        "dimension": "n_observations",
+        "link_rate": null,
+        "lower": 0.0,
+        "n": 0,
+        "n_detected": 0,
+        "n_linked": 0,
+        "n_scored": 0,
+        "score_rate": null,
+        "upper": 3.0
+      },
+      {
+        "bin": "[3,6)",
+        "detection_rate": null,
+        "dimension": "n_observations",
+        "link_rate": null,
+        "lower": 3.0,
+        "n": 0,
+        "n_detected": 0,
+        "n_linked": 0,
+        "n_scored": 0,
+        "score_rate": null,
+        "upper": 6.0
+      },
+      {
+        "bin": "[6,9)",
+        "detection_rate": 0.08,
+        "dimension": "n_observations",
+        "link_rate": 0.07,
+        "lower": 6.0,
+        "n": 200,
+        "n_detected": 16,
+        "n_linked": 14,
+        "n_scored": 14,
+        "score_rate": 0.07,
+        "upper": 9.0
+      },
+      {
+        "bin": "[9,12)",
+        "detection_rate": null,
+        "dimension": "n_observations",
+        "link_rate": null,
+        "lower": 9.0,
+        "n": 0,
+        "n_detected": 0,
+        "n_linked": 0,
+        "n_scored": 0,
+        "score_rate": null,
+        "upper": 12.0
+      }
+    ],
+    "seeing_arcsec": [
+      {
+        "bin": "[0.8,1.2)",
+        "detection_rate": 0.3103448275862069,
+        "dimension": "seeing_arcsec",
+        "link_rate": 0.2413793103448276,
+        "lower": 0.8,
+        "n": 29,
+        "n_detected": 9,
+        "n_linked": 7,
+        "n_scored": 7,
+        "score_rate": 0.2413793103448276,
+        "upper": 1.2
+      },
+      {
+        "bin": "[1.2,1.6)",
+        "detection_rate": 0.08333333333333333,
+        "dimension": "seeing_arcsec",
+        "link_rate": 0.08333333333333333,
+        "lower": 1.2,
+        "n": 24,
+        "n_detected": 2,
+        "n_linked": 2,
+        "n_scored": 2,
+        "score_rate": 0.08333333333333333,
+        "upper": 1.6
+      },
+      {
+        "bin": "[1.6,2)",
+        "detection_rate": 0.13793103448275862,
+        "dimension": "seeing_arcsec",
+        "link_rate": 0.13793103448275862,
+        "lower": 1.6,
+        "n": 29,
+        "n_detected": 4,
+        "n_linked": 4,
+        "n_scored": 4,
+        "score_rate": 0.13793103448275862,
+        "upper": 2.0
+      },
+      {
+        "bin": "[2,2.5)",
+        "detection_rate": 0.030303030303030304,
+        "dimension": "seeing_arcsec",
+        "link_rate": 0.030303030303030304,
+        "lower": 2.0,
+        "n": 33,
+        "n_detected": 1,
+        "n_linked": 1,
+        "n_scored": 1,
+        "score_rate": 0.030303030303030304,
+        "upper": 2.5
+      },
+      {
+        "bin": "[2.5,3)",
+        "detection_rate": 0.0,
+        "dimension": "seeing_arcsec",
+        "link_rate": 0.0,
+        "lower": 2.5,
+        "n": 43,
+        "n_detected": 0,
+        "n_linked": 0,
+        "n_scored": 0,
+        "score_rate": 0.0,
+        "upper": 3.0
+      },
+      {
+        "bin": "[3,3.5)",
+        "detection_rate": 0.0,
+        "dimension": "seeing_arcsec",
+        "link_rate": 0.0,
+        "lower": 3.0,
+        "n": 42,
+        "n_detected": 0,
+        "n_linked": 0,
+        "n_scored": 0,
+        "score_rate": 0.0,
+        "upper": 3.5
+      }
+    ],
+    "trail_length_arcsec": [
+      {
+        "bin": "[0,0.5)",
+        "detection_rate": 0.15384615384615385,
+        "dimension": "trail_length_arcsec",
+        "link_rate": 0.15384615384615385,
+        "lower": 0.0,
+        "n": 13,
+        "n_detected": 2,
+        "n_linked": 2,
+        "n_scored": 2,
+        "score_rate": 0.15384615384615385,
+        "upper": 0.5
+      },
+      {
+        "bin": "[0.5,1)",
+        "detection_rate": 0.15,
+        "dimension": "trail_length_arcsec",
+        "link_rate": 0.15,
+        "lower": 0.5,
+        "n": 20,
+        "n_detected": 3,
+        "n_linked": 3,
+        "n_scored": 3,
+        "score_rate": 0.15,
+        "upper": 1.0
+      },
+      {
+        "bin": "[1,2)",
+        "detection_rate": 0.12903225806451613,
+        "dimension": "trail_length_arcsec",
+        "link_rate": 0.12903225806451613,
+        "lower": 1.0,
+        "n": 31,
+        "n_detected": 4,
+        "n_linked": 4,
+        "n_scored": 4,
+        "score_rate": 0.12903225806451613,
+        "upper": 2.0
+      },
+      {
+        "bin": "[2,3)",
+        "detection_rate": 0.15789473684210525,
+        "dimension": "trail_length_arcsec",
+        "link_rate": 0.10526315789473684,
+        "lower": 2.0,
+        "n": 19,
+        "n_detected": 3,
+        "n_linked": 2,
+        "n_scored": 2,
+        "score_rate": 0.10526315789473684,
+        "upper": 3.0
+      },
+      {
+        "bin": "[3,5)",
+        "detection_rate": 0.04,
+        "dimension": "trail_length_arcsec",
+        "link_rate": 0.04,
+        "lower": 3.0,
+        "n": 50,
+        "n_detected": 2,
+        "n_linked": 2,
+        "n_scored": 2,
+        "score_rate": 0.04,
+        "upper": 5.0
+      },
+      {
+        "bin": "[5,8)",
+        "detection_rate": 0.029850746268656716,
+        "dimension": "trail_length_arcsec",
+        "link_rate": 0.014925373134328358,
+        "lower": 5.0,
+        "n": 67,
+        "n_detected": 2,
+        "n_linked": 1,
+        "n_scored": 1,
+        "score_rate": 0.014925373134328358,
+        "upper": 8.0
+      }
+    ]
+  },
+  "limitations": [
+    "Curves summarize synthetic injection records only."
+  ],
+  "missing_dimensions": [],
+  "model_behavior": {
+    "cnn_model_path": "models/tier2_cnn_v4.pt",
+    "cnn_model_sha256": "515d92ba776f9ca2a70b26f60a3ca7886d27af5bd10b0d9027890ca39a372a7a",
+    "n_scored_posteriors": 14,
+    "posterior_argmax_counts": {
+      "known_object": 0,
+      "main_belt_asteroid": 0,
+      "neo_candidate": 0,
+      "other_solar_system": 0,
+      "stellar_artifact": 14
+    },
+    "records": [
+      {
+        "argmax_class": "stellar_artifact",
+        "index": 10,
+        "posterior": {
+          "known_object": 0.004357565413381593,
+          "main_belt_asteroid": 0.0008113555757530246,
+          "neo_candidate": 0.22196335832139621,
+          "other_solar_system": 0.001692564817829541,
+          "stellar_artifact": 0.7711751558716397
+        }
+      },
+      {
+        "argmax_class": "stellar_artifact",
+        "index": 17,
+        "posterior": {
+          "known_object": 0.00435932548497246,
+          "main_belt_asteroid": 0.0008116515957998368,
+          "neo_candidate": 0.22195884765134755,
+          "other_solar_system": 0.0016843825589012238,
+          "stellar_artifact": 0.7711857927089789
+        }
+      },
+      {
+        "argmax_class": "stellar_artifact",
+        "index": 38,
+        "posterior": {
+          "known_object": 0.004424747359145546,
+          "main_belt_asteroid": 0.0008072682195123787,
+          "neo_candidate": 0.22195249272692277,
+          "other_solar_system": 0.0016639018379219826,
+          "stellar_artifact": 0.7711515898564972
+        }
+      },
+      {
+        "argmax_class": "stellar_artifact",
+        "index": 67,
+        "posterior": {
+          "known_object": 0.00437853220627773,
+          "main_belt_asteroid": 0.0008085652358296418,
+          "neo_candidate": 0.2219578937499474,
+          "other_solar_system": 0.0016789731088708716,
+          "stellar_artifact": 0.7711760356990744
+        }
+      },
+      {
+        "argmax_class": "stellar_artifact",
+        "index": 76,
+        "posterior": {
+          "known_object": 0.004554217506800361,
+          "main_belt_asteroid": 0.0009738173376607534,
+          "neo_candidate": 0.22126126543701696,
+          "other_solar_system": 0.0018403580897184935,
+          "stellar_artifact": 0.7713703416288036
+        }
+      },
+      {
+        "argmax_class": "stellar_artifact",
+        "index": 103,
+        "posterior": {
+          "known_object": 0.004387068634605617,
+          "main_belt_asteroid": 0.0008150029758904787,
+          "neo_candidate": 0.22196427687168274,
+          "other_solar_system": 0.0016924810623758254,
+          "stellar_artifact": 0.7711411704554454
+        }
+      },
+      {
+        "argmax_class": "stellar_artifact",
+        "index": 104,
+        "posterior": {
+          "known_object": 0.00438131590252301,
+          "main_belt_asteroid": 0.0008080719077101175,
+          "neo_candidate": 0.22195477019866386,
+          "other_solar_system": 0.0016728786668342291,
+          "stellar_artifact": 0.7711829633242687
+        }
+      },
+      {
+        "argmax_class": "stellar_artifact",
+        "index": 105,
+        "posterior": {
+          "known_object": 0.004387608550395285,
+          "main_belt_asteroid": 0.0008022963785911434,
+          "neo_candidate": 0.22196159762677098,
+          "other_solar_system": 0.0016742309761844849,
+          "stellar_artifact": 0.7711742664680581
+        }
+      },
+      {
+        "argmax_class": "stellar_artifact",
+        "index": 109,
+        "posterior": {
+          "known_object": 0.004355798988883973,
+          "main_belt_asteroid": 0.0008062775231758565,
+          "neo_candidate": 0.22195394860033346,
+          "other_solar_system": 0.001661525358975936,
+          "stellar_artifact": 0.7712224495286308
+        }
+      },
+      {
+        "argmax_class": "stellar_artifact",
+        "index": 113,
+        "posterior": {
+          "known_object": 0.004411180755520062,
+          "main_belt_asteroid": 0.0008060138970520131,
+          "neo_candidate": 0.2219520090324514,
+          "other_solar_system": 0.001663854989848428,
+          "stellar_artifact": 0.771166941325128
+        }
+      },
+      {
+        "argmax_class": "stellar_artifact",
+        "index": 126,
+        "posterior": {
+          "known_object": 0.00454993864842448,
+          "main_belt_asteroid": 0.0009721208853523504,
+          "neo_candidate": 0.22126636260300142,
+          "other_solar_system": 0.0018486893921603018,
+          "stellar_artifact": 0.7713628884710615
+        }
+      },
+      {
+        "argmax_class": "stellar_artifact",
+        "index": 138,
+        "posterior": {
+          "known_object": 0.004389161999622049,
+          "main_belt_asteroid": 0.0008081906921915585,
+          "neo_candidate": 0.22196109433710462,
+          "other_solar_system": 0.0016813063932144263,
+          "stellar_artifact": 0.7711602465778673
+        }
+      },
+      {
+        "argmax_class": "stellar_artifact",
+        "index": 176,
+        "posterior": {
+          "known_object": 0.004369976182481017,
+          "main_belt_asteroid": 0.0008073426421378754,
+          "neo_candidate": 0.22195455756578178,
+          "other_solar_system": 0.0016693604648873861,
+          "stellar_artifact": 0.7711987631447119
+        }
+      },
+      {
+        "argmax_class": "stellar_artifact",
+        "index": 187,
+        "posterior": {
+          "known_object": 0.004420919128427806,
+          "main_belt_asteroid": 0.0008867413719799779,
+          "neo_candidate": 0.2216471169119562,
+          "other_solar_system": 0.0017803259210946198,
+          "stellar_artifact": 0.7712648966665413
+        }
+      }
+    ]
+  },
+  "n_records": 200,
+  "outcomes": [
+    "detected",
+    "linked",
+    "scored"
+  ],
+  "passed": true,
+  "schema_version": "injection-recovery-curves-v1",
+  "source_report": "Logs/reports/injection_recovery_cnn_tier2_cnn_v4_n200.json"
+}

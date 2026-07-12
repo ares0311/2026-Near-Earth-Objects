@@ -147,6 +147,16 @@ def table_count(db_path: Path, table: str) -> int:
         return int(conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0])
 
 
+def test_background_connection_closes_on_context_exit(tmp_path):
+    conn = background._connect(tmp_path / "background.sqlite")
+
+    with conn:
+        conn.execute("CREATE TABLE lifecycle_check (value INTEGER)")
+
+    with pytest.raises(sqlite3.ProgrammingError, match="closed database"):
+        conn.execute("SELECT * FROM lifecycle_check")
+
+
 def test_background_run_once_writes_one_ledger_and_followup(monkeypatch, tmp_path):
     fixture = tmp_path / "targets.json"
     db_path = tmp_path / "Logs" / "background.sqlite"

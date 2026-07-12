@@ -1,0 +1,35 @@
+{
+  "dataset_id": "tier2_cnn_v4_synthetic_hard_negatives_v1",
+  "project": "2026 Near Earth Objects",
+  "role": "training",
+  "source_name": "Deterministic synthetic sub-pixel artifact hard-negative generator",
+  "source_url": "repository://Skills/evaluate_cnn_false_discovery.py::_synthesize_artifact_cutout_arrays",
+  "instrument": "Synthetic ZTF-like 63x63 cutout generator; no physical instrument",
+  "target_ids": [
+    "deterministic-hard-negative-indices-0-through-2999"
+  ],
+  "time_range": {
+    "start": "2026-07-12T00:00:00Z",
+    "end": "2026-07-12T23:59:59Z",
+    "scale": "UTC"
+  },
+  "cadence": "One deterministic synthetic triplet per index, generated from numpy seed=(0 + index); 3000 total samples",
+  "band_or_frequency": "Synthetic ZTF-like science/reference/difference image triplets; no calibrated passband",
+  "data_product_type": "On-the-fly synthetic stellar_artifact hard-negative cutout triplets",
+  "downloaded_at": "not-downloaded; generated in memory during the 2026-07-12 tier2_cnn_v4 training run",
+  "local_path": "in-memory://Skills/train_tier2_cnn.py::SyntheticArtifactDataset",
+  "checksum": {
+    "algorithm": "none",
+    "value": "no-persisted-payload; deterministic generator parameters are n=3000, seed=0, sigma_px=[0.05,0.35], mag=[18,21], background=[2,40]"
+  },
+  "license": "Project-generated synthetic data; repository license applies",
+  "label_source": "Generator construction: every sample is explicitly labeled stellar_artifact",
+  "label_confidence": "synthetic",
+  "preprocessing_version": "Skills/train_tier2_cnn.py::SyntheticArtifactDataset plus Skills/evaluate_cnn_false_discovery.py::_synthesize_artifact_cutout_arrays at commit 637ab9c6; n=3000, seed=0, sigma range 0.05-0.35 px",
+  "known_caveats": [
+    "Samples were generated on the fly and were not persisted, so there is no payload checksum; reproducibility depends on the cited code revision and generator parameters.",
+    "This synthetic dataset supplements 58,500 real training rows and never enters validation or test splits.",
+    "The sigma range deliberately brackets the 0.15 px adversarial artifact used by Skills/evaluate_cnn_false_discovery.py; success on that test family is therefore not independent evidence of general artifact robustness.",
+    "The real-data training source remains separately documented by data_selection/dataset_manifests/ztf_labeled_alerts_tier2_cnn_v3.json."
+  ]
+}
