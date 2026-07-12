@@ -81,3 +81,63 @@ Citations: `docs/astrometrics_data_selection_policy.md` (NEO live-search
   Conditions).
 
 new_target_search
+
+## 2026-07-12 — Second and third new-field selections (aten + ieo diversity)
+
+Date: 2026-07-12
+Repo: 2026 Near Earth Objects
+Data: Real UW ZTF public alert archive detections for 2 new fields x 2 new
+  nights each (4 nights total)
+Role: live_search
+Acquisition mode: batch (bounded, checkpointed, per-night, 4 concurrent
+  processes)
+Estimated download GB: <0.5 GB total (per-night kept-observation counts to
+  date range 0-316 rows; `--max-per-night` safety cap is 5000 per night)
+Live search priority score: 0.9189 (aten rank 2) and 0.9621 (ieo rank 1) --
+  see `data_selection/target_priority_queue.csv` for this run's full
+  8-row batches under each mode
+Storage cost penalty: 0
+Why this data: Continuing the new-field discovery-sweep portfolio after the
+  first field (RA 89.3, Dec 22.5) returned a clean null result (see prior
+  entry and `docs/evidence/live/2026-07-11-first-new-discovery-sweep.md`).
+  Diversifying across both undersearched-population categories this project
+  supports: `--mode aten` (quadrature/dawn-dusk, ~85% undiscovered) and
+  `--mode ieo` (twilight Atira, ~97% undiscovered -- the highest-value
+  category available). Picked aten rank 2 (RA 97.42, Dec 22.5) rather than
+  rank 1, because rank 1 is the same field already searched -- confirmed
+  `select_survey_fields.py --history-dir` does not recognize
+  `Skills/ztf_alert_archive_ingest.py`'s checkpoint format as prior
+  coverage (a real, minor tooling gap noted here but not yet fixed; the
+  history mechanism was built for `run_pipeline.py`'s own run-directory
+  layout). Manual rank selection substitutes for that gap in the interim.
+Why not alternatives: Ranks 3-8 in each mode (see target queue) are
+  reasonable alternates; picked top-available-novel score in each mode.
+Why this acquisition mode: Two new fields x two nights each = 4 real
+  archive nights (20230914/20230916, JD 2460201.5-2460203.5), a calendar
+  year not present in any prior ingest. September dates chosen to preserve
+  the same seasonal solar-elongation geometry the selection scores were
+  computed for (JD 2459107.5, September 2020) rather than recomputing for
+  a different time of year. Sharded across 4 concurrent background
+  processes (one per night): the prior 2-night batch (2026-07-11) completed
+  with zero errors, zero rate-limit responses, and (after initial slow
+  throughput resolved itself) acceptable latency -- per the standing
+  concurrency-escalation rule, this batch steps up by +2 (2 -> 4) rather
+  than repeating the same concurrency level indefinitely.
+Eviction or pin rule: Checkpoints retained under
+  `Logs/pipeline_runs/ztf_alert_archive_ingest/` (gitignored, local);
+  compact summaries auto-committed to the shared manifest.
+Leakage risks: None -- real archived data selection, not a
+  train/validation/test split.
+Manifest: `Logs/reports/ztf_alert_archive_ingest_manifest.jsonl`;
+  `data_selection/target_priority_queue.csv` (both mode batches from this
+  run).
+Expected scientific or model-hardening value: Builds toward a real search
+  portfolio across the two population-bias categories this project's own
+  selection algorithm supports, per
+  `docs/astrometrics_coding_agents_master_guide.md`'s 60/30/10 new/
+  follow-up/control balance. A null result on this batch (like the first)
+  remains a valid, expected outcome per the Production Definition.
+Citations: `docs/astrometrics_data_selection_policy.md`;
+  `docs/ZTF_DR24_PRODUCTION_GATES.md`.
+
+new_target_search
