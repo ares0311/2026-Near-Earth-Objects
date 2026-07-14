@@ -3,6 +3,23 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.97 — Sparse expansion and cross-batch association (2026-07-14)
+
+### Result
+- Three shards streamed 19.053 GB, scanned 402,053 alerts, retained 2,311,
+  persisted 1.1 MB, and formed zero real tracklets; fresh control passed 20/20.
+- Cross-batch association found zero production tracklets. All 70 sensitivity
+  fits are underconstrained two-point/two-night pairs.
+
+### Added
+- The portfolio analyzer now accepts repeated manifest-bound batches, validates
+  every source checkpoint, rejects changed field definitions, and deduplicates
+  identical observations by `obs_id`.
+
+### Safety
+- No candidate-review queue exists. Further bulk expansion requires an explicit
+  research decision; no submission, alert, discovery claim, or impact claim.
+
 ## v0.90.96 — Sparse-field ZTF expansion batch (2026-07-14)
 
 ### Added

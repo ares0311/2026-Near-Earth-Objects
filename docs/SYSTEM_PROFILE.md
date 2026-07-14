@@ -91,6 +91,7 @@ itself always overrides anything recorded here.
 | 2026-07-14 | 6 outer file shards x 6 pytest-xdist workers; native threads pinned to 1 | Clean v0.90.93 broad run: 1,941 tests passed in 31 s; six isolated coverage datasets combined without errors; 5,447 source statements at 100% coverage. |
 | 2026-07-14 | 6 outer file shards x 6 pytest-xdist workers; native threads pinned to 1 | Clean v0.90.95 broad run: 1,943 tests passed in 27 s; six isolated coverage datasets combined without errors; 5,447 source statements at 100% coverage. |
 | 2026-07-14 | 6 outer file shards x 6 pytest-xdist workers; native threads pinned to 1 | Clean v0.90.96 broad run: 1,944 tests passed in 27 s; six isolated coverage datasets combined without errors; 5,447 source statements at 100% coverage. |
+| 2026-07-14 | 6 outer file shards x 6 pytest-xdist workers; native threads pinned to 1 | Clean v0.90.97 broad run: 1,950 tests passed in 30 s; six isolated coverage datasets combined without errors; 5,447 source statements at 100% coverage. |
 
 ---
 

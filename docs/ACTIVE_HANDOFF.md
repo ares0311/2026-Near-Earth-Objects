@@ -5,20 +5,28 @@ Repository identity: `2026 Near Earth Objects`
 Branch: `main`
 Merged batch selection: `d81af0a0` (PR #235)
 Execution manifest: `b048be9c`
-App version: `v0.90.96`
+App version: `v0.90.97`
 
-## Next bounded batch
+## Latest result and decision gate
+
+Run `56c2348f31302291` completed 3/3 shards in 5m10s: 402,053 scanned,
+2,311 retained, 1.1 MB persisted, zero production tracklets, zero sensitivity
+tracklets, and a fresh 20/20 control. Cross-batch analysis with run
+`017eb50381badb75` gave IEO 147.53 four retained nights and 8,956 seed pairs
+but zero production tracklets. Its 70 sensitivity fits are all two-point/
+two-night pairs. No candidate proceeds to later gates. Further bulk replay is
+now a research decision, not an automatic continuation.
+
+## Completed sparse-field expansion
 
 `data_selection/batch_manifests/ztf_dr24_sparse_field_expansion_2024_v1.json`
-targets the two fields that remained below three retained nights. Its three
+targeted the two fields that remained below three retained nights. Its three
 nights (`20231003`, `20231029`, `20240429`) total 19.053230740 GB and provide
 98 central-box exposure rows for Aten 81.18 and 88 for IEO 147.53. It is the
 minimum-transfer qualifying trio among the 12 highest-exposure candidates
-whose archive sizes were HEAD-verified. Launch as three shards x one worker;
-raw archives remain streamed/unpersisted and retained output is capped at 1 GB.
-Validation: 1,944 tests passed in 27 seconds through the optimized 6x6 runner,
-with 100% coverage across 5,447 source statements; Ruff and manifest-focused
-checks are clean.
+whose archive sizes were HEAD-verified. Run `56c2348f31302291` executed it as
+three shards x one worker; raw archives remained streamed/unpersisted and
+retained output stayed at 1.1 MB.
 
 ## Completed acquisition and association
 
@@ -101,11 +109,11 @@ for `ztf.uw.edu` and the manifest-only git relay. Do not broaden it.
 4. `Skills/run_sharded_download.py --status/--merge` now infers non-default
    shard topology from the selected run; legacy manifests without topology
    still require explicit `--shards`.
-5. The next research expansion should be selected and logged as a new bounded
-   batch rather than silently reusing this completed result. Gate Z3 remains
-   separately paused.
+5. The sparse-field expansion and provenance-bound cross-batch analysis are
+   complete. Another bulk replay requires an explicit research decision and a
+   newly selected, logged, bounded batch. Gate Z3 remains separately paused.
 
-Validation for v0.90.95: optimized 6x6 broad suite, 1,943 tests in 27 seconds,
+Validation for v0.90.97: optimized 6x6 broad suite, 1,950 tests in 30 seconds,
 100% coverage across 5,447 source statements; full Ruff and mypy clean; uv
 lock and repository artifact-policy checks passed.
 

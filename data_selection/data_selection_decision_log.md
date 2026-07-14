@@ -318,3 +318,23 @@ Safety: Historical replay and internal review only. No external submission,
   authority contact, public alert, discovery claim, or impact claim.
 
 new_target_search
+
+## 2026-07-14 — Sparse expansion and cross-batch result
+
+Date: 2026-07-14
+Repo: 2026 Near Earth Objects
+Role: live_search_result
+Execution: Run `56c2348f31302291`; three shards; 19.053230740 GB streamed;
+  402,053 alerts scanned; 2,311 retained; 1.1 MB persisted
+Single-batch result: Zero production tracklets and zero sensitivity tracklets;
+  fresh isolated control passed 20/20 detection, linking, and scoring
+Cross-batch result: Combined with `ztf_dr24_coverage_selected_2024_v1`; IEO
+  147.53 had four retained nights and 8,956 seed pairs but zero production
+  tracklets. All 70 sensitivity fits were two-point/two-night non-candidates.
+Decision gate: No candidate-review queue exists. Further bulk expansion needs
+  an explicit research decision rather than automatic continuation.
+Evidence: `docs/evidence/live/2026-07-14-ztf-sparse-expansion-and-cross-batch-result.md`
+Safety: No known-object exclusion, classification, scoring, adversarial review,
+  submission, authority contact, public alert, discovery claim, or impact claim.
+
+new_target_search
