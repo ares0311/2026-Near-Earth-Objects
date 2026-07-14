@@ -1,16 +1,23 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.90.96
+**Current version**: v0.90.97
 **Last updated**: 2026-07-14 (header/sync line only — the P1-P5 gate register
 body below is unchanged historical evidence from 2026-07-02; current gate
 status for the active ZTF DR24 path lives in
 `docs/ZTF_DR24_PRODUCTION_GATES.md`, which is kept current every session)
 
-**Active-directive sync (2026-07-14)**: The next bounded replay targets the
-two fields left below three retained nights. The committed three-night batch
-is the minimum-transfer combination among 12 HEAD-verified high-exposure
-candidates that gives each sparse field at least 80 central-box exposure rows:
-19.053 GB streamed, three shards x one worker, raw archives unpersisted.
+**Active-directive sync (2026-07-14)**: Sparse expansion run
+`56c2348f31302291` completed with zero production tracklets after 402,053
+alerts scanned and 2,311 retained. Cross-batch association safely combined it
+with run `017eb50381badb75`; IEO 147.53 had four retained nights and 8,956
+seed pairs but zero production tracklets. All 70 sensitivity fits are
+underconstrained two-point/two-night pairs. No candidate-review queue exists.
+Further bulk expansion now requires an explicit research decision.
+
+The completed three-night sparse-field batch was the minimum-transfer
+combination among 12 HEAD-verified high-exposure candidates that gave each
+sparse field at least 80 central-box exposure rows. It streamed 19.053 GB as
+three shards x one worker while leaving raw archives unpersisted.
 
 The coverage-qualified four-night
 archive run `017eb50381badb75` completed successfully: 567,025 alerts scanned,

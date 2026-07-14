@@ -887,7 +887,17 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.96)
+## Current State (v0.90.97)
+
+**Latest sync (2026-07-14, sparse expansion and cross-batch association
+complete)**: Run `56c2348f31302291` completed three clean shards (402,053
+scanned, 2,311 retained, 1.1 MB persisted) with zero production or sensitivity
+tracklets and a fresh 20/20 control. The safe analyzer now combines repeated
+manifest-bound batches and deduplicates by observation ID. Combined with run
+`017eb50381badb75`, IEO 147.53 had four retained nights and 8,956 seed pairs
+but zero production tracklets; 70 sensitivity fits remain two-point/two-night
+non-candidates. Do not start another bulk expansion without a research
+decision.
 
 **Latest sync (2026-07-14, sparse-field expansion selected)**: The committed
 `ztf_dr24_sparse_field_expansion_2024_v1` batch targets the two fields left

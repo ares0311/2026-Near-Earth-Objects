@@ -669,7 +669,18 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.96)
+## Current State (v0.90.97)
+
+**Latest sync (2026-07-14, sparse expansion and cross-batch association
+complete)**: Run `56c2348f31302291` streamed 19.053 GB across three clean
+shards, scanned 402,053 alerts, retained 2,311, persisted 1.1 MB, and formed
+zero tracklets at production or sensitivity thresholds. The fresh control
+passed 20/20. The analyzer now accepts repeated `--batch-manifest` arguments,
+validates each checkpoint hash, enforces identical field definitions, and
+deduplicates by `obs_id`. Combined with run `017eb50381badb75`, IEO 147.53 had
+four retained nights and 8,956 seed pairs but zero production tracklets; all
+70 sensitivity fits are two-point/two-night pairs and not candidates. Further
+bulk expansion requires an explicit research decision.
 
 **Latest sync (2026-07-14, sparse-field expansion selected)**: The committed
 `ztf_dr24_sparse_field_expansion_2024_v1` batch targets Aten 81.18 and IEO
