@@ -1,12 +1,18 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.90.95
+**Current version**: v0.90.96
 **Last updated**: 2026-07-14 (header/sync line only — the P1-P5 gate register
 body below is unchanged historical evidence from 2026-07-02; current gate
 status for the active ZTF DR24 path lives in
 `docs/ZTF_DR24_PRODUCTION_GATES.md`, which is kept current every session)
 
-**Active-directive sync (2026-07-14)**: The coverage-qualified four-night
+**Active-directive sync (2026-07-14)**: The next bounded replay targets the
+two fields left below three retained nights. The committed three-night batch
+is the minimum-transfer combination among 12 HEAD-verified high-exposure
+candidates that gives each sparse field at least 80 central-box exposure rows:
+19.053 GB streamed, three shards x one worker, raw archives unpersisted.
+
+The coverage-qualified four-night
 archive run `017eb50381badb75` completed successfully: 567,025 alerts scanned,
 5,416 observations retained, 2.2 MB persisted, and zero production tracklets
 at the required three-observation minimum. All 222 two-observation sensitivity

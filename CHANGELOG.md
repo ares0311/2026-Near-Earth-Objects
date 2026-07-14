@@ -3,6 +3,22 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.96 — Sparse-field ZTF expansion batch (2026-07-14)
+
+### Added
+- Added a measured three-night expansion for the two new fields that remained
+  below three retained nights after the coverage-qualified replay.
+
+### Selection
+- HEAD-verified the 12 highest combined-exposure candidate archives. The
+  minimum-transfer trio meeting at least 80 exposure rows per sparse field is
+  `20231003`, `20231029`, `20240429`: 19.053 GB total, with 98 Aten rows and
+  88 IEO rows.
+
+### Safety
+- Three archive shards x one worker; stream/process/evict; 1 GB persistent cap;
+  no external submission, alert, discovery claim, or impact claim.
+
 ## v0.90.95 — Coverage-qualified ZTF search result (2026-07-14)
 
 ### Result

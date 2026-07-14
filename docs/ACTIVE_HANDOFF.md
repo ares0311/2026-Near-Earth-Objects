@@ -5,7 +5,20 @@ Repository identity: `2026 Near Earth Objects`
 Branch: `main`
 Merged batch selection: `d81af0a0` (PR #235)
 Execution manifest: `b048be9c`
-App version: `v0.90.95`
+App version: `v0.90.96`
+
+## Next bounded batch
+
+`data_selection/batch_manifests/ztf_dr24_sparse_field_expansion_2024_v1.json`
+targets the two fields that remained below three retained nights. Its three
+nights (`20231003`, `20231029`, `20240429`) total 19.053230740 GB and provide
+98 central-box exposure rows for Aten 81.18 and 88 for IEO 147.53. It is the
+minimum-transfer qualifying trio among the 12 highest-exposure candidates
+whose archive sizes were HEAD-verified. Launch as three shards x one worker;
+raw archives remain streamed/unpersisted and retained output is capped at 1 GB.
+Validation: 1,944 tests passed in 27 seconds through the optimized 6x6 runner,
+with 100% coverage across 5,447 source statements; Ruff and manifest-focused
+checks are clean.
 
 ## Completed acquisition and association
 
