@@ -887,9 +887,20 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.90)
+## Current State (v0.90.91)
 
-**Latest sync (2026-07-13, single-run bounded CI)**: `CI` and synthetic E2E
+**Latest sync (2026-07-14, sharded ZTF portfolio search)**: The operator has
+explicitly authorized a bounded archival portfolio search. Run the committed
+six-night batch through `Skills/run_sharded_download.py` with six shards and
+one worker per shard. The native target streams each nightly archive only once
+while filtering all nine fields (six new, three follow-up); the tenth portfolio
+allocation is a post-ingest injection control. Verified transfer is 38.98 GB,
+raw archives are not retained, and persistent output is capped/projected at no
+more than 1 GB. Search and internal review are authorized; MPC submission,
+external alerts, and impact claims remain prohibited, and time-aware
+known-object exclusion plus both review gates remain mandatory.
+
+**Earlier sync (2026-07-13, single-run bounded CI)**: `CI` and synthetic E2E
 validation no longer execute twice for the same feature-branch commit. PRs run
 through `pull_request`, merged commits run through `push` on `main`, newer
 commits cancel superseded executions, and explicit timeouts fail closed on a

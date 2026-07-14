@@ -3,6 +3,31 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.91 — Sharded ZTF portfolio search (2026-07-14)
+
+### Added
+- Added a committed 60/30/10 ZTF DR24 search batch: six new Aten/IEO fields,
+  three follow-up fields, one post-ingest injection control, and six verified
+  2024 September archive nights.
+- Added `Skills/ztf_alert_archive_portfolio.py`, a native target for the
+  sharded downloader that streams each nightly archive once and filters all
+  portfolio fields in the same pass, with atomic query-bound checkpoints.
+- Added offline tests for manifest validation, spherical field matching,
+  checkpoint binding, repo-contained outputs, and disjoint shard ownership.
+
+### Performance
+- Uses six independent archive-night shards with one worker each. This advances
+  the last clean UW level from four to a bounded six-stream probe while
+  avoiding nine redundant downloads of every nightly archive.
+
+### Safety
+- Verified transfer is 38.98 GB but raw archives are never persisted; bounded
+  retained output is projected at no more than 1 GB, keeping project data far
+  below the 100 GB ceiling.
+- Time-aware known-object exclusion and adversarial/operator review remain
+  mandatory before candidate review. External submission and impact claims
+  remain disabled.
+
 ## v0.90.90 — Single-run bounded CI (2026-07-13)
 
 ### Changed

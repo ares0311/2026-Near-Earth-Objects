@@ -669,9 +669,21 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.90)
+## Current State (v0.90.91)
 
-**Latest sync (2026-07-13, single-run bounded CI)**: Feature branches now run
+**Latest sync (2026-07-14, sharded ZTF portfolio search)**: The operator has
+explicitly authorized the bounded archival search. The committed batch uses
+six archive-night shards and one worker per shard (six actual UW streams),
+covering six new ranked Aten/IEO fields, three follow-up fields, and one
+post-ingest injection control. `Skills/ztf_alert_archive_portfolio.py` streams
+each night once across all fields, writes atomic query-bound checkpoints, and
+runs under `Skills/run_sharded_download.py`. Raw archives are not retained;
+verified transfer is 38.98 GB and persistent output is capped/projected at no
+more than 1 GB. This does not authorize MPC submission, external alerts, or
+impact claims; time-aware known-object exclusion and both review gates remain
+mandatory.
+
+**Earlier sync (2026-07-13, single-run bounded CI)**: Feature branches now run
 `CI` and synthetic E2E validation once through the pull-request event; pushes
 run those workflows only on `main`. Newer commits cancel superseded runs, the
 full CI job has a 15-minute timeout, and each E2E job has a 10-minute timeout.
