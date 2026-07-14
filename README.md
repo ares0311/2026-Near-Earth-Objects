@@ -1,7 +1,7 @@
 # 2026 Near-Earth Object Detection & Ranking Pipeline
 
 ![Status](https://img.shields.io/badge/status-active%20development-blue)
-![Version](https://img.shields.io/badge/version-0.90.97-informational)
+![Version](https://img.shields.io/badge/version-0.90.98-informational)
 ![License](https://img.shields.io/badge/license-Apache%202.0-green)
 ![Tests](https://img.shields.io/badge/tests-1900%2B%20passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
@@ -124,7 +124,7 @@ The pipeline implements a strict directed acyclic graph (DAG) of processing stag
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    NEO DETECTION PIPELINE  v0.90.97                  │
+│                    NEO DETECTION PIPELINE  v0.90.98                  │
 └─────────────────────────────────────────────────────────────────────┘
 
   External Data Sources
@@ -536,7 +536,7 @@ The diagram below shows how data and artifacts move between the repository's top
 2026-Near-Earth-Objects/
 │
 ├── src/                          # Core pipeline modules (Python 3.11+)
-│   ├── __init__.py               # Package version (0.90.97)
+│   ├── __init__.py               # Package version (0.90.98)
 │   ├── schemas.py                # All Pydantic data models (frozen=True)
 │   ├── fetch.py                  # ZTF/ATLAS/MPC/Horizons data retrieval
 │   ├── preprocess.py             # Difference image handling; Gaia astrometry
@@ -1229,7 +1229,14 @@ evidence. MPC submission remains disabled until a real candidate survives
 adversarial plus operator review and the applicable source/submission protocol
 is satisfied.
 
-### 15.1 Current State Snapshot (v0.90.97)
+### 15.1 Current State Snapshot (v0.90.98)
+
+ZTF's primary documentation confirms that packet `prv_candidates` history is
+position-matched within 1.5 arcseconds and looks back approximately 30 days.
+It therefore cannot safely replace missing moving-object archive nights or be
+fed directly into tracklet association. Another bulk alert replay is paused
+for an explicit research decision; changing candidate generation to
+motion-oriented survey detections/images is the recommended path.
 
 Sparse expansion run `56c2348f31302291` completed 3/3 shards: 19.053 GB
 streamed, 402,053 alerts scanned, 2,311 retained, and 1.1 MB persisted. It
@@ -1257,8 +1264,8 @@ control passed 20/20 detection, linking, and scoring. No real alert proceeds
 to known-object exclusion, classification, scoring, adversarial review, or
 submission.
 
-Local v0.90.97 validation used the repo-native 6x6 test launcher: 1,950 tests
-passed in 30 seconds with 100% coverage across all 5,447 source statements;
+Local v0.90.98 validation used the repo-native 6x6 test launcher: 1,950 tests
+passed in 29 seconds with 100% coverage across all 5,447 source statements;
 Ruff and mypy are clean.
 
 The preceding live IRSA coverage preflight passed all six new fields (44–110 distinct

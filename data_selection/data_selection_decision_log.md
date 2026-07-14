@@ -338,3 +338,24 @@ Safety: No known-object exclusion, classification, scoring, adversarial review,
   submission, authority contact, public alert, discovery claim, or impact claim.
 
 new_target_search
+
+## 2026-07-14 — ZTF source-native packet-history audit
+
+Date: 2026-07-14
+Repo: 2026 Near Earth Objects
+Role: research_path_decision
+Question: Can packet `prv_candidates` replace missing nights in moving-object
+  association without another archive replay?
+Primary-source result: No. ZTF documents a 1.5-arcsecond positional match and
+  approximately 30-day lookback; packet history is not a motion track.
+Decision boundary: Never inject `prv_candidates` into tracklet association.
+  It may be retained later only as provenance-bound context/veto evidence after
+  an independent tracklet exists, with no-future-leakage tests.
+Recommended path: Change candidate generation to survey detection/image
+  products designed for motion. Continuing the transient-alert replay is an
+  explicit lower-yield alternative requiring operator approval.
+Evidence: `docs/evidence/live/2026-07-14-ztf-sparse-expansion-and-cross-batch-result.md`
+Safety: No download, candidate promotion, submission, alert, discovery claim,
+  or impact claim was made.
+
+new_target_search
