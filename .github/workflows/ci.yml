@@ -2,13 +2,21 @@ name: CI
 
 on:
   push:
-    branches: ["**"]
+    branches: ["main"]
   pull_request:
     branches: ["main"]
+
+# Feature branches are validated by the pull_request event; restricting push
+# runs to main avoids executing the identical suite twice for the same PR SHA.
+# A newer commit to the same PR/main branch supersedes the older run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       matrix:
         # Python 3.14.3 matches the project venv (.venv) on the operator Mac.

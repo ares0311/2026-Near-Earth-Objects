@@ -1,7 +1,7 @@
 # 2026 Near-Earth Object Detection & Ranking Pipeline
 
 ![Status](https://img.shields.io/badge/status-active%20development-blue)
-![Version](https://img.shields.io/badge/version-0.90.89-informational)
+![Version](https://img.shields.io/badge/version-0.90.90-informational)
 ![License](https://img.shields.io/badge/license-Apache%202.0-green)
 ![Tests](https://img.shields.io/badge/tests-1900%2B%20passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
@@ -124,7 +124,7 @@ The pipeline implements a strict directed acyclic graph (DAG) of processing stag
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    NEO DETECTION PIPELINE  v0.90.89                  │
+│                    NEO DETECTION PIPELINE  v0.90.90                  │
 └─────────────────────────────────────────────────────────────────────┘
 
   External Data Sources
@@ -536,7 +536,7 @@ The diagram below shows how data and artifacts move between the repository's top
 2026-Near-Earth-Objects/
 │
 ├── src/                          # Core pipeline modules (Python 3.11+)
-│   ├── __init__.py               # Package version (0.90.89)
+│   ├── __init__.py               # Package version (0.90.90)
 │   ├── schemas.py                # All Pydantic data models (frozen=True)
 │   ├── fetch.py                  # ZTF/ATLAS/MPC/Horizons data retrieval
 │   ├── preprocess.py             # Difference image handling; Gaia astrometry
@@ -1229,13 +1229,20 @@ evidence. MPC submission remains disabled until a real candidate survives
 adversarial plus operator review and the applicable source/submission protocol
 is satisfied.
 
-### 15.1 Current State Snapshot (v0.90.89)
+### 15.1 Current State Snapshot (v0.90.90)
 
 The active handoff is coherent with the completed v4 lifecycle:
 `tier2_cnn_v4` is internally promoted with signed A1-A7 evidence, so no model
 retrain or operator-signoff blocker remains. Gate Z3 is the sole open ZTF DR24
 gate and is intentionally paused. A broader new-field archive portfolio, bulk
 ingest, or external submission requires explicit operator direction.
+
+CI now runs feature-branch validation once through the pull-request event and
+runs again after merge on `main`; it no longer duplicates the same suite for
+both a branch push and its PR merge ref. Superseded runs cancel automatically,
+and the full CI and E2E jobs have bounded timeouts. Local broad validation
+continues to use the measured 6x6 sharded runner; GitHub's smaller hosted
+runner stays serial to avoid counterproductive 36-process oversubscription.
 
 Codex can now replace six manual terminal tabs with one bounded command for
 native shard-aware downloaders, and can run broad offline validation as six

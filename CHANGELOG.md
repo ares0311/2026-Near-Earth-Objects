@@ -3,6 +3,27 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.90 — Single-run bounded CI (2026-07-13)
+
+### Changed
+- Restricted feature-branch CI and synthetic E2E validation to the
+  `pull_request` event while retaining post-merge `push` validation on `main`,
+  eliminating duplicate workflow copies for the same PR commit.
+- Added per-workflow concurrency groups with `cancel-in-progress` so a newer
+  commit supersedes stale work.
+- Added a 15-minute timeout to the full lint/type/test job and 10-minute
+  timeouts to each synthetic E2E job after a redundant CI copy remained stuck
+  despite identical PR and subsequent `main` runs passing.
+
+### Performance
+- Broad local tests remain on the measured 6-shard x 6-worker launcher.
+  GitHub's smaller hosted runner remains serial rather than spawning 36
+  processes, while the six independent E2E jobs continue to run in parallel.
+
+### Safety
+- No data acquisition, model training, scientific scoring, or external
+  submission behavior changed.
+
 ## v0.90.89 — Active-directive coherence (2026-07-13)
 
 ### Changed

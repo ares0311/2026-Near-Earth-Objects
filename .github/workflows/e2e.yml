@@ -1,6 +1,7 @@
 name: End-to-End Pipeline Smoke Tests
 
-# Runs synthetic end-to-end pipeline checks on every push and PR.
+# Runs synthetic end-to-end pipeline checks on main pushes and PRs targeting
+# main. Feature-branch pushes are covered by the PR event, avoiding duplicates.
 # No credentials, no network access — all synthetic/mocked data.
 #
 # Jobs:
@@ -16,14 +17,19 @@ name: End-to-End Pipeline Smoke Tests
 
 on:
   push:
-    branches: ["**"]
+    branches: ["main"]
   pull_request:
     branches: ["main"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   smoke:
     name: Module smoke test
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - uses: actions/checkout@v4
@@ -49,6 +55,7 @@ jobs:
   diagnose:
     name: Stage-by-stage pipeline diagnostic
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - uses: actions/checkout@v4
@@ -74,6 +81,7 @@ jobs:
   injection:
     name: Injection-recovery (n=20, synthetic)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - uses: actions/checkout@v4
@@ -115,6 +123,7 @@ jobs:
   wise-injection:
     name: WISE injection-recovery (Gate P1 positive control)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - uses: actions/checkout@v4
@@ -162,6 +171,7 @@ jobs:
   model-weights:
     name: Model weight validation
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - name: Set up uv with Python 3.14
@@ -180,6 +190,7 @@ jobs:
   alert-protocol:
     name: Alert protocol compliance
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - name: Set up uv with Python 3.14

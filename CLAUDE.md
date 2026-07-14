@@ -887,9 +887,19 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.89)
+## Current State (v0.90.90)
 
-**Latest sync (2026-07-13, active-directive coherence)**: The active handoff
+**Latest sync (2026-07-13, single-run bounded CI)**: `CI` and synthetic E2E
+validation no longer execute twice for the same feature-branch commit. PRs run
+through `pull_request`, merged commits run through `push` on `main`, newer
+commits cancel superseded executions, and explicit timeouts fail closed on a
+stalled job (15 minutes for full CI; 10 minutes per E2E job). This responds to
+a real redundant CI copy that remained in pytest long after its identical PR
+copy and the later `main` run passed. Continue using the repo-native 6x6 test
+launcher for broad local validation; the small GitHub-hosted runner stays
+serial because 36 local worker processes would oversubscribe it.
+
+**Earlier sync (2026-07-13, active-directive coherence)**: The active handoff
 now reflects the completed v4 lifecycle end to end. `tier2_cnn_v4` is
 internally promoted under its signed operator decision, so no A1-A7 signoff
 blocker remains and the old v3 retrain/calibration command is not pending.

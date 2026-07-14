@@ -669,9 +669,19 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.89)
+## Current State (v0.90.90)
 
-**Latest sync (2026-07-13, active-directive coherence)**: Removed the stale
+**Latest sync (2026-07-13, single-run bounded CI)**: Feature branches now run
+`CI` and synthetic E2E validation once through the pull-request event; pushes
+run those workflows only on `main`. Newer commits cancel superseded runs, the
+full CI job has a 15-minute timeout, and each E2E job has a 10-minute timeout.
+This closes the observed duplicate-run failure mode where one redundant copy
+remained stuck after its identical PR copy passed. Keep local broad validation
+on `Skills/run_sharded_tests.py` at the measured 6x6 default; do not force 36
+processes onto a small GitHub-hosted runner where oversubscription increases
+latency instead of reducing it.
+
+**Earlier sync (2026-07-13, active-directive coherence)**: Removed the stale
 active handoff that still described the completed `tier2_cnn_v3` retrain and
 operator signoff as pending. `tier2_cnn_v4` is internally promoted with its
 signed evidence packet; no A1-A7 signoff blocker remains. The only open ZTF
