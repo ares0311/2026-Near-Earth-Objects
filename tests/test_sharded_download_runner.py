@@ -173,6 +173,38 @@ def test_merge_writes_summary_only_after_all_shards_succeed(tmp_path):
     assert json.loads(output.read_text())["shard_count"] == 2
 
 
+def test_status_and_merge_infer_nondefault_shard_count_from_run(tmp_path):
+    """Inspection reuses recorded topology instead of assuming six shards."""
+    manifest = tmp_path / "manifest.jsonl"
+    runner.append_manifest_record(
+        manifest,
+        {
+            "record_type": "run_started",
+            "run_id": "run-four",
+            "shard_count": 4,
+        },
+    )
+    for index in range(4):
+        runner.append_manifest_record(
+            manifest,
+            {
+                "record_type": "shard_completed",
+                "run_id": "run-four",
+                "shard_count": 4,
+                "shard_index": index,
+                "status": "succeeded",
+            },
+        )
+
+    status = runner.report_status(manifest, "run-four", shard_count=None)
+    assert status["shard_count"] == 4
+    assert status["shards_missing"] == []
+
+    output = tmp_path / "summary.json"
+    merged = runner.merge_run(manifest, "run-four", shard_count=None, out_path=output)
+    assert merged["shard_count"] == 4
+
+
 def test_manifest_relay_scopes_commit_and_retries_push(monkeypatch, tmp_path):
     """Only the manifest is committed, with a bounded concurrent-push retry."""
     manifest = tmp_path / "Logs/reports/manifest.jsonl"

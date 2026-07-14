@@ -887,7 +887,18 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.94)
+## Current State (v0.90.95)
+
+**Latest sync (2026-07-14, coverage-qualified search complete)**: Run
+`017eb50381badb75` completed all four archive shards in 10m36s: 567,025 alerts
+scanned, 5,416 retained, 2.2 MB persisted, and no service/rate-limit errors.
+The production three-observation association gate formed zero tracklets. Every
+one of the 222 two-observation sensitivity fits is a two-point/two-night pair
+and is not a candidate. A fresh isolated ZTF control passed 20/20
+detect/link/score. No real tracklet is eligible for known-object exclusion,
+classification, scoring, review, or submission. Status/merge now infer a
+non-default run's recorded shard count instead of silently assuming six. See
+the active handoff and dated coverage-qualified search evidence.
 
 **Latest sync (2026-07-14, coverage preflight passed and batch selected)**:
 Real IRSA run `9a9e148f570d162b` completed all six field shards in 10 seconds
