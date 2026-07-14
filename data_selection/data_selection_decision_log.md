@@ -219,3 +219,48 @@ Citations: `docs/astrometrics_data_selection_policy.md`;
   `docs/ZTF_DR24_PRODUCTION_GATES.md`.
 
 new_target_search
+
+## 2026-07-14 — Coverage-selected ZTF DR24 four-night portfolio
+
+Date: 2026-07-14
+Repo: 2026 Near Earth Objects
+Data: Four UW ZTF public nightly alert archives selected from real IRSA
+  science-image exposure metadata for the six new Aten/IEO fields
+Role: live_search
+Acquisition mode: stream/process/evict with four disjoint archive-night shards
+  and one worker per shard; raw tar archives are never persisted
+Estimated transfer: 26.670482707 GB from verified HTTP Content-Length values
+Estimated persistent storage: at most 1.0 GB under the 5,000-observation
+  per-field/night cap; project-managed data remains near 10 GB
+Why this data: The first six-night portfolio guessed common September dates
+  and left five of six new fields without repeat coverage. Metadata-only run
+  `9a9e148f570d162b` queried a bounded 365-day interval for every new field;
+  all six passed with 44-110 distinct exposure nights. An exhaustive
+  four-night combination check then selected the lowest-transfer quartet that
+  gives every new field at least three covered nights.
+Selected nights: 20240321, 20240422, 20240504, 20240603. Each new field has
+  central-box exposure coverage on exactly three of the four. The four remote
+  archives total 26,670,482,707 bytes. A 74-byte 20240114 placeholder was
+  explicitly rejected as unusable.
+Why this concurrency: There are four independent nightly archives, so four
+  shards x one worker is the complete useful parallel layout. Six shards would
+  create two empty children; 6x6 would exceed both the work count and the
+  empirically justified UW ceiling. The prior real UW run proved six streams
+  safe, so four is within measured bounds.
+Checkpoint and retry plan: Atomic per-night checkpoints under
+  `Logs/pipeline_runs/ztf_alert_archive_portfolio/`; parent status in
+  `Logs/reports/sharded_download_manifest.jsonl`; resume skips successful
+  nights and restarts only incomplete streams.
+Leakage and review controls: Historical replay only, before the 2024-09-21
+  cutoff. Live-search data remains excluded from training/calibration.
+  Time-aware known-object exclusion and adversarial plus operator review are
+  mandatory before any candidate review.
+Manifest: `data_selection/batch_manifests/ztf_dr24_coverage_selected_2024_v1.json`
+Evidence: `docs/evidence/live/2026-07-14-ztf-field-night-coverage-preflight.md`
+Expected value: A coverage-qualified real archival search of all six new
+  fields. Metadata coverage does not guarantee retained alerts or tracklets;
+  a clean null remains scientifically valid.
+Safety: No MPC/NEOCP submission, NASA/PDCO contact, public alert, discovery
+  claim, or impact-probability claim is authorized.
+
+new_target_search

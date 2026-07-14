@@ -669,7 +669,17 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.93)
+## Current State (v0.90.94)
+
+**Latest sync (2026-07-14, coverage preflight passed and batch selected)**:
+IRSA run `9a9e148f570d162b` completed six field shards in 10 seconds with no
+service errors; all six new fields have 44–110 distinct exposure nights. The
+minimum-transfer valid quartet is `20240321`, `20240422`, `20240504`, and
+`20240603` (26.67 GB streamed), giving each new field exactly three covered
+nights. The committed source of truth is
+`ztf_dr24_coverage_selected_2024_v1.json`. Run it as four archive-night shards
+x one worker; raw archives are not persisted, retained output is capped at
+1 GB, and external submission remains prohibited.
 
 **Latest sync (2026-07-14, metadata-only coverage preflight ready)**:
 `Skills/inventory_ztf_field_night_coverage.py` and the committed

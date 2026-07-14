@@ -1,7 +1,7 @@
 # 2026 Near-Earth Object Detection & Ranking Pipeline
 
 ![Status](https://img.shields.io/badge/status-active%20development-blue)
-![Version](https://img.shields.io/badge/version-0.90.93-informational)
+![Version](https://img.shields.io/badge/version-0.90.94-informational)
 ![License](https://img.shields.io/badge/license-Apache%202.0-green)
 ![Tests](https://img.shields.io/badge/tests-1900%2B%20passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
@@ -124,7 +124,7 @@ The pipeline implements a strict directed acyclic graph (DAG) of processing stag
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    NEO DETECTION PIPELINE  v0.90.93                  │
+│                    NEO DETECTION PIPELINE  v0.90.94                  │
 └─────────────────────────────────────────────────────────────────────┘
 
   External Data Sources
@@ -536,7 +536,7 @@ The diagram below shows how data and artifacts move between the repository's top
 2026-Near-Earth-Objects/
 │
 ├── src/                          # Core pipeline modules (Python 3.11+)
-│   ├── __init__.py               # Package version (0.90.93)
+│   ├── __init__.py               # Package version (0.90.94)
 │   ├── schemas.py                # All Pydantic data models (frozen=True)
 │   ├── fetch.py                  # ZTF/ATLAS/MPC/Horizons data retrieval
 │   ├── preprocess.py             # Difference image handling; Gaia astrometry
@@ -1229,7 +1229,14 @@ evidence. MPC submission remains disabled until a real candidate survives
 adversarial plus operator review and the applicable source/submission protocol
 is satisfied.
 
-### 15.1 Current State Snapshot (v0.90.93)
+### 15.1 Current State Snapshot (v0.90.94)
+
+The live IRSA coverage preflight passed all six new fields (44–110 distinct
+nights each). The committed next batch uses the minimum-transfer valid
+four-night set—`20240321`, `20240422`, `20240504`, `20240603`—for 26.67 GB of
+streamed archive traffic. Every new field has exposure coverage on exactly
+three nights. Raw archives remain unpersisted and the retained-output cap is
+1 GB.
 
 The next-batch coverage gate is now implemented. A committed six-field,
 365-day IRSA metadata manifest runs through
