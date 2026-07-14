@@ -113,7 +113,7 @@ for `ztf.uw.edu` and the manifest-only git relay. Do not broaden it.
    complete. Another bulk replay requires an explicit research decision and a
    newly selected, logged, bounded batch. Gate Z3 remains separately paused.
 
-Validation for v0.90.97: optimized 6x6 broad suite, 1,947 tests in 29.2 seconds,
+Validation for v0.90.97: optimized 6x6 broad suite, 1,950 tests in 30 seconds,
 100% coverage across 5,447 source statements; full Ruff and mypy clean; uv
 lock and repository artifact-policy checks passed.
 

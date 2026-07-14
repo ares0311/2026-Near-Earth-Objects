@@ -1257,8 +1257,8 @@ control passed 20/20 detection, linking, and scoring. No real alert proceeds
 to known-object exclusion, classification, scoring, adversarial review, or
 submission.
 
-Local v0.90.97 validation used the repo-native 6x6 test launcher: 1,947 tests
-passed in 29.2 seconds with 100% coverage across all 5,447 source statements;
+Local v0.90.97 validation used the repo-native 6x6 test launcher: 1,950 tests
+passed in 30 seconds with 100% coverage across all 5,447 source statements;
 Ruff and mypy are clean.
 
 The preceding live IRSA coverage preflight passed all six new fields (44–110 distinct
