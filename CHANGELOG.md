@@ -3,6 +3,35 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.88 — Single-command sharded downloads and tests (2026-07-13)
+
+### Added
+- `Skills/run_sharded_download.py`: one parent command for native shard-aware
+  downloaders, defaulting to 6 shards x 6 workers with local uv cache/venv,
+  native-thread limits, active-run protection, explicit storage projection,
+  per-shard logs, fail-fast child cleanup, resume/status/finalize records, and
+  a compact auto-pushed manifest.
+- `Skills/run_sharded_tests.py`: partitions test modules into six disjoint
+  outer shards and runs six pytest-xdist workers per shard using
+  `--dist=loadfile`; per-shard coverage files are combined once before the
+  existing 100% coverage gate is enforced. The small SQLite coverage files
+  use a sandbox temporary directory during execution to avoid Dropbox sync
+  races and are deleted after the combined report; the venv, uv cache, logs,
+  and durable artifacts remain repository-local.
+- Focused regression tests for target validation, secret/control-flag
+  rejection, deterministic shard assignment, storage ceilings, manifest
+  finalization, xdist command construction, and coverage isolation.
+
+### Changed
+- Codex directives now require the single-command launchers whenever they
+  safely reduce measured wall time; small targeted tests remain serial and
+  provider limits or active operator runs still override parallel defaults.
+- Added `pytest-xdist` to locked development dependencies.
+
+### Safety
+- This tooling change starts no download, reopens no paused discovery gate,
+  and authorizes no external submission or scientific claim.
+
 ## v0.90.87 — Approve tier2_cnn_v4 for internal promotion (2026-07-12)
 
 ### Changed

@@ -39,6 +39,7 @@ def test_only_log_placeholders_are_tracked():
         "Logs/reports/.gitkeep",
         "Logs/reports/ranking_baseline.json",
         "Logs/reports/retrospective_validation.json",
+        "Logs/reports/sharded_download_manifest.jsonl",
         "Logs/reports/ztf_alert_archive_ingest_manifest.jsonl",
     ]
 

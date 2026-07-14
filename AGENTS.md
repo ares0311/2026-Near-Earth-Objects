@@ -77,7 +77,8 @@ It contains the facts a coding agent needs to work productively without re-readi
 - **Repository artifact policy supports `git add .`**: The standard operator
   cadence may use `git add .`, so `.gitignore` must protect local/generated
   outputs by default. Treat `Logs/**` as local operational output and never
-  commit it except `Logs/.gitkeep` and `Logs/reports/.gitkeep`. When run
+  commit it except explicit compact `Logs/reports/` evidence/manifests and
+  the two `.gitkeep` placeholders. When run
   evidence must be visible to future agents, promote a compact, sanitized
   summary into `docs/evidence/` or `data/evidence/` instead of committing raw
   `Logs/` files. Production model artifacts in `models/` must be explicitly
@@ -96,6 +97,30 @@ It contains the facts a coding agent needs to work productively without re-readi
   changes. State explicitly whether parallelism was considered and why it
   was or wasn't applied. If it's ambiguous whether parallelizing is worth
   the complexity, ask the operator rather than deciding unilaterally.
+- **Optimized sharded/multiprocess execution is the standing default wherever
+  it safely applies**. All agents must prefer the single-command launchers
+  below when work is independently divisible and they reduce wall time:
+  - For a long data acquisition whose target Skill already implements native
+    `--shard-index`, `--shard-count`, and `--workers` semantics, the agent must
+    call `Skills/run_sharded_download.py` itself instead of asking the operator
+    to maintain six terminal tabs. The default is **6 shards x 6 workers**.
+    First run its `--dry-run`, provide `--estimated-download-gb`, verify the
+    target's service limit/checkpoint/output isolation, and keep the projected
+    project footprint below 100 GB. The launcher must not invent shard
+    semantics for a target that lacks those native flags.
+  - For a full or otherwise broad offline test pass, Codex should call
+    `Skills/run_sharded_tests.py`, defaulting to **6 file shards x 6
+    pytest-xdist workers** with `--dist=loadfile`. The runner owns disjoint
+    test files and separate coverage data per shard, then combines coverage
+    once and enforces the repository's 100% gate. Use a normal targeted pytest
+    command when only a few tests are relevant, because launcher overhead
+    would not improve wall time.
+  - Do not run either launcher during an active Tier 3 operator run or beside
+    another resource-heavy job. If a measured 6x6 run is slower, exhausts
+    memory, or exposes a provider rate limit, reduce the explicit shard/worker
+    counts to the last clean level and record why. Prefer an equivalent
+    repo-native launcher in future workflows rather than recreating ad hoc
+    terminal-tab orchestration.
 - **Progressively probe toward the safe concurrency ceiling — don't stay pinned to the conservative starting point**:
   `docs/SYSTEM_PROFILE.md`'s "usually 4 to 6 workers" for external-service
   work is a conservative first-batch starting point, not a permanent
@@ -118,6 +143,11 @@ It contains the facts a coding agent needs to work productively without re-readi
   fail closed if any expected shard has not reported in. Re-running a
   shard replaces, not duplicates, its manifest entry. See CLAUDE.md's
   Standing Rules for the full implementation checklist.
+  `Skills/run_sharded_tests.py` is the narrow local-validation exception to
+  the committed git-relay requirement: one parent process directly owns every
+  child, emits one fail-closed result, writes ignored logs and `summary.json`
+  under `Logs/pipeline_runs/`, and deletes its small sandbox-temporary coverage
+  databases after combining them. It must not auto-commit every local test run.
 - **The manifest must live in a committed path and be auto-pushed — git is the relay, not the operator's filesystem**:
   A local-only manifest does not solve "avoid pasting console output"
   because the agent has no access to the operator's machine, only to what
@@ -590,6 +620,11 @@ uv run --python 3.14 python -m mypy src
 # Tests
 PYTHONPATH=src uv run --python 3.14 python -m pytest
 
+# Broad local test pass: six disjoint file shards x six xdist workers, with
+# isolated per-shard coverage data combined into the same 100% final gate.
+UV_CACHE_DIR=.uv-cache caffeinate -i uv run --no-sync --python 3.14 python \
+    Skills/run_sharded_tests.py
+
 # macOS local runs with XGBoost/OpenMP may need deterministic threading
 OMP_NUM_THREADS=1 PYTHONPATH=src uv run --python 3.14 python -m pytest
 
@@ -634,7 +669,19 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.87)
+## Current State (v0.90.88)
+
+**Latest sync (2026-07-13, single-command sharding)**: Added Codex-owned
+single-command orchestration for native shard-aware downloads and broad offline
+tests. `Skills/run_sharded_download.py` defaults to 6 shards x 6 workers, checks
+the 100 GB conservative cache budget, requires exact native shard flags,
+isolates logs, fails the whole batch on a child failure, and maintains a
+file-locked status/finalize manifest. `Skills/run_sharded_tests.py` assigns
+every test file to exactly one of 6 outer shards, runs 6 pytest-xdist workers
+per shard with `--dist=loadfile`, isolates coverage files, combines them only
+after all shards pass, and retains the 100% coverage gate. Codex should use
+these launchers whenever measured wall time benefits and safety conditions are
+met; small targeted checks remain serial.
 
 **Latest sync (2026-07-12, tier2_cnn_v4 operator-approved)**: V4 now has
 two validated training manifests (real ZTF plus the deterministic synthetic

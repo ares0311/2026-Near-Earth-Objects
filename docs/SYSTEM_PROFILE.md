@@ -34,9 +34,27 @@ Sensitive machine identifiers such as serial number, hardware UUID, provisioning
 
 Prefer these defaults when running project code on this machine:
 
+- Treat optimized sharded/multiprocess execution as the standing default
+  wherever work is independently divisible and the measured or expected wall
+  time improves. Use the repo launchers below rather than recreating manual
+  terminal-tab orchestration; retain serial execution for small, shared-state,
+  memory-bound, or provider-limited work.
 - Keep default CPU-bound worker counts below full saturation. Start with `12` workers for local batch jobs and increase only after measuring.
 - Keep at least `2` CPU cores free during interactive work.
 - For I/O-heavy work, external-service queries, or live catalog access, use lower concurrency first, usually `4` to `6` workers, because remote service limits and disk throughput can dominate. This is a conservative **first-batch** starting point, not a permanent ceiling — see "Empirically-Found Concurrency Ceilings" below and the corresponding CLAUDE.md/AGENTS.md standing rule for how to progressively raise it per service once a clean batch establishes headroom.
+- When a long downloader already has native disjoint shard semantics and the
+  provider/storage checks permit aggregate concurrency, use
+  `Skills/run_sharded_download.py` to replace six terminal tabs. The repo
+  default is 6 shards x 6 workers, but provider limits and the last measured
+  clean level remain authoritative; reduce the explicit counts immediately on
+  throttling, errors, or degraded latency.
+- For the broad offline suite, use `Skills/run_sharded_tests.py` with 6
+  disjoint file shards x 6 pytest-xdist workers when measured wall time
+  improves. The runner pins native numerical libraries to one thread per
+  process, uses `--dist=loadfile`, isolates shard coverage, and combines the
+  100% coverage result at the end. Use serial pytest for small targeted checks
+  and reduce counts if the 36-worker aggregate oversubscribes this 16-core
+  machine or exceeds the 48 GB routine memory target.
 - Target peak memory below `48 GB` for routine local runs, leaving about `16 GB` for macOS, browser windows, notebooks, and the editor.
 - Chunk large target or sector sweeps by target, sector, or candidate batch rather than loading all mission data into memory at once.
 - Prefer memory-mapped arrays, columnar files, or streaming reads for large intermediate products.
@@ -63,6 +81,12 @@ itself always overrides anything recorded here.
 | Service | Confirmed safe concurrency | Evidence |
 |---|---|---|
 | *(none recorded yet)* | | |
+
+### Local test-runner evidence
+
+| Date | Layout | Result |
+|---|---|---|
+| 2026-07-13 | 6 outer file shards x 6 pytest-xdist workers; native threads pinned to 1 | Clean broad run: 1,917 tests passed in 29 s; six isolated coverage datasets combined without errors; 5,447 source statements at 100% coverage. |
 
 ---
 
