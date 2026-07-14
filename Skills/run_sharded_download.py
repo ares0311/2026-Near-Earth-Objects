@@ -311,9 +311,41 @@ def read_run_records(path: Path, run_id: str | None = None) -> tuple[str | None,
     return selected, latest
 
 
-def report_status(path: Path, run_id: str | None, shard_count: int) -> dict[str, Any]:
+def _recorded_shard_count(
+    path: Path, run_id: str | None, requested: int | None
+) -> int:
+    """Return an explicit shard count or infer it from the selected run.
+
+    Modern run-start and completion records both carry ``shard_count``.  This
+    keeps status/merge faithful to a non-default launch without making the
+    operator repeat topology already committed to the manifest.  Legacy rows
+    without that field remain fail-closed and require ``--shards`` explicitly.
+    """
+    if requested is not None:
+        return requested
+    if path.exists():
+        for line in reversed(path.read_text(encoding="utf-8").splitlines()):
+            try:
+                record = json.loads(line)
+            except (json.JSONDecodeError, TypeError):
+                continue
+            if record.get("run_id") != run_id:
+                continue
+            shard_count = record.get("shard_count")
+            if isinstance(shard_count, int) and shard_count > 0:
+                return shard_count
+    raise ValueError(
+        f"cannot infer shard count for run {run_id or 'unknown'}; "
+        "pass --shards explicitly for a legacy manifest"
+    )
+
+
+def report_status(
+    path: Path, run_id: str | None, shard_count: int | None
+) -> dict[str, Any]:
     """Print partial progress without failing when shards are outstanding."""
     selected, records = read_run_records(path, run_id)
+    shard_count = _recorded_shard_count(path, selected, shard_count)
     reported = sorted(records)
     missing = [index for index in range(shard_count) if index not in records]
     failed = sorted(
@@ -334,9 +366,12 @@ def report_status(path: Path, run_id: str | None, shard_count: int) -> dict[str,
     return status
 
 
-def merge_run(path: Path, run_id: str | None, shard_count: int, out_path: Path) -> dict[str, Any]:
+def merge_run(
+    path: Path, run_id: str | None, shard_count: int | None, out_path: Path
+) -> dict[str, Any]:
     """Write a final summary only when every expected shard succeeded."""
     selected, records = read_run_records(path, run_id)
+    shard_count = _recorded_shard_count(path, selected, shard_count)
     missing = [index for index in range(shard_count) if index not in records]
     if missing:
         raise RuntimeError(f"cannot merge run {selected or 'unknown'}; missing shards {missing}")
@@ -617,7 +652,15 @@ def _build_parser() -> argparse.ArgumentParser:
         description=__doc__, formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument("--script", type=Path, help="Native shard-aware downloader under Skills/.")
-    parser.add_argument("--shards", type=int, default=DEFAULT_SHARDS)
+    parser.add_argument(
+        "--shards",
+        type=int,
+        default=None,
+        help=(
+            f"Shard count (launch default: {DEFAULT_SHARDS}; status/merge default: "
+            "infer from the selected manifest run)."
+        ),
+    )
     parser.add_argument("--workers", type=int, default=DEFAULT_WORKERS)
     parser.add_argument("--estimated-download-gb", type=float)
     parser.add_argument("--max-project-data-gb", type=float, default=DEFAULT_MAX_PROJECT_DATA_GB)
@@ -657,19 +700,25 @@ def _build_parser() -> argparse.ArgumentParser:
 def main() -> None:
     """Validate the requested batch, then inspect, report, or launch it."""
     args = _build_parser().parse_args()
-    if args.shards < 1 or args.workers < 1:
+    if (args.shards is not None and args.shards < 1) or args.workers < 1:
         raise SystemExit("--shards and --workers must both be >= 1")
     if args.status:
-        report_status(args.manifest, args.run_id, args.shards)
+        try:
+            report_status(args.manifest, args.run_id, args.shards)
+        except ValueError as exc:
+            raise SystemExit(str(exc)) from exc
         return
     if args.merge:
         selected = args.run_id or "latest"
-        merge_run(
-            args.manifest,
-            args.run_id,
-            args.shards,
-            args.run_root / selected / "summary.json",
-        )
+        try:
+            merge_run(
+                args.manifest,
+                args.run_id,
+                args.shards,
+                args.run_root / selected / "summary.json",
+            )
+        except ValueError as exc:
+            raise SystemExit(str(exc)) from exc
         return
     if args.sync:
         manifest = args.manifest if args.manifest.is_absolute() else REPO_ROOT / args.manifest
@@ -681,6 +730,8 @@ def main() -> None:
         raise SystemExit("--script is required unless --status, --merge, or --sync is used")
     if args.estimated_download_gb is None:
         raise SystemExit("--estimated-download-gb is required before a download launch")
+
+    args.shards = args.shards or DEFAULT_SHARDS
 
     child_args = _strip_remainder_separator(args.child_args)
     try:

@@ -1,7 +1,7 @@
 # 2026 Near-Earth Object Detection & Ranking Pipeline
 
 ![Status](https://img.shields.io/badge/status-active%20development-blue)
-![Version](https://img.shields.io/badge/version-0.90.94-informational)
+![Version](https://img.shields.io/badge/version-0.90.95-informational)
 ![License](https://img.shields.io/badge/license-Apache%202.0-green)
 ![Tests](https://img.shields.io/badge/tests-1900%2B%20passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
@@ -124,7 +124,7 @@ The pipeline implements a strict directed acyclic graph (DAG) of processing stag
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    NEO DETECTION PIPELINE  v0.90.94                  │
+│                    NEO DETECTION PIPELINE  v0.90.95                  │
 └─────────────────────────────────────────────────────────────────────┘
 
   External Data Sources
@@ -536,7 +536,7 @@ The diagram below shows how data and artifacts move between the repository's top
 2026-Near-Earth-Objects/
 │
 ├── src/                          # Core pipeline modules (Python 3.11+)
-│   ├── __init__.py               # Package version (0.90.94)
+│   ├── __init__.py               # Package version (0.90.95)
 │   ├── schemas.py                # All Pydantic data models (frozen=True)
 │   ├── fetch.py                  # ZTF/ATLAS/MPC/Horizons data retrieval
 │   ├── preprocess.py             # Difference image handling; Gaia astrometry
@@ -1229,9 +1229,24 @@ evidence. MPC submission remains disabled until a real candidate survives
 adversarial plus operator review and the applicable source/submission protocol
 is satisfied.
 
-### 15.1 Current State Snapshot (v0.90.94)
+### 15.1 Current State Snapshot (v0.90.95)
 
-The live IRSA coverage preflight passed all six new fields (44–110 distinct
+The coverage-qualified four-night search completed cleanly under run
+`017eb50381badb75`. Four archive shards streamed 26.67 GB in 10m36s, scanned
+567,025 alerts, retained 5,416 observations, and persisted only 2.2 MB. Five
+new fields had retained observations on at least two nights; four had three
+retained nights. Production association formed zero tracklets at the required
+three-observation minimum. The 222 sensitivity fits all contain exactly two
+observations across two nights and are not candidates. A fresh isolated ZTF
+control passed 20/20 detection, linking, and scoring. No real alert proceeds
+to known-object exclusion, classification, scoring, adversarial review, or
+submission.
+
+Local v0.90.95 validation used the repo-native 6x6 test launcher: 1,943 tests
+passed in 27 seconds with 100% coverage across all 5,447 source statements;
+Ruff and mypy are clean.
+
+The preceding live IRSA coverage preflight passed all six new fields (44–110 distinct
 nights each). The committed next batch uses the minimum-transfer valid
 four-night set—`20240321`, `20240422`, `20240504`, `20240603`—for 26.67 GB of
 streamed archive traffic. Every new field has exposure coverage on exactly

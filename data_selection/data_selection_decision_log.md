@@ -264,3 +264,32 @@ Safety: No MPC/NEOCP submission, NASA/PDCO contact, public alert, discovery
   claim, or impact-probability claim is authorized.
 
 new_target_search
+
+## 2026-07-14 — Coverage-selected ZTF DR24 result
+
+Date: 2026-07-14
+Repo: 2026 Near Earth Objects
+Data: Completed four-night replay for
+  `ztf_dr24_coverage_selected_2024_v1`
+Role: live_search_result
+Execution: Run `017eb50381badb75`; four archive-night shards x one worker;
+  26.670482707 GB streamed in 10m36s; raw archives evicted during streaming
+Storage: 2.2 MB durable checkpoints, keeping the project near 12 GB total and
+  far below the 100 GB ceiling
+Observed volume: 567,025 alerts scanned; 5,416 retained at `rb >= 0.5`
+Production result: Five new fields had at least two populated retained nights;
+  four had three. Association at `min_observations=3` formed zero tracklets.
+Sensitivity: 222 fits at `min_observations=2`; every fit has exactly two
+  observations across exactly two nights and is not a candidate.
+Control: Fresh isolated ZTF injection run, seed 42, passed 20/20 detection,
+  linking, and scoring using the documented analytic real/bogus proxy.
+Interpretation: Exposure-level preflight improved the number of populated
+  field/night cells but cannot guarantee retained alerts or a valid moving
+  path. The completed batch is an honest null association result, not a model
+  rejection or a discovery claim.
+Evidence: `docs/evidence/live/2026-07-14-ztf-coverage-qualified-search-result.md`
+Safety: Candidate review remains fail-closed. No time-aware known-object
+  exclusion, classification, scoring, adversarial review, MPC/NEOCP
+  submission, public alert, or impact-probability statement is authorized.
+
+new_target_search

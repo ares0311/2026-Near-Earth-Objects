@@ -1,19 +1,28 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.90.94
+**Current version**: v0.90.95
 **Last updated**: 2026-07-14 (header/sync line only — the P1-P5 gate register
 body below is unchanged historical evidence from 2026-07-02; current gate
 status for the active ZTF DR24 path lives in
 `docs/ZTF_DR24_PRODUCTION_GATES.md`, which is kept current every session)
 
-**Active-directive sync (2026-07-14)**: The v3 retrain and
+**Active-directive sync (2026-07-14)**: The coverage-qualified four-night
+archive run `017eb50381badb75` completed successfully: 567,025 alerts scanned,
+5,416 observations retained, 2.2 MB persisted, and zero production tracklets
+at the required three-observation minimum. All 222 two-observation sensitivity
+fits are underconstrained two-point/two-night pairs and are not candidates. A
+fresh isolated control passed 20/20 detection, linking, and scoring. Candidate
+review remains fail-closed; no known-object exclusion, classification,
+adversarial review, submission, or external alert is pending from this batch.
+
+The v3 retrain and
 `operator_signoff_missing` statements in dated version-history entries below
 are historical snapshots, not current blockers. `tier2_cnn_v4` is internally
 promoted with signed evidence. No A1-A7 blocker remains. Gate Z3 is the only
 open ZTF DR24 gate and remains intentionally paused. The authorized broader
 archive continuation is coverage-first. The bounded six-field IRSA inventory
-has passed, and the committed four-night batch gives each new field exactly
-three exposure-covered nights while minimizing verified transfer (26.67 GB).
+has passed. The completed four-night run tested the minimum-transfer quartet;
+exposure coverage did not produce a valid multi-night tracklet.
 External submission remains prohibited.
 
 **Purpose**: Mandatory read at session start (per MANDATORY SESSION-START PROTOCOL).  

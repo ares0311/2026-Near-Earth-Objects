@@ -669,7 +669,19 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.94)
+## Current State (v0.90.95)
+
+**Latest sync (2026-07-14, coverage-qualified search complete)**: Run
+`017eb50381badb75` completed four UW archive shards in 10m36s with no service
+or rate-limit errors: 567,025 alerts scanned, 5,416 retained, and 2.2 MB
+persisted. Production association found zero three-observation tracklets. All
+222 sensitivity fits are exactly two observations across two nights and are
+not candidates. A fresh isolated injection control passed 20/20
+detect/link/score. There is no real tracklet for time-aware known-object
+exclusion, classification, scoring, adversarial review, or submission. See
+`docs/evidence/live/2026-07-14-ztf-coverage-qualified-search-result.md` and
+`docs/ACTIVE_HANDOFF.md`. The sharded downloader status/merge commands now
+infer non-default topology from the selected manifest run.
 
 **Latest sync (2026-07-14, coverage preflight passed and batch selected)**:
 IRSA run `9a9e148f570d162b` completed six field shards in 10 seconds with no

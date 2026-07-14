@@ -3,6 +3,26 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.95 — Coverage-qualified ZTF search result (2026-07-14)
+
+### Result
+- Four archive shards streamed 26.67 GB in 10m36s without service errors,
+  scanned 567,025 alerts, retained 5,416 observations, and persisted 2.2 MB.
+- Production association found zero tracklets at the required three-observation
+  minimum. All 222 sensitivity fits are two-point/two-night pairs and are not
+  candidates.
+- A fresh batch-isolated ZTF injection control passed 20/20 detection, linking,
+  and scoring.
+
+### Fixed
+- `run_sharded_download.py --status/--merge` now infers non-default shard
+  topology from the selected run's manifest records. Legacy manifests without
+  recorded topology continue to require explicit `--shards`.
+
+### Safety
+- No real tracklet proceeds to time-aware known-object exclusion,
+  classification, scoring, adversarial review, external submission, or alert.
+
 ## v0.90.94 — Coverage-qualified ZTF archive batch (2026-07-14)
 
 ### Result
