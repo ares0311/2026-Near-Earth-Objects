@@ -1,9 +1,9 @@
 # Active Handoff — ZTF DR24 Sharded Portfolio Search
 
-Updated: 2026-07-14  
-Repository identity: `2026 Near Earth Objects`  
-Branch: `main`  
-Merged implementation: `20576cb4` (PR #231)  
+Updated: 2026-07-14
+Repository identity: `2026 Near Earth Objects`
+Branch: `main`
+Merged implementation: `20576cb4` (PR #231)
 App version: `v0.90.91`
 
 ## Completed acquisition
