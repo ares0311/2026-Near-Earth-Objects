@@ -1,7 +1,7 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.90.87
-**Last updated**: 2026-07-12 (header/sync line only — the P1-P5 gate register
+**Current version**: v0.90.88
+**Last updated**: 2026-07-13 (header/sync line only — the P1-P5 gate register
 body below is unchanged historical evidence from 2026-07-02; current gate
 status for the active ZTF DR24 path lives in
 `docs/ZTF_DR24_PRODUCTION_GATES.md`, which is kept current every session)
@@ -15,6 +15,15 @@ artifacts passing, `promotion_allowed: true`, and no blockers. The disclosed
 14/14 synthetic moving-source `stellar_artifact` tradeoff was accepted.
 `benchmark_cnn_v1` remains the immutable historical benchmark. No external
 submission, alert, live-search expansion, or impact claim is authorized.
+
+**Execution tooling update (2026-07-13)**: Codex now has repo-native
+single-command launchers for 6x6 native download sharding and 6x6 disjoint
+offline test execution. These close the manual six-terminal orchestration
+burden without reopening paused Gate Z3 or authorizing a data acquisition.
+Download launches remain bounded by native shard semantics, service limits,
+checkpoint/output isolation, an explicit size estimate, and the conservative
+100 GB project-data ceiling. Parallel tests retain fail-closed combined 100%
+coverage.
 
 **Also mandatory at session start**: `docs/near_earth_objects_research_brief.md` — canonical primer on ranked space assets (WISE/NEOWISE #2, NEO Surveyor #1, Gaia #3), frontier AI methods (THOR, HelioLinC3D), submission best practices, and key literature. Required to keep agents aligned on the discovery-paper data strategy (step 5 of CLAUDE.md §MANDATORY SESSION-START PROTOCOL).
 

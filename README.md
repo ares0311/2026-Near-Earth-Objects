@@ -1,7 +1,7 @@
 # 2026 Near-Earth Object Detection & Ranking Pipeline
 
 ![Status](https://img.shields.io/badge/status-active%20development-blue)
-![Version](https://img.shields.io/badge/version-0.90.87-informational)
+![Version](https://img.shields.io/badge/version-0.90.88-informational)
 ![License](https://img.shields.io/badge/license-Apache%202.0-green)
 ![Tests](https://img.shields.io/badge/tests-3500%2B%20passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
@@ -124,7 +124,7 @@ The pipeline implements a strict directed acyclic graph (DAG) of processing stag
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    NEO DETECTION PIPELINE  v0.90.87                  │
+│                    NEO DETECTION PIPELINE  v0.90.88                  │
 └─────────────────────────────────────────────────────────────────────┘
 
   External Data Sources
@@ -536,7 +536,7 @@ The diagram below shows how data and artifacts move between the repository's top
 2026-Near-Earth-Objects/
 │
 ├── src/                          # Core pipeline modules (Python 3.11+)
-│   ├── __init__.py               # Package version (0.90.87)
+│   ├── __init__.py               # Package version (0.90.88)
 │   ├── schemas.py                # All Pydantic data models (frozen=True)
 │   ├── fetch.py                  # ZTF/ATLAS/MPC/Horizons data retrieval
 │   ├── preprocess.py             # Difference image handling; Gaia astrometry
@@ -1229,7 +1229,14 @@ evidence. MPC submission remains disabled until a real candidate survives
 adversarial plus operator review and the applicable source/submission protocol
 is satisfied.
 
-### 15.1 Current State Snapshot (v0.90.87)
+### 15.1 Current State Snapshot (v0.90.88)
+
+Codex can now replace six manual terminal tabs with one bounded command for
+native shard-aware downloaders, and can run broad offline validation as six
+disjoint test-file shards with six pytest-xdist workers per shard. The test
+runner keeps coverage data isolated until a final combine and still enforces
+the repository's 100% coverage gate. See `Skills/run_sharded_download.py`,
+`Skills/run_sharded_tests.py`, and the Codex execution rules in `AGENTS.md`.
 
 | Area | Status | Notes |
 |---|---|---|
