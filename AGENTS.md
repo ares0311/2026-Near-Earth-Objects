@@ -669,7 +669,16 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.92)
+## Current State (v0.90.93)
+
+**Latest sync (2026-07-14, metadata-only coverage preflight ready)**:
+`Skills/inventory_ztf_field_night_coverage.py` and the committed
+`ztf_dr24_new_field_coverage_preflight_v1` manifest implement the required
+coverage-first continuation. Use `Skills/run_sharded_download.py` with six
+field shards and **one** worker per shard; this IRSA target rejects 6x6 because
+six aggregate metadata requests are the verified service ceiling. The bounded
+365-day preflight downloads no alert archives or catalogs and must merge with
+at least three populated nights per new field before another bulk transfer.
 
 **Latest sync (2026-07-14, portfolio association complete)**: Run
 `0b381aac323c0f28` completed all six UW shards in 9m48s: 793,005 alerts

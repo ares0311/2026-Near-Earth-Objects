@@ -1,0 +1,60 @@
+{
+  "batch_id": "ztf_dr24_new_field_coverage_preflight_v1",
+  "project": "2026 Near Earth Objects",
+  "source": "IRSA ZTF public science-image metadata",
+  "source_url": "https://irsa.ipac.caltech.edu/ibe/search/ztf/products/sci",
+  "data_role": "metadata_only_coverage_preflight",
+  "replay_cutoff_utc": "2024-09-21T00:00:00Z",
+  "start_jd_exclusive": 2460209.5,
+  "end_jd_exclusive": 2460574.5,
+  "window_days": 365.0,
+  "size_deg": 2.0,
+  "footprint_note": "Each query covers the central 2 degree by 2 degree IRSA search box, not the full radius_deg=2 portfolio cone.",
+  "min_distinct_nights": 3,
+  "selection_source": "data_selection/batch_manifests/ztf_dr24_portfolio_2024sep_v1.json",
+  "fields": [
+    {
+      "field_id": "new_aten_251p66_m22p50",
+      "role": "live_search",
+      "ra_deg": 251.66,
+      "dec_deg": -22.5
+    },
+    {
+      "field_id": "new_aten_243p54_m22p50",
+      "role": "live_search",
+      "ra_deg": 243.54,
+      "dec_deg": -22.5
+    },
+    {
+      "field_id": "new_aten_081p18_p22p50",
+      "role": "live_search",
+      "ra_deg": 81.18,
+      "dec_deg": 22.5
+    },
+    {
+      "field_id": "new_ieo_204p25_m07p50",
+      "role": "live_search",
+      "ra_deg": 204.25,
+      "dec_deg": -7.5
+    },
+    {
+      "field_id": "new_ieo_196p68_m07p50",
+      "role": "live_search",
+      "ra_deg": 196.68,
+      "dec_deg": -7.5
+    },
+    {
+      "field_id": "new_ieo_147p53_p15p00",
+      "role": "live_search",
+      "ra_deg": 147.53,
+      "dec_deg": 15.0
+    }
+  ],
+  "safety": {
+    "metadata_only": true,
+    "raw_alert_archives_downloaded": false,
+    "candidate_scoring": false,
+    "external_submission": false,
+    "impact_claims": false
+  }
+}
