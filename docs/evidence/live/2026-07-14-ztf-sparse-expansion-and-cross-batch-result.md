@@ -29,3 +29,21 @@ deduplicating by `obs_id`.
 No time-aware known-object exclusion, classification, scoring, adversarial
 review, submission, external alert, discovery claim, or impact claim follows
 from these results. Another bulk replay requires an explicit research decision.
+
+## Source-native packet-history audit
+
+The [ZTF Science Data System explanatory supplement](https://irsa.ipac.caltech.edu/data/ZTF/docs/ztf_explanatory_supplement.pdf)
+defines `prv_candidates` as historical events matched within 1.5 arcseconds of
+the triggering alert, with an approximately 30-day lookback. The
+[ZTF extended cautionary notes](https://irsa.ipac.caltech.edu/data/ZTF/docs/ztf_extended_cautionary_notes.pdf)
+say packet history is constructed by positional matching independently for
+each triggering event and warn that `objectId` assignments can split or merge
+nearby detections.
+
+Those semantics do not supply a reliable moving-object trajectory. Promoting
+`prv_candidates` rows into association would risk manufacturing false links,
+so this audit rejects that use. Packet history may be useful later as
+context/veto evidence after an independent tracklet exists, but it does not
+justify another bulk alert-archive transfer. The recommended research choice
+is to move candidate generation to survey detection/image products designed
+for motion; continuing the alert replay is an explicit lower-yield option.

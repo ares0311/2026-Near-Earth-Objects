@@ -1,6 +1,6 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.90.97
+**Current version**: v0.90.98
 **Last updated**: 2026-07-14 (header/sync line only — the P1-P5 gate register
 body below is unchanged historical evidence from 2026-07-02; current gate
 status for the active ZTF DR24 path lives in
@@ -13,6 +13,13 @@ with run `017eb50381badb75`; IEO 147.53 had four retained nights and 8,956
 seed pairs but zero production tracklets. All 70 sensitivity fits are
 underconstrained two-point/two-night pairs. No candidate-review queue exists.
 Further bulk expansion now requires an explicit research decision.
+
+The source-native history audit does not remove that gate. ZTF
+`prv_candidates` uses a 1.5-arcsecond positional association and an
+approximately 30-day lookback, so treating those rows as a moving-object
+tracklet would be scientifically invalid. The recommended next path is a
+candidate generator over survey detection/image products built for motion;
+continuing the transient-alert replay is an explicit lower-yield alternative.
 
 The completed three-night sparse-field batch was the minimum-transfer
 combination among 12 HEAD-verified high-exposure candidates that gave each

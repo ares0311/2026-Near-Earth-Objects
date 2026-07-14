@@ -5,7 +5,7 @@ Repository identity: `2026 Near Earth Objects`
 Branch: `main`
 Merged batch selection: `d81af0a0` (PR #235)
 Execution manifest: `b048be9c`
-App version: `v0.90.97`
+App version: `v0.90.98`
 
 ## Latest result and decision gate
 
@@ -16,6 +16,31 @@ tracklets, and a fresh 20/20 control. Cross-batch analysis with run
 but zero production tracklets. Its 70 sensitivity fits are all two-point/
 two-night pairs. No candidate proceeds to later gates. Further bulk replay is
 now a research decision, not an automatic continuation.
+
+## Historical-context audit and operator decision
+
+The official ZTF Science Data System documentation says `prv_candidates`
+contains historical events within 1.5 arcseconds of the triggering alert and
+looks back approximately 30 days. ZTF's cautionary notes further explain that
+packet histories and `objectId` reuse are position-based and can split or merge
+nearby sources. Therefore `prv_candidates` must not be inserted into the
+moving-object linker as if it supplied missing tracklet observations.
+
+Decision required before another large transfer:
+
+1. **Recommended:** change candidate generation to survey detection/image
+   products designed for motion, keeping the alert replay as benchmark/null
+   evidence. This costs more engineering but directly addresses the observed
+   mismatch between transient alerts and moving-object discovery.
+2. Continue bounded alert replay. This reuses current tooling but accepts the
+   measured low yield and another multi-gigabyte transfer with no evidence that
+   `prv_candidates` fixes the association gap.
+3. Pause the archival search. This avoids more transfer and engineering but
+   does not advance the discovery-event gate.
+
+If packet history is retained in future work, use it only as provenance-bound
+context or veto evidence after an independent tracklet exists, with explicit
+deduplication and no-future-leakage tests.
 
 ## Completed sparse-field expansion
 
@@ -113,7 +138,7 @@ for `ztf.uw.edu` and the manifest-only git relay. Do not broaden it.
    complete. Another bulk replay requires an explicit research decision and a
    newly selected, logged, bounded batch. Gate Z3 remains separately paused.
 
-Validation for v0.90.97: optimized 6x6 broad suite, 1,950 tests in 30 seconds,
+Validation for v0.90.98: optimized 6x6 broad suite, 1,950 tests in 29 seconds,
 100% coverage across 5,447 source statements; full Ruff and mypy clean; uv
 lock and repository artifact-policy checks passed.
 

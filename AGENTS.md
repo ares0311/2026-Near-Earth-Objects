@@ -669,7 +669,17 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.97)
+## Current State (v0.90.98)
+
+**Latest sync (2026-07-14, ZTF packet-history audit complete)**: Primary ZTF
+documentation confirms `prv_candidates` is constructed by a 1.5-arcsecond
+positional match around each triggering alert with an approximately 30-day
+lookback. It must not be promoted into moving-object association observations;
+at most it is future context/veto evidence after an independent tracklet
+exists. Another bulk alert replay remains decision-gated. The recommended
+research path is to change candidate generation to survey detection/image
+products designed for motion, rather than spend another large transfer on the
+measured low-yield transient-alert path. Gate Z3 remains separately paused.
 
 **Latest sync (2026-07-14, sparse expansion and cross-batch association
 complete)**: Run `56c2348f31302291` streamed 19.053 GB across three clean

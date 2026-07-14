@@ -3,6 +3,19 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.98 — ZTF packet-history research decision audit (2026-07-14)
+
+### Research decision
+- ZTF `prv_candidates` is a 1.5-arcsecond, position-matched packet history
+  with an approximately 30-day lookback. It is not a moving-object tracklet
+  source and must not be inserted into association as if it were one.
+- Historical packet rows may be retained later as context or veto evidence,
+  with provenance and no-future-leakage checks, after another method forms a
+  tracklet.
+- Another bulk alert-archive replay remains paused pending the operator's
+  choice between changing candidate-generation data products, accepting the
+  measured low-yield alert path, or pausing the search.
+
 ## v0.90.97 — Sparse expansion and cross-batch association (2026-07-14)
 
 ### Result
