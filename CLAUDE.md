@@ -887,9 +887,19 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.88)
+## Current State (v0.90.89)
 
-**Latest sync (2026-07-13, all-agent single-command sharding)**: Added shared
+**Latest sync (2026-07-13, active-directive coherence)**: The active handoff
+now reflects the completed v4 lifecycle end to end. `tier2_cnn_v4` is
+internally promoted under its signed operator decision, so no A1-A7 signoff
+blocker remains and the old v3 retrain/calibration command is not pending.
+Gate Z3 remains the sole open ZTF DR24 gate and its repeated known-object
+identity search is intentionally paused. A broader new-field archival search,
+any bulk ingest, and all external submission/authority-facing actions require
+explicit operator direction. Historical v3 blocker text below remains only as
+dated evidence and must not be treated as a current task.
+
+**Earlier sync (2026-07-13, all-agent single-command sharding)**: Added shared
 execution directives and repo-native parent launchers so Codex, Claude, and
 other coding agents use one command instead of six manual terminal tabs when
 parallelism is safe and beneficial. `Skills/run_sharded_download.py` defaults
@@ -902,7 +912,7 @@ keeps coverage files separate, combines them after every shard passes, and
 retains the 100% gate. Small targeted tests remain serial; measured resource
 or provider limits override 6x6 defaults.
 
-**Latest sync (2026-07-12, tier2_cnn_v4 operator-approved)**: Jerome W.
+**Earlier sync (2026-07-12, tier2_cnn_v4 operator-approved)**: Jerome W.
 Lindsey III approved `tier2_cnn_v4` for internal production promotion after
 reviewing the 0/200 adversarial artifact result, all passing real-data
 calibration KPIs, the 14/14 synthetic moving-source `stellar_artifact`
@@ -1211,9 +1221,9 @@ of sandboxed CPU-only compute, the actual retrain is handed off to an
 where MPS + parallel workers should make it dramatically faster. Full
 detail: `docs/evidence/a7/2026-07-10-sixth-attempt-device-selection-and-sandbox-training-limits.md`.
 
-**Next command (NOT YET RUN)** — real GPU-accelerated retrain on the
-already-downloaded, already-passing-grouped-split 18-night batch, closing
-`calibration_report_missing`:
+**SUPERSEDED HANDOFF COMMAND — completed historically; do not run as a next
+step.** This was the real GPU-accelerated v3 retrain command before v3 was
+rejected and v4 was retuned, validated, signed, and promoted:
 
 ```bash
 git pull origin main
@@ -1241,14 +1251,14 @@ caffeinate -i uv run --python 3.14 python Skills/evaluate_calibration.py \
     --report-out Logs/reports/calibration_report_v3.json
 ```
 
-Not sharded: single GPU/MPS training job, not independent parallel units —
+Historical execution note: this was not sharded because it was one GPU/MPS
+training job, not independent parallel units —
 `docs/SYSTEM_PROFILE.md` says use full local compute headroom here, not
 multiprocessing across tabs. Naming: this produces a new candidate
 (`tier2_cnn_v3`), not a silent overwrite of the frozen `benchmark_cnn_v1`,
-per A3's freeze policy. A follow-up promotion report for the new candidate
-(citing the real passing grouped-split report + this calibration report) is
-the next coding step once this run completes; `operator_signoff_missing`
-remains the final, inherently human-gated blocker after that.
+per A3's freeze policy. The follow-up promotion work described here was
+completed and superseded by the signed v4 promotion recorded at the top of
+Current State. It is not an active blocker or next step.
 
 **Earlier sync (2026-07-10, v0.90.77)**: **`grouped_split_report_missing` is
 CLOSED with real evidence.** After the v0.90.76 findings below, a real
@@ -1621,20 +1631,23 @@ Pipeline generates candidates → adversarial review filters → operator
 reviews survivors → MPC submission → provisional designation → independent
 confirmation → journal paper.
 
-Steps 1-3 of the original v0.90.74 handoff (download with real provenance,
-build cutout dataset, emit + validate grouped split) are now DONE for real
-— see the v0.90.77/78 entries above: `grouped_split_report_missing` is
-CLOSED with a real passing report on an 18-night, 90,000-alert batch. The
-concrete next action is the retrain + recalibrate command block in the
-v0.90.78 entry under **Current State** above. That command has **not yet
-been run** — it needs an unsandboxed terminal with real MPS/GPU access
-(this session's sandbox verified both MPS and multiprocess DataLoader
-workers are blocked here specifically, not by the code or hardware). After
-it completes, the next coding step is a promotion report for the new
-`tier2_cnn_v3` candidate citing the real grouped-split and calibration
-reports; `operator_signoff_missing` remains the final, inherently
-human-gated blocker after that. The superseded WISE/DECam/TESS
-discovery-sweep evidence trail (pre-2026-07-02 pivot) is archived in
+The original v0.90.74-v0.90.87 training/evidence sequence is complete:
+real-data acquisition, grouped splits, v3 rejection, v4 hard-negative retune,
+calibration, adversarial evaluation, canonical evidence, and operator signoff
+all landed. `tier2_cnn_v4` is internally promoted; no model retrain or A1-A7
+signoff action is pending.
+
+The next roadmap move requires an operator decision:
+
+1. Resume the intentionally paused Gate Z3 positive-control identity search;
+2. approve a broader bounded ZTF DR24 new-field archival portfolio; or
+3. resolve the applicable MPC submission/observatory-code path if a reviewed
+   survivor ever reaches that stage.
+
+Until one is selected, do not start new downloads, choose another Z3 target,
+retrain models, or perform external submission work. Continue only concrete
+safe maintenance driven by an actual failing check or diagnosed defect. The
+superseded WISE/DECam/TESS discovery-sweep trail is archived in
 `docs/HANDOFF_HISTORY.md` for historical context only.
 
 ### Version-by-Version Changelog

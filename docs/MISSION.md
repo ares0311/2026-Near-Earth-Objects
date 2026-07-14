@@ -188,6 +188,14 @@ that the operator actually runs.
 
 ## Immediate Next Steps (ordered, per the brief's phased plan)
 
+**Current execution overlay (2026-07-13)**: Phase 0 verification and the
+engineering portions of Z1/Z2/Z4/Z5/Z6/Z7 are closed. `tier2_cnn_v4` is
+internally promoted with signed A1-A7 evidence. Z3 is the only open ZTF DR24
+gate and its repeated known-object identity search is intentionally paused.
+Do not interpret the phased historical plan below as authority to resume Z3,
+start a broader archival download/search portfolio, or submit externally;
+each now requires an explicit operator decision.
+
 1. **Phase 0 — Source verification** (required before any ingestion code is
    written): **materially complete as of v0.90.18** in
    `docs/evidence/phase0/`. JPL SBDB, MPC get-obs, and IRSA ZTF image metadata
