@@ -1,7 +1,7 @@
 # 2026 Near-Earth Object Detection & Ranking Pipeline
 
 ![Status](https://img.shields.io/badge/status-active%20development-blue)
-![Version](https://img.shields.io/badge/version-0.90.95-informational)
+![Version](https://img.shields.io/badge/version-0.90.96-informational)
 ![License](https://img.shields.io/badge/license-Apache%202.0-green)
 ![Tests](https://img.shields.io/badge/tests-1900%2B%20passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
@@ -124,7 +124,7 @@ The pipeline implements a strict directed acyclic graph (DAG) of processing stag
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    NEO DETECTION PIPELINE  v0.90.95                  │
+│                    NEO DETECTION PIPELINE  v0.90.96                  │
 └─────────────────────────────────────────────────────────────────────┘
 
   External Data Sources
@@ -536,7 +536,7 @@ The diagram below shows how data and artifacts move between the repository's top
 2026-Near-Earth-Objects/
 │
 ├── src/                          # Core pipeline modules (Python 3.11+)
-│   ├── __init__.py               # Package version (0.90.95)
+│   ├── __init__.py               # Package version (0.90.96)
 │   ├── schemas.py                # All Pydantic data models (frozen=True)
 │   ├── fetch.py                  # ZTF/ATLAS/MPC/Horizons data retrieval
 │   ├── preprocess.py             # Difference image handling; Gaia astrometry
@@ -1229,7 +1229,15 @@ evidence. MPC submission remains disabled until a real candidate survives
 adversarial plus operator review and the applicable source/submission protocol
 is satisfied.
 
-### 15.1 Current State Snapshot (v0.90.95)
+### 15.1 Current State Snapshot (v0.90.96)
+
+The next bounded expansion targets the two fields that remained below three
+retained nights. The measured trio `20231003`, `20231029`, `20240429` is the
+minimum-transfer solution among the 12 highest-exposure candidates that gives
+both sparse fields at least 80 central-box exposure rows: 19.053 GB total,
+98 rows for Aten 81.18 and 88 for IEO 147.53. It runs as three archive shards
+x one worker; raw archives remain unpersisted and external submission remains
+prohibited.
 
 The coverage-qualified four-night search completed cleanly under run
 `017eb50381badb75`. Four archive shards streamed 26.67 GB in 10m36s, scanned

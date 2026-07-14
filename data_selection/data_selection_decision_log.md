@@ -293,3 +293,28 @@ Safety: Candidate review remains fail-closed. No time-aware known-object
   submission, public alert, or impact-probability statement is authorized.
 
 new_target_search
+
+## 2026-07-14 — Sparse-field ZTF DR24 expansion
+
+Date: 2026-07-14
+Repo: 2026 Near Earth Objects
+Data: Three unused UW ZTF public nightly archives targeting Aten 81.18,+22.50
+  and IEO 147.53,+15.00
+Role: live_search
+Selection: Rank unused nights by combined target-field central-box exposure
+  rows; HEAD-verify the top 12; choose the minimum-transfer three-night
+  combination giving each target at least 80 rows
+Nights: 20231003, 20231029, 20240429
+Verified transfer: 19.053230740 GB
+Exposure allocation: 98 rows for Aten 81.18; 88 for IEO 147.53
+Execution: Three archive-night shards x one worker; raw archives streamed and
+  evicted; retained output capped at 1 GB
+Why this data: Run `017eb50381badb75` left these fields with only one and two
+  populated retained nights. This is a bounded continuation of the same
+  archival research path, not a model change or promotion decision.
+Manifest: `data_selection/batch_manifests/ztf_dr24_sparse_field_expansion_2024_v1.json`
+Evidence: `docs/evidence/live/2026-07-14-ztf-sparse-field-expansion-selection.md`
+Safety: Historical replay and internal review only. No external submission,
+  authority contact, public alert, discovery claim, or impact claim.
+
+new_target_search

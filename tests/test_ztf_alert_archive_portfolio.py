@@ -158,3 +158,34 @@ def test_committed_coverage_selected_batch_is_query_bound_and_bounded() -> None:
     assert set(coverage) == new_field_ids
     assert all(len(set(nights)) == 3 for nights in coverage.values())
     assert all(set(nights) <= selected_nights for nights in coverage.values())
+
+
+def test_committed_sparse_field_expansion_is_measured_and_bounded() -> None:
+    path = (
+        ROOT
+        / "data_selection/batch_manifests/ztf_dr24_sparse_field_expansion_2024_v1.json"
+    )
+    batch = portfolio.load_batch_manifest(path)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+
+    assert batch.nights == ("20231003", "20231029", "20240429")
+    assert len(batch.fields) == 9
+    assert payload["coverage_preflight_query_key"] == "807efb0e5ef7d55d"
+    assert sum(payload["verified_remote_bytes"].values()) == 19_053_230_740
+    assert payload["target_field_exposure_rows"] == {
+        "new_aten_081p18_p22p50": {
+            "20231003": 9,
+            "20231029": 41,
+            "20240429": 48,
+            "total": 98,
+        },
+        "new_ieo_147p53_p15p00": {
+            "20231003": 55,
+            "20231029": 13,
+            "20240429": 20,
+            "total": 88,
+        },
+    }
+    assert payload["safety"]["min_exposure_rows_per_target_field"] == 80
+    assert payload["safety"]["raw_archive_persisted"] is False
+    assert payload["safety"]["external_submission"] is False

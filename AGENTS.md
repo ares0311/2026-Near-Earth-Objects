@@ -669,7 +669,16 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.95)
+## Current State (v0.90.96)
+
+**Latest sync (2026-07-14, sparse-field expansion selected)**: The committed
+`ztf_dr24_sparse_field_expansion_2024_v1` batch targets Aten 81.18 and IEO
+147.53 after they remained below three retained nights. Among the 12
+highest-exposure unused candidates, `20231003`, `20231029`, and `20240429` are
+the minimum-transfer trio meeting at least 80 exposure rows for each target:
+19.053 GB total, 98 and 88 rows respectively. Run as three archive shards x
+one worker. Stream/process/evict, the 1 GB retained-output cap, fail-closed
+review, and all external-submission prohibitions remain mandatory.
 
 **Latest sync (2026-07-14, coverage-qualified search complete)**: Run
 `017eb50381badb75` completed four UW archive shards in 10m36s with no service

@@ -887,7 +887,15 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.95)
+## Current State (v0.90.96)
+
+**Latest sync (2026-07-14, sparse-field expansion selected)**: The committed
+`ztf_dr24_sparse_field_expansion_2024_v1` batch targets the two fields left
+below three retained nights. The measured nights `20231003`, `20231029`, and
+`20240429` are the lowest-transfer trio among 12 HEAD-verified high-exposure
+candidates meeting at least 80 exposure rows per target (19.053 GB; 98 Aten
+rows and 88 IEO rows). Use three shards x one worker; never persist raw
+archives or broaden submission authority.
 
 **Latest sync (2026-07-14, coverage-qualified search complete)**: Run
 `017eb50381badb75` completed all four archive shards in 10m36s: 567,025 alerts
