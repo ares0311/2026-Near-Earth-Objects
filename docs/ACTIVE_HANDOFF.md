@@ -4,7 +4,7 @@ Updated: 2026-07-14
 Repository identity: `2026 Near Earth Objects`
 Branch: `main`
 Merged implementation: `20576cb4` (PR #231)
-App version: `v0.90.92`
+App version: `v0.90.93`
 
 ## Completed acquisition
 
@@ -112,9 +112,12 @@ for `ztf.uw.edu` and the manifest-only git relay. Do not broaden it.
 3. The post-ingest control passed 20/20 detection, linking, and scoring.
 4. No known-object, scoring, or adversarial-review work is pending for this
    batch because the production tracklet set is empty.
-5. Next build a metadata-only field/night coverage inventory and select at
-   least three populated archive nights per new field before another bulk
-   transfer. Reuse the bounded sharded downloader only after that preflight.
+5. The metadata-only field/night coverage inventory is now implemented in
+   `Skills/inventory_ztf_field_night_coverage.py`, using the committed
+   `data_selection/batch_manifests/ztf_dr24_new_field_coverage_preflight_v1.json`.
+   Run it as six shards x one worker (six aggregate IRSA requests), merge its
+   query-bound results, and require at least three populated archive nights per
+   new field before another bulk transfer. It downloads no alert archives.
 
 ## Hard boundaries
 

@@ -887,7 +887,17 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.92)
+## Current State (v0.90.93)
+
+**Latest sync (2026-07-14, metadata-only coverage preflight ready)**: The
+required next-batch guard is implemented as
+`Skills/inventory_ztf_field_night_coverage.py` plus the committed
+`ztf_dr24_new_field_coverage_preflight_v1` manifest. Launch it through the
+single-command sharded downloader with six field shards and one worker per
+shard. The target intentionally rejects the generic 6x6 default because this
+IRSA job is capped at six aggregate metadata requests. It downloads no alert
+archives or catalogs; its fail-closed merged result must demonstrate at least
+three populated nights per new field before another bulk transfer.
 
 **Latest sync (2026-07-14, portfolio association complete)**: The authorized
 six-shard search completed cleanly (793,005 scanned, 1,211 retained, 548 KB

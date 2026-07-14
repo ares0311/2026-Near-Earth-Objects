@@ -3,6 +3,28 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.93 — Coverage-first ZTF archive planning (2026-07-14)
+
+### Added
+- Added a committed metadata-only preflight for the six uncovered portfolio
+  fields across a bounded 365-day historical window before the replay cutoff.
+- Added `Skills/inventory_ztf_field_night_coverage.py`, a native six-shard
+  target that reuses the verified IRSA science-image metadata ingest, writes
+  query-bound per-field checkpoints, supports safe status and fail-closed
+  merge, and ranks real UTC archive nights by field coverage.
+- Added offline tests for manifest safety, deterministic field ownership,
+  bounded-query delegation, aggregate provider concurrency, status, and merge.
+
+### Performance
+- The preflight uses six field shards with one worker each. The target rejects
+  the generic 6x6 default because the verified IRSA ceiling for this job is six
+  aggregate requests.
+
+### Safety
+- The preflight downloads no alert archives, cutouts, source photometry, or
+  catalogs and performs no candidate scoring or external submission. A later
+  bulk transfer must have at least three populated nights per new field.
+
 ## v0.90.92 — ZTF portfolio association result (2026-07-14)
 
 ### Added

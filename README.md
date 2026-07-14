@@ -1,7 +1,7 @@
 # 2026 Near-Earth Object Detection & Ranking Pipeline
 
 ![Status](https://img.shields.io/badge/status-active%20development-blue)
-![Version](https://img.shields.io/badge/version-0.90.92-informational)
+![Version](https://img.shields.io/badge/version-0.90.93-informational)
 ![License](https://img.shields.io/badge/license-Apache%202.0-green)
 ![Tests](https://img.shields.io/badge/tests-1900%2B%20passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
@@ -124,7 +124,7 @@ The pipeline implements a strict directed acyclic graph (DAG) of processing stag
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    NEO DETECTION PIPELINE  v0.90.92                  │
+│                    NEO DETECTION PIPELINE  v0.90.93                  │
 └─────────────────────────────────────────────────────────────────────┘
 
   External Data Sources
@@ -536,7 +536,7 @@ The diagram below shows how data and artifacts move between the repository's top
 2026-Near-Earth-Objects/
 │
 ├── src/                          # Core pipeline modules (Python 3.11+)
-│   ├── __init__.py               # Package version (0.90.92)
+│   ├── __init__.py               # Package version (0.90.93)
 │   ├── schemas.py                # All Pydantic data models (frozen=True)
 │   ├── fetch.py                  # ZTF/ATLAS/MPC/Horizons data retrieval
 │   ├── preprocess.py             # Difference image handling; Gaia astrometry
@@ -1229,7 +1229,15 @@ evidence. MPC submission remains disabled until a real candidate survives
 adversarial plus operator review and the applicable source/submission protocol
 is satisfied.
 
-### 15.1 Current State Snapshot (v0.90.92)
+### 15.1 Current State Snapshot (v0.90.93)
+
+The next-batch coverage gate is now implemented. A committed six-field,
+365-day IRSA metadata manifest runs through
+`Skills/inventory_ztf_field_night_coverage.py` as six field shards with one
+worker each. It downloads no alert archives and fails closed if aggregate
+IRSA concurrency exceeds six. Its merged inventory is the source of truth for
+requiring at least three populated nights per new field before another bulk
+archive transfer.
 
 The bounded ZTF DR24 archival portfolio search completed cleanly. Six shards
 scanned 793,005 alerts, retained 1,211 observations, and persisted 548 KB.
