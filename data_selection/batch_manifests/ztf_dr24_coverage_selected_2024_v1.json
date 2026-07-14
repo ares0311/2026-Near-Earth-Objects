@@ -1,0 +1,119 @@
+{
+  "batch_id": "ztf_dr24_coverage_selected_2024_v1",
+  "project": "2026 Near Earth Objects",
+  "source": "UW public ZTF alert archive",
+  "source_base_url": "https://ztf.uw.edu/alerts/public/",
+  "data_role": "live_search",
+  "replay_cutoff_utc": "2024-09-21T00:00:00Z",
+  "selection_method": "Six-field IRSA metadata inventory run 9a9e148f570d162b; minimum-transfer four-night solution giving every new field at least three central-box coverage nights",
+  "coverage_preflight_manifest": "data_selection/batch_manifests/ztf_dr24_new_field_coverage_preflight_v1.json",
+  "coverage_preflight_query_key": "807efb0e5ef7d55d",
+  "portfolio_role_mix": {
+    "new": 6,
+    "followup": 3,
+    "control": 1
+  },
+  "nights": [
+    "20240321",
+    "20240422",
+    "20240504",
+    "20240603"
+  ],
+  "verified_remote_bytes": {
+    "20240321": 5014634609,
+    "20240422": 6244536269,
+    "20240504": 11805932297,
+    "20240603": 3605379532
+  },
+  "estimated_stream_transfer_gb": 26.670482707,
+  "estimated_persistent_output_gb": 1.0,
+  "new_field_coverage_nights": {
+    "new_aten_251p66_m22p50": ["20240422", "20240504", "20240603"],
+    "new_aten_243p54_m22p50": ["20240422", "20240504", "20240603"],
+    "new_aten_081p18_p22p50": ["20240321", "20240422", "20240504"],
+    "new_ieo_204p25_m07p50": ["20240321", "20240504", "20240603"],
+    "new_ieo_196p68_m07p50": ["20240321", "20240504", "20240603"],
+    "new_ieo_147p53_p15p00": ["20240422", "20240504", "20240603"]
+  },
+  "fields": [
+    {
+      "field_id": "new_aten_251p66_m22p50",
+      "role": "live_search",
+      "ra_deg": 251.66,
+      "dec_deg": -22.5,
+      "radius_deg": 2.0
+    },
+    {
+      "field_id": "new_aten_243p54_m22p50",
+      "role": "live_search",
+      "ra_deg": 243.54,
+      "dec_deg": -22.5,
+      "radius_deg": 2.0
+    },
+    {
+      "field_id": "new_aten_081p18_p22p50",
+      "role": "live_search",
+      "ra_deg": 81.18,
+      "dec_deg": 22.5,
+      "radius_deg": 2.0
+    },
+    {
+      "field_id": "new_ieo_204p25_m07p50",
+      "role": "live_search",
+      "ra_deg": 204.25,
+      "dec_deg": -7.5,
+      "radius_deg": 2.0
+    },
+    {
+      "field_id": "new_ieo_196p68_m07p50",
+      "role": "live_search",
+      "ra_deg": 196.68,
+      "dec_deg": -7.5,
+      "radius_deg": 2.0
+    },
+    {
+      "field_id": "new_ieo_147p53_p15p00",
+      "role": "live_search",
+      "ra_deg": 147.53,
+      "dec_deg": 15.0,
+      "radius_deg": 2.0
+    },
+    {
+      "field_id": "followup_aten_089p30_p22p50",
+      "role": "followup_live_search",
+      "ra_deg": 89.3,
+      "dec_deg": 22.5,
+      "radius_deg": 2.0
+    },
+    {
+      "field_id": "followup_aten_097p42_p22p50",
+      "role": "followup_live_search",
+      "ra_deg": 97.42,
+      "dec_deg": 22.5,
+      "radius_deg": 2.0
+    },
+    {
+      "field_id": "followup_ieo_139p76_p15p00",
+      "role": "followup_live_search",
+      "ra_deg": 139.76,
+      "dec_deg": 15.0,
+      "radius_deg": 2.0
+    }
+  ],
+  "controls": [
+    {
+      "control_id": "moving_source_injection_v1",
+      "role": "injection_control",
+      "execution_stage": "post_ingest"
+    }
+  ],
+  "safety": {
+    "metadata_preflight_passed": true,
+    "min_coverage_nights_per_new_field": 3,
+    "raw_archive_persisted": false,
+    "max_per_field_night": 5000,
+    "external_submission": false,
+    "impact_claims": false,
+    "known_object_exclusion_required_before_candidate_review": true
+  }
+}

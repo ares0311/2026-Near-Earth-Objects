@@ -4,7 +4,7 @@ Updated: 2026-07-14
 Repository identity: `2026 Near Earth Objects`
 Branch: `main`
 Merged implementation: `20576cb4` (PR #231)
-App version: `v0.90.93`
+App version: `v0.90.94`
 
 ## Completed acquisition
 
@@ -112,12 +112,16 @@ for `ztf.uw.edu` and the manifest-only git relay. Do not broaden it.
 3. The post-ingest control passed 20/20 detection, linking, and scoring.
 4. No known-object, scoring, or adversarial-review work is pending for this
    batch because the production tracklet set is empty.
-5. The metadata-only field/night coverage inventory is now implemented in
-   `Skills/inventory_ztf_field_night_coverage.py`, using the committed
-   `data_selection/batch_manifests/ztf_dr24_new_field_coverage_preflight_v1.json`.
-   Run it as six shards x one worker (six aggregate IRSA requests), merge its
-   query-bound results, and require at least three populated archive nights per
-   new field before another bulk transfer. It downloads no alert archives.
+5. Metadata-only run `9a9e148f570d162b` completed all six field shards in 10
+   seconds with no service errors. All six new fields pass with 44–110 distinct
+   exposure nights. Query key: `807efb0e5ef7d55d`.
+6. The minimum-transfer valid quartet is `20240321`, `20240422`, `20240504`,
+   and `20240603`: 26.67 GB total, with exactly three covered nights per new
+   field. Source of truth:
+   `data_selection/batch_manifests/ztf_dr24_coverage_selected_2024_v1.json`.
+7. Run the coverage-qualified batch as four shards x one worker, then analyze
+   associations with the existing safe portfolio analyzer. Raw archives must
+   remain streamed/unpersisted; retained output remains capped at 1 GB.
 
 ## Hard boundaries
 

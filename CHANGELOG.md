@@ -3,6 +3,25 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.94 — Coverage-qualified ZTF archive batch (2026-07-14)
+
+### Result
+- The real six-shard IRSA preflight completed in 10 seconds without errors.
+  All six new fields pass with 44–110 distinct exposure nights.
+- An exhaustive four-night check selected the lowest-transfer valid quartet:
+  `20240321`, `20240422`, `20240504`, and `20240603`. Every new field has
+  coverage on exactly three nights; verified stream transfer is 26.67 GB.
+
+### Added
+- Added the committed coverage-qualified acquisition manifest and dated live
+  evidence, including per-field counts, exact archive sizes, query binding,
+  and the rejected 74-byte archive placeholder.
+
+### Safety
+- Preflight fetched metadata only. The planned archive pass remains
+  stream/process/evict with a 1 GB persistent cap; all external reporting and
+  impact claims remain prohibited.
+
 ## v0.90.93 — Coverage-first ZTF archive planning (2026-07-14)
 
 ### Added

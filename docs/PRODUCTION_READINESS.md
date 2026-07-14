@@ -1,6 +1,6 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.90.93
+**Current version**: v0.90.94
 **Last updated**: 2026-07-14 (header/sync line only — the P1-P5 gate register
 body below is unchanged historical evidence from 2026-07-02; current gate
 status for the active ZTF DR24 path lives in
@@ -11,9 +11,10 @@ status for the active ZTF DR24 path lives in
 are historical snapshots, not current blockers. `tier2_cnn_v4` is internally
 promoted with signed evidence. No A1-A7 blocker remains. Gate Z3 is the only
 open ZTF DR24 gate and remains intentionally paused. The authorized broader
-archive continuation is coverage-first: run the bounded six-field IRSA
-metadata inventory and require at least three populated nights per new field
-before another bulk transfer. External submission remains prohibited.
+archive continuation is coverage-first. The bounded six-field IRSA inventory
+has passed, and the committed four-night batch gives each new field exactly
+three exposure-covered nights while minimizing verified transfer (26.67 GB).
+External submission remains prohibited.
 
 **Purpose**: Mandatory read at session start (per MANDATORY SESSION-START PROTOCOL).  
 Every planning cycle must name the highest-priority unresolved production-capability gate and show how proposed steps close or directly unblock it.

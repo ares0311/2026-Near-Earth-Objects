@@ -887,7 +887,17 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.93)
+## Current State (v0.90.94)
+
+**Latest sync (2026-07-14, coverage preflight passed and batch selected)**:
+Real IRSA run `9a9e148f570d162b` completed all six field shards in 10 seconds
+without errors. Every new field has 44–110 distinct exposure nights. The
+lowest-transfer valid quartet (`20240321`, `20240422`, `20240504`,
+`20240603`) totals 26.67 GB and gives every new field exactly three covered
+nights. Use the committed `ztf_dr24_coverage_selected_2024_v1.json` manifest
+with four archive-night shards x one worker. Stream/process/evict remains
+mandatory; retained output is capped at 1 GB and external submission is not
+authorized.
 
 **Latest sync (2026-07-14, metadata-only coverage preflight ready)**: The
 required next-batch guard is implemented as

@@ -132,3 +132,29 @@ def test_run_shard_passes_only_owned_nights(tmp_path: Path, monkeypatch) -> None
     assert seen == ["20240102"]
     assert summary["kept_count"] == 2
     assert summary["status"] == "succeeded"
+
+
+def test_committed_coverage_selected_batch_is_query_bound_and_bounded() -> None:
+    path = (
+        ROOT
+        / "data_selection/batch_manifests/ztf_dr24_coverage_selected_2024_v1.json"
+    )
+    batch = portfolio.load_batch_manifest(path)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+
+    assert batch.nights == ("20240321", "20240422", "20240504", "20240603")
+    assert len(batch.fields) == 9
+    assert payload["coverage_preflight_query_key"] == "807efb0e5ef7d55d"
+    assert sum(payload["verified_remote_bytes"].values()) == 26_670_482_707
+    assert payload["estimated_persistent_output_gb"] == 1.0
+    assert payload["safety"]["raw_archive_persisted"] is False
+    assert payload["safety"]["external_submission"] is False
+
+    selected_nights = set(batch.nights)
+    coverage = payload["new_field_coverage_nights"]
+    new_field_ids = {
+        field.field_id for field in batch.fields if field.role == "live_search"
+    }
+    assert set(coverage) == new_field_ids
+    assert all(len(set(nights)) == 3 for nights in coverage.values())
+    assert all(set(nights) <= selected_nights for nights in coverage.values())
