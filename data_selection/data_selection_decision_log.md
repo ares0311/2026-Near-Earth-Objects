@@ -173,3 +173,49 @@ Citations: `docs/astrometrics_data_selection_policy.md`;
   `docs/ZTF_DR24_PRODUCTION_GATES.md`.
 
 new_target_search
+
+## 2026-07-14 — Six-shard ZTF DR24 60/30/10 portfolio search
+
+Date: 2026-07-14
+Repo: 2026 Near Earth Objects
+Data: Real UW ZTF public alert archives for six bounded 2024 September nights,
+  filtered in one streaming pass per night across nine sky fields; one
+  post-ingest moving-source injection supplies the control allocation
+Role: live_search
+Acquisition mode: six disjoint archive-night shards launched by
+  `Skills/run_sharded_download.py`; one worker per shard, for six aggregate UW
+  streams. Raw nightly archives are never persisted.
+Estimated transfer: 38.98 GB, based on verified HTTP Content-Length values in
+  `data_selection/batch_manifests/ztf_dr24_portfolio_2024sep_v1.json`
+Estimated persistent storage: at most 1.0 GB under the 5,000-observation
+  per-field/night cap; current project data is approximately 10 GB, safely
+  below the 100 GB ceiling.
+Portfolio: six new ranked fields (three Aten and three IEO), three follow-up
+  fields from the 2020/2023 sweeps, and one post-ingest injection control.
+Why this data: It extends the bounded archival search across both prioritized
+  undersearched populations while revisiting prior null/incomplete fields. A
+  single multi-field pass avoids downloading the same multi-gigabyte nightly
+  archive once per field.
+Why this concurrency: The prior four-stream UW archive batch completed without
+  rate limiting or service errors. Six streams is the standing policy's bounded
+  +2 probe. Thirty-six simultaneous archive streams are not justified by the
+  measured service ceiling, and each shard owns only one night, so additional
+  inner workers would provide no work.
+Checkpoint and retry plan: Atomic per-night checkpoints live under
+  `Logs/pipeline_runs/ztf_alert_archive_portfolio/`; completed shards are
+  resumable through the parent manifest. A failed night is restarted from its
+  stream boundary without duplicating completed nights.
+Leakage and review controls: Historical replay only, with a 2024-09-21 cutoff.
+  Time-aware known-object exclusion is required before candidate review.
+  Automated adversarial review and operator review remain mandatory; no MPC
+  submission, external alert, or impact-probability claim is authorized.
+Manifest: `data_selection/batch_manifests/ztf_dr24_portfolio_2024sep_v1.json`;
+  shared execution state in `Logs/reports/sharded_download_manifest.jsonl`.
+Expected value: A larger, diversity-balanced real-data search test of the
+  production candidate pipeline. A clean null result remains scientifically
+  valid and does not alter the research path.
+Citations: `docs/astrometrics_data_selection_policy.md`;
+  `docs/astrometrics_coding_agents_master_guide.md`;
+  `docs/ZTF_DR24_PRODUCTION_GATES.md`.
+
+new_target_search

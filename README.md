@@ -1,7 +1,7 @@
 # 2026 Near-Earth Object Detection & Ranking Pipeline
 
 ![Status](https://img.shields.io/badge/status-active%20development-blue)
-![Version](https://img.shields.io/badge/version-0.90.90-informational)
+![Version](https://img.shields.io/badge/version-0.90.91-informational)
 ![License](https://img.shields.io/badge/license-Apache%202.0-green)
 ![Tests](https://img.shields.io/badge/tests-1900%2B%20passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
@@ -124,7 +124,7 @@ The pipeline implements a strict directed acyclic graph (DAG) of processing stag
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    NEO DETECTION PIPELINE  v0.90.90                  │
+│                    NEO DETECTION PIPELINE  v0.90.91                  │
 └─────────────────────────────────────────────────────────────────────┘
 
   External Data Sources
@@ -536,7 +536,7 @@ The diagram below shows how data and artifacts move between the repository's top
 2026-Near-Earth-Objects/
 │
 ├── src/                          # Core pipeline modules (Python 3.11+)
-│   ├── __init__.py               # Package version (0.90.90)
+│   ├── __init__.py               # Package version (0.90.91)
 │   ├── schemas.py                # All Pydantic data models (frozen=True)
 │   ├── fetch.py                  # ZTF/ATLAS/MPC/Horizons data retrieval
 │   ├── preprocess.py             # Difference image handling; Gaia astrometry
@@ -1229,7 +1229,16 @@ evidence. MPC submission remains disabled until a real candidate survives
 adversarial plus operator review and the applicable source/submission protocol
 is satisfied.
 
-### 15.1 Current State Snapshot (v0.90.90)
+### 15.1 Current State Snapshot (v0.90.91)
+
+The operator has authorized a bounded ZTF DR24 archival portfolio search.
+`Skills/ztf_alert_archive_portfolio.py` streams each of six selected archive
+nights once across nine fields, using six disjoint night shards through the
+single-command downloader. The committed batch is 60/30/10: six new ranked
+Aten/IEO fields, three follow-up fields, and one post-ingest injection control.
+Raw archives are not retained; the projected persistent addition is at most
+1 GB. This authorizes search and internal review only—not MPC submission,
+external alerts, or impact claims.
 
 The active handoff is coherent with the completed v4 lifecycle:
 `tier2_cnn_v4` is internally promoted with signed A1-A7 evidence, so no model
