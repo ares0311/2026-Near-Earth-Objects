@@ -3,6 +3,28 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.92 — ZTF portfolio association result (2026-07-14)
+
+### Added
+- Added a portfolio-specific association analyzer that validates checkpoint
+  provenance and prevents ZTF survey field numbers from being mistaken for
+  stable object identities.
+- Added a durable acquisition/association result and active handoff with exact
+  retained field/night counts and safe continuation instructions.
+
+### Result
+- Six archive shards scanned 793,005 alerts and retained 1,211 observations in
+  9m48s, using only 548 KB of persistent output.
+- The two fields with repeated coverage formed zero tracklets at the production
+  three-observation minimum. A two-observation sensitivity run formed 100
+  underconstrained two-point fits; none are reviewable candidates.
+- The post-ingest synthetic control passed 20/20 detection, linking, and
+  scoring. Historical known-object exclusion had no valid tracklet to process.
+
+### Safety
+- No real alert was classified, scored, submitted, or presented as a candidate.
+  External reporting and impact claims remain disabled.
+
 ## v0.90.91 — Sharded ZTF portfolio search (2026-07-14)
 
 ### Added

@@ -4,7 +4,7 @@ Updated: 2026-07-14
 Repository identity: `2026 Near Earth Objects`
 Branch: `main`
 Merged implementation: `20576cb4` (PR #231)
-App version: `v0.90.91`
+App version: `v0.90.92`
 
 ## Completed acquisition
 
@@ -101,26 +101,20 @@ UV_CACHE_DIR=.uv-cache uv run --no-sync --python 3.14 python \
 The network command may require the already-approved narrow sandbox exception
 for `ztf.uw.edu` and the manifest-only git relay. Do not broaden it.
 
-## Next work
+## Completed analysis and next work
 
 1. The acquisition audit is complete: all six shards succeeded, checkpoint
    totals equal 1,211 observations, and durable output is only 548 KB.
-2. Do not feed these checkpoints directly to
-   `Skills/run_archive_positive_control.py`: that older tool expects the
-   single-field checkpoint schema. Add a tested portfolio adapter or extend the
-   downstream runner so each field retains batch/night provenance.
-3. Run the committed post-ingest moving-source injection control and record its
-   recovery separately from real search results.
-4. Link detections across nights per field. Before any candidate review, apply
-   the required time-aware known-object exclusion using the historical replay
-   cutoff and preserve the exclusion audit trail.
-5. Score only the remaining unknown-object tracklets, then run
-   `Skills/adversarial_review.py`. Only SURVIVE/BORDERLINE results may reach
-   operator review. A zero-match or all-rejected result is a valid scientific
-   null, not a failed run.
-6. Promote a compact sanitized result into `docs/evidence/live/`, update
-   `AGENTS.md`, `CLAUDE.md`, README/current state, changelog, and the app version,
-   then validate with the optimized sharded test runner and merge through a PR.
+2. `Skills/analyze_ztf_alert_archive_portfolio.py` now safely adapts the
+   portfolio schema without treating ZTF survey field numbers as object IDs.
+   Production association found zero valid three-observation tracklets. The
+   100 two-point sensitivity fits are underconstrained and not candidates.
+3. The post-ingest control passed 20/20 detection, linking, and scoring.
+4. No known-object, scoring, or adversarial-review work is pending for this
+   batch because the production tracklet set is empty.
+5. Next build a metadata-only field/night coverage inventory and select at
+   least three populated archive nights per new field before another bulk
+   transfer. Reuse the bounded sharded downloader only after that preflight.
 
 ## Hard boundaries
 

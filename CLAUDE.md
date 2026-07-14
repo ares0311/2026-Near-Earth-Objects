@@ -887,9 +887,20 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.91)
+## Current State (v0.90.92)
 
-**Latest sync (2026-07-14, sharded ZTF portfolio search)**: The operator has
+**Latest sync (2026-07-14, portfolio association complete)**: The authorized
+six-shard search completed cleanly (793,005 scanned, 1,211 retained, 548 KB
+persisted). Only two follow-up fields had two populated nights, and the safe
+portfolio analyzer formed zero tracklets at the production minimum of three
+observations. The 100 two-point sensitivity fits are underconstrained and must
+not be treated as candidates. The 20/20 injection control confirms mechanics,
+but no real tracklet is eligible for known-object exclusion, classification,
+scoring, review, or submission. Next build a metadata-only coverage inventory
+and require at least three populated nights per new field before another bulk
+transfer. See the active handoff and dated live evidence.
+
+**Earlier sync (2026-07-14, sharded ZTF portfolio search)**: The operator has
 explicitly authorized a bounded archival portfolio search. Run the committed
 six-night batch through `Skills/run_sharded_download.py` with six shards and
 one worker per shard. The native target streams each nightly archive only once
