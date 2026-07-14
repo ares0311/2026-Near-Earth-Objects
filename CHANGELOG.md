@@ -3,6 +3,25 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.89 — Active-directive coherence (2026-07-13)
+
+### Changed
+- Synchronized `AGENTS.md`, `CLAUDE.md`, `docs/MISSION.md`, the readiness
+  register, and README with the completed Tier 2 v4 lifecycle: v4 is
+  internally promoted with signed evidence and no A1-A7 signoff blocker
+  remains.
+- Marked the old v3 retrain/calibration command and v3 signoff claims as
+  superseded historical evidence rather than an active next task.
+- Made the actual decision boundary explicit: Gate Z3 remains intentionally
+  paused; broader ZTF archival searches, bulk downloads, and external
+  submission work require operator direction.
+- Corrected the README test badge to the measured broad-suite scale (1,918
+  passing cases, represented as 1900+).
+
+### Safety
+- No data acquisition, model training, external submission, or scientific
+  status claim was performed.
+
 ## v0.90.88 — Single-command sharded downloads and tests (2026-07-13)
 
 ### Added

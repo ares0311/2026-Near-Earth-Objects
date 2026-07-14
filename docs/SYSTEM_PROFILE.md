@@ -86,7 +86,7 @@ itself always overrides anything recorded here.
 
 | Date | Layout | Result |
 |---|---|---|
-| 2026-07-13 | 6 outer file shards x 6 pytest-xdist workers; native threads pinned to 1 | Clean broad run: 1,917 tests passed in 29 s; six isolated coverage datasets combined without errors; 5,447 source statements at 100% coverage. |
+| 2026-07-13 | 6 outer file shards x 6 pytest-xdist workers; native threads pinned to 1 | Clean v0.90.89 broad run: 1,918 tests passed in 29 s; six isolated coverage datasets combined without errors; 5,447 source statements at 100% coverage. |
 
 ---
 

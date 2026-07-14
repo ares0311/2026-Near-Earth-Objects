@@ -669,9 +669,18 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.88)
+## Current State (v0.90.89)
 
-**Latest sync (2026-07-13, single-command sharding)**: Added Codex-owned
+**Latest sync (2026-07-13, active-directive coherence)**: Removed the stale
+active handoff that still described the completed `tier2_cnn_v3` retrain and
+operator signoff as pending. `tier2_cnn_v4` is internally promoted with its
+signed evidence packet; no A1-A7 signoff blocker remains. The only open ZTF
+DR24 gate is Z3, whose positive-control identity search remains intentionally
+paused. Do not restart Z3, start a broader new-field archive portfolio, or
+perform external submission work without explicit operator direction. Older
+v3 commands and blocker statements below are historical evidence only.
+
+**Earlier sync (2026-07-13, single-command sharding)**: Added Codex-owned
 single-command orchestration for native shard-aware downloads and broad offline
 tests. `Skills/run_sharded_download.py` defaults to 6 shards x 6 workers, checks
 the 100 GB conservative cache budget, requires exact native shard flags,
@@ -679,11 +688,11 @@ isolates logs, fails the whole batch on a child failure, and maintains a
 file-locked status/finalize manifest. `Skills/run_sharded_tests.py` assigns
 every test file to exactly one of 6 outer shards, runs 6 pytest-xdist workers
 per shard with `--dist=loadfile`, isolates coverage files, combines them only
-after all shards pass, and retains the 100% coverage gate. Codex should use
+after all shards pass, and retains the 100% coverage gate. All agents should use
 these launchers whenever measured wall time benefits and safety conditions are
 met; small targeted checks remain serial.
 
-**Latest sync (2026-07-12, tier2_cnn_v4 operator-approved)**: V4 now has
+**Earlier sync (2026-07-12, tier2_cnn_v4 operator-approved)**: V4 now has
 two validated training manifests (real ZTF plus the deterministic synthetic
 hard-negative supplement), real CNN injection evidence bound to checkpoint
 SHA-256, a 5/5-case and 25/25-check canonical suite, and a signed promotion
@@ -699,7 +708,7 @@ calibration KPIs. `tier2_cnn_v4` is now the internally promoted Tier 2
 candidate; `benchmark_cnn_v1` remains the immutable historical benchmark.
 This does not authorize live-search expansion or any external submission.
 
-**Latest sync (2026-07-11, v0.90.85 — doc-sync only)**: Four commits landed
+**Earlier sync (2026-07-11, v0.90.85 — superseded status snapshot)**: Four commits landed
 after this file's last sync without an AGENTS.md update; catching up here.
 `1ca5fecc`/`736a81c5` add real dataset manifests for `models/tier1_xgb.json`
 and `models/tier3_transformer.pt`'s training data, closing the last A1 gaps
@@ -715,8 +724,9 @@ blocker — read this before recording a signoff decision. `c2a02dac` makes
 a real gap where candidates could be produced with zero ledger provenance by
 omitting a flag; also fixed a `--source-dataset-id="not-recorded"` footgun
 that would have written fake provenance into the ledger. Full detail in
-`CLAUDE.md`'s Current State. `operator_signoff_missing` remains the sole
-A1-A7 blocker, now backed by a real review packet.
+`CLAUDE.md`'s Current State. At that historical checkpoint,
+`operator_signoff_missing` was the sole A1-A7 blocker; the signed v4 decision
+above has since closed it.
 
 **Earlier sync (2026-07-10, v0.90.75)**: Fixed a real operator-reported bug:
 `Skills/download_ztf_training_alerts.py` produced total console silence
@@ -1034,20 +1044,24 @@ gate or bug. This mirrors, but is not identical to, `CLAUDE.md`'s own
 
 ### Immediate Next Steps
 
-**No autonomous code work remains.** All T1/T2 production gaps are closed as of
-2026-06-22. The pipeline is ready for discovery-paper operation against unreviewed archives.
+**Current decision gates (2026-07-13)**:
 
-**One human-gated blocker**:
-- **MPC observatory code / escalation path**: Jerome must decide whether and how to
-  obtain an observatory code to submit MPC reports. See
-  `docs/MPC_SUBMISSION_POLICY.md §TODO for Future Agents — Archival WISE Submission Authority`.
-  The pipeline prints an escalation notice for submission-ready candidates but makes
-  no actual submission until this is resolved.
+1. `tier2_cnn_v4` promotion and A1-A7 evidence/signoff are complete. Do not
+   retrain or reopen v3/v4 promotion without a newly diagnosed model failure.
+2. Gate Z3 is the only open ZTF DR24 capability gate and is intentionally
+   paused after the documented repeated positive-control identity failures.
+   Do not resume it or select a replacement designation without explicit
+   operator direction.
+3. A broader ZTF DR24 new-field search portfolio is also an operator-approved
+   expansion, not an automatic next task. No bulk ingest/download is currently
+   authorized.
+4. MPC submission, observatory-code decisions, NEOCP monitoring, and any
+   authority-facing communication remain human/external-state gated. The
+   pipeline may prepare review material but must not submit autonomously.
 
-**When Jerome resolves the observatory code strategy**:
-1. Update `docs/MPC_SUBMISSION_POLICY.md` §TODO for Future Agents with the answer.
-2. Update `alert.py` to perform the actual submission in `run_pipeline.py`.
-3. Update `Skills/export_ades_report.py` `--obs-code` default to the assigned code.
+Safe maintenance that responds to a concrete failing check or diagnosed defect
+may continue. If no such defect exists, stop for an operator roadmap decision
+rather than inventing new search, training, or documentation work.
 
 **Historical next live run (SUPERSEDED — do NOT run for discovery)**:
 ```bash
