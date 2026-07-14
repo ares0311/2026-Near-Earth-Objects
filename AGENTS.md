@@ -669,9 +669,22 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.91)
+## Current State (v0.90.92)
 
-**Latest sync (2026-07-14, sharded ZTF portfolio search)**: The operator has
+**Latest sync (2026-07-14, portfolio association complete)**: Run
+`0b381aac323c0f28` completed all six UW shards in 9m48s: 793,005 alerts
+scanned, 1,211 retained, 548 KB persisted, and no service/rate-limit errors.
+Only two follow-up fields had two populated nights. The safe portfolio analyzer
+formed zero tracklets at the production three-observation minimum; 100
+two-point sensitivity fits are explicitly underconstrained and not candidates.
+The injection control passed 20/20 detect/link/score. There is no valid
+tracklet for known-object exclusion, classification, scoring, adversarial
+review, or submission. Next perform metadata-only coverage preflight and
+require at least three populated nights per new field before another bulk
+archive transfer. See `docs/evidence/live/2026-07-14-ztf-portfolio-search-result.md`
+and `docs/ACTIVE_HANDOFF.md`.
+
+**Earlier sync (2026-07-14, sharded ZTF portfolio search)**: The operator has
 explicitly authorized the bounded archival search. The committed batch uses
 six archive-night shards and one worker per shard (six actual UW streams),
 covering six new ranked Aten/IEO fields, three follow-up fields, and one

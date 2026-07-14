@@ -80,7 +80,7 @@ itself always overrides anything recorded here.
 
 | Service | Confirmed safe concurrency | Evidence |
 |---|---|---|
-| *(none recorded yet)* | | |
+| UW public ZTF nightly alert archives | 6 concurrent nightly streams | Clean 2026-07-14 portfolio run `0b381aac323c0f28`: six disjoint nights, 38.98 GB streamed in 9m48s, zero service/rate-limit errors. This supports six streams, not 36. |
 
 ### Local test-runner evidence
 
