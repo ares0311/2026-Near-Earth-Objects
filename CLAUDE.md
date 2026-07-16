@@ -391,6 +391,46 @@ non-blocked ZTF/Astrometrics gate or documentation sync.
 
 ---
 
+## Operator Maintenance Backlog (unscoped — do not implement without scoping first)
+
+Recorded verbatim from Jerome W. Lindsey III on 2026-07-16. These are
+process/tooling ideas, not yet scoped as production gaps. Per the PRIMARY
+DIRECTIVE above, none of these may be implemented directly — each needs
+its own scoping pass (concrete design, named gap or explicit operator
+go-ahead) before code changes. Restated for clarity below the raw item;
+the restatement is this session's interpretation, not an approved spec.
+
+1. **Assert that everything should fail loudly** — audit for silent
+   error-swallowing (bare `except: pass`, defaulted return values that mask
+   a real failure) and ensure failures always raise or print visibly.
+   Overlaps with the existing fail-closed/conservative-by-default rules
+   above; needs a scoping pass to find any place that currently violates it.
+2. **Lossless factor system directives so they can be read and reread
+   effectively** — this file and `AGENTS.md` have grown very large (1000+
+   lines each, with a long inline changelog-style "Current State" section).
+   Restructure for readability without deleting any information (e.g. move
+   dated history into `docs/HANDOFF_HISTORY.md`-style archives more
+   aggressively, keep only current/active state inline). Needs a concrete
+   restructuring plan before touching either file.
+3. **Add a system directive to prevent stubbing** — a rule against writing
+   placeholder/stub implementations (functions that appear to do something
+   but don't) and presenting them as real, working code.
+4. **Add provenance stamping to ensure that code actually does what the
+   spec says it does and what an LLM tells the operator it does** — some
+   mechanism to bind a claim ("this function does X") to verifiable
+   evidence, not just an agent's say-so.
+5. **Fidelity tests to ensure that code does what it says it does** — tests
+   that check behavioral fidelity against docstrings/specs, not just line
+   coverage.
+6. **Spec conformance checks** — automated checks that implementation
+   matches documented spec; likely related to items 3–5 and may consolidate
+   into one initiative once scoped.
+7. **Assert a linter when something fails** — when a real failure is
+   diagnosed and fixed, consider whether a permanent lint rule should be
+   added so the same failure pattern can't silently recur.
+
+---
+
 ## Project
 
 **Near-Earth Object Detection and Ranking Pipeline**
@@ -889,7 +929,28 @@ and excluded from CI.
 
 ## Current State (v0.91.0)
 
-**Latest sync (2026-07-16, operator decision + first live integrated preflight)**:
+**Latest sync (2026-07-16, first live pixel-extraction pilot)**: Built and
+ran the bounded, hard-capped single-exposure pixel-extraction pilot named as
+the next step after the motion-product preflight. `Skills/ztf_dr24_bounded_ingest.py
+--pixel-extraction-pilot` downloads exactly one difference image, runs a
+minimal numpy/scipy/astropy 5-sigma local-maximum detector, and converts hits
+to RA/Dec via WCS (offline-verified against a synthetic injected source to
+1e-6 deg agreement before trusting it on real data). Real live result on the
+same verified exposure (pid 585152193615): 7,957,440 bytes downloaded
+(SHA-256 `d536c474...cdfdbbf`), 855 pixels genuinely cleared the 5-sigma
+threshold, output capped at 200. A bug where the report silently showed only
+the capped count (not the true 855) was caught and fixed before this was
+recorded, per the standing no-silent-caps rule; two new regression tests
+guard it. This proves real RA/Dec extraction from DR24 pixels works
+end-to-end, independent of `prv_candidates`, and honestly surfaces that a
+real candidate generator still needs bad-pixel masking (`science_mask`),
+peak deduplication, and PSF-matched photometry before the source list is
+usable. Full suite re-run clean (6/6 shards, 100% coverage) before and after
+the fix. See `docs/evidence/live/2026-07-16-ztf-dr24-pixel-extraction-pilot-first-live-run.md`.
+Does not authorize a wider batch, a candidate claim, Gate Z3 resumption, or
+external submission.
+
+**Earlier sync (2026-07-16, operator decision + first live integrated preflight)**:
 Jerome W. Lindsey III chose the motion-product pivot (Option 1 of the
 three-way ZTF DR24 decision recorded in `docs/ACTIVE_HANDOFF.md`): switch
 candidate generation from transient-alert replay to survey detection/image
@@ -1666,7 +1727,7 @@ consult it only for historical context on a specific gate, blocker, or bug.
 | `Skills/scan_mpc_history_ztf_coverage.py` | Gate Z3: scans a known NEO's real MPC-confirmed observation history for real ZTF coverage overlap |
 | `Skills/scan_neo_track_coverage.py` | Gate Z3: scans a known NEO's real predicted track for real ZTF coverage |
 | `Skills/probe_ztf_alert_archive_file.py` | Gate Z3: bounded single-file verification probe for the UW public ZTF alert archive |
-| `Skills/ztf_dr24_bounded_ingest.py` | Gate Z1 bounded ZTF DR24 historical replay ingest (dry-run, metadata only) |
+| `Skills/ztf_dr24_bounded_ingest.py` | Gate Z1 bounded ZTF DR24 historical replay ingest (metadata-only by default); `--emit-motion-product-manifest`/`--preflight-motion-products` plan and HEAD-verify source-native motion products; `--pixel-extraction-pilot` downloads exactly one difference image and runs a minimal numpy/scipy source detector on it, reporting candidate RA/Dec (single-exposure hard cap, not a batch downloader) |
 | `Skills/diagnose_wise_query.py` | Diagnostic: probes the IRSA NEOWISE query directly with full error reporting, bypassing the pipeline's caching/retry layers |
 | `Skills/_live_connection_test.py` | Internal helper invoked by `Skills/verify_live_credentials.sh`; tests live ATLAS/ZTF credential connectivity without printing secret values |
 | `Skills/load_credentials.py` | Loads project credentials (ATLAS/ZTF) from macOS Keychain into environment variables; called at the start of any Skill needing live network credentials |

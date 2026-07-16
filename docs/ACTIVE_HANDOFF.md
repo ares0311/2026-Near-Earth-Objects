@@ -21,11 +21,26 @@ returned HTTP 200, `available: true`, aggregate 27,311,040 bytes, no bodies
 downloaded. Evidence:
 `docs/evidence/live/2026-07-16-ztf-dr24-motion-product-preflight-first-live-run.md`.
 This confirms the checkpointed preflight tool itself, not just the manual
-probe. **Still not authorized by this step**: pixel download, a candidate
-claim, Gate Z3 resumption, or any external submission. The next safe
-engineering step is a separately scoped, explicitly bounded tiny
-pixel-extraction pilot (single exposure, one difference image) to validate
-a source-native motion extractor before any wider batch.
+probe.
+
+**Next step completed same day**: the bounded, single-exposure
+pixel-extraction pilot named above. `Skills/ztf_dr24_bounded_ingest.py
+--pixel-extraction-pilot` downloads exactly one difference image and runs a
+minimal numpy/scipy/astropy source detector, converting hits to RA/Dec via
+WCS. Real live run on the same verified exposure: 855 pixels genuinely
+cleared a 5-sigma threshold, output capped at 200 -- a report bug that
+silently hid the true 855 count behind the cap was caught and fixed (per
+the standing no-silent-caps rule) before this was recorded, with two new
+regression tests. This proves real RA/Dec extraction from DR24 pixels works
+end-to-end, independent of `prv_candidates`; it also honestly surfaces that
+bad-pixel masking (the already-verified `science_mask` product), peak
+deduplication, and PSF-matched photometry are still needed before the
+source list is usable for real candidate generation. Evidence:
+`docs/evidence/live/2026-07-16-ztf-dr24-pixel-extraction-pilot-first-live-run.md`.
+**Still not authorized**: a wider batch, a candidate claim, Gate Z3
+resumption, or any external submission. The next step is an operator
+decision on whether to continue investing in this extractor (masking/dedup/
+PSF-matching) toward a real candidate generator, or pause here.
 
 ## Source-native motion-product path initiated
 
