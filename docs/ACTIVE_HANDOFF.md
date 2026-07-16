@@ -7,6 +7,26 @@ Merged batch selection: `d81af0a0` (PR #235)
 Execution manifest: `b048be9c`
 App version: `v0.91.0`
 
+## Operator decision (2026-07-16): motion-product pivot approved
+
+Jerome W. Lindsey III chose Option 1 of the three-way decision below:
+**pivot candidate generation to survey detection/image products designed
+for motion**, keeping the completed alert-replay work as benchmark/null
+evidence. This is now the active ZTF DR24 direction. The immediate next
+step taken under this decision was the first live, integrated run of
+`Skills/ztf_dr24_bounded_ingest.py --preflight-motion-products` (previously
+only manually HEAD-probed): all four products for the one-exposure bounded
+verification window (RA 232.6, Dec -8.4, 0.01 deg, JD 2458339.5-2458340.5)
+returned HTTP 200, `available: true`, aggregate 27,311,040 bytes, no bodies
+downloaded. Evidence:
+`docs/evidence/live/2026-07-16-ztf-dr24-motion-product-preflight-first-live-run.md`.
+This confirms the checkpointed preflight tool itself, not just the manual
+probe. **Still not authorized by this step**: pixel download, a candidate
+claim, Gate Z3 resumption, or any external submission. The next safe
+engineering step is a separately scoped, explicitly bounded tiny
+pixel-extraction pilot (single exposure, one difference image) to validate
+a source-native motion extractor before any wider batch.
+
 ## Source-native motion-product path initiated
 
 The recommended metadata-first pivot is now implemented without acquiring
