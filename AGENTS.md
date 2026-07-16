@@ -671,7 +671,22 @@ and excluded from CI.
 
 ## Current State (v0.91.0)
 
-**Latest sync (2026-07-16, operator decision + first live integrated preflight)**:
+**Latest sync (2026-07-16, first live pixel-extraction pilot)**:
+`Skills/ztf_dr24_bounded_ingest.py --pixel-extraction-pilot` (new,
+hard-capped to one exposure) downloads exactly one difference image and
+runs a minimal numpy/scipy/astropy source detector, converting hits to
+RA/Dec via WCS. Real live run on the already-verified exposure: 855 pixels
+genuinely cleared a 5-sigma threshold, output capped at 200 — a report bug
+that silently hid the true 855 count was caught and fixed (no-silent-caps
+rule) before this was recorded, with two new regression tests. Proves
+real RA/Dec extraction from DR24 pixels works end-to-end, independent of
+`prv_candidates`; also surfaces that bad-pixel masking, peak deduplication,
+and PSF-matched photometry are still needed before the source list is
+production-usable. Full suite clean (6/6 shards, 100% coverage). See
+`docs/evidence/live/2026-07-16-ztf-dr24-pixel-extraction-pilot-first-live-run.md`.
+Does not authorize a wider batch, Gate Z3 resumption, or external submission.
+
+**Earlier sync (2026-07-16, operator decision + first live integrated preflight)**:
 Jerome W. Lindsey III chose the motion-product pivot (Option 1 of the
 three-way ZTF DR24 decision recorded in `docs/ACTIVE_HANDOFF.md`): switch
 candidate generation from transient-alert replay to survey detection/image

@@ -31,6 +31,14 @@ fetch per-source photometry or image pixels. The optional
 single-exposure products needed by a future source-native motion extractor;
 it still downloads no products and records their availability as unverified.
 
+``--pixel-extraction-pilot`` (requires ``--preflight-motion-products``) is a
+tiny, hard-capped validation step: it downloads exactly ONE difference image
+(the query window must resolve to exactly one exposure) and runs a minimal
+numpy/scipy/astropy source detector on it, reporting candidate RA/Dec
+positions. This proves a source-native motion extractor is buildable against
+this product family; it is not a batch pixel downloader and never processes
+more than one exposure per invocation.
+
 Bounded by design: both the sky-search box size and the time window are
 capped (see _MAX_SIZE_DEG, _MAX_WINDOW_DAYS) and must be passed explicitly
 by the caller -- there is no default "search everything" mode.
@@ -45,6 +53,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
 import json
 import sys
 import time
@@ -88,6 +97,11 @@ _MAX_ATTEMPTS = 5
 _BACKOFF_SECONDS = (2, 4, 8, 16, 32)
 _MAX_PREFLIGHT_EXPOSURES = 100
 _MAX_PREFLIGHT_WORKERS = 6
+# The pixel-extraction pilot is a tiny single-file validation step, not a
+# batch downloader -- hard-capped at exactly one exposure per invocation.
+_MAX_PIXEL_PILOT_EXPOSURES = 1
+_PIXEL_PILOT_DETECTION_SIGMA = 5.0
+_PIXEL_PILOT_MAX_SOURCES = 200
 
 
 def _fmt_duration(seconds: float) -> str:
@@ -449,6 +463,200 @@ def _preflight_motion_products(
     return manifest
 
 
+def _fetch_binary_with_retry(url: str) -> bytes:
+    """GET a binary science product with the standard bounded retry schedule
+    and return its raw body bytes. Used only by the single-exposure pixel-
+    extraction pilot below -- never for a batch download."""
+    last_exc: Exception | None = None
+    for attempt in range(1, _MAX_ATTEMPTS + 1):
+        try:
+            resp = requests.get(url, timeout=120)
+            resp.raise_for_status()
+            return resp.content
+        except (ConnectionError, TimeoutError, OSError, requests.HTTPError) as exc:
+            last_exc = exc
+            print(
+                f"[pixel-pilot] attempt {attempt}/{_MAX_ATTEMPTS} failed "
+                f"({type(exc).__name__}: {exc})",
+                file=sys.stderr,
+                flush=True,
+            )
+            if attempt < _MAX_ATTEMPTS:
+                time.sleep(_BACKOFF_SECONDS[attempt - 1])
+    raise RuntimeError(
+        f"pixel-extraction pilot product fetch failed after {_MAX_ATTEMPTS} attempts: {url}"
+    ) from last_exc
+
+
+def _detect_sources_in_difference_image(
+    fits_bytes: bytes, max_sources: int = _PIXEL_PILOT_MAX_SOURCES
+) -> dict:
+    """Run a minimal, dependency-light source detector on one ZTF DR24
+    difference image and return candidate source positions.
+
+    This is a proof-of-concept extractor for validating that the motion-
+    product pivot is buildable, not the final motion linker: it finds
+    local-maximum pixels above a sigma-clipped background threshold and
+    converts them to RA/Dec via the image's own WCS. Pure numpy/scipy/
+    astropy -- matches this project's existing preference for minimal new
+    dependencies (see orbit.py's "no external orbit-determination
+    dependency" note). A calibrated PSF-fit photometric pipeline is
+    deliberately out of scope for this tiny validation pilot.
+    """
+    # Lazy imports for heavy third-party libraries, matching this file's
+    # existing convention (astropy.io.ascii, astropy.time.Time above).
+    import numpy as np
+    from astropy.io import fits
+    from astropy.stats import sigma_clipped_stats
+    from astropy.wcs import WCS
+    from scipy.ndimage import maximum_filter
+
+    with fits.open(io.BytesIO(fits_bytes)) as hdul:
+        # .fz (Rice-compressed) ZTF products decompress transparently via
+        # astropy's CompImageHDU support; the Primary HDU is header-only, so
+        # pick the first HDU that actually carries pixel data.
+        hdu = next(h for h in hdul if h.data is not None)
+        data = np.asarray(hdu.data, dtype=float)
+        header = hdu.header
+
+    finite = np.isfinite(data)
+    mean, median, std = sigma_clipped_stats(data[finite], sigma=3.0)
+    # A conservative 5-sigma cut, matching this project's cautious-detection
+    # posture elsewhere (e.g. detect.py's real/bogus threshold discipline).
+    threshold = median + _PIXEL_PILOT_DETECTION_SIGMA * std
+
+    # maximum_filter gives cheap local non-maximum suppression within its
+    # window; a pixel is a candidate source only if it equals the local max
+    # and clears the background threshold.
+    local_max = maximum_filter(data, size=5)
+    is_peak = finite & (data == local_max) & (data > threshold)
+    ys, xs = np.nonzero(is_peak)
+    # Record the true pre-cap count separately -- silently reporting only the
+    # truncated top-N would misrepresent how many pixels actually cleared
+    # threshold (per the standing "no silent caps" rule: log what was
+    # dropped, don't let truncation read as "covered everything").
+    n_peaks_above_threshold = int(len(ys))
+
+    wcs = WCS(header)
+    sources = []
+    # Rank by peak brightness and keep only the strongest max_sources so
+    # output size stays bounded regardless of how noisy an exposure is.
+    order = np.argsort(data[ys, xs])[::-1][:max_sources]
+    for idx in order:
+        y, x = int(ys[idx]), int(xs[idx])
+        ra, dec = wcs.all_pix2world(float(x), float(y), 0)
+        sources.append(
+            {
+                "x": x,
+                "y": y,
+                "ra_deg": float(ra),
+                "dec_deg": float(dec),
+                "peak_value": float(data[y, x]),
+                "snr": float((data[y, x] - median) / std) if std > 0 else None,
+            }
+        )
+
+    return {
+        "background_mean": float(mean),
+        "background_median": float(median),
+        "background_std": float(std),
+        "detection_sigma": _PIXEL_PILOT_DETECTION_SIGMA,
+        "detection_threshold": float(threshold),
+        "n_pixels": int(data.size),
+        "n_finite_pixels": int(finite.sum()),
+        "n_peaks_above_threshold": n_peaks_above_threshold,
+        "n_candidate_sources": len(sources),
+        "n_candidate_sources_cap": max_sources,
+        "n_candidate_sources_truncated": n_peaks_above_threshold > max_sources,
+        "sources": sources,
+    }
+
+
+def _save_pixel_pilot_checkpoint(path: Path, payload: dict) -> None:
+    """Persist the pixel-extraction pilot result once download+extraction
+    complete, so a re-run resumes instead of re-downloading the product."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2))
+
+
+def _run_pixel_extraction_pilot(manifest: dict, run_dir: Path) -> dict:
+    """Download exactly one difference image and run the minimal source
+    extractor on it -- the bounded "tiny pixel-extraction pilot" identified
+    as the next safe engineering step after the motion-product HEAD
+    preflight (see docs/evidence/live/2026-07-16-ztf-dr24-motion-product-
+    preflight-first-live-run.md). Hard-capped to a single exposure: this
+    validates that a source-native motion extractor is buildable against
+    this product family before any wider batch is considered.
+    """
+    exposures = manifest.get("exposures", [])
+    if len(exposures) != _MAX_PIXEL_PILOT_EXPOSURES:
+        raise ValueError(
+            f"pixel-extraction pilot requires exactly {_MAX_PIXEL_PILOT_EXPOSURES} "
+            f"exposure in the bounded query window, got {len(exposures)}; narrow "
+            "--size-deg/--start-jd/--end-jd to select a single exposure"
+        )
+    exposure = exposures[0]
+    preflight_result = exposure.get("product_headers", {}).get("difference_image")
+    if not preflight_result or not preflight_result.get("available"):
+        raise RuntimeError(
+            "pixel-extraction pilot requires a passed --preflight-motion-products run "
+            "showing the difference image is available before downloading it"
+        )
+
+    checkpoint_path = run_dir / "pixel_extraction_pilot.json"
+    fits_path = run_dir / "difference_image.fits.fz"
+
+    if checkpoint_path.exists() and fits_path.exists():
+        print(
+            "[pixel-pilot] checkpoint and downloaded product already present, skipping fetch",
+            flush=True,
+        )
+        return json.loads(checkpoint_path.read_text())
+
+    url = exposure["product_urls"]["difference_image"]
+    print(
+        f"[pixel-pilot] Downloading {url} "
+        f"(~{preflight_result['content_length_bytes']} bytes)",
+        flush=True,
+    )
+    t0 = time.monotonic()
+    content = _fetch_binary_with_retry(url)
+    fits_path.parent.mkdir(parents=True, exist_ok=True)
+    fits_path.write_bytes(content)
+    downloaded_sha256 = hashlib.sha256(content).hexdigest()
+    print(
+        f"[pixel-pilot] Downloaded {len(content)} bytes  "
+        f"elapsed {_fmt_duration(time.monotonic() - t0)}",
+        flush=True,
+    )
+
+    extraction = _detect_sources_in_difference_image(content)
+    result = {
+        "schema_version": "ztf-dr24-pixel-extraction-pilot-v1",
+        "pid": exposure["pid"],
+        "product_url": url,
+        "downloaded_bytes": len(content),
+        "downloaded_sha256": downloaded_sha256,
+        "fits_path": str(fits_path),
+        **extraction,
+        "elapsed_seconds": round(time.monotonic() - t0, 2),
+    }
+    _save_pixel_pilot_checkpoint(checkpoint_path, result)
+    truncation_note = (
+        f" (truncated from {result['n_peaks_above_threshold']} pixels above threshold)"
+        if result["n_candidate_sources_truncated"]
+        else ""
+    )
+    print(
+        f"[pixel-pilot] Extracted {result['n_candidate_sources']} candidate source(s) above "
+        f"{result['detection_threshold']:.2f} threshold{truncation_note}  "
+        f"elapsed {_fmt_duration(time.monotonic() - t0)}",
+        flush=True,
+    )
+    print(f"[pixel-pilot] Wrote {checkpoint_path}", flush=True)
+    return result
+
+
 def run_bounded_ingest(
     ra: float,
     dec: float,
@@ -460,6 +668,7 @@ def run_bounded_ingest(
     preflight_motion_products: bool = False,
     max_preflight_exposures: int = 10,
     preflight_workers: int = 4,
+    pixel_extraction_pilot: bool = False,
 ) -> dict:
     """Run one bounded, checkpointed ZTF DR24 sci-metadata ingest and return
     the sample-ingest-report dict. No candidate detection, no live alert
@@ -576,6 +785,17 @@ def run_bounded_ingest(
             f"{availability_message} and no products were downloaded",
             flush=True,
         )
+    if pixel_extraction_pilot:
+        if not preflight_motion_products:
+            raise ValueError(
+                "--pixel-extraction-pilot requires --preflight-motion-products to verify "
+                "product availability before any download is attempted"
+            )
+        if preflight_failed:
+            raise RuntimeError(
+                "pixel-extraction pilot skipped: motion-product preflight failed"
+            )
+        report["pixel_extraction_pilot"] = _run_pixel_extraction_pilot(manifest, run_dir)
     run_dir.mkdir(parents=True, exist_ok=True)
     checkpoint_path.write_text(json.dumps(report, indent=2))
     report_path = run_dir / "sample_ingest_report.json"
@@ -650,6 +870,15 @@ def main() -> None:
         default=4,
         help=f"Concurrent HEAD requests (default: 4; hard cap: {_MAX_PREFLIGHT_WORKERS})",
     )
+    parser.add_argument(
+        "--pixel-extraction-pilot",
+        action="store_true",
+        help=(
+            "Download exactly one difference image (query window must resolve to a "
+            "single exposure) and run a minimal source detector on it; requires "
+            "--preflight-motion-products. Hard-capped to one exposure per invocation."
+        ),
+    )
     args = parser.parse_args()
 
     run_bounded_ingest(
@@ -663,6 +892,7 @@ def main() -> None:
         preflight_motion_products=args.preflight_motion_products,
         max_preflight_exposures=args.max_preflight_exposures,
         preflight_workers=args.preflight_workers,
+        pixel_extraction_pilot=args.pixel_extraction_pilot,
     )
 
 

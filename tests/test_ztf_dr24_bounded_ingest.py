@@ -70,14 +70,48 @@ class _FakeResponse:
         text: str = "",
         status: int = 200,
         headers: dict[str, str] | None = None,
+        content: bytes = b"",
     ):
         self.text = text
         self.status_code = status
         self.headers = headers or {}
+        self.content = content
 
     def raise_for_status(self):
         if self.status_code >= 400:
             raise requests.HTTPError(f"HTTP {self.status_code}")
+
+
+def _synthetic_difference_image_fits_bytes(
+    size: int = 50,
+    source_xy: tuple[int, int] = (25, 25),
+    source_peak: float = 500.0,
+    seed: int = 7,
+) -> bytes:
+    """Build a small synthetic ZTF-like difference image: Gaussian background
+    noise plus one bright injected point source, with a real TAN WCS header,
+    written via astropy's own FITS writer so the reader under test is
+    exercised against a real, library-round-tripped file rather than a
+    hand-typed byte layout."""
+    import numpy as np
+    from astropy.io import fits
+    from astropy.wcs import WCS
+
+    rng = np.random.default_rng(seed)
+    data = rng.normal(loc=0.0, scale=5.0, size=(size, size)).astype(np.float32)
+    y0, x0 = source_xy
+    data[y0, x0] += source_peak
+
+    wcs = WCS(naxis=2)
+    wcs.wcs.crpix = [size / 2, size / 2]
+    wcs.wcs.cdelt = [-1.0 / 3600, 1.0 / 3600]
+    wcs.wcs.crval = [232.6, -8.4]
+    wcs.wcs.ctype = ["RA---TAN", "DEC--TAN"]
+
+    hdu = fits.PrimaryHDU(data=data, header=wcs.to_header())
+    buf = io.BytesIO()
+    hdu.writeto(buf)
+    return buf.getvalue()
 
 
 def test_run_bounded_ingest_writes_report(tmp_path):
@@ -447,3 +481,208 @@ def test_build_url_includes_pos_size_where_columns():
         "WHERE=obsjd>2460310.5+AND+obsjd<2460311.5+AND+infobits<33554432" in url
     )
     assert "COLUMNS=" in url
+
+
+def test_detect_sources_in_difference_image_finds_injected_point_source():
+    """The minimal detector must recover an injected bright point source at
+    approximately its true WCS-derived RA/Dec, not just report a count."""
+    from astropy.wcs import WCS
+
+    fits_bytes = _synthetic_difference_image_fits_bytes(source_xy=(25, 25), source_peak=500.0)
+    result = ztf_dr24_bounded_ingest._detect_sources_in_difference_image(fits_bytes)
+
+    assert result["n_candidate_sources"] >= 1
+    top = result["sources"][0]  # ranked by peak brightness
+
+    wcs = WCS(naxis=2)
+    wcs.wcs.crpix = [25.0, 25.0]
+    wcs.wcs.cdelt = [-1.0 / 3600, 1.0 / 3600]
+    wcs.wcs.crval = [232.6, -8.4]
+    wcs.wcs.ctype = ["RA---TAN", "DEC--TAN"]
+    expected_ra, expected_dec = wcs.all_pix2world(25.0, 25.0, 0)
+
+    assert top["x"] == 25 and top["y"] == 25
+    assert abs(top["ra_deg"] - float(expected_ra)) < 1e-6
+    assert abs(top["dec_deg"] - float(expected_dec)) < 1e-6
+    assert top["snr"] > ztf_dr24_bounded_ingest._PIXEL_PILOT_DETECTION_SIGMA
+
+
+def test_detect_sources_in_difference_image_caps_output_count():
+    """A noisy image must never return more than the configured cap, however
+    many pixels clear the detection threshold -- and must report the true
+    pre-cap count rather than silently truncating (no-silent-caps rule)."""
+    fits_bytes = _synthetic_difference_image_fits_bytes(source_peak=500.0)
+    result = ztf_dr24_bounded_ingest._detect_sources_in_difference_image(
+        fits_bytes, max_sources=1
+    )
+    assert result["n_candidate_sources"] <= 1
+    assert result["n_candidate_sources_cap"] == 1
+    assert result["n_peaks_above_threshold"] >= result["n_candidate_sources"]
+    assert result["n_candidate_sources_truncated"] == (
+        result["n_peaks_above_threshold"] > 1
+    )
+
+
+def test_detect_sources_in_difference_image_reports_untruncated_when_under_cap():
+    """When every clearing pixel fits under the cap, truncation must read
+    False rather than defaulting to a misleading truthy value."""
+    fits_bytes = _synthetic_difference_image_fits_bytes(source_peak=500.0)
+    result = ztf_dr24_bounded_ingest._detect_sources_in_difference_image(
+        fits_bytes, max_sources=1000
+    )
+    assert result["n_candidate_sources_truncated"] is False
+    assert result["n_candidate_sources"] == result["n_peaks_above_threshold"]
+
+
+def _available_single_exposure_manifest(content_length: int = 1000) -> dict:
+    """One exposure whose difference-image preflight already passed --
+    the precondition _run_pixel_extraction_pilot requires."""
+    return {
+        "exposures": [
+            {
+                "pid": 585152193615,
+                "product_urls": {
+                    "difference_image": "https://irsa.ipac.caltech.edu/product/diff.fits.fz",
+                },
+                "product_headers": {
+                    "difference_image": {
+                        "available": True,
+                        "content_length_bytes": content_length,
+                    },
+                },
+            }
+        ]
+    }
+
+
+def test_run_pixel_extraction_pilot_downloads_and_extracts(tmp_path):
+    """End-to-end: download the (mocked) difference image and extract
+    candidate sources, writing a checkpoint keyed off the real content."""
+    fits_bytes = _synthetic_difference_image_fits_bytes()
+    manifest = _available_single_exposure_manifest(content_length=len(fits_bytes))
+    with patch(
+        "requests.get", return_value=_FakeResponse(status=200, content=fits_bytes)
+    ) as get:
+        result = ztf_dr24_bounded_ingest._run_pixel_extraction_pilot(manifest, tmp_path)
+    assert get.call_count == 1
+    assert result["schema_version"] == "ztf-dr24-pixel-extraction-pilot-v1"
+    assert result["downloaded_bytes"] == len(fits_bytes)
+    assert result["downloaded_sha256"] == __import__("hashlib").sha256(fits_bytes).hexdigest()
+    assert result["n_candidate_sources"] >= 1
+    assert (tmp_path / "difference_image.fits.fz").exists()
+    assert (tmp_path / "pixel_extraction_pilot.json").exists()
+
+
+def test_run_pixel_extraction_pilot_resumes_without_redownload(tmp_path):
+    """A repeated call must reuse the checkpoint and never re-fetch the
+    (potentially several-MB) product body."""
+    fits_bytes = _synthetic_difference_image_fits_bytes()
+    manifest = _available_single_exposure_manifest(content_length=len(fits_bytes))
+    with patch(
+        "requests.get", return_value=_FakeResponse(status=200, content=fits_bytes)
+    ) as get:
+        first = ztf_dr24_bounded_ingest._run_pixel_extraction_pilot(manifest, tmp_path)
+        assert get.call_count == 1
+        second = ztf_dr24_bounded_ingest._run_pixel_extraction_pilot(manifest, tmp_path)
+        assert get.call_count == 1
+    assert first == second
+
+
+def test_run_pixel_extraction_pilot_rejects_multiple_exposures(tmp_path):
+    """The hard single-exposure cap must reject a broader manifest before any
+    network call, keeping this a tiny pilot rather than a batch downloader."""
+    manifest = _available_single_exposure_manifest()
+    manifest["exposures"] = manifest["exposures"] * 2
+    with patch("requests.get") as get:
+        with pytest.raises(ValueError, match="exactly 1"):
+            ztf_dr24_bounded_ingest._run_pixel_extraction_pilot(manifest, tmp_path)
+    get.assert_not_called()
+
+
+def test_run_pixel_extraction_pilot_requires_verified_availability(tmp_path):
+    """An exposure whose preflight never verified (or failed to verify) the
+    difference image must not be downloaded."""
+    manifest = _available_single_exposure_manifest()
+    manifest["exposures"][0]["product_headers"]["difference_image"]["available"] = False
+    with patch("requests.get") as get:
+        with pytest.raises(RuntimeError, match="requires a passed --preflight-motion-products"):
+            ztf_dr24_bounded_ingest._run_pixel_extraction_pilot(manifest, tmp_path)
+    get.assert_not_called()
+
+
+def test_pixel_extraction_pilot_requires_preflight_flag(tmp_path):
+    """Requesting the pilot without --preflight-motion-products must fail
+    closed before any network call, matching the CLI's documented contract."""
+    with patch("requests.get", return_value=_FakeResponse(_ipac_response_text(n_rows=1))) as get:
+        with pytest.raises(ValueError, match="requires --preflight-motion-products"):
+            ztf_dr24_bounded_ingest.run_bounded_ingest(
+                ra=232.6,
+                dec=-8.4,
+                size_deg=0.01,
+                start_jd=2458339.5,
+                end_jd=2458340.5,
+                out_dir=tmp_path,
+                pixel_extraction_pilot=True,
+            )
+    assert get.call_count == 1  # only the metadata call; no product fetch attempted
+
+
+def test_run_bounded_ingest_pixel_extraction_pilot_end_to_end(tmp_path):
+    """Full CLI-level path: metadata -> manifest -> preflight -> pixel pilot,
+    with the metadata GET and the binary product GET both mocked by URL."""
+    fits_bytes = _synthetic_difference_image_fits_bytes()
+    metadata_response = _FakeResponse(_ipac_response_text(obsjd_values=[2458339.6521991]))
+    head_response = _FakeResponse(
+        status=200,
+        headers={"content-length": str(len(fits_bytes))},
+    )
+
+    def _get_side_effect(url, *args, **kwargs):
+        if url.startswith(ztf_dr24_bounded_ingest._IRSA_SCI_URL):
+            return metadata_response
+        return _FakeResponse(status=200, content=fits_bytes)
+
+    with (
+        patch("requests.get", side_effect=_get_side_effect),
+        patch("requests.head", return_value=head_response),
+    ):
+        report = ztf_dr24_bounded_ingest.run_bounded_ingest(
+            ra=232.6,
+            dec=-8.4,
+            size_deg=0.01,
+            start_jd=2458339.5,
+            end_jd=2458340.5,
+            out_dir=tmp_path,
+            preflight_motion_products=True,
+            max_preflight_exposures=1,
+            preflight_workers=1,
+            pixel_extraction_pilot=True,
+        )
+    pilot = report["pixel_extraction_pilot"]
+    assert pilot["n_candidate_sources"] >= 1
+    assert pilot["downloaded_bytes"] == len(fits_bytes)
+
+
+def test_fetch_binary_with_retry_recovers_and_exhausts():
+    """Binary product fetch follows the same bounded five-attempt retry
+    policy as the metadata and HEAD fetchers."""
+    success = _FakeResponse(status=200, content=b"fits-bytes")
+    with (
+        patch("time.sleep"),
+        patch("requests.get", side_effect=[ConnectionError("temporary"), success]) as get,
+    ):
+        content = ztf_dr24_bounded_ingest._fetch_binary_with_retry(
+            "https://example.invalid/diff.fits.fz"
+        )
+    assert content == b"fits-bytes"
+    assert get.call_count == 2
+
+    with (
+        patch("time.sleep"),
+        patch("requests.get", side_effect=ConnectionError("persistent")) as get,
+    ):
+        with pytest.raises(RuntimeError, match="failed after 5 attempts"):
+            ztf_dr24_bounded_ingest._fetch_binary_with_retry(
+                "https://example.invalid/diff.fits.fz"
+            )
+    assert get.call_count == 5
