@@ -887,7 +887,16 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.99)
+## Current State (v0.91.0)
+
+**Latest sync (2026-07-16, bounded motion-product HEAD preflight)**:
+`--preflight-motion-products` now verifies planned DR24 products without
+downloading bodies, checkpoints every result, resumes completed work, enforces
+100-exposure/6-worker hard caps, and fails closed on unavailable or zero-byte
+products and exhausted transport retries. The integrated live invocation was
+not authorized in this session; the same four real URLs remain independently
+HEAD-verified by v0.90.99 evidence. Pixel acquisition, Gate Z3, broad alert
+replay, and external submission remain paused.
 
 **Latest sync (2026-07-16, source-native motion-product manifest verified)**:
 `Skills/ztf_dr24_bounded_ingest.py --emit-motion-product-manifest` now plans

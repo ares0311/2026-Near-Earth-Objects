@@ -669,7 +669,16 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.99)
+## Current State (v0.91.0)
+
+**Latest sync (2026-07-16, bounded motion-product HEAD preflight)**:
+The DR24 motion-product planner now supports checkpointed HEAD verification
+with hard caps of 100 exposures and 6 workers, records content lengths, resumes
+completed products, and fails closed on empty, missing, zero-byte, or
+transport-failed products. The integrated live invocation was not authorized
+in this session; v0.90.99's independent four-HEAD live evidence remains the
+real-source basis. No product bodies, candidates, Gate Z3 work, or external
+submission are authorized.
 
 **Latest sync (2026-07-16, source-native motion-product manifest verified)**:
 The bounded IRSA metadata ingest can now emit a no-download acquisition plan

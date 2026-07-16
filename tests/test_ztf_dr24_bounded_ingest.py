@@ -65,9 +65,15 @@ def _ipac_response_text(
 
 
 class _FakeResponse:
-    def __init__(self, text: str, status: int = 200):
+    def __init__(
+        self,
+        text: str = "",
+        status: int = 200,
+        headers: dict[str, str] | None = None,
+    ):
         self.text = text
         self.status_code = status
+        self.headers = headers or {}
 
     def raise_for_status(self):
         if self.status_code >= 400:
@@ -143,6 +149,192 @@ def test_science_product_url_rejects_malformed_identifiers():
     table["ccdid"][0] = 17
     with pytest.raises(ValueError, match="invalid ZTF product identifiers"):
         ztf_dr24_bounded_ingest._science_product_url(table[0], "psfcat.fits")
+
+
+def test_motion_product_preflight_records_headers_and_bytes(tmp_path):
+    """A bounded HEAD preflight must verify every product and download no body."""
+    head_response = _FakeResponse(
+        status=200,
+        headers={"content-length": "1024", "content-type": "application/octet-stream"},
+    )
+    with (
+        patch("requests.get", return_value=_FakeResponse(_ipac_response_text(n_rows=1))),
+        patch("requests.head", return_value=head_response) as head,
+    ):
+        report = ztf_dr24_bounded_ingest.run_bounded_ingest(
+            ra=358.3,
+            dec=25.6,
+            size_deg=0.2,
+            start_jd=2460310.5,
+            end_jd=2460311.5,
+            out_dir=tmp_path,
+            preflight_motion_products=True,
+            max_preflight_exposures=1,
+            preflight_workers=4,
+        )
+    assert head.call_count == 4
+    assert report["motion_product_preflight"]["status"] == "passed"
+    assert report["motion_product_preflight"]["total_content_bytes"] == 4096
+    manifest = json.loads(Path(report["motion_product_manifest_path"]).read_text())
+    assert manifest["exposures"][0]["availability"] == "verified"
+    assert manifest["exposures"][0]["verified_content_bytes"] == 4096
+
+
+def test_motion_product_preflight_resumes_completed_heads(tmp_path):
+    """A repeated preflight must reuse its per-product checkpoint."""
+    table = ap_ascii.read(_ipac_response_text(n_rows=1), format="ipac")
+    manifest = ztf_dr24_bounded_ingest._build_motion_product_manifest(table, {}, "a" * 64)
+    checkpoint_path = tmp_path / "preflight.json"
+    response = _FakeResponse(status=200, headers={"content-length": "2"})
+    with patch("requests.head", return_value=response) as head:
+        ztf_dr24_bounded_ingest._preflight_motion_products(manifest, checkpoint_path, 1, 2)
+        assert head.call_count == 4
+        manifest = ztf_dr24_bounded_ingest._build_motion_product_manifest(
+            table, {}, "a" * 64
+        )
+        ztf_dr24_bounded_ingest._preflight_motion_products(manifest, checkpoint_path, 1, 2)
+    assert head.call_count == 4
+
+
+def test_motion_product_preflight_rejects_exposure_overflow_before_head(tmp_path):
+    """The explicit exposure cap must prevent an accidental broad HEAD sweep."""
+    table = ap_ascii.read(_ipac_response_text(n_rows=2), format="ipac")
+    manifest = ztf_dr24_bounded_ingest._build_motion_product_manifest(table, {}, "b" * 64)
+    with patch("requests.head") as head:
+        with pytest.raises(ValueError, match="exceeding the explicit cap"):
+            ztf_dr24_bounded_ingest._preflight_motion_products(
+                manifest, tmp_path / "preflight.json", 1, 1
+            )
+    head.assert_not_called()
+
+
+def test_motion_product_preflight_rejects_empty_or_zero_byte_products(tmp_path):
+    """An empty plan or a zero-byte file must never pass availability gates."""
+    with pytest.raises(ValueError, match="at least one exposure"):
+        ztf_dr24_bounded_ingest._preflight_motion_products(
+            {"raw_metadata_sha256": "c" * 64, "exposures": []},
+            tmp_path / "empty.json",
+            1,
+            1,
+        )
+
+    table = ap_ascii.read(_ipac_response_text(n_rows=1), format="ipac")
+    manifest = ztf_dr24_bounded_ingest._build_motion_product_manifest(table, {}, "d" * 64)
+    with patch(
+        "requests.head",
+        return_value=_FakeResponse(status=200, headers={"content-length": "0"}),
+    ):
+        result = ztf_dr24_bounded_ingest._preflight_motion_products(
+            manifest, tmp_path / "zero.json", 1, 1
+        )
+    assert result["preflight"]["status"] == "failed"
+    assert result["preflight"]["total_content_bytes"] == 0
+
+
+def test_motion_product_preflight_fails_closed_on_missing_product(tmp_path):
+    """A missing required product must write evidence and fail the caller."""
+    responses = [
+        _FakeResponse(status=404),
+        *[
+            _FakeResponse(status=200, headers={"content-length": "10"})
+            for _ in range(3)
+        ],
+    ]
+    with (
+        patch("requests.get", return_value=_FakeResponse(_ipac_response_text(n_rows=1))),
+        patch("requests.head", side_effect=responses),
+    ):
+        with pytest.raises(RuntimeError, match="preflight failed"):
+            ztf_dr24_bounded_ingest.run_bounded_ingest(
+                ra=358.3,
+                dec=25.6,
+                size_deg=0.2,
+                start_jd=2460310.5,
+                end_jd=2460311.5,
+                out_dir=tmp_path,
+                preflight_motion_products=True,
+                max_preflight_exposures=1,
+                preflight_workers=1,
+            )
+    manifest_paths = list(tmp_path.glob("*/motion_product_manifest.json"))
+    assert len(manifest_paths) == 1
+    manifest = json.loads(manifest_paths[0].read_text())
+    assert manifest["preflight"]["status"] == "failed"
+
+
+def test_motion_product_preflight_checkpoints_transport_failure(tmp_path):
+    """An exhausted transport retry must be recorded while siblings finish."""
+    table = ap_ascii.read(_ipac_response_text(n_rows=1), format="ipac")
+    manifest = ztf_dr24_bounded_ingest._build_motion_product_manifest(table, {}, "e" * 64)
+    good = _FakeResponse(status=200, headers={"content-length": "10"})
+    with patch.object(
+        ztf_dr24_bounded_ingest,
+        "_head_with_retry",
+        side_effect=[RuntimeError("network exhausted"), good, good, good],
+    ):
+        result = ztf_dr24_bounded_ingest._preflight_motion_products(
+            manifest, tmp_path / "transport.json", 1, 1
+        )
+    assert result["preflight"]["status"] == "failed"
+    assert result["preflight"]["checked_products"] == 4
+    checkpoint = json.loads((tmp_path / "transport.json").read_text())
+    failures = [item for item in checkpoint["results"].values() if item["error"]]
+    assert len(failures) == 1
+    assert failures[0]["error"] == "network exhausted"
+
+
+def test_head_with_retry_recovers_and_exhausts():
+    """HEAD transport failures follow the bounded five-attempt retry policy."""
+    success = _FakeResponse(status=200, headers={"content-length": "1"})
+    with (
+        patch("time.sleep"),
+        patch("requests.head", side_effect=[ConnectionError("temporary"), success]) as head,
+    ):
+        response = ztf_dr24_bounded_ingest._head_with_retry("https://example.invalid/product")
+    assert response is success
+    assert head.call_count == 2
+
+    with (
+        patch("time.sleep"),
+        patch("requests.head", side_effect=ConnectionError("persistent")) as head,
+    ):
+        with pytest.raises(RuntimeError, match="HEAD failed after 5 attempts"):
+            ztf_dr24_bounded_ingest._head_with_retry("https://example.invalid/product")
+    assert head.call_count == 5
+
+
+def test_motion_product_preflight_rejects_malformed_checkpoint(tmp_path):
+    """Unknown schemas and non-mapping results fail before any network call."""
+    table = ap_ascii.read(_ipac_response_text(n_rows=1), format="ipac")
+    manifest = ztf_dr24_bounded_ingest._build_motion_product_manifest(table, {}, "f" * 64)
+    checkpoint = tmp_path / "malformed.json"
+    checkpoint.write_text(
+        json.dumps(
+            {
+                "schema_version": "unknown",
+                "raw_metadata_sha256": "f" * 64,
+                "results": {},
+            }
+        )
+    )
+    with patch("requests.head") as head:
+        with pytest.raises(RuntimeError, match="unsupported schema"):
+            ztf_dr24_bounded_ingest._preflight_motion_products(
+                manifest, checkpoint, 1, 1
+            )
+    head.assert_not_called()
+
+    checkpoint.write_text(
+        json.dumps(
+            {
+                "schema_version": "ztf-dr24-motion-product-preflight-v1",
+                "raw_metadata_sha256": "f" * 64,
+                "results": [],
+            }
+        )
+    )
+    with pytest.raises(RuntimeError, match="invalid results"):
+        ztf_dr24_bounded_ingest._preflight_motion_products(manifest, checkpoint, 1, 1)
 
 
 def test_run_bounded_ingest_reports_real_night_dates(tmp_path):

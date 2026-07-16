@@ -5,7 +5,7 @@ Repository identity: `2026 Near Earth Objects`
 Branch: `main`
 Merged batch selection: `d81af0a0` (PR #235)
 Execution manifest: `b048be9c`
-App version: `v0.90.99`
+App version: `v0.91.0`
 
 ## Source-native motion-product path initiated
 
@@ -20,10 +20,15 @@ confirmed all planned products with an aggregate size of 27,311,040 bytes
 (~26.0 MiB); no bodies were downloaded. Evidence:
 `docs/evidence/live/2026-07-16-ztf-dr24-motion-product-manifest.md`.
 
-The next safe engineering step is a bounded, checkpointed HEAD preflight that
-records availability and byte estimates. A later tiny pixel/extraction pilot
-still requires an explicit bounded batch decision. Broad alert replay, Gate Z3,
-and all external submission remain paused.
+The bounded, checkpointed HEAD preflight is now implemented and records
+availability and byte estimates:
+`--preflight-motion-products` defaults to 10 exposures and 4 workers, has hard
+caps of 100 exposures and 6 workers, checkpoints every product, and fails
+closed on missing/zero-byte/transport-failed products. Its integrated live
+invocation was not authorized in the v0.91.0 session, so only the v0.90.99
+manual four-HEAD live evidence exists. A later tiny pixel/extraction pilot
+still requires an explicit bounded batch decision. Broad alert replay, Gate
+Z3, and all external submission remain paused.
 
 ## Latest result and decision gate
 
@@ -156,7 +161,7 @@ for `ztf.uw.edu` and the manifest-only git relay. Do not broaden it.
    complete. Another bulk replay requires an explicit research decision and a
    newly selected, logged, bounded batch. Gate Z3 remains separately paused.
 
-Validation for v0.90.99: optimized 6x6 broad suite, 1,957 tests in 29 seconds,
+Validation for v0.91.0: optimized 6x6 broad suite, 1,965 tests in 30 seconds,
 100% coverage across 5,447 source statements; full Ruff and mypy clean; uv
 lock and repository artifact-policy checks passed.
 

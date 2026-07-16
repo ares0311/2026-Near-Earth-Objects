@@ -3,6 +3,33 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.91.0 — Bounded ZTF motion-product HEAD preflight (2026-07-16)
+
+### Added
+- The DR24 motion-product planner can now HEAD-check every required product,
+  checkpoint each result, and attach verified content lengths without
+  downloading response bodies.
+- Preflight is bounded to at most 100 exposures and 6 concurrent requests;
+  defaults are 10 exposures and 4 workers.
+
+### Reliability
+- Identical reruns resume completed product checks. Metadata hash mismatches,
+  empty plans, missing products, absent/zero content lengths, and exhausted
+  network retries fail closed.
+- Transport failures are checkpointed while sibling futures finish, preserving
+  partial evidence instead of discarding successful concurrent checks.
+
+### Validation
+- Offline tests cover pass, resume, exposure caps, empty/zero-byte products,
+  missing products, and transport exhaustion. The repo-native 6x6 suite passed
+  1,965 tests in 30 seconds with 100% source coverage; Ruff and mypy are clean.
+- The integrated live invocation was not run in this change. The same four
+  real URLs were independently HEAD-verified in v0.90.99.
+
+### Safety
+- HEAD preflight downloads no product bodies and authorizes no pixel batch,
+  candidate claim, Gate Z3 resumption, or external submission.
+
 ## v0.90.99 — ZTF source-native motion-product manifest (2026-07-16)
 
 ### Added
