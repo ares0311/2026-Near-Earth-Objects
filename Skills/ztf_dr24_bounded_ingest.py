@@ -26,8 +26,10 @@ Verified request syntax (not guessed -- see docs cited below):
 
 This is METADATA-ONLY ingest (image/exposure records: sky position, field,
 CCD/quadrant, filter, obsdate/obsjd, seeing, magnitude limit). It does not
-fetch per-source photometry or difference-image cutouts -- that is later
-pipeline work, not Gate Z1's scope.
+fetch per-source photometry or image pixels. The optional
+``--emit-motion-product-manifest`` mode derives the documented URLs for the
+single-exposure products needed by a future source-native motion extractor;
+it still downloads no products and records their availability as unverified.
 
 Bounded by design: both the sky-search box size and the time window are
 capped (see _MAX_SIZE_DEG, _MAX_WINDOW_DAYS) and must be passed explicitly
@@ -60,8 +62,24 @@ _IRSA_SCI_URL = "https://irsa.ipac.caltech.edu/ibe/search/ztf/products/sci"
 # Columns confirmed present in the live Phase 0 IRSA response preview
 # (docs/evidence/phase0/phase0_probe_results.json).
 _COLUMNS = (
-    "ra,dec,field,ccdid,qid,rcid,fid,filtercode,obsdate,obsjd,exptime,seeing,maglimit,infobits"
+    "ra,dec,field,ccdid,qid,rcid,fid,filtercode,pid,obsdate,obsjd,filefracday,"
+    "imgtypecode,exptime,seeing,maglimit,infobits,ipac_pub_date"
 )
+
+# Product suffixes and semantics are documented by IRSA's ZTF metadata page.
+# Difference pixels are the source-native detection input; the science mask,
+# science PSF catalog, and difference PSF provide artifact/static-source vetoes
+# and extraction context without treating position-matched alert history as
+# moving-object observations.
+_MOTION_PRODUCT_SUFFIXES = {
+    "difference_image": "scimrefdiffimg.fits.fz",
+    "science_mask": "mskimg.fits",
+    "science_psf_catalog": "psfcat.fits",
+    "difference_psf": "diffimgpsf.fits",
+}
+_IRSA_DATA_ROOT = "https://irsa.ipac.caltech.edu/ibe/data/ztf/products/sci"
+_MOTION_MANIFEST_SCHEMA = "ztf-dr24-motion-product-manifest-v1"
+_QUALITY_FILTER = "infobits<33554432"
 
 _CACHE_ROOT = Path("Logs/pipeline_runs/ztf_dr24_bounded_ingest")
 _MAX_ATTEMPTS = 5
@@ -79,7 +97,19 @@ def _run_key(ra: float, dec: float, size_deg: float, start_jd: float, end_jd: fl
     the identical command resumes instead of re-querying (checkpoint/resume
     standing rule)."""
     payload = json.dumps(
-        {"ra": ra, "dec": dec, "size_deg": size_deg, "start_jd": start_jd, "end_jd": end_jd},
+        {
+            "ra": ra,
+            "dec": dec,
+            "size_deg": size_deg,
+            "start_jd": start_jd,
+            "end_jd": end_jd,
+            # Include the projection contract so a schema change cannot resume
+            # an older raw response that lacks newly required columns.
+            "columns": _COLUMNS,
+            # Include the selection policy for the same reason: changing a
+            # quality constraint must force a fresh metadata response.
+            "quality_filter": _QUALITY_FILTER,
+        },
         sort_keys=True,
     )
     return hashlib.md5(payload.encode()).hexdigest()[:12]
@@ -88,7 +118,10 @@ def _run_key(ra: float, dec: float, size_deg: float, start_jd: float, end_jd: fl
 def _build_url(ra: float, dec: float, size_deg: float, start_jd: float, end_jd: float) -> str:
     """Build the IRSA IBE query URL from verified parameter syntax (POS/SIZE
     spatial box, WHERE obsjd time bound, COLUMNS projection)."""
-    where = f"obsjd>{start_jd}+AND+obsjd<{end_jd}"
+    # DR24 release notes section 12.b.i recommends INFOBITS < 33554432 when
+    # selecting likely usable single-exposure products. Apply that documented
+    # threshold before planning any downstream product acquisition.
+    where = f"obsjd>{start_jd}+AND+obsjd<{end_jd}+AND+{_QUALITY_FILTER}"
     return f"{_IRSA_SCI_URL}?POS={ra},{dec}&SIZE={size_deg}&WHERE={where}&COLUMNS={_COLUMNS}"
 
 
@@ -130,6 +163,110 @@ def _parse_ipac_table(raw_text: str):
     return ap_ascii.read(raw_text, format="ipac")
 
 
+def _science_product_url(row: object, suffix: str) -> str:
+    """Derive one IRSA science-product URL from a metadata-table row.
+
+    The path pattern is copied from IRSA's official ZTF metadata contract.
+    Validation is deliberately strict because a malformed identifier would
+    otherwise produce a plausible-looking but invented archive URL.
+    """
+    filefracday = str(int(row["filefracday"]))
+    if len(filefracday) != 14 or not filefracday.isdigit():
+        raise ValueError(f"invalid ZTF filefracday {filefracday!r}; expected 14 digits")
+    field = int(row["field"])
+    ccdid = int(row["ccdid"])
+    qid = int(row["qid"])
+    filtercode = str(row["filtercode"]).strip()
+    imgtypecode = str(row["imgtypecode"]).strip()
+    if not (0 <= field <= 999999 and 1 <= ccdid <= 16 and 1 <= qid <= 4):
+        raise ValueError(
+            "invalid ZTF product identifiers: "
+            f"field={field}, ccdid={ccdid}, qid={qid}"
+        )
+    if not filtercode or not imgtypecode:
+        raise ValueError("filtercode and imgtypecode must be populated")
+
+    year = filefracday[:4]
+    month_day = filefracday[4:8]
+    fracday = filefracday[8:14]
+    basename = (
+        f"ztf_{filefracday}_{field:06d}_{filtercode}_c{ccdid:02d}_"
+        f"{imgtypecode}_q{qid}_{suffix}"
+    )
+    return f"{_IRSA_DATA_ROOT}/{year}/{month_day}/{fracday}/{basename}"
+
+
+def _build_motion_product_manifest(table: object, query: dict, raw_hash: str) -> dict:
+    """Build a metadata-only acquisition plan for source-native products.
+
+    Every URL remains explicitly unverified because DR24 states that a
+    difference product exists only when a reference image existed during the
+    original processing. A later bounded HEAD preflight must select available
+    rows before any pixels are downloaded.
+    """
+    required_columns = {
+        "pid",
+        "obsjd",
+        "field",
+        "ccdid",
+        "qid",
+        "filtercode",
+        "filefracday",
+        "imgtypecode",
+        "infobits",
+    }
+    missing = sorted(required_columns.difference(table.colnames))
+    if missing:
+        raise RuntimeError(
+            "IRSA metadata response is missing motion-manifest columns: " + ", ".join(missing)
+        )
+
+    exposures = []
+    for row in table:
+        exposures.append(
+            {
+                "pid": int(row["pid"]),
+                "obsjd": float(row["obsjd"]),
+                "field": int(row["field"]),
+                "ccdid": int(row["ccdid"]),
+                "qid": int(row["qid"]),
+                "filtercode": str(row["filtercode"]).strip(),
+                "filefracday": str(int(row["filefracday"])),
+                "imgtypecode": str(row["imgtypecode"]).strip(),
+                "infobits": int(row["infobits"]),
+                "availability": "unverified",
+                "product_urls": {
+                    product_name: _science_product_url(row, suffix)
+                    for product_name, suffix in _MOTION_PRODUCT_SUFFIXES.items()
+                },
+            }
+        )
+
+    return {
+        "schema_version": _MOTION_MANIFEST_SCHEMA,
+        "artifact_kind": "metadata_only_acquisition_plan",
+        "data_role": "live_search",
+        "source_name": "IRSA ZTF single-exposure archive",
+        "source_release": "DR24",
+        "source_metadata_url": _IRSA_SCI_URL,
+        "source_documentation": [
+            "https://irsa.ipac.caltech.edu/docs/program_interface/ztf_api.html",
+            "https://irsa.ipac.caltech.edu/docs/program_interface/ztf_metadata.html",
+            "https://irsa.ipac.caltech.edu/data/ZTF/docs/releases/dr24/ztf_release_notes_dr24.pdf",
+        ],
+        "query": query,
+        "raw_metadata_sha256": raw_hash,
+        "n_exposures": len(exposures),
+        "availability_policy": (
+            "unverified until bounded HEAD preflight; do not download or treat a URL as present "
+            "from filename construction alone"
+        ),
+        "quality_filter": "infobits < 33554432",
+        "products": dict(_MOTION_PRODUCT_SUFFIXES),
+        "exposures": exposures,
+    }
+
+
 def run_bounded_ingest(
     ra: float,
     dec: float,
@@ -137,6 +274,7 @@ def run_bounded_ingest(
     start_jd: float,
     end_jd: float,
     out_dir: Path,
+    emit_motion_product_manifest: bool = False,
 ) -> dict:
     """Run one bounded, checkpointed ZTF DR24 sci-metadata ingest and return
     the sample-ingest-report dict. No candidate detection, no live alert
@@ -205,14 +343,15 @@ def run_bounded_ingest(
     )
 
     raw_hash = hashlib.sha256(raw_text.encode()).hexdigest()
+    query = {
+        "ra": ra,
+        "dec": dec,
+        "size_deg": size_deg,
+        "start_jd": start_jd,
+        "end_jd": end_jd,
+    }
     report = {
-        "query": {
-            "ra": ra,
-            "dec": dec,
-            "size_deg": size_deg,
-            "start_jd": start_jd,
-            "end_jd": end_jd,
-        },
+        "query": query,
         "n_rows": n_rows,
         "n_distinct_nights": len(distinct_nights_yyyymmdd),
         "distinct_nights_yyyymmdd": distinct_nights_yyyymmdd,
@@ -221,6 +360,17 @@ def run_bounded_ingest(
         "raw_response_sha256": raw_hash,
         "elapsed_seconds": round(time.monotonic() - t0, 2),
     }
+    if emit_motion_product_manifest:
+        manifest = _build_motion_product_manifest(table, query, raw_hash)
+        manifest_path = run_dir / "motion_product_manifest.json"
+        manifest_path.write_text(json.dumps(manifest, indent=2))
+        report["motion_product_manifest_path"] = str(manifest_path)
+        report["motion_product_manifest_exposures"] = manifest["n_exposures"]
+        print(
+            f"[ingest] Planned source-native products for {manifest['n_exposures']} exposure(s); "
+            "availability remains unverified and no products were downloaded",
+            flush=True,
+        )
     run_dir.mkdir(parents=True, exist_ok=True)
     checkpoint_path.write_text(json.dumps(report, indent=2))
     report_path = run_dir / "sample_ingest_report.json"
@@ -260,10 +410,24 @@ def main() -> None:
         metavar="DIR",
         help="Override the Logs/pipeline_runs checkpoint root (advanced/testing use)",
     )
+    parser.add_argument(
+        "--emit-motion-product-manifest",
+        action="store_true",
+        help=(
+            "Write a metadata-only plan containing documented difference-image, mask, "
+            "science-catalog, and difference-PSF URLs; downloads no products"
+        ),
+    )
     args = parser.parse_args()
 
     run_bounded_ingest(
-        args.ra, args.dec, args.size_deg, args.start_jd, args.end_jd, Path(args.out_dir)
+        args.ra,
+        args.dec,
+        args.size_deg,
+        args.start_jd,
+        args.end_jd,
+        Path(args.out_dir),
+        emit_motion_product_manifest=args.emit_motion_product_manifest,
     )
 
 

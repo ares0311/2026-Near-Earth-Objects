@@ -3,6 +3,28 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## v0.90.99 — ZTF source-native motion-product manifest (2026-07-16)
+
+### Added
+- The bounded IRSA metadata ingest can now emit a no-download acquisition plan
+  for each exposure's difference image, science mask, single-exposure PSF
+  catalog, and difference-image PSF.
+- The planner derives URLs only from IRSA's documented DR24 filename contract,
+  fails closed on stale/malformed metadata, and records product availability as
+  unverified until a bounded HEAD preflight.
+
+### Verified
+- A one-exposure live DR24 query returned all required identifiers. Four HEAD
+  probes confirmed the planned products exist and total 27,311,040 bytes
+  (~26.0 MiB) without downloading response bodies.
+- The official DR24 usable-image filter `infobits < 33554432` is applied before
+  product planning and is part of the checkpoint identity.
+
+### Safety
+- No image/catalog product, alert archive, or candidate data was downloaded.
+  Gate Z3, broad alert replay, candidate claims, and external submission remain
+  paused or fail-closed.
+
 ## v0.90.98 — ZTF packet-history research decision audit (2026-07-14)
 
 ### Research decision
