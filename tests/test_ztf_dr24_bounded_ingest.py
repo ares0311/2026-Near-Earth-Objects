@@ -267,8 +267,9 @@ def test_motion_product_preflight_checkpoints_transport_failure(tmp_path):
     table = ap_ascii.read(_ipac_response_text(n_rows=1), format="ipac")
     manifest = ztf_dr24_bounded_ingest._build_motion_product_manifest(table, {}, "e" * 64)
     good = _FakeResponse(status=200, headers={"content-length": "10"})
-    with patch(
-        "ztf_dr24_bounded_ingest._head_with_retry",
+    with patch.object(
+        ztf_dr24_bounded_ingest,
+        "_head_with_retry",
         side_effect=[RuntimeError("network exhausted"), good, good, good],
     ):
         result = ztf_dr24_bounded_ingest._preflight_motion_products(
