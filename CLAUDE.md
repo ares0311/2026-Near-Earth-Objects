@@ -889,7 +889,25 @@ and excluded from CI.
 
 ## Current State (v0.91.0)
 
-**Latest sync (2026-07-16, bounded motion-product HEAD preflight)**:
+**Latest sync (2026-07-16, operator decision + first live integrated preflight)**:
+Jerome W. Lindsey III chose the motion-product pivot (Option 1 of the
+three-way ZTF DR24 decision recorded in `docs/ACTIVE_HANDOFF.md`): switch
+candidate generation from transient-alert replay to survey detection/image
+products designed for motion, keeping alert replay as benchmark/null
+evidence. Under that decision, `Skills/ztf_dr24_bounded_ingest.py
+--preflight-motion-products` was run live and integrated (not just
+manually HEAD-probed) for the first time: the one-exposure bounded
+verification window (RA 232.6, Dec -8.4, 0.01 deg, JD
+2458339.5-2458340.5) returned HTTP 200 / `available: true` for all four
+products (difference image, difference-image PSF, science mask, science
+PSF catalog; aggregate 27,311,040 bytes), no bodies downloaded. See
+`docs/evidence/live/2026-07-16-ztf-dr24-motion-product-preflight-first-live-run.md`.
+This does not authorize pixel download, a candidate claim, Gate Z3
+resumption, or external submission. Next: a separately scoped, explicitly
+bounded tiny pixel-extraction pilot (single exposure, one difference
+image) before any wider batch.
+
+**Earlier sync (2026-07-16, bounded motion-product HEAD preflight)**:
 `--preflight-motion-products` now verifies planned DR24 products without
 downloading bodies, checkpoints every result, resumes completed work, enforces
 100-exposure/6-worker hard caps, and fails closed on unavailable or zero-byte
