@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import importlib.util
 import io
+import json
 import sys
 from pathlib import Path
 from unittest.mock import patch
@@ -46,12 +47,16 @@ def _ipac_response_text(
     table["rcid"] = [0] * n_rows
     table["fid"] = [1] * n_rows
     table["filtercode"] = ["zg"] * n_rows
+    table["pid"] = [1000 + i for i in range(n_rows)]
     table["obsdate"] = [f"2024-01-{i + 1:02d} 05:00:00" for i in range(n_rows)]
     table["obsjd"] = obsjd_values
+    table["filefracday"] = [20240101000000 + i for i in range(n_rows)]
+    table["imgtypecode"] = ["o"] * n_rows
     table["exptime"] = [30.0] * n_rows
     table["seeing"] = [2.1] * n_rows
     table["maglimit"] = [20.5] * n_rows
     table["infobits"] = [0] * n_rows
+    table["ipac_pub_date"] = ["2024-01-02 00:00:00"] * n_rows
 
     buf = io.StringIO()
     ap_ascii.write(table, buf, format="ipac")
@@ -80,6 +85,64 @@ def test_run_bounded_ingest_writes_report(tmp_path):
     assert report["n_distinct_fields"] == 2
     assert report["n_distinct_nights"] == 2
     assert len(report["raw_response_sha256"]) == 64
+
+
+def test_motion_product_manifest_uses_documented_urls_without_download(tmp_path):
+    """Optional planning mode must derive the four source-native product URLs
+    from metadata while making no request beyond the one metadata GET."""
+    with patch("requests.get", return_value=_FakeResponse(_ipac_response_text(n_rows=1))) as get:
+        report = ztf_dr24_bounded_ingest.run_bounded_ingest(
+            ra=358.3,
+            dec=25.6,
+            size_deg=0.2,
+            start_jd=2460310.5,
+            end_jd=2460311.5,
+            out_dir=tmp_path,
+            emit_motion_product_manifest=True,
+        )
+    assert get.call_count == 1
+    manifest_path = Path(report["motion_product_manifest_path"])
+    manifest = json.loads(manifest_path.read_text())
+    assert manifest["schema_version"] == "ztf-dr24-motion-product-manifest-v1"
+    assert manifest["data_role"] == "live_search"
+    assert manifest["quality_filter"] == "infobits < 33554432"
+    assert manifest["n_exposures"] == 1
+    exposure = manifest["exposures"][0]
+    assert exposure["availability"] == "unverified"
+    assert exposure["product_urls"] == {
+        "difference_image": (
+            "https://irsa.ipac.caltech.edu/ibe/data/ztf/products/sci/2024/0101/000000/"
+            "ztf_20240101000000_000100_zg_c01_o_q1_scimrefdiffimg.fits.fz"
+        ),
+        "science_mask": (
+            "https://irsa.ipac.caltech.edu/ibe/data/ztf/products/sci/2024/0101/000000/"
+            "ztf_20240101000000_000100_zg_c01_o_q1_mskimg.fits"
+        ),
+        "science_psf_catalog": (
+            "https://irsa.ipac.caltech.edu/ibe/data/ztf/products/sci/2024/0101/000000/"
+            "ztf_20240101000000_000100_zg_c01_o_q1_psfcat.fits"
+        ),
+        "difference_psf": (
+            "https://irsa.ipac.caltech.edu/ibe/data/ztf/products/sci/2024/0101/000000/"
+            "ztf_20240101000000_000100_zg_c01_o_q1_diffimgpsf.fits"
+        ),
+    }
+
+
+def test_motion_product_manifest_fails_closed_on_missing_metadata_column():
+    """A stale or altered IRSA response must not produce guessed product URLs."""
+    table = Table()
+    table["pid"] = [1]
+    with pytest.raises(RuntimeError, match="missing motion-manifest columns"):
+        ztf_dr24_bounded_ingest._build_motion_product_manifest(table, {}, "0" * 64)
+
+
+def test_science_product_url_rejects_malformed_identifiers():
+    """Malformed metadata must fail before a plausible archive URL is emitted."""
+    table = ap_ascii.read(_ipac_response_text(n_rows=1), format="ipac")
+    table["ccdid"][0] = 17
+    with pytest.raises(ValueError, match="invalid ZTF product identifiers"):
+        ztf_dr24_bounded_ingest._science_product_url(table[0], "psfcat.fits")
 
 
 def test_run_bounded_ingest_reports_real_night_dates(tmp_path):
@@ -188,5 +251,7 @@ def test_build_url_includes_pos_size_where_columns():
     url = ztf_dr24_bounded_ingest._build_url(358.3, 25.6, 0.2, 2460310.5, 2460311.5)
     assert "POS=358.3,25.6" in url
     assert "SIZE=0.2" in url
-    assert "WHERE=obsjd>2460310.5+AND+obsjd<2460311.5" in url
+    assert (
+        "WHERE=obsjd>2460310.5+AND+obsjd<2460311.5+AND+infobits<33554432" in url
+    )
     assert "COLUMNS=" in url

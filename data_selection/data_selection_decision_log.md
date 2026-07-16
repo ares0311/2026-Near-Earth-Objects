@@ -1,5 +1,30 @@
 # Data Selection Decision Log
 
+## 2026-07-16 — Begin Metadata-First ZTF Motion-Product Pivot
+
+Decision: Begin the recommended replacement path with a metadata-only
+acquisition plan for source-native ZTF DR24 products. Do not resume the broad
+alert replay or Gate Z3 candidate-pair search.
+
+- Data: IRSA ZTF single-exposure metadata and documented product URLs
+- Role: live_search
+- Acquisition mode: metadata-only
+- Persistent storage added: 16 KiB under ignored `Logs/pipeline_runs/`
+- Potential first-exposure transfer: 27,311,040 bytes (~26.0 MiB), not downloaded
+
+Rationale: completed alert-archive runs produced valid null results, and ZTF
+packet history is position-matched transient context rather than a moving-object
+tracklet source. Difference pixels provide an independent per-exposure input;
+the mask, science PSF catalog, and difference PSF provide extraction and veto
+context.
+
+Guardrails: use only documented IRSA URLs, apply `infobits < 33554432`, mark
+availability unverified until HEAD preflight, and require a separately bounded
+batch decision before downloading pixels. No candidate, submission, or impact
+claim is authorized.
+
+Evidence: `docs/evidence/live/2026-07-16-ztf-dr24-motion-product-manifest.md`.
+
 ## 2026-07-08 — Adopt Astrometrics Data Selection Controls
 
 Decision: Treat `docs/astrometrics_data_selection_policy.md`,

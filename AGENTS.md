@@ -669,7 +669,17 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.98)
+## Current State (v0.90.99)
+
+**Latest sync (2026-07-16, source-native motion-product manifest verified)**:
+The bounded IRSA metadata ingest can now emit a no-download acquisition plan
+for DR24 difference images, science masks, single-exposure PSF catalogs, and
+difference-image PSFs after applying the official `infobits < 33554432`
+quality filter. One live exposure produced all four documented products; HEAD
+probes confirmed 27,311,040 bytes total without downloading bodies. Product
+availability remains fail-closed until preflight, and pixel acquisition, Gate
+Z3, broad alert replay, and external submission remain paused. See the active
+handoff and `docs/evidence/live/2026-07-16-ztf-dr24-motion-product-manifest.md`.
 
 **Latest sync (2026-07-14, ZTF packet-history audit complete)**: Primary ZTF
 documentation confirms `prv_candidates` is constructed by a 1.5-arcsecond

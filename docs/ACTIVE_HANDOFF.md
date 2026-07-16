@@ -1,11 +1,29 @@
-# Active Handoff — ZTF DR24 Sharded Portfolio Search
+# Active Handoff — ZTF DR24 Motion-Product Pivot
 
-Updated: 2026-07-14
+Updated: 2026-07-16
 Repository identity: `2026 Near Earth Objects`
 Branch: `main`
 Merged batch selection: `d81af0a0` (PR #235)
 Execution manifest: `b048be9c`
-App version: `v0.90.98`
+App version: `v0.90.99`
+
+## Source-native motion-product path initiated
+
+The recommended metadata-first pivot is now implemented without acquiring
+pixels. `Skills/ztf_dr24_bounded_ingest.py --emit-motion-product-manifest`
+derives the documented DR24 difference-image, science-mask, science-PSF-catalog,
+and difference-PSF URLs for each usable (`infobits < 33554432`) exposure. It
+marks every product unverified and performs no product download.
+
+A one-exposure live query returned real DR24 metadata. Four HEAD probes
+confirmed all planned products with an aggregate size of 27,311,040 bytes
+(~26.0 MiB); no bodies were downloaded. Evidence:
+`docs/evidence/live/2026-07-16-ztf-dr24-motion-product-manifest.md`.
+
+The next safe engineering step is a bounded, checkpointed HEAD preflight that
+records availability and byte estimates. A later tiny pixel/extraction pilot
+still requires an explicit bounded batch decision. Broad alert replay, Gate Z3,
+and all external submission remain paused.
 
 ## Latest result and decision gate
 
@@ -138,7 +156,7 @@ for `ztf.uw.edu` and the manifest-only git relay. Do not broaden it.
    complete. Another bulk replay requires an explicit research decision and a
    newly selected, logged, bounded batch. Gate Z3 remains separately paused.
 
-Validation for v0.90.98: optimized 6x6 broad suite, 1,950 tests in 29 seconds,
+Validation for v0.90.99: optimized 6x6 broad suite, 1,957 tests in 29 seconds,
 100% coverage across 5,447 source statements; full Ruff and mypy clean; uv
 lock and repository artifact-policy checks passed.
 

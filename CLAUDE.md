@@ -887,7 +887,17 @@ and excluded from CI.
 
 ---
 
-## Current State (v0.90.98)
+## Current State (v0.90.99)
+
+**Latest sync (2026-07-16, source-native motion-product manifest verified)**:
+`Skills/ztf_dr24_bounded_ingest.py --emit-motion-product-manifest` now plans
+the documented DR24 difference image, science mask, single-exposure PSF
+catalog, and difference-image PSF for each usable exposure without downloading
+product bodies. One live exposure passed metadata ingest and four HEAD probes
+(27,311,040 bytes total if later acquired). Availability remains fail-closed;
+the next step is a checkpointed HEAD preflight, while pixels, Gate Z3, broad
+alert replay, and external submission remain paused. See the active handoff
+and dated live evidence.
 
 **Latest sync (2026-07-14, ZTF packet-history audit complete)**: Primary ZTF
 documentation confirms `prv_candidates` is constructed by a 1.5-arcsecond
