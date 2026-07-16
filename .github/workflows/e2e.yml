@@ -159,7 +159,7 @@ jobs:
       # sky field lacked a real NEO.
       - name: Assert non-zero WISE recovery
         run: |
-          python -c "
+          uv run --python 3.14 python -c "
           import json
           with open('/tmp/e2e_wise_injection_result.json') as f:
               r = json.load(f)
