@@ -124,7 +124,7 @@ The pipeline implements a strict directed acyclic graph (DAG) of processing stag
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    NEO DETECTION PIPELINE  v0.90.99                  │
+│                    NEO DETECTION PIPELINE   v0.91.0                  │
 └─────────────────────────────────────────────────────────────────────┘
 
   External Data Sources
@@ -1229,15 +1229,22 @@ evidence. MPC submission remains disabled until a real candidate survives
 adversarial plus operator review and the applicable source/submission protocol
 is satisfied.
 
-### 15.1 Current State Snapshot (v0.90.99)
+### 15.1 Current State Snapshot (v0.91.0)
+
+The optional ZTF motion-product plan now supports bounded, checkpointed HEAD
+preflight. It records availability and byte estimates without downloading
+product bodies, resumes completed checks, and fails closed on empty, missing,
+zero-byte, or transport-failed products. Hard caps are 100 exposures and 6
+workers. The integrated live invocation was not run for v0.91.0; v0.90.99's
+independent four-HEAD live verification remains the real-source evidence.
 
 The bounded IRSA metadata ingest now has an optional metadata-only motion-product
 planner. It derives documented DR24 URLs for difference images, masks,
 single-exposure PSF catalogs, and difference-image PSFs after applying the
 official usable-image quality filter. A one-exposure live probe confirmed all
 four products by HEAD (27,311,040 bytes total) without downloading bodies.
-Availability preflight, pixel extraction, Gate Z3, broad alert replay, and
-external submission remain gated.
+Live integrated preflight execution, pixel extraction, Gate Z3, broad alert
+replay, and external submission remain gated.
 
 ZTF's primary documentation confirms that packet `prv_candidates` history is
 position-matched within 1.5 arcseconds and looks back approximately 30 days.
@@ -1272,7 +1279,7 @@ control passed 20/20 detection, linking, and scoring. No real alert proceeds
 to known-object exclusion, classification, scoring, adversarial review, or
 submission.
 
-Local v0.90.99 validation used the repo-native 6x6 test launcher: 1,957 tests
+Local v0.91.0 validation used the repo-native 6x6 test launcher: 1,965 tests
 passed in 29 seconds with 100% coverage across all 5,447 source statements;
 Ruff and mypy are clean.
 

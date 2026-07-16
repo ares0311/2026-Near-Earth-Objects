@@ -48,6 +48,8 @@ import hashlib
 import json
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import UTC, datetime
 from pathlib import Path
 
 import requests
@@ -84,6 +86,8 @@ _QUALITY_FILTER = "infobits<33554432"
 _CACHE_ROOT = Path("Logs/pipeline_runs/ztf_dr24_bounded_ingest")
 _MAX_ATTEMPTS = 5
 _BACKOFF_SECONDS = (2, 4, 8, 16, 32)
+_MAX_PREFLIGHT_EXPOSURES = 100
+_MAX_PREFLIGHT_WORKERS = 6
 
 
 def _fmt_duration(seconds: float) -> str:
@@ -146,6 +150,31 @@ def _fetch_with_retry(url: str) -> requests.Response:
                 time.sleep(_BACKOFF_SECONDS[attempt - 1])
     raise RuntimeError(
         f"IRSA ZTF sci metadata fetch failed after {_MAX_ATTEMPTS} attempts"
+    ) from last_exc
+
+
+def _head_with_retry(url: str) -> requests.Response:
+    """HEAD one planned product with the standard bounded retry schedule.
+
+    HTTP-level missing-product responses are returned as scientific findings;
+    only transport failures are retried. No response body is requested.
+    """
+    last_exc: Exception | None = None
+    for attempt in range(1, _MAX_ATTEMPTS + 1):
+        try:
+            return requests.head(url, timeout=30, allow_redirects=True)
+        except (ConnectionError, TimeoutError, OSError) as exc:
+            last_exc = exc
+            print(
+                f"[preflight] attempt {attempt}/{_MAX_ATTEMPTS} failed "
+                f"({type(exc).__name__}: {exc})",
+                file=sys.stderr,
+                flush=True,
+            )
+            if attempt < _MAX_ATTEMPTS:
+                time.sleep(_BACKOFF_SECONDS[attempt - 1])
+    raise RuntimeError(
+        f"IRSA ZTF product HEAD failed after {_MAX_ATTEMPTS} attempts for {url}"
     ) from last_exc
 
 
@@ -267,6 +296,159 @@ def _build_motion_product_manifest(table: object, query: dict, raw_hash: str) ->
     }
 
 
+def _save_preflight_checkpoint(path: Path, payload: dict) -> None:
+    """Persist the current HEAD results after every completed product."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2))
+
+
+def _preflight_motion_products(
+    manifest: dict,
+    checkpoint_path: Path,
+    max_exposures: int,
+    workers: int,
+) -> dict:
+    """HEAD-check a bounded motion-product plan and attach byte estimates.
+
+    The exposure cap prevents a metadata query from silently becoming a broad
+    product probe. Up to six concurrent HEAD requests match the measured IRSA
+    metadata-service ceiling; every result is checkpointed immediately so an
+    identical rerun resumes without repeating completed probes.
+    """
+    if not 1 <= max_exposures <= _MAX_PREFLIGHT_EXPOSURES:
+        raise ValueError(
+            f"max_preflight_exposures must be in [1, {_MAX_PREFLIGHT_EXPOSURES}]"
+        )
+    if not 1 <= workers <= _MAX_PREFLIGHT_WORKERS:
+        raise ValueError(f"preflight_workers must be in [1, {_MAX_PREFLIGHT_WORKERS}]")
+
+    exposures = manifest.get("exposures", [])
+    if not exposures:
+        raise ValueError("motion-product preflight requires at least one exposure")
+    if len(exposures) > max_exposures:
+        raise ValueError(
+            f"motion-product preflight has {len(exposures)} exposures, exceeding the "
+            f"explicit cap of {max_exposures}; narrow the metadata query"
+        )
+
+    checkpoint = {
+        "schema_version": "ztf-dr24-motion-product-preflight-v1",
+        "raw_metadata_sha256": manifest["raw_metadata_sha256"],
+        "results": {},
+    }
+    if checkpoint_path.exists():
+        loaded = json.loads(checkpoint_path.read_text())
+        if loaded.get("schema_version") != "ztf-dr24-motion-product-preflight-v1":
+            raise RuntimeError("motion-product preflight checkpoint has an unsupported schema")
+        if loaded.get("raw_metadata_sha256") != manifest["raw_metadata_sha256"]:
+            raise RuntimeError("motion-product preflight checkpoint does not match raw metadata")
+        if not isinstance(loaded.get("results"), dict):
+            raise RuntimeError("motion-product preflight checkpoint has invalid results")
+        checkpoint = loaded
+
+    tasks = []
+    for exposure in exposures:
+        pid = int(exposure["pid"])
+        for product_name, url in exposure["product_urls"].items():
+            task_key = f"{pid}:{product_name}"
+            existing = checkpoint["results"].get(task_key)
+            if existing and existing.get("url") == url:
+                print(f"[resume] preflight {task_key}: already checked, skipping", flush=True)
+                continue
+            tasks.append((task_key, url))
+
+    total_products = sum(len(exposure["product_urls"]) for exposure in exposures)
+    already_complete = total_products - len(tasks)
+    started = time.monotonic()
+    if tasks:
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = {
+                executor.submit(_head_with_retry, url): (task_key, url)
+                for task_key, url in tasks
+            }
+            for completed_in_run, future in enumerate(as_completed(futures), start=1):
+                task_key, url = futures[future]
+                try:
+                    response = future.result()
+                    raw_length = response.headers.get("content-length")
+                    content_length = (
+                        int(raw_length) if raw_length and raw_length.isdigit() else None
+                    )
+                    status_code = response.status_code
+                    content_type = response.headers.get("content-type")
+                    error = None
+                except RuntimeError as exc:
+                    # Preserve a fail-closed result for this product while still
+                    # collecting/checkpointing sibling futures that completed.
+                    content_length = None
+                    status_code = None
+                    content_type = None
+                    error = str(exc)
+                available = status_code == 200 and content_length is not None and content_length > 0
+                checkpoint["results"][task_key] = {
+                    "url": url,
+                    "status_code": status_code,
+                    "content_length_bytes": content_length,
+                    "content_type": content_type,
+                    "available": available,
+                    "error": error,
+                    "checked_at_utc": datetime.now(UTC).isoformat(),
+                }
+                _save_preflight_checkpoint(checkpoint_path, checkpoint)
+                completed = already_complete + completed_in_run
+                elapsed = time.monotonic() - started
+                seconds_per_product = elapsed / completed_in_run
+                eta = seconds_per_product * (len(tasks) - completed_in_run)
+                print(
+                    f"[preflight] {completed}/{total_products} {task_key}: "
+                    f"HTTP {status_code}, bytes={content_length}  "
+                    f"elapsed {_fmt_duration(elapsed)}  ETA {_fmt_duration(eta)}",
+                    flush=True,
+                )
+
+    total_bytes = 0
+    all_available = True
+    for exposure in exposures:
+        pid = int(exposure["pid"])
+        product_headers = {}
+        for product_name in exposure["product_urls"]:
+            result = checkpoint["results"].get(f"{pid}:{product_name}")
+            if result is None:
+                all_available = False
+                continue
+            product_headers[product_name] = result
+            all_available = all_available and bool(result["available"])
+            if result["available"]:
+                total_bytes += int(result["content_length_bytes"])
+        exposure["product_headers"] = product_headers
+        exposure_available = len(product_headers) == len(exposure["product_urls"]) and all(
+            item["available"] for item in product_headers.values()
+        )
+        exposure["availability"] = "verified" if exposure_available else "unavailable"
+        exposure["verified_content_bytes"] = sum(
+            int(item["content_length_bytes"])
+            for item in product_headers.values()
+            if item["available"]
+        )
+
+    manifest["preflight"] = {
+        "status": "passed" if all_available else "failed",
+        "all_required_products_available": all_available,
+        "checked_products": sum(
+            1
+            for exposure in exposures
+            for product_name in exposure["product_urls"]
+            if f"{int(exposure['pid'])}:{product_name}" in checkpoint["results"]
+        ),
+        "expected_products": total_products,
+        "total_content_bytes": total_bytes,
+        "max_exposures": max_exposures,
+        "workers": workers,
+        "checkpoint_path": str(checkpoint_path),
+    }
+    return manifest
+
+
 def run_bounded_ingest(
     ra: float,
     dec: float,
@@ -275,6 +457,9 @@ def run_bounded_ingest(
     end_jd: float,
     out_dir: Path,
     emit_motion_product_manifest: bool = False,
+    preflight_motion_products: bool = False,
+    max_preflight_exposures: int = 10,
+    preflight_workers: int = 4,
 ) -> dict:
     """Run one bounded, checkpointed ZTF DR24 sci-metadata ingest and return
     the sample-ingest-report dict. No candidate detection, no live alert
@@ -360,15 +545,35 @@ def run_bounded_ingest(
         "raw_response_sha256": raw_hash,
         "elapsed_seconds": round(time.monotonic() - t0, 2),
     }
-    if emit_motion_product_manifest:
+    preflight_failed = False
+    if emit_motion_product_manifest or preflight_motion_products:
         manifest = _build_motion_product_manifest(table, query, raw_hash)
         manifest_path = run_dir / "motion_product_manifest.json"
+        if preflight_motion_products:
+            manifest = _preflight_motion_products(
+                manifest,
+                run_dir / "motion_product_preflight.json",
+                max_exposures=max_preflight_exposures,
+                workers=preflight_workers,
+            )
+            preflight = manifest["preflight"]
+            report["motion_product_preflight"] = preflight
+            preflight_failed = not preflight["all_required_products_available"]
         manifest_path.write_text(json.dumps(manifest, indent=2))
         report["motion_product_manifest_path"] = str(manifest_path)
         report["motion_product_manifest_exposures"] = manifest["n_exposures"]
+        availability_message = (
+            "availability verified by HEAD preflight"
+            if preflight_motion_products and not preflight_failed
+            else (
+                "availability preflight failed"
+                if preflight_motion_products
+                else "availability remains unverified"
+            )
+        )
         print(
             f"[ingest] Planned source-native products for {manifest['n_exposures']} exposure(s); "
-            "availability remains unverified and no products were downloaded",
+            f"{availability_message} and no products were downloaded",
             flush=True,
         )
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -383,6 +588,10 @@ def run_bounded_ingest(
     )
     print(f"[ingest] Distinct real nights (YYYYMMDD): {distinct_nights_yyyymmdd}", flush=True)
     print(f"[ingest] Wrote {report_path}", flush=True)
+    if preflight_failed:
+        raise RuntimeError(
+            "motion-product preflight failed: one or more required products are unavailable"
+        )
     return report
 
 
@@ -418,6 +627,29 @@ def main() -> None:
             "science-catalog, and difference-PSF URLs; downloads no products"
         ),
     )
+    parser.add_argument(
+        "--preflight-motion-products",
+        action="store_true",
+        help=(
+            "HEAD-check a bounded product plan, checkpoint each result, and fail closed if "
+            "any required product is unavailable; downloads no response bodies"
+        ),
+    )
+    parser.add_argument(
+        "--max-preflight-exposures",
+        type=int,
+        default=10,
+        help=(
+            "Maximum exposures allowed in a HEAD preflight (default: 10; hard cap: "
+            f"{_MAX_PREFLIGHT_EXPOSURES})"
+        ),
+    )
+    parser.add_argument(
+        "--preflight-workers",
+        type=int,
+        default=4,
+        help=f"Concurrent HEAD requests (default: 4; hard cap: {_MAX_PREFLIGHT_WORKERS})",
+    )
     args = parser.parse_args()
 
     run_bounded_ingest(
@@ -428,6 +660,9 @@ def main() -> None:
         args.end_jd,
         Path(args.out_dir),
         emit_motion_product_manifest=args.emit_motion_product_manifest,
+        preflight_motion_products=args.preflight_motion_products,
+        max_preflight_exposures=args.max_preflight_exposures,
+        preflight_workers=args.preflight_workers,
     )
 
 
