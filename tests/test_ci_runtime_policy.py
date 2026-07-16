@@ -44,3 +44,9 @@ def test_workflows_use_node24_action_versions() -> None:
         if "uses: astral-sh/setup-uv@" in text:
             assert f"uses: {SETUP_UV_ACTION}" in text
             assert "uses: astral-sh/setup-uv@v5" not in text
+
+
+def test_parallel_e2e_jobs_do_not_race_to_save_the_same_uv_cache() -> None:
+    e2e = (WORKFLOWS / "e2e.yml").read_text()
+
+    assert e2e.count('save-cache: "false"') == e2e.count(f"uses: {SETUP_UV_ACTION}")
