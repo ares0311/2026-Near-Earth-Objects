@@ -34,9 +34,14 @@ It contains the facts a coding agent needs to work productively without re-readi
 9. Call `Read` on `docs/astrometrics_external_and_cloud_storage_policy.md` —
    the cross-project storage policy for external SSDs, local caches, cloud
    storage, and sync boundaries.
+10. Call `Read` on `docs/AGENT_RELIABILITY_DIRECTIVES.md` — the canonical
+    fail-loud / no-fake-completion / no-unsupported-claims / verification
+    requirements (REL-01 through REL-10). Run
+    `Skills/verify_reliability_controls.py` before claiming any material
+    piece of work "complete" or "verified."
 
 These steps are non-negotiable. No planning or code changes may happen before
-all ten are complete.
+all eleven are complete.
 
 ---
 
@@ -929,7 +934,47 @@ and excluded from CI.
 
 ## Current State (v0.91.0)
 
-**Latest sync (2026-07-16, first live pixel-extraction pilot)**: Built and
+**Latest sync (2026-07-16, agent reliability controls implemented)**: Per
+explicit operator request, implemented verifiable agent-reliability controls
+spanning both Claude Code and Codex. New canonical directives doc
+`docs/AGENT_RELIABILITY_DIRECTIVES.md` (REL-01 through REL-10: fail loudly,
+no fake completion, no unsupported completion claims, lossless directive
+factoring + Claude/Codex parity, traceable claims + verification freshness,
+behavioral verification over presence, lint/static enforcement,
+incomplete-implementation detection, verification-of-verification, canonical
+verification workflow), read by Claude Code via a new item 10 of the
+MANDATORY SESSION-START PROTOCOL and mirrored verbatim into `AGENTS.md` for
+Codex (which loads that file directly rather than following file-read
+instructions the way Claude Code's tool-enforced protocol does).
+`Skills/check_directive_parity.py` byte-compares the two copies and fails
+loudly on drift. `Skills/check_silent_exceptions.py` and
+`Skills/check_incomplete_implementations.py` are AST/tokenize-based scanners
+gated by committed, justified allowlists
+(`data_selection/silent_exception_allowlist.json`,
+`data_selection/incomplete_implementation_allowlist.json`) — the former
+honestly catalogues 22 pre-existing `except Exception: pass` occurrences in
+`src/fetch.py`/`src/classify.py`/several `Skills/*.py` files rather than
+either fixing all of them (out of scope, real regression risk) or hiding
+them. `Skills/verify_reliability_controls.py` is the one canonical
+verification entry point (directive parity, silent-exception gate,
+incomplete-implementation scan, ruff, mypy, pytest, then a git-state-bound
+freshness record) and `Skills/run_adversarial_verification.py` runs 46
+negative-control tests proving every critical check can actually detect the
+failure it claims to detect (known-good/known-bad/malformed cases each).
+Two real bugs were found and fixed while dogfooding these tools on
+themselves before any evidence was recorded: 4 ruff line-length violations,
+and a genuine pytest segfault root-caused to missing `PYTHONPATH=src` +
+native-thread isolation (matching this project's own documented
+XGBoost/OpenMP macOS caveat). A real sandbox constraint was also discovered
+and disclosed rather than worked around silently: this session's sandbox
+denies real `git init` fixtures both outside the repo root and under
+pytest's tmp_path fallback, so the freshness negative controls stub only the
+git I/O boundary, not the comparison logic under test. Full verification:
+all 6 checks PASS, 2021 tests passed, 100% coverage (5,447 statements); full
+adversarial suite: 46/46 PASS, repo unchanged. See
+`docs/evidence/reliability/2026-07-16-reliability-controls-first-verified-run.md`.
+
+**Earlier sync (2026-07-16, first live pixel-extraction pilot)**: Built and
 ran the bounded, hard-capped single-exposure pixel-extraction pilot named as
 the next step after the motion-product preflight. `Skills/ztf_dr24_bounded_ingest.py
 --pixel-extraction-pilot` downloads exactly one difference image, runs a
@@ -1653,6 +1698,11 @@ consult it only for historical context on a specific gate, blocker, or bug.
 
 | Script | Purpose |
 |---|---|
+| `Skills/verify_reliability_controls.py` | REL-10 canonical verification entry point: runs directive parity, silent-exception gate, incomplete-implementation scan, ruff, mypy, and pytest in order, then writes a git-state-bound freshness record; `--check-freshness` reports whether the last recorded run is still current |
+| `Skills/run_adversarial_verification.py` | REL-09 adversarial verification workflow: runs every reliability-control negative-control test module and reports a clear PASS/FAIL summary, confirming each critical check can actually detect the failure it claims to detect |
+| `Skills/check_directive_parity.py` | REL-04 drift detector: byte-compares `docs/AGENT_RELIABILITY_DIRECTIVES.md`'s REL-XX blocks against their verbatim mirror in `AGENTS.md` and confirms both `CLAUDE.md`/`AGENTS.md` reference the canonical source |
+| `Skills/check_incomplete_implementations.py` | REL-02/REL-08 stub scanner: AST/tokenize-based scan of `src/`+`Skills/*.py` for `NotImplementedError`, production `# TODO`/`# FIXME` comments, and bare-`pass` function bodies, gated by a documented allowlist (`data_selection/incomplete_implementation_allowlist.json`) |
+| `Skills/check_silent_exceptions.py` | REL-01 new-silent-exception gate: AST scan for `except ...: pass` handlers, hard-failing on any occurrence not in the committed, justified allowlist (`data_selection/silent_exception_allowlist.json`); `--report-only` reprints all findings to reseed the allowlist |
 | `Skills/smoke_test.py` | Happy-path check for all modules; exits 0 on success |
 | `Skills/evaluate_calibration.py` | Brier/ECE evaluation for Platt and isotonic calibrators |
 | `Skills/generate_training_labels.py` | Download Tier 1 labels or build the approved four-class MPC Tier 3 pilot manifest |
@@ -1763,6 +1813,8 @@ consult it only for historical context on a specific gate, blocker, or bug.
 
 | File | Purpose |
 |---|---|
+| `data_selection/silent_exception_allowlist.json` | REL-01 committed allowlist of the 22 pre-existing `except ...: pass` occurrences, each with a required justification; `Skills/check_silent_exceptions.py` hard-fails on anything not listed here |
+| `data_selection/incomplete_implementation_allowlist.json` | REL-02/REL-08 committed allowlist for `Skills/check_incomplete_implementations.py`; empty by default (0 findings in the current codebase) |
 | `data/sample_tracklets.json` | Two synthetic tracklets for testing batch Skills |
 | `data/README.md` | Data directory documentation and format reference |
 | `data/injection_recovery_baseline.json` | Injection-recovery results (n=50, seed=42): 100% detection, 62% link, 62% score |

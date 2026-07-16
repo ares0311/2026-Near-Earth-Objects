@@ -1,0 +1,134 @@
+[
+  {
+    "path": "Skills/check_tisserand.py",
+    "line": 32,
+    "exception_types": "Exception",
+    "reason": "Pre-existing silent-swallow predating REL-01 (2026-07-16), catalogued not fixed. Loop building Observation objects from raw dicts; a malformed entry is silently dropped from the returned list with no count/log of how many were skipped."
+  },
+  {
+    "path": "Skills/check_tisserand.py",
+    "line": 62,
+    "exception_types": "Exception",
+    "reason": "Pre-existing silent-swallow predating REL-01 (2026-07-16), catalogued not fixed. Optional Tisserand-parameter enrichment block; failure silently omits the enrichment fields with no indication to the caller that the fields are missing due to an error rather than not being applicable."
+  },
+  {
+    "path": "Skills/ephemeris_check.py",
+    "line": 31,
+    "exception_types": "Exception",
+    "reason": "Pre-existing silent-swallow predating REL-01 (2026-07-16), catalogued not fixed. Same Observation-from-dict filter-loop pattern as check_tisserand.py:32 -- malformed entries dropped with no visible count."
+  },
+  {
+    "path": "Skills/flag_comet_candidates.py",
+    "line": 33,
+    "exception_types": "Exception",
+    "reason": "Pre-existing silent-swallow predating REL-01 (2026-07-16), catalogued not fixed. Same Observation-from-dict filter-loop pattern -- malformed entries dropped with no visible count."
+  },
+  {
+    "path": "Skills/generate_training_labels.py",
+    "line": 111,
+    "exception_types": "ValueError, IndexError",
+    "reason": "Pre-existing silent-swallow predating REL-01 (2026-07-16), catalogued not fixed. Packed-designation parsing tries a strict format then falls back to returning the raw stripped string on parse failure; the fallback path does not indicate to the caller that parsing failed rather than succeeding."
+  },
+  {
+    "path": "Skills/run_pipeline.py",
+    "line": 522,
+    "exception_types": "OSError",
+    "reason": "Pre-existing silent-swallow predating REL-01 (2026-07-16), catalogued not fixed. Cache-file cleanup loop; a file that fails to unlink is simply absent from the returned `deleted` list (an implicit signal) but the specific OSError itself is never surfaced or logged."
+  },
+  {
+    "path": "Skills/select_survey_fields.py",
+    "line": 263,
+    "exception_types": "Exception",
+    "reason": "Pre-existing silent-swallow predating REL-01 (2026-07-16), catalogued not fixed. Already self-documented in-code as intentional (\"Malformed or partial files are silently skipped\"), but still has no count of how many files were skipped, so a systematic parsing regression would be invisible."
+  },
+  {
+    "path": "Skills/tag_neo_class.py",
+    "line": 33,
+    "exception_types": "Exception",
+    "reason": "Pre-existing silent-swallow predating REL-01 (2026-07-16), catalogued not fixed. Same Observation-from-dict filter-loop pattern -- malformed entries dropped with no visible count."
+  },
+  {
+    "path": "Skills/tag_neo_class.py",
+    "line": 59,
+    "exception_types": "Exception",
+    "reason": "Pre-existing silent-swallow predating REL-01 (2026-07-16), catalogued not fixed. Optional orbit-quality enrichment block; failure silently omits the enrichment fields with no indication to the caller."
+  },
+  {
+    "path": "Skills/train_tier1_xgboost.py",
+    "line": 285,
+    "exception_types": "Exception",
+    "reason": "Pre-existing silent-swallow predating REL-01 (2026-07-16), catalogued not fixed. Optional macro-AUC metric computation for the training report; failure silently omits the metric with no note in the report that computation failed versus was inapplicable."
+  },
+  {
+    "path": "Skills/validate_model_weights.py",
+    "line": 400,
+    "exception_types": "ImportError",
+    "reason": "Pre-existing, already self-documented as an intentional optional-dependency guard (\"torch not installed; CNN/T3 paths will skip gracefully\") predating REL-01. Narrower and more clearly legitimate than the other entries here, but still not re-audited under REL-01 -- catalogued rather than independently re-verified."
+  },
+  {
+    "path": "src/classify.py",
+    "line": 827,
+    "exception_types": "Exception",
+    "reason": "Pre-existing silent-swallow predating REL-01 (2026-07-16), catalogued not fixed. Full-ensemble stacking prediction attempt falls back to a simpler stacking path on any failure, with no log of what the original failure was."
+  },
+  {
+    "path": "src/classify.py",
+    "line": 1023,
+    "exception_types": "Exception",
+    "reason": "Pre-existing silent-swallow predating REL-01 (2026-07-16), catalogued not fixed. Writing the ensemble-stacker coefficient JSON to disk; a write failure (e.g. permissions, disk full) leaves `coef_path` unset with no error surfaced to the caller."
+  },
+  {
+    "path": "src/fetch.py",
+    "line": 795,
+    "exception_types": "Exception",
+    "reason": "Pre-existing silent-swallow predating REL-01 (2026-07-16), catalogued not fixed. Not yet individually audited; part of the batch of fetch.py occurrences disclosed as a known limitation in docs/AGENT_RELIABILITY_DIRECTIVES.md REL-01."
+  },
+  {
+    "path": "src/fetch.py",
+    "line": 863,
+    "exception_types": "Exception",
+    "reason": "Pre-existing silent-swallow predating REL-01 (2026-07-16), catalogued not fixed. Not yet individually audited; part of the batch of fetch.py occurrences disclosed as a known limitation in docs/AGENT_RELIABILITY_DIRECTIVES.md REL-01."
+  },
+  {
+    "path": "src/fetch.py",
+    "line": 941,
+    "exception_types": "Exception",
+    "reason": "Pre-existing silent-swallow predating REL-01 (2026-07-16), catalogued not fixed. Not yet individually audited; part of the batch of fetch.py occurrences disclosed as a known limitation in docs/AGENT_RELIABILITY_DIRECTIVES.md REL-01."
+  },
+  {
+    "path": "src/fetch.py",
+    "line": 1057,
+    "exception_types": "Exception",
+    "reason": "Pre-existing silent-swallow predating REL-01 (2026-07-16), catalogued not fixed. Not yet individually audited; part of the batch of fetch.py occurrences disclosed as a known limitation in docs/AGENT_RELIABILITY_DIRECTIVES.md REL-01."
+  },
+  {
+    "path": "src/fetch.py",
+    "line": 1108,
+    "exception_types": "Exception",
+    "reason": "Pre-existing silent-swallow predating REL-01 (2026-07-16), catalogued not fixed. Not yet individually audited; part of the batch of fetch.py occurrences disclosed as a known limitation in docs/AGENT_RELIABILITY_DIRECTIVES.md REL-01."
+  },
+  {
+    "path": "src/fetch.py",
+    "line": 1137,
+    "exception_types": "Exception",
+    "reason": "Pre-existing silent-swallow predating REL-01 (2026-07-16), catalogued not fixed. Not yet individually audited; part of the batch of fetch.py occurrences disclosed as a known limitation in docs/AGENT_RELIABILITY_DIRECTIVES.md REL-01."
+  },
+  {
+    "path": "src/fetch.py",
+    "line": 1144,
+    "exception_types": "Exception",
+    "reason": "Pre-existing silent-swallow predating REL-01 (2026-07-16), catalogued not fixed. Not yet individually audited; part of the batch of fetch.py occurrences disclosed as a known limitation in docs/AGENT_RELIABILITY_DIRECTIVES.md REL-01."
+  },
+  {
+    "path": "src/fetch.py",
+    "line": 1178,
+    "exception_types": "Exception",
+    "reason": "Pre-existing silent-swallow predating REL-01 (2026-07-16), catalogued not fixed. Not yet individually audited; part of the batch of fetch.py occurrences disclosed as a known limitation in docs/AGENT_RELIABILITY_DIRECTIVES.md REL-01."
+  },
+  {
+    "path": "src/fetch.py",
+    "line": 1219,
+    "exception_types": "Exception",
+    "reason": "Pre-existing silent-swallow predating REL-01 (2026-07-16), catalogued not fixed. Not yet individually audited; part of the batch of fetch.py occurrences disclosed as a known limitation in docs/AGENT_RELIABILITY_DIRECTIVES.md REL-01."
+  }
+]
