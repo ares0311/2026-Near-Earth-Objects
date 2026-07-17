@@ -934,7 +934,26 @@ and excluded from CI.
 
 ## Current State (v0.91.0)
 
-**Latest sync (2026-07-17, first real multi-night linking test)**: Per
+**Latest sync (2026-07-17, second field confirms the null result)**: Per
+operator direction, ran the fully-validated pipeline (unchanged from the
+first field) against a field chosen by the project's own documented
+selection scoring (`Skills/select_survey_fields.py --mode aten`, rank 1 of
+20: RA 217.41, Dec -15.0, score 0.9308, elongation 82.8 deg, never
+processed before), rather than reusing the convenience field. Acquired 3
+real nights (20180327, 20180330, 20180409) of real ZTF field 325. Result:
+`min_observations=2` gave 200 combinatorial tracklets (same phenomenon as
+the first field); the real default `min_observations=3` gave **5**
+survivors, all of which fail independent PSF-shape cross-validation (max
+correlation 0.168, still far below the >0.5 real-source threshold). **A
+second, algorithmically-selected field reproduces the same null result as
+the first** -- this strengthens rather than weakens the conclusion that it
+is not an artifact of one specific field/night combination. No code
+changes were needed; this exercised the existing pipeline as-is. See
+`docs/evidence/live/2026-07-17-ztf-dr24-selected-field-linking-test.md`.
+Does not authorize a wider batch, Gate Z3 resumption, or external
+submission.
+
+**Earlier sync (2026-07-17, first real multi-night linking test)**: Per
 operator direction (Option 2 of the post-pilot decision: build real
 multi-exposure linking over trying a different field), acquired 2
 additional real nights (20180802, 20180806) of the same field alongside the

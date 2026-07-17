@@ -941,7 +941,19 @@ and excluded from CI.
 
 ## Current State (v0.91.0)
 
-**Latest sync (2026-07-17, first real multi-night linking test)**: Per
+**Latest sync (2026-07-17, second field confirms the null result)**: Ran
+the fully-validated pipeline (unchanged) against a field chosen by
+`Skills/select_survey_fields.py --mode aten` (rank 1 of 20: RA 217.41,
+Dec -15.0, score 0.9308, never processed before), not the convenience
+field. 3 real nights (20180327, 20180330, 20180409) of real field 325.
+Result: `min_observations=2` gave 200 combinatorial tracklets (same
+phenomenon as field 1); `min_observations=3` gave **5** survivors, all
+failing independent PSF-shape cross-validation (max correlation 0.168).
+**A second, algorithmically-selected field reproduces the same null
+result** -- strengthens the conclusion. No code changes needed. See
+`docs/evidence/live/2026-07-17-ztf-dr24-selected-field-linking-test.md`.
+
+**Earlier sync (2026-07-17, first real multi-night linking test)**: Per
 operator direction, acquired 2 additional real nights (20180802, 20180806)
 of the same field and linked across all 3 nights via the existing
 `src/link.py` linker. New: `Skills/convert_pixel_extraction_to_observations.py`
