@@ -934,7 +934,31 @@ and excluded from CI.
 
 ## Current State (v0.91.0)
 
-**Latest sync (2026-07-17, second field confirms the null result)**: Per
+**Latest sync (2026-07-17, formal production-readiness gate register for
+the motion-product path)**: Per operator request, closed the documentation
+gap identified while answering "is this project ready for production":
+`docs/PRODUCTION_READINESS.md`'s top summary was stale (last synced
+2026-07-14, predating all pixel-extraction work) and
+`docs/ZTF_DR24_PRODUCTION_GATES.md` only registered the now-superseded
+alert-replay sub-approach (Z0-Z7). Added a "Motion-Product Gates"
+(MP1-MP7) section to `docs/ZTF_DR24_PRODUCTION_GATES.md`: MP1-MP5 (bounded
+preflight, extraction, masking/dedup, PSF-scoring, multi-night linking)
+are CLOSED, citing the real evidence already produced 2026-07-16/17. MP6
+(no-submission package drill) and MP7 (operator runbook update) are OPEN
+with a complete, self-contained closure plan (exact code change to mirror
+from `run_archive_positive_control.py`'s existing `--build-review-packets`
+pattern, exact commands using already-acquired checkpoints, predicted
+expected result stated before running per this project's diagnose-first
+discipline) so any future agent — this session or a fresh one, Claude or
+Codex — can execute it without re-deriving the analysis. Honest bottom
+line recorded: the secondary WISE path already satisfies its own
+Production Definition (P4 dormant, non-blocking); the primary motion-
+product path has substantial real, validated capability but has never
+been formally run through positive-control-packet generation or the
+no-submission drill — a bounded, mechanical gap, not an open-ended
+readiness question.
+
+**Earlier sync (2026-07-17, second field confirms the null result)**: Per
 operator direction, ran the fully-validated pipeline (unchanged from the
 first field) against a field chosen by the project's own documented
 selection scoring (`Skills/select_survey_fields.py --mode aten`, rank 1 of

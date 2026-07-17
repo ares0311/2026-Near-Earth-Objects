@@ -1,12 +1,50 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
-**Current version**: v0.90.98
-**Last updated**: 2026-07-14 (header/sync line only — the P1-P5 gate register
+**Current version**: v0.91.0
+**Last updated**: 2026-07-17 (header/sync line only — the P1-P5 gate register
 body below is unchanged historical evidence from 2026-07-02; current gate
 status for the active ZTF DR24 path lives in
 `docs/ZTF_DR24_PRODUCTION_GATES.md`, which is kept current every session)
 
-**Active-directive sync (2026-07-14)**: Sparse expansion run
+**Active-directive sync (2026-07-17, motion-product pivot supersedes the
+2026-07-14 alert-replay entry below)**: The primary ZTF DR24 discovery
+path changed on 2026-07-16 from transient-alert (`prv_candidates`) replay
+to source-native pixel extraction over DR24 motion-designed image
+products, per operator decision (`docs/ACTIVE_HANDOFF.md`). The
+2026-07-14 entry below describes the now-superseded alert-replay
+sub-approach; it remains as accurate historical evidence, not current
+status.
+
+Under the new path, real live work across 2026-07-16/17 built and
+validated, end to end on real data: bounded preflight verification,
+single-exposure pixel extraction, bad-pixel masking, connected-component
+deduplication, PSF-shape confidence scoring, and multi-night
+motion-consistency linking (reusing the existing `src/link.py`). This was
+independently validated on two separately-selected fields (one convenience
+field, one chosen via `Skills/select_survey_fields.py`'s documented
+scoring) totaling 6 real nights — both produced a consistent, honest null
+result: the geometric linker's real `min_observations=3` default (chi2
+orbit-consistency required) reduces each field's raw combinatorial
+candidate pool to a handful of survivors, and every survivor across both
+fields fails independent PSF-shape cross-validation (max correlation 0.168
+vs >0.95 for a genuine injected source). See
+`docs/evidence/live/2026-07-17-ztf-dr24-multi-night-linking-first-test.md`
+and `docs/evidence/live/2026-07-17-ztf-dr24-selected-field-linking-test.md`.
+
+**This is not yet formally gated.** The new motion-product path has never
+been run against this file's own Production Definition (below) the way the
+WISE/DECam/TESS path was via Gates P1-P5. Concretely: requirement 1
+(positive-control/injection-recovery proof to a full `ScoredNEO` packet)
+and requirement 3 (no-submission end-to-end drill) have not been exercised
+on this pipeline's real tracklets. This is a bounded, well-scoped, mostly-
+mechanical gap (the exact mirrored pattern that closed the equivalent gate
+for the old alert-replay path already exists and works — see Gate Z6 in
+`docs/ZTF_DR24_PRODUCTION_GATES.md`), not an open-ended readiness question.
+A precise, self-contained closure plan (gates MP1-MP7) is recorded in
+`docs/ZTF_DR24_PRODUCTION_GATES.md`'s "Motion-Product Gates" section.
+
+**Earlier sync (2026-07-14, superseded alert-replay entry, historical
+evidence only)**: Sparse expansion run
 `56c2348f31302291` completed with zero production tracklets after 402,053
 alerts scanned and 2,311 retained. Cross-batch association safely combined it
 with run `017eb50381badb75`; IEO 147.53 had four retained nights and 8,956
