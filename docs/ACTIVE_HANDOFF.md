@@ -37,10 +37,23 @@ bad-pixel masking (the already-verified `science_mask` product), peak
 deduplication, and PSF-matched photometry are still needed before the
 source list is usable for real candidate generation. Evidence:
 `docs/evidence/live/2026-07-16-ztf-dr24-pixel-extraction-pilot-first-live-run.md`.
+
+**Masking + deduplication closed same day**: the detector now applies the
+exposure's verified `science_mask` (nonzero pixels excluded) and uses
+connected-component labeling instead of local-maximum filtering, so one
+physical residual spanning several pixels becomes one candidate source.
+Real re-run on the same exposure: 855 raw pixel-hits -> 74 after masking ->
+71 connected components, untruncated. Masking alone did nearly all the
+work; most surviving components are 1-2 pixels (consistent with genuine
+near-threshold detections, not artifact blobs). Schema bumped to
+`ztf-dr24-pixel-extraction-pilot-v2`. Evidence:
+`docs/evidence/live/2026-07-16-ztf-dr24-pixel-extraction-pilot-masking-dedup.md`.
 **Still not authorized**: a wider batch, a candidate claim, Gate Z3
-resumption, or any external submission. The next step is an operator
-decision on whether to continue investing in this extractor (masking/dedup/
-PSF-matching) toward a real candidate generator, or pause here.
+resumption, or any external submission. **Remaining disclosed gap**:
+PSF-matched photometry (using the already-verified `difference_psf`
+product) before this extractor's output could inform a real candidate
+generator -- an operator call on whether to continue toward that or pause
+here.
 
 ## Source-native motion-product path initiated
 
