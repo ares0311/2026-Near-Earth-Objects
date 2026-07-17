@@ -941,7 +941,25 @@ and excluded from CI.
 
 ## Current State (v0.91.0)
 
-**Latest sync (2026-07-16, pixel-extraction pilot masking + deduplication)**:
+**Latest sync (2026-07-16, pixel-extraction pilot PSF-shape scoring —
+single-exposure arc complete)**: `_detect_sources_in_difference_image` now
+Pearson-correlates a cutout around each candidate against the real
+`difference_psf` kernel (shape consistency, not flux photometry). Real
+result: PSF kernel is 25x25 pixels, so 38/71 v2 candidates were too close
+to the edge for a full cutout; **of the 33 scored, none exceed 0.18
+correlation** (mean 0.037) — an honest null result, not a broken metric
+(the unit test confirms a real Gaussian source correlates >0.95 against its
+own shape). Schema bumped to v3; 8 new/updated tests. Full verification:
+6/6 checks PASS, 100% coverage. See
+`docs/evidence/live/2026-07-16-ztf-dr24-pixel-extraction-pilot-psf-scoring.md`.
+
+**This completes the single-exposure pixel-extraction pilot arc**
+(preflight -> extraction -> masking/dedup -> PSF-shape scoring). Does not
+authorize a wider batch, Gate Z3 resumption, or external submission. Next
+step is a genuine operator decision (different exposure/field, real
+multi-exposure linking, or pause), not another same-exposure refinement.
+
+**Earlier sync (2026-07-16, pixel-extraction pilot masking + deduplication)**:
 `Skills/ztf_dr24_bounded_ingest.py`'s detector now applies the exposure's
 verified `science_mask` (nonzero pixels excluded) and uses
 `scipy.ndimage.label` connected-component deduplication instead of local-

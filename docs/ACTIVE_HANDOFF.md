@@ -48,12 +48,32 @@ work; most surviving components are 1-2 pixels (consistent with genuine
 near-threshold detections, not artifact blobs). Schema bumped to
 `ztf-dr24-pixel-extraction-pilot-v2`. Evidence:
 `docs/evidence/live/2026-07-16-ztf-dr24-pixel-extraction-pilot-masking-dedup.md`.
-**Still not authorized**: a wider batch, a candidate claim, Gate Z3
-resumption, or any external submission. **Remaining disclosed gap**:
-PSF-matched photometry (using the already-verified `difference_psf`
-product) before this extractor's output could inform a real candidate
-generator -- an operator call on whether to continue toward that or pause
-here.
+**PSF-shape scoring closed same day — single-exposure arc complete**: the
+detector now Pearson-correlates a cutout around each candidate against the
+real `difference_psf` kernel (shape consistency, not flux-calibrated
+photometry). Real result: the PSF kernel is 25x25 pixels, larger than
+assumed when this gap was scoped, so 38 of the 71 v2 candidates were too
+close to the image edge for a full cutout. **Of the 33 that could be
+scored, none exceed 0.18 correlation** (mean 0.037, median 0.010) -- an
+honest null result. A unit test confirms the method itself works (a real
+synthetic Gaussian source correlates >0.95 against its own generating
+shape), so this is a genuine finding about this exposure's candidates, not
+a broken metric: none of them show meaningful evidence of being real point
+sources, consistent with noise-level fluctuations right at the 5-sigma
+threshold. Schema bumped to `ztf-dr24-pixel-extraction-pilot-v3`. Evidence:
+`docs/evidence/live/2026-07-16-ztf-dr24-pixel-extraction-pilot-psf-scoring.md`.
+
+**This completes the single-exposure pixel-extraction pilot arc**
+(preflight -> extraction -> masking/dedup -> PSF-shape scoring), each step
+closing the disclosed gap from the one before it. **Still not authorized**:
+a wider batch, a candidate claim, Gate Z3 resumption, or any external
+submission. **The next step is a genuine operator decision, not another
+same-exposure refinement**: try this pipeline against a different
+exposure/field (this null result may just mean this one night/field had
+nothing), build real multi-exposure tracklet linking (the actual next
+scientific rung -- consistency across exposures, not just single-exposure
+PSF shape), or pause this path here having validated the extraction
+mechanics end-to-end on real data.
 
 ## Source-native motion-product path initiated
 

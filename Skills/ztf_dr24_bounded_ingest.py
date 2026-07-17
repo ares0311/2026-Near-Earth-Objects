@@ -488,9 +488,38 @@ def _fetch_binary_with_retry(url: str) -> bytes:
     ) from last_exc
 
 
+def _psf_shape_correlation(
+    data, x: int, y: int, psf_kernel
+) -> float | None:
+    """Pearson correlation between a cutout of `data` centered at (x, y) and
+    the PSF kernel, both flattened. 1.0 means the local pixel pattern is
+    shaped like the PSF; values near 0 or negative mean it is not (a cosmic
+    ray spike, a bad-column edge, or other non-point-source artifact does
+    not correlate well with a smooth PSF). Returns None when a full cutout
+    cannot be extracted (source too close to the image edge) rather than
+    fabricating a value from a partial/padded cutout.
+    """
+    import numpy as np
+
+    half_h, half_w = psf_kernel.shape[0] // 2, psf_kernel.shape[1] // 2
+    y0, y1 = y - half_h, y - half_h + psf_kernel.shape[0]
+    x0, x1 = x - half_w, x - half_w + psf_kernel.shape[1]
+    if y0 < 0 or x0 < 0 or y1 > data.shape[0] or x1 > data.shape[1]:
+        return None
+    cutout = data[y0:y1, x0:x1]
+    if cutout.shape != psf_kernel.shape or not np.all(np.isfinite(cutout)):
+        return None
+    cutout_flat = cutout.ravel()
+    psf_flat = psf_kernel.ravel()
+    if np.std(cutout_flat) == 0 or np.std(psf_flat) == 0:
+        return None
+    return float(np.corrcoef(cutout_flat, psf_flat)[0, 1])
+
+
 def _detect_sources_in_difference_image(
     fits_bytes: bytes,
     mask_fits_bytes: bytes | None = None,
+    psf_fits_bytes: bytes | None = None,
     max_sources: int = _PIXEL_PILOT_MAX_SOURCES,
 ) -> dict:
     """Run a minimal, dependency-light source detector on one ZTF DR24
@@ -505,8 +534,11 @@ def _detect_sources_in_difference_image(
     component to RA/Dec via the image's own WCS. Pure numpy/scipy/astropy
     -- matches this project's existing preference for minimal new
     dependencies (see orbit.py's "no external orbit-determination
-    dependency" note). A calibrated PSF-fit photometric pipeline is
-    deliberately out of scope for this tiny validation pilot.
+    dependency" note). A full calibrated PSF-fit photometric pipeline is
+    still out of scope for this tiny validation pilot; `psf_fits_bytes`
+    adds a lighter PSF-shape *consistency* score (correlation, not flux-
+    calibrated photometry) to help distinguish real point-source-shaped
+    detections from non-PSF-shaped artifacts.
 
     `mask_fits_bytes`, if provided, is the exposure's `science_mask`
     product: any pixel with a nonzero mask value is excluded from both the
@@ -564,6 +596,15 @@ def _detect_sources_in_difference_image(
     # suppression.
     labeled, n_components = label(above_threshold)
 
+    psf_applied = psf_fits_bytes is not None
+    psf_kernel = None
+    psf_kernel_shape = None
+    if psf_applied:
+        with fits.open(io.BytesIO(psf_fits_bytes)) as psf_hdul:
+            psf_hdu = next(h for h in psf_hdul if h.data is not None)
+            psf_kernel = np.asarray(psf_hdu.data, dtype=float)
+        psf_kernel_shape = list(psf_kernel.shape)
+
     wcs = WCS(header)
     components = []
     for component_id in range(1, n_components + 1):
@@ -579,17 +620,18 @@ def _detect_sources_in_difference_image(
     sources = []
     for peak_value, x, y, component_size_pixels in components[:max_sources]:
         ra, dec = wcs.all_pix2world(float(x), float(y), 0)
-        sources.append(
-            {
-                "x": x,
-                "y": y,
-                "ra_deg": float(ra),
-                "dec_deg": float(dec),
-                "peak_value": peak_value,
-                "snr": float((peak_value - median) / std) if std > 0 else None,
-                "component_size_pixels": component_size_pixels,
-            }
-        )
+        source = {
+            "x": x,
+            "y": y,
+            "ra_deg": float(ra),
+            "dec_deg": float(dec),
+            "peak_value": peak_value,
+            "snr": float((peak_value - median) / std) if std > 0 else None,
+            "component_size_pixels": component_size_pixels,
+        }
+        if psf_applied:
+            source["psf_correlation"] = _psf_shape_correlation(data, x, y, psf_kernel)
+        sources.append(source)
 
     return {
         "background_mean": float(mean),
@@ -606,6 +648,8 @@ def _detect_sources_in_difference_image(
         "n_candidate_sources": len(sources),
         "n_candidate_sources_cap": max_sources,
         "n_candidate_sources_truncated": n_components > max_sources,
+        "psf_applied": psf_applied,
+        "psf_kernel_shape": psf_kernel_shape,
         "sources": sources,
     }
 
@@ -644,6 +688,7 @@ def _run_pixel_extraction_pilot(manifest: dict, run_dir: Path) -> dict:
     checkpoint_path = run_dir / "pixel_extraction_pilot.json"
     fits_path = run_dir / "difference_image.fits.fz"
     mask_path = run_dir / "science_mask.fits"
+    psf_path = run_dir / "difference_psf.fits"
 
     if checkpoint_path.exists() and fits_path.exists():
         print(
@@ -692,15 +737,40 @@ def _run_pixel_extraction_pilot(manifest: dict, run_dir: Path) -> dict:
             flush=True,
         )
 
-    extraction = _detect_sources_in_difference_image(content, mask_fits_bytes=mask_bytes)
+    # Same soft-requirement pattern as the mask: apply the PSF-shape
+    # correlation score only when the same preflight already verified
+    # difference_psf available for this exposure.
+    psf_bytes: bytes | None = None
+    psf_preflight = exposure.get("product_headers", {}).get("difference_psf")
+    if psf_preflight and psf_preflight.get("available"):
+        psf_url = exposure["product_urls"]["difference_psf"]
+        print(
+            f"[pixel-pilot] Downloading difference PSF {psf_url} "
+            f"(~{psf_preflight['content_length_bytes']} bytes)",
+            flush=True,
+        )
+        psf_bytes = _fetch_binary_with_retry(psf_url)
+        psf_path.write_bytes(psf_bytes)
+        print(f"[pixel-pilot] Downloaded PSF {len(psf_bytes)} bytes", flush=True)
+    else:
+        print(
+            "[pixel-pilot] difference_psf not verified available for this exposure -- "
+            "proceeding without PSF-shape scoring",
+            flush=True,
+        )
+
+    extraction = _detect_sources_in_difference_image(
+        content, mask_fits_bytes=mask_bytes, psf_fits_bytes=psf_bytes
+    )
     result = {
-        "schema_version": "ztf-dr24-pixel-extraction-pilot-v2",
+        "schema_version": "ztf-dr24-pixel-extraction-pilot-v3",
         "pid": exposure["pid"],
         "product_url": url,
         "downloaded_bytes": len(content),
         "downloaded_sha256": downloaded_sha256,
         "fits_path": str(fits_path),
         "mask_path": str(mask_path) if mask_bytes else None,
+        "psf_path": str(psf_path) if psf_bytes else None,
         **extraction,
         "elapsed_seconds": round(time.monotonic() - t0, 2),
     }

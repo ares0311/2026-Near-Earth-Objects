@@ -934,7 +934,34 @@ and excluded from CI.
 
 ## Current State (v0.91.0)
 
-**Latest sync (2026-07-16, pixel-extraction pilot masking + deduplication)**:
+**Latest sync (2026-07-16, pixel-extraction pilot PSF-shape scoring —
+single-exposure arc complete)**: Closed the last disclosed gap from the
+masking/dedup evidence. `_detect_sources_in_difference_image` now accepts
+the exposure's `difference_psf` product and Pearson-correlates a cutout
+around each candidate against the real PSF kernel (shape-consistency score,
+not flux-calibrated photometry — disclosed as such). Real live re-run: PSF
+kernel is 25x25 pixels (larger than assumed when this gap was scoped), so
+38 of the 71 v2 candidates were too close to the image edge for a full
+cutout. **Of the 33 that could be scored, none exceed 0.18 correlation**
+(mean 0.037, median 0.010) — an honest null result: no candidate in this
+exposure shows meaningful PSF-shape consistency, distinct from noise. The
+offline unit test confirms the method itself works (a real synthetic
+Gaussian source correlates >0.95 against its own generating shape), so this
+is a genuine finding about this exposure's candidates, not a broken metric.
+Schema bumped to `ztf-dr24-pixel-extraction-pilot-v3`. 8 new/updated tests.
+Full verification: 6/6 checks PASS, 100% coverage. See
+`docs/evidence/live/2026-07-16-ztf-dr24-pixel-extraction-pilot-psf-scoring.md`.
+
+**This completes the single-exposure pixel-extraction pilot arc**
+(preflight -> extraction -> masking/dedup -> PSF-shape scoring), each step
+closing the disclosed gap from the one before it, on real live data. Does
+not authorize a wider batch, Gate Z3 resumption, or external submission.
+**Next step is a genuine operator decision, not another same-exposure
+refinement**: try a different exposure/field, build real multi-exposure
+tracklet linking, or pause here having validated the extraction mechanics
+end-to-end with an honest null result.
+
+**Earlier sync (2026-07-16, pixel-extraction pilot masking + deduplication)**:
 Closed the two concrete gaps the first pixel-extraction pilot run flagged.
 `Skills/ztf_dr24_bounded_ingest.py`'s `_detect_sources_in_difference_image`
 now applies the exposure's already-verified `science_mask` product (any
