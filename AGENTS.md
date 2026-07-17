@@ -941,7 +941,24 @@ and excluded from CI.
 
 ## Current State (v0.91.0)
 
-**Latest sync (2026-07-17, second field confirms the null result)**: Ran
+**Latest sync (2026-07-17, formal production-readiness gate register for
+the motion-product path)**: Added a "Motion-Product Gates" (MP1-MP7)
+section to `docs/ZTF_DR24_PRODUCTION_GATES.md` (which previously only
+registered the now-superseded alert-replay sub-approach, Z0-Z7) and synced
+`docs/PRODUCTION_READINESS.md`'s stale top summary. MP1-MP5 (preflight,
+extraction, masking/dedup, PSF-scoring, multi-night linking) are CLOSED
+citing real 2026-07-16/17 evidence; MP6 (no-submission drill) and MP7
+(runbook update) are OPEN with a complete, self-contained closure plan
+(mirror `run_archive_positive_control.py`'s existing `--build-review-
+packets` pattern into `run_pixel_extraction_positive_control.py`, exact
+commands against already-acquired checkpoints, predicted result stated
+up front) so any future agent can execute it without re-deriving the
+analysis. Bottom line: the secondary WISE path already satisfies its own
+Production Definition; the primary motion-product path has real,
+validated capability but has never been formally run through positive-
+control-packet generation or the no-submission drill.
+
+**Earlier sync (2026-07-17, second field confirms the null result)**: Ran
 the fully-validated pipeline (unchanged) against a field chosen by
 `Skills/select_survey_fields.py --mode aten` (rank 1 of 20: RA 217.41,
 Dec -15.0, score 0.9308, never processed before), not the convenience
