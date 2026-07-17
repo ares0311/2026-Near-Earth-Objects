@@ -509,50 +509,140 @@ def test_detect_sources_in_difference_image_finds_injected_point_source():
 
 def test_detect_sources_in_difference_image_caps_output_count():
     """A noisy image must never return more than the configured cap, however
-    many pixels clear the detection threshold -- and must report the true
-    pre-cap count rather than silently truncating (no-silent-caps rule)."""
+    many connected components clear the detection threshold -- and must
+    report the true pre-cap count rather than silently truncating
+    (no-silent-caps rule)."""
     fits_bytes = _synthetic_difference_image_fits_bytes(source_peak=500.0)
     result = ztf_dr24_bounded_ingest._detect_sources_in_difference_image(
         fits_bytes, max_sources=1
     )
     assert result["n_candidate_sources"] <= 1
     assert result["n_candidate_sources_cap"] == 1
-    assert result["n_peaks_above_threshold"] >= result["n_candidate_sources"]
+    assert result["n_connected_components"] >= result["n_candidate_sources"]
     assert result["n_candidate_sources_truncated"] == (
-        result["n_peaks_above_threshold"] > 1
+        result["n_connected_components"] > 1
     )
 
 
 def test_detect_sources_in_difference_image_reports_untruncated_when_under_cap():
-    """When every clearing pixel fits under the cap, truncation must read
+    """When every clearing component fits under the cap, truncation must read
     False rather than defaulting to a misleading truthy value."""
     fits_bytes = _synthetic_difference_image_fits_bytes(source_peak=500.0)
     result = ztf_dr24_bounded_ingest._detect_sources_in_difference_image(
         fits_bytes, max_sources=1000
     )
     assert result["n_candidate_sources_truncated"] is False
-    assert result["n_candidate_sources"] == result["n_peaks_above_threshold"]
+    assert result["n_candidate_sources"] == result["n_connected_components"]
 
 
-def _available_single_exposure_manifest(content_length: int = 1000) -> dict:
+def test_detect_sources_deduplicates_adjacent_pixels_into_one_component():
+    """The exact real-world fix this session made: a multi-pixel blob (one
+    physical residual spanning several adjacent pixels) must collapse into
+    ONE candidate source via connected-component labeling, not be counted
+    once per pixel the way the earlier local-maximum approach did."""
+    import numpy as np
+    from astropy.io import fits
+    from astropy.wcs import WCS
+
+    size = 50
+    rng = np.random.default_rng(11)
+    data = rng.normal(loc=0.0, scale=5.0, size=(size, size)).astype(np.float32)
+    # A solid 3x3 block of bright pixels -- one connected blob, 9 pixels.
+    data[20:23, 20:23] += 500.0
+
+    wcs = WCS(naxis=2)
+    wcs.wcs.crpix = [size / 2, size / 2]
+    wcs.wcs.cdelt = [-1.0 / 3600, 1.0 / 3600]
+    wcs.wcs.crval = [232.6, -8.4]
+    wcs.wcs.ctype = ["RA---TAN", "DEC--TAN"]
+    hdu = fits.PrimaryHDU(data=data, header=wcs.to_header())
+    buf = io.BytesIO()
+    hdu.writeto(buf)
+
+    result = ztf_dr24_bounded_ingest._detect_sources_in_difference_image(buf.getvalue())
+    assert result["n_connected_components"] == 1
+    assert result["n_pixels_above_threshold"] == 9
+    assert result["sources"][0]["component_size_pixels"] == 9
+
+
+def _synthetic_mask_fits_bytes(
+    size: int = 50, flagged_xy: list[tuple[int, int]] | None = None
+) -> bytes:
+    """An all-zero (nothing flagged) mask by default, or with specific
+    (x, y) pixels flagged nonzero when `flagged_xy` is given -- matching
+    ZTF's science_mask product shape/semantics at the level this tiny
+    pilot implements (any nonzero value means excluded)."""
+    import numpy as np
+    from astropy.io import fits
+
+    mask = np.zeros((size, size), dtype=np.int32)
+    for x, y in flagged_xy or []:
+        mask[y, x] = 1
+    hdu = fits.PrimaryHDU(data=mask)
+    buf = io.BytesIO()
+    hdu.writeto(buf)
+    return buf.getvalue()
+
+
+def test_detect_sources_excludes_masked_pixels():
+    """A pixel flagged nonzero in the science_mask must never become a
+    candidate source, even though it clears the brightness threshold --
+    this is the real fix for the 855-candidate false-positive finding in
+    docs/evidence/live/2026-07-16-ztf-dr24-pixel-extraction-pilot-first-live-run.md."""
+    fits_bytes = _synthetic_difference_image_fits_bytes(source_xy=(25, 25), source_peak=500.0)
+    mask_bytes = _synthetic_mask_fits_bytes(flagged_xy=[(25, 25)])
+
+    unmasked = ztf_dr24_bounded_ingest._detect_sources_in_difference_image(fits_bytes)
+    assert unmasked["n_candidate_sources"] >= 1  # sanity: source is real without masking
+
+    masked = ztf_dr24_bounded_ingest._detect_sources_in_difference_image(
+        fits_bytes, mask_fits_bytes=mask_bytes
+    )
+    assert masked["mask_applied"] is True
+    assert masked["n_masked_pixels"] == 1
+    assert all((s["x"], s["y"]) != (25, 25) for s in masked["sources"])
+
+
+def test_detect_sources_mask_shape_mismatch_raises_loudly():
+    """malformed -> FAIL LOUDLY: a mask that doesn't match the difference
+    image's shape must never be silently applied (e.g. misaligned pixels
+    would corrupt the result without warning)."""
+    fits_bytes = _synthetic_difference_image_fits_bytes(size=50)
+    mismatched_mask = _synthetic_mask_fits_bytes(size=40)
+    with pytest.raises(ValueError, match="does not match difference image"):
+        ztf_dr24_bounded_ingest._detect_sources_in_difference_image(
+            fits_bytes, mask_fits_bytes=mismatched_mask
+        )
+
+
+def _available_single_exposure_manifest(
+    content_length: int = 1000,
+    mask_available: bool | None = None,
+    mask_content_length: int = 500,
+) -> dict:
     """One exposure whose difference-image preflight already passed --
-    the precondition _run_pixel_extraction_pilot requires."""
-    return {
-        "exposures": [
-            {
-                "pid": 585152193615,
-                "product_urls": {
-                    "difference_image": "https://irsa.ipac.caltech.edu/product/diff.fits.fz",
-                },
-                "product_headers": {
-                    "difference_image": {
-                        "available": True,
-                        "content_length_bytes": content_length,
-                    },
-                },
-            }
-        ]
+    the precondition _run_pixel_extraction_pilot requires. `mask_available`
+    controls whether a science_mask entry is present at all (None), verified
+    available (True), or present-but-unavailable (False)."""
+    exposure = {
+        "pid": 585152193615,
+        "product_urls": {
+            "difference_image": "https://irsa.ipac.caltech.edu/product/diff.fits.fz",
+        },
+        "product_headers": {
+            "difference_image": {
+                "available": True,
+                "content_length_bytes": content_length,
+            },
+        },
     }
+    if mask_available is not None:
+        exposure["product_urls"]["science_mask"] = "https://irsa.ipac.caltech.edu/product/mask.fits"
+        exposure["product_headers"]["science_mask"] = {
+            "available": mask_available,
+            "content_length_bytes": mask_content_length,
+        }
+    return {"exposures": [exposure]}
 
 
 def test_run_pixel_extraction_pilot_downloads_and_extracts(tmp_path):
@@ -565,7 +655,8 @@ def test_run_pixel_extraction_pilot_downloads_and_extracts(tmp_path):
     ) as get:
         result = ztf_dr24_bounded_ingest._run_pixel_extraction_pilot(manifest, tmp_path)
     assert get.call_count == 1
-    assert result["schema_version"] == "ztf-dr24-pixel-extraction-pilot-v1"
+    assert result["schema_version"] == "ztf-dr24-pixel-extraction-pilot-v2"
+    assert result["mask_applied"] is False  # no science_mask entry in this manifest
     assert result["downloaded_bytes"] == len(fits_bytes)
     assert result["downloaded_sha256"] == __import__("hashlib").sha256(fits_bytes).hexdigest()
     assert result["n_candidate_sources"] >= 1
@@ -586,6 +677,47 @@ def test_run_pixel_extraction_pilot_resumes_without_redownload(tmp_path):
         second = ztf_dr24_bounded_ingest._run_pixel_extraction_pilot(manifest, tmp_path)
         assert get.call_count == 1
     assert first == second
+
+
+def test_run_pixel_extraction_pilot_downloads_mask_when_verified_available(tmp_path):
+    """When the same preflight run already verified science_mask available for
+    this exposure, the pilot must download and apply it -- not just the
+    difference image."""
+    fits_bytes = _synthetic_difference_image_fits_bytes()
+    mask_bytes = _synthetic_mask_fits_bytes()
+    manifest = _available_single_exposure_manifest(
+        content_length=len(fits_bytes), mask_available=True, mask_content_length=len(mask_bytes)
+    )
+
+    def _get_side_effect(url, *args, **kwargs):
+        if "mask" in url:
+            return _FakeResponse(status=200, content=mask_bytes)
+        return _FakeResponse(status=200, content=fits_bytes)
+
+    with patch("requests.get", side_effect=_get_side_effect) as get:
+        result = ztf_dr24_bounded_ingest._run_pixel_extraction_pilot(manifest, tmp_path)
+    assert get.call_count == 2  # difference image + mask
+    assert result["mask_applied"] is True
+    assert result["mask_path"] is not None
+    assert (tmp_path / "science_mask.fits").exists()
+
+
+def test_run_pixel_extraction_pilot_skips_mask_when_not_verified_available(tmp_path):
+    """A science_mask entry present but not verified available (preflight
+    failed/missing it) must not be downloaded -- soft requirement, not a
+    hard failure of the whole pilot."""
+    fits_bytes = _synthetic_difference_image_fits_bytes()
+    manifest = _available_single_exposure_manifest(
+        content_length=len(fits_bytes), mask_available=False
+    )
+    with patch(
+        "requests.get", return_value=_FakeResponse(status=200, content=fits_bytes)
+    ) as get:
+        result = ztf_dr24_bounded_ingest._run_pixel_extraction_pilot(manifest, tmp_path)
+    assert get.call_count == 1  # difference image only
+    assert result["mask_applied"] is False
+    assert result["mask_path"] is None
+    assert not (tmp_path / "science_mask.fits").exists()
 
 
 def test_run_pixel_extraction_pilot_rejects_multiple_exposures(tmp_path):
@@ -629,8 +761,10 @@ def test_pixel_extraction_pilot_requires_preflight_flag(tmp_path):
 
 def test_run_bounded_ingest_pixel_extraction_pilot_end_to_end(tmp_path):
     """Full CLI-level path: metadata -> manifest -> preflight -> pixel pilot,
-    with the metadata GET and the binary product GET both mocked by URL."""
+    with the metadata GET and both binary product GETs (difference image AND
+    the real preflight-verified science_mask) mocked by URL."""
     fits_bytes = _synthetic_difference_image_fits_bytes()
+    mask_bytes = _synthetic_mask_fits_bytes()  # all-zero: nothing flagged
     metadata_response = _FakeResponse(_ipac_response_text(obsjd_values=[2458339.6521991]))
     head_response = _FakeResponse(
         status=200,
@@ -640,6 +774,8 @@ def test_run_bounded_ingest_pixel_extraction_pilot_end_to_end(tmp_path):
     def _get_side_effect(url, *args, **kwargs):
         if url.startswith(ztf_dr24_bounded_ingest._IRSA_SCI_URL):
             return metadata_response
+        if url.endswith("_mskimg.fits"):
+            return _FakeResponse(status=200, content=mask_bytes)
         return _FakeResponse(status=200, content=fits_bytes)
 
     with (
@@ -661,6 +797,8 @@ def test_run_bounded_ingest_pixel_extraction_pilot_end_to_end(tmp_path):
     pilot = report["pixel_extraction_pilot"]
     assert pilot["n_candidate_sources"] >= 1
     assert pilot["downloaded_bytes"] == len(fits_bytes)
+    assert pilot["mask_applied"] is True
+    assert pilot["n_masked_pixels"] == 0  # all-zero mask: nothing flagged
 
 
 def test_fetch_binary_with_retry_recovers_and_exhausts():

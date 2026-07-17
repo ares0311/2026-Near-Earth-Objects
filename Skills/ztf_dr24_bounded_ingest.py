@@ -489,19 +489,32 @@ def _fetch_binary_with_retry(url: str) -> bytes:
 
 
 def _detect_sources_in_difference_image(
-    fits_bytes: bytes, max_sources: int = _PIXEL_PILOT_MAX_SOURCES
+    fits_bytes: bytes,
+    mask_fits_bytes: bytes | None = None,
+    max_sources: int = _PIXEL_PILOT_MAX_SOURCES,
 ) -> dict:
     """Run a minimal, dependency-light source detector on one ZTF DR24
     difference image and return candidate source positions.
 
     This is a proof-of-concept extractor for validating that the motion-
-    product pivot is buildable, not the final motion linker: it finds
-    local-maximum pixels above a sigma-clipped background threshold and
-    converts them to RA/Dec via the image's own WCS. Pure numpy/scipy/
-    astropy -- matches this project's existing preference for minimal new
+    product pivot is buildable, not the final motion linker: it thresholds
+    a sigma-clipped background, groups surviving pixels into connected
+    components (so one physical residual -- e.g. a bright-star subtraction
+    artifact spanning several adjacent pixels -- becomes ONE candidate
+    source, not several), and converts the brightest pixel of each
+    component to RA/Dec via the image's own WCS. Pure numpy/scipy/astropy
+    -- matches this project's existing preference for minimal new
     dependencies (see orbit.py's "no external orbit-determination
     dependency" note). A calibrated PSF-fit photometric pipeline is
     deliberately out of scope for this tiny validation pilot.
+
+    `mask_fits_bytes`, if provided, is the exposure's `science_mask`
+    product: any pixel with a nonzero mask value is excluded from both the
+    background statistics and candidate detection. This is a deliberately
+    coarse simplification -- treating ANY nonzero flag as "exclude" rather
+    than decoding ZTF's specific per-bit mask semantics -- disclosed here
+    rather than overclaiming bit-level precision this tiny pilot does not
+    implement.
     """
     # Lazy imports for heavy third-party libraries, matching this file's
     # existing convention (astropy.io.ascii, astropy.time.Time above).
@@ -509,7 +522,7 @@ def _detect_sources_in_difference_image(
     from astropy.io import fits
     from astropy.stats import sigma_clipped_stats
     from astropy.wcs import WCS
-    from scipy.ndimage import maximum_filter
+    from scipy.ndimage import label
 
     with fits.open(io.BytesIO(fits_bytes)) as hdul:
         # .fz (Rice-compressed) ZTF products decompress transparently via
@@ -520,30 +533,51 @@ def _detect_sources_in_difference_image(
         header = hdu.header
 
     finite = np.isfinite(data)
-    mean, median, std = sigma_clipped_stats(data[finite], sigma=3.0)
+    mask_applied = mask_fits_bytes is not None
+    n_masked_pixels = 0
+    usable = finite
+    if mask_applied:
+        with fits.open(io.BytesIO(mask_fits_bytes)) as mask_hdul:
+            mask_hdu = next(h for h in mask_hdul if h.data is not None)
+            mask_data = np.asarray(mask_hdu.data)
+        if mask_data.shape != data.shape:
+            raise ValueError(
+                f"science_mask shape {mask_data.shape} does not match difference image "
+                f"shape {data.shape} -- refusing to apply a mismatched mask"
+            )
+        flagged = mask_data != 0
+        n_masked_pixels = int(flagged.sum())
+        usable = finite & ~flagged
+
+    mean, median, std = sigma_clipped_stats(data[usable], sigma=3.0)
     # A conservative 5-sigma cut, matching this project's cautious-detection
     # posture elsewhere (e.g. detect.py's real/bogus threshold discipline).
     threshold = median + _PIXEL_PILOT_DETECTION_SIGMA * std
 
-    # maximum_filter gives cheap local non-maximum suppression within its
-    # window; a pixel is a candidate source only if it equals the local max
-    # and clears the background threshold.
-    local_max = maximum_filter(data, size=5)
-    is_peak = finite & (data == local_max) & (data > threshold)
-    ys, xs = np.nonzero(is_peak)
-    # Record the true pre-cap count separately -- silently reporting only the
-    # truncated top-N would misrepresent how many pixels actually cleared
-    # threshold (per the standing "no silent caps" rule: log what was
-    # dropped, don't let truncation read as "covered everything").
-    n_peaks_above_threshold = int(len(ys))
+    above_threshold = usable & (data > threshold)
+    n_pixels_above_threshold = int(above_threshold.sum())
+
+    # Connected-component labeling merges adjacent above-threshold pixels
+    # (default scipy 4-connectivity) into single sources -- this is what
+    # fixes the earlier v1 finding where one bright residual produced
+    # several separately-counted "sources" via plain local-maximum
+    # suppression.
+    labeled, n_components = label(above_threshold)
 
     wcs = WCS(header)
-    sources = []
+    components = []
+    for component_id in range(1, n_components + 1):
+        ys, xs = np.nonzero(labeled == component_id)
+        values = data[ys, xs]
+        peak_idx = int(np.argmax(values))
+        y, x = int(ys[peak_idx]), int(xs[peak_idx])
+        components.append((float(data[y, x]), x, y, int(len(ys))))
+
     # Rank by peak brightness and keep only the strongest max_sources so
     # output size stays bounded regardless of how noisy an exposure is.
-    order = np.argsort(data[ys, xs])[::-1][:max_sources]
-    for idx in order:
-        y, x = int(ys[idx]), int(xs[idx])
+    components.sort(key=lambda c: c[0], reverse=True)
+    sources = []
+    for peak_value, x, y, component_size_pixels in components[:max_sources]:
         ra, dec = wcs.all_pix2world(float(x), float(y), 0)
         sources.append(
             {
@@ -551,8 +585,9 @@ def _detect_sources_in_difference_image(
                 "y": y,
                 "ra_deg": float(ra),
                 "dec_deg": float(dec),
-                "peak_value": float(data[y, x]),
-                "snr": float((data[y, x] - median) / std) if std > 0 else None,
+                "peak_value": peak_value,
+                "snr": float((peak_value - median) / std) if std > 0 else None,
+                "component_size_pixels": component_size_pixels,
             }
         )
 
@@ -564,10 +599,13 @@ def _detect_sources_in_difference_image(
         "detection_threshold": float(threshold),
         "n_pixels": int(data.size),
         "n_finite_pixels": int(finite.sum()),
-        "n_peaks_above_threshold": n_peaks_above_threshold,
+        "mask_applied": mask_applied,
+        "n_masked_pixels": n_masked_pixels,
+        "n_pixels_above_threshold": n_pixels_above_threshold,
+        "n_connected_components": n_components,
         "n_candidate_sources": len(sources),
         "n_candidate_sources_cap": max_sources,
-        "n_candidate_sources_truncated": n_peaks_above_threshold > max_sources,
+        "n_candidate_sources_truncated": n_components > max_sources,
         "sources": sources,
     }
 
@@ -605,6 +643,7 @@ def _run_pixel_extraction_pilot(manifest: dict, run_dir: Path) -> dict:
 
     checkpoint_path = run_dir / "pixel_extraction_pilot.json"
     fits_path = run_dir / "difference_image.fits.fz"
+    mask_path = run_dir / "science_mask.fits"
 
     if checkpoint_path.exists() and fits_path.exists():
         print(
@@ -630,20 +669,44 @@ def _run_pixel_extraction_pilot(manifest: dict, run_dir: Path) -> dict:
         flush=True,
     )
 
-    extraction = _detect_sources_in_difference_image(content)
+    # Apply the science mask when the same preflight already verified it
+    # available -- soft requirement: an exposure without a verified mask
+    # still runs (mask_applied=False is reported explicitly), it just isn't
+    # blocked on a product that was never confirmed present.
+    mask_bytes: bytes | None = None
+    mask_preflight = exposure.get("product_headers", {}).get("science_mask")
+    if mask_preflight and mask_preflight.get("available"):
+        mask_url = exposure["product_urls"]["science_mask"]
+        print(
+            f"[pixel-pilot] Downloading science mask {mask_url} "
+            f"(~{mask_preflight['content_length_bytes']} bytes)",
+            flush=True,
+        )
+        mask_bytes = _fetch_binary_with_retry(mask_url)
+        mask_path.write_bytes(mask_bytes)
+        print(f"[pixel-pilot] Downloaded mask {len(mask_bytes)} bytes", flush=True)
+    else:
+        print(
+            "[pixel-pilot] science_mask not verified available for this exposure -- "
+            "proceeding without mask filtering",
+            flush=True,
+        )
+
+    extraction = _detect_sources_in_difference_image(content, mask_fits_bytes=mask_bytes)
     result = {
-        "schema_version": "ztf-dr24-pixel-extraction-pilot-v1",
+        "schema_version": "ztf-dr24-pixel-extraction-pilot-v2",
         "pid": exposure["pid"],
         "product_url": url,
         "downloaded_bytes": len(content),
         "downloaded_sha256": downloaded_sha256,
         "fits_path": str(fits_path),
+        "mask_path": str(mask_path) if mask_bytes else None,
         **extraction,
         "elapsed_seconds": round(time.monotonic() - t0, 2),
     }
     _save_pixel_pilot_checkpoint(checkpoint_path, result)
     truncation_note = (
-        f" (truncated from {result['n_peaks_above_threshold']} pixels above threshold)"
+        f" (truncated from {result['n_connected_components']} connected components)"
         if result["n_candidate_sources_truncated"]
         else ""
     )

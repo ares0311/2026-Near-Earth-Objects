@@ -941,7 +941,20 @@ and excluded from CI.
 
 ## Current State (v0.91.0)
 
-**Latest sync (2026-07-16, agent reliability controls implemented)**: Per
+**Latest sync (2026-07-16, pixel-extraction pilot masking + deduplication)**:
+`Skills/ztf_dr24_bounded_ingest.py`'s detector now applies the exposure's
+verified `science_mask` (nonzero pixels excluded) and uses
+`scipy.ndimage.label` connected-component deduplication instead of local-
+maximum filtering. Real re-run on the same exposure: 855 raw pixel-hits (v1)
+-> 74 after masking -> 71 connected components (v2, untruncated). Masking
+did nearly all the work; most components are 1-2 pixels. Schema bumped to
+v2; 5 new/updated tests. Full verification: 6/6 checks PASS, 2026 tests,
+100% coverage. See
+`docs/evidence/live/2026-07-16-ztf-dr24-pixel-extraction-pilot-masking-dedup.md`.
+PSF-matched photometry remains the one disclosed gap. Does not authorize a
+wider batch, Gate Z3 resumption, or external submission.
+
+**Earlier sync (2026-07-16, agent reliability controls implemented)**: Per
 explicit operator request, implemented verifiable agent-reliability controls
 for both Claude Code and Codex: `docs/AGENT_RELIABILITY_DIRECTIVES.md`
 (REL-01..REL-10) mirrored verbatim into this file's own "Agent Reliability
