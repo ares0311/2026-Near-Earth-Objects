@@ -109,9 +109,28 @@ one-field test is plausible. Evidence:
 `docs/evidence/live/2026-07-17-ztf-dr24-multi-night-linking-first-test.md`.
 
 **Still not authorized**: a wider batch, a candidate claim, Gate Z3
-resumption, or any external submission. Next is again an operator
-decision: try this linking pipeline against a different, more promising
-field (e.g. via `Skills/select_survey_fields.py`'s scoring), or pause.
+resumption, or any external submission.
+
+**Second field run same day, per operator direction ("pick a promising
+field via the project's existing selection scoring")**: ran the identical,
+unmodified pipeline against `Skills/select_survey_fields.py --mode aten`'s
+rank-1 field (RA 217.41, Dec -15.0, score 0.9308, elongation 82.8 deg,
+never processed before), a real ZTF field 325 with 31 real covered nights
+found via metadata-only query. Acquired 3 nights (20180327, 20180330,
+20180409). Result: `min_observations=2` again gave 200 combinatorial
+tracklets; the real default `min_observations=3` gave **5** survivors, all
+failing independent PSF-shape cross-validation (max correlation 0.168,
+still far below the >0.5 real-source threshold). **A second,
+algorithmically-selected field reproduces the same null result as the
+first** -- this strengthens, not weakens, the conclusion that it is not an
+artifact of one specific field/night combination. No code changes were
+needed. Evidence:
+`docs/evidence/live/2026-07-17-ztf-dr24-selected-field-linking-test.md`.
+
+Still not authorized: a wider batch, a candidate claim, Gate Z3 resumption,
+or any external submission. Two fields, six real nights, and the complete
+pipeline (extraction through linking) are now validated end-to-end with
+consistent, cross-validated null results. Next is an operator decision.
 
 ## Source-native motion-product path initiated
 
