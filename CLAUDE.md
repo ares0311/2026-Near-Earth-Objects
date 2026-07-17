@@ -934,7 +934,42 @@ and excluded from CI.
 
 ## Current State (v0.91.0)
 
-**Latest sync (2026-07-16, pixel-extraction pilot PSF-shape scoring —
+**Latest sync (2026-07-17, first real multi-night linking test)**: Per
+operator direction (Option 2 of the post-pilot decision: build real
+multi-exposure linking over trying a different field), acquired 2
+additional real nights (20180802, 20180806) of the same field alongside the
+already-analyzed 20180809, ran the full pixel-extraction pipeline on each,
+and linked across all 3 nights using the existing `src/link.py` linker.
+New: `Skills/convert_pixel_extraction_to_observations.py` (checkpoint format
+converter, disclosed uncalibrated magnitude proxy) and
+`Skills/run_pixel_extraction_positive_control.py` (reuses `preprocess()`+
+`link()`, bypasses `detect()`'s WISE/DECam/TESS-only singleton gate rather
+than modifying shared `detect.py`). Two real bugs root-caused and fixed
+live: (1) the first magnitude formula produced negative values, rejected by
+`preprocess()`'s `mag <= 0` gate (0/471 passed until fixed); (2)
+`detect()`'s ZTF path structurally cannot handle single-exposure-per-night
+data (root-caused, not worked around by touching shared code).
+
+Real result: at the permissive `min_observations=2`, 200 tracklets formed
+— expected combinatorial explosion (the 36-arcsec field is far smaller than
+the 60 arcsec/hr x multi-day tolerance window), reproducing the identical
+"crowded-field combinatorial pairing" phenomenon this project's Gate Z6
+evidence already documented for the old alert-based path. At the real
+default `min_observations=3` (chi2 orbit-consistency required), this
+collapsed to **2** tracklets. Cross-validated against the independent
+PSF-shape scores from the earlier pilot work: every observation in both
+survivors is at/near the 5-sigma noise floor (SNR 5.4-10.6) with
+`psf_correlation` far below the real-source threshold (max 0.068 vs >0.95
+for a real injected source). **Honest conclusion: a well-supported null
+result across the full pipeline** (extraction, masking, dedup, PSF-scoring,
+and now linking all work correctly end-to-end on real data; no candidate
+from this 3-night, one-field test is plausible). See
+`docs/evidence/live/2026-07-17-ztf-dr24-multi-night-linking-first-test.md`.
+Does not authorize a wider batch, Gate Z3 resumption, or external
+submission. Next is again an operator decision: a different, more
+promising field, or pause.
+
+**Earlier sync (2026-07-16, pixel-extraction pilot PSF-shape scoring —
 single-exposure arc complete)**: Closed the last disclosed gap from the
 masking/dedup evidence. `_detect_sources_in_difference_image` now accepts
 the exposure's `difference_psf` product and Pearson-correlates a cutout
@@ -1824,7 +1859,9 @@ consult it only for historical context on a specific gate, blocker, or bug.
 | `Skills/scan_mpc_history_ztf_coverage.py` | Gate Z3: scans a known NEO's real MPC-confirmed observation history for real ZTF coverage overlap |
 | `Skills/scan_neo_track_coverage.py` | Gate Z3: scans a known NEO's real predicted track for real ZTF coverage |
 | `Skills/probe_ztf_alert_archive_file.py` | Gate Z3: bounded single-file verification probe for the UW public ZTF alert archive |
-| `Skills/ztf_dr24_bounded_ingest.py` | Gate Z1 bounded ZTF DR24 historical replay ingest (metadata-only by default); `--emit-motion-product-manifest`/`--preflight-motion-products` plan and HEAD-verify source-native motion products; `--pixel-extraction-pilot` downloads exactly one difference image and runs a minimal numpy/scipy source detector on it, reporting candidate RA/Dec (single-exposure hard cap, not a batch downloader) |
+| `Skills/ztf_dr24_bounded_ingest.py` | Gate Z1 bounded ZTF DR24 historical replay ingest (metadata-only by default); `--emit-motion-product-manifest`/`--preflight-motion-products` plan and HEAD-verify source-native motion products; `--pixel-extraction-pilot` downloads exactly one difference image and runs mask-filtered, connected-component-deduplicated, PSF-shape-scored source detection on it (single-exposure hard cap, not a batch downloader) |
+| `Skills/convert_pixel_extraction_to_observations.py` | Converts a `--pixel-extraction-pilot` checkpoint into the `Observation` checkpoint format `Skills/run_archive_positive_control.py` already consumes, using a disclosed uncalibrated magnitude proxy |
+| `Skills/run_pixel_extraction_positive_control.py` | Runs real `preprocess()`+`link()` on converted pixel-extraction observations across multiple real nights, bypassing `detect()`'s ZTF-specific (WISE/DECam/TESS-only) singleton-preservation gate rather than modifying shared core logic |
 | `Skills/diagnose_wise_query.py` | Diagnostic: probes the IRSA NEOWISE query directly with full error reporting, bypassing the pipeline's caching/retry layers |
 | `Skills/_live_connection_test.py` | Internal helper invoked by `Skills/verify_live_credentials.sh`; tests live ATLAS/ZTF credential connectivity without printing secret values |
 | `Skills/load_credentials.py` | Loads project credentials (ATLAS/ZTF) from macOS Keychain into environment variables; called at the start of any Skill needing live network credentials |
