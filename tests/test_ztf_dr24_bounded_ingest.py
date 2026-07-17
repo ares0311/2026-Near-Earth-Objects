@@ -615,15 +615,120 @@ def test_detect_sources_mask_shape_mismatch_raises_loudly():
         )
 
 
+def _synthetic_psf_fits_bytes(size: int = 9, sigma: float = 1.5) -> bytes:
+    """A small 2D Gaussian PSF kernel, matching the general shape of a real
+    ZTF difference_psf product (a compact point-spread-function image)."""
+    import numpy as np
+    from astropy.io import fits
+
+    yy, xx = np.mgrid[0:size, 0:size]
+    center = (size - 1) / 2
+    kernel = np.exp(-(((xx - center) ** 2 + (yy - center) ** 2) / (2 * sigma**2)))
+    kernel = (kernel / kernel.sum()).astype(np.float32)
+    hdu = fits.PrimaryHDU(data=kernel)
+    buf = io.BytesIO()
+    hdu.writeto(buf)
+    return buf.getvalue()
+
+
+def test_psf_shape_correlation_high_for_matching_gaussian_source():
+    """Independent-oracle test: a source injected with the SAME Gaussian
+    shape as the PSF kernel must correlate near 1.0 -- this is the direct
+    check that psf_correlation actually measures shape similarity, not just
+    presence of a bright pixel."""
+    import numpy as np
+    from astropy.io import fits
+
+    size = 50
+    rng = np.random.default_rng(3)
+    data = rng.normal(loc=0.0, scale=1.0, size=(size, size)).astype(np.float64)
+    yy, xx = np.mgrid[0:size, 0:size]
+    x0, y0 = 25, 25
+    gaussian_source = 500.0 * np.exp(-(((xx - x0) ** 2 + (yy - y0) ** 2) / (2 * 1.5**2)))
+    data += gaussian_source
+
+    psf_kernel_bytes = _synthetic_psf_fits_bytes(size=9, sigma=1.5)
+    with fits.open(io.BytesIO(psf_kernel_bytes)) as hdul:
+        psf_kernel = hdul[0].data.astype(float)
+
+    correlation = ztf_dr24_bounded_ingest._psf_shape_correlation(data, x0, y0, psf_kernel)
+    assert correlation is not None
+    assert correlation > 0.95  # near-perfect match to its own generating shape
+
+
+def test_psf_shape_correlation_low_for_non_psf_shaped_artifact():
+    """A hard single-pixel spike (not smoothly PSF-shaped) must correlate
+    much more weakly than a real Gaussian source -- this is the actual
+    discrimination this feature exists to provide."""
+    import numpy as np
+    from astropy.io import fits
+
+    size = 50
+    data = np.zeros((size, size), dtype=np.float64)
+    data[25, 25] = 500.0  # a single hot pixel, not a smooth PSF-shaped blob
+
+    psf_kernel_bytes = _synthetic_psf_fits_bytes(size=9, sigma=1.5)
+    with fits.open(io.BytesIO(psf_kernel_bytes)) as hdul:
+        psf_kernel = hdul[0].data.astype(float)
+
+    correlation = ztf_dr24_bounded_ingest._psf_shape_correlation(data, 25, 25, psf_kernel)
+    assert correlation is not None
+    assert correlation < 0.5  # far from the near-1.0 real-source case above
+
+
+def test_psf_shape_correlation_returns_none_near_edge():
+    """A source too close to the image edge for a full PSF-sized cutout must
+    report None rather than fabricate a value from a partial/padded cutout."""
+    import numpy as np
+    from astropy.io import fits
+
+    data = np.zeros((50, 50), dtype=np.float64)
+    psf_kernel_bytes = _synthetic_psf_fits_bytes(size=9)
+    with fits.open(io.BytesIO(psf_kernel_bytes)) as hdul:
+        psf_kernel = hdul[0].data.astype(float)
+
+    assert ztf_dr24_bounded_ingest._psf_shape_correlation(data, 0, 0, psf_kernel) is None
+    assert ztf_dr24_bounded_ingest._psf_shape_correlation(data, 49, 49, psf_kernel) is None
+
+
+def test_detect_sources_reports_psf_correlation_when_provided():
+    """End-to-end within the detector: when a PSF kernel is supplied, every
+    reported source gets a psf_correlation field, and psf_applied/
+    psf_kernel_shape are recorded for provenance."""
+    fits_bytes = _synthetic_difference_image_fits_bytes(source_xy=(25, 25), source_peak=500.0)
+    psf_bytes = _synthetic_psf_fits_bytes(size=9)
+
+    result = ztf_dr24_bounded_ingest._detect_sources_in_difference_image(
+        fits_bytes, psf_fits_bytes=psf_bytes
+    )
+    assert result["psf_applied"] is True
+    assert result["psf_kernel_shape"] == [9, 9]
+    assert len(result["sources"]) >= 1
+    assert all("psf_correlation" in s for s in result["sources"])
+
+
+def test_detect_sources_omits_psf_correlation_when_not_provided():
+    """Without a PSF kernel, sources must not carry a psf_correlation key at
+    all (not a null placeholder) and psf_applied must read False."""
+    fits_bytes = _synthetic_difference_image_fits_bytes(source_xy=(25, 25), source_peak=500.0)
+    result = ztf_dr24_bounded_ingest._detect_sources_in_difference_image(fits_bytes)
+    assert result["psf_applied"] is False
+    assert result["psf_kernel_shape"] is None
+    assert all("psf_correlation" not in s for s in result["sources"])
+
+
 def _available_single_exposure_manifest(
     content_length: int = 1000,
     mask_available: bool | None = None,
     mask_content_length: int = 500,
+    psf_available: bool | None = None,
+    psf_content_length: int = 300,
 ) -> dict:
     """One exposure whose difference-image preflight already passed --
-    the precondition _run_pixel_extraction_pilot requires. `mask_available`
-    controls whether a science_mask entry is present at all (None), verified
-    available (True), or present-but-unavailable (False)."""
+    the precondition _run_pixel_extraction_pilot requires. `mask_available`/
+    `psf_available` control whether a science_mask/difference_psf entry is
+    present at all (None), verified available (True), or
+    present-but-unavailable (False)."""
     exposure = {
         "pid": 585152193615,
         "product_urls": {
@@ -642,6 +747,12 @@ def _available_single_exposure_manifest(
             "available": mask_available,
             "content_length_bytes": mask_content_length,
         }
+    if psf_available is not None:
+        exposure["product_urls"]["difference_psf"] = "https://irsa.ipac.caltech.edu/product/psf.fits"
+        exposure["product_headers"]["difference_psf"] = {
+            "available": psf_available,
+            "content_length_bytes": psf_content_length,
+        }
     return {"exposures": [exposure]}
 
 
@@ -655,8 +766,9 @@ def test_run_pixel_extraction_pilot_downloads_and_extracts(tmp_path):
     ) as get:
         result = ztf_dr24_bounded_ingest._run_pixel_extraction_pilot(manifest, tmp_path)
     assert get.call_count == 1
-    assert result["schema_version"] == "ztf-dr24-pixel-extraction-pilot-v2"
+    assert result["schema_version"] == "ztf-dr24-pixel-extraction-pilot-v3"
     assert result["mask_applied"] is False  # no science_mask entry in this manifest
+    assert result["psf_applied"] is False  # no difference_psf entry in this manifest
     assert result["downloaded_bytes"] == len(fits_bytes)
     assert result["downloaded_sha256"] == __import__("hashlib").sha256(fits_bytes).hexdigest()
     assert result["n_candidate_sources"] >= 1
@@ -720,6 +832,46 @@ def test_run_pixel_extraction_pilot_skips_mask_when_not_verified_available(tmp_p
     assert not (tmp_path / "science_mask.fits").exists()
 
 
+def test_run_pixel_extraction_pilot_downloads_psf_when_verified_available(tmp_path):
+    """When the same preflight run already verified difference_psf available
+    for this exposure, the pilot must download and apply it -- not just the
+    difference image."""
+    fits_bytes = _synthetic_difference_image_fits_bytes()
+    psf_bytes = _synthetic_psf_fits_bytes()
+    manifest = _available_single_exposure_manifest(
+        content_length=len(fits_bytes), psf_available=True, psf_content_length=len(psf_bytes)
+    )
+
+    def _get_side_effect(url, *args, **kwargs):
+        if "psf" in url:
+            return _FakeResponse(status=200, content=psf_bytes)
+        return _FakeResponse(status=200, content=fits_bytes)
+
+    with patch("requests.get", side_effect=_get_side_effect) as get:
+        result = ztf_dr24_bounded_ingest._run_pixel_extraction_pilot(manifest, tmp_path)
+    assert get.call_count == 2  # difference image + psf
+    assert result["psf_applied"] is True
+    assert result["psf_path"] is not None
+    assert (tmp_path / "difference_psf.fits").exists()
+
+
+def test_run_pixel_extraction_pilot_skips_psf_when_not_verified_available(tmp_path):
+    """A difference_psf entry present but not verified available must not be
+    downloaded -- soft requirement, not a hard failure of the whole pilot."""
+    fits_bytes = _synthetic_difference_image_fits_bytes()
+    manifest = _available_single_exposure_manifest(
+        content_length=len(fits_bytes), psf_available=False
+    )
+    with patch(
+        "requests.get", return_value=_FakeResponse(status=200, content=fits_bytes)
+    ) as get:
+        result = ztf_dr24_bounded_ingest._run_pixel_extraction_pilot(manifest, tmp_path)
+    assert get.call_count == 1  # difference image only
+    assert result["psf_applied"] is False
+    assert result["psf_path"] is None
+    assert not (tmp_path / "difference_psf.fits").exists()
+
+
 def test_run_pixel_extraction_pilot_rejects_multiple_exposures(tmp_path):
     """The hard single-exposure cap must reject a broader manifest before any
     network call, keeping this a tiny pilot rather than a batch downloader."""
@@ -761,10 +913,12 @@ def test_pixel_extraction_pilot_requires_preflight_flag(tmp_path):
 
 def test_run_bounded_ingest_pixel_extraction_pilot_end_to_end(tmp_path):
     """Full CLI-level path: metadata -> manifest -> preflight -> pixel pilot,
-    with the metadata GET and both binary product GETs (difference image AND
-    the real preflight-verified science_mask) mocked by URL."""
+    with the metadata GET and all three binary product GETs (difference
+    image, the real preflight-verified science_mask, and difference_psf)
+    mocked by URL."""
     fits_bytes = _synthetic_difference_image_fits_bytes()
     mask_bytes = _synthetic_mask_fits_bytes()  # all-zero: nothing flagged
+    psf_bytes = _synthetic_psf_fits_bytes()
     metadata_response = _FakeResponse(_ipac_response_text(obsjd_values=[2458339.6521991]))
     head_response = _FakeResponse(
         status=200,
@@ -776,6 +930,8 @@ def test_run_bounded_ingest_pixel_extraction_pilot_end_to_end(tmp_path):
             return metadata_response
         if url.endswith("_mskimg.fits"):
             return _FakeResponse(status=200, content=mask_bytes)
+        if url.endswith("_diffimgpsf.fits"):
+            return _FakeResponse(status=200, content=psf_bytes)
         return _FakeResponse(status=200, content=fits_bytes)
 
     with (
@@ -799,6 +955,8 @@ def test_run_bounded_ingest_pixel_extraction_pilot_end_to_end(tmp_path):
     assert pilot["downloaded_bytes"] == len(fits_bytes)
     assert pilot["mask_applied"] is True
     assert pilot["n_masked_pixels"] == 0  # all-zero mask: nothing flagged
+    assert pilot["psf_applied"] is True
+    assert all("psf_correlation" in s for s in pilot["sources"])
 
 
 def test_fetch_binary_with_retry_recovers_and_exhausts():
