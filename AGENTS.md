@@ -941,7 +941,25 @@ and excluded from CI.
 
 ## Current State (v0.91.0)
 
-**Latest sync (2026-07-16, pixel-extraction pilot PSF-shape scoring —
+**Latest sync (2026-07-17, first real multi-night linking test)**: Per
+operator direction, acquired 2 additional real nights (20180802, 20180806)
+of the same field and linked across all 3 nights via the existing
+`src/link.py` linker. New: `Skills/convert_pixel_extraction_to_observations.py`
+and `Skills/run_pixel_extraction_positive_control.py` (bypasses `detect()`'s
+WISE/DECam/TESS-only gate rather than modifying shared `detect.py`). Two
+real bugs root-caused and fixed live (negative-magnitude proxy rejected by
+`preprocess()`; `detect()`'s ZTF path structurally can't handle
+single-exposure-per-night data). Result: `min_observations=2` gave 200
+combinatorial tracklets (expected — 36-arcsec field, wide tolerance
+window); the real default `min_observations=3` collapsed this to **2**,
+both of which fail independent PSF-shape cross-validation (max correlation
+0.068 vs >0.95 for a real source). Honest null result across the full
+pipeline. See
+`docs/evidence/live/2026-07-17-ztf-dr24-multi-night-linking-first-test.md`.
+Does not authorize a wider batch, Gate Z3 resumption, or external
+submission.
+
+**Earlier sync (2026-07-16, pixel-extraction pilot PSF-shape scoring —
 single-exposure arc complete)**: `_detect_sources_in_difference_image` now
 Pearson-correlates a cutout around each candidate against the real
 `difference_psf` kernel (shape consistency, not flux photometry). Real

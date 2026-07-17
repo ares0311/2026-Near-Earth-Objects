@@ -75,6 +75,44 @@ scientific rung -- consistency across exposures, not just single-exposure
 PSF shape), or pause this path here having validated the extraction
 mechanics end-to-end on real data.
 
+## Operator decision (2026-07-17): multi-night linking, not a different field
+
+Jerome W. Lindsey III chose real multi-exposure linking (the scientifically
+necessary path, since motion can only be measured across >=2 epochs) over
+retrying a different field. Acquired 2 additional real nights (20180802,
+20180806) of the same field via a metadata-only coverage query (52 real
+nights found over ~400 days; picked the 2 closest), ran the full pilot
+pipeline on each, and linked across all 3 nights.
+
+New: `Skills/convert_pixel_extraction_to_observations.py` and
+`Skills/run_pixel_extraction_positive_control.py` (reuses `preprocess()`+
+`link()`, bypasses `detect()`'s WISE/DECam/TESS-only singleton-preservation
+gate rather than modifying shared `detect.py` core logic -- root-caused
+live: `detect()`'s ZTF path structurally cannot handle single-exposure-
+per-night data). A real magnitude-proxy bug (negative values rejected by
+`preprocess()`'s `mag <= 0` gate, 0/471 observations passing) was also
+root-caused and fixed before this evidence was recorded.
+
+**Result**: `min_observations=2` produced 200 tracklets -- expected
+combinatorial explosion (36-arcsec field, 60 arcsec/hr x multi-day
+tolerance covers the whole field), reproducing the same crowded-field
+pairing phenomenon Gate Z6 already documented for the old alert-based
+path. The real default `min_observations=3` (chi2 orbit-consistency
+required) collapsed this to **2** tracklets. Both fail independent
+cross-validation against the earlier PSF-shape scores: every observation
+is at/near the 5-sigma noise floor with `psf_correlation` far below the
+real-source threshold (max 0.068 vs >0.95 for a real injected source).
+**Honest conclusion: a well-supported null result across the full
+pipeline** -- extraction, masking, dedup, PSF-scoring, and linking all
+work correctly end-to-end on real data; no candidate from this 3-night,
+one-field test is plausible. Evidence:
+`docs/evidence/live/2026-07-17-ztf-dr24-multi-night-linking-first-test.md`.
+
+**Still not authorized**: a wider batch, a candidate claim, Gate Z3
+resumption, or any external submission. Next is again an operator
+decision: try this linking pipeline against a different, more promising
+field (e.g. via `Skills/select_survey_fields.py`'s scoring), or pause.
+
 ## Source-native motion-product path initiated
 
 The recommended metadata-first pivot is now implemented without acquiring
