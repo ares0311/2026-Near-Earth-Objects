@@ -3,8 +3,13 @@
 **Established**: 2026-07-02
 **Updated**: 2026-07-04 — added the ZTF DR24 path (see below); the original
 steps below remain valid for the secondary WISE/DECam/TESS path.
+**Updated**: 2026-07-17 — added the ZTF DR24 motion-product path (see
+below), the current primary sub-approach as of the 2026-07-16 pivot; the
+2026-07-04 ZTF DR24 (alert-replay) section remains valid for that
+now-superseded sub-approach.
 **Status**: Closes `docs/PRODUCTION_READINESS.md` Gate P5 (WISE/DECam/TESS
-path) and `docs/ZTF_DR24_PRODUCTION_GATES.md` Gate Z7 (ZTF DR24 path).
+path), `docs/ZTF_DR24_PRODUCTION_GATES.md` Gate Z7 (ZTF DR24 alert-replay
+path), and Gate MP7 (ZTF DR24 motion-product path).
 **Audience**: Jerome W. Lindsey III (operator). One page. If you need more
 detail than this, the full references are linked at the bottom.
 
@@ -79,6 +84,83 @@ do so, until the operator has obtained and recorded written MPC guidance
 for this specific archival-replay use case.
 
 Steps 6 and "Forbidden communications" below apply identically to both
+paths.
+
+---
+
+## ZTF DR24 motion-product path (current primary sub-approach, as of 2026-07-16)
+
+This section covers the sub-approach that superseded the alert-replay
+section above on 2026-07-16 (see `docs/ACTIVE_HANDOFF.md` and
+`docs/ZTF_DR24_PRODUCTION_GATES.md`'s pivot notice): source-native pixel
+extraction directly over DR24 motion-designed image products (difference
+images, science masks, PSF kernels) rather than the `prv_candidates`
+alert-broker field. The alert-replay section above remains valid if you
+ever run that older path again; this section is what to use for the
+current default.
+
+**Source attribution rule**: every motion-product observation in a review
+packet originates from a real DR24 difference-image exposure and its
+paired science mask / PSF products, downloaded and pixel-extracted by
+`Skills/ztf_dr24_bounded_ingest.py` and converted to `Observation` records
+by `Skills/convert_pixel_extraction_to_observations.py` — see the MP1-MP5
+evidence files cited in `docs/ZTF_DR24_PRODUCTION_GATES.md`. Do not treat a
+motion-product packet as coming from the live ZTF alert stream, ZAPS, or
+the `prv_candidates` field; live-stream ZTF discovery remains prohibited
+(CLAUDE.md DECISION-001).
+
+**Step 1 (motion-product) — Build review packets**:
+
+```bash
+git pull origin main
+export PYTHONPATH=src
+caffeinate -i uv run --python 3.14 python Skills/run_pixel_extraction_positive_control.py \
+    --nights <night1> <night2> [...] \
+    --checkpoint-dir <checkpoint_dir> \
+    --min-observations 3 \
+    --build-review-packets \
+    --review-packet-out <checkpoint_dir>/review_packets.json
+```
+
+Real `ScoredNEO` review packets are written directly to
+`<checkpoint_dir>/review_packets.json` as a plain JSON array — this is the
+`--review-packet-out` flag, not `--out` (which instead writes the full
+diagnostic report as a wrapper dict that `adversarial_review.py` cannot
+parse; this exact interface gap was found and fixed closing Gate MP6, see
+`docs/evidence/live/2026-07-17-ztf-dr24-mp6-no-submission-drill.md`). If
+`n_tracklets_linked` in the console output is 0, there is nothing to
+review — stop here.
+
+**Step 2 (motion-product) — Adversarial review and export**: run the same
+Step 2 and Step 4 commands from the ZTF DR24 alert-replay path above,
+against `<checkpoint_dir>/review_packets.json`:
+
+```bash
+uv run --python 3.14 python Skills/adversarial_review.py \
+    <checkpoint_dir>/review_packets.json --offline --json
+uv run --python 3.14 python Skills/export_ades_report.py \
+    <checkpoint_dir>/review_packets.json --out Logs/reports/<slug>_ades.psv
+```
+
+This exact mechanism was drilled end-to-end on real data (Gate MP6,
+2026-07-17): 2 real review packets from a real pixel-extracted, multi-night
+motion-consistency-linked tracklet, correctly `REJECT`ed by adversarial
+review (independent PSF-shape correlation and classifier posterior both
+agree these are not real point sources — see the MP6 evidence file above),
+then exported as valid dry-run ADES PSV text with zero network calls
+(verified by code inspection).
+
+**Step 3 (motion-product) — Your review**: same checklist as Step 3 below,
+substituting the motion-product source-attribution rule above.
+
+**Step 5 (motion-product) — MPC submission authority check**: same as the
+alert-replay path's Step 5 above — `stn=XXX` not failing closed does not
+constitute written MPC confirmation that this pipeline may submit
+motion-product-derived astrometry. No such confirmation is currently
+documented anywhere in this project for this sub-approach. Do not submit
+externally until the operator has obtained and recorded it.
+
+Steps 6 and "Forbidden communications" below apply identically to all three
 paths.
 
 ---
@@ -220,6 +302,10 @@ Once you submit, this pipeline's job is done for that candidate:
 - `docs/ALERT_PROTOCOL.md` — technical reference for the alert-pathway
   decision tree.
 - `docs/ZTF_DR24_PRODUCTION_GATES.md` — full gap register for the current
-  primary ZTF DR24 path, all gates Z0-Z7.
+  primary ZTF DR24 path, all gates Z0-Z7 and MP1-MP7.
 - `docs/evidence/live/2026-07-04-gate-z6-no-submission-drill-closed.md` —
-  the verified drill the ZTF DR24 section above is based on (Gate Z6).
+  the verified drill the ZTF DR24 alert-replay section above is based on
+  (Gate Z6).
+- `docs/evidence/live/2026-07-17-ztf-dr24-mp6-no-submission-drill.md` — the
+  verified drill the ZTF DR24 motion-product section above is based on
+  (Gate MP6).

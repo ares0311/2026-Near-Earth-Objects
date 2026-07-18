@@ -934,7 +934,42 @@ and excluded from CI.
 
 ## Current State (v0.91.0)
 
-**Latest sync (2026-07-17, formal production-readiness gate register for
+**Latest sync (2026-07-17, MP6/MP7 closed — all seven Motion-Product Gates
+CLOSED)**: Executed the MP6 closure plan written in the entry immediately
+below. Added `--build-review-packets`/`--review-packet-out` to
+`Skills/run_pixel_extraction_positive_control.py`, mirroring
+`run_archive_positive_control.py`'s existing pattern; 6 new offline tests.
+Ran it live on field 1's already-acquired checkpoints: 2 real `ScoredNEO`
+packets produced from the real pixel-extracted, multi-night-linked
+tracklets. Found and fixed a real interface gap along the way: the
+closure plan's original `--out` command writes a wrapper dict
+`Skills/adversarial_review.py` cannot parse as a `ScoredNEO` array; the new
+`--review-packet-out` flag (matching `run_pipeline.py`'s existing
+convention) writes the plain array both `adversarial_review.py` and
+`export_ades_report.py` actually expect. With that fix, the drill produced
+exactly the predicted result: `SURVIVE=0 BORDERLINE=0 REJECT=2`, with
+`artifact_posterior` FAIL (`stellar_artifact` posterior ~0.99 for both
+packets) independently agreeing with MP4's PSF-shape-correlation finding
+via a third, distinct signal. `export_ades_report.py` produced valid
+`stn=XXX` ADES PSV text; code inspection confirmed zero network-capable
+imports anywhere in the file. Evidence:
+`docs/evidence/live/2026-07-17-ztf-dr24-mp6-no-submission-drill.md`. MP7
+followed mechanically: added a "ZTF DR24 motion-product path" section to
+`docs/OPERATOR_GO_NO_GO_RUNBOOK.md`, mirroring the existing alert-replay
+section, citing the corrected command and the MP6 evidence.
+`docs/ZTF_DR24_PRODUCTION_GATES.md`'s MP6/MP7 rows and "Next Coding Step"
+section updated to CLOSED. **All seven Motion-Product Gates (MP1-MP7) are
+now CLOSED.** No candidate survived adversarial review on either tested
+field — three independent signals (geometric chi2-consistency, PSF-shape
+correlation, classifier posterior) agree this is a well-supported null
+result, not a tooling gap. Per the Production Definition, this does not
+block production readiness; a confirmed discovery is not a precondition.
+Still not authorized without further operator direction: a new
+field/wider batch, Gate Z3 resumption, or any external submission. The
+next roadmap move is again an operator decision among the same three
+options as before (try another field, resume paused Gate Z3, or pause).
+
+**Earlier sync (2026-07-17, formal production-readiness gate register for
 the motion-product path)**: Per operator request, closed the documentation
 gap identified while answering "is this project ready for production":
 `docs/PRODUCTION_READINESS.md`'s top summary was stale (last synced

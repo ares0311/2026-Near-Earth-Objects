@@ -1,6 +1,6 @@
 # Active Handoff — ZTF DR24 Motion-Product Pivot
 
-Updated: 2026-07-16
+Updated: 2026-07-17
 Repository identity: `2026 Near Earth Objects`
 Branch: `main`
 Merged batch selection: `d81af0a0` (PR #235)
@@ -131,6 +131,40 @@ Still not authorized: a wider batch, a candidate claim, Gate Z3 resumption,
 or any external submission. Two fields, six real nights, and the complete
 pipeline (extraction through linking) are now validated end-to-end with
 consistent, cross-validated null results. Next is an operator decision.
+
+## MP6/MP7 closed same day (2026-07-17) — all Motion-Product Gates now CLOSED
+
+Executed the MP6 closure plan pre-written in `docs/ZTF_DR24_PRODUCTION_GATES.md`.
+Added `--build-review-packets`/`--review-packet-out` to
+`Skills/run_pixel_extraction_positive_control.py` (mirroring
+`run_archive_positive_control.py`'s existing pattern), then ran field 1's
+checkpoints through the real `classify() -> fit_orbit() -> score() ->
+process_alert(dry_run=True)` chain: 2 real `ScoredNEO` packets produced.
+Found and fixed a real interface gap along the way: the plan's original
+`--out` command writes a wrapper dict `adversarial_review.py` cannot parse
+as a `ScoredNEO` array; the new `--review-packet-out` flag writes the plain
+array both `adversarial_review.py` and `export_ades_report.py` actually
+expect. With that fix, the drill produced exactly the predicted result:
+`SURVIVE=0 BORDERLINE=0 REJECT=2`, with `artifact_posterior` FAIL
+(`stellar_artifact` ~0.99) independently agreeing with MP4's PSF-correlation
+finding via a third distinct signal (classifier posterior, not pixel-shape
+correlation). `export_ades_report.py` produced valid `stn=XXX` ADES PSV
+text; code inspection confirmed zero network-capable imports. Evidence:
+`docs/evidence/live/2026-07-17-ztf-dr24-mp6-no-submission-drill.md`.
+
+MP7 followed mechanically: added a "ZTF DR24 motion-product path" section
+to `docs/OPERATOR_GO_NO_GO_RUNBOOK.md`, mirroring the existing alert-replay
+section, citing the corrected `--review-packet-out` command and the MP6
+evidence above.
+
+**All seven Motion-Product Gates (MP1-MP7) are now CLOSED.** No candidate
+survived adversarial review on either tested field — a well-supported null
+result (three independent signals agree: geometric chi2-consistency,
+PSF-shape correlation, and classifier posterior), not a tooling gap. Per
+the Production Definition in `docs/ZTF_DR24_PRODUCTION_GATES.md`, this does
+not block production readiness; a confirmed discovery is not a
+precondition. Still not authorized without further operator direction: a
+new field/wider batch, Gate Z3 resumption, or any external submission.
 
 ## Source-native motion-product path initiated
 

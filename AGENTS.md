@@ -941,22 +941,46 @@ and excluded from CI.
 
 ## Current State (v0.91.0)
 
-**Latest sync (2026-07-17, formal production-readiness gate register for
+**Latest sync (2026-07-17, MP6/MP7 closed — all seven Motion-Product Gates
+CLOSED)**: Added `--build-review-packets`/`--review-packet-out` to
+`Skills/run_pixel_extraction_positive_control.py`, mirroring
+`run_archive_positive_control.py`'s existing pattern, and ran it live on
+field 1's checkpoints: 2 real `ScoredNEO` packets produced from real
+pixel-extracted, multi-night-linked tracklets. Found and fixed a real
+interface gap: the prior closure plan's `--out` command writes a wrapper
+dict `Skills/adversarial_review.py` cannot parse; `--review-packet-out`
+(matching `run_pipeline.py`'s convention) writes the plain array both
+`adversarial_review.py` and `export_ades_report.py` expect. With that fix,
+the drill produced exactly the predicted result: `SURVIVE=0 BORDERLINE=0
+REJECT=2`, with `artifact_posterior` FAIL (`stellar_artifact` ~0.99)
+independently agreeing with MP4's PSF-correlation finding via a third
+distinct signal. `export_ades_report.py` produced valid `stn=XXX` ADES PSV
+text; code inspection confirmed zero network-capable imports. Evidence:
+`docs/evidence/live/2026-07-17-ztf-dr24-mp6-no-submission-drill.md`. MP7
+followed mechanically: added a "ZTF DR24 motion-product path" section to
+`docs/OPERATOR_GO_NO_GO_RUNBOOK.md`. **All seven Motion-Product Gates
+(MP1-MP7) are now CLOSED.** No candidate survived adversarial review on
+either tested field — three independent signals agree this is a
+well-supported null result. Per the Production Definition, this does not
+block production readiness. Next roadmap move is again an operator
+decision: try another field, resume paused Gate Z3, or pause.
+
+**Earlier sync (2026-07-17, formal production-readiness gate register for
 the motion-product path)**: Added a "Motion-Product Gates" (MP1-MP7)
 section to `docs/ZTF_DR24_PRODUCTION_GATES.md` (which previously only
 registered the now-superseded alert-replay sub-approach, Z0-Z7) and synced
 `docs/PRODUCTION_READINESS.md`'s stale top summary. MP1-MP5 (preflight,
 extraction, masking/dedup, PSF-scoring, multi-night linking) are CLOSED
-citing real 2026-07-16/17 evidence; MP6 (no-submission drill) and MP7
-(runbook update) are OPEN with a complete, self-contained closure plan
-(mirror `run_archive_positive_control.py`'s existing `--build-review-
-packets` pattern into `run_pixel_extraction_positive_control.py`, exact
-commands against already-acquired checkpoints, predicted result stated
-up front) so any future agent can execute it without re-deriving the
-analysis. Bottom line: the secondary WISE path already satisfies its own
-Production Definition; the primary motion-product path has real,
-validated capability but has never been formally run through positive-
-control-packet generation or the no-submission drill.
+citing real 2026-07-16/17 evidence; MP6/MP7 were OPEN at this point with a
+complete, self-contained closure plan (mirror `run_archive_positive_
+control.py`'s existing `--build-review-packets` pattern into `run_pixel_
+extraction_positive_control.py`, exact commands against already-acquired
+checkpoints, predicted result stated up front) so any future agent could
+execute it without re-deriving the analysis — see the entry above for the
+real closure. Bottom line: the secondary WISE path already satisfies its
+own Production Definition; the primary motion-product path has real,
+validated capability but had not yet been formally run through
+positive-control-packet generation or the no-submission drill.
 
 **Earlier sync (2026-07-17, second field confirms the null result)**: Ran
 the fully-validated pipeline (unchanged) against a field chosen by

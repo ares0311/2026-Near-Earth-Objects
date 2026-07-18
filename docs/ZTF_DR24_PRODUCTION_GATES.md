@@ -63,10 +63,19 @@ agent (this session or a fresh one, Claude or Codex) picks this up.
 | MP3: Artifact rejection (masking + dedup) | **CLOSED (2026-07-16)** | The detector applies the exposure's real `science_mask` (nonzero pixels excluded) and uses `scipy.ndimage.label` connected-component deduplication so one physical residual becomes one candidate, not several. Real result: 855 raw pixel-hits -> 74 after masking -> 71 connected components on the same exposure. See `docs/evidence/live/2026-07-16-ztf-dr24-pixel-extraction-pilot-masking-dedup.md`. |
 | MP4: PSF-shape confidence gate | **CLOSED (2026-07-16)** | Each candidate's cutout is Pearson-correlated against the exposure's real `difference_psf` kernel. A real injected synthetic Gaussian source correlates >0.95 against its own generating shape (proves the method works); real candidates on the tested exposure correlate <=0.18 (proves the method discriminates). See `docs/evidence/live/2026-07-16-ztf-dr24-pixel-extraction-pilot-psf-scoring.md`. |
 | MP5: Multi-night motion-consistency linking | **CLOSED (2026-07-17)** | `Skills/convert_pixel_extraction_to_observations.py` + `Skills/run_pixel_extraction_positive_control.py` reuse the real `preprocess()`+`link()` chain across multiple real nights (bypassing `detect()`'s WISE/DECam/TESS-only singleton gate, root-caused not guessed -- see the script's own module docstring). Validated on 2 independently-selected fields (6 real nights total): `min_observations=2` shows the expected crowded-field combinatorial explosion (200 tracklets each field); the real `min_observations=3` default collapses this to 2 and 5 survivors respectively, all of which fail MP4's independent PSF check. See `docs/evidence/live/2026-07-17-ztf-dr24-multi-night-linking-first-test.md` and `docs/evidence/live/2026-07-17-ztf-dr24-selected-field-linking-test.md`. |
-| MP6: No-submission package drill | **OPEN** | Exact closure plan below. Mirrors Gate Z6's already-proven pattern. |
-| MP7: Operator runbook update | **OPEN** | Blocked on MP6 (cites its evidence). Exact closure plan below. |
+| MP6: No-submission package drill | **CLOSED (2026-07-17)** | `Skills/run_pixel_extraction_positive_control.py --build-review-packets` runs every tracklet linked from real pixel-extracted candidates through the real `classify() -> fit_orbit() -> score() -> process_alert(dry_run=True)` chain. Real result on field 1's 2 surviving tracklets: `Skills/adversarial_review.py --offline` reported `SURVIVE=0 BORDERLINE=0 REJECT=2` (predicted before running), with `artifact_posterior` FAIL (`stellar_artifact` ~0.99) independently agreeing with MP4's PSF-correlation finding via a third distinct signal. `Skills/export_ades_report.py` produced valid ADES PSV text with `stn=XXX`; code-inspection confirmed zero network-capable imports. Found and fixed a real interface gap along the way: the original closure plan's `--out` command produced a wrapper dict `adversarial_review.py` cannot parse; a new `--review-packet-out` flag (matching `run_pipeline.py`'s existing convention) writes the plain `ScoredNEO` array both downstream tools expect. See `docs/evidence/live/2026-07-17-ztf-dr24-mp6-no-submission-drill.md`. |
+| MP7: Operator runbook update | **CLOSED (2026-07-17)** | `docs/OPERATOR_GO_NO_GO_RUNBOOK.md` now has a "ZTF DR24 motion-product path" section covering the real `--build-review-packets --review-packet-out` packet location, the exact verified `adversarial_review.py`/`export_ades_report.py` commands, the same operator-review checklist as the other paths, and an explicit statement that motion-product-path submission authority is not yet confirmed in writing with MPC. Cites the real MP6 drill above as the verified basis. |
 
-### MP6 closure plan — no-submission package drill
+### MP6 closure plan — no-submission package drill (CLOSED — kept for reference)
+
+**Closed 2026-07-17.** See the MP6 gate row above and
+`docs/evidence/live/2026-07-17-ztf-dr24-mp6-no-submission-drill.md` for the
+real drill result. The plan text below is left in place, corrected, as a
+reference for how the drill was actually run — including the real
+`--review-packet-out` gap found and fixed along the way (Step 3's original
+text used only `--out`, which does not produce a format
+`adversarial_review.py`/`export_ades_report.py` can consume; use
+`--review-packet-out` instead, as corrected below).
 
 **Objective**: prove that a real tracklet produced by this pipeline can be
 carried through `classify() -> fit_orbit() -> score() -> process_alert
@@ -100,8 +109,12 @@ caffeinate -i uv run --python 3.14 python Skills/run_pixel_extraction_positive_c
     --checkpoint-dir Logs/pipeline_runs/ztf_dr24_pixel_extraction_positive_control \
     --min-observations 3 \
     --build-review-packets \
-    --out Logs/pipeline_runs/ztf_dr24_pixel_extraction_positive_control/review_packets.json
+    --review-packet-out Logs/pipeline_runs/ztf_dr24_pixel_extraction_positive_control/review_packets.json
 ```
+
+(Corrected 2026-07-17: use `--review-packet-out`, not `--out`, to get the
+plain `ScoredNEO` array `adversarial_review.py`/`export_ades_report.py`
+expect -- see the real gap found in the MP6 evidence file cited above.)
 
 Expect 2 real `ScoredNEO` review packets (matching MP5's 2 surviving
 tracklets on this field). Repeat for the second field's checkpoint dir
@@ -172,12 +185,19 @@ Do not stop merely because no candidate has been found.
 
 ## Next Coding Step
 
-**Current as of 2026-07-17 (v0.91.0)**: the active register is the
-Motion-Product Gates section above. MP1-MP5 are CLOSED with real data;
-**MP6 (no-submission package drill) is the concrete next coding step**,
-with a complete, self-contained closure plan already written out under
-"MP6 closure plan" above -- follow it directly, no re-derivation needed.
-MP7 follows mechanically once MP6 closes.
+**Current as of 2026-07-17**: all seven Motion-Product Gates (MP1-MP7) are
+now **CLOSED** with real data. MP6's no-submission drill produced the
+predicted `REJECT=2` result (a third independent signal agreeing with
+MP4/MP5 that no real point source survives on the tested field), and MP7's
+operator runbook update is complete. No candidate has survived adversarial
+review on either tested field. Per the Production Definition above, this
+is not itself a readiness gap -- production readiness does not require a
+confirmed discovery. The next roadmap move is again an operator decision
+(same three options listed under `CLAUDE.md`'s "Immediate Next Steps": try
+another field via `Skills/select_survey_fields.py`, resume the paused Z3
+alert-replay identity search, or pause pending a different direction). Do
+not select a new field or start a new bulk transfer without that
+direction.
 
 **Z0-Z7 below are the superseded alert-replay sub-approach's gate history**
 (see the pivot notice near the top of this file). Gates Z1, Z2, Z4, Z5, Z6,

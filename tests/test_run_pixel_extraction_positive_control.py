@@ -131,6 +131,123 @@ def test_known_bad_pure_noise_forms_no_tracklet(tmp_path):
     assert report["n_tracklets_linked"] == 0
 
 
+def test_build_review_packets_produces_real_scored_neo_dicts(tmp_path):
+    """MP6 no-submission package drill: build_review_packets=True must run
+    every linked tracklet through the real classify -> fit_orbit -> score ->
+    process_alert(dry_run=True) chain and include the resulting ScoredNEO
+    dicts in the report. Never submits externally (process_alert is always
+    called with dry_run=True in this path)."""
+    nights = _write_two_night_checkpoints(tmp_path)
+    report = run_pixel_extraction_positive_control.run_positive_control(
+        nights, tmp_path, min_observations=2, build_review_packets=True
+    )
+    assert report["n_tracklets_linked"] > 0
+    assert "review_packets" in report
+    assert len(report["review_packets"]) == report["n_tracklets_linked"]
+    packet = report["review_packets"][0]
+    assert "hazard" in packet
+    assert "posterior" in packet
+    assert "metadata" in packet
+
+
+def test_build_review_packets_false_omits_key_by_default(tmp_path):
+    nights = _write_two_night_checkpoints(tmp_path)
+    report = run_pixel_extraction_positive_control.run_positive_control(
+        nights, tmp_path, min_observations=2
+    )
+    assert "review_packets" not in report
+
+
+def test_build_review_packets_with_zero_tracklets_produces_empty_list(tmp_path):
+    """malformed-adjacent edge case: requesting review packets when nothing
+    linked must not crash or fabricate packets -- an empty list, not a
+    missing key, since the flag was explicitly requested."""
+    nights = _write_two_night_checkpoints(tmp_path)
+    report = run_pixel_extraction_positive_control.run_positive_control(
+        nights, tmp_path, min_observations=100, build_review_packets=True
+    )
+    assert report["n_tracklets_linked"] == 0
+    assert report["review_packets"] == []
+
+
+def test_cli_build_review_packets_flag_writes_packets(tmp_path, monkeypatch):
+    nights = _write_two_night_checkpoints(tmp_path)
+    out_path = tmp_path / "report.json"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_pixel_extraction_positive_control.py",
+            "--nights",
+            *nights,
+            "--checkpoint-dir",
+            str(tmp_path),
+            "--min-observations",
+            "2",
+            "--build-review-packets",
+            "--out",
+            str(out_path),
+        ],
+    )
+    run_pixel_extraction_positive_control.main()
+    written = json.loads(out_path.read_text())
+    assert "review_packets" in written
+    assert len(written["review_packets"]) == written["n_tracklets_linked"]
+
+
+def test_cli_review_packet_out_writes_plain_scored_neo_list(tmp_path, monkeypatch):
+    """Regression test for the real gap found running MP6 live: feeding the
+    full --out report (a wrapper dict with 'review_packets' among other
+    keys) into Skills/adversarial_review.py fails schema validation because
+    that tool expects a plain JSON array of ScoredNEO dicts. --review-
+    packet-out must write exactly that plain array, matching
+    Skills/run_pipeline.py's existing --review-packet-out convention."""
+    nights = _write_two_night_checkpoints(tmp_path)
+    packets_path = tmp_path / "packets.json"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_pixel_extraction_positive_control.py",
+            "--nights",
+            *nights,
+            "--checkpoint-dir",
+            str(tmp_path),
+            "--min-observations",
+            "2",
+            "--build-review-packets",
+            "--review-packet-out",
+            str(packets_path),
+        ],
+    )
+    run_pixel_extraction_positive_control.main()
+    written = json.loads(packets_path.read_text())
+    assert isinstance(written, list)
+    assert len(written) > 0
+    assert all("hazard" in packet and "posterior" in packet for packet in written)
+
+
+def test_cli_review_packet_out_requires_build_review_packets(tmp_path, monkeypatch):
+    import pytest
+
+    nights = _write_two_night_checkpoints(tmp_path)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_pixel_extraction_positive_control.py",
+            "--nights",
+            *nights,
+            "--checkpoint-dir",
+            str(tmp_path),
+            "--review-packet-out",
+            str(tmp_path / "packets.json"),
+        ],
+    )
+    with pytest.raises(SystemExit, match="requires --build-review-packets"):
+        run_pixel_extraction_positive_control.main()
+
+
 def test_missing_checkpoint_fails_loudly(tmp_path):
     import pytest
 
