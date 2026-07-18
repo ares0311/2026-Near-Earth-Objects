@@ -33,23 +33,28 @@ products, per operator decision (`docs/ACTIVE_HANDOFF.md`). The
 sub-approach; it remains as accurate historical evidence, not current
 status.
 
-Under the new path, real live work across 2026-07-16/17 built and
+Under the new path, real live work across 2026-07-16/18 built and
 validated, end to end on real data: bounded preflight verification,
 single-exposure pixel extraction, bad-pixel masking, connected-component
 deduplication, PSF-shape confidence scoring, and multi-night
 motion-consistency linking (reusing the existing `src/link.py`). This was
-independently validated on three separately-selected fields (one
-convenience field, two chosen via `Skills/select_survey_fields.py`'s
-documented scoring) totaling 9 real nights — all three produced a
-consistent, honest null result: the geometric linker's real
-`min_observations=3` default (chi2 orbit-consistency required) reduces
-each field's raw combinatorial candidate pool to a handful of survivors
-(or zero, for the third field), and every survivor across the first two
-fields fails independent PSF-shape cross-validation (max correlation 0.168
-vs >0.95 for a genuine injected source). See
+independently validated on four separately-selected fields (one
+convenience field, three chosen via `Skills/select_survey_fields.py`'s
+documented scoring) totaling 12 real nights — all four produced a
+consistent, honest null result under two independent checks: the
+geometric linker's real `min_observations=3` default (chi2
+orbit-consistency required) reduces each field's raw combinatorial
+candidate pool to a small survivor set (2, 5, 0, and 6 survivors across
+the four fields), and every survivor across all four fields fails
+independent PSF-shape cross-validation (max correlation 0.187 vs >0.95 for
+a genuine injected source) and/or adversarial review's classifier
+posteriors. Field 4 is the clearest demonstration that the two checks are
+doing real work: it produced the most raw survivors (6) of any field, and
+both independent checks still correctly rejected all of them. See
 `docs/evidence/live/2026-07-17-ztf-dr24-multi-night-linking-first-test.md`,
 `docs/evidence/live/2026-07-17-ztf-dr24-selected-field-linking-test.md`,
-and `docs/evidence/live/2026-07-17-ztf-dr24-third-field-linking-test.md`.
+`docs/evidence/live/2026-07-17-ztf-dr24-third-field-linking-test.md`, and
+`docs/evidence/live/2026-07-18-ztf-dr24-fourth-field-linking-test.md`.
 
 **This is now formally gated and CLOSED (2026-07-17).** The new
 motion-product path has now been run against this file's own Production

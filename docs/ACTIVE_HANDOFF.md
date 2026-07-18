@@ -1,6 +1,6 @@
 # Active Handoff — ZTF DR24 Motion-Product Pivot
 
-Updated: 2026-07-17 (third-field expansion)
+Updated: 2026-07-18 (fourth-field expansion)
 Repository identity: `2026 Near Earth Objects`
 Branch: `main`
 Merged batch selection: `d81af0a0` (PR #235)
@@ -191,6 +191,32 @@ packet list. Evidence:
 total, now show consistent null results** across the fully-validated
 pipeline. Still not authorized without further operator direction: a wider
 batch, a candidate claim, Gate Z3 resumption, or any external submission.
+
+## Fourth field expanded (2026-07-18), continuing "expand to more fields"
+
+Selected rank 3 of the same `--mode aten --top-n 20` batch that gave
+fields 2 and 3: **RA 48.71, Dec 22.5, score 0.8879**. Acquired 3 real
+nights (20180713, 20180716, 20180719) of real ZTF field 556.
+
+**Result**: `min_observations=2` gave 200 tracklets (capped); the real
+default `min_observations=3` gave **6** survivors -- the most of any
+field tested so far. All 6 were correctly REJECTED by
+`Skills/adversarial_review.py --offline` (`artifact_posterior`:
+`stellar_artifact` ~0.99 for every packet; `neo_dominance`: `neo_candidate`
+~0.001 for every packet; 2 of the 6 also failed the hard motion-rate
+bound as near-stationary pairings). Independently, PSF-shape correlation
+against each night's real PSF kernel maxed at 0.077/0.124/0.187 -- far
+below the >0.5 real-source threshold, consistent with fields 1-3.
+`Skills/export_ades_report.py` produced valid dry-run ADES PSV for all 6.
+Evidence:
+`docs/evidence/live/2026-07-18-ztf-dr24-fourth-field-linking-test.md`.
+
+**Four consecutive algorithmically-selected fields, twelve real nights
+total, now show consistent null results** under both independent
+verification signals (chi2 geometric consistency + classifier
+posterior/PSF-shape). Still not authorized without further operator
+direction: a wider batch, a candidate claim, Gate Z3 resumption, or any
+external submission.
 
 ## Source-native motion-product path initiated
 
