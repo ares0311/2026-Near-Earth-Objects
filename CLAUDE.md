@@ -934,7 +934,32 @@ and excluded from CI.
 
 ## Current State (v0.91.0)
 
-**Latest sync (2026-07-17, MP6/MP7 closed — all seven Motion-Product Gates
+**Latest sync (2026-07-17, third field expanded — three consecutive null
+results)**: Per operator decision ("expand to more fields," chosen among a
+structured 3-option decision offered after MP6/MP7 closed: expand vs.
+resume Gate Z3 vs. pause), selected rank 2 of the same `--mode aten
+--top-n 20` batch that gave field 2 (RA 54.35, Dec 15.0, score 0.8997).
+Acquired 3 real nights (20180807, 20180810, 20180813) of real ZTF field
+506 via the identical, unmodified pixel-extraction pipeline; verified each
+single-exposure JD window locally against the already-fetched metadata
+table before any further downloads (one window initially collided with a
+near-simultaneous adjacent-field exposure ~35s apart, caught and narrowed
+before running). Result: `min_observations=2` gave 71 tracklets;
+`min_observations=3` gave **zero** — a cleaner null result than fields 1
+(2 survivors) and 2 (5 survivors), since the chi2 filter rejected every
+candidate outright with nothing left to run through PSF-shape
+cross-validation or adversarial review. `data_selection/
+target_priority_queue.csv` updated: field 2's row marked `null_result`
+(closing a real gap — it had stayed `not_searched` despite being fully
+processed), field 3's row marked `null_result` citing the new evidence.
+Evidence:
+`docs/evidence/live/2026-07-17-ztf-dr24-third-field-linking-test.md`.
+**Three consecutive algorithmically-selected fields, nine real nights
+total, now show consistent null results.** Still not authorized without
+further operator direction: a wider batch, a candidate claim, Gate Z3
+resumption, or any external submission.
+
+**Earlier sync (2026-07-17, MP6/MP7 closed — all seven Motion-Product Gates
 CLOSED)**: Executed the MP6 closure plan written in the entry immediately
 below. Added `--build-review-packets`/`--review-packet-out` to
 `Skills/run_pixel_extraction_positive_control.py`, mirroring
