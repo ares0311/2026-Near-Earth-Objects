@@ -6,7 +6,25 @@ body below is unchanged historical evidence from 2026-07-02; current gate
 status for the active ZTF DR24 path lives in
 `docs/ZTF_DR24_PRODUCTION_GATES.md`, which is kept current every session)
 
-**Active-directive sync (2026-07-17, motion-product pivot supersedes the
+**Active-directive sync (2026-07-17, MP6/MP7 closed — all seven
+Motion-Product Gates now CLOSED)**: The formal gap flagged by the entry
+immediately below (requirement 1 and requirement 3 not yet exercised on
+this pipeline's real tracklets) is now closed. `Skills/run_pixel_
+extraction_positive_control.py --build-review-packets` ran field 1's real
+pixel-extracted, multi-night-linked tracklets through the full `classify()
+-> fit_orbit() -> score() -> process_alert(dry_run=True)` chain, producing
+2 real `ScoredNEO` packets; `Skills/adversarial_review.py` correctly
+REJECTed both (predicted before running, confirmed exactly), and
+`Skills/export_ades_report.py` produced valid dry-run ADES PSV text with
+zero network calls. See
+`docs/evidence/live/2026-07-17-ztf-dr24-mp6-no-submission-drill.md` and
+`docs/ZTF_DR24_PRODUCTION_GATES.md`'s MP6/MP7 rows. Per this file's own
+Production Definition, a confirmed discovery is not a precondition for
+readiness — the motion-product path's full pipeline (extraction through
+no-submission packaging) is now validated end-to-end on real data with a
+well-supported null result, not an unexercised gap.
+
+**Earlier sync (2026-07-17, motion-product pivot supersedes the
 2026-07-14 alert-replay entry below)**: The primary ZTF DR24 discovery
 path changed on 2026-07-16 from transient-alert (`prv_candidates`) replay
 to source-native pixel extraction over DR24 motion-designed image
@@ -31,17 +49,17 @@ vs >0.95 for a genuine injected source). See
 `docs/evidence/live/2026-07-17-ztf-dr24-multi-night-linking-first-test.md`
 and `docs/evidence/live/2026-07-17-ztf-dr24-selected-field-linking-test.md`.
 
-**This is not yet formally gated.** The new motion-product path has never
-been run against this file's own Production Definition (below) the way the
-WISE/DECam/TESS path was via Gates P1-P5. Concretely: requirement 1
+**This is now formally gated and CLOSED (2026-07-17).** The new
+motion-product path has now been run against this file's own Production
+Definition (below) the same way the WISE/DECam/TESS path was via Gates
+P1-P5 — all seven Motion-Product Gates (MP1-MP7) in
+`docs/ZTF_DR24_PRODUCTION_GATES.md` are CLOSED. Requirement 1
 (positive-control/injection-recovery proof to a full `ScoredNEO` packet)
-and requirement 3 (no-submission end-to-end drill) have not been exercised
-on this pipeline's real tracklets. This is a bounded, well-scoped, mostly-
-mechanical gap (the exact mirrored pattern that closed the equivalent gate
-for the old alert-replay path already exists and works — see Gate Z6 in
-`docs/ZTF_DR24_PRODUCTION_GATES.md`), not an open-ended readiness question.
-A precise, self-contained closure plan (gates MP1-MP7) is recorded in
-`docs/ZTF_DR24_PRODUCTION_GATES.md`'s "Motion-Product Gates" section.
+and requirement 3 (no-submission end-to-end drill) have both now been
+exercised on this pipeline's real tracklets, mirroring the pattern that
+closed the equivalent gate for the old alert-replay path (Gate Z6 in
+`docs/ZTF_DR24_PRODUCTION_GATES.md`). See the active-directive sync entry
+above for the real evidence.
 
 **Earlier sync (2026-07-14, superseded alert-replay entry, historical
 evidence only)**: Sparse expansion run

@@ -83,11 +83,22 @@ def load_observations_from_checkpoints(nights: list[str], checkpoint_dir: Path):
 
 
 def run_positive_control(
-    nights: list[str], checkpoint_dir: Path, min_observations: int = 3
+    nights: list[str],
+    checkpoint_dir: Path,
+    min_observations: int = 3,
+    build_review_packets: bool = False,
 ) -> dict:
     """preprocess() every real observation, wrap each surviving one as its
     own 1-observation RawCandidate (mission-agnostic version of detect.py's
-    `_preserve_discovery_archive_singletons`), then run the real link()."""
+    `_preserve_discovery_archive_singletons`), then run the real link().
+
+    When build_review_packets is True, every linked tracklet is also run
+    through classify() -> fit_orbit() -> score() -> process_alert(dry_run=True)
+    -- the exact same pattern Skills/run_archive_positive_control.py uses
+    for Gate Z6's no-submission drill -- and the resulting ScoredNEO dicts
+    are included in the report under "review_packets". This never submits
+    anything externally (process_alert is always called with dry_run=True
+    here) and never claims "confirmed NEO"."""
     from link import link
     from preprocess import preprocess
     from schemas import RawCandidate
@@ -162,6 +173,32 @@ def run_positive_control(
             flush=True,
         )
 
+    review_packets: list[dict] = []
+    if build_review_packets and n_tracklets > 0:
+        from alert import process_alert
+        from classify import classify
+        from orbit import fit_orbit
+        from score import score
+
+        for i, trk in enumerate(link_result.tracklets, start=1):
+            print(
+                f"[control]   [review-packet] ({i}/{n_tracklets}) {trk.object_id}  "
+                f"elapsed {_fmt_duration(time.monotonic() - t0)}",
+                flush=True,
+            )
+            features, posterior = classify(trk)
+            orbital = fit_orbit(trk)
+            scored = score(trk, features, posterior, orbital)
+            process_alert(scored, dry_run=True)  # never submits; dry_run is fixed True here
+            review_packets.append(scored.model_dump(mode="json"))
+        print(
+            f"[control] Built {len(review_packets)} real ScoredNEO review "
+            "packet(s) from real pixel-extracted tracklets (dry-run only, "
+            "no external submission)  "
+            f"elapsed {_fmt_duration(time.monotonic() - t0)}",
+            flush=True,
+        )
+
     report = {
         "nights": nights,
         "min_observations": min_observations,
@@ -172,6 +209,8 @@ def run_positive_control(
         "tracklets": tracklet_summaries,
         "elapsed_seconds": round(time.monotonic() - t0, 2),
     }
+    if build_review_packets:
+        report["review_packets"] = review_packets
 
     if n_tracklets == 0:
         print(
@@ -198,13 +237,46 @@ def main() -> None:
     parser.add_argument("--checkpoint-dir", type=Path, default=_DEFAULT_CHECKPOINT_DIR)
     parser.add_argument("--min-observations", type=int, default=3)
     parser.add_argument("--out", type=Path, default=None)
+    parser.add_argument(
+        "--build-review-packets",
+        action="store_true",
+        help="Also run every linked tracklet through classify() -> "
+        "fit_orbit() -> score() -> process_alert(dry_run=True) and include "
+        "the resulting real ScoredNEO dicts in the report under "
+        "'review_packets' -- for MP6's no-submission package drill. "
+        "Never submits externally; dry_run is fixed True.",
+    )
+    parser.add_argument(
+        "--review-packet-out",
+        type=Path,
+        default=None,
+        help="Optional path to write JUST the review_packets list (a plain "
+        "JSON array of ScoredNEO dicts), matching Skills/run_pipeline.py's "
+        "--review-packet-out convention -- this is the format "
+        "Skills/adversarial_review.py and Skills/export_ades_report.py "
+        "expect as input, not the full diagnostic report --out writes. "
+        "Requires --build-review-packets.",
+    )
     args = parser.parse_args()
 
-    report = run_positive_control(args.nights, args.checkpoint_dir, args.min_observations)
+    if args.review_packet_out and not args.build_review_packets:
+        raise SystemExit("--review-packet-out requires --build-review-packets")
+
+    report = run_positive_control(
+        args.nights, args.checkpoint_dir, args.min_observations, args.build_review_packets
+    )
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(json.dumps(report, indent=2))
         print(f"[control] Wrote {args.out}", flush=True)
+    if args.review_packet_out:
+        args.review_packet_out.parent.mkdir(parents=True, exist_ok=True)
+        args.review_packet_out.write_text(json.dumps(report["review_packets"], indent=2))
+        print(
+            f"[control] Wrote {len(report['review_packets'])} review packet(s) to "
+            f"{args.review_packet_out}",
+            flush=True,
+        )
 
 
 if __name__ == "__main__":
