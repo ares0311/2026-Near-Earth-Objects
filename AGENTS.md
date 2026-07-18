@@ -941,7 +941,20 @@ and excluded from CI.
 
 ## Current State (v0.91.0)
 
-**Latest sync (2026-07-17, third field expanded — three consecutive null
+**Latest sync (2026-07-18, fourth field expanded — four consecutive null
+results under two independent checks)**: Selected rank 3 of the same
+`--mode aten --top-n 20` batch that gave fields 2 and 3 (RA 48.71, Dec
+22.5, score 0.8879). Acquired 3 real nights (20180713, 20180716,
+20180719) of real ZTF field 556. Result: `min_observations=3` gave **6**
+survivors — the most of any field yet — but all 6 REJECTED by
+`Skills/adversarial_review.py --offline` (`artifact_posterior` ~0.99,
+`neo_dominance` ~0.001) and all fail independent PSF-shape
+cross-validation (max correlation 0.187 vs >0.5 threshold). Evidence:
+`docs/evidence/live/2026-07-18-ztf-dr24-fourth-field-linking-test.md`.
+**Four consecutive fields, twelve real nights total, now show consistent
+null results under both independent checks.**
+
+**Earlier sync (2026-07-17, third field expanded — three consecutive null
 results)**: Per operator decision ("expand to more fields"), selected rank
 2 of the same `--mode aten --top-n 20` batch that gave field 2 (RA 54.35,
 Dec 15.0, score 0.8997). Acquired 3 real nights (20180807, 20180810,

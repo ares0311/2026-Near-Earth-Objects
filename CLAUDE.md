@@ -934,7 +934,31 @@ and excluded from CI.
 
 ## Current State (v0.91.0)
 
-**Latest sync (2026-07-17, third field expanded — three consecutive null
+**Latest sync (2026-07-18, fourth field expanded — four consecutive null
+results under two independent checks)**: Continued the operator-approved
+field expansion. Selected rank 3 of the same `--mode aten --top-n 20`
+batch that gave fields 2 and 3 (RA 48.71, Dec 22.5, score 0.8879).
+Acquired 3 real nights (20180713, 20180716, 20180719) of real ZTF field
+556. Result: `min_observations=2` gave 200 tracklets (capped);
+`min_observations=3` gave **6** survivors — the most of any field tested
+so far. All 6 REJECTED by `Skills/adversarial_review.py --offline`
+(`artifact_posterior` ~0.99, `neo_dominance` ~0.001 for every packet; 2 of
+6 additionally failed the hard motion-rate bound as near-stationary
+pairings). Independently, PSF-shape correlation maxed at 0.187 across all
+three nights — far below the >0.5 real-source threshold, consistent with
+fields 1-3. `data_selection/target_priority_queue.csv`'s rank-3 row marked
+`null_result`. Evidence:
+`docs/evidence/live/2026-07-18-ztf-dr24-fourth-field-linking-test.md`.
+**Four consecutive algorithmically-selected fields, twelve real nights
+total, now show consistent null results under both independent
+verification signals** (chi2 geometric consistency + classifier
+posterior/PSF-shape). This is the clearest demonstration yet that the two
+independent checks are doing real work: field 4 formed the most raw
+survivors of any field, and both checks still correctly rejected all of
+them. Still not authorized without further operator direction: a wider
+batch, a candidate claim, Gate Z3 resumption, or any external submission.
+
+**Earlier sync (2026-07-17, third field expanded — three consecutive null
 results)**: Per operator decision ("expand to more fields," chosen among a
 structured 3-option decision offered after MP6/MP7 closed: expand vs.
 resume Gate Z3 vs. pause), selected rank 2 of the same `--mode aten
