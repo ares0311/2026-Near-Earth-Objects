@@ -1,6 +1,6 @@
 # Active Handoff — ZTF DR24 Motion-Product Pivot
 
-Updated: 2026-07-17
+Updated: 2026-07-17 (third-field expansion)
 Repository identity: `2026 Near Earth Objects`
 Branch: `main`
 Merged batch selection: `d81af0a0` (PR #235)
@@ -165,6 +165,32 @@ the Production Definition in `docs/ZTF_DR24_PRODUCTION_GATES.md`, this does
 not block production readiness; a confirmed discovery is not a
 precondition. Still not authorized without further operator direction: a
 new field/wider batch, Gate Z3 resumption, or any external submission.
+
+## Third field expanded same day (2026-07-17), per operator decision to keep expanding
+
+Jerome W. Lindsey III chose "expand to more fields" over resuming Gate Z3
+or pausing (offered as a structured 3-option decision after MP6/MP7
+closed). Selected rank 2 of the same `--mode aten --top-n 20` batch that
+gave field 2 (RA 217.41, Dec -15.0, now marked `null_result` in
+`data_selection/target_priority_queue.csv`): **RA 54.35, Dec 15.0, score
+0.8997**. Acquired 3 real nights (20180807, 20180810, 20180813) of real
+ZTF field 506 via the identical, unmodified pixel-extraction pipeline.
+
+**Result**: `min_observations=2` gave 71 tracklets (lower than either
+prior field's 200, consistent with this field's lower raw per-night
+candidate counts: 18/200-capped/53). The real default `min_observations=3`
+gave **zero** tracklets -- a cleaner null result than fields 1 (2
+survivors) and 2 (5 survivors), since the chi2 orbit-consistency filter
+rejected every combinatorial candidate outright with nothing left to run
+through PSF-shape cross-validation or adversarial review.
+`--build-review-packets --review-packet-out` correctly wrote an empty
+packet list. Evidence:
+`docs/evidence/live/2026-07-17-ztf-dr24-third-field-linking-test.md`.
+
+**Three consecutive algorithmically-selected fields, nine real nights
+total, now show consistent null results** across the fully-validated
+pipeline. Still not authorized without further operator direction: a wider
+batch, a candidate claim, Gate Z3 resumption, or any external submission.
 
 ## Source-native motion-product path initiated
 

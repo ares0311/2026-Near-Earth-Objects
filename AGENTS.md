@@ -941,7 +941,25 @@ and excluded from CI.
 
 ## Current State (v0.91.0)
 
-**Latest sync (2026-07-17, MP6/MP7 closed — all seven Motion-Product Gates
+**Latest sync (2026-07-17, third field expanded — three consecutive null
+results)**: Per operator decision ("expand to more fields"), selected rank
+2 of the same `--mode aten --top-n 20` batch that gave field 2 (RA 54.35,
+Dec 15.0, score 0.8997). Acquired 3 real nights (20180807, 20180810,
+20180813) of real ZTF field 506 via the identical, unmodified
+pixel-extraction pipeline. Result: `min_observations=2` gave 71
+tracklets; `min_observations=3` gave **zero** — a cleaner null result than
+fields 1 (2 survivors) and 2 (5 survivors), since the chi2 filter rejected
+every candidate outright. `data_selection/target_priority_queue.csv`
+updated: field 2's row marked `null_result` (it had stayed `not_searched`
+despite being fully processed), field 3's row marked `null_result`.
+Evidence:
+`docs/evidence/live/2026-07-17-ztf-dr24-third-field-linking-test.md`.
+**Three consecutive algorithmically-selected fields, nine real nights
+total, now show consistent null results.** Still not authorized without
+further operator direction: a wider batch, a candidate claim, Gate Z3
+resumption, or any external submission.
+
+**Earlier sync (2026-07-17, MP6/MP7 closed — all seven Motion-Product Gates
 CLOSED)**: Added `--build-review-packets`/`--review-packet-out` to
 `Skills/run_pixel_extraction_positive_control.py`, mirroring
 `run_archive_positive_control.py`'s existing pattern, and ran it live on

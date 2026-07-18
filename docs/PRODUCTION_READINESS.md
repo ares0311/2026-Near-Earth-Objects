@@ -38,16 +38,18 @@ validated, end to end on real data: bounded preflight verification,
 single-exposure pixel extraction, bad-pixel masking, connected-component
 deduplication, PSF-shape confidence scoring, and multi-night
 motion-consistency linking (reusing the existing `src/link.py`). This was
-independently validated on two separately-selected fields (one convenience
-field, one chosen via `Skills/select_survey_fields.py`'s documented
-scoring) totaling 6 real nights — both produced a consistent, honest null
-result: the geometric linker's real `min_observations=3` default (chi2
-orbit-consistency required) reduces each field's raw combinatorial
-candidate pool to a handful of survivors, and every survivor across both
+independently validated on three separately-selected fields (one
+convenience field, two chosen via `Skills/select_survey_fields.py`'s
+documented scoring) totaling 9 real nights — all three produced a
+consistent, honest null result: the geometric linker's real
+`min_observations=3` default (chi2 orbit-consistency required) reduces
+each field's raw combinatorial candidate pool to a handful of survivors
+(or zero, for the third field), and every survivor across the first two
 fields fails independent PSF-shape cross-validation (max correlation 0.168
 vs >0.95 for a genuine injected source). See
-`docs/evidence/live/2026-07-17-ztf-dr24-multi-night-linking-first-test.md`
-and `docs/evidence/live/2026-07-17-ztf-dr24-selected-field-linking-test.md`.
+`docs/evidence/live/2026-07-17-ztf-dr24-multi-night-linking-first-test.md`,
+`docs/evidence/live/2026-07-17-ztf-dr24-selected-field-linking-test.md`,
+and `docs/evidence/live/2026-07-17-ztf-dr24-third-field-linking-test.md`.
 
 **This is now formally gated and CLOSED (2026-07-17).** The new
 motion-product path has now been run against this file's own Production
