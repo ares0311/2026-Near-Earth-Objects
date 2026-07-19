@@ -32,6 +32,7 @@ docs/evidence/live/2026-07-05-gate-z2-first-obs-verified.md.
 
 from __future__ import annotations
 
+import math
 from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict
@@ -103,6 +104,25 @@ def known_as_of(known_objects: list[KnownObject], cutoff: date) -> list[KnownObj
     data field happened to be blank).
     """
     return [obj for obj in known_objects if obj.first_obs is not None and obj.first_obs <= cutoff]
+
+
+def known_at_observation_jd(
+    first_observation_jd: float | None,
+    observation_jd: float,
+) -> bool:
+    """Return whether published history establishes knowledge by an exact JD.
+
+    Missing or non-finite evidence never suppresses a candidate as known. The
+    adversarial caller separately fails closed when its required provider
+    evidence is missing, while this pure predicate preserves the module's
+    no-future-catalog-leakage direction of error.
+    """
+    return (
+        first_observation_jd is not None
+        and math.isfinite(first_observation_jd)
+        and math.isfinite(observation_jd)
+        and first_observation_jd <= observation_jd
+    )
 
 
 def validate_snapshot_usable_for_replay(

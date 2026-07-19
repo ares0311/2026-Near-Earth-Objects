@@ -39,6 +39,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import sys
@@ -50,7 +51,8 @@ from typing import Literal
 # Allow running directly as a script or via PYTHONPATH=src
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from schemas import ScoredNEO
+from known_object_exclusion import known_at_observation_jd
+from schemas import Observation, ScoredNEO
 
 # ---------------------------------------------------------------------------
 # Type aliases
@@ -88,8 +90,12 @@ _RB_GATE = 0.90
 _RB_BORDERLINE_MARGIN = 0.02  # 0.90–0.92 is suspicious even if technically passes
 _PSF_SHAPE_GATE = 0.50  # source-native correlation gate; not a probability
 
-# Field radius for live MPC cone search (degrees)
-_LIVE_FIELD_RADIUS_DEG = 0.5
+# Epoch-specific known-object association policy. Ten arcseconds is wider than
+# the detector's 5-arcsecond match radius while remaining an association test,
+# not a scientifically invalid field-density proxy.
+_KNOWN_OBJECT_POLICY_VERSION = "skybot-mpc-first-observation-v1"
+_KNOWN_OBJECT_RADIUS_ARCSEC = 10.0
+_KNOWN_OBJECT_OBSERVER_CODE = "500"
 
 # ATLAS cross-survey: require at least 1 detection in the ATLAS field to confirm
 _ATLAS_MIN_DETECTIONS = 1
@@ -627,73 +633,210 @@ def _challenge_motion_consistency(neo: ScoredNEO) -> ChallengeResult:
 
 
 # ---------------------------------------------------------------------------
-# Live challenges (run unless --offline is specified; gracefully degrade)
+# Live challenges (run unless --offline is specified)
 # ---------------------------------------------------------------------------
 
 
-def _challenge_mpc_field_scan(neo: ScoredNEO) -> ChallengeResult:
-    """Query MPC for known objects in the candidate's sky field.
+def _scalar(value: object) -> float:
+    """Return a float from an Astropy scalar or a plain numeric value."""
+    if hasattr(value, "value"):
+        value = value.value
+    return float(value)
 
-    If known solar system objects are present near the candidate's centroid,
-    the candidate may simply be one of them.  Complements the ML known_object
-    posterior with a direct catalog lookup.
 
-    Requires network access; returns SKIP if unavailable.
+def _skybot_designation(row: object) -> str:
+    """Prefer a numbered designation, falling back to the SkyBoT name."""
+    for key in ("Number", "Name"):
+        try:
+            value = row[key]  # type: ignore[index]
+        except (KeyError, TypeError, IndexError):
+            continue
+        if value is None or getattr(value, "mask", False):
+            continue
+        text = str(value).strip()
+        if text and text not in {"--", "nan"}:
+            return text.lstrip("0") or "0"
+    raise ValueError("SkyBoT match has no MPC-compatible designation")
+
+
+def _query_skybot_at_epoch(observation: Observation) -> list[dict]:
+    """Return normalized SkyBoT associations for one measured position/time."""
+    import astropy.units as u
+    from astropy.coordinates import SkyCoord
+    from astropy.time import Time
+    from astroquery.imcce import Skybot  # type: ignore[import]
+
+    field = SkyCoord(observation.ra_deg * u.deg, observation.dec_deg * u.deg)
+    rows = Skybot.cone_search(
+        field,
+        _KNOWN_OBJECT_RADIUS_ARCSEC * u.arcsec,
+        Time(observation.jd, format="jd"),
+        location=_KNOWN_OBJECT_OBSERVER_CODE,
+        cache=False,
+    )
+    return _normalize_skybot_rows(observation, rows)
+
+
+def _normalize_skybot_rows(observation: Observation, rows: object) -> list[dict]:
+    """Normalize the documented Number/Name/RA/DEC SkyBoT result schema."""
+    matches: list[dict] = []
+    for row in rows:
+        ra_deg = _scalar(row["RA"])
+        dec_deg = _scalar(row["DEC"])
+        cos_sep = (
+            math.sin(math.radians(observation.dec_deg)) * math.sin(math.radians(dec_deg))
+            + math.cos(math.radians(observation.dec_deg))
+            * math.cos(math.radians(dec_deg))
+            * math.cos(math.radians(observation.ra_deg - ra_deg))
+        )
+        separation = math.degrees(math.acos(max(-1.0, min(1.0, cos_sep)))) * 3600.0
+        matches.append(
+            {
+                "designation": _skybot_designation(row),
+                "ephemeris_ra_deg": ra_deg,
+                "ephemeris_dec_deg": dec_deg,
+                "separation_arcsec": separation,
+            }
+        )
+    return matches
+
+
+def _query_mpc_first_observation_jd(designation: str) -> float:
+    """Return the earliest published MPC observation, failing on no evidence."""
+    from fetch import fetch_mpc_observations
+
+    observations = fetch_mpc_observations(designation, raise_on_error=True)
+    if not observations:
+        raise RuntimeError(f"MPC returned no published observation history for {designation}")
+    return min(observation.jd for observation in observations)
+
+
+def _challenge_known_object_epoch_association(
+    neo: ScoredNEO,
+    *,
+    skybot_query=None,
+    first_observation_query=None,
+) -> ChallengeResult:
+    """Cross-match at each measured epoch and reject only objects known then.
+
+    SkyBoT supplies the predicted position at the historical observation epoch.
+    MPC published history supplies the earliest observation date. This prevents
+    a current catalog from rejecting a candidate solely because the object was
+    discovered later. Provider or provenance failure is a disqualifying FAIL,
+    never a passing zero count.
     """
-    # Compute centroid from tracklet observations
-    obs_list = list(neo.tracklet.observations)
-    if not obs_list:
+    observations = sorted(neo.tracklet.observations, key=lambda observation: observation.jd)
+    policy_input = {
+        "object_id": neo.tracklet.object_id,
+        "policy_version": _KNOWN_OBJECT_POLICY_VERSION,
+        "radius_arcsec": _KNOWN_OBJECT_RADIUS_ARCSEC,
+        "observer_code": _KNOWN_OBJECT_OBSERVER_CODE,
+        "observations": [
+            {
+                "obs_id": observation.obs_id,
+                "ra_deg": observation.ra_deg,
+                "dec_deg": observation.dec_deg,
+                "jd": observation.jd,
+            }
+            for observation in observations
+        ],
+    }
+    input_sha256 = hashlib.sha256(
+        json.dumps(policy_input, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    common = {
+        "policy_version": _KNOWN_OBJECT_POLICY_VERSION,
+        "policy_input_sha256": input_sha256,
+        "radius_arcsec": _KNOWN_OBJECT_RADIUS_ARCSEC,
+        "observer_code": _KNOWN_OBJECT_OBSERVER_CODE,
+    }
+    if not observations:
         return ChallengeResult(
-            name="mpc_field_scan",
-            outcome="SKIP",
-            reason="No observations in tracklet — cannot compute centroid for MPC query.",
-            details={},
+            name="known_object_epoch_association",
+            outcome="FAIL",
+            reason="No observations are available for time-aware known-object association.",
+            details=common,
         )
 
-    ra_c = sum(o.ra_deg for o in obs_list) / len(obs_list)
-    dec_c = sum(o.dec_deg for o in obs_list) / len(obs_list)
-
+    skybot_query = skybot_query or _query_skybot_at_epoch
+    first_observation_query = first_observation_query or _query_mpc_first_observation_jd
+    associations: list[dict] = []
     try:
-        from fetch import count_known_objects_in_field
-        n_known = count_known_objects_in_field(ra_c, dec_c, _LIVE_FIELD_RADIUS_DEG)
+        for observation in observations:
+            matches = skybot_query(observation)
+            if not isinstance(matches, list):
+                raise TypeError("SkyBoT provider result must be a list")
+            for match in matches:
+                designation = str(match["designation"]).strip()
+                separation = float(match["separation_arcsec"])
+                if not designation or not math.isfinite(separation):
+                    raise ValueError("SkyBoT association is missing valid identity/separation")
+                if separation > _KNOWN_OBJECT_RADIUS_ARCSEC:
+                    continue
+                associations.append(
+                    {
+                        "designation": designation,
+                        "observation_id": observation.obs_id,
+                        "observation_jd": observation.jd,
+                        "separation_arcsec": separation,
+                    }
+                )
+        first_observation_by_designation = {
+            designation: float(first_observation_query(designation))
+            for designation in sorted({row["designation"] for row in associations})
+        }
+        if any(not math.isfinite(jd) for jd in first_observation_by_designation.values()):
+            raise ValueError("MPC first-observation provider returned a non-finite JD")
     except Exception as exc:
         return ChallengeResult(
-            name="mpc_field_scan",
-            outcome="SKIP",
-            reason=f"MPC field scan failed (network issue?): {exc}",
-            details={"error": str(exc), "ra_deg": ra_c, "dec_deg": dec_c},
+            name="known_object_epoch_association",
+            outcome="FAIL",
+            reason=f"Time-aware known-object association could not be verified: {exc}",
+            details={**common, "error_type": type(exc).__name__, "error": str(exc)},
         )
 
-    if n_known > 10:
+    if not associations:
         return ChallengeResult(
-            name="mpc_field_scan",
+            name="known_object_epoch_association",
+            outcome="PASS",
+            reason="No SkyBoT object is positionally associated at any measured epoch.",
+            details={**common, "associations": []},
+        )
+
+    evidence = [
+        {
+            **association,
+            "first_observation_jd": first_observation_by_designation[
+                association["designation"]
+            ],
+            "known_at_observation": known_at_observation_jd(
+                first_observation_by_designation[association["designation"]],
+                association["observation_jd"],
+            ),
+        }
+        for association in associations
+    ]
+    known_then = [row for row in evidence if row["known_at_observation"]]
+    if known_then:
+        designations = sorted({row["designation"] for row in known_then})
+        return ChallengeResult(
+            name="known_object_epoch_association",
             outcome="FAIL",
             reason=(
-                f"MPC catalog reports {n_known} known objects within "
-                f"{_LIVE_FIELD_RADIUS_DEG}° of candidate — dense known-object field; "
-                "candidate association with known object is highly likely."
+                "Epoch-specific position and published first-observation history "
+                f"associate the tracklet with object(s) {designations} already known then."
             ),
-            details={"n_known_in_field": n_known, "radius_deg": _LIVE_FIELD_RADIUS_DEG},
+            details={**common, "associations": evidence, "known_designations": designations},
         )
-    if n_known > 0:
-        return ChallengeResult(
-            name="mpc_field_scan",
-            outcome="WARNING",
-            reason=(
-                f"MPC catalog reports {n_known} known object(s) within "
-                f"{_LIVE_FIELD_RADIUS_DEG}° — manual cross-match recommended."
-            ),
-            details={"n_known_in_field": n_known, "radius_deg": _LIVE_FIELD_RADIUS_DEG},
-        )
-
     return ChallengeResult(
-        name="mpc_field_scan",
-        outcome="PASS",
+        name="known_object_epoch_association",
+        outcome="WARNING",
         reason=(
-            f"No known MPC objects found within {_LIVE_FIELD_RADIUS_DEG}° "
-            f"of candidate centroid (RA={ra_c:.4f}, Dec={dec_c:.4f})."
+            "A current-catalog object matches the historical positions but its "
+            "published first observation is later; retained as retrospective context "
+            "without future-catalog rejection."
         ),
-        details={"n_known_in_field": 0, "ra_deg": ra_c, "dec_deg": dec_c},
+        details={**common, "associations": evidence, "known_designations": []},
     )
 
 
@@ -814,6 +957,8 @@ def run_adversarial_review(
     *,
     offline: bool = False,
     atlas_token: str | None = None,
+    skybot_query=None,
+    first_observation_query=None,
 ) -> ReviewVerdict:
     """Run the full adversarial challenge battery on one scored NEO.
 
@@ -825,6 +970,9 @@ def run_adversarial_review(
         If True, skip all challenges that require network access.
     atlas_token:
         Optional ATLAS forced-photometry API token for cross-survey checks.
+    skybot_query / first_observation_query:
+        Optional injected providers for cached/offline verified association
+        evidence and behavioral tests.
 
     Returns
     -------
@@ -846,9 +994,31 @@ def run_adversarial_review(
         _challenge_motion_consistency(neo),
     ]
 
-    # --- Live challenges (skipped when --offline) ---
+    # Known-object association is required eligibility evidence. Offline mode
+    # may use explicit cached providers; it may not silently omit this stage.
+    if not offline or skybot_query is not None:
+        challenges.append(
+            _challenge_known_object_epoch_association(
+                neo,
+                skybot_query=skybot_query,
+                first_observation_query=first_observation_query,
+            )
+        )
+    else:
+        challenges.append(
+            ChallengeResult(
+                name="known_object_epoch_association",
+                outcome="FAIL",
+                reason=(
+                    "Offline review has no cached epoch-specific known-object "
+                    "association evidence; required eligibility cannot be verified."
+                ),
+                details={"policy_version": _KNOWN_OBJECT_POLICY_VERSION, "offline": True},
+            )
+        )
+
+    # Cross-survey confirmation remains an optional live enrichment.
     if not offline:
-        challenges.append(_challenge_mpc_field_scan(neo))
         challenges.append(_challenge_cross_survey_confirmation(neo, atlas_token))
 
     # --- Aggregate counts ---
@@ -982,7 +1152,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--offline",
         action="store_true",
-        help="Skip all live network challenges (MPC scan, ATLAS cross-survey).",
+        help=(
+            "Skip live network challenges (epoch-specific SkyBoT/MPC association "
+            "and ATLAS cross-survey confirmation)."
+        ),
     )
     parser.add_argument(
         "--atlas-token",

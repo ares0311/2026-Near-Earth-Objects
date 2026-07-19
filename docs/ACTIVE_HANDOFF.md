@@ -25,6 +25,23 @@ Phase 2 is not closed. The next gap is replay-cutoff-aware known-object
 association in adversarial eligibility; the present-day live density check can
 also turn provider failure into a passing zero count. Do not start Phase 3.
 
+That next gap is now implemented as epoch-specific SkyBoT positional matching
+plus earliest published MPC observation filtering, wired to the shared
+no-future-leakage predicate. Provider/schema/history failures and offline
+review without cached evidence now `FAIL`; later-discovered matches warn but do
+not reject. Focused result: 93 tests passed and the Phase 1 packet replay stays
+`REJECT=2` with the previously omitted evidence now explicit. Live-positive
+verification is still open: both a bounded candidate-shaped request and
+Astroquery's documented example reached SkyBoT but returned HTTP 500 on
+2026-07-19. Evidence:
+`docs/evidence/live/2026-07-19-phase2-known-object-eligibility.md`.
+
+Do not retry the same provider request in a loop. On service recovery, run one
+documented probe and one known-object positive control. Independently, the next
+safe Phase 2 code gap is ATLAS confirmation quality: the current challenge can
+treat arbitrary returned rows as confirmation without validating time,
+position, or measurement quality. Phase 3 remains blocked.
+
 ## Phase 1 implementation complete; operator closure pending (2026-07-19)
 
 Both named Phase 1 detection-hardening gaps now meet their technical exit

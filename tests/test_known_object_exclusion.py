@@ -17,8 +17,23 @@ from known_object_exclusion import (
     KnownObject,
     KnownObjectCatalogSnapshot,
     known_as_of,
+    known_at_observation_jd,
     validate_snapshot_usable_for_replay,
 )
+
+
+@pytest.mark.parametrize(
+    ("first_jd", "observation_jd", "expected"),
+    [
+        (2459000.5, 2459000.5, True),
+        (2459000.6, 2459000.5, False),
+        (None, 2459000.5, False),
+        (float("nan"), 2459000.5, False),
+        (2459000.4, float("inf"), False),
+    ],
+)
+def test_known_at_observation_jd_exact_boundaries(first_jd, observation_jd, expected):
+    assert known_at_observation_jd(first_jd, observation_jd) is expected
 
 
 def _known_object(pdes: str, first_obs: date | None) -> KnownObject:
