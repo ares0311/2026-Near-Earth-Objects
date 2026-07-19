@@ -43,6 +43,15 @@ terminal evidence rows; no history was overwritten. Targeted verification is
 `docs/evidence/live/2026-07-19-phase2-ranking-eligibility.md`. Next gap:
 replay-cutoff-aware known-object association in adversarial eligibility.
 
+The time-aware adversarial association unit is now implemented and has 93
+focused passing tests. It replaces current-field density with 10-arcsecond
+SkyBoT matches at each measured JD, checks earliest published MPC observation
+through the shared no-future-leakage predicate, provenance-hashes the policy
+input, and fails closed on missing/provider evidence. Live success remains
+unverified because two distinct bounded SkyBoT requests both returned HTTP 500
+on 2026-07-19. Phase 2 therefore remains open. Evidence:
+`docs/evidence/live/2026-07-19-phase2-known-object-eligibility.md`.
+
 ## Production Definition
 
 For the ZTF DR24 path, production readiness means the project can run a bounded,

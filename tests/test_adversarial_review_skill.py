@@ -19,20 +19,20 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
 
 # Import the module under test
 from adversarial_review import (
-    ChallengeResult,
     _challenge_arc_length,
     _challenge_artifact_posterior,
     _challenge_cross_survey_confirmation,
+    _challenge_known_object_epoch_association,
     _challenge_known_object_posterior,
     _challenge_mba_confusion,
     _challenge_moid_arc_consistency,
     _challenge_motion_consistency,
     _challenge_motion_rate,
-    _challenge_mpc_field_scan,
     _challenge_multi_night,
     _challenge_neo_posterior_dominance,
     _challenge_orbit_quality,
     _challenge_real_bogus,
+    _normalize_skybot_rows,
     main,
     run_adversarial_review,
 )
@@ -520,47 +520,133 @@ class TestChallengeMotionConsistency:
 # ---------------------------------------------------------------------------
 
 
-class TestChallengeMpcFieldScan:
-    def test_pass_no_known_objects(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        import adversarial_review
-        monkeypatch.setattr(
-            adversarial_review,
-            "_challenge_mpc_field_scan",
-            lambda neo: ChallengeResult(
-                name="mpc_field_scan", outcome="PASS",
-                reason="Mocked: 0 known objects", details={},
+class TestChallengeKnownObjectEpochAssociation:
+    @staticmethod
+    def _match(designation: str = "433", separation_arcsec: float = 1.2) -> dict:
+        return {
+            "designation": designation,
+            "separation_arcsec": separation_arcsec,
+        }
+
+    def test_pass_when_epoch_queries_return_no_associations(self) -> None:
+        result = _challenge_known_object_epoch_association(
+            _make_neo(),
+            skybot_query=lambda _observation: [],
+            first_observation_query=lambda _designation: pytest.fail(
+                "history must not be queried without a positional association"
             ),
         )
+
+        assert result.outcome == "PASS"
+        assert result.details["associations"] == []
+        assert len(result.details["policy_input_sha256"]) == 64
+
+    def test_provider_failure_fails_loudly(self) -> None:
+        def unavailable(_observation):
+            raise ConnectionError("SkyBoT unavailable")
+
+        result = _challenge_known_object_epoch_association(
+            _make_neo(),
+            skybot_query=unavailable,
+            first_observation_query=lambda _designation: 2400000.5,
+        )
+
+        assert result.outcome == "FAIL"
+        assert result.details["error_type"] == "ConnectionError"
+        assert "unavailable" in result.reason
+
+    def test_object_known_on_exact_observation_epoch_fails(self) -> None:
         neo = _make_neo()
-        r = adversarial_review._challenge_mpc_field_scan(neo)
-        assert r.outcome == "PASS"
+        first_jd = neo.tracklet.observations[0].jd
+        result = _challenge_known_object_epoch_association(
+            neo,
+            skybot_query=lambda observation: (
+                [self._match()] if observation.obs_id == "o_0" else []
+            ),
+            first_observation_query=lambda designation: (
+                first_jd if designation == "433" else pytest.fail("wrong designation")
+            ),
+        )
 
-    def test_skip_on_network_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Network failure must yield SKIP, not FAIL or exception."""
-        import fetch
+        assert result.outcome == "FAIL"
+        assert result.details["known_designations"] == ["433"]
+        assert result.details["associations"][0]["known_at_observation"] is True
 
-        def _raise(*a, **kw):
-            raise ConnectionError("no network")
-
-        monkeypatch.setattr(fetch, "count_known_objects_in_field", _raise)
+    def test_later_catalog_match_warns_without_future_leakage(self) -> None:
         neo = _make_neo()
-        r = _challenge_mpc_field_scan(neo)
-        assert r.outcome == "SKIP"
-        assert "network" in r.reason.lower() or "failed" in r.reason.lower()
+        result = _challenge_known_object_epoch_association(
+            neo,
+            skybot_query=lambda observation: (
+                [self._match("2026 AB1")] if observation.obs_id == "o_0" else []
+            ),
+            first_observation_query=lambda _designation: max(
+                observation.jd for observation in neo.tracklet.observations
+            )
+            + 100.0,
+        )
 
-    def test_warn_one_known_object(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        import fetch
-        monkeypatch.setattr(fetch, "count_known_objects_in_field", lambda *a, **kw: 1)
-        neo = _make_neo()
-        r = _challenge_mpc_field_scan(neo)
-        assert r.outcome == "WARNING"
+        assert result.outcome == "WARNING"
+        assert result.details["known_designations"] == []
+        assert result.details["associations"][0]["known_at_observation"] is False
 
-    def test_fail_many_known_objects(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        import fetch
-        monkeypatch.setattr(fetch, "count_known_objects_in_field", lambda *a, **kw: 15)
-        neo = _make_neo()
-        r = _challenge_mpc_field_scan(neo)
-        assert r.outcome == "FAIL"
+    def test_malformed_history_result_fails_loudly(self) -> None:
+        result = _challenge_known_object_epoch_association(
+            _make_neo(),
+            skybot_query=lambda _observation: [self._match()],
+            first_observation_query=lambda _designation: float("nan"),
+        )
+
+        assert result.outcome == "FAIL"
+        assert result.details["error_type"] == "ValueError"
+
+    def test_outside_radius_is_not_an_association(self) -> None:
+        result = _challenge_known_object_epoch_association(
+            _make_neo(),
+            skybot_query=lambda _observation: [self._match(separation_arcsec=10.1)],
+            first_observation_query=lambda _designation: pytest.fail(
+                "outside-radius object must not trigger history lookup"
+            ),
+        )
+
+        assert result.outcome == "PASS"
+
+    def test_policy_digest_is_reproducible(self) -> None:
+        kwargs = {
+            "skybot_query": lambda _observation: [],
+            "first_observation_query": lambda _designation: 0.0,
+        }
+        first = _challenge_known_object_epoch_association(_make_neo(), **kwargs)
+        second = _challenge_known_object_epoch_association(_make_neo(), **kwargs)
+        assert first.details["policy_input_sha256"] == second.details["policy_input_sha256"]
+
+    def test_documented_skybot_schema_normalizes_identity_and_position(self) -> None:
+        observation = _obs("schema", 2460000.5, ra_deg=180.0)
+        matches = _normalize_skybot_rows(
+            observation,
+            [{"Number": "00433", "Name": "Eros", "RA": 180.0, "DEC": 10.0}],
+        )
+
+        assert matches == [
+            {
+                "designation": "433",
+                "ephemeris_ra_deg": 180.0,
+                "ephemeris_dec_deg": 10.0,
+                "separation_arcsec": pytest.approx(0.0, abs=0.01),
+            }
+        ]
+
+    def test_skybot_name_fallback_and_malformed_identity(self) -> None:
+        observation = _obs("schema", 2460000.5, ra_deg=180.0)
+        matches = _normalize_skybot_rows(
+            observation,
+            [{"Number": "--", "Name": "2026 AB1", "RA": 180.0, "DEC": 10.0}],
+        )
+        assert matches[0]["designation"] == "2026 AB1"
+        with pytest.raises(ValueError, match="no MPC-compatible designation"):
+            _normalize_skybot_rows(
+                observation,
+                [{"Number": "--", "Name": "", "RA": 180.0, "DEC": 10.0}],
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -660,10 +746,27 @@ class TestRunAdversarialReview:
             orbit_quality=2,
             motion_consistency=0.90,
         )
-        v = run_adversarial_review(neo, offline=True)
+        v = run_adversarial_review(
+            neo,
+            offline=True,
+            skybot_query=lambda _observation: [],
+            first_observation_query=lambda _designation: pytest.fail(
+                "no positional match means no history query"
+            ),
+        )
         assert v.verdict == "SURVIVE"
         assert v.fail_count == 0
         assert v.object_id == "T_TEST"
+
+    def test_offline_without_cached_known_object_evidence_rejects(self) -> None:
+        verdict = run_adversarial_review(_make_neo(), offline=True)
+        challenge = next(
+            challenge
+            for challenge in verdict.challenges
+            if challenge.name == "known_object_epoch_association"
+        )
+        assert challenge.outcome == "FAIL"
+        assert verdict.verdict == "REJECT"
 
     def test_reject_low_rb(self) -> None:
         """rb=0.80 should FAIL the real_bogus gate → REJECT."""
@@ -747,8 +850,10 @@ class TestRunAdversarialReview:
 
 
 class TestCLI:
-    def test_survive_exit_code_0(self, tmp_path: Path) -> None:
-        """A clean candidate → all offline checks pass → exit code 0."""
+    def test_offline_candidate_without_known_object_evidence_exits_1(
+        self, tmp_path: Path
+    ) -> None:
+        """Offline review cannot report survival without required association evidence."""
         neo = _make_neo(
             arc_days=3.0, n_nights=3, rb=0.97,
             neo_p=0.80, known_p=0.05, mba_p=0.08, art_p=0.04, other_p=0.03,
@@ -759,7 +864,7 @@ class TestCLI:
         data_file.write_text(json.dumps([neo.model_dump()]))
 
         rc = main([str(data_file), "--offline"])
-        assert rc == 0
+        assert rc == 1
 
     def test_reject_exit_code_1(self, tmp_path: Path) -> None:
         """A bad candidate → REJECT → exit code 1."""
