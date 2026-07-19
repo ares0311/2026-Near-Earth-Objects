@@ -88,7 +88,7 @@ def _elements(quality: int = 2, moid: float = 0.03) -> OrbitalElements:
 def _make_neo(
     arc_days: float = 3.0,
     n_nights: int = 3,
-    rb: float = 0.95,
+    rb: float | None = 0.95,
     neo_p: float = 0.75,
     known_p: float = 0.05,
     mba_p: float = 0.10,
@@ -99,6 +99,8 @@ def _make_neo(
     orbit_quality: int = 2,
     motion_consistency: float | None = 0.85,
     mission: str = "ZTF",
+    psf_correlations: tuple[float | None, ...] | None = None,
+    psf_quality: float | None = None,
 ) -> ScoredNEO:
     """Build a configurable ScoredNEO for challenge testing."""
     # Spread observations across distinct nights
@@ -112,7 +114,10 @@ def _make_neo(
             mag_err=0.05,
             filter_band="r",
             mission=mission,            # type: ignore[arg-type]
-            real_bogus=0.95,
+            real_bogus=0.95 if rb is not None else None,
+            psf_shape_correlation=(
+                psf_correlations[i] if psf_correlations is not None else None
+            ),
         )
         for i in range(n_nights)
     )
@@ -125,6 +130,7 @@ def _make_neo(
     )
     features = CandidateFeatures(
         real_bogus_score=rb,
+        psf_quality_score=psf_quality,
         motion_consistency_score=motion_consistency,
     )
     posterior = NEOPosterior(
@@ -207,6 +213,8 @@ class TestChallengeOrbitQuality:
                 model_version="test",
             ),
             orbital_elements=None,  # explicitly no elements
+            arc_quality_tier=2,
+            orbit_fit_status="no_solution",
         )
         neo_no_el = ScoredNEO(
             tracklet=neo.tracklet,
@@ -218,6 +226,8 @@ class TestChallengeOrbitQuality:
         r = _challenge_orbit_quality(neo_no_el)
         assert r.outcome == "FAIL"
         assert "No orbital elements" in r.reason
+        assert r.details["arc_quality_tier"] == 2
+        assert r.details["orbit_fit_status"] == "no_solution"
 
 
 # ---------------------------------------------------------------------------
@@ -303,16 +313,37 @@ class TestChallengeRealBogus:
         assert _challenge_real_bogus(_make_neo(rb=0.85)).outcome == "FAIL"
 
     def test_fail_none_rb(self) -> None:
-        neo = _make_neo(rb=0.95)
-        features_no_rb = CandidateFeatures(real_bogus_score=None)
-        neo_none = ScoredNEO(
-            tracklet=neo.tracklet,
-            features=features_no_rb,
-            posterior=neo.posterior,
-            hazard=neo.hazard,
-            metadata=neo.metadata,
+        assert _challenge_real_bogus(_make_neo(rb=None)).outcome == "FAIL"
+
+    def test_warn_when_uncalibrated_psf_quality_fully_passes(self) -> None:
+        neo = _make_neo(
+            rb=None,
+            psf_correlations=(0.8, 0.75, 0.7),
+            psf_quality=0.75,
         )
-        assert _challenge_real_bogus(neo_none).outcome == "FAIL"
+        result = _challenge_real_bogus(neo)
+        assert result.outcome == "WARNING"
+        assert result.details["quality_signal"] == "psf_shape_correlation"
+
+    def test_fail_when_psf_quality_is_low(self) -> None:
+        neo = _make_neo(
+            rb=None,
+            psf_correlations=(0.95, 0.10, 0.95),
+            psf_quality=2.0 / 3.0,
+        )
+        result = _challenge_real_bogus(neo)
+        assert result.outcome == "FAIL"
+        assert result.details["minimum_psf_shape_correlation"] == 0.10
+
+    def test_fail_when_psf_coverage_is_incomplete(self) -> None:
+        neo = _make_neo(
+            rb=None,
+            psf_correlations=(0.8, None, 0.7),
+            psf_quality=0.75,
+        )
+        result = _challenge_real_bogus(neo)
+        assert result.outcome == "FAIL"
+        assert result.details["psf_shape_scored"] == 2
 
 
 # ---------------------------------------------------------------------------

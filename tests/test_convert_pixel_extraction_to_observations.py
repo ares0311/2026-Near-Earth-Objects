@@ -30,8 +30,14 @@ def _write_fixture(tmp_path: Path) -> tuple[Path, Path]:
     pilot = {
         "pid": 585152193615,
         "sources": [
-            {"x": 100, "y": 200, "ra_deg": 232.4, "dec_deg": -8.5, "peak_value": 150.0},
-            {"x": 300, "y": 400, "ra_deg": 232.5, "dec_deg": -8.6, "peak_value": 60.0},
+            {
+                "x": 100, "y": 200, "ra_deg": 232.4, "dec_deg": -8.5,
+                "peak_value": 150.0, "psf_correlation": 0.82,
+            },
+            {
+                "x": 300, "y": 400, "ra_deg": 232.5, "dec_deg": -8.6,
+                "peak_value": 60.0, "psf_correlation": None,
+            },
         ],
     }
     manifest = {
@@ -63,6 +69,8 @@ def test_convert_produces_valid_observation_dicts(tmp_path):
         assert obs.jd == 2458339.6521991
         assert obs.real_bogus is None
         assert obs.deep_real_bogus is None
+    assert result["observations"][0]["psf_shape_correlation"] == 0.82
+    assert result["observations"][1]["psf_shape_correlation"] is None
 
 
 def test_convert_derives_mag_proxy_from_peak_value(tmp_path):

@@ -192,6 +192,8 @@ class TestScoreFunction:
         valid_flags = {"pha_candidate", "close_approach", "nominal", "unknown"}
         assert result.hazard.hazard_flag in valid_flags
         assert result.metadata.scorer_version == "0.1.0"
+        assert result.hazard.arc_quality_tier == 2
+        assert result.hazard.orbit_fit_status == "fitted"
 
     def test_no_orbital_gives_unknown_class(self):
         t = make_tracklet()
@@ -200,6 +202,13 @@ class TestScoreFunction:
         result = score(t, f, p, None)
         assert result.hazard.neo_class == "unknown"
         assert result.hazard.moid_au is None
+        assert result.hazard.arc_quality_tier == 2
+        assert result.hazard.orbit_fit_status == "no_solution"
+
+    def test_insufficient_observations_has_explicit_fit_status(self):
+        result = score(make_tracklet(n=2), make_features(), make_posterior(), None)
+        assert result.hazard.arc_quality_tier == 2
+        assert result.hazard.orbit_fit_status == "insufficient_observations"
 
     def test_none_rb_blocks_mpc_pathway(self):
         t = make_tracklet()
@@ -601,6 +610,5 @@ class TestGetTopCandidates:
         sys.path.insert(0, "src")
         import score
         assert "get_top_candidates" in score.__all__
-
 
 

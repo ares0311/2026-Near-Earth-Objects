@@ -27,7 +27,9 @@ observations for exactly this reason). `real_bogus`/`deep_real_bogus` are
 left None (no such score exists for these candidates) -- detect.py's own
 `_passes_real_bogus()` already handles a None score by passing it through
 conservatively rather than rejecting it, matching the project's existing
-policy for non-native sources.
+policy for non-native sources. The source-native Pearson PSF correlation is
+preserved separately as `psf_shape_correlation`; it is not copied into an rb
+field because no calibration currently justifies treating it as a probability.
 
 Usage:
     uv run --python 3.14 python Skills/convert_pixel_extraction_to_observations.py \\
@@ -86,6 +88,7 @@ def convert(pilot_path: Path, manifest_path: Path) -> dict:
                 "mag_err": _PLACEHOLDER_MAG_ERR,
                 "filter_band": filter_band,
                 "mission": "ZTF",
+                "psf_shape_correlation": source.get("psf_correlation"),
             }
         )
     return {"observations": observations, "kept_count": len(observations)}

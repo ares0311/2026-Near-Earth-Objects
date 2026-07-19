@@ -37,12 +37,19 @@ Streak fraction across a tracklet: `batch_morphology(tracklet)["streak_fraction"
 
 ### 1.3 PSF Quality Score (`psf_quality_score`)
 
-**Source**: `preprocess.py` PSF fitting  
+**Source**: Mean of available pixel-extraction `psf_shape_correlation` values,
+with negative correlations contributing zero.
 **Range**: [0, 1] (0 = poor, 1 = stellar PSF)  
-**Interpretation**: Ratio of observed PSF FWHM to expected seeing FWHM.  
-Values near 1.0 indicate clean, well-sampled point sources.
+**Interpretation**: Shape similarity to the exposure's real difference-image
+PSF kernel. Values near 1.0 indicate a point-source-like shape. Missing
+correlations remain missing and are checked separately; they are never imputed.
 
-**Related function**: `compute_psf_fwhm(obs)` returns FWHM in arcseconds (ZTF pixel scale: 1.01 arcsec/px).
+This is not a calibrated real/bogus probability. When no calibrated score
+exists, adversarial review requires complete PSF-shape coverage and every
+observation to exceed 0.5. Passing produces a warning requiring manual review,
+never an automatic real/bogus pass. The 0.5 discriminator is backed by the
+synthetic matching-PSF and single-pixel-artifact negative controls in
+`tests/test_ztf_dr24_bounded_ingest.py`.
 
 ---
 
@@ -134,20 +141,24 @@ Values near 0.5 correspond to C-type asteroid colors; values near 1.0 indicate r
 
 ## 5. Orbit Quality
 
-### 5.1 Orbit Quality Code
+### 5.1 Project Arc-Quality Tier
 
 **Source**: `orbit.py` → `arc_quality_report(tracklet)`  
 **Values**: 1 (arc < 1 day), 2 (multi-night), 3 (multi-week), 4 (multi-opposition)  
-**Interpretation**: Reliability of the fitted orbit.
+**Interpretation**: Temporal sufficiency of the observational arc, independent
+of whether the preliminary fitter found a physical solution. This is not the
+MPC `U` uncertainty parameter.
 
-| Code | Description | MOID reliability |
+| Tier | Description | Fit implication |
 |---|---|---|
-| 1 | Single-night arc | Unreliable — flag |
-| 2 | Multi-night arc | Moderate |
-| 3 | Multi-week arc | Good |
-| 4 | Opposition-linked | Excellent |
+| 1 | Arc < 1 day | Insufficient leverage |
+| 2 | 1 to < 7 days | Fit may remain ambiguous |
+| 3 | 7 to < 30 days | Better temporal leverage |
+| 4 | ≥ 30 days | Opposition-scale leverage |
 
-**Alert protocol gate**: MOID ≤ 0.05 AU AND quality code ≥ 2 required before MPC submission.
+`HazardAssessment.orbit_fit_status` separately records `not_attempted`,
+`insufficient_observations`, `no_solution`, or `fitted`. A tier 2 arc with
+`no_solution` has no orbital elements or MOID and cannot enter an alert path.
 
 ### 5.2 MOID Score (`moid_score`)
 

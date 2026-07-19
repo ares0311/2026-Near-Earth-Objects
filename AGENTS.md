@@ -275,6 +275,89 @@ they call this project's existing tools (`ruff`, `mypy`, `pytest`,
 
 ---
 
+## Current Roadmap Phase (operator-directed, established 2026-07-19)
+
+**Read this before proposing or executing any task.** Jerome W. Lindsey
+III set an explicit three-phase sequence for the ZTF DR24 motion-product
+path after observing drift: repeated field-expansion runs (fields 3, 4,
+6 — see dated evidence files in `docs/evidence/live/`) continued after
+the pipeline mechanics were already proven (MP1-MP7 closed in
+`docs/ZTF_DR24_PRODUCTION_GATES.md`), which re-exercised an
+already-validated mechanism instead of doing the actual next task.
+**Do not repeat that pattern.** Running more fields through the existing
+pipeline is not "hardening" anything and is out of scope until Phase 1
+below is explicitly closed by the operator.
+
+**Phase 1 — Harden the detection pipeline (TECHNICAL EXIT MET 2026-07-19;
+OPERATOR CLOSURE PENDING).**
+Two concrete, named gaps identified 2026-07-19 by inspecting real
+review-packet output from five completed field tests:
+1. **No real/bogus score exists for pixel-extraction-sourced candidates.**
+   Every review packet from `Skills/run_pixel_extraction_positive_control.py`
+   fails `Skills/adversarial_review.py`'s `real_bogus` challenge with
+   `real_bogus_score: None` — nothing populates this field for this data
+   path at all. Investigate whether a real signal can be derived (e.g.
+   calibrating the existing PSF-correlation score, or reusing
+   `tier2_cnn_v4` if the cutout format can be made compatible) and either
+   wire it in or explicitly document why `None` is correct/unavoidable.
+2. **`fit_orbit()` returns `quality_code: null` for every tested
+   candidate**, rather than a graded low-quality code, despite
+   `schemas.py`'s orbit-quality-code scheme explicitly anticipating
+   short-arc cases (1 = arc < 1 day, 2 = multi-night, etc.). Investigate
+   whether `null` is correct for 3-observation/~6-day arcs or a real gap
+   in `orbit.py`'s short-arc handling.
+
+**Exit criteria for Phase 1**: both gaps investigated and each either
+fixed (with tests and real-data evidence) or explicitly documented as
+correct/expected, backed by evidence — not assumed.
+
+**Technical disposition (2026-07-19)**: both criteria are met. The pixel
+path now preserves source-native PSF-shape evidence separately, never
+mislabels it as a calibrated real/bogus probability, and fails closed on
+incomplete/low coverage. Arc sufficiency and orbit-fit success are now
+separate durable fields, and the fitter uses a bounded two-body state fit
+with measured residuals. The original field-1 replay kept both candidates
+rejected with explicit tier-2/`no_solution` outcomes. Canonical verification
+passed with 2,067 tests and 100% `src/` coverage. Evidence:
+`docs/evidence/live/2026-07-19-phase1-detection-hardening.md`. Do not begin
+Phase 2 until the operator explicitly closes Phase 1.
+
+**Phase 2 — Harden the search algorithm (BLOCKED on Phase 1).** Reframed
+2026-07-19 per `docs/HUNTER_PROD_DIRECTIVE.md`'s "ranking/selection" and
+"eligibility" stages: evaluate/improve `Skills/select_survey_fields.py`'s
+scoring and `Skills/adversarial_review.py`'s challenge set into a
+deterministic, explainable, reproducible ranking model (not opaque LLM
+judgment as core ranking logic). Do not start early.
+
+**Phase 3 — Package the application (BLOCKED on Phase 2).** Concretized
+2026-07-19 by `docs/HUNTER_PROD_DIRECTIVE.md`: build the required CLI
+(`/Create-New-Search`, `/Run-New-Search`, `/Show-Follow-Ups`) and 5
+distinct durable-state entities (candidate catalog, search manifest,
+search run, target search history, follow-up registry). Not yet scoped.
+Do not start early.
+
+**Hunter-directive pipeline mapping (verified 2026-07-19)**: checked
+against actual code, not assumed. Present and working: candidate
+universe (`Skills/select_survey_fields.py`, field-level), identity/history
+resolution (`src/known_object_exclusion.py`, Gate Z2), data acquisition
+(`Skills/ztf_dr24_bounded_ingest.py`), preprocessing (`src/preprocess.py`),
+composite interpretation (`src/score.py` + `Skills/adversarial_review.py`),
+durable results/provenance (`Skills/candidate_ledger.py`, Gate A2 — one
+denormalized `candidates` table, not Hunter's 5 distinct entities).
+**Real gaps found**: eligibility/scoring has Phase 1's two named holes;
+the manifest (`data_selection/target_priority_queue.csv`) is a running
+priority list, not a per-run manifest; there is no discrete "pending
+search" entity before execution; there is no follow-up registry (only ad
+hoc scripts `Skills/export_followup_requests.py`/
+`Skills/generate_obs_schedule.py`); and there is **no CLI at all**
+(verified: no `[project.scripts]` in `pyproject.toml`, no CLI wrapper in
+the repo root). Per the Hunter directive's own
+`HARD INVARIANTS` sequence, close Phase 1's scoring-stage gaps before
+building the CLI/durable-state layer on top of them — full detail and the
+complete stage-by-stage table are in `CLAUDE.md`'s equivalent section.
+
+---
+
 ## Standing Rules
 
 - **Skills directory**: Any standalone `.py` utility script created to perform a task must be saved in `Skills/` at the project root.
@@ -326,6 +409,10 @@ they call this project's existing tools (`ruff`, `mypy`, `pytest`,
   workflow brief for candidate language, historical replay, source
   verification, no future-catalog leakage, pretrained-model audits, and
   auditable candidate-ranker design.
+  **MANDATORY READ**: `docs/HUNTER_PROD_DIRECTIVE.md` — the cross-project
+  (NEO-Hunter/Techno-Hunter/EXO-Hunter) PROD mission, required CLI,
+  durable-state model, and Definition of Done. This repo is NEO-Hunter.
+  Read its "SESSION START" checklist before planning or editing.
 - **Astrometrics policies are mandatory directives**:
   `docs/astrometrics_coding_agents_master_guide.md`,
   `docs/astrometrics_data_selection_policy.md`, and
@@ -941,7 +1028,34 @@ and excluded from CI.
 
 ## Current State (v0.91.0)
 
-**Latest sync (2026-07-19, sixth field expanded — five real linking runs,
+**Latest sync (2026-07-19, Hunter PROD Directive integrated)**: A
+cross-project "Hunter PROD Directive" (this repo is NEO-Hunter; sibling
+repos Techno-Hunter/EXO-Hunter are independently sandboxed) was confirmed
+real and intentional by the operator. Recorded verbatim in new
+`docs/HUNTER_PROD_DIRECTIVE.md`, referenced as a MANDATORY READ above and
+in `CLAUDE.md`'s session-start protocol. Performed the directive's
+required SESSION START pipeline-mapping exercise against actual code —
+see the "Current Roadmap Phase" section above for the full stage-by-stage
+table. Real gaps found: no CLI exists at all; no discrete "pending
+search" entity; manifest is a running priority list, not per-run; no
+follow-up registry. Phase 1's active status and two named gaps
+unchanged. No code changes — documentation/roadmap integration only.
+
+**Earlier sync (2026-07-19, operator-directed three-phase roadmap
+established after drift correction)**: Jerome W. Lindsey III flagged
+continued field-expansion runs (fields 3, 4, 6, after MP1-MP7 already
+closed) as drift and replaced the old "resume Z3 / broader batch / MPC
+path" decision with an explicit three-phase roadmap: **Phase 1 (active) —
+harden the detection pipeline; Phase 2 (blocked) — harden the search
+algorithm; Phase 3 (blocked) — package the application to run
+autonomously offline.** See the "Current Roadmap Phase" section near the
+top of this file for full detail — Phase 1 has two concrete named gaps
+(no real/bogus score for pixel-extraction candidates; `fit_orbit()`
+returns `quality_code: null` for every tested candidate rather than a
+graded code). No code changes in this sync — documentation/roadmap
+correction only.
+
+**Earlier sync (2026-07-19, sixth field expanded — five real linking runs,
 consistent null results)**: Rank 4 (RA 211.81, Dec -7.5) skipped for
 insufficient coverage (2 real nights, below the 3-night minimum) —
 recorded as `insufficient_coverage`. Proceeded to rank 5 (RA 46.59, Dec
@@ -1628,7 +1742,15 @@ gate or bug. This mirrors, but is not identical to, `CLAUDE.md`'s own
 
 ### Immediate Next Steps
 
-**Current decision gates (2026-07-13)**:
+**Superseded 2026-07-19** — see the "Current Roadmap Phase" section near
+the top of this file for the current, active directive (Phase 1: harden
+the detection pipeline). The decision gates below are historical context
+only; items 1, 2, and 4 remain factually true (no v4 retrain, Z3 stays
+paused, MPC submission stays human-gated) but item 3's framing (a broader
+field search as the next optional expansion) is exactly the drift pattern
+the operator corrected — do not treat it as live guidance.
+
+**Former decision gates (2026-07-13, historical)**:
 
 1. `tier2_cnn_v4` promotion and A1-A7 evidence/signoff are complete. Do not
    retrain or reopen v3/v4 promotion without a newly diagnosed model failure.

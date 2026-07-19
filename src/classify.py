@@ -53,6 +53,22 @@ def _mean_real_bogus(tracklet: Tracklet) -> OptScore:
     return float(np.mean(scores))
 
 
+def _mean_psf_shape_quality(tracklet: Tracklet) -> OptScore:
+    """Aggregate measured PSF-shape correlations without inventing rb.
+
+    Negative correlations contribute zero quality. Missing measurements stay
+    missing and adversarial review checks their coverage explicitly.
+    """
+    scores = [
+        max(0.0, o.psf_shape_correlation)
+        for o in tracklet.observations
+        if o.psf_shape_correlation is not None
+    ]
+    if not scores:
+        return None
+    return float(np.mean(scores))
+
+
 def _color_index(tracklet: Tracklet) -> OptScore:
     """Compute g-r color index if both bands present, else None."""
     g_mags = [o.mag for o in tracklet.observations if o.filter_band == "g"]
@@ -116,7 +132,7 @@ def extract_features(tracklet: Tracklet) -> CandidateFeatures:
     return CandidateFeatures(
         real_bogus_score=_mean_real_bogus(tracklet),
         streak_score=None,  # populated by detect stage if applicable
-        psf_quality_score=None,
+        psf_quality_score=_mean_psf_shape_quality(tracklet),
         motion_consistency_score=_motion_consistency(tracklet),
         arc_coverage_score=_arc_coverage(tracklet),
         nights_observed_score=_nights_score(tracklet),
@@ -1164,7 +1180,6 @@ def compute_calibration_gain(
     eps = 1e-12
     kl = float(np.sum(p * np.log((p + eps) / (q + eps))))
     return round(kl, 6)
-
 
 
 

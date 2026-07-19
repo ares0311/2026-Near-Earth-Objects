@@ -86,6 +86,7 @@ _MBA_WARN_PROB = 0.25         # main_belt_asteroid posterior above this → WARN
 # Real/bogus threshold: gate is 0.90; within 2% is "borderline"
 _RB_GATE = 0.90
 _RB_BORDERLINE_MARGIN = 0.02  # 0.90–0.92 is suspicious even if technically passes
+_PSF_SHAPE_GATE = 0.50  # source-native correlation gate; not a probability
 
 # Field radius for live MPC cone search (degrees)
 _LIVE_FIELD_RADIUS_DEG = 0.5
@@ -143,11 +144,20 @@ def _challenge_orbit_quality(neo: ScoredNEO) -> ChallengeResult:
     """
     elements = neo.hazard.orbital_elements
     if elements is None:
+        arc_tier = neo.hazard.arc_quality_tier
+        fit_status = neo.hazard.orbit_fit_status
         return ChallengeResult(
             name="orbit_quality",
             outcome="FAIL",
-            reason="No orbital elements computed — cannot assess orbit quality.",
-            details={"quality_code": None},
+            reason=(
+                "No orbital elements computed — orbit fit status "
+                f"{fit_status}; observational arc tier {arc_tier}."
+            ),
+            details={
+                "solution_quality_code": None,
+                "arc_quality_tier": arc_tier,
+                "orbit_fit_status": fit_status,
+            },
         )
     q = elements.quality_code
     if q == 0:
@@ -251,7 +261,63 @@ def _challenge_real_bogus(neo: ScoredNEO) -> ChallengeResult:
     the gate exists for a reason and proximity to it is a red flag.
     """
     rb = neo.features.real_bogus_score
-    if rb is None or rb < _RB_GATE:
+    if rb is None:
+        psf_values = [
+            o.psf_shape_correlation
+            for o in neo.tracklet.observations
+            if o.psf_shape_correlation is not None
+        ]
+        n_obs = len(neo.tracklet.observations)
+        if len(psf_values) != n_obs:
+            return ChallengeResult(
+                name="real_bogus",
+                outcome="FAIL",
+                reason=(
+                    "No calibrated real/bogus score and incomplete source-native "
+                    f"PSF-shape coverage ({len(psf_values)}/{n_obs}) — fails closed."
+                ),
+                details={
+                    "real_bogus_score": None,
+                    "psf_shape_scored": len(psf_values),
+                    "n_observations": n_obs,
+                    "psf_shape_gate": _PSF_SHAPE_GATE,
+                },
+            )
+        minimum_psf_shape = min(psf_values)
+        psf_quality = neo.features.psf_quality_score
+        if psf_quality is None or minimum_psf_shape < _PSF_SHAPE_GATE:
+            return ChallengeResult(
+                name="real_bogus",
+                outcome="FAIL",
+                reason=(
+                    "No calibrated real/bogus score; at least one source-native "
+                    f"PSF-shape correlation ({minimum_psf_shape:.3f}) is below "
+                    f"{_PSF_SHAPE_GATE}."
+                ),
+                details={
+                    "real_bogus_score": None,
+                    "psf_quality_score": psf_quality,
+                    "minimum_psf_shape_correlation": minimum_psf_shape,
+                    "psf_shape_gate": _PSF_SHAPE_GATE,
+                    "quality_signal": "psf_shape_correlation",
+                },
+            )
+        return ChallengeResult(
+            name="real_bogus",
+            outcome="WARNING",
+            reason=(
+                "No calibrated real/bogus probability; all observations pass the "
+                f"source-native PSF-shape gate ({psf_quality:.3f}). Manual review required."
+            ),
+            details={
+                "real_bogus_score": None,
+                "psf_quality_score": psf_quality,
+                "minimum_psf_shape_correlation": minimum_psf_shape,
+                "psf_shape_gate": _PSF_SHAPE_GATE,
+                "quality_signal": "psf_shape_correlation",
+            },
+        )
+    if rb < _RB_GATE:
         return ChallengeResult(
             name="real_bogus",
             outcome="FAIL",

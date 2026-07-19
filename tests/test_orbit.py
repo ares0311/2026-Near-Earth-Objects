@@ -10,8 +10,11 @@ from orbit import (
     _equatorial_to_ecliptic,
     _gauss_iod,
     _kepler_equation,
+    _propagate_state,
+    _state_astrometric_residuals,
     _state_to_elements,
     _sun_position_ecliptic,
+    _two_body_derivative,
     arc_quality_report,
     classify_neo,
     compute_moid,
@@ -157,6 +160,82 @@ class TestGaussIod:
         assert result.pos.shape == (3,)
         assert result.vel.shape == (3,)
 
+    @pytest.mark.parametrize(
+        "obs_list",
+        [
+            [(2460000.0, 180.0, 0.0)] * 3,
+            [(math.nan, 180.0, 0.0), (2460001.0, 180.1, 0.0), (2460002.0, 180.2, 0.0)],
+            [(2460000.0, math.nan, 0.0), (2460001.0, 180.1, 0.0), (2460002.0, 180.2, 0.0)],
+        ],
+    )
+    def test_invalid_geometry_fails_closed(self, obs_list):
+        assert _gauss_iod(obs_list).success is False
+
+    def test_solver_failure_fails_closed(self, monkeypatch):
+        import scipy.optimize
+
+        class FailedResult:
+            success = False
+            x = np.zeros(6)
+
+        monkeypatch.setattr(
+            scipy.optimize, "least_squares", lambda *args, **kwargs: FailedResult()
+        )
+        obs = [
+            (2460000.0, 180.0, 0.0),
+            (2460001.0, 180.1, 0.0),
+            (2460002.0, 180.2, 0.0),
+        ]
+        assert _gauss_iod(obs).success is False
+
+    def test_out_of_bounds_orbit_fails_closed(self, monkeypatch):
+        import scipy.optimize
+
+        import orbit as orbit_mod
+
+        class SolverResult:
+            success = True
+            x = np.array([1.0, 0.0, 0.0, 0.0, 0.01, 0.0])
+
+        monkeypatch.setattr(
+            scipy.optimize, "least_squares", lambda *args, **kwargs: SolverResult()
+        )
+        monkeypatch.setattr(
+            orbit_mod,
+            "_state_to_elements",
+            lambda *args: make_elements(
+                semi_major_axis_au=0.05,
+                eccentricity=0.2,
+                perihelion_au=0.04,
+                aphelion_au=0.06,
+            ),
+        )
+        obs = [
+            (2460000.0, 180.0, 0.0),
+            (2460001.0, 180.1, 0.0),
+            (2460002.0, 180.2, 0.0),
+        ]
+        assert _gauss_iod(obs).success is False
+
+
+class TestTwoBodyPropagationFailures:
+    def test_singular_state_produces_visible_nonfinite_result(self):
+        derivative = _two_body_derivative(np.zeros(6))
+        assert np.isnan(derivative).all()
+        propagated = _propagate_state(np.zeros(6), 1.0)
+        assert not np.isfinite(propagated).all()
+
+    def test_zero_geocentric_distance_gets_large_penalty(self):
+        state = np.array([1.0, 0.0, 0.0, 0.0, 0.01, 0.0])
+        residuals = _state_astrometric_residuals(
+            state,
+            np.array([2460000.0]),
+            np.array([[0.0, 0.0]]),
+            np.array([[1.0, 0.0, 0.0]]),
+            2460000.0,
+        )
+        assert np.array_equal(residuals, np.array([1e9, 1e9]))
+
 
 class TestStateToElementsEdgeCases:
     def test_hyperbolic_orbit_returns_none(self):
@@ -183,7 +262,7 @@ class TestDifferentialCorrection:
 
     def test_long_arc_quality_3(self):
         el = make_elements()
-        obs = [(2460000.0, 180.0, 0.0), (2460030.0, 183.0, 0.0)]
+        obs = [(2460000.0, 180.0, 0.0), (2460029.0, 183.0, 0.0)]
         result = _differential_correction(el, obs)
         assert result.quality_code == 3
 
@@ -240,6 +319,96 @@ class TestFitOrbit:
         result = fit_orbit(t)
         if result is not None:
             assert isinstance(result, OrbitalElements)
+
+    def test_invalid_state_conversion_returns_none(self, monkeypatch):
+        import orbit as orbit_mod
+
+        monkeypatch.setattr(
+            orbit_mod,
+            "_gauss_iod",
+            lambda obs: orbit_mod._GaussResult(np.zeros(3), np.zeros(3), True),
+        )
+        obs = tuple(
+            make_obs(obs_id=f"bad_state_{i}", jd=2460000.5 + i)
+            for i in range(3)
+        )
+        assert fit_orbit(Tracklet("BAD_STATE", obs, 2.0, 1.0, 0.0)) is None
+
+    def test_high_measured_residual_returns_none(self, monkeypatch):
+        import orbit as orbit_mod
+
+        preliminary = make_elements(fit_residual_arcsec=None)
+        monkeypatch.setattr(
+            orbit_mod,
+            "_gauss_iod",
+            lambda obs: orbit_mod._GaussResult(
+                np.array([1.0, 0.0, 0.0]),
+                np.array([0.0, 0.017, 0.001]),
+                True,
+            ),
+        )
+        monkeypatch.setattr(orbit_mod, "_state_to_elements", lambda *args: preliminary)
+        monkeypatch.setattr(
+            orbit_mod,
+            "_differential_correction",
+            lambda elements, obs: elements.model_copy(
+                update={"fit_residual_arcsec": 6.0}
+            ),
+        )
+        obs = tuple(
+            make_obs(obs_id=f"high_rms_{i}", jd=2460000.5 + i)
+            for i in range(3)
+        )
+        assert fit_orbit(Tracklet("HIGH_RMS", obs, 2.0, 1.0, 0.0)) is None
+
+    def test_recovers_independent_circular_orbit_control(self):
+        """A hand-generated circular heliocentric orbit must fit physically.
+
+        The oracle uses analytic uniform circular motion plus Astropy's Earth
+        ephemeris; it does not call the production propagator or fitter.
+        """
+        from astropy.coordinates import get_body_barycentric_posvel
+        from astropy.time import Time
+
+        epoch = 2460000.5
+        jds = np.array([epoch - 3.0, epoch, epoch + 3.0])
+        times = Time(jds, format="jd", scale="tdb")
+        earth, _ = get_body_barycentric_posvel("earth", times)
+        sun, _ = get_body_barycentric_posvel("sun", times)
+        earth_helio = np.asarray((earth.xyz - sun.xyz).to_value("au").T)
+
+        a = 1.5
+        inc = math.radians(10.0)
+        phase0 = math.radians(75.0)
+        mean_motion = math.sqrt((4.0 * math.pi**2 / 365.25**2) / a**3)
+        eps = math.radians(23.439291111)
+        ecl_to_eq = np.array(
+            [[1.0, 0.0, 0.0], [0.0, math.cos(eps), -math.sin(eps)],
+             [0.0, math.sin(eps), math.cos(eps)]]
+        )
+        observations = []
+        for i, jd in enumerate(jds):
+            phase = phase0 + mean_motion * (jd - epoch)
+            pos_ecl = np.array(
+                [a * math.cos(phase), a * math.sin(phase) * math.cos(inc),
+                 a * math.sin(phase) * math.sin(inc)]
+            )
+            geo = ecl_to_eq @ pos_ecl - earth_helio[i]
+            distance = float(np.linalg.norm(geo))
+            ra = math.degrees(math.atan2(geo[1], geo[0])) % 360.0
+            dec = math.degrees(math.asin(geo[2] / distance))
+            observations.append(
+                make_obs(obs_id=f"oracle_{i}", jd=float(jd), ra_deg=ra, dec_deg=dec)
+            )
+
+        tracklet = Tracklet("ORACLE", tuple(observations), 6.0, 1.0, 90.0)
+        result = fit_orbit(tracklet)
+        assert result is not None
+        assert result.fit_residual_arcsec is not None
+        assert result.fit_residual_arcsec < 1.0
+        assert result.semi_major_axis_au == pytest.approx(a, rel=0.5)
+        assert result.eccentricity < 0.6
+        assert result.quality_code == 2
 
 
 class TestStateToElementsAdditional:
@@ -706,6 +875,3 @@ class TestComputeMeanMotion:
     def test_in_all(self):
         from orbit import __all__
         assert "compute_mean_motion" in __all__
-
-
-
