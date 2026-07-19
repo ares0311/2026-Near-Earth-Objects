@@ -339,6 +339,74 @@ class TestNoOpaqueAIModelHook:
             ssf.select_fields(jd=2461000.5, model_path=Path("model.json"))
 
 
+class TestRankingPolicyProvenance:
+    def test_committed_policy_is_versioned_honest_and_digest_stamped(self):
+        policy = ssf.load_ranking_policy()
+
+        assert policy["schema_version"] == "ztf-field-ranking-policy-v1"
+        assert policy["policy_id"] == "ztf-field-ranking-v1"
+        assert policy["coefficient_status"] == "uncalibrated_transparent_prior"
+        assert len(policy["sha256"]) == 64
+        assert policy["path"] == (
+            "data_selection/ranking_policies/ztf_field_ranking_v1.json"
+        )
+        assert any("calibrated" in limitation for limitation in policy["limitations"])
+
+    def test_tampered_coefficient_fails_loudly(self, tmp_path):
+        payload = json.loads(ssf._DEFAULT_RANKING_POLICY_PATH.read_text())
+        payload["discovery_weights"]["scarcity"] = 0.99
+        path = tmp_path / "tampered.json"
+        path.write_text(json.dumps(payload))
+
+        with pytest.raises(ValueError, match="discovery_weights"):
+            ssf.load_ranking_policy(path)
+
+    @pytest.mark.parametrize(
+        ("mutation", "message"),
+        [
+            (lambda payload: payload.update(schema_version="wrong"), "schema"),
+            (lambda payload: payload.update(policy_id=""), "policy_id"),
+            (lambda payload: payload.update(model_type="opaque_ai"), "model_type"),
+            (
+                lambda payload: payload.update(coefficient_status="calibrated"),
+                "coefficient_status",
+            ),
+            (lambda payload: payload.update(references=[]), "references"),
+            (lambda payload: payload.update(limitations=[]), "limitations"),
+        ],
+    )
+    def test_incomplete_or_misrepresented_policy_fails_loudly(
+        self,
+        tmp_path,
+        mutation,
+        message,
+    ):
+        payload = json.loads(ssf._DEFAULT_RANKING_POLICY_PATH.read_text())
+        mutation(payload)
+        path = tmp_path / f"{message}.json"
+        path.write_text(json.dumps(payload))
+
+        with pytest.raises(ValueError, match=message):
+            ssf.load_ranking_policy(path)
+
+    def test_incomplete_reference_fails_loudly(self, tmp_path):
+        payload = json.loads(ssf._DEFAULT_RANKING_POLICY_PATH.read_text())
+        del payload["references"][0]["does_not_support"]
+        path = tmp_path / "incomplete-reference.json"
+        path.write_text(json.dumps(payload))
+
+        with pytest.raises(ValueError, match="reference is incomplete"):
+            ssf.load_ranking_policy(path)
+
+    def test_missing_and_malformed_policy_fail_loudly(self, tmp_path):
+        with pytest.raises(FileNotFoundError, match="ranking policy not found"):
+            ssf.load_ranking_policy(tmp_path / "missing.json")
+        malformed = tmp_path / "malformed.json"
+        malformed.write_text("not-json")
+        with pytest.raises(ValueError, match="invalid ranking policy"):
+            ssf.load_ranking_policy(malformed)
+
+
 
 
 
@@ -365,6 +433,7 @@ class TestSelectFields:
                     "field_radius_deg", "reason"}
         for f in fields:
             assert required.issubset(f.keys())
+            assert f["ranking_policy"]["policy_id"] == "ztf-field-ranking-v1"
 
     def test_scores_in_range(self):
         fields = ssf.select_fields(jd=2461000.5, mode="aten", top_n=10)
@@ -573,6 +642,57 @@ class TestProductionEligibility:
         inventory.write_text(json.dumps(payload))
 
         with pytest.raises(ValueError, match="coverage eligibility mismatch"):
+            ssf.load_coverage_inventory(inventory)
+
+    @pytest.mark.parametrize(
+        ("field_name", "value", "message"),
+        [
+            ("batch_id", "", "batch_id"),
+            ("batch_manifest_sha256", "not-a-digest", "batch_manifest_sha256"),
+        ],
+    )
+    def test_inventory_requires_batch_provenance(
+        self,
+        tmp_path,
+        field_name,
+        value,
+        message,
+    ):
+        inventory = _write_coverage_inventory(
+            tmp_path,
+            [
+                {
+                    "field_id": "field-1",
+                    "ra_deg": 211.81,
+                    "dec_deg": -7.5,
+                    "nights": ["20240901", "20240902", "20240903"],
+                }
+            ],
+        )
+        payload = json.loads(inventory.read_text())
+        payload[field_name] = value
+        inventory.write_text(json.dumps(payload))
+
+        with pytest.raises(ValueError, match=message):
+            ssf.load_coverage_inventory(inventory)
+
+    def test_inventory_requires_per_field_response_digest(self, tmp_path):
+        inventory = _write_coverage_inventory(
+            tmp_path,
+            [
+                {
+                    "field_id": "field-1",
+                    "ra_deg": 211.81,
+                    "dec_deg": -7.5,
+                    "nights": ["20240901", "20240902", "20240903"],
+                }
+            ],
+        )
+        payload = json.loads(inventory.read_text())
+        payload["field_results"][0]["raw_response_sha256"] = None
+        inventory.write_text(json.dumps(payload))
+
+        with pytest.raises(ValueError, match="raw_response_sha256"):
             ssf.load_coverage_inventory(inventory)
 
 
