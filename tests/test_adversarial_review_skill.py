@@ -8,6 +8,7 @@ entry point.  All tests run fully offline — no network access is required.
 from __future__ import annotations
 
 import json
+import math
 import sys
 from pathlib import Path
 
@@ -19,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Skills"))
 
 # Import the module under test
 from adversarial_review import (
+    _atlas_association_evidence,
     _challenge_arc_length,
     _challenge_artifact_posterior,
     _challenge_cross_survey_confirmation,
@@ -650,77 +652,157 @@ class TestChallengeKnownObjectEpochAssociation:
 
 
 # ---------------------------------------------------------------------------
-# Cross-survey confirmation (live, tested via monkeypatch)
+# Cross-survey confirmation
 # ---------------------------------------------------------------------------
 
 
 class TestChallengeCrossSurvey:
-    def test_skip_no_token(self) -> None:
-        neo = _make_neo(mission="ZTF")
-        r = _challenge_cross_survey_confirmation(neo, atlas_token=None)
-        assert r.outcome == "SKIP"
-        assert "token" in r.reason.lower()
-
-    def test_pass_multi_survey_already(self) -> None:
-        """Candidate with both ZTF and ATLAS missions is already confirmed."""
-        obs_ztf = _obs("o_ztf_0", 2460000.5)
-        obs_atlas = Observation(
-            obs_id="o_atlas_0", ra_deg=180.0, dec_deg=10.0,
-            jd=2460001.5, mag=19.5, mag_err=0.05,
-            filter_band="o", mission="ATLAS", real_bogus=None,
-        )
+    @staticmethod
+    def _multi_survey_neo(*atlas_observations: Observation) -> ScoredNEO:
+        neo = _make_neo(n_nights=2, mission="ZTF")
         tracklet = Tracklet(
             object_id="MULTI",
-            observations=(obs_ztf, obs_atlas),
-            arc_days=1.0,
-            motion_rate_arcsec_per_hour=5.0,
-            motion_pa_degrees=90.0,
+            observations=(*neo.tracklet.observations, *atlas_observations),
+            arc_days=neo.tracklet.arc_days,
+            motion_rate_arcsec_per_hour=neo.tracklet.motion_rate_arcsec_per_hour,
+            motion_pa_degrees=neo.tracklet.motion_pa_degrees,
         )
-        neo = _make_neo()
-        multi_neo = ScoredNEO(
+        return ScoredNEO(
             tracklet=tracklet,
             features=neo.features,
             posterior=neo.posterior,
             hazard=neo.hazard,
             metadata=neo.metadata,
         )
-        r = _challenge_cross_survey_confirmation(multi_neo, atlas_token="fake")
-        assert r.outcome == "PASS"
-        assert "already" in r.reason.lower()
 
-    def test_pass_atlas_confirms(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        import fetch
-        monkeypatch.setattr(
-            fetch, "fetch_atlas_forced",
-            lambda **kw: [_obs("atlas_det", 2460000.9)],
+    @staticmethod
+    def _atlas_observation(
+        *,
+        obs_id: str = "o_atlas_0",
+        jd: float = 2460001.5,
+        ra_deg: float | None = None,
+        dec_deg: float = 10.0,
+        mag: float = 19.5,
+        mag_err: float = 0.05,
+    ) -> Observation:
+        if ra_deg is None:
+            ra_deg = 180.0 + 120.0 / (3600.0 * math.cos(math.radians(10.0)))
+        return Observation(
+            obs_id=obs_id,
+            ra_deg=ra_deg,
+            dec_deg=dec_deg,
+            jd=jd,
+            mag=mag,
+            mag_err=mag_err,
+            filter_band="o",
+            mission="ATLAS",
         )
+
+    def test_skip_without_linked_atlas_evidence(self) -> None:
         neo = _make_neo(mission="ZTF")
-        r = _challenge_cross_survey_confirmation(neo, atlas_token="fake_token")
-        assert r.outcome == "PASS"
-        assert "1" in r.reason  # 1 detection
-
-    def test_warn_atlas_no_detections(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        import fetch
-        monkeypatch.setattr(fetch, "fetch_atlas_forced", lambda **kw: [])
-        neo = _make_neo(mission="ZTF")
-        r = _challenge_cross_survey_confirmation(neo, atlas_token="fake_token")
-        assert r.outcome == "WARNING"
-
-    def test_skip_atlas_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        import fetch
-
-        def _raise(**kw):
-            raise ConnectionError("atlas down")
-
-        monkeypatch.setattr(fetch, "fetch_atlas_forced", _raise)
-        neo = _make_neo(mission="ZTF")
-        r = _challenge_cross_survey_confirmation(neo, atlas_token="fake_token")
+        r = _challenge_cross_survey_confirmation(neo)
         assert r.outcome == "SKIP"
+        assert "fixed-coordinate" in r.reason.lower()
+
+    def test_passes_only_valid_linked_atlas_association(self) -> None:
+        r = _challenge_cross_survey_confirmation(
+            self._multi_survey_neo(self._atlas_observation())
+        )
+        assert r.outcome == "PASS"
+        association = r.details["validated_associations"][0]
+        assert association["residual_arcsec"] == pytest.approx(0.0, abs=0.01)
+        assert association["estimated_snr"] > 5.0
+        assert r.details["policy_version"] == "linked-tracklet-kinematics-v1"
+
+    @pytest.mark.parametrize(
+        ("observation", "message"),
+        [
+            (_atlas_observation.__func__(ra_deg=180.0), "residual"),
+            (_atlas_observation.__func__(mag=99.0), "sentinel"),
+            (_atlas_observation.__func__(mag_err=0.5), "S/N"),
+            (_atlas_observation.__func__(mag_err=0.0), "positive"),
+            (_atlas_observation.__func__(mag=float("nan")), "non-finite"),
+        ],
+    )
+    def test_rejects_invalid_claimed_association(
+        self,
+        observation: Observation,
+        message: str,
+    ) -> None:
+        r = _challenge_cross_survey_confirmation(
+            self._multi_survey_neo(observation)
+        )
+        assert r.outcome == "FAIL"
+        assert message in r.details["errors"][0]["error"]
+
+    def test_rejects_duplicate_claimed_association(self) -> None:
+        observation = self._atlas_observation()
+        r = _challenge_cross_survey_confirmation(
+            self._multi_survey_neo(observation, observation)
+        )
+        assert r.outcome == "FAIL"
+        assert r.details["errors"] == [
+            {"obs_id": observation.obs_id, "error": "duplicate ATLAS row"}
+        ]
+        assert len(r.details["validated_associations"]) == 1
+
+    def test_helper_requires_ztf_reference(self) -> None:
+        neo = _make_neo(mission="ATLAS")
+        with pytest.raises(ValueError, match="no ZTF reference"):
+            _atlas_association_evidence(neo, neo.tracklet.observations[0])
+
+    def test_helper_rejects_polar_tangent_plane(self) -> None:
+        neo = self._multi_survey_neo(self._atlas_observation())
+        polar_ztf = Observation(
+            obs_id="polar",
+            ra_deg=180.0,
+            dec_deg=90.0,
+            jd=2460000.5,
+            mag=19.0,
+            mag_err=0.05,
+            filter_band="r",
+            mission="ZTF",
+        )
+        tracklet = Tracklet(
+            object_id="POLAR",
+            observations=(polar_ztf, self._atlas_observation()),
+            arc_days=1.0,
+            motion_rate_arcsec_per_hour=5.0,
+            motion_pa_degrees=90.0,
+        )
+        polar = ScoredNEO(
+            tracklet=tracklet,
+            features=neo.features,
+            posterior=neo.posterior,
+            hazard=neo.hazard,
+            metadata=neo.metadata,
+        )
+        with pytest.raises(ValueError, match="celestial pole"):
+            _atlas_association_evidence(polar, tracklet.observations[1])
+
+    def test_helper_rejects_invalid_predicted_declination(self) -> None:
+        neo = self._multi_survey_neo(self._atlas_observation())
+        tracklet = Tracklet(
+            object_id="BAD_DEC",
+            observations=neo.tracklet.observations,
+            arc_days=1.0,
+            motion_rate_arcsec_per_hour=200.0,
+            motion_pa_degrees=0.0,
+        )
+        bad_dec = ScoredNEO(
+            tracklet=tracklet,
+            features=neo.features,
+            posterior=neo.posterior,
+            hazard=neo.hazard,
+            metadata=neo.metadata,
+        )
+        far_future = self._atlas_observation(jd=2461000.5)
+        with pytest.raises(ValueError, match="invalid declination"):
+            _atlas_association_evidence(bad_dec, far_future)
 
     def test_skip_non_ztf_mission(self) -> None:
-        """Non-ZTF, non-ATLAS candidate: cross-survey check is SKIP (not implemented)."""
         neo = _make_neo(mission="CSS")
-        r = _challenge_cross_survey_confirmation(neo, atlas_token="fake_token")
+        r = _challenge_cross_survey_confirmation(neo)
         assert r.outcome == "SKIP"
 
 

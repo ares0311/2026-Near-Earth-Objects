@@ -52,6 +52,18 @@ unverified because two distinct bounded SkyBoT requests both returned HTTP 500
 on 2026-07-19. Phase 2 therefore remains open. Evidence:
 `docs/evidence/live/2026-07-19-phase2-known-object-eligibility.md`.
 
+ATLAS cross-survey confirmation is also hardened. Fixed-coordinate forced
+photometry can no longer promote a moving candidate: only linked ATLAS rows
+that match the tracklet's replayed kinematics within the documented
+2-arcsecond requirement, clear a 5-sigma measurement floor, and pass
+finite/sentinel/duplicate checks receive `PASS`. Invalid claimed evidence
+fails; missing optional evidence skips visibly. Focused verification is 86
+passing tests and the original packet replay remains `REJECT=2`. Evidence:
+`docs/evidence/live/2026-07-19-phase2-atlas-confirmation-quality.md`.
+
+Phase 2 remains open pending a selector feature/weight provenance and
+independent-oracle audit. Phase 3 remains blocked.
+
 ## Production Definition
 
 For the ZTF DR24 path, production readiness means the project can run a bounded,

@@ -32,8 +32,6 @@ Usage:
     # Machine-readable output:
     python Skills/adversarial_review.py data/candidates.json --json
 
-    # Supply ATLAS token for cross-survey verification:
-    python Skills/adversarial_review.py data/candidates.json --atlas-token TOKEN
 """
 
 from __future__ import annotations
@@ -97,8 +95,14 @@ _KNOWN_OBJECT_POLICY_VERSION = "skybot-mpc-first-observation-v1"
 _KNOWN_OBJECT_RADIUS_ARCSEC = 10.0
 _KNOWN_OBJECT_OBSERVER_CODE = "500"
 
-# ATLAS cross-survey: require at least 1 detection in the ATLAS field to confirm
-_ATLAS_MIN_DETECTIONS = 1
+# ATLAS documents that moving-object forced photometry needs predicted positions
+# accurate to about one pixel (2 arcsec). A 5-sigma magnitude measurement has
+# dm <= 1.0857 / 5 under the standard magnitude-error approximation.
+_ATLAS_ASSOCIATION_POLICY_VERSION = "linked-tracklet-kinematics-v1"
+_ATLAS_MAX_RESIDUAL_ARCSEC = 2.0
+_ATLAS_MIN_SNR = 5.0
+_MAG_ERROR_TO_SNR = 1.0857362047581296
+_ATLAS_SENTINEL_MAG = 90.0
 
 # Minimum independent nights required for a valid reportable tracklet
 _MIN_NIGHTS_HARD = 2     # MPC requires observations on ≥2 distinct nights
@@ -683,13 +687,12 @@ def _normalize_skybot_rows(observation: Observation, rows: object) -> list[dict]
     for row in rows:
         ra_deg = _scalar(row["RA"])
         dec_deg = _scalar(row["DEC"])
-        cos_sep = (
-            math.sin(math.radians(observation.dec_deg)) * math.sin(math.radians(dec_deg))
-            + math.cos(math.radians(observation.dec_deg))
-            * math.cos(math.radians(dec_deg))
-            * math.cos(math.radians(observation.ra_deg - ra_deg))
+        separation = _angular_separation_arcsec(
+            observation.ra_deg,
+            observation.dec_deg,
+            ra_deg,
+            dec_deg,
         )
-        separation = math.degrees(math.acos(max(-1.0, min(1.0, cos_sep)))) * 3600.0
         matches.append(
             {
                 "designation": _skybot_designation(row),
@@ -840,37 +843,145 @@ def _challenge_known_object_epoch_association(
     )
 
 
-def _challenge_cross_survey_confirmation(
-    neo: ScoredNEO,
-    atlas_token: str | None,
-) -> ChallengeResult:
+def _angular_separation_arcsec(
+    ra1_deg: float,
+    dec1_deg: float,
+    ra2_deg: float,
+    dec2_deg: float,
+) -> float:
+    """Return stable great-circle separation in arcseconds."""
+    cos_sep = (
+        math.sin(math.radians(dec1_deg)) * math.sin(math.radians(dec2_deg))
+        + math.cos(math.radians(dec1_deg))
+        * math.cos(math.radians(dec2_deg))
+        * math.cos(math.radians(ra1_deg - ra2_deg))
+    )
+    return math.degrees(math.acos(max(-1.0, min(1.0, cos_sep)))) * 3600.0
+
+
+def _atlas_association_evidence(neo: ScoredNEO, observation: Observation) -> dict:
+    """Validate one ATLAS row against the linked tracklet's kinematics."""
+    ztf_observations = sorted(
+        (row for row in neo.tracklet.observations if row.mission == "ZTF"),
+        key=lambda row: row.jd,
+    )
+    if not ztf_observations:
+        raise ValueError("no ZTF reference observation exists")
+    values = (
+        observation.ra_deg,
+        observation.dec_deg,
+        observation.jd,
+        observation.mag,
+        observation.mag_err,
+        neo.tracklet.motion_rate_arcsec_per_hour,
+        neo.tracklet.motion_pa_degrees,
+    )
+    if not all(math.isfinite(value) for value in values):
+        raise ValueError("association contains non-finite values")
+    if observation.mag >= _ATLAS_SENTINEL_MAG:
+        raise ValueError("ATLAS magnitude is a non-detection sentinel")
+    if observation.mag_err <= 0.0:
+        raise ValueError("ATLAS magnitude uncertainty must be positive")
+    snr = _MAG_ERROR_TO_SNR / observation.mag_err
+    if snr < _ATLAS_MIN_SNR:
+        raise ValueError(f"ATLAS measurement S/N {snr:.3f} is below {_ATLAS_MIN_SNR:.1f}")
+
+    reference = ztf_observations[0]
+    elapsed_hours = (observation.jd - reference.jd) * 24.0
+    pa_radians = math.radians(neo.tracklet.motion_pa_degrees)
+    east_arcsec = neo.tracklet.motion_rate_arcsec_per_hour * math.sin(pa_radians) * elapsed_hours
+    north_arcsec = neo.tracklet.motion_rate_arcsec_per_hour * math.cos(pa_radians) * elapsed_hours
+    cos_dec = math.cos(math.radians(reference.dec_deg))
+    if abs(cos_dec) < 1e-12:
+        raise ValueError("tracklet is too close to a celestial pole for tangent-plane replay")
+    predicted_ra = (reference.ra_deg + east_arcsec / (3600.0 * cos_dec)) % 360.0
+    predicted_dec = reference.dec_deg + north_arcsec / 3600.0
+    if not -90.0 <= predicted_dec <= 90.0:
+        raise ValueError("kinematic replay predicted an invalid declination")
+    residual = _angular_separation_arcsec(
+        predicted_ra,
+        predicted_dec,
+        observation.ra_deg,
+        observation.dec_deg,
+    )
+    if residual > _ATLAS_MAX_RESIDUAL_ARCSEC:
+        raise ValueError(
+            f"ATLAS residual {residual:.3f} arcsec exceeds "
+            f"{_ATLAS_MAX_RESIDUAL_ARCSEC:.1f} arcsec"
+        )
+    return {
+        "obs_id": observation.obs_id,
+        "jd": observation.jd,
+        "ra_deg": observation.ra_deg,
+        "dec_deg": observation.dec_deg,
+        "predicted_ra_deg": predicted_ra,
+        "predicted_dec_deg": predicted_dec,
+        "residual_arcsec": residual,
+        "mag": observation.mag,
+        "mag_err": observation.mag_err,
+        "estimated_snr": snr,
+    }
+
+
+def _challenge_cross_survey_confirmation(neo: ScoredNEO) -> ChallengeResult:
     """Seek independent confirmation from a second survey.
 
-    If the candidate was found by ZTF, check whether ATLAS also detected
-    it at the same sky position during the observation window.  Independent
-    detection by a separate instrument is strong evidence against an
-    instrument-specific artifact.
-
-    A PASS here does not guarantee the candidate is real, but a FAIL or SKIP
-    without any alternative confirmation is a concern.
-
-    Requires ATLAS token; returns SKIP if unavailable.
+    Only linked ATLAS observations can confirm a moving candidate here. The
+    fixed-coordinate forced-photometry endpoint cannot establish a moving-
+    object association without a sufficiently precise ephemeris, so this
+    challenge never upgrades a candidate from arbitrary live query rows.
     """
     # Determine which survey found the candidate
     missions = {o.mission for o in neo.tracklet.observations}
     has_ztf = "ZTF" in missions
     has_atlas = "ATLAS" in missions
 
-    # If already multi-survey, cross-confirmation already exists
+    common = {
+        "policy_version": _ATLAS_ASSOCIATION_POLICY_VERSION,
+        "missions": sorted(missions),
+        "max_residual_arcsec": _ATLAS_MAX_RESIDUAL_ARCSEC,
+        "min_snr": _ATLAS_MIN_SNR,
+    }
+
+    # Validate linked multi-survey evidence rather than trusting its label.
     if has_ztf and has_atlas:
+        evidence: list[dict] = []
+        errors: list[dict] = []
+        seen: set[tuple[str, float, float, float]] = set()
+        for observation in neo.tracklet.observations:
+            if observation.mission != "ATLAS":
+                continue
+            identity = (
+                observation.obs_id,
+                observation.jd,
+                observation.ra_deg,
+                observation.dec_deg,
+            )
+            if identity in seen:
+                errors.append({"obs_id": observation.obs_id, "error": "duplicate ATLAS row"})
+                continue
+            seen.add(identity)
+            try:
+                evidence.append(_atlas_association_evidence(neo, observation))
+            except ValueError as exc:
+                errors.append({"obs_id": observation.obs_id, "error": str(exc)})
+        if not evidence or errors:
+            return ChallengeResult(
+                name="cross_survey_confirmation",
+                outcome="FAIL",
+                reason=(
+                    "Claimed ZTF + ATLAS evidence failed kinematic or measurement-quality "
+                    "validation; it is not independent confirmation."
+                ),
+                details={**common, "validated_associations": evidence, "errors": errors},
+            )
         return ChallengeResult(
             name="cross_survey_confirmation",
             outcome="PASS",
-            reason="Candidate already has observations from multiple surveys (ZTF + ATLAS).",
-            details={"missions": sorted(missions)},
+            reason="Linked ATLAS observation(s) independently match the ZTF tracklet kinematics.",
+            details={**common, "validated_associations": evidence, "errors": []},
         )
 
-    # Need ATLAS token for live cross-check
     if not has_ztf:
         return ChallengeResult(
             name="cross_survey_confirmation",
@@ -879,71 +990,17 @@ def _challenge_cross_survey_confirmation(
                 f"Candidate missions: {sorted(missions)}. "
                 "Cross-survey check currently implemented for ZTF-origin candidates only."
             ),
-            details={"missions": sorted(missions)},
-        )
-
-    if not atlas_token:
-        return ChallengeResult(
-            name="cross_survey_confirmation",
-            outcome="SKIP",
-            reason=(
-                "No ATLAS token provided — cannot query ATLAS for cross-survey confirmation. "
-                "Provide --atlas-token or set ATLAS_TOKEN env variable."
-            ),
-            details={"missions": sorted(missions)},
-        )
-
-    # Build query parameters from tracklet
-    obs_list = sorted(neo.tracklet.observations, key=lambda o: o.jd)
-    ra_c = sum(o.ra_deg for o in obs_list) / len(obs_list)
-    dec_c = sum(o.dec_deg for o in obs_list) / len(obs_list)
-    start_jd = obs_list[0].jd - 1.0   # 1-day buffer before first observation
-    end_jd = obs_list[-1].jd + 1.0    # 1-day buffer after last observation
-
-    try:
-        from fetch import fetch_atlas_forced
-        atlas_obs = fetch_atlas_forced(
-            ra_deg=ra_c,
-            dec_deg=dec_c,
-            start_jd=start_jd,
-            end_jd=end_jd,
-            atlas_token=atlas_token,
-            force_refresh=False,
-        )
-    except Exception as exc:
-        return ChallengeResult(
-            name="cross_survey_confirmation",
-            outcome="SKIP",
-            reason=f"ATLAS query failed: {exc}",
-            details={"error": str(exc)},
-        )
-
-    n_atlas = len(atlas_obs)
-    if n_atlas >= _ATLAS_MIN_DETECTIONS:
-        return ChallengeResult(
-            name="cross_survey_confirmation",
-            outcome="PASS",
-            reason=(
-                f"ATLAS independently detected {n_atlas} data point(s) near "
-                f"candidate position — cross-survey confirmation obtained."
-            ),
-            details={
-                "n_atlas_detections": n_atlas,
-                "ra_deg": ra_c,
-                "dec_deg": dec_c,
-            },
+            details=common,
         )
 
     return ChallengeResult(
         name="cross_survey_confirmation",
-        outcome="WARNING",
+        outcome="SKIP",
         reason=(
-            f"ATLAS returned 0 detections near candidate position "
-            f"(RA={ra_c:.4f}, Dec={dec_c:.4f}, JD {start_jd:.1f}–{end_jd:.1f}). "
-            "Lack of independent confirmation is a concern but not a disqualification "
-            "(ATLAS may not cover this field at this epoch)."
+            "No linked ATLAS observation is present. Fixed-coordinate forced photometry "
+            "is not treated as moving-object confirmation without a precise ephemeris."
         ),
-        details={"n_atlas_detections": 0, "ra_deg": ra_c, "dec_deg": dec_c},
+        details=common,
     )
 
 
@@ -956,7 +1013,6 @@ def run_adversarial_review(
     neo: ScoredNEO,
     *,
     offline: bool = False,
-    atlas_token: str | None = None,
     skybot_query=None,
     first_observation_query=None,
 ) -> ReviewVerdict:
@@ -968,8 +1024,6 @@ def run_adversarial_review(
         The ScoredNEO to review.
     offline:
         If True, skip all challenges that require network access.
-    atlas_token:
-        Optional ATLAS forced-photometry API token for cross-survey checks.
     skybot_query / first_observation_query:
         Optional injected providers for cached/offline verified association
         evidence and behavioral tests.
@@ -1019,7 +1073,7 @@ def run_adversarial_review(
 
     # Cross-survey confirmation remains an optional live enrichment.
     if not offline:
-        challenges.append(_challenge_cross_survey_confirmation(neo, atlas_token))
+        challenges.append(_challenge_cross_survey_confirmation(neo))
 
     # --- Aggregate counts ---
     fail_count = sum(1 for c in challenges if c.outcome == "FAIL")
@@ -1158,25 +1212,12 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
-        "--atlas-token",
-        default=None,
-        metavar="TOKEN",
-        help=(
-            "ATLAS forced-photometry API token for cross-survey confirmation. "
-            "Falls back to ATLAS_TOKEN environment variable if not provided."
-        ),
-    )
-    parser.add_argument(
         "--json",
         dest="as_json",
         action="store_true",
         help="Output results as a JSON array.",
     )
     args = parser.parse_args(argv)
-
-    # Resolve ATLAS token from env if not provided on CLI
-    import os
-    atlas_token: str | None = args.atlas_token or os.environ.get("ATLAS_TOKEN")
 
     # Load input JSON
     try:
@@ -1211,7 +1252,7 @@ def main(argv: list[str] | None = None) -> int:
     # Run adversarial review on each candidate
     verdicts: list[ReviewVerdict] = list(malformed_verdicts)
     for neo in neos:
-        v = run_adversarial_review(neo, offline=args.offline, atlas_token=atlas_token)
+        v = run_adversarial_review(neo, offline=args.offline)
         verdicts.append(v)
         if not args.as_json:
             _print_verdict(v, as_json=False)
