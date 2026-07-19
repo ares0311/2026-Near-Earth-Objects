@@ -1,6 +1,6 @@
 # ZTF DR24 Production Gates
 
-Last updated: 2026-07-17
+Last updated: 2026-07-19
 Applies to: ZTF DR24 archival historical replay, the current primary discovery
 path defined in `docs/MISSION.md` and `docs/neo_discovery_agent_brief.md`.
 
@@ -19,6 +19,17 @@ products (difference images, science masks, PSF kernels) — the
 historical evidence (Z1/Z2/Z4/Z5/Z6/Z7 closed, Z3 intentionally paused)
 but do not by themselves establish current production readiness; the
 Motion-Product Gates section is the currently-active register.
+
+**Phase 1 detection-hardening status (2026-07-19)**: both operator-named
+technical gaps are implemented, tested, and replayed on the original field-1
+data; explicit operator closure is pending before Phase 2 begins. Pixel-source
+PSF evidence is preserved separately without inventing a calibrated real/bogus
+probability, and incomplete/low-quality evidence fails closed. Arc sufficiency
+and orbit-fit success are now separate durable fields; the preliminary fitter
+uses a real bounded two-body state fit and measured residual rather than the
+former invalid approximation/hard-coded residual. The replay kept both
+candidates rejected with explicit tier-2/`no_solution` statuses. Evidence:
+`docs/evidence/live/2026-07-19-phase1-detection-hardening.md`.
 
 ## Production Definition
 
@@ -185,19 +196,30 @@ Do not stop merely because no candidate has been found.
 
 ## Next Coding Step
 
-**Current as of 2026-07-17**: all seven Motion-Product Gates (MP1-MP7) are
-now **CLOSED** with real data. MP6's no-submission drill produced the
-predicted `REJECT=2` result (a third independent signal agreeing with
-MP4/MP5 that no real point source survives on the tested field), and MP7's
-operator runbook update is complete. No candidate has survived adversarial
-review on either tested field. Per the Production Definition above, this
-is not itself a readiness gap -- production readiness does not require a
-confirmed discovery. The next roadmap move is again an operator decision
-(same three options listed under `CLAUDE.md`'s "Immediate Next Steps": try
-another field via `Skills/select_survey_fields.py`, resume the paused Z3
-alert-replay identity search, or pause pending a different direction). Do
-not select a new field or start a new bulk transfer without that
-direction.
+**Current as of 2026-07-19**: all seven Motion-Product Gates (MP1-MP7) are
+**CLOSED** with real data, and five algorithmically-selected fields (fifteen
+real nights) have each independently confirmed the pipeline's mechanics and
+null-result behavior are consistent. **That validation work is done. Do not
+run another field through this pipeline as a "next step."**
+
+The operator identified this as drift (2026-07-19) -- repeated
+field-expansion runs after MP1-MP7 already closed were re-exercising an
+already-proven mechanism, not doing real hardening work -- and replaced
+the old "resume Z3 / broader batch / MPC path" 3-way decision with an
+explicit three-phase roadmap recorded in `CLAUDE.md`'s **"Current Roadmap
+Phase"** section (right after its PRIMARY DIRECTIVE). **That section is
+the current source of truth; this paragraph only points to it.**
+
+Phase 1 (active now): harden the detection pipeline. Two concrete named
+gaps, found by inspecting real review-packet output from the five
+completed field tests: (1) `real_bogus_score` is always `None` for
+pixel-extraction-sourced candidates -- no real/bogus signal exists for
+this data path at all; (2) `fit_orbit()` returns `quality_code: null` for
+every tested candidate rather than a graded low-quality code, despite the
+schema anticipating short-arc cases. See `CLAUDE.md`'s "Current Roadmap
+Phase" for the full description and exit criteria. Do not select a new
+field, start a new bulk transfer, resume Gate Z3, or do MPC-submission
+work until Phase 1 closes.
 
 **Z0-Z7 below are the superseded alert-replay sub-approach's gate history**
 (see the pivot notice near the top of this file). Gates Z1, Z2, Z4, Z5, Z6,

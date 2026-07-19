@@ -16,6 +16,7 @@ from classify import (
     _features_to_array,
     _lightcurve_variability,
     _load_xgb_model,
+    _mean_psf_shape_quality,
     _mean_real_bogus,
     _motion_consistency,
     _nights_score,
@@ -76,6 +77,30 @@ class TestFeatureExtraction:
         obs = make_obs(real_bogus=None, deep_real_bogus=None)
         t = Tracklet("T", (obs,), 0.0, 0.0, 0.0)
         assert _mean_real_bogus(t) is None
+
+    def test_psf_shape_quality_is_distinct_from_real_bogus(self):
+        obs = (
+            make_obs(real_bogus=None, psf_shape_correlation=0.8),
+            make_obs(
+                obs_id="psf2", jd=2460001.5, real_bogus=None,
+                psf_shape_correlation=-0.2,
+            ),
+            make_obs(
+                obs_id="psf3", jd=2460002.5, real_bogus=None,
+                psf_shape_correlation=None,
+            ),
+        )
+        t = Tracklet("PSF", obs, 2.0, 1.0, 0.0)
+        assert _mean_real_bogus(t) is None
+        assert _mean_psf_shape_quality(t) == pytest.approx(0.4)
+        features = extract_features(t)
+        assert features.real_bogus_score is None
+        assert features.psf_quality_score == pytest.approx(0.4)
+
+    def test_psf_shape_quality_none_when_unmeasured(self):
+        obs = make_obs(real_bogus=None, psf_shape_correlation=None)
+        t = Tracklet("PSF_NONE", (obs,), 0.0, 0.0, 0.0)
+        assert _mean_psf_shape_quality(t) is None
 
     def test_arc_coverage(self):
         t = make_tracklet(arc_days=15.0)

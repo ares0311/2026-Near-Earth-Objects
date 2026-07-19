@@ -6,72 +6,49 @@ Technical reference for the orbit fitting subsystem in `src/orbit.py`.
 
 ## Overview
 
-Preliminary orbit determination follows a classical two-stage approach:
+Preliminary orbit determination follows a two-stage bounded fit:
 
-1. **Initial Orbit Determination (IOD)** via Gauss's method — produces a rough
-   Keplerian orbit from three observations spanning a short arc.
-2. **Differential Correction (DC)** — iterative least-squares refinement that
-   minimises the residuals between the fitted orbit and all available observations.
+1. **Initial state fit** — deterministic multi-start nonlinear least squares fits
+   a six-component heliocentric Cartesian state to all available RA/Dec epochs.
+2. **Differential correction** — a second least-squares refinement starts from
+   the fitted Keplerian state and records the measured astrometric RMS.
 
-Both stages operate in heliocentric ecliptic Cartesian coordinates.  All
-distances are in AU; velocities in AU/day; angles in degrees unless otherwise
-noted.
+Earth positions come from Astropy's bundled `builtin` ephemeris, so the normal
+path is offline and never downloads a remote kernel. Propagation uses a
+heliocentric two-body model. Distances are in AU, velocities in AU/day, and
+angles in degrees unless otherwise noted.
 
 ---
 
-## Stage 1: Gauss's Method
+## Stage 1: Initial State Fit
 
 ### Input
-Three observations, each specified as `(JD, RA_deg, Dec_deg)`.  For arcs
-spanning more than three observations, Gauss's method uses the first, middle,
-and last observations.
+At least three observations, each specified as `(JD, RA_deg, Dec_deg)`. All
+observations are used; duplicate/non-finite time geometry fails explicitly.
 
 ### Algorithm
 
-1. Convert each observation to a heliocentric **direction unit vector** (ρ̂)
-   in ecliptic coordinates using a mean-obliquity rotation (ε = 23.439°).
-
-2. Compute the **Sun's geocentric ecliptic position** (R_i) at each epoch
-   using a low-precision solar longitude formula accurate to ~0.01°.
-
-3. Form the scalar and vector cross-products that define the Gauss **D matrix**:
-
-   ```
-   p_i = ρ̂_j × ρ̂_k   (i ≠ j ≠ k)
-   D_ij = R_i · p_j
-   D_0 = ρ̂_1 · p_1
-   ```
-
-4. Express the topocentric range at the middle epoch (ρ₂) as a function of the
-   heliocentric distance r₂ via the Gauss **f-function**:
-
-   ```
-   ρ₂ = A + (k²·B) / r₂³
-   ```
-
-   where `A` and `B` absorb the time ratios τ₁ = t₁−t₂, τ₃ = t₃−t₂.
-
-5. Solve for r₂ iteratively (Newton iteration from r₂ = 1.5 AU seed):
-
-   ```
-   r₂_new = |R₂ + 2ρ₂(ρ̂₂·R₂) + ρ₂²|^(1/2)
-   ```
-
-6. Recover heliocentric positions r₁, r₂, r₃ and estimate the velocity at t₂
-   via a finite difference:
-
-   ```
-   v₂ ≈ (r₃ − r₁) / (t₃ − t₁)
-   ```
+1. Convert RA/Dec to ICRS line-of-sight unit vectors.
+2. Obtain Earth-centre heliocentric ICRS positions for every epoch.
+3. Seed six range hypotheses (0.1, 0.3, 0.7, 1.5, 3, and 8 AU), with a
+   finite-difference velocity at the middle epoch.
+4. Propagate each state with deterministic RK4 two-body dynamics and minimize
+   tangent-plane RA/Dec residuals with SciPy's bounded TRF least-squares solver.
+5. Reject non-finite, hyperbolic, out-of-bounds, or RMS > 5 arcsec solutions;
+   retain the physical solution with the smallest measured RMS.
 
 ### Output
-A heliocentric state vector `(r₂, v₂)` at the middle epoch.
+A heliocentric ecliptic state vector `(r, v)` at the middle epoch, or an
+explicit no-solution result. The internal function retains its historical
+`_gauss_iod` name for compatibility; it is not the previous scalar Gauss
+approximation.
 
 ### Limitations
-- Light-travel-time is not corrected; introduces < 1 arcsec error for
-  objects < 2 AU from Earth.
-- Valid only for arcs < ~30 days; longer arcs require multi-revolution
-  disambiguation.
+- Light-travel-time, observatory topocentric parallax, non-solar perturbations,
+  and measurement covariance weighting are not modeled.
+- Sparse short arcs can have multiple admissible range solutions. A low
+  residual is necessary but not sufficient for a definitive orbit.
+- This is a preliminary internal fit, not an MPC orbit determination.
 - Hyperbolic (e > 1) solutions are rejected.
 
 ---
@@ -96,55 +73,46 @@ from AU/day to AU/yr internally.
 
 ## Stage 2: Differential Correction
 
-Starting from the Gauss IOD, an iterative least-squares loop refines the
-six Keplerian elements to minimise residuals across all observations.
+Starting from the initial solution, the fitter converts the elements back to a
+Cartesian state and reruns the same bounded astrometric least-squares problem.
 
 ### Process
 
-1. **Propagate** the current orbital elements to each observation epoch using
-   Keplerian propagation (mean anomaly advance + eccentric anomaly solution).
-
-2. **Compute residuals** between predicted and observed (RA, Dec) for each
-   observation.  Residuals are weighted by `1/σ²` where `σ = max(mag_err, 0.5)`
-   arcseconds (conservative floor for typical survey astrometry).
-
-3. **Form the partial derivatives** (design matrix `A`) of (RA, Dec) with
-   respect to the six initial state components via finite differences (step
-   size 1 × 10⁻⁶ AU or AU/day).
-
-4. **Solve the normal equations** `(AᵀWA)Δx = AᵀWr` for the correction vector
-   `Δx` using numpy's LU solver.
-
-5. **Apply** Δx and repeat until the RMS residual decreases by less than
-   `1 × 10⁻¹⁰` arcseconds or 20 iterations are completed.
+1. Propagate the heliocentric state to each observation epoch.
+2. Compute tangent-plane RA/Dec residuals in arcseconds.
+3. Let SciPy's TRF solver refine all six state components within explicit
+   position and velocity bounds.
+4. Convert the refined state back to Keplerian elements and store the measured
+   RMS in `fit_residual_arcsec`.
 
 ### Convergence
 
-Typical residuals after convergence:
-
-| Arc length | Expected RMS (arcsec) |
-|---|---|
-| < 1 day | ~5–20 (few observations) |
-| 1–3 nights | ~1–5 |
-| 1+ week | ~0.5–2 |
-| 1+ month | ~0.3–1 |
+`fit_orbit()` returns `None` unless it has at least three observations, finds a
+bound elliptic solution, and measures RMS ≤ 5 arcsec. Callers persist the
+reason separately as `HazardAssessment.orbit_fit_status`.
 
 ---
 
-## Orbit Quality Codes
+## Project Arc-Quality Tiers
 
-| Code | Criterion | Reliability |
+| Tier | Criterion | Meaning |
 |---|---|---|
-| 1 | Arc < 1 day; single night | Very poor; MOID unreliable |
-| 2 | Multi-night arc (≥ 2 nights) | Orbit class usually correct |
-| 3 | Multi-week arc (≥ 7 days) | Elements reliable to ~1% |
-| 4 | Opposition coverage (> 30 days) | High-quality orbit |
+| 0 | Not assessed | No arc assessment recorded |
+| 1 | Arc < 1 day | Insufficient temporal leverage |
+| 2 | 1 to < 7 days | Short multi-night arc |
+| 3 | 7 to < 30 days | Multi-week arc |
+| 4 | ≥ 30 days | Opposition-scale arc |
 
-Code is assigned in `arc_quality_report()` and stored in
-`OrbitalElements.quality_code`.
+The tier is assigned in `arc_quality_report()` whether or not a physical orbit
+fits. It is stored as `HazardAssessment.arc_quality_tier`; a successful fit also
+copies the tier to `OrbitalElements.quality_code` for compatibility.
 
-**Never use Code 1 orbits for hazard assessment.**
-`_compute_hazard_flag()` in `score.py` requires `quality_code ≥ 2` before
+This is a project arc-sufficiency tier, **not** the MPC `U` uncertainty
+parameter. Arc tier and fit success are deliberately separate: a three-night,
+six-day tracklet is tier 2 even when `orbit_fit_status == "no_solution"`.
+
+**Never use Tier 1 orbits for hazard assessment.**
+`_compute_hazard_flag()` in `score.py` requires a fitted quality tier ≥ 2 before
 assigning a non-"unknown" hazard flag.
 
 ---
@@ -162,9 +130,9 @@ grid search over eccentric anomaly:
 4. Refine the minimum with `scipy.optimize.minimize_scalar` (Brent's method)
    around the best seed.
 
-**Short-arc caveat**: For `quality_code = 1` (arc < 1 day), the MOID has
-typical uncertainty > 0.1 AU.  The pipeline sets `moid_au = None` in these
-cases rather than reporting an unreliable value.
+**Short-arc caveat**: The pipeline returns no MOID when there is no accepted
+orbital solution. An internal MOID must never be presented as an authoritative
+impact or hazard assessment; MPC/CNEOS remain authoritative.
 
 ---
 
@@ -209,7 +177,7 @@ comet-like candidates before MPC submission.
 ## Worked Example
 
 ```python
-from schemas import Observation
+from schemas import Observation, Tracklet
 from orbit import fit_orbit, classify_neo_class, compute_moid, tisserand_parameter
 
 obs = (
@@ -221,7 +189,14 @@ obs = (
                 mag=19.3, mag_err=0.05, filter_band="r", mission="ZTF"),
 )
 
-elements = fit_orbit(obs)
+tracklet = Tracklet(
+    object_id="example",
+    observations=obs,
+    arc_days=2.0,
+    motion_rate_arcsec_per_hour=15.0,
+    motion_pa_degrees=45.0,
+)
+elements = fit_orbit(tracklet)
 if elements is not None:
     print(f"a = {elements.semi_major_axis_au:.3f} AU")
     print(f"e = {elements.eccentricity:.4f}")
@@ -232,17 +207,8 @@ if elements is not None:
     print(f"Quality code: {elements.quality_code}")
 ```
 
-Expected output for a typical Apollo-class synthetic track:
-
-```
-a = 1.42 AU
-e = 0.3120
-i = 8.50 deg
-NEO class: apollo
-MOID: 0.031 AU
-T_J: 5.214
-Quality code: 2
-```
+The illustrative coordinates above are not guaranteed to admit a physical
+solution; production callers must handle `None` and preserve `orbit_fit_status`.
 
 ---
 
@@ -252,4 +218,5 @@ Quality code: 2
 - Escobal, P.R. (1965). *Methods of Orbit Determination*. Krieger.
 - Milani, A. & Gronchi, G.F. (2010). *Theory of Orbit Determination*. CUP.
 - Sitarski, G. (1998). *Acta Astronomica*, 48, 547 — iterative orbit improvement.
-- MPC orbit quality codes: https://minorplanetcenter.net/iau/info/QualityCode.html
+- Astropy solar-system ephemerides: `astropy.coordinates.get_body_barycentric_posvel`
+- SciPy bounded nonlinear least squares: `scipy.optimize.least_squares`

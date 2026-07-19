@@ -1,6 +1,84 @@
 # Active Handoff — ZTF DR24 Motion-Product Pivot
 
-Updated: 2026-07-19 (sixth-field expansion; IRSA concurrency probe)
+Updated: 2026-07-19 (Hunter PROD Directive integrated)
+
+## Phase 1 implementation complete; operator closure pending (2026-07-19)
+
+Both named Phase 1 detection-hardening gaps now meet their technical exit
+criteria, with tests and a replay of the original three-night field-1 data.
+Phase 2 remains blocked because the roadmap requires explicit operator closure.
+
+1. Pixel extraction now preserves its real PSF-kernel correlation as
+   `Observation.psf_shape_correlation` and aggregates it separately as
+   `psf_quality_score`. It deliberately does not fabricate a calibrated
+   `real_bogus_score`; `tier2_cnn_v4` cannot consume this path's products
+   because its required three 63x63 cutouts do not exist here. Adversarial
+   review fails closed on missing coverage or any correlation below the
+   independently tested 0.5 artifact discriminator; even complete passing
+   coverage yields `WARNING`, not `PASS`.
+2. The invalid approximate orbit initialization and hard-coded fit residual
+   were replaced with a deterministic bounded two-body state fit using the
+   bundled offline Earth ephemeris and measured astrometric RMS. Arc sufficiency
+   is now stored independently as `arc_quality_tier`; fit outcome is stored as
+   `orbit_fit_status`. A tier-2 arc with no physical solution now says exactly
+   that instead of exposing an ambiguous null quality code.
+
+Real replay result: 471 observations, two linked tracklets, both correctly
+rejected. Their PSF means are 0.0680 and 0.0116 with incomplete coverage; both
+have `arc_quality_tier: 2`, `orbit_fit_status: no_solution`, and no invented
+orbital elements. Canonical verification passed all six stages with 2,067 tests
+and 100% `src/` coverage before the final documentation update. Full evidence:
+`docs/evidence/live/2026-07-19-phase1-detection-hardening.md`.
+
+## Hunter PROD Directive confirmed and integrated (2026-07-19)
+
+Jerome W. Lindsey III confirmed a cross-project "Hunter PROD Directive"
+(this repo is NEO-Hunter; sibling repos Techno-Hunter/EXO-Hunter are
+independently sandboxed, no cross-repo coupling) is real and intentional
+— it extends, not contradicts, the three-phase roadmap below. Recorded
+verbatim in `docs/HUNTER_PROD_DIRECTIVE.md`, referenced from both
+`CLAUDE.md`'s MANDATORY SESSION-START PROTOCOL and `AGENTS.md`'s
+mandatory-read list.
+
+Performed the directive's required SESSION START pipeline-mapping
+exercise against this repo's actual code (verified, not assumed): the
+candidate universe, identity/history resolution, data acquisition,
+preprocessing, composite interpretation, and durable results/provenance
+stages all have real, working implementations already. Real gaps found:
+no unified CLI exists at all (verified via `pyproject.toml` — no
+`[project.scripts]`, and no CLI wrapper in the repo root); no discrete
+"pending search" entity exists before execution; the existing manifest
+(`data_selection/target_priority_queue.csv`) is a running priority list,
+not a per-run manifest; there is no durable follow-up registry (only ad
+hoc scripts). Full stage-by-stage table in `CLAUDE.md`'s "Current
+Roadmap Phase" section.
+
+Phase 1 (harden the detection pipeline) remains active and unchanged.
+Phase 2 and Phase 3 were reframed in the Hunter directive's specific
+terms (deterministic ranking model for Phase 2; the required CLI +
+5 durable-state entities for Phase 3), without changing their blocked
+status. **No code changes — documentation/roadmap integration only.**
+
+## Operator decision (2026-07-19): three-phase roadmap replaces the old 3-way decision
+
+Jerome W. Lindsey III flagged that continued field-expansion runs
+(fields 3, 4, 6 below) after MP1-MP7 already closed was drift —
+re-exercising an already-proven pipeline mechanism rather than doing real
+hardening work. Replaced the "resume Z3 / broader batch / MPC path"
+3-way decision with an explicit sequence: **Phase 1 (active) — harden
+the detection pipeline; Phase 2 (blocked) — harden the search algorithm;
+Phase 3 (blocked) — package the application to run autonomously offline.**
+Recorded in full in `CLAUDE.md`'s "Current Roadmap Phase" section
+(immediately after PRIMARY DIRECTIVE) and mirrored into `AGENTS.md` for
+Codex parity. Phase 1's two concrete named gaps, found by inspecting real
+review-packet output from the five completed field tests below (not
+guessed): (1) `real_bogus_score` is always `None` for pixel-extraction
+candidates — no real/bogus signal exists for this data path; (2)
+`fit_orbit()` returns `quality_code: null` for every tested candidate
+rather than a graded low-quality code, despite the schema anticipating
+short-arc cases. **Do not run another field-expansion batch, resume Gate
+Z3, or start MPC-submission work until both gaps are investigated and
+closed (fixed or explicitly documented as correct).**
 Repository identity: `2026 Near Earth Objects`
 Branch: `main`
 Merged batch selection: `d81af0a0` (PR #235)

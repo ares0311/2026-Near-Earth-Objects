@@ -14,7 +14,8 @@ All models in `src/schemas.py` use `ConfigDict(frozen=True)` — they are immuta
 | `NEOClass` | Literal: `"amor"`, `"apollo"`, `"aten"`, `"ieo"`, `"unknown"` |
 | `HazardFlag` | Literal: `"pha_candidate"`, `"close_approach"`, `"nominal"`, `"unknown"` |
 | `AlertPathway` | Literal: `"mpc_submission"`, `"neocp_followup"`, `"nasa_pdco_notify"`, `"internal_candidate"`, `"known_object"` |
-| `OrbitQualityCode` | Literal: 1, 2, 3, 4 |
+| `OrbitQualityCode` | Project arc tier: 0 (unassessed), 1, 2, 3, or 4; not MPC `U` |
+| `OrbitFitStatus` | `"not_attempted"`, `"insufficient_observations"`, `"no_solution"`, or `"fitted"` |
 
 ---
 
@@ -35,6 +36,7 @@ A single photometric detection.
 | `mission` | `Mission` | Survey that produced this observation |
 | `real_bogus` | `float \| None` | Classical real/bogus score [0, 1] |
 | `deep_real_bogus` | `float \| None` | Deep-learning real/bogus score [0, 1] |
+| `psf_shape_correlation` | `float \| None` | Pixel-extraction PSF Pearson correlation [-1, 1]; not a probability |
 | `cutout_science` | `str \| None` | Base64 63×63 float32 science cutout |
 | `cutout_reference` | `str \| None` | Base64 63×63 float32 reference cutout |
 | `cutout_difference` | `str \| None` | Base64 63×63 float32 difference cutout |
@@ -67,7 +69,7 @@ Feature vector for ML classification. All `OptScore` fields are `float | None` i
 |-------|-------------|
 | `real_bogus_score` | Real/bogus classifier output |
 | `streak_score` | Streak/trail severity |
-| `psf_quality_score` | PSF quality |
+| `psf_quality_score` | Mean nonnegative source-native PSF-shape correlation |
 | `motion_consistency_score` | Linear motion fit quality |
 | `arc_coverage_score` | Arc length normalized to 30 days |
 | `nights_observed_score` | Number of nights normalized |
@@ -117,7 +119,7 @@ Keplerian orbital elements from `orbit.py`.
 | `argument_of_perihelion_deg` | ω (degrees) |
 | `mean_anomaly_deg` | M₀ (degrees) at epoch |
 | `epoch_jd` | Reference epoch (JD) |
-| `quality_code` | `OrbitQualityCode` 1–4 |
+| `quality_code` | Successful fit's project arc tier, 1–4 |
 
 ### `HazardAssessment`
 Result of the scoring and hazard evaluation stage.
@@ -131,6 +133,9 @@ Result of the scoring and hazard evaluation stage.
 | `neo_class` | `NEOClass` | Dynamical class |
 | `alert_pathway` | `AlertPathway` | Recommended reporting pathway |
 | `explanation` | `CandidateExplanation` | Scoring rationale |
+| `orbital_elements` | `OrbitalElements \| None` | Accepted preliminary solution, if any |
+| `arc_quality_tier` | `OrbitQualityCode` | Arc sufficiency even when no fit exists |
+| `orbit_fit_status` | `OrbitFitStatus` | Explicit fit outcome |
 
 ### `ScoringMetadata`
 Provenance for a scoring run.

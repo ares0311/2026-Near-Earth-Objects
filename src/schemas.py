@@ -10,6 +10,7 @@ __all__ = [
     "HazardFlag",
     "AlertPathway",
     "OrbitQualityCode",
+    "OrbitFitStatus",
     "Observation",
     "Tracklet",
     "CandidateFeatures",
@@ -124,7 +125,12 @@ AlertPathway = Literal[
 ]
 
 OrbitQualityCode = Literal[0, 1, 2, 3, 4]
-# 0=no orbit, 1=arc<1day, 2=multi-night, 3=multi-week, 4=opposition
+# Project arc-sufficiency tier (not the MPC U uncertainty parameter):
+# 0=unassessed, 1=arc<1day, 2=multi-night, 3=multi-week, 4=opposition.
+
+OrbitFitStatus = Literal[
+    "not_attempted", "insufficient_observations", "no_solution", "fitted"
+]
 
 BackgroundOutcome = Literal["reviewed", "needs_follow_up"]
 
@@ -158,6 +164,9 @@ class Observation(BaseModel):
     # ZTF-specific optional fields
     real_bogus: OptScore = None
     deep_real_bogus: OptScore = None
+    # Pixel-extraction Pearson shape correlation. This is deliberately not
+    # stored as a calibrated real/bogus probability.
+    psf_shape_correlation: float | None = Field(default=None, ge=-1.0, le=1.0)
     # image cutouts as base64 strings (science / reference / difference)
     cutout_science: str | None = None
     cutout_reference: str | None = None
@@ -280,6 +289,10 @@ class HazardAssessment(BaseModel):
     alert_pathway: AlertPathway
     explanation: CandidateExplanation
     orbital_elements: OrbitalElements | None = None
+    # Arc sufficiency and fit success are distinct: a multi-night arc may be
+    # tier 2 while the orbit fitter still reports no physical solution.
+    arc_quality_tier: OrbitQualityCode = 0
+    orbit_fit_status: OrbitFitStatus = "not_attempted"
 
 
 # ---------------------------------------------------------------------------

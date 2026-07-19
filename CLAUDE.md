@@ -39,9 +39,13 @@ It contains the facts a coding agent needs to work productively without re-readi
     requirements (REL-01 through REL-10). Run
     `Skills/verify_reliability_controls.py` before claiming any material
     piece of work "complete" or "verified."
+11. Call `Read` on `docs/HUNTER_PROD_DIRECTIVE.md` — the cross-project
+    (NEO-Hunter/Techno-Hunter/EXO-Hunter) PROD mission, required CLI,
+    durable-state model, and Definition of Done. This repo is NEO-Hunter.
+    Read its "SESSION START" checklist before planning or editing.
 
 These steps are non-negotiable. No planning or code changes may happen before
-all eleven are complete.
+all twelve are complete.
 
 ---
 
@@ -65,6 +69,126 @@ If the answer is NO, do not do it. In particular:
 If the highest-priority production gap cannot be resolved because a human
 blocker is unresolved, **state that explicitly** and limit scope to the next
 non-blocked ZTF/Astrometrics gate or documentation sync.
+
+---
+
+## Current Roadmap Phase (operator-directed, established 2026-07-19)
+
+**This section is the current gate for what work is in scope. Read it
+before proposing or executing any task — it narrows the PRIMARY DIRECTIVE
+above to a specific, ordered sequence for the ZTF DR24 motion-product
+path.** Jerome W. Lindsey III set this three-phase sequence explicitly
+after observing drift: repeated field-expansion runs (fields 3, 4, 6 —
+see the dated evidence files in `docs/evidence/live/`) continued after
+the pipeline mechanics were already proven (MP1-MP7 closed), which
+re-exercised an already-validated mechanism rather than doing the actual
+next task. **Do not repeat that pattern.** Running more fields through
+the existing pipeline is not "hardening" anything and is out of scope
+until Phase 1 below is explicitly closed by the operator.
+
+**Phase 1 — Harden the detection pipeline (TECHNICAL EXIT MET 2026-07-19;
+OPERATOR CLOSURE PENDING).**
+Two concrete, named gaps were identified 2026-07-19 by inspecting the
+actual review-packet output from five already-completed field tests, not
+guessed:
+1. **No real/bogus score exists for pixel-extraction-sourced candidates.**
+   Every review packet from `Skills/run_pixel_extraction_positive_control.py`
+   fails `Skills/adversarial_review.py`'s `real_bogus` challenge with
+   `real_bogus_score: None` — not because the pipeline evaluated and
+   rejected a low score, but because nothing populates this field for
+   this data path at all. Investigate whether a real signal can be
+   derived for this path (e.g. calibrating the existing PSF-correlation
+   score, or reusing `tier2_cnn_v4` if the cutout format can be made
+   compatible) and either wire it in or explicitly document why `None` is
+   correct/unavoidable for this specific source.
+2. **`fit_orbit()` returns no orbital elements (`quality_code: null`) for
+   every tested candidate**, rather than a graded low-quality code, even
+   though `schemas.py`'s `HazardAssessment`/orbit-quality-code scheme
+   (1 = arc < 1 day, 2 = multi-night, 3 = multi-week, 4 = opposition)
+   explicitly anticipates short-arc cases. Investigate whether `null` is
+   correct given these arcs are only 3 observations over ~6 days, or
+   whether this is a real gap in `orbit.py`'s short-arc handling that
+   should instead report quality code 1 or 2.
+
+**Exit criteria for Phase 1**: both gaps above are investigated and each
+is either fixed (with tests and real-data evidence) or explicitly
+documented as correct/expected behavior for this data source, backed by
+evidence — not assumed. Do not declare Phase 1 done without addressing
+both items explicitly, one way or the other.
+
+**Technical disposition (2026-07-19)**: both criteria are met. The pixel
+path now preserves source-native PSF-shape evidence separately, never
+mislabels it as a calibrated real/bogus probability, and fails closed on
+incomplete/low coverage. Arc sufficiency and orbit-fit success are now
+separate durable fields, and the fitter uses a bounded two-body state fit
+with measured residuals. The original field-1 replay kept both candidates
+rejected with explicit tier-2/`no_solution` outcomes. Canonical verification
+passed with 2,067 tests and 100% `src/` coverage. Evidence:
+`docs/evidence/live/2026-07-19-phase1-detection-hardening.md`. Do not begin
+Phase 2 until the operator explicitly closes Phase 1.
+
+**Phase 2 — Harden the search algorithm (BLOCKED on Phase 1 closing).**
+Reframed 2026-07-19 in terms of `docs/HUNTER_PROD_DIRECTIVE.md`'s
+"ranking/selection" and "eligibility" pipeline stages (see the mapping
+below): evaluating/improving `Skills/select_survey_fields.py`'s field
+scoring against real outcomes, evaluating/improving the adversarial
+review challenge set (`Skills/adversarial_review.py`), and building the
+Hunter directive's required deterministic, explainable, reproducible
+ranking model (not opaque LLM judgment as core ranking logic). Do not
+start this phase early.
+
+**Phase 3 — Package the application (BLOCKED on Phase 2 closing).**
+Concretized 2026-07-19 by `docs/HUNTER_PROD_DIRECTIVE.md`: build the
+required CLI (`/Create-New-Search`, `/Run-New-Search`, `/Show-Follow-Ups`)
+and the 5 distinct durable-state entities (candidate catalog, search
+manifest, search run, target search history, follow-up registry) so the
+pipeline can run autonomously while both operator and coding agent are
+offline. Do not start this phase early.
+
+### Hunter-directive pipeline mapping (verified 2026-07-19, not guessed)
+
+`docs/HUNTER_PROD_DIRECTIVE.md`'s required pipeline is: candidate universe
+→ identity/history resolution → eligibility → ranking/selection →
+manifest → durable search creation → data acquisition → preprocessing →
+scoring → composite interpretation → durable results/provenance →
+follow-up creation → follow-up recommendation, behind a
+`/Create-New-Search` / `/Run-New-Search` / `/Show-Follow-Ups` CLI. Checked
+against this repo's actual code (not assumed) on 2026-07-19:
+
+| Hunter stage | This repo's implementation | Status |
+|---|---|---|
+| Candidate universe | `Skills/select_survey_fields.py` scores sky fields (geometry/coverage/novelty); real detections come from per-exposure pixel extraction, not a pre-existing catalog | Exists, domain-shaped differently (fields, not catalog objects) — see note below |
+| Identity/history resolution | `src/known_object_exclusion.py` (Gate Z2, closed) | Exists |
+| Eligibility | `detect.py` real/bogus threshold; `Skills/adversarial_review.py`'s challenge set | Exists, but real/bogus is structurally `None` for the pixel-extraction path (Phase 1 gap #1) |
+| Ranking/selection | `Skills/select_survey_fields.py` (field level); `src/score.py` discovery_priority (candidate level) | Exists at two levels, not evaluated/hardened as an algorithm (Phase 2) |
+| Manifest | `data_selection/target_priority_queue.csv` | Exists, but is a running append-only priority list, not a per-run "exact selected targets" manifest tied to one search |
+| Durable search creation | None — a search today is just directly invoking Skills scripts with explicit CLI args | **Gap**: no discrete "pending search" entity exists before execution |
+| Data acquisition | `Skills/ztf_dr24_bounded_ingest.py` | Exists, checkpointed/resumable |
+| Preprocessing | `src/preprocess.py` | Exists |
+| Scoring | `src/classify.py` + `src/score.py` | Exists; Phase 1 gap #1 (real/bogus) and gap #2 (`fit_orbit()` quality code) sit here |
+| Composite interpretation | `src/score.py` hazard assessment; `Skills/adversarial_review.py` verdict | Exists |
+| Durable results/provenance | `Skills/candidate_ledger.py` + `data_selection/candidate_ledger.sqlite` (Gate A2, closed) — single `candidates` table with review_status, model versions/scores, regeneration_command | Exists, but is one denormalized table, not Hunter's 5 distinct durable entities |
+| Follow-up creation/recommendation | `Skills/export_followup_requests.py`, `Skills/generate_obs_schedule.py` | Exists as ad hoc scripts; no durable "follow-up registry" |
+| CLI (`/Create-New-Search` etc.) | None — verified via `pyproject.toml` (no `[project.scripts]`) and repo root (no CLI wrapper script) | **Gap**: no unified CLI exists at all |
+
+**Highest-priority gap, per this mapping**: the missing durable-search
+entity + unified CLI (the "durable search creation" and CLI rows above)
+is the single largest structural gap relative to the Hunter directive —
+but per the directive's own `HARD INVARIANTS` sequence
+("READ HISTORY → MAP PIPELINE → CLOSE GAPS → BUILD END-TO-END"), Phase
+1's two named gaps (scoring-stage correctness) should close first, since
+building a polished CLI/durable-state layer on top of a scoring stage
+with a known structural gap would just make the gap harder to find later.
+**Work Phase 1 first; Phase 3's CLI/durable-state build is the concrete
+target once Phase 2 closes.**
+
+**How to use this section each session**: before proposing any task,
+check which phase is active (this section is kept current — see the
+"Latest sync" entry under Current State for the most recent phase-status
+update) and confirm the specific task maps to that phase's open items.
+If a task doesn't map to the active phase's named items, it fails the
+PRIMARY DIRECTIVE gate above, regardless of how otherwise reasonable it
+seems.
 
 ---
 
@@ -960,7 +1084,57 @@ and excluded from CI.
 
 ## Current State (v0.91.0)
 
-**Latest sync (2026-07-19, sixth field expanded — five real linking runs,
+**Latest sync (2026-07-19, Hunter PROD Directive integrated)**: Jerome W.
+Lindsey III confirmed a cross-project "Hunter PROD Directive" (covering
+this repo as NEO-Hunter, plus sibling repos Techno-Hunter and EXO-Hunter,
+each independently sandboxed) is real and intentional, not a misdirected
+paste — it extends rather than contradicts the three-phase roadmap
+below. Recorded verbatim in new `docs/HUNTER_PROD_DIRECTIVE.md`,
+referenced from both this file's MANDATORY SESSION-START PROTOCOL (new
+item 11) and `AGENTS.md`'s equivalent mandatory-read list. Performed the
+directive's own required SESSION START pipeline-mapping exercise
+(verified against actual code, not assumed — see the "Hunter-directive
+pipeline mapping" table in the "Current Roadmap Phase" section above):
+confirmed real, working stages (candidate universe, identity/history
+resolution, data acquisition, preprocessing, composite interpretation,
+durable results/provenance via the candidate ledger) alongside real gaps
+(no CLI exists at all — verified via `pyproject.toml`; no discrete
+"pending search" entity before execution; manifest is a running priority
+list, not a per-run manifest; no follow-up registry). Phase 2 and Phase 3
+of the existing roadmap were reframed in the Hunter directive's specific
+terms (deterministic ranking model; `/Create-New-Search`/`/Run-New-Search`/
+`/Show-Follow-Ups` CLI + 5 durable-state entities) without changing Phase
+1's active status or its two named gaps. **No code changes in this sync —
+documentation/roadmap integration only.** The next real work remains
+Phase 1: investigate and close the missing real/bogus score and the
+`fit_orbit()` null-quality-code gap.
+
+**Earlier sync (2026-07-19, operator-directed three-phase roadmap
+established after drift correction)**: Jerome W. Lindsey III flagged that
+continued field-expansion runs (fields 3, 4, 6, all after MP1-MP7 already
+closed) were drift — re-exercising an already-proven pipeline mechanism
+rather than doing real hardening work. Replaced the old "resume Z3 /
+broader batch / MPC path" 3-way decision with an explicit three-phase
+roadmap: **Phase 1 (active) — harden the detection pipeline; Phase 2
+(blocked) — harden the search algorithm; Phase 3 (blocked) — package the
+application to run autonomously offline.** Recorded as a new "Current
+Roadmap Phase" section immediately after `CLAUDE.md`'s PRIMARY DIRECTIVE
+(highest-visibility location, read every session before any task is
+proposed), mirrored into `AGENTS.md` in the equivalent location for
+Codex parity. Phase 1 has two concrete, named gaps identified by
+inspecting real review-packet output from the five completed field
+tests (not guessed): (1) `real_bogus_score` is always `None` for
+pixel-extraction-sourced candidates — no real/bogus signal exists for
+this data path; (2) `fit_orbit()` returns `quality_code: null` for every
+tested candidate rather than a graded low-quality code, despite the
+schema anticipating short-arc cases. Both `CLAUDE.md`'s and
+`docs/ZTF_DR24_PRODUCTION_GATES.md`'s "Immediate Next Steps"/"Next Coding
+Step" sections updated to point to the new roadmap rather than describing
+the superseded 3-way decision. **No code changes in this sync — this is a
+documentation/roadmap correction only.** The next real work is
+investigating and closing Phase 1's two named gaps.
+
+**Earlier sync (2026-07-19, sixth field expanded — five real linking runs,
 consistent null results)**: Continued field expansion. Rank 4 (RA 211.81,
 Dec -7.5) checked and skipped: only 2 real distinct nights of coverage
 over the max 399-day window, below the 3-night minimum — recorded as
@@ -2176,18 +2350,21 @@ calibration, adversarial evaluation, canonical evidence, and operator signoff
 all landed. `tier2_cnn_v4` is internally promoted; no model retrain or A1-A7
 signoff action is pending.
 
-The next roadmap move requires an operator decision:
-
-1. Resume the intentionally paused Gate Z3 positive-control identity search;
-2. approve a broader bounded ZTF DR24 new-field archival portfolio; or
-3. resolve the applicable MPC submission/observatory-code path if a reviewed
-   survivor ever reaches that stage.
-
-Until one is selected, do not start new downloads, choose another Z3 target,
-retrain models, or perform external submission work. Continue only concrete
-safe maintenance driven by an actual failing check or diagnosed defect. The
-superseded WISE/DECam/TESS discovery-sweep trail is archived in
-`docs/HANDOFF_HISTORY.md` for historical context only.
+**Superseded 2026-07-19**: the three-way decision above (resume Z3 /
+broader field batch / MPC path) is no longer the active framing. The
+operator observed that continued field-expansion runs (fields 3, 4, 6)
+after MP1-MP7 already closed was drift — re-exercising an already-proven
+mechanism rather than doing real hardening work — and replaced it with
+the explicit three-phase roadmap in **"Current Roadmap Phase"** near the
+top of this file (right after PRIMARY DIRECTIVE). **That section, not
+this one, is the current source of truth for what to work on next.**
+Phase 1 (harden the detection pipeline) is active now; do not start
+another field-expansion batch, resume Gate Z3, or do any MPC-submission
+work until Phase 1's two named gaps are explicitly closed. This paragraph
+is kept only so the historical decision trail isn't lost; read "Current
+Roadmap Phase" for the live directive. The superseded WISE/DECam/TESS
+discovery-sweep trail is archived in `docs/HANDOFF_HISTORY.md` for
+historical context only.
 
 ### Version-by-Version Changelog
 

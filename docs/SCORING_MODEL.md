@@ -66,7 +66,7 @@ log_score_neo =
 |---|---|---|
 | `real_bogus_score` | [0, 1] | Mean rb/drb score from ZTF; 1 = real source |
 | `streak_score` | [0, 1] | Image elongation; 1 = clear streak (fast NEO) |
-| `psf_quality_score` | [0, 1] | Peak SNR proxy; 1 = high-quality detection |
+| `psf_quality_score` | [0, 1] | Mean nonnegative source-native PSF-shape correlation; not a calibrated rb probability |
 
 ### Motion
 
@@ -112,13 +112,15 @@ estimated_diameter_m: float | None
 absolute_magnitude_h: float | None
 neo_class: NEOClass
 alert_pathway: AlertPathway
+arc_quality_tier: OrbitQualityCode
+orbit_fit_status: OrbitFitStatus
 ```
 
 **PHA flag logic**:
 - `pha_candidate`: MOID ≤ 0.05 AU **and** H ≤ 22 (D ≳ 140 m) and quality_code ≥ 2
 - `close_approach`: MOID ≤ 0.05 AU but H > 22 (smaller body)
 - `nominal`: NEO with MOID > 0.05 AU
-- `unknown`: orbit not yet constrained (quality_code = 1 or MOID = None)
+- `unknown`: orbit not yet constrained (no fitted orbit, quality tier 1, or MOID = None)
 
 **Diameter estimate** from absolute magnitude H:
 ```

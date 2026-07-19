@@ -67,13 +67,13 @@
   },
   {
     "path": "src/classify.py",
-    "line": 827,
+    "line": 843,
     "exception_types": "Exception",
     "reason": "Pre-existing silent-swallow predating REL-01 (2026-07-16), catalogued not fixed. Full-ensemble stacking prediction attempt falls back to a simpler stacking path on any failure, with no log of what the original failure was."
   },
   {
     "path": "src/classify.py",
-    "line": 1023,
+    "line": 1039,
     "exception_types": "Exception",
     "reason": "Pre-existing silent-swallow predating REL-01 (2026-07-16), catalogued not fixed. Writing the ensemble-stacker coefficient JSON to disk; a write failure (e.g. permissions, disk full) leaves `coef_path` unset with no error surfaced to the caller."
   },

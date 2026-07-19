@@ -76,9 +76,18 @@ class TestObservation:
             make_obs(dec_deg=91.0)
 
     def test_optional_scores(self):
-        obs = make_obs(real_bogus=0.9, deep_real_bogus=0.95)
+        obs = make_obs(
+            real_bogus=0.9,
+            deep_real_bogus=0.95,
+            psf_shape_correlation=-0.2,
+        )
         assert obs.real_bogus == 0.9
         assert obs.deep_real_bogus == 0.95
+        assert obs.psf_shape_correlation == -0.2
+
+    def test_psf_shape_correlation_bounds(self):
+        with pytest.raises(ValidationError):
+            make_obs(psf_shape_correlation=1.1)
 
 
 class TestTracklet:

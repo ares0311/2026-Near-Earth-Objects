@@ -15,7 +15,7 @@ __all__ = [
 import math
 import uuid
 
-from orbit import classify_neo, compute_moid
+from orbit import arc_quality_report, classify_neo, compute_moid
 from schemas import (
     AlertPathway,
     CandidateExplanation,
@@ -262,6 +262,16 @@ def score(
     scored_at_jd = float(Time.now().jd)
     run_id = pipeline_run_id or str(uuid.uuid4())
 
+    # Arc sufficiency is always reportable, even when orbit fitting fails.
+    arc_report = arc_quality_report(tracklet)
+    arc_quality_tier = int(arc_report["quality_code"])
+    if orbital is not None:
+        orbit_fit_status = "fitted"
+    elif len(tracklet.observations) < 3:
+        orbit_fit_status = "insufficient_observations"
+    else:
+        orbit_fit_status = "no_solution"
+
     # NEO class and MOID
     neo_class: NEOClass = classify_neo(orbital) if orbital else "unknown"
     moid_au = compute_moid(orbital) if orbital else None
@@ -286,6 +296,8 @@ def score(
         alert_pathway=alert_pathway,
         explanation=explanation,
         orbital_elements=orbital,
+        arc_quality_tier=arc_quality_tier,
+        orbit_fit_status=orbit_fit_status,
     )
 
     # Update feature scores from orbit
@@ -561,7 +573,6 @@ def get_top_candidates(neos: list, n: int = 10) -> list:
 
     sorted_neos = sorted(neos, key=_priority, reverse=True)
     return sorted_neos[: max(0, int(n))]
-
 
 
 
