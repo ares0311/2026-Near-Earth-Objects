@@ -61,8 +61,18 @@ fails; missing optional evidence skips visibly. Focused verification is 86
 passing tests and the original packet replay remains `REJECT=2`. Evidence:
 `docs/evidence/live/2026-07-19-phase2-atlas-confirmation-quality.md`.
 
-Phase 2 remains open pending a selector feature/weight provenance and
-independent-oracle audit. Phase 3 remains blocked.
+The selector feature/weight provenance audit is now complete. Exact policy
+values and source support boundaries are checked in, digest-stamped into every
+result, and fail closed on drift; coverage inventory batch and per-field
+digests are mandatory. The old comments overstated the literature: the exact
+v1 coefficients are now honestly labeled `uncalibrated_transparent_prior`.
+Focused verification is 88 passing tests. Evidence:
+`docs/evidence/live/2026-07-19-phase2-ranking-policy-provenance.md`.
+
+Phase 2 remains open because calibration itself requires a frozen,
+leakage-safe positive/null historical field set that does not yet exist in the
+repo; SkyBoT's current HTTP 500 blocks the planned epoch-specific positive
+association. Phase 3 remains blocked.
 
 ## Production Definition
 

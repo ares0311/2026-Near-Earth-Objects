@@ -50,9 +50,22 @@ core eligibility. Focused result: 86 tests passed; the original two real packet
 candidates remain rejected. Evidence:
 `docs/evidence/live/2026-07-19-phase2-atlas-confirmation-quality.md`.
 
-Phase 2 remains open. The next safe unit is a feature-by-feature audit of
-selector weights/threshold provenance and independent regression oracles.
-Phase 3 remains blocked.
+The selector policy audit is complete. The exact weights, priors, windows,
+thresholds, source support boundaries, and limitations now live in a checked-in
+versioned policy; every result carries its SHA256. Missing batch/per-field
+coverage digests fail closed. The audit also corrects the earlier overclaim:
+the cited papers support feature direction, not the exact v1 coefficients,
+which are now labeled `uncalibrated_transparent_prior`. Focused result: 88
+tests passed and a fixed-JD replay stamps the exact policy digest. Evidence:
+`docs/evidence/live/2026-07-19-phase2-ranking-policy-provenance.md`.
+
+Phase 2 remains open on a real scientific blocker: coefficient calibration
+needs a frozen leakage-safe historical field set with positive and null
+outcomes resolved at each replay cutoff. The repo has real null fields but no
+comparable positive field set, and both bounded SkyBoT probes returned HTTP 500
+on 2026-07-19. Do not claim calibration or start Phase 3. On provider recovery,
+build/freeze the calibration set, fit or replace the priors, and add
+out-of-sample rank-order regression oracles.
 
 ## Phase 1 implementation complete; operator closure pending (2026-07-19)
 

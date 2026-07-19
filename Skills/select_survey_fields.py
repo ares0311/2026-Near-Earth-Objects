@@ -1,21 +1,16 @@
 """Select optimal sky fields for NEO discovery, targeting Aten and IEO/Atira classes.
 
-Scientific basis
-----------------
-Aten/IEO classes have the highest fraction of undiscovered objects:
+Scientific basis and coefficient status
+---------------------------------------
+Granvik et al. (2018) supports debiased NEO orbit/population priors, Ye et al.
+(2020) supports low-elongation ZTF twilight searches, and Harris & D'Abramo
+(2015) supports population-completeness estimation. Those papers do not supply
+this selector's exact weights, exponentials, windows, or completeness values.
+The exact v1 coefficients are transparent, uncalibrated operator priors recorded
+in data_selection/ranking_policies/ztf_field_ranking_v1.json; every result is
+stamped with that file's SHA256 and limitations.
 
-  IEO (Atira, Q < 0.983 AU) — ~97% undiscovered. Only ~30 known. Population
-    models (Granvik et al. 2018) predict thousands. Accessible only in
-    twilight at elongation 20-45° from the Sun.
-
-  Aten (a < 1 AU, Q > 0.983 AU) — ~85% undiscovered for H < 20. Best found
-    at quadrature (elongation 60-100°) where standard opposition surveys do
-    not focus.
-
-  Apollo/Amor — comparatively well-surveyed near opposition; lower marginal
-    discovery value per field.
-
-Scoring formula (Granvik 2018, Ye et al. 2020, Harris & D'Abramo 2015):
+Scoring formula:
 
     S = 0.35 * SurveyScarcity  +  0.30 * PopulationDensity
       + 0.20 * Geometry      +  0.15 * Novelty
@@ -49,6 +44,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import math
 import re
@@ -90,9 +86,8 @@ _ELONG_WINDOWS: dict[str, tuple[float, float, float]] = {
     "recovery": (120.0, 180.0, 165.0),  # opposition-side fields rich in known objects
 }
 
-# Approximate catalog completeness fraction at the optimal elongation per mode.
-# Derived from Harris & D'Abramo (2015) census and Granvik et al. (2018) model.
-# 1 - completeness = undiscovered fraction used in population score.
+# Approximate catalog-completeness operator priors. The cited population papers
+# support the feature direction, not these exact values; see the policy file.
 _COMPLETENESS: dict[str, float] = {
     "aten": 0.15,  # ~85% of Atens H<20 still undiscovered
     "ieo":  0.03,  # ~97% of IEOs undiscovered (fewest known of any NEO class)
@@ -111,6 +106,14 @@ _HISTORY_OVERLAP_DEG = 5.0
 _WISE_PARENT_RADIUS_DEG = 0.2
 
 _COVERAGE_SCHEMA_VERSION = "ztf-field-night-coverage-inventory-v1"
+_RANKING_POLICY_SCHEMA_VERSION = "ztf-field-ranking-policy-v1"
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+_DEFAULT_RANKING_POLICY_PATH = (
+    _REPO_ROOT
+    / "data_selection"
+    / "ranking_policies"
+    / "ztf_field_ranking_v1.json"
+)
 _TARGET_QUEUE_FIELDS = {
     "rank",
     "priority",
@@ -303,6 +306,80 @@ def _coordinate_key(ra_deg: float, dec_deg: float) -> tuple[float, float]:
     return round(float(ra_deg), 2), round(float(dec_deg), 2)
 
 
+def _required_sha256(value: object, label: str) -> str:
+    digest = str(value or "").strip().lower()
+    if re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+        raise ValueError(f"{label} must be a 64-character SHA256 digest")
+    return digest
+
+
+def load_ranking_policy(path: Path = _DEFAULT_RANKING_POLICY_PATH) -> dict:
+    """Load the exact deterministic ranking policy and return its digest."""
+    if not path.is_file():
+        raise FileNotFoundError(f"ranking policy not found: {path}")
+    raw = path.read_bytes()
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"invalid ranking policy {path}: {exc}") from exc
+    if payload.get("schema_version") != _RANKING_POLICY_SCHEMA_VERSION:
+        raise ValueError(
+            f"ranking policy schema must be {_RANKING_POLICY_SCHEMA_VERSION}"
+        )
+    if not str(payload.get("policy_id", "")).strip():
+        raise ValueError("ranking policy must have a non-empty policy_id")
+    if payload.get("model_type") != "deterministic_analytic":
+        raise ValueError("ranking policy model_type must be deterministic_analytic")
+    if payload.get("coefficient_status") != "uncalibrated_transparent_prior":
+        raise ValueError("ranking policy coefficient_status is unsupported")
+    expected = {
+        "discovery_weights": _WEIGHTS,
+        "recovery_weights": {
+            "population": 0.45,
+            "geometry": 0.35,
+            "novelty": 0.20,
+        },
+        "elongation_windows_deg": {
+            key: list(value) for key, value in _ELONG_WINDOWS.items()
+        },
+        "class_completeness_priors": _COMPLETENESS,
+        "eligibility": {
+            "min_distinct_nights": 3,
+            "min_hours_visible": 0.5,
+            "min_altitude_deg": _MIN_ALT_DEG,
+            "history_overlap_deg": _HISTORY_OVERLAP_DEG,
+            "dedup_radius_deg": _DEDUP_RADIUS_DEG,
+        },
+    }
+    for key, value in expected.items():
+        if payload.get(key) != value:
+            raise ValueError(f"ranking policy {key} does not match implementation")
+    references = payload.get("references")
+    if not isinstance(references, list) or not references:
+        raise ValueError("ranking policy must contain references")
+    for reference in references:
+        if not isinstance(reference, dict) or not all(
+            str(reference.get(key, "")).strip()
+            for key in ("id", "url", "supports", "does_not_support")
+        ):
+            raise ValueError("ranking policy reference is incomplete")
+    limitations = payload.get("limitations")
+    if not isinstance(limitations, list) or not limitations:
+        raise ValueError("ranking policy must disclose its limitations")
+    try:
+        recorded_path = str(path.resolve().relative_to(_REPO_ROOT))
+    except ValueError:
+        recorded_path = str(path)
+    return {
+        "schema_version": payload["schema_version"],
+        "policy_id": payload["policy_id"],
+        "coefficient_status": payload["coefficient_status"],
+        "sha256": hashlib.sha256(raw).hexdigest(),
+        "path": recorded_path,
+        "limitations": list(limitations),
+    }
+
+
 def load_coverage_inventory(path: Path) -> dict:
     """Load and fail-closed validate a ZTF field/night coverage inventory."""
     if not path.is_file():
@@ -362,15 +439,25 @@ def load_coverage_inventory(path: Path) -> dict:
                 "n_distinct_nights": n_nights,
                 "distinct_nights_yyyymmdd": list(nights),
                 "passes_min_distinct_nights": bool(passes),
-                "raw_response_sha256": raw.get("raw_response_sha256"),
+                "raw_response_sha256": _required_sha256(
+                    raw.get("raw_response_sha256"),
+                    f"coverage field {field_id} raw_response_sha256",
+                ),
             }
         )
         seen_ids.add(field_id)
         seen_coordinates.add(coordinate)
+    batch_id = str(payload.get("batch_id", "")).strip()
+    if not batch_id:
+        raise ValueError("coverage inventory must have a non-empty batch_id")
+    batch_manifest_sha256 = _required_sha256(
+        payload.get("batch_manifest_sha256"),
+        "coverage inventory batch_manifest_sha256",
+    )
     return {
         "schema_version": _COVERAGE_SCHEMA_VERSION,
-        "batch_id": payload.get("batch_id"),
-        "batch_manifest_sha256": payload.get("batch_manifest_sha256"),
+        "batch_id": batch_id,
+        "batch_manifest_sha256": batch_manifest_sha256,
         "min_distinct_nights": minimum,
         "field_results": results,
     }
@@ -466,7 +553,8 @@ def select_fields(jd: float,
                   lat: float = _PALOMAR_LAT,
                   coverage_inventory_path: Path | None = None,
                   target_queue_path: Path | None = None,
-                  search_mode: str | None = None) -> list[dict]:
+                  search_mode: str | None = None,
+                  ranking_policy_path: Path = _DEFAULT_RANKING_POLICY_PATH) -> list[dict]:
     """Score all candidate sky fields and return the top-N for the current night.
 
     All geometry is computed analytically over a vectorised NumPy array for
@@ -487,6 +575,8 @@ def select_fields(jd: float,
                   ``search_mode``.
     search_mode:  None for planning, or ``new``/``follow-up`` for production
                   eligibility semantics.
+    ranking_policy_path: Versioned analytic policy whose digest and limitations
+                  are stamped into every selected row.
 
     Returns
     -------
@@ -495,6 +585,7 @@ def select_fields(jd: float,
     hours_visible, field_radius_deg, reason.
     """
     t_start = time.monotonic()
+    ranking_policy = load_ranking_policy(ranking_policy_path)
 
     if search_mode not in {None, "new", "follow-up"}:
         raise ValueError("search_mode must be None, 'new', or 'follow-up'")
@@ -638,6 +729,7 @@ def select_fields(jd: float,
             "hours_visible":    round(float(hours[idx]),   1),
             "field_radius_deg": _FIELD_RADIUS_DEG,
             "selection_stage":  "eligible" if search_mode else "planning",
+            "ranking_policy":   ranking_policy,
             "reason":           reason,
         }
         if candidate_metadata is not None:

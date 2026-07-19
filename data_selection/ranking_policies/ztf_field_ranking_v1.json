@@ -1,0 +1,61 @@
+{
+  "schema_version": "ztf-field-ranking-policy-v1",
+  "policy_id": "ztf-field-ranking-v1",
+  "model_type": "deterministic_analytic",
+  "coefficient_status": "uncalibrated_transparent_prior",
+  "discovery_weights": {
+    "scarcity": 0.35,
+    "population": 0.3,
+    "geometry": 0.2,
+    "novelty": 0.15
+  },
+  "recovery_weights": {
+    "population": 0.45,
+    "geometry": 0.35,
+    "novelty": 0.2
+  },
+  "elongation_windows_deg": {
+    "aten": [60.0, 100.0, 80.0],
+    "ieo": [20.0, 45.0, 32.5],
+    "all": [60.0, 160.0, 110.0],
+    "recovery": [120.0, 180.0, 165.0]
+  },
+  "class_completeness_priors": {
+    "aten": 0.15,
+    "ieo": 0.03,
+    "all": 0.45,
+    "recovery": 0.95
+  },
+  "eligibility": {
+    "min_distinct_nights": 3,
+    "min_hours_visible": 0.5,
+    "min_altitude_deg": 25.0,
+    "history_overlap_deg": 5.0,
+    "dedup_radius_deg": 3.5
+  },
+  "references": [
+    {
+      "id": "granvik-2018",
+      "url": "https://doi.org/10.1016/j.icarus.2018.04.018",
+      "supports": "Debiased NEO orbital and absolute-magnitude distributions and source-region priors.",
+      "does_not_support": "The selector's exact component weights, sky-density exponentials, or class completeness constants."
+    },
+    {
+      "id": "ye-2020",
+      "url": "https://arxiv.org/abs/1912.06109",
+      "supports": "ZTF twilight searches for interior-Earth objects at solar elongations down to about 35 degrees.",
+      "does_not_support": "The selector's exact 20-45 degree window, 32.5 degree peak, scarcity curve, or component weights."
+    },
+    {
+      "id": "harris-dabramo-2015",
+      "url": "https://doi.org/10.1016/j.icarus.2015.05.004",
+      "supports": "Population-completeness estimation using discovery and re-detection statistics.",
+      "does_not_support": "The selector's exact per-class completeness constants or component weights."
+    }
+  ],
+  "limitations": [
+    "Exact coefficients are explicit operator priors, not fitted literature coefficients.",
+    "This policy must be calibrated against leakage-safe historical discovery or recovery outcomes before Phase 2 can close.",
+    "The policy is deterministic and explainable but is not a calibrated probability model."
+  ]
+}
