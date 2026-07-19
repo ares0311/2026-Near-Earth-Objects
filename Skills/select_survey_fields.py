@@ -17,11 +17,11 @@ Aten/IEO classes have the highest fraction of undiscovered objects:
 
 Scoring formula (Granvik 2018, Ye et al. 2020, Harris & D'Abramo 2015):
 
-    S = 0.35 * CoverageGap  +  0.30 * PopulationDensity
+    S = 0.35 * SurveyScarcity  +  0.30 * PopulationDensity
       + 0.20 * Geometry      +  0.15 * Novelty
 
-  CoverageGap   — proxy for time since last survey visit; twilight and
-                  quadrature fields are rarely pointed at by standard cadences.
+  SurveyScarcity — geometric prior for historically sparse survey cadence;
+                  this is not measured archive coverage.
   PopulationDensity — expected undiscovered object density from debiased
                   population model, weighted by ecliptic latitude and
                   catalog incompleteness fraction.
@@ -30,19 +30,10 @@ Scoring formula (Granvik 2018, Ye et al. 2020, Harris & D'Abramo 2015):
   Novelty       — penalises fields already processed by this pipeline
                   (read from Logs/pipeline_runs/ audit log).
 
-The algorithm autonomously selects the best fields from a tessellated grid
-of the entire observable sky for tonight, then outputs a ranked list ready
-to feed into Skills/run_pipeline.py.
-
-ML hook (Phase 2)
------------------
-After ~20 pipeline runs are logged, run::
-
-    uv run python Skills/train_field_selector.py
-
-to fit an XGBoost regressor on (gap, pop, geom, novelty, moon_phase,
-limiting_mag, run_yield) to replace the analytic weights with learned ones.
-Pass --model path/to/field_selector.json to use the trained model.
+The planning mode scores a tessellated grid. Production-eligible selection
+requires a versioned ZTF coverage inventory plus committed target-queue history;
+it filters ineligible or already-searched fields before applying the same
+deterministic analytic score. No AI model is required or supported.
 
 Usage::
 
@@ -57,8 +48,10 @@ Usage::
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import math
+import re
 import sys
 import time
 from pathlib import Path
@@ -83,7 +76,7 @@ _MIN_ALT_DEG = 25.0
 
 # Scoring weights (Aten/IEO priority mode)
 _WEIGHTS: dict[str, float] = {
-    "gap": 0.35,
+    "scarcity": 0.35,
     "population": 0.30,
     "geometry": 0.20,
     "novelty": 0.15,
@@ -116,6 +109,22 @@ _HISTORY_OVERLAP_DEG = 5.0
 # WISE/NEOWISE diagnostic defaults: small parent cones are scale-plan probes,
 # not complete discovery tiles. The linker may recommend smaller subfields.
 _WISE_PARENT_RADIUS_DEG = 0.2
+
+_COVERAGE_SCHEMA_VERSION = "ztf-field-night-coverage-inventory-v1"
+_TARGET_QUEUE_FIELDS = {
+    "rank",
+    "priority",
+    "status",
+    "data_role",
+    "source",
+    "selection_rule",
+    "evidence_path",
+    "notes",
+}
+_UNSEARCHED_STATUSES = {"not_searched", "pending"}
+_COORDINATE_PATTERN = re.compile(
+    r"(?:^|;)\s*ra_deg=(-?\d+(?:\.\d+)?)\s+dec_deg=(-?\d+(?:\.\d+)?)"
+)
 
 
 # ── Vectorised geometry helpers ───────────────────────────────────────────────
@@ -172,12 +181,11 @@ def hours_visible_batch(dec_deg: np.ndarray, lat_deg: float,
 
 # ── Scoring components ─────────────────────────────────────────────────────────
 
-def gap_score_batch(elong: np.ndarray, mode: str) -> np.ndarray:
-    """Coverage gap proxy score based on elongation and survey mode.
+def survey_scarcity_score_batch(elong: np.ndarray, mode: str) -> np.ndarray:
+    """Survey-scarcity prior based on elongation and survey mode.
 
-    Twilight and quadrature fields are visited far less frequently than the
-    opposition region. In Phase 2, replace with actual per-field last-visit
-    JD from the ZTF IRSA ztf.field_coverage table.
+    This encodes a scientific cadence prior only. Actual archive eligibility
+    is supplied separately by a versioned coverage inventory.
 
     Empirical basis (Ye et al. 2020): discovery rate rises sharply for fields
     with cadence gaps > 5 days; opposition fields average < 3-day gaps in ZTF;
@@ -256,13 +264,13 @@ def load_run_history(history_dir: Path) -> list[tuple[float, float]]:
     for summary_file in sorted(history_dir.rglob("run_summary.json")):
         try:
             data = json.loads(summary_file.read_text())
-            ra  = data.get("ra_deg")
+            ra = data.get("ra_deg")
             dec = data.get("dec_deg")
-            if ra is not None and dec is not None:
-                seen.append((float(ra), float(dec)))
-        except Exception:
-            # Malformed or partial files are silently skipped
-            pass
+            if ra is None or dec is None:
+                raise ValueError("missing ra_deg/dec_deg")
+            seen.append((float(ra), float(dec)))
+        except (OSError, TypeError, ValueError) as exc:
+            raise ValueError(f"invalid run history file {summary_file}: {exc}") from exc
     return seen
 
 
@@ -288,45 +296,126 @@ def novelty_scores_batch(ra: np.ndarray, dec: np.ndarray,
     return scores
 
 
-# ── ML model hook (Phase 2 stub) ──────────────────────────────────────────────
+# ── Production eligibility inputs ─────────────────────────────────────────────
 
-def load_field_selector_model(model_path: Path) -> object | None:
-    """Load a trained field-selector model from JSON (Phase 2 hook).
 
-    The model replaces the analytic _WEIGHTS with learned coefficients trained
-    on pipeline run history via Skills/train_field_selector.py.  Returns None
-    if the file does not exist or is malformed; the caller falls back to
-    analytic scoring.
+def _coordinate_key(ra_deg: float, dec_deg: float) -> tuple[float, float]:
+    return round(float(ra_deg), 2), round(float(dec_deg), 2)
 
-    Expected JSON schema::
-        {
-          "version": "1.0",
-          "feature_names": ["gap", "population", "geometry", "novelty", ...],
-          "coef": [0.35, 0.30, 0.20, 0.15, ...],
-          "intercept": 0.0
-        }
-    """
-    if not model_path or not model_path.exists():
-        return None
+
+def load_coverage_inventory(path: Path) -> dict:
+    """Load and fail-closed validate a ZTF field/night coverage inventory."""
+    if not path.is_file():
+        raise FileNotFoundError(f"coverage inventory not found: {path}")
     try:
-        data = json.loads(model_path.read_text())
-        coef = np.array(data["coef"], dtype=float)
-        intercept = float(data.get("intercept", 0.0))
-        names = data.get("feature_names", [])
-        return {"coef": coef, "intercept": intercept, "feature_names": names}
-    except Exception as exc:
-        print(f"Warning: could not load field selector model: {exc}", file=sys.stderr)
-        return None
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"invalid coverage inventory {path}: {exc}") from exc
+    if payload.get("schema_version") != _COVERAGE_SCHEMA_VERSION:
+        raise ValueError(
+            f"coverage inventory schema must be {_COVERAGE_SCHEMA_VERSION}"
+        )
+    if payload.get("metadata_only") is not True:
+        raise ValueError("coverage inventory must declare metadata_only=true")
+    minimum = int(payload.get("min_distinct_nights", 0))
+    if minimum < 3:
+        raise ValueError("coverage inventory min_distinct_nights must be >= 3")
+    raw_results = payload.get("field_results")
+    if not isinstance(raw_results, list) or not raw_results:
+        raise ValueError("coverage inventory field_results must be a non-empty list")
+
+    results: list[dict] = []
+    seen_ids: set[str] = set()
+    seen_coordinates: set[tuple[float, float]] = set()
+    for raw in raw_results:
+        if not isinstance(raw, dict):
+            raise ValueError("coverage inventory field result must be an object")
+        field_id = str(raw.get("field_id", "")).strip()
+        if not field_id or field_id in seen_ids:
+            raise ValueError("coverage inventory field_id values must be non-empty and unique")
+        ra_deg = float(raw["ra_deg"])
+        dec_deg = float(raw["dec_deg"])
+        if not (0.0 <= ra_deg < 360.0 and -90.0 <= dec_deg <= 90.0):
+            raise ValueError(f"invalid coordinates for coverage field {field_id}")
+        coordinate = _coordinate_key(ra_deg, dec_deg)
+        if coordinate in seen_coordinates:
+            raise ValueError("coverage inventory coordinates must be unique")
+        nights = raw.get("distinct_nights_yyyymmdd")
+        if not isinstance(nights, list) or any(
+            not isinstance(night, str) or len(night) != 8 or not night.isdigit()
+            for night in nights
+        ):
+            raise ValueError(f"invalid distinct nights for coverage field {field_id}")
+        if len(nights) != len(set(nights)):
+            raise ValueError(f"duplicate distinct nights for coverage field {field_id}")
+        n_nights = int(raw.get("n_distinct_nights", -1))
+        if n_nights != len(nights):
+            raise ValueError(f"night count mismatch for coverage field {field_id}")
+        passes = raw.get("passes_min_distinct_nights")
+        if not isinstance(passes, bool) or passes != (n_nights >= minimum):
+            raise ValueError(f"coverage eligibility mismatch for field {field_id}")
+        results.append(
+            {
+                "field_id": field_id,
+                "ra_deg": ra_deg,
+                "dec_deg": dec_deg,
+                "n_distinct_nights": n_nights,
+                "distinct_nights_yyyymmdd": list(nights),
+                "passes_min_distinct_nights": bool(passes),
+                "raw_response_sha256": raw.get("raw_response_sha256"),
+            }
+        )
+        seen_ids.add(field_id)
+        seen_coordinates.add(coordinate)
+    return {
+        "schema_version": _COVERAGE_SCHEMA_VERSION,
+        "batch_id": payload.get("batch_id"),
+        "batch_manifest_sha256": payload.get("batch_manifest_sha256"),
+        "min_distinct_nights": minimum,
+        "field_results": results,
+    }
 
 
-def apply_model_score(features: np.ndarray, model: dict) -> np.ndarray:
-    """Apply a learned linear model to the feature matrix.
+def load_target_queue_history(path: Path) -> dict[tuple[float, float], list[dict]]:
+    """Load terminal search history from the committed target queue.
 
-    features: shape (N, K) where K matches len(model['coef']).
-    Returns scores in [0, 1] via sigmoid.
+    Any terminal status wins over duplicate ``not_searched`` rows for the same
+    coordinate. This preserves prior null/failed/coverage outcomes instead of
+    allowing a later appended planning row to erase them.
     """
-    raw = features @ model["coef"] + model["intercept"]
-    return 1.0 / (1.0 + np.exp(-raw))  # sigmoid to [0, 1]
+    if not path.is_file():
+        raise FileNotFoundError(f"target queue not found: {path}")
+    history: dict[tuple[float, float], list[dict]] = {}
+    try:
+        with path.open(newline="", encoding="utf-8") as handle:
+            reader = csv.DictReader(handle)
+            if set(reader.fieldnames or ()) != _TARGET_QUEUE_FIELDS:
+                raise ValueError("target queue schema does not match the committed contract")
+            for line_number, row in enumerate(reader, start=2):
+                if None in row:
+                    raise ValueError(f"target queue row {line_number} has extra columns")
+                status = str(row.get("status", "")).strip().lower()
+                if not status:
+                    raise ValueError(f"target queue row {line_number} has no status")
+                if status in _UNSEARCHED_STATUSES:
+                    continue
+                match = _COORDINATE_PATTERN.search(str(row.get("notes", "")))
+                if match is None:
+                    raise ValueError(
+                        f"terminal target queue row {line_number} has no coordinates"
+                    )
+                coordinate = _coordinate_key(float(match.group(1)), float(match.group(2)))
+                history.setdefault(coordinate, []).append(
+                    {
+                        "status": status,
+                        "source": row.get("source"),
+                        "evidence_path": row.get("evidence_path"),
+                        "selection_rule": row.get("selection_rule"),
+                    }
+                )
+    except OSError as exc:
+        raise ValueError(f"could not read target queue {path}: {exc}") from exc
+    return history
 
 
 # ── Sun position ──────────────────────────────────────────────────────────────
@@ -375,7 +464,9 @@ def select_fields(jd: float,
                   top_n: int = 20,
                   history_dir: Path | None = None,
                   lat: float = _PALOMAR_LAT,
-                  model_path: Path | None = None) -> list[dict]:
+                  coverage_inventory_path: Path | None = None,
+                  target_queue_path: Path | None = None,
+                  search_mode: str | None = None) -> list[dict]:
     """Score all candidate sky fields and return the top-N for the current night.
 
     All geometry is computed analytically over a vectorised NumPy array for
@@ -390,17 +481,49 @@ def select_fields(jd: float,
     history_dir:  Path to Logs/pipeline_runs/ directory; if given, fields
                   already processed are penalised via the Novelty score.
     lat:          Observer latitude in degrees North (default: Palomar +33.36°).
-    model_path:   Optional path to a trained field-selector model JSON file
-                  (Phase 2 ML hook). Falls back to analytic scoring if None
-                  or if the file does not exist.
+    coverage_inventory_path: Versioned measured ZTF night coverage. Required
+                  with ``search_mode``.
+    target_queue_path: Committed interim prior-search provenance. Required with
+                  ``search_mode``.
+    search_mode:  None for planning, or ``new``/``follow-up`` for production
+                  eligibility semantics.
 
     Returns
     -------
-    List of dicts with keys: rank, ra_deg, dec_deg, score, gap_score,
+    List of dicts with keys: rank, ra_deg, dec_deg, score, survey_scarcity_score,
     pop_score, geom_score, novelty_score, elongation_deg, ecl_lat_deg,
     hours_visible, field_radius_deg, reason.
     """
     t_start = time.monotonic()
+
+    if search_mode not in {None, "new", "follow-up"}:
+        raise ValueError("search_mode must be None, 'new', or 'follow-up'")
+    if search_mode is None:
+        if coverage_inventory_path is not None or target_queue_path is not None:
+            raise ValueError(
+                "coverage_inventory_path and target_queue_path require search_mode"
+            )
+        candidate_metadata: list[dict] | None = None
+        target_history: dict[tuple[float, float], list[dict]] = {}
+        ra_arr, dec_arr = generate_sky_grid()
+    else:
+        if coverage_inventory_path is None or target_queue_path is None:
+            raise ValueError(
+                "eligible selection requires coverage_inventory_path and target_queue_path"
+            )
+        coverage = load_coverage_inventory(coverage_inventory_path)
+        target_history = load_target_queue_history(target_queue_path)
+        candidate_metadata = []
+        for field in coverage["field_results"]:
+            prior = target_history.get(
+                _coordinate_key(field["ra_deg"], field["dec_deg"]), []
+            )
+            coverage_passes = field["passes_min_distinct_nights"]
+            history_passes = not prior if search_mode == "new" else bool(prior)
+            if coverage_passes and history_passes:
+                candidate_metadata.append({**field, "prior_searches": prior})
+        ra_arr = np.array([field["ra_deg"] for field in candidate_metadata], dtype=float)
+        dec_arr = np.array([field["dec_deg"] for field in candidate_metadata], dtype=float)
 
     ra_sun, dec_sun = get_sun_position(jd)
     print(
@@ -412,10 +535,15 @@ def select_fields(jd: float,
         file=sys.stderr, flush=True,
     )
 
-    # Build sky grid
-    ra_arr, dec_arr = generate_sky_grid()
+    # Build the planning grid or the measured-coverage eligible universe.
     n_fields = len(ra_arr)
-    print(f"Scoring {n_fields} candidate fields...", file=sys.stderr, flush=True)
+    print(
+        f"Scoring {n_fields} {'eligible' if search_mode else 'planning'} candidate fields...",
+        file=sys.stderr,
+        flush=True,
+    )
+    if n_fields == 0:
+        return []
 
     # Vectorised geometry
     elong   = elongation_batch(ra_arr, dec_arr, ra_sun, dec_sun)
@@ -423,7 +551,7 @@ def select_fields(jd: float,
     hours   = hours_visible_batch(dec_arr, lat)
 
     # Vectorised scoring components
-    gap_s   = gap_score_batch(elong, mode)
+    scarcity_s = survey_scarcity_score_batch(elong, mode)
     pop_s   = (
         known_object_density_score_batch(ecl_lat, elong)
         if mode == "recovery"
@@ -431,29 +559,29 @@ def select_fields(jd: float,
     )
     geom_s  = geometry_score_batch(elong, hours, mode)
     history = load_run_history(history_dir) if history_dir else []
+    if search_mode is not None:
+        history.extend(target_history)
     novel_s = novelty_scores_batch(ra_arr, dec_arr, history)
 
-    # Composite score: analytic weights or learned model
-    ml_model = load_field_selector_model(model_path) if model_path else None
-    if ml_model is not None:
-        # Phase 2: learned linear model over component features
-        feature_matrix = np.column_stack([gap_s, pop_s, geom_s, novel_s])
-        total = apply_model_score(feature_matrix, ml_model)
-        print(f"Using ML model: {model_path}", file=sys.stderr, flush=True)
+    # Deterministic analytic score. Eligibility is a hard gate, not a tunable
+    # weight, because three nights are structurally required by the linker.
+    w = _WEIGHTS
+    if mode == "recovery":
+        total = 0.45 * pop_s + 0.35 * geom_s + 0.20 * novel_s
     else:
-        w = _WEIGHTS
-        if mode == "recovery":
-            total = 0.45 * pop_s + 0.35 * geom_s + 0.20 * novel_s
-        else:
-            total = (w["gap"] * gap_s + w["population"] * pop_s
-                     + w["geometry"] * geom_s + w["novelty"] * novel_s)
+        total = (
+            w["scarcity"] * scarcity_s
+            + w["population"] * pop_s
+            + w["geometry"] * geom_s
+            + w["novelty"] * novel_s
+        )
 
     # Mask non-observable fields (below horizon or outside elongation window)
     observable = (geom_s > 0.01) & (hours > 0.5)
     total      = np.where(observable, total, -1.0)
 
     # Sort descending; grab extra candidates to absorb deduplication losses
-    order   = np.argsort(-total)
+    order = np.lexsort((dec_arr, ra_arr, -total))
     results: list[dict] = []
     selected_positions: list[tuple[float, float]] = []  # (ra, dec) of chosen fields
 
@@ -485,8 +613,8 @@ def select_fields(jd: float,
 
         # Human-readable reason string
         parts: list[str] = []
-        if gap_s[idx] > 0.7:
-            parts.append(f"coverage gap {gap_s[idx]:.2f}")
+        if scarcity_s[idx] > 0.7:
+            parts.append(f"survey scarcity prior {scarcity_s[idx]:.2f}")
         if pop_s[idx] > 0.4:
             label = "known-object density" if mode == "recovery" else "pop density"
             parts.append(f"{label} {pop_s[idx]:.2f}")
@@ -496,12 +624,12 @@ def select_fields(jd: float,
             parts.append("WARNING: recently processed")
         reason = "; ".join(parts) or f"elong {elong[idx]:.1f}°"
 
-        results.append({
+        result = {
             "rank":             len(results) + 1,
             "ra_deg":           round(ra_i, 2),
             "dec_deg":          round(dec_i, 2),
             "score":            round(float(total[idx]), 4),
-            "gap_score":        round(float(gap_s[idx]),   4),
+            "survey_scarcity_score": round(float(scarcity_s[idx]), 4),
             "pop_score":        round(float(pop_s[idx]),   4),
             "geom_score":       round(float(geom_s[idx]),  4),
             "novelty_score":    round(float(novel_s[idx]), 4),
@@ -509,8 +637,31 @@ def select_fields(jd: float,
             "ecl_lat_deg":      round(float(ecl_lat[idx]), 1),
             "hours_visible":    round(float(hours[idx]),   1),
             "field_radius_deg": _FIELD_RADIUS_DEG,
+            "selection_stage":  "eligible" if search_mode else "planning",
             "reason":           reason,
-        })
+        }
+        if candidate_metadata is not None:
+            metadata = candidate_metadata[idx]
+            result.update(
+                {
+                    "field_id": metadata["field_id"],
+                    "search_mode": search_mode,
+                    "n_distinct_nights": metadata["n_distinct_nights"],
+                    "coverage_nights": metadata["distinct_nights_yyyymmdd"],
+                    "coverage_raw_response_sha256": metadata["raw_response_sha256"],
+                    "coverage_provenance": {
+                        "schema_version": coverage["schema_version"],
+                        "batch_id": coverage["batch_id"],
+                        "batch_manifest_sha256": coverage["batch_manifest_sha256"],
+                        "min_distinct_nights": coverage["min_distinct_nights"],
+                    },
+                    "prior_searches": metadata["prior_searches"],
+                }
+            )
+            result["reason"] = (
+                f"measured coverage {metadata['n_distinct_nights']} nights; {reason}"
+            )
+        results.append(result)
 
         if len(results) >= top_n:
             break
@@ -826,9 +977,25 @@ def main(argv: list[str] | None = None) -> None:
         help="Path to Logs/pipeline_runs/ for novelty scoring (skip recently processed fields).",
     )
     parser.add_argument(
-        "--model", type=Path, default=None,
-        help="Path to trained field-selector model JSON (Phase 2 ML hook). "
-             "Falls back to analytic scoring if not provided.",
+        "--search-mode",
+        choices=["new", "follow-up"],
+        default=None,
+        help=(
+            "Apply production eligibility semantics. Requires --coverage-inventory "
+            "and --target-queue. Omit for planning-only sky-grid ranking."
+        ),
+    )
+    parser.add_argument(
+        "--coverage-inventory",
+        type=Path,
+        default=None,
+        help="Versioned ztf-field-night-coverage-inventory-v1 JSON.",
+    )
+    parser.add_argument(
+        "--target-queue",
+        type=Path,
+        default=None,
+        help="Target-priority queue used as interim prior-search provenance.",
     )
     parser.add_argument(
         "--json", action="store_true", dest="json_out",
@@ -972,7 +1139,9 @@ def main(argv: list[str] | None = None) -> None:
         top_n=initial_top_n,
         history_dir=args.history_dir,
         lat=args.obs_lat,
-        model_path=args.model,
+        coverage_inventory_path=args.coverage_inventory,
+        target_queue_path=args.target_queue,
+        search_mode=args.search_mode,
     )
     if args.require_ztf_alerts:
         fields = filter_fields_by_ztf_availability(
@@ -1011,7 +1180,7 @@ def main(argv: list[str] | None = None) -> None:
     # ASCII ranked table
     col = "  "
     hdr = (f"{'Rank':>4}{col}{'RA':>8}{col}{'Dec':>7}{col}{'Score':>6}{col}"
-           f"{'Gap':>5}{col}{'Pop':>5}{col}{'Geom':>5}{col}"
+           f"{'Scar':>5}{col}{'Pop':>5}{col}{'Geom':>5}{col}"
            f"{'Elong':>6}{col}{'EclLat':>7}{col}{'Vis_h':>5}{col}Reason")
     print()
     print(hdr)
@@ -1019,7 +1188,8 @@ def main(argv: list[str] | None = None) -> None:
     for f in fields:
         print(
             f"{f['rank']:>4}{col}{f['ra_deg']:>8.2f}{col}{f['dec_deg']:>7.2f}{col}"
-            f"{f['score']:>6.4f}{col}{f['gap_score']:>5.3f}{col}{f['pop_score']:>5.3f}{col}"
+            f"{f['score']:>6.4f}{col}{f['survey_scarcity_score']:>5.3f}{col}"
+            f"{f['pop_score']:>5.3f}{col}"
             f"{f['geom_score']:>5.3f}{col}{f['elongation_deg']:>6.1f}{col}"
             f"{f['ecl_lat_deg']:>7.1f}{col}{f['hours_visible']:>5.1f}{col}{f['reason']}"
         )

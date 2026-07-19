@@ -22,7 +22,8 @@ Motion-Product Gates section is the currently-active register.
 
 **Phase 1 detection-hardening status (2026-07-19)**: both operator-named
 technical gaps are implemented, tested, and replayed on the original field-1
-data; explicit operator closure is pending before Phase 2 begins. Pixel-source
+data; the operator explicitly closed Phase 1 after PR #258 passed all checks
+and merged. Phase 2 ranking/eligibility hardening is active. Pixel-source
 PSF evidence is preserved separately without inventing a calibrated real/bogus
 probability, and incomplete/low-quality evidence fails closed. Arc sufficiency
 and orbit-fit success are now separate durable fields; the preliminary fitter
@@ -30,6 +31,17 @@ uses a real bounded two-body state fit and measured residual rather than the
 former invalid approximation/hard-coded residual. The replay kept both
 candidates rejected with explicit tier-2/`no_solution` statuses. Evidence:
 `docs/evidence/live/2026-07-19-phase1-detection-hardening.md`.
+
+**Phase 2 ranking/eligibility status (2026-07-19)**: the first work unit is
+implemented but Phase 2 remains open. Production selection now gates the
+deterministic analytic score on versioned measured night coverage and
+preserved terminal history, with separate `new`/`follow-up` semantics. The
+real two-night rank-4 failure is a regression oracle. Six older completed
+searches whose planning rows still said `not_searched` now have appended
+terminal evidence rows; no history was overwritten. Targeted verification is
+75 passing tests. Evidence:
+`docs/evidence/live/2026-07-19-phase2-ranking-eligibility.md`. Next gap:
+replay-cutoff-aware known-object association in adversarial eligibility.
 
 ## Production Definition
 

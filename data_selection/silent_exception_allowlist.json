@@ -36,12 +36,6 @@
     "reason": "Pre-existing silent-swallow predating REL-01 (2026-07-16), catalogued not fixed. Cache-file cleanup loop; a file that fails to unlink is simply absent from the returned `deleted` list (an implicit signal) but the specific OSError itself is never surfaced or logged."
   },
   {
-    "path": "Skills/select_survey_fields.py",
-    "line": 263,
-    "exception_types": "Exception",
-    "reason": "Pre-existing silent-swallow predating REL-01 (2026-07-16), catalogued not fixed. Already self-documented in-code as intentional (\"Malformed or partial files are silently skipped\"), but still has no count of how many files were skipped, so a systematic parsing regression would be invisible."
-  },
-  {
     "path": "Skills/tag_neo_class.py",
     "line": 33,
     "exception_types": "Exception",

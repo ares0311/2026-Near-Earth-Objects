@@ -86,8 +86,7 @@ next task. **Do not repeat that pattern.** Running more fields through
 the existing pipeline is not "hardening" anything and is out of scope
 until Phase 1 below is explicitly closed by the operator.
 
-**Phase 1 — Harden the detection pipeline (TECHNICAL EXIT MET 2026-07-19;
-OPERATOR CLOSURE PENDING).**
+**Phase 1 — Harden the detection pipeline (CLOSED 2026-07-19).**
 Two concrete, named gaps were identified 2026-07-19 by inspecting the
 actual review-packet output from five already-completed field tests, not
 guessed:
@@ -124,18 +123,17 @@ separate durable fields, and the fitter uses a bounded two-body state fit
 with measured residuals. The original field-1 replay kept both candidates
 rejected with explicit tier-2/`no_solution` outcomes. Canonical verification
 passed with 2,067 tests and 100% `src/` coverage. Evidence:
-`docs/evidence/live/2026-07-19-phase1-detection-hardening.md`. Do not begin
-Phase 2 until the operator explicitly closes Phase 1.
+`docs/evidence/live/2026-07-19-phase1-detection-hardening.md`. The operator
+explicitly closed Phase 1 after reviewing this evidence; PR #258 merged.
 
-**Phase 2 — Harden the search algorithm (BLOCKED on Phase 1 closing).**
+**Phase 2 — Harden the search algorithm (ACTIVE — work here now).**
 Reframed 2026-07-19 in terms of `docs/HUNTER_PROD_DIRECTIVE.md`'s
 "ranking/selection" and "eligibility" pipeline stages (see the mapping
 below): evaluating/improving `Skills/select_survey_fields.py`'s field
 scoring against real outcomes, evaluating/improving the adversarial
 review challenge set (`Skills/adversarial_review.py`), and building the
 Hunter directive's required deterministic, explainable, reproducible
-ranking model (not opaque LLM judgment as core ranking logic). Do not
-start this phase early.
+ranking model (not opaque LLM judgment as core ranking logic).
 
 **Phase 3 — Package the application (BLOCKED on Phase 2 closing).**
 Concretized 2026-07-19 by `docs/HUNTER_PROD_DIRECTIVE.md`: build the

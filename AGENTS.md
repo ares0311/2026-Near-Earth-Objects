@@ -288,8 +288,7 @@ already-validated mechanism instead of doing the actual next task.
 pipeline is not "hardening" anything and is out of scope until Phase 1
 below is explicitly closed by the operator.
 
-**Phase 1 — Harden the detection pipeline (TECHNICAL EXIT MET 2026-07-19;
-OPERATOR CLOSURE PENDING).**
+**Phase 1 — Harden the detection pipeline (CLOSED 2026-07-19).**
 Two concrete, named gaps identified 2026-07-19 by inspecting real
 review-packet output from five completed field tests:
 1. **No real/bogus score exists for pixel-extraction-sourced candidates.**
@@ -319,15 +318,15 @@ separate durable fields, and the fitter uses a bounded two-body state fit
 with measured residuals. The original field-1 replay kept both candidates
 rejected with explicit tier-2/`no_solution` outcomes. Canonical verification
 passed with 2,067 tests and 100% `src/` coverage. Evidence:
-`docs/evidence/live/2026-07-19-phase1-detection-hardening.md`. Do not begin
-Phase 2 until the operator explicitly closes Phase 1.
+`docs/evidence/live/2026-07-19-phase1-detection-hardening.md`. The operator
+explicitly closed Phase 1 after reviewing this evidence; PR #258 merged.
 
-**Phase 2 — Harden the search algorithm (BLOCKED on Phase 1).** Reframed
+**Phase 2 — Harden the search algorithm (ACTIVE — work here now).** Reframed
 2026-07-19 per `docs/HUNTER_PROD_DIRECTIVE.md`'s "ranking/selection" and
 "eligibility" stages: evaluate/improve `Skills/select_survey_fields.py`'s
 scoring and `Skills/adversarial_review.py`'s challenge set into a
 deterministic, explainable, reproducible ranking model (not opaque LLM
-judgment as core ranking logic). Do not start early.
+judgment as core ranking logic).
 
 **Phase 3 — Package the application (BLOCKED on Phase 2).** Concretized
 2026-07-19 by `docs/HUNTER_PROD_DIRECTIVE.md`: build the required CLI

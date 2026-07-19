@@ -6,6 +6,7 @@ astropy network call is made.  The geometry helpers use only NumPy arithmetic.
 
 from __future__ import annotations
 
+import csv
 import json
 import math
 import sys
@@ -18,6 +19,52 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent / "Skills"))
 
 import select_survey_fields as ssf
+
+
+def _write_coverage_inventory(tmp_path: Path, fields: list[dict]) -> Path:
+    path = tmp_path / "coverage_inventory.json"
+    payload = {
+        "schema_version": "ztf-field-night-coverage-inventory-v1",
+        "batch_id": "phase2-test-batch",
+        "batch_manifest_sha256": "a" * 64,
+        "metadata_only": True,
+        "min_distinct_nights": 3,
+        "field_results": [],
+    }
+    for field in fields:
+        nights = field["nights"]
+        payload["field_results"].append(
+            {
+                "field_id": field["field_id"],
+                "ra_deg": field["ra_deg"],
+                "dec_deg": field["dec_deg"],
+                "n_distinct_nights": len(nights),
+                "distinct_nights_yyyymmdd": nights,
+                "passes_min_distinct_nights": len(nights) >= 3,
+                "raw_response_sha256": field.get("raw_response_sha256", "b" * 64),
+            }
+        )
+    path.write_text(json.dumps(payload))
+    return path
+
+
+def _write_target_queue(tmp_path: Path, rows: list[dict] | None = None) -> Path:
+    path = tmp_path / "target_priority_queue.csv"
+    fieldnames = [
+        "rank",
+        "priority",
+        "status",
+        "data_role",
+        "source",
+        "selection_rule",
+        "evidence_path",
+        "notes",
+    ]
+    with path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows or [])
+    return path
 
 # ── Geometry helper tests ──────────────────────────────────────────────────────
 
@@ -107,29 +154,29 @@ class TestHoursVisibleBatch:
 
 # ── Scoring component tests ────────────────────────────────────────────────────
 
-class TestGapScoreBatch:
+class TestSurveyScarcityScoreBatch:
     def test_ieo_is_high_everywhere(self):
         elong = np.array([25.0, 32.0, 40.0])
-        scores = ssf.gap_score_batch(elong, "ieo")
+        scores = ssf.survey_scarcity_score_batch(elong, "ieo")
         assert np.all(scores > 0.90)
 
     def test_aten_peaks_at_80_degrees(self):
         elong = np.array([80.0])
-        peak  = ssf.gap_score_batch(elong, "aten")
+        peak  = ssf.survey_scarcity_score_batch(elong, "aten")
         elong2 = np.array([60.0])
-        off   = ssf.gap_score_batch(elong2, "aten")
+        off   = ssf.survey_scarcity_score_batch(elong2, "aten")
         assert peak[0] > off[0]
 
     def test_all_mode_output_in_range(self):
         elong = np.linspace(0, 180, 181)
-        scores = ssf.gap_score_batch(elong, "all")
+        scores = ssf.survey_scarcity_score_batch(elong, "all")
         assert np.all(scores >= 0.0)
         assert np.all(scores <= 1.0)
 
     def test_unknown_mode_falls_through_to_all(self):
         # No mode match → should not raise; treated same as "all"
         elong = np.array([90.0])
-        scores = ssf.gap_score_batch(elong, "all")
+        scores = ssf.survey_scarcity_score_batch(elong, "all")
         assert 0.0 <= scores[0] <= 1.0
 
 
@@ -245,19 +292,19 @@ class TestLoadRunHistory:
         assert len(result) == 1
         assert result[0] == pytest.approx((120.5, -15.2))
 
-    def test_skips_malformed_files(self, tmp_path):
+    def test_malformed_file_fails_loudly(self, tmp_path):
         run_dir = tmp_path / "run_bad"
         run_dir.mkdir()
         (run_dir / "run_summary.json").write_text("NOT JSON {{{")
-        result = ssf.load_run_history(tmp_path)
-        assert result == []
+        with pytest.raises(ValueError, match="invalid run history file"):
+            ssf.load_run_history(tmp_path)
 
-    def test_skips_missing_ra_dec(self, tmp_path):
+    def test_missing_coordinates_fail_loudly(self, tmp_path):
         run_dir = tmp_path / "run_partial"
         run_dir.mkdir()
         (run_dir / "run_summary.json").write_text(json.dumps({"n_candidates": 5}))
-        result = ssf.load_run_history(tmp_path)
-        assert result == []
+        with pytest.raises(ValueError, match="missing ra_deg/dec_deg"):
+            ssf.load_run_history(tmp_path)
 
 
 # ── Grid generation tests ──────────────────────────────────────────────────────
@@ -286,39 +333,14 @@ class TestGenerateSkyGrid:
 
 # ── ML model hook tests ───────────────────────────────────────────────────────
 
-class TestMLModelHook:
-    def test_missing_model_returns_none(self, tmp_path):
-        result = ssf.load_field_selector_model(tmp_path / "no_model.json")
-        assert result is None
+class TestNoOpaqueAIModelHook:
+    def test_legacy_model_parameter_is_rejected(self):
+        with pytest.raises(TypeError, match="model_path"):
+            ssf.select_fields(jd=2461000.5, model_path=Path("model.json"))
 
-    def test_valid_model_loads(self, tmp_path):
-        model_data = {
-            "version": "1.0",
-            "feature_names": ["gap", "population", "geometry", "novelty"],
-            "coef": [0.35, 0.30, 0.20, 0.15],
-            "intercept": 0.0,
-        }
-        model_file = tmp_path / "model.json"
-        model_file.write_text(json.dumps(model_data))
-        model = ssf.load_field_selector_model(model_file)
-        assert model is not None
-        assert "coef" in model
-        assert len(model["coef"]) == 4
 
-    def test_corrupt_model_returns_none(self, tmp_path):
-        bad_file = tmp_path / "bad.json"
-        bad_file.write_text("not json {{{")
-        result = ssf.load_field_selector_model(bad_file)
-        assert result is None
 
-    def test_apply_model_score_sigmoid_range(self):
-        model = {"coef": np.array([1.0, 1.0, 1.0, 1.0]), "intercept": 0.0}
-        features = np.array([[0.5, 0.5, 0.5, 0.5], [0.0, 0.0, 0.0, 0.0]])
-        scores = ssf.apply_model_score(features, model)
-        assert np.all(scores >= 0.0)
-        assert np.all(scores <= 1.0)
-        # Higher feature values → higher score
-        assert scores[0] > scores[1]
+
 
 
 # ── select_fields integration test ────────────────────────────────────────────
@@ -337,7 +359,7 @@ class TestSelectFields:
 
     def test_result_keys_present(self):
         fields = ssf.select_fields(jd=2461000.5, mode="aten", top_n=3)
-        required = {"rank", "ra_deg", "dec_deg", "score", "gap_score",
+        required = {"rank", "ra_deg", "dec_deg", "score", "survey_scarcity_score",
                     "pop_score", "geom_score", "novelty_score",
                     "elongation_deg", "ecl_lat_deg", "hours_visible",
                     "field_radius_deg", "reason"}
@@ -348,7 +370,7 @@ class TestSelectFields:
         fields = ssf.select_fields(jd=2461000.5, mode="aten", top_n=10)
         for f in fields:
             assert 0.0 <= f["score"] <= 1.0
-            assert 0.0 <= f["gap_score"] <= 1.0
+            assert 0.0 <= f["survey_scarcity_score"] <= 1.0
             assert 0.0 <= f["pop_score"] <= 1.0
             assert 0.0 <= f["geom_score"] <= 1.0
 
@@ -400,21 +422,158 @@ class TestSelectFields:
                 # If it appears, it must have novelty_score=0
                 assert f["novelty_score"] == 0.0
 
-    def test_ml_model_path_used_when_provided(self, tmp_path, monkeypatch):
-        # Provide a trivially valid ML model; verify it loads and produces scores
-        model_data = {
-            "feature_names": ["gap", "population", "geometry", "novelty"],
-            "coef": [1.0, 1.0, 1.0, 1.0],
-            "intercept": -2.0,
-        }
-        model_file = tmp_path / "model.json"
-        model_file.write_text(json.dumps(model_data))
-        fields = ssf.select_fields(
-            jd=2461000.5, mode="aten", top_n=5, model_path=model_file
+    def test_score_matches_documented_formula(self):
+        field = ssf.select_fields(jd=2461000.5, mode="aten", top_n=1)[0]
+        expected = (
+            0.35 * field["survey_scarcity_score"]
+            + 0.30 * field["pop_score"]
+            + 0.20 * field["geom_score"]
+            + 0.15 * field["novelty_score"]
         )
-        assert len(fields) >= 1
-        for f in fields:
-            assert 0.0 <= f["score"] <= 1.0
+        assert field["score"] == pytest.approx(expected, abs=2e-4)
+
+    def test_repeated_selection_is_identical(self):
+        first = ssf.select_fields(jd=2461000.5, mode="aten", top_n=10)
+        second = ssf.select_fields(jd=2461000.5, mode="aten", top_n=10)
+        assert first == second
+
+
+class TestProductionEligibility:
+    @pytest.fixture(autouse=True)
+    def patch_sun(self, monkeypatch):
+        # Both real review fields are inside the Aten window for this fixed Sun.
+        monkeypatch.setattr(ssf, "get_sun_position", lambda jd: (139.0, 0.0))
+
+    def test_real_rank4_two_night_field_is_rejected_before_scoring(self, tmp_path):
+        coverage = _write_coverage_inventory(
+            tmp_path,
+            [
+                {
+                    "field_id": "real-rank-4",
+                    "ra_deg": 211.81,
+                    "dec_deg": -7.5,
+                    "nights": ["20240901", "20240902"],
+                },
+                {
+                    "field_id": "real-rank-5",
+                    "ra_deg": 46.59,
+                    "dec_deg": 15.0,
+                    "nights": [f"202409{day:02d}" for day in range(1, 10)],
+                },
+            ],
+        )
+        queue = _write_target_queue(tmp_path)
+
+        fields = ssf.select_fields(
+            jd=2458340.5,
+            mode="aten",
+            top_n=10,
+            search_mode="new",
+            coverage_inventory_path=coverage,
+            target_queue_path=queue,
+        )
+
+        assert [field["field_id"] for field in fields] == ["real-rank-5"]
+        assert fields[0]["n_distinct_nights"] == 9
+        assert fields[0]["selection_stage"] == "eligible"
+        assert "measured coverage 9 nights" in fields[0]["reason"]
+
+    def test_new_and_follow_up_modes_use_preserved_terminal_history(self, tmp_path):
+        coverage = _write_coverage_inventory(
+            tmp_path,
+            [
+                {
+                    "field_id": "searched-field",
+                    "ra_deg": 211.81,
+                    "dec_deg": -7.5,
+                    "nights": ["20240901", "20240902", "20240903"],
+                }
+            ],
+        )
+        queue = _write_target_queue(
+            tmp_path,
+            [
+                {
+                    "rank": 4,
+                    "priority": "0.8821",
+                    "status": "null_result",
+                    "data_role": "live_search",
+                    "source": "ZTF",
+                    "selection_rule": "historical measured run",
+                    "evidence_path": "docs/evidence/live/rank4.md",
+                    "notes": "ra_deg=211.81 dec_deg=-7.5; preserved result",
+                }
+            ],
+        )
+
+        common = {
+            "jd": 2458340.5,
+            "mode": "aten",
+            "top_n": 10,
+            "coverage_inventory_path": coverage,
+            "target_queue_path": queue,
+        }
+        assert ssf.select_fields(search_mode="new", **common) == []
+        follow_up = ssf.select_fields(search_mode="follow-up", **common)
+        assert [field["field_id"] for field in follow_up] == ["searched-field"]
+        assert follow_up[0]["prior_searches"] == [
+            {
+                "status": "null_result",
+                "source": "ZTF",
+                "evidence_path": "docs/evidence/live/rank4.md",
+                "selection_rule": "historical measured run",
+            }
+        ]
+
+    def test_eligibility_inputs_are_mandatory_and_fail_loudly(self, tmp_path):
+        queue = _write_target_queue(tmp_path)
+        with pytest.raises(ValueError, match="requires coverage_inventory_path"):
+            ssf.select_fields(jd=1.0, search_mode="new")
+        with pytest.raises(FileNotFoundError, match="coverage inventory not found"):
+            ssf.select_fields(
+                jd=1.0,
+                search_mode="new",
+                coverage_inventory_path=tmp_path / "missing.json",
+                target_queue_path=queue,
+            )
+
+    def test_terminal_history_without_coordinates_fails_loudly(self, tmp_path):
+        queue = _write_target_queue(
+            tmp_path,
+            [
+                {
+                    "rank": 1,
+                    "priority": "0.9",
+                    "status": "null_result",
+                    "data_role": "live_search",
+                    "source": "ZTF",
+                    "selection_rule": "result",
+                    "evidence_path": "evidence.json",
+                    "notes": "missing coordinate provenance",
+                }
+            ],
+        )
+        with pytest.raises(ValueError, match="has no coordinates"):
+            ssf.load_target_queue_history(queue)
+
+    def test_inventory_cannot_claim_two_night_field_is_eligible(self, tmp_path):
+        inventory = _write_coverage_inventory(
+            tmp_path,
+            [
+                {
+                    "field_id": "false-positive",
+                    "ra_deg": 211.81,
+                    "dec_deg": -7.5,
+                    "nights": ["20240901", "20240902"],
+                }
+            ],
+        )
+        payload = json.loads(inventory.read_text())
+        payload["field_results"][0]["passes_min_distinct_nights"] = True
+        inventory.write_text(json.dumps(payload))
+
+        with pytest.raises(ValueError, match="coverage eligibility mismatch"):
+            ssf.load_coverage_inventory(inventory)
 
 
 class TestZtfAvailabilityProbe:
@@ -510,6 +669,46 @@ class TestCLI:
         data = json.loads(out)
         assert isinstance(data, list)
         assert len(data) <= 3
+
+    def test_new_search_cli_uses_measured_eligible_universe(self, tmp_path, capsys):
+        coverage = _write_coverage_inventory(
+            tmp_path,
+            [
+                {
+                    "field_id": "eligible-field",
+                    "ra_deg": 90.0,
+                    "dec_deg": 0.0,
+                    "nights": ["20240901", "20240902", "20240903"],
+                },
+                {
+                    "field_id": "ineligible-field",
+                    "ra_deg": 100.0,
+                    "dec_deg": 0.0,
+                    "nights": ["20240901", "20240902"],
+                },
+            ],
+        )
+        queue = _write_target_queue(tmp_path)
+
+        ssf.main(
+            [
+                "--jd",
+                "2461000.5",
+                "--mode",
+                "aten",
+                "--search-mode",
+                "new",
+                "--coverage-inventory",
+                str(coverage),
+                "--target-queue",
+                str(queue),
+                "--json",
+            ]
+        )
+
+        data = json.loads(capsys.readouterr().out)
+        assert [field["field_id"] for field in data] == ["eligible-field"]
+        assert data[0]["coverage_provenance"]["batch_id"] == "phase2-test-batch"
 
     def test_require_ztf_alerts_cli_json(self, capsys, monkeypatch):
         monkeypatch.setattr(

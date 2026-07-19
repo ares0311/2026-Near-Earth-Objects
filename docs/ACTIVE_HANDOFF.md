@@ -2,6 +2,29 @@
 
 Updated: 2026-07-19 (Hunter PROD Directive integrated)
 
+## Operator closed Phase 1; Phase 2 active (2026-07-19)
+
+After reviewing the implementation, real replay, clean-commit reliability
+record, and all-green GitHub CI in PR #258, the operator explicitly closed
+Phase 1 and authorized Phase 2. PR #258 was squash-merged to `main` as
+`1cc6351f`. The active work is now deterministic, explainable, reproducible
+search ranking and eligibility hardening. Phase 3 CLI/durable-state packaging
+remains blocked until Phase 2 closes.
+
+The first Phase 2 unit now gates scoring on measured three-night coverage and
+preserved terminal search history, with explicit `new`/`follow-up` semantics.
+It also corrects the misleading `gap_score` name to
+`survey_scarcity_score`, removes the nonexistent/opaque model hook, and
+appends terminal evidence for six completed searches without rewriting their
+older planning rows. Targeted result: 75 selector tests passed; real committed
+state replay returns zero of those six as `new` and all six in the follow-up
+eligible universe before observability filtering. Evidence:
+`docs/evidence/live/2026-07-19-phase2-ranking-eligibility.md`.
+
+Phase 2 is not closed. The next gap is replay-cutoff-aware known-object
+association in adversarial eligibility; the present-day live density check can
+also turn provider failure into a passing zero count. Do not start Phase 3.
+
 ## Phase 1 implementation complete; operator closure pending (2026-07-19)
 
 Both named Phase 1 detection-hardening gaps now meet their technical exit
