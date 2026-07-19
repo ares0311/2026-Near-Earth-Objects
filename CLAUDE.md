@@ -960,7 +960,24 @@ and excluded from CI.
 
 ## Current State (v0.91.0)
 
-**Latest sync (2026-07-18, IRSA concurrency probe + false-failure root
+**Latest sync (2026-07-19, sixth field expanded — five real linking runs,
+consistent null results)**: Continued field expansion. Rank 4 (RA 211.81,
+Dec -7.5) checked and skipped: only 2 real distinct nights of coverage
+over the max 399-day window, below the 3-night minimum — recorded as
+`insufficient_coverage` in `data_selection/target_priority_queue.csv`.
+Proceeded to rank 5 (RA 46.59, Dec 15.0, score 0.8761). Acquired 3 real
+nights (20180714, 20180717, 20180720) of real ZTF field 505. Result:
+`min_observations=2` gave 95 tracklets; `min_observations=3` gave **2**
+survivors, both REJECTED by adversarial review (`artifact_posterior`,
+`neo_dominance`) and both fail independent PSF-shape cross-validation
+(max correlation 0.260 vs >0.5 threshold). Evidence:
+`docs/evidence/live/2026-07-19-ztf-dr24-sixth-field-linking-test.md`.
+**Five algorithmically-selected fields now tested with a real linking
+run, fifteen real nights total**, all showing consistent null results.
+Still not authorized without further operator direction: a wider batch,
+a candidate claim, Gate Z3 resumption, or any external submission.
+
+**Earlier sync (2026-07-18, IRSA concurrency probe + false-failure root
 cause)**: Per operator direction ("try more field concurrently to probe
 the limit of the host"), progressively probed real concurrent request
 levels (2/4/6/10) against two structurally different IRSA endpoints.

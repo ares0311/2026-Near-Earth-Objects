@@ -1,6 +1,6 @@
 # Active Handoff — ZTF DR24 Motion-Product Pivot
 
-Updated: 2026-07-18 (fourth-field expansion)
+Updated: 2026-07-19 (sixth-field expansion; IRSA concurrency probe)
 Repository identity: `2026 Near Earth Objects`
 Branch: `main`
 Merged batch selection: `d81af0a0` (PR #235)
@@ -217,6 +217,43 @@ verification signals (chi2 geometric consistency + classifier
 posterior/PSF-shape). Still not authorized without further operator
 direction: a wider batch, a candidate claim, Gate Z3 resumption, or any
 external submission.
+
+## Sixth field expanded (2026-07-19), continuing "expand to more fields"
+
+Rank 4 of the batch (RA 211.81, Dec -7.5, score 0.8821) was checked and
+skipped: metadata-only query found only 2 real distinct nights over the
+max 399-day window -- below the 3-night minimum for a meaningful test.
+Recorded in `data_selection/target_priority_queue.csv` as
+`insufficient_coverage`. Proceeded to rank 5: **RA 46.59, Dec 15.0, score
+0.8761**. Acquired 3 real nights (20180714, 20180717, 20180720) of real
+ZTF field 505.
+
+**Result**: `min_observations=2` gave 95 tracklets; the real default
+`min_observations=3` gave **2** survivors. Both REJECTED by
+`Skills/adversarial_review.py --offline` (`artifact_posterior`,
+`neo_dominance` -- same pattern as every prior field). Independently, PSF-
+shape correlation maxed at 0.260 -- still well below the >0.5 real-source
+threshold. `Skills/export_ades_report.py` produced valid dry-run ADES PSV
+for both. Evidence:
+`docs/evidence/live/2026-07-19-ztf-dr24-sixth-field-linking-test.md`.
+
+**Five algorithmically-selected fields now tested with a real linking
+run, fifteen real nights total** (plus one candidate correctly skipped
+for insufficient coverage before consuming download budget), all showing
+consistent null results under both independent verification signals.
+Still not authorized without further operator direction: a wider batch, a
+candidate claim, Gate Z3 resumption, or any external submission.
+
+Separately this session: an IRSA concurrency probe (per operator
+direction) found the metadata endpoint scales cleanly to 10 concurrent,
+while the pixel-download endpoint's apparent degradation at 4-6
+concurrent was confounded by the operator's own changing network
+connection (boarding a flight) and is recorded as unconfirmed pending a
+future clean re-probe. A recurring "background task failed" notification
+pattern (present all session) was root-caused to a Claude Code
+tool-harness artifact, not real command failures. Full detail:
+`docs/evidence/live/2026-07-18-irsa-concurrency-probe.md` and the new
+standing rule in `CLAUDE.md`.
 
 ## Source-native motion-product path initiated
 
