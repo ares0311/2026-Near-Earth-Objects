@@ -941,7 +941,19 @@ and excluded from CI.
 
 ## Current State (v0.91.0)
 
-**Latest sync (2026-07-18, fourth field expanded — four consecutive null
+**Latest sync (2026-07-19, sixth field expanded — five real linking runs,
+consistent null results)**: Rank 4 (RA 211.81, Dec -7.5) skipped for
+insufficient coverage (2 real nights, below the 3-night minimum) —
+recorded as `insufficient_coverage`. Proceeded to rank 5 (RA 46.59, Dec
+15.0, score 0.8761). Acquired 3 real nights (20180714, 20180717,
+20180720) of real ZTF field 505. Result: `min_observations=3` gave 2
+survivors, both REJECTED by adversarial review and both fail independent
+PSF-shape cross-validation (max correlation 0.260). Evidence:
+`docs/evidence/live/2026-07-19-ztf-dr24-sixth-field-linking-test.md`.
+**Five algorithmically-selected fields now tested with a real linking
+run, fifteen real nights total**, all showing consistent null results.
+
+**Earlier sync (2026-07-18, fourth field expanded — four consecutive null
 results under two independent checks)**: Selected rank 3 of the same
 `--mode aten --top-n 20` batch that gave fields 2 and 3 (RA 48.71, Dec
 22.5, score 0.8879). Acquired 3 real nights (20180713, 20180716,
