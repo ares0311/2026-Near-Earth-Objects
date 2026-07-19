@@ -37,10 +37,22 @@ Astroquery's documented example reached SkyBoT but returned HTTP 500 on
 `docs/evidence/live/2026-07-19-phase2-known-object-eligibility.md`.
 
 Do not retry the same provider request in a loop. On service recovery, run one
-documented probe and one known-object positive control. Independently, the next
-safe Phase 2 code gap is ATLAS confirmation quality: the current challenge can
-treat arbitrary returned rows as confirmation without validating time,
-position, or measurement quality. Phase 3 remains blocked.
+documented probe and one known-object positive control.
+
+The independent ATLAS confirmation-quality gap is now closed in code. The
+adversarial challenge no longer queries one fixed mean coordinate or treats an
+arbitrary forced-photometry row as moving-object confirmation. Only linked
+ATLAS observations can pass, and each is replayed against tracklet kinematics,
+the documented 2-arcsecond position requirement, a 5-sigma measurement floor,
+finite/sentinel checks, and duplicate rejection. Invalid claimed evidence
+fails; absent ATLAS evidence skips transparently because the enrichment is not
+core eligibility. Focused result: 86 tests passed; the original two real packet
+candidates remain rejected. Evidence:
+`docs/evidence/live/2026-07-19-phase2-atlas-confirmation-quality.md`.
+
+Phase 2 remains open. The next safe unit is a feature-by-feature audit of
+selector weights/threshold provenance and independent regression oracles.
+Phase 3 remains blocked.
 
 ## Phase 1 implementation complete; operator closure pending (2026-07-19)
 
