@@ -141,6 +141,32 @@ non-blocked ZTF/Astrometrics gate or documentation sync.
   local run debris, fix `.gitignore` and untrack it before committing.
 
 - **Always comment all code**: Every function, class, script, shell command, and non-trivial code block must include comments explaining what it does and why. This applies to all Python source files, all Skills scripts, all shell commands given to the operator, and all inline code snippets in documentation. No exceptions. This rule overrides any default behavior that would omit comments.
+- **Claude Code's own backgrounded-command completion status is unreliable — verify against the real exit code, not the wrapper label (Claude Code tool-harness note, not a Codex/AGENTS.md concern)**:
+  Every backgrounded Bash command in this sandboxed environment ends with a
+  shell-level line of the form
+  `zsh:N: operation not permitted: /tmp/claude-501/cwd-XXXXXXXX` — a
+  sandbox-denied stat/write from zsh's own prompt/precmd machinery, not
+  from the launched command. Claude Code's background-task completion
+  notification appears to key off this shell-level noise rather than the
+  launched command's actual exit code, so it reports `status: failed` even
+  when the real command succeeded cleanly. Root-caused 2026-07-18 across
+  ~30 independent samples during a live concurrency probe, by explicitly
+  capturing `$?` into each command's own redirected log
+  (`command > logfile 2>&1; echo "EXIT=$?" >> logfile`): every single
+  "failed" notification had a real `EXIT=0` underneath, including on
+  purely local commands (git pushes, pytest runs) with no network
+  involved at all, ruling out a network-specific explanation for this
+  specific pattern. See
+  `docs/evidence/live/2026-07-18-irsa-concurrency-probe.md` for the full
+  investigation. **Never trust a background-task notification's
+  `status: failed`/`status: completed` label as the sole signal of
+  success.** For anything where the real result matters, redirect to a
+  repo-local log file and capture `$?` explicitly, then read that file —
+  piping through `grep -v "operation not permitted"` (already this
+  project's convention for foreground commands) does not fix this for
+  *backgrounded* commands, since the false-failure signal comes from the
+  harness's own completion classifier, not from noise visible in the
+  piped output.
 - **caffeinate all long-running Mac commands**: Any operator command expected to run longer than ~30 seconds must be prefixed with `caffeinate -i` to prevent macOS from sleeping mid-run. This applies to all downloads, training runs, and pipeline executions. Example: `caffeinate -i uv run --python 3.14 python Skills/download_ztf_training_alerts.py ...`
 - **All long-running scripts must print live progress with ETA**: Any script or pipeline stage that runs for more than a few seconds MUST emit per-item or per-batch progress lines to **stdout**, including: items processed / total, current status, running accepted counts, elapsed time, and estimated time remaining (ETA). Silent long-running processes are unacceptable — the operator must always be able to see that the process is alive and estimate when it will finish. This rule applies to all Skills scripts that loop over network queries, training epochs, or large data processing. Use `print(..., flush=True)` (stdout, NOT stderr — stderr is not reliably interleaved with stdout in the operator's terminal). ETA format: `elapsed {m}m{s:02d}s  ETA {m}m{s:02d}s`. ETA must be computed from a measurable quantity (bytes read, items processed, batches done) — elapsed-only heartbeats are not acceptable as a substitute for ETA.
 
@@ -934,7 +960,51 @@ and excluded from CI.
 
 ## Current State (v0.91.0)
 
-**Latest sync (2026-07-18, fourth field expanded — four consecutive null
+**Latest sync (2026-07-18, IRSA concurrency probe + false-failure root
+cause)**: Per operator direction ("try more field concurrently to probe
+the limit of the host"), progressively probed real concurrent request
+levels (2/4/6/10) against two structurally different IRSA endpoints.
+**Metadata endpoint** (coverage/inventory queries): clean, zero errors, no
+meaningful degradation up to 10 concurrent — `docs/SYSTEM_PROFILE.md`
+upgraded from 6 to 10. **Pixel-product download endpoint** (real
+difference-image/mask/PSF files): 4 and 6 concurrent both completed with
+zero hard errors but real, worsening latency (serial baseline 2-4s → 4
+concurrent 23-33s → 6 concurrent up to 47s). **Operator flagged a real
+confound live during the probe**: their Mac's network connection was
+changing (boarding a flight) during exactly these rounds, which fully
+explains the same symptom independent of any server-side behavior. This
+was caught and the conclusion downgraded honestly rather than asserted as
+a confirmed IRSA-side rate limit — `docs/SYSTEM_PROFILE.md` records the
+pixel-download endpoint's 3-concurrent recommendation as "conservative,
+unconfirmed," explicitly requiring a future clean re-probe before
+upgrading. Full methodology and honest caveats:
+`docs/evidence/live/2026-07-18-irsa-concurrency-probe.md`.
+
+Separately, root-caused a recurring pattern this whole session: every
+backgrounded Bash command's completion notification reports
+`status: failed` regardless of whether the real command succeeded —
+traced to a shell-level `zsh: operation not permitted:
+/tmp/claude-501/cwd-XXXX` line (a sandbox-denied zsh prompt/precmd
+stat/write, not the launched command) that Claude Code's own completion
+classifier appears to key off. Confirmed across ~30 independent samples
+by explicitly capturing `$?` into each command's own log; every "failed"
+notification had a real `EXIT=0` underneath, including on purely local
+commands (git push, pytest) with no network involved, ruling out a
+network explanation for *this specific* pattern (distinct from the
+concurrency-probe confound above). Recorded as a new standing rule above
+("Claude Code's own backgrounded-command completion status is
+unreliable"): never trust the wrapper label alone; capture and read the
+real exit code for anything where the result matters. Not mirrored to
+`AGENTS.md` — this is a Claude Code tool-harness artifact, not a
+NEO-pipeline reliability directive Codex would share.
+
+Also declined an out-of-scope request during this session (per the
+PRIMARY DIRECTIVE's own gate): a request to have agents generically
+"compact the code, comment it" was flagged as having no named production
+gap behind it, distinct from the already-standing "always comment all
+code" rule (which does apply and was not touched here).
+
+**Earlier sync (2026-07-18, fourth field expanded — four consecutive null
 results under two independent checks)**: Continued the operator-approved
 field expansion. Selected rank 3 of the same `--mode aten --top-n 20`
 batch that gave fields 2 and 3 (RA 48.71, Dec 22.5, score 0.8879).
