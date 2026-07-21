@@ -1,6 +1,22 @@
 # Active Handoff — ZTF DR24 Motion-Product Pivot
 
-Updated: 2026-07-19 (Hunter PROD Directive integrated)
+Updated: 2026-07-21 (Hunter PROD loop active)
+
+## CI runtime repair after Phase 2 policy merge (2026-07-21)
+
+PR #262 merged the versioned ranking-policy provenance work, but its serial
+GitHub `pytest` step was cancelled at the workflow's 15-minute limit after
+reaching 68%; ruff and mypy had passed and no test failure was reported.  The
+CI command now uses pytest-xdist's file-level scheduler (`-n auto
+--dist=loadfile`).  pytest-cov still combines all worker data into the same
+terminal report and enforces the unchanged `--cov-fail-under=100` gate.  The
+exact proposed command completed locally in 40.84 seconds with 2,101 tests
+passing and 100% coverage across 5,545 `src/` statements.  Evidence:
+`docs/evidence/live/2026-07-21-ci-parallel-coverage.md`.
+
+This repairs the verification path only.  Phase 2 remains open on the frozen,
+leakage-safe field-ranking calibration set described below; Phase 3 remains
+blocked.
 
 ## Operator closed Phase 1; Phase 2 active (2026-07-19)
 

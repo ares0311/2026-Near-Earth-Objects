@@ -54,6 +54,8 @@ jobs:
           uv run python -m pytest \
             -m "not integration_live" \
             -q \
+            -n auto \
+            --dist=loadfile \
             --cov=src \
             --cov-report=term-missing \
             --cov-fail-under=100
