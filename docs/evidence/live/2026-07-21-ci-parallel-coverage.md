@@ -20,7 +20,7 @@ stage, not a known lint, type, test, or coverage defect.
 
 ## Change
 
-The existing CI pytest command now adds:
+The first diagnostic changed the CI pytest command to add:
 
 ```text
 -n auto --dist=loadfile
@@ -31,6 +31,19 @@ documented xdist integration combines worker coverage before applying the
 existing `--cov-fail-under=100` gate.  The marker expression, source scope,
 coverage report, and threshold are unchanged.
 
+That hosted run (`29852308200`, job `88707966513`) reached 99% in 6 minutes 24
+seconds, then printed nothing for 7 minutes 53 seconds before cancellation.
+Four Python worker processes were still alive.  Therefore xdist removed the
+general serial bottleneck but exposed a final Linux-only hang.  The dots-only
+console could not name the unfinished test.
+
+The follow-up diagnostic replaces quiet output with `-vv` and adds
+`--timeout=120 --timeout-method=thread`.  Every running test is now named in
+the console; a worker that stops for two minutes dumps its thread stacks and
+exits nonzero instead of remaining silent until the job-wide timeout.  The
+timeout is diagnostic and fail-loud behavior, not a skipped test or relaxed
+gate.
+
 ## Behavioral verification
 
 The exact proposed pytest command was run locally with Python 3.14.3 and the
@@ -40,12 +53,17 @@ locked environment:
 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 \
 NUMEXPR_MAX_THREADS=1 PYTHONPATH=src UV_CACHE_DIR=.uv-cache \
 uv run --no-sync --python 3.14 python -m pytest \
-  -m "not integration_live" -q -n auto --dist=loadfile \
+  -m "not integration_live" -vv -n auto --dist=loadfile \
+  --timeout=120 --timeout-method=thread \
   --cov=src --cov-report=term-missing --cov-fail-under=100
 ```
 
 Result: `2101 passed` in 38.28 test seconds / 40.84 wall-clock seconds;
 5,545 source statements measured; total coverage 100.00%; exit status 0.
+
+The final verbose/timeout form was also executed locally: `2101 passed` in
+32.68 test seconds, 100.00% coverage, exit status 0.  Its console named each
+scheduled/running test and reported the configured 120-second thread timeout.
 
 The canonical reliability workflow also passed all six stages on the changed
 tree: directive parity, silent-exception gate, incomplete-implementation gate,
@@ -57,5 +75,6 @@ record was dirty; it must be rerun after commit before a `VERIFIED` claim.
 ## Scope and remaining work
 
 This is a verification-infrastructure repair only.  It does not close Phase 2
-ranking calibration and does not unblock Phase 3 packaging by itself.  A fresh
-GitHub-hosted CI result is required after the change is pushed.
+ranking calibration and does not unblock Phase 3 packaging by itself.  The
+next GitHub-hosted run must either complete or name/dump the exact hanging test;
+partial output is not accepted as success.

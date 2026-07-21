@@ -6,12 +6,16 @@ Updated: 2026-07-21 (Hunter PROD loop active)
 
 PR #262 merged the versioned ranking-policy provenance work, but its serial
 GitHub `pytest` step was cancelled at the workflow's 15-minute limit after
-reaching 68%; ruff and mypy had passed and no test failure was reported.  The
-CI command now uses pytest-xdist's file-level scheduler (`-n auto
---dist=loadfile`).  pytest-cov still combines all worker data into the same
-terminal report and enforces the unchanged `--cov-fail-under=100` gate.  The
-exact proposed command completed locally in 40.84 seconds with 2,101 tests
-passing and 100% coverage across 5,545 `src/` statements.  Evidence:
+reaching 68%; ruff and mypy had passed and no test failure was reported.  A
+first xdist repair reached 99% in 6m24s, then produced no console output for
+7m53s before the same timeout.  This proves a hosted test hang remains rather
+than general suite slowness.  The CI command now uses file-level scheduling,
+verbose per-test console output, and a 120-second per-test timeout that dumps
+worker stacks (`-n auto --dist=loadfile -vv --timeout=120
+--timeout-method=thread`).  pytest-cov still combines all worker data and
+enforces the unchanged `--cov-fail-under=100` gate.  The exact parallel command
+completed locally in 40.84 seconds with 2,101 tests passing and 100% coverage
+across 5,545 `src/` statements.  Evidence:
 `docs/evidence/live/2026-07-21-ci-parallel-coverage.md`.
 
 This repairs the verification path only.  Phase 2 remains open on the frozen,
