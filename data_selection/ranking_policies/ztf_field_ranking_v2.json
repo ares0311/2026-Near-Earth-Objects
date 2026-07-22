@@ -1,0 +1,76 @@
+{
+  "schema_version": "ztf-field-ranking-policy-v2",
+  "policy_id": "ztf-field-ranking-v2",
+  "model_type": "deterministic_analytic",
+  "coefficient_status": "uncalibrated_transparent_prior",
+  "discovery_weights": {
+    "scarcity": 0.35,
+    "population": 0.3,
+    "geometry": 0.2,
+    "novelty": 0.15
+  },
+  "recovery_weights": {
+    "population": 0.45,
+    "geometry": 0.35,
+    "novelty": 0.2
+  },
+  "preference_windows_deg": {
+    "aten": [60.0, 100.0, 80.0],
+    "ieo": [20.0, 45.0, 32.5],
+    "all": [60.0, 160.0, 110.0],
+    "recovery": [120.0, 180.0, 165.0]
+  },
+  "eligibility_windows_deg": {
+    "aten": [60.0, 180.0],
+    "ieo": [20.0, 60.0],
+    "all": [60.0, 180.0],
+    "recovery": [120.0, 180.0]
+  },
+  "class_completeness_priors": {
+    "aten": 0.15,
+    "ieo": 0.03,
+    "all": 0.45,
+    "recovery": 0.95
+  },
+  "eligibility": {
+    "min_distinct_nights": 3,
+    "min_hours_visible": 0.5,
+    "min_altitude_deg": 25.0,
+    "history_overlap_deg": 5.0,
+    "dedup_radius_deg": 3.5
+  },
+  "references": [
+    {
+      "id": "granvik-2018",
+      "url": "https://doi.org/10.1016/j.icarus.2018.04.018",
+      "supports": "Debiased NEO orbital and absolute-magnitude distributions and source-region priors.",
+      "does_not_support": "The selector's exact component weights, sky-density exponentials, or class completeness constants."
+    },
+    {
+      "id": "ye-2020",
+      "url": "https://arxiv.org/abs/1912.06109",
+      "supports": "ZTF twilight searches for interior-Earth objects at solar elongations down to about 35 degrees.",
+      "does_not_support": "The selector's exact preference peak, eligibility bounds, scarcity curve, or component weights."
+    },
+    {
+      "id": "harris-dabramo-2015",
+      "url": "https://doi.org/10.1016/j.icarus.2015.05.004",
+      "supports": "Population-completeness estimation using discovery and re-detection statistics.",
+      "does_not_support": "The selector's exact per-class completeness constants or component weights."
+    }
+  ],
+  "empirical_evidence": [
+    {
+      "id": "mpc-ztf-discovery-geometry-2018-2024",
+      "path": "data_selection/calibration/ztf_field_ranking_audit_v1_pre_eligibility_fix.json",
+      "sha256": "766ba369205d4d628233f37db0323565d0c9a80ab9e5eecf5d1af8ab0f3b4dde",
+      "supports": "Separating broad eligibility from narrow preference: v1 admitted 0/1 ZTF Aten and 1/7 ZTF Atira positives while admitting every searched null.",
+      "does_not_support": "Coefficient fitting, calibrated discovery probability, or causal yield claims."
+    }
+  ],
+  "limitations": [
+    "Exact coefficients remain explicit operator priors, not fitted literature coefficients.",
+    "Eligibility bounds are evidence-audited search bounds; preference peaks remain uncalibrated priorities.",
+    "The policy is deterministic and explainable but is not a calibrated probability model."
+  ]
+}

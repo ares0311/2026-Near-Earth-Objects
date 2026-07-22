@@ -1,0 +1,1942 @@
+{
+  "all_source_metrics": {
+    "aten": {
+      "all": {
+        "eligible_pairwise_auc": 0.0,
+        "positive_count": 56,
+        "positive_eligibility_recall": 0.017857,
+        "positive_eligible_count": 1,
+        "searched_null_count": 6,
+        "searched_null_eligible_count": 6
+      },
+      "development_through_2023": {
+        "eligible_pairwise_auc": 0.0,
+        "positive_count": 48,
+        "positive_eligibility_recall": 0.020833,
+        "positive_eligible_count": 1,
+        "searched_null_count": 4,
+        "searched_null_eligible_count": 4
+      },
+      "holdout_2024": {
+        "eligible_pairwise_auc": null,
+        "positive_count": 8,
+        "positive_eligibility_recall": 0.0,
+        "positive_eligible_count": 0,
+        "searched_null_count": 2,
+        "searched_null_eligible_count": 2
+      }
+    },
+    "ieo": {
+      "all": {
+        "eligible_pairwise_auc": 0.0,
+        "positive_count": 19,
+        "positive_eligibility_recall": 0.105263,
+        "positive_eligible_count": 2,
+        "searched_null_count": 3,
+        "searched_null_eligible_count": 3
+      },
+      "development_through_2023": {
+        "eligible_pairwise_auc": null,
+        "positive_count": 16,
+        "positive_eligibility_recall": 0.125,
+        "positive_eligible_count": 2,
+        "searched_null_count": 0,
+        "searched_null_eligible_count": 0
+      },
+      "holdout_2024": {
+        "eligible_pairwise_auc": null,
+        "positive_count": 3,
+        "positive_eligibility_recall": 0.0,
+        "positive_eligible_count": 0,
+        "searched_null_count": 3,
+        "searched_null_eligible_count": 3
+      }
+    }
+  },
+  "coefficient_promotion_gate": {
+    "coefficient_update_authorized": false,
+    "decision": "retain_transparent_v1_prior",
+    "minimum_positive_per_mode": 20,
+    "minimum_searched_null_per_mode": 20,
+    "observed_counts": {
+      "aten": {
+        "positive": 1,
+        "searched_null": 6
+      },
+      "ieo": {
+        "positive": 7,
+        "searched_null": 3
+      }
+    }
+  },
+  "limitations": [
+    "Searched nulls are top-selected fields, not random or bottom-ranked controls.",
+    "Non-I41 positives establish discovery geometry but are not ZTF source-aligned.",
+    "The I41 subset is too small for coefficient fitting or probability calibration.",
+    "Pairwise AUC is a diagnostic ordering statistic, not discovery-yield validation."
+  ],
+  "policy": {
+    "coefficient_status": "uncalibrated_transparent_prior",
+    "limitations": [
+      "Exact coefficients are explicit operator priors, not fitted literature coefficients.",
+      "This policy must be calibrated against leakage-safe historical discovery or recovery outcomes before Phase 2 can close.",
+      "The policy is deterministic and explainable but is not a calibrated probability model."
+    ],
+    "path": "data_selection/ranking_policies/ztf_field_ranking_v1.json",
+    "policy_id": "ztf-field-ranking-v1",
+    "schema_version": "ztf-field-ranking-policy-v1",
+    "sha256": "27c4b3776088eb09acc8061aae1aee271121c106ccf808d4e88a501d92a4363f"
+  },
+  "records": [
+    {
+      "cohort_year": 2018,
+      "dec_deg": 26.37511,
+      "features": {
+        "ecliptic_latitude_deg": 11.806692,
+        "eligible": false,
+        "elongation_deg": 150.722782,
+        "geometry_score": 0.0,
+        "hours_visible": 10.0,
+        "novelty_score": 1.0,
+        "population_score": 0.561879,
+        "score": 0.563564,
+        "survey_scarcity_score": 0.700001
+      },
+      "outcome": "positive",
+      "ra_deg": 145.27988,
+      "ranking_jd": 2458130.83089,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2018 AS2",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2018,
+      "dec_deg": 22.03575,
+      "features": {
+        "ecliptic_latitude_deg": 0.651904,
+        "eligible": false,
+        "elongation_deg": 152.29492,
+        "geometry_score": 0.0,
+        "hours_visible": 9.836754,
+        "novelty_score": 1.0,
+        "population_score": 0.82997,
+        "score": 0.643991,
+        "survey_scarcity_score": 0.700001
+      },
+      "outcome": "positive",
+      "ra_deg": 64.51696,
+      "ranking_jd": 2458424.04865,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2018 VG",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2018,
+      "dec_deg": 17.12192,
+      "features": {
+        "ecliptic_latitude_deg": 3.942736,
+        "eligible": false,
+        "elongation_deg": 170.236341,
+        "geometry_score": 0.0,
+        "hours_visible": 9.457995,
+        "novelty_score": 1.0,
+        "population_score": 0.737126,
+        "score": 0.616138,
+        "survey_scarcity_score": 0.7
+      },
+      "outcome": "positive",
+      "ra_deg": 31.98312,
+      "ranking_jd": 2458411.93196,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2018 UV1",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2018,
+      "dec_deg": 20.28542,
+      "features": {
+        "ecliptic_latitude_deg": -1.685579,
+        "eligible": false,
+        "elongation_deg": 171.99969,
+        "geometry_score": 0.0,
+        "hours_visible": 9.703471,
+        "novelty_score": 1.0,
+        "population_score": 0.79936,
+        "score": 0.634808,
+        "survey_scarcity_score": 0.7
+      },
+      "outcome": "positive",
+      "ra_deg": 68.65071,
+      "ranking_jd": 2458462.7423,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2018 XQ2",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2018,
+      "dec_deg": 58.44897,
+      "features": {
+        "ecliptic_latitude_deg": 74.313285,
+        "eligible": true,
+        "elongation_deg": 75.781645,
+        "geometry_score": 0.96827,
+        "hours_visible": 10.0,
+        "novelty_score": 1.0,
+        "population_score": 0.110946,
+        "score": 0.705631,
+        "survey_scarcity_score": 0.939122
+      },
+      "outcome": "positive",
+      "ra_deg": 240.35712,
+      "ranking_jd": 2458376.76778,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2018 RP8",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2018,
+      "dec_deg": -0.42881,
+      "features": {
+        "ecliptic_latitude_deg": -2.408853,
+        "eligible": false,
+        "elongation_deg": 143.960759,
+        "geometry_score": 0.0,
+        "hours_visible": 7.903418,
+        "novelty_score": 1.0,
+        "population_score": 0.778749,
+        "score": 0.628628,
+        "survey_scarcity_score": 0.700009
+      },
+      "outcome": "positive",
+      "ra_deg": 5.07171,
+      "ranking_jd": 2458425.7053,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2018 VS3",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2018,
+      "dec_deg": -23.89772,
+      "features": {
+        "ecliptic_latitude_deg": -19.297665,
+        "eligible": false,
+        "elongation_deg": 132.559991,
+        "geometry_score": 0.0,
+        "hours_visible": 4.309097,
+        "novelty_score": 1.0,
+        "population_score": 0.440813,
+        "score": 0.527332,
+        "survey_scarcity_score": 0.70025
+      },
+      "outcome": "positive",
+      "ra_deg": 186.505,
+      "ranking_jd": 2458259.82633,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2018 KD2",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2018,
+      "dec_deg": 2.58886,
+      "features": {
+        "ecliptic_latitude_deg": 23.351533,
+        "eligible": false,
+        "elongation_deg": 156.231372,
+        "geometry_score": 0.0,
+        "hours_visible": 8.203812,
+        "novelty_score": 1.0,
+        "population_score": 0.389057,
+        "score": 0.511717,
+        "survey_scarcity_score": 0.7
+      },
+      "outcome": "positive",
+      "ra_deg": 243.27746,
+      "ranking_jd": 2458255.83896,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2018 KR",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2019,
+      "dec_deg": 50.51005,
+      "features": {
+        "ecliptic_latitude_deg": 37.202631,
+        "eligible": false,
+        "elongation_deg": 135.72075,
+        "geometry_score": 0.0,
+        "hours_visible": 10.0,
+        "novelty_score": 1.0,
+        "population_score": 0.262276,
+        "score": 0.47372,
+        "survey_scarcity_score": 0.700106
+      },
+      "outcome": "positive",
+      "ra_deg": 155.868837,
+      "ranking_jd": 2458495.084,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2019 AP11",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2019,
+      "dec_deg": 65.301,
+      "features": {
+        "ecliptic_latitude_deg": 45.755798,
+        "eligible": false,
+        "elongation_deg": 119.234894,
+        "geometry_score": 0.0,
+        "hours_visible": 10.0,
+        "novelty_score": 1.0,
+        "population_score": 0.210354,
+        "score": 0.459971,
+        "survey_scarcity_score": 0.705328
+      },
+      "outcome": "positive",
+      "ra_deg": 135.173,
+      "ranking_jd": 2458819.84091,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2019 XQ",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2019,
+      "dec_deg": -23.054467,
+      "features": {
+        "ecliptic_latitude_deg": -10.814282,
+        "eligible": false,
+        "elongation_deg": 143.427724,
+        "geometry_score": 0.0,
+        "hours_visible": 4.519492,
+        "novelty_score": 1.0,
+        "population_score": 0.580914,
+        "score": 0.569278,
+        "survey_scarcity_score": 0.700011
+      },
+      "outcome": "positive",
+      "ra_deg": 207.970742,
+      "ranking_jd": 2458634.8187259953,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2019 KJ4",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2019,
+      "dec_deg": -22.43125,
+      "features": {
+        "ecliptic_latitude_deg": -9.505479,
+        "eligible": false,
+        "elongation_deg": 170.483552,
+        "geometry_score": 0.0,
+        "hours_visible": 4.666971,
+        "novelty_score": 1.0,
+        "population_score": 0.60726,
+        "score": 0.577178,
+        "survey_scarcity_score": 0.7
+      },
+      "outcome": "positive",
+      "ra_deg": 210.19913,
+      "ranking_jd": 2458599.76586,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2019 HP3",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2019,
+      "dec_deg": 7.31572,
+      "features": {
+        "ecliptic_latitude_deg": -9.515869,
+        "eligible": false,
+        "elongation_deg": 149.208565,
+        "geometry_score": 0.0,
+        "hours_visible": 8.641443,
+        "novelty_score": 1.0,
+        "population_score": 0.607045,
+        "score": 0.577114,
+        "survey_scarcity_score": 0.700002
+      },
+      "outcome": "positive",
+      "ra_deg": 134.3455,
+      "ranking_jd": 2458547.73495,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2019 ED1",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2019,
+      "dec_deg": -14.356671,
+      "features": {
+        "ecliptic_latitude_deg": -19.450629,
+        "eligible": false,
+        "elongation_deg": 151.267114,
+        "geometry_score": 0.0,
+        "hours_visible": 6.174563,
+        "novelty_score": 1.0,
+        "population_score": 0.438705,
+        "score": 0.526612,
+        "survey_scarcity_score": 0.700001
+      },
+      "outcome": "positive",
+      "ra_deg": 15.888638,
+      "ranking_jd": 2458780.8995219907,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2019 UU7",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2019,
+      "dec_deg": 14.33806,
+      "features": {
+        "ecliptic_latitude_deg": -0.070213,
+        "eligible": false,
+        "elongation_deg": 178.808932,
+        "geometry_score": 0.0,
+        "hours_visible": 9.235923,
+        "novelty_score": 1.0,
+        "population_score": 0.847815,
+        "score": 0.649345,
+        "survey_scarcity_score": 0.7
+      },
+      "outcome": "positive",
+      "ra_deg": 143.64854,
+      "ranking_jd": 2458523.92502,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2019 CR4",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2019,
+      "dec_deg": 13.94067,
+      "features": {
+        "ecliptic_latitude_deg": -6.489985,
+        "eligible": false,
+        "elongation_deg": 158.740841,
+        "geometry_score": 0.0,
+        "hours_visible": 9.203683,
+        "novelty_score": 1.0,
+        "population_score": 0.673816,
+        "score": 0.597145,
+        "survey_scarcity_score": 0.7
+      },
+      "outcome": "positive",
+      "ra_deg": 59.91933,
+      "ranking_jd": 2458790.90478,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2019 VW",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2020,
+      "dec_deg": -10.60896,
+      "features": {
+        "ecliptic_latitude_deg": -3.563642,
+        "eligible": false,
+        "elongation_deg": 135.246649,
+        "geometry_score": 0.0,
+        "hours_visible": 6.713614,
+        "novelty_score": 1.0,
+        "population_score": 0.747157,
+        "score": 0.61919,
+        "survey_scarcity_score": 0.700121
+      },
+      "outcome": "positive",
+      "ra_deg": 344.154255,
+      "ranking_jd": 2459141.6969595947,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2020 UE2",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2020,
+      "dec_deg": -27.31025,
+      "features": {
+        "ecliptic_latitude_deg": -40.929819,
+        "eligible": false,
+        "elongation_deg": 133.692765,
+        "geometry_score": 0.0,
+        "hours_visible": 3.277811,
+        "novelty_score": 1.0,
+        "population_score": 0.237763,
+        "score": 0.466394,
+        "survey_scarcity_score": 0.700185
+      },
+      "outcome": "positive",
+      "ra_deg": 41.49777,
+      "ranking_jd": 2459167.8623850695,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2020 VT4",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2020,
+      "dec_deg": -7.74981,
+      "features": {
+        "ecliptic_latitude_deg": 10.109768,
+        "eligible": false,
+        "elongation_deg": 154.543213,
+        "geometry_score": 0.0,
+        "hours_visible": 7.081933,
+        "novelty_score": 1.0,
+        "population_score": 0.594915,
+        "score": 0.573475,
+        "survey_scarcity_score": 0.7
+      },
+      "outcome": "positive",
+      "ra_deg": 229.39833,
+      "ranking_jd": 2458954.89078,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2020 GZ2",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2020,
+      "dec_deg": 33.55408,
+      "features": {
+        "ecliptic_latitude_deg": 12.976884,
+        "eligible": false,
+        "elongation_deg": 162.137691,
+        "geometry_score": 0.0,
+        "hours_visible": 10.0,
+        "novelty_score": 1.0,
+        "population_score": 0.540424,
+        "score": 0.557127,
+        "survey_scarcity_score": 0.7
+      },
+      "outcome": "positive",
+      "ra_deg": 58.470765,
+      "ranking_jd": 2459166.777845822,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2020 VP4",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2020,
+      "dec_deg": -10.72378,
+      "features": {
+        "ecliptic_latitude_deg": -25.099087,
+        "eligible": false,
+        "elongation_deg": 154.72817,
+        "geometry_score": 0.0,
+        "hours_visible": 6.69812,
+        "novelty_score": 1.0,
+        "population_score": 0.369167,
+        "score": 0.50575,
+        "survey_scarcity_score": 0.7
+      },
+      "outcome": "positive",
+      "ra_deg": 139.56917,
+      "ranking_jd": 2458897.73124,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2020 DX1",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2020,
+      "dec_deg": -23.25028,
+      "features": {
+        "ecliptic_latitude_deg": -31.796146,
+        "eligible": false,
+        "elongation_deg": 108.072566,
+        "geometry_score": 0.0,
+        "hours_visible": 4.471801,
+        "novelty_score": 1.0,
+        "population_score": 0.304161,
+        "score": 0.498449,
+        "survey_scarcity_score": 0.734858
+      },
+      "outcome": "positive",
+      "ra_deg": 26.78952,
+      "ranking_jd": 2459060.0771122687,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2020 OT6",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2020,
+      "dec_deg": -14.0127,
+      "features": {
+        "ecliptic_latitude_deg": -2.289481,
+        "eligible": false,
+        "elongation_deg": 147.514959,
+        "geometry_score": 0.0,
+        "hours_visible": 6.227177,
+        "novelty_score": 1.0,
+        "population_score": 0.782107,
+        "score": 0.629633,
+        "survey_scarcity_score": 0.700003
+      },
+      "outcome": "positive",
+      "ra_deg": 331.828365,
+      "ranking_jd": 2459116.6634408333,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2020 SN4",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2020,
+      "dec_deg": -6.37536,
+      "features": {
+        "ecliptic_latitude_deg": -26.983869,
+        "eligible": false,
+        "elongation_deg": 139.76492,
+        "geometry_score": 0.0,
+        "hours_visible": 7.248212,
+        "novelty_score": 1.0,
+        "population_score": 0.349171,
+        "score": 0.499763,
+        "survey_scarcity_score": 0.700033
+      },
+      "outcome": "positive",
+      "ra_deg": 62.882325,
+      "ranking_jd": 2459205.697499537,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2020 YK3",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2021,
+      "dec_deg": 13.102082,
+      "features": {
+        "ecliptic_latitude_deg": 16.443807,
+        "eligible": false,
+        "elongation_deg": 157.264054,
+        "geometry_score": 0.0,
+        "hours_visible": 9.135164,
+        "novelty_score": 1.0,
+        "population_score": 0.482625,
+        "score": 0.539788,
+        "survey_scarcity_score": 0.7
+      },
+      "outcome": "positive",
+      "ra_deg": 348.823644,
+      "ranking_jd": 2459491.7722407407,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2021 TE3",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2021,
+      "dec_deg": -15.80903,
+      "features": {
+        "ecliptic_latitude_deg": 0.265229,
+        "eligible": false,
+        "elongation_deg": 125.436992,
+        "geometry_score": 0.0,
+        "hours_visible": 5.944273,
+        "novelty_score": 1.0,
+        "population_score": 0.841782,
+        "score": 0.648036,
+        "survey_scarcity_score": 0.701434
+      },
+      "outcome": "positive",
+      "ra_deg": 318.30483,
+      "ranking_jd": 2459377.9138,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2021 LF6",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2021,
+      "dec_deg": -35.24914,
+      "features": {
+        "ecliptic_latitude_deg": -12.259022,
+        "eligible": false,
+        "elongation_deg": 144.986346,
+        "geometry_score": 0.0,
+        "hours_visible": 0.0,
+        "novelty_score": 1.0,
+        "population_score": 0.553462,
+        "score": 0.561041,
+        "survey_scarcity_score": 0.700006
+      },
+      "outcome": "positive",
+      "ra_deg": 282.47329,
+      "ranking_jd": 2459432.48639,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2021 PH2",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2021,
+      "dec_deg": 27.13299,
+      "features": {
+        "ecliptic_latitude_deg": 12.856063,
+        "eligible": false,
+        "elongation_deg": 123.246066,
+        "geometry_score": 0.0,
+        "hours_visible": 10.0,
+        "novelty_score": 1.0,
+        "population_score": 0.542591,
+        "score": 0.558593,
+        "survey_scarcity_score": 0.70233
+      },
+      "outcome": "positive",
+      "ra_deg": 33.603915,
+      "ranking_jd": 2459464.9392495253,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2021 RY3",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2021,
+      "dec_deg": 19.35383,
+      "features": {
+        "ecliptic_latitude_deg": 20.448188,
+        "eligible": false,
+        "elongation_deg": 111.271022,
+        "geometry_score": 0.0,
+        "hours_visible": 9.631846,
+        "novelty_score": 1.0,
+        "population_score": 0.425268,
+        "score": 0.530171,
+        "survey_scarcity_score": 0.721688
+      },
+      "outcome": "positive",
+      "ra_deg": 353.066385,
+      "ranking_jd": 2459549.6920417477,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2021 XM",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2021,
+      "dec_deg": 1.21516,
+      "features": {
+        "ecliptic_latitude_deg": 1.069494,
+        "eligible": false,
+        "elongation_deg": 167.245224,
+        "geometry_score": 0.0,
+        "hours_visible": 8.069348,
+        "novelty_score": 1.0,
+        "population_score": 0.817437,
+        "score": 0.640231,
+        "survey_scarcity_score": 0.7
+      },
+      "outcome": "positive",
+      "ra_deg": 179.88591,
+      "ranking_jd": 2459280.860926042,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2021 EH2",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2021,
+      "dec_deg": 36.3564,
+      "features": {
+        "ecliptic_latitude_deg": 59.780382,
+        "eligible": false,
+        "elongation_deg": 118.52628,
+        "geometry_score": 0.0,
+        "hours_visible": 10.0,
+        "novelty_score": 1.0,
+        "population_score": 0.151209,
+        "score": 0.442503,
+        "survey_scarcity_score": 0.706115
+      },
+      "outcome": "positive",
+      "ra_deg": 268.339425,
+      "ranking_jd": 2459364.9132371643,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2021 KD16",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2021,
+      "dec_deg": 9.738915,
+      "features": {
+        "ecliptic_latitude_deg": 31.050902,
+        "eligible": false,
+        "elongation_deg": 104.907081,
+        "geometry_score": 0.0,
+        "hours_visible": 8.853051,
+        "novelty_score": 1.0,
+        "population_score": 0.310611,
+        "score": 0.506738,
+        "survey_scarcity_score": 0.753014
+      },
+      "outcome": "positive",
+      "ra_deg": 246.8955,
+      "ranking_jd": 2459434.8181678243,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2021 PE9",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2022,
+      "dec_deg": 26.90645,
+      "features": {
+        "ecliptic_latitude_deg": 32.164674,
+        "eligible": false,
+        "elongation_deg": 106.934843,
+        "geometry_score": 0.0,
+        "hours_visible": 10.0,
+        "novelty_score": 1.0,
+        "population_score": 0.301036,
+        "score": 0.499577,
+        "survey_scarcity_score": 0.740762
+      },
+      "outcome": "positive",
+      "ra_deg": 340.713225,
+      "ranking_jd": 2459766.8935950925,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2022 NV",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2022,
+      "dec_deg": 11.075556,
+      "features": {
+        "ecliptic_latitude_deg": 11.440617,
+        "eligible": false,
+        "elongation_deg": 145.897196,
+        "geometry_score": 0.0,
+        "hours_visible": 8.966662,
+        "novelty_score": 1.0,
+        "population_score": 0.568809,
+        "score": 0.565644,
+        "survey_scarcity_score": 0.700005
+      },
+      "outcome": "positive",
+      "ra_deg": 183.245561,
+      "ranking_jd": 2459690.7971377317,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2022 HK",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2022,
+      "dec_deg": 16.94658,
+      "features": {
+        "ecliptic_latitude_deg": -3.319982,
+        "eligible": false,
+        "elongation_deg": 152.182899,
+        "geometry_score": 0.0,
+        "hours_visible": 9.44419,
+        "novelty_score": 1.0,
+        "population_score": 0.753692,
+        "score": 0.621108,
+        "survey_scarcity_score": 0.700001
+      },
+      "outcome": "positive",
+      "ra_deg": 58.76217,
+      "ranking_jd": 2459878.8365156017,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2022 UB11",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2022,
+      "dec_deg": 12.860778,
+      "features": {
+        "ecliptic_latitude_deg": 29.444291,
+        "eligible": false,
+        "elongation_deg": 150.45776,
+        "geometry_score": 0.0,
+        "hours_visible": 9.115322,
+        "novelty_score": 1.0,
+        "population_score": 0.325142,
+        "score": 0.492543,
+        "survey_scarcity_score": 0.700001
+      },
+      "outcome": "positive",
+      "ra_deg": 227.81725,
+      "ranking_jd": 2459698.856497928,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2022 HR3",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2022,
+      "dec_deg": -1.333653,
+      "features": {
+        "ecliptic_latitude_deg": 20.297484,
+        "eligible": false,
+        "elongation_deg": 120.994477,
+        "geometry_score": 0.0,
+        "hours_visible": 7.80957,
+        "novelty_score": 1.0,
+        "population_score": 0.427264,
+        "score": 0.52449,
+        "survey_scarcity_score": 0.703744
+      },
+      "outcome": "positive",
+      "ra_deg": 247.822089,
+      "ranking_jd": 2459786.776888889,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2022 OZ1",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2022,
+      "dec_deg": 12.40753,
+      "features": {
+        "ecliptic_latitude_deg": -9.399304,
+        "eligible": false,
+        "elongation_deg": 108.257221,
+        "geometry_score": 0.0,
+        "hours_visible": 9.077894,
+        "novelty_score": 1.0,
+        "population_score": 0.609462,
+        "score": 0.589726,
+        "survey_scarcity_score": 0.733963
+      },
+      "outcome": "positive",
+      "ra_deg": 68.09817,
+      "ranking_jd": 2459842.6384,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2022 SW3",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2022,
+      "dec_deg": -27.105414,
+      "features": {
+        "ecliptic_latitude_deg": -10.496054,
+        "eligible": false,
+        "elongation_deg": 124.317809,
+        "geometry_score": 0.0,
+        "hours_visible": 3.350887,
+        "novelty_score": 1.0,
+        "population_score": 0.587187,
+        "score": 0.571801,
+        "survey_scarcity_score": 0.701843
+      },
+      "outcome": "positive",
+      "ra_deg": 318.232204,
+      "ranking_jd": 2459739.0775405094,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2022 LA3",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2022,
+      "dec_deg": -6.18422,
+      "features": {
+        "ecliptic_latitude_deg": -11.731204,
+        "eligible": false,
+        "elongation_deg": 140.001368,
+        "geometry_score": 0.0,
+        "hours_visible": 7.270838,
+        "novelty_score": 1.0,
+        "population_score": 0.563299,
+        "score": 0.564001,
+        "survey_scarcity_score": 0.700031
+      },
+      "outcome": "positive",
+      "ra_deg": 164.68011,
+      "ranking_jd": 2459609.5525199072,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2022 BU4",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2023,
+      "dec_deg": 23.883,
+      "features": {
+        "ecliptic_latitude_deg": 31.81462,
+        "eligible": false,
+        "elongation_deg": 126.900836,
+        "geometry_score": 0.0,
+        "hours_visible": 9.975856,
+        "novelty_score": 1.0,
+        "population_score": 0.304003,
+        "score": 0.486559,
+        "survey_scarcity_score": 0.701022
+      },
+      "outcome": "positive",
+      "ra_deg": 334.65225,
+      "ranking_jd": 2460150.46354,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2023 OH2",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2023,
+      "dec_deg": 14.199769,
+      "features": {
+        "ecliptic_latitude_deg": 0.25274,
+        "eligible": false,
+        "elongation_deg": 160.172721,
+        "geometry_score": 0.0,
+        "hours_visible": 9.22472,
+        "novelty_score": 1.0,
+        "population_score": 0.842167,
+        "score": 0.64765,
+        "survey_scarcity_score": 0.7
+      },
+      "outcome": "positive",
+      "ra_deg": 145.096855,
+      "ranking_jd": 2459967.953908565,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2023 BC2",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2023,
+      "dec_deg": 30.89321,
+      "features": {
+        "ecliptic_latitude_deg": 18.554009,
+        "eligible": false,
+        "elongation_deg": 116.143544,
+        "geometry_score": 0.0,
+        "hours_visible": 10.0,
+        "novelty_score": 1.0,
+        "population_score": 0.451249,
+        "score": 0.533714,
+        "survey_scarcity_score": 0.709541
+      },
+      "outcome": "positive",
+      "ra_deg": 26.60633,
+      "ranking_jd": 2460184.0183417825,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2023 QL7",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2023,
+      "dec_deg": 39.95792,
+      "features": {
+        "ecliptic_latitude_deg": 25.606189,
+        "eligible": false,
+        "elongation_deg": 124.578076,
+        "geometry_score": 0.0,
+        "hours_visible": 10.0,
+        "novelty_score": 1.0,
+        "population_score": 0.363644,
+        "score": 0.504702,
+        "survey_scarcity_score": 0.701739
+      },
+      "outcome": "positive",
+      "ra_deg": 148.997805,
+      "ranking_jd": 2460296.8162399307,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2023 YT",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2023,
+      "dec_deg": -1.814944,
+      "features": {
+        "ecliptic_latitude_deg": 16.725079,
+        "eligible": false,
+        "elongation_deg": 151.719362,
+        "geometry_score": 0.0,
+        "hours_visible": 7.758876,
+        "novelty_score": 1.0,
+        "population_score": 0.478286,
+        "score": 0.538486,
+        "survey_scarcity_score": 0.700001
+      },
+      "outcome": "positive",
+      "ra_deg": 232.837,
+      "ranking_jd": 2460052.8953804746,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2023 HR1",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2023,
+      "dec_deg": 28.98308,
+      "features": {
+        "ecliptic_latitude_deg": 32.62601,
+        "eligible": false,
+        "elongation_deg": 146.101042,
+        "geometry_score": 0.0,
+        "hours_visible": 10.0,
+        "novelty_score": 1.0,
+        "population_score": 0.297184,
+        "score": 0.484157,
+        "survey_scarcity_score": 0.700005
+      },
+      "outcome": "positive",
+      "ra_deg": 344.22683,
+      "ranking_jd": 2460219.30592,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2023 TA",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2023,
+      "dec_deg": 29.04736,
+      "features": {
+        "ecliptic_latitude_deg": 34.129879,
+        "eligible": false,
+        "elongation_deg": 137.811258,
+        "geometry_score": 0.0,
+        "hours_visible": 10.0,
+        "novelty_score": 1.0,
+        "population_score": 0.285069,
+        "score": 0.480541,
+        "survey_scarcity_score": 0.700059
+      },
+      "outcome": "positive",
+      "ra_deg": 199.41683,
+      "ranking_jd": 2460056.78681,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2023 HT3",
+      "source_aligned_ztf_i41": true
+    },
+    {
+      "cohort_year": 2023,
+      "dec_deg": 37.235472,
+      "features": {
+        "ecliptic_latitude_deg": 34.809731,
+        "eligible": false,
+        "elongation_deg": 136.608064,
+        "geometry_score": 0.0,
+        "hours_visible": 10.0,
+        "novelty_score": 1.0,
+        "population_score": 0.279806,
+        "score": 0.478971,
+        "survey_scarcity_score": 0.700083
+      },
+      "outcome": "positive",
+      "ra_deg": 357.159875,
+      "ranking_jd": 2460253.6904038657,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2023 VC2",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2024,
+      "dec_deg": -22.542775,
+      "features": {
+        "ecliptic_latitude_deg": -26.599173,
+        "eligible": false,
+        "elongation_deg": 144.364177,
+        "geometry_score": 0.0,
+        "hours_visible": 4.641042,
+        "novelty_score": 1.0,
+        "population_score": 0.353136,
+        "score": 0.500943,
+        "survey_scarcity_score": 0.700008
+      },
+      "outcome": "positive",
+      "ra_deg": 15.148944,
+      "ranking_jd": 2460605.8357349536,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2024 UB1",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2024,
+      "dec_deg": 13.559528,
+      "features": {
+        "ecliptic_latitude_deg": 6.929016,
+        "eligible": false,
+        "elongation_deg": 161.090924,
+        "geometry_score": 0.0,
+        "hours_visible": 9.172624,
+        "novelty_score": 1.0,
+        "population_score": 0.663587,
+        "score": 0.594076,
+        "survey_scarcity_score": 0.7
+      },
+      "outcome": "positive",
+      "ra_deg": 14.140583,
+      "ranking_jd": 2460612.69309162,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2024 UV7",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2024,
+      "dec_deg": 12.620051,
+      "features": {
+        "ecliptic_latitude_deg": -9.820291,
+        "eligible": false,
+        "elongation_deg": 153.465844,
+        "geometry_score": 0.0,
+        "hours_visible": 9.095469,
+        "novelty_score": 1.0,
+        "population_score": 0.60079,
+        "score": 0.575237,
+        "survey_scarcity_score": 0.7
+      },
+      "outcome": "positive",
+      "ra_deg": 72.903441,
+      "ranking_jd": 2460625.0603981484,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2024 VK3",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2024,
+      "dec_deg": 13.27194,
+      "features": {
+        "ecliptic_latitude_deg": -9.203595,
+        "eligible": false,
+        "elongation_deg": 153.1146,
+        "geometry_score": 0.0,
+        "hours_visible": 9.149097,
+        "novelty_score": 1.0,
+        "population_score": 0.613546,
+        "score": 0.579064,
+        "survey_scarcity_score": 0.7
+      },
+      "outcome": "positive",
+      "ra_deg": 73.170825,
+      "ranking_jd": 2460624.8033203357,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2024 VC3",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2024,
+      "dec_deg": -30.12411,
+      "features": {
+        "ecliptic_latitude_deg": -44.576744,
+        "eligible": false,
+        "elongation_deg": 134.410187,
+        "geometry_score": 0.0,
+        "hours_visible": 1.969889,
+        "novelty_score": 1.0,
+        "population_score": 0.216645,
+        "score": 0.460047,
+        "survey_scarcity_score": 0.700153
+      },
+      "outcome": "positive",
+      "ra_deg": 44.559,
+      "ranking_jd": 2460617.6515136575,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2024 VD1",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2024,
+      "dec_deg": 7.788469,
+      "features": {
+        "ecliptic_latitude_deg": 17.621864,
+        "eligible": false,
+        "elongation_deg": 149.976645,
+        "geometry_score": 0.0,
+        "hours_visible": 8.683336,
+        "novelty_score": 1.0,
+        "population_score": 0.464779,
+        "score": 0.534434,
+        "survey_scarcity_score": 0.700001
+      },
+      "outcome": "positive",
+      "ra_deg": 333.085022,
+      "ranking_jd": 2460528.043578704,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2024 PJ1",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2024,
+      "dec_deg": 33.89143,
+      "features": {
+        "ecliptic_latitude_deg": 54.746185,
+        "eligible": false,
+        "elongation_deg": 124.793693,
+        "geometry_score": 0.0,
+        "hours_visible": 10.0,
+        "novelty_score": 1.0,
+        "population_score": 0.169545,
+        "score": 0.446444,
+        "survey_scarcity_score": 0.701657
+      },
+      "outcome": "positive",
+      "ra_deg": 247.47153,
+      "ranking_jd": 2460456.8592235646,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2024 KL",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2024,
+      "dec_deg": 3.80686,
+      "features": {
+        "ecliptic_latitude_deg": 26.659867,
+        "eligible": false,
+        "elongation_deg": 153.309387,
+        "geometry_score": 0.0,
+        "hours_visible": 8.320103,
+        "novelty_score": 1.0,
+        "population_score": 0.352506,
+        "score": 0.500752,
+        "survey_scarcity_score": 0.7
+      },
+      "outcome": "positive",
+      "ra_deg": 257.692815,
+      "ranking_jd": 2460466.8581965393,
+      "ranking_mode": "aten",
+      "record_id": "mpc-discovery-observation:2024 LB1",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2018,
+      "dec_deg": 37.50431,
+      "features": {
+        "ecliptic_latitude_deg": 37.498107,
+        "eligible": false,
+        "elongation_deg": 54.673907,
+        "geometry_score": 0.0,
+        "hours_visible": 10.0,
+        "novelty_score": 1.0,
+        "population_score": 0.296949,
+        "score": 0.571585,
+        "survey_scarcity_score": 0.95
+      },
+      "outcome": "positive",
+      "ra_deg": 350.85504,
+      "ranking_jd": 2458251.95551,
+      "ranking_mode": "ieo",
+      "record_id": "mpc-discovery-observation:2018 JB3",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2019,
+      "dec_deg": 0.35289,
+      "features": {
+        "ecliptic_latitude_deg": 13.297964,
+        "eligible": false,
+        "elongation_deg": 46.431165,
+        "geometry_score": 0.0,
+        "hours_visible": 7.983029,
+        "novelty_score": 1.0,
+        "population_score": 0.610207,
+        "score": 0.665562,
+        "survey_scarcity_score": 0.95
+      },
+      "outcome": "positive",
+      "ra_deg": 325.66325,
+      "ranking_jd": 2458487.5792002315,
+      "ranking_mode": "ieo",
+      "record_id": "mpc-discovery-observation:2019 AQ3",
+      "source_aligned_ztf_i41": true
+    },
+    {
+      "cohort_year": 2019,
+      "dec_deg": 47.34783,
+      "features": {
+        "ecliptic_latitude_deg": 28.161601,
+        "eligible": false,
+        "elongation_deg": 48.789204,
+        "geometry_score": 0.0,
+        "hours_visible": 10.0,
+        "novelty_score": 1.0,
+        "population_score": 0.385021,
+        "score": 0.598006,
+        "survey_scarcity_score": 0.95
+      },
+      "outcome": "positive",
+      "ra_deg": 131.1855,
+      "ranking_jd": 2458644.6723029977,
+      "ranking_mode": "ieo",
+      "record_id": "mpc-discovery-observation:2019 LF6",
+      "source_aligned_ztf_i41": true
+    },
+    {
+      "cohort_year": 2020,
+      "dec_deg": -6.14494,
+      "features": {
+        "ecliptic_latitude_deg": 8.601612,
+        "eligible": true,
+        "elongation_deg": 39.530944,
+        "geometry_score": 0.805341,
+        "hours_visible": 7.275473,
+        "novelty_score": 1.0,
+        "population_score": 0.714745,
+        "score": 0.857992,
+        "survey_scarcity_score": 0.95
+      },
+      "outcome": "positive",
+      "ra_deg": 321.20792,
+      "ranking_jd": 2458852.5770694446,
+      "ranking_mode": "ieo",
+      "record_id": "mpc-discovery-observation:2020 AV2",
+      "source_aligned_ztf_i41": true
+    },
+    {
+      "cohort_year": 2020,
+      "dec_deg": 10.466,
+      "features": {
+        "ecliptic_latitude_deg": 18.30197,
+        "eligible": false,
+        "elongation_deg": 56.742765,
+        "geometry_score": 0.0,
+        "hours_visible": 8.915109,
+        "novelty_score": 1.0,
+        "population_score": 0.519072,
+        "score": 0.638222,
+        "survey_scarcity_score": 0.95
+      },
+      "outcome": "positive",
+      "ra_deg": 337.86854,
+      "ranking_jd": 2458967.96153,
+      "ranking_mode": "ieo",
+      "record_id": "mpc-discovery-observation:2020 HA10",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2020,
+      "dec_deg": 46.63564,
+      "features": {
+        "ecliptic_latitude_deg": 24.381015,
+        "eligible": false,
+        "elongation_deg": 48.20106,
+        "geometry_score": 0.0,
+        "hours_visible": 10.0,
+        "novelty_score": 1.0,
+        "population_score": 0.430425,
+        "score": 0.611627,
+        "survey_scarcity_score": 0.95
+      },
+      "outcome": "positive",
+      "ra_deg": 68.54896,
+      "ranking_jd": 2459049.9708298612,
+      "ranking_mode": "ieo",
+      "record_id": "mpc-discovery-observation:2020 OV1",
+      "source_aligned_ztf_i41": true
+    },
+    {
+      "cohort_year": 2021,
+      "dec_deg": 49.07458,
+      "features": {
+        "ecliptic_latitude_deg": 25.878232,
+        "eligible": false,
+        "elongation_deg": 53.141922,
+        "geometry_score": 0.0,
+        "hours_visible": 10.0,
+        "novelty_score": 1.0,
+        "population_score": 0.411651,
+        "score": 0.605995,
+        "survey_scarcity_score": 0.95
+      },
+      "outcome": "positive",
+      "ra_deg": 80.17846,
+      "ranking_jd": 2459429.977519676,
+      "ranking_mode": "ieo",
+      "record_id": "mpc-discovery-observation:2021 PB2",
+      "source_aligned_ztf_i41": true
+    },
+    {
+      "cohort_year": 2021,
+      "dec_deg": 6.69336,
+      "features": {
+        "ecliptic_latitude_deg": 29.618693,
+        "eligible": false,
+        "elongation_deg": 49.325291,
+        "geometry_score": 0.0,
+        "hours_visible": 8.585813,
+        "novelty_score": 1.0,
+        "population_score": 0.369196,
+        "score": 0.593259,
+        "survey_scarcity_score": 0.95
+      },
+      "outcome": "positive",
+      "ra_deg": 258.61167,
+      "ranking_jd": 2459233.0716400463,
+      "ranking_mode": "ieo",
+      "record_id": "mpc-discovery-observation:2021 BS1",
+      "source_aligned_ztf_i41": true
+    },
+    {
+      "cohort_year": 2021,
+      "dec_deg": 10.793175,
+      "features": {
+        "ecliptic_latitude_deg": -8.800876,
+        "eligible": false,
+        "elongation_deg": 48.017621,
+        "geometry_score": 0.0,
+        "hours_visible": 8.942832,
+        "novelty_score": 1.0,
+        "population_score": 0.709878,
+        "score": 0.695463,
+        "survey_scarcity_score": 0.95
+      },
+      "outcome": "positive",
+      "ra_deg": 123.770117,
+      "ranking_jd": 2459372.45171,
+      "ranking_mode": "ieo",
+      "record_id": "mpc-discovery-observation:2021 LJ4",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2021,
+      "dec_deg": -2.152977,
+      "features": {
+        "ecliptic_latitude_deg": -3.285668,
+        "eligible": true,
+        "elongation_deg": 36.846615,
+        "geometry_score": 0.917331,
+        "hours_visible": 7.722938,
+        "novelty_score": 1.0,
+        "population_score": 0.861152,
+        "score": 0.924312,
+        "survey_scarcity_score": 0.95
+      },
+      "outcome": "positive",
+      "ra_deg": 176.705036,
+      "ranking_jd": 2459440.4676973377,
+      "ranking_mode": "ieo",
+      "record_id": "mpc-discovery-observation:2021 PH27",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2021,
+      "dec_deg": -10.75528,
+      "features": {
+        "ecliptic_latitude_deg": -14.637709,
+        "eligible": false,
+        "elongation_deg": 49.426273,
+        "geometry_score": 0.0,
+        "hours_visible": 6.693859,
+        "novelty_score": 1.0,
+        "population_score": 0.583948,
+        "score": 0.657684,
+        "survey_scarcity_score": 0.95
+      },
+      "outcome": "positive",
+      "ra_deg": 167.96388,
+      "ranking_jd": 2459522.026829861,
+      "ranking_mode": "ieo",
+      "record_id": "mpc-discovery-observation:2021 VR3",
+      "source_aligned_ztf_i41": true
+    },
+    {
+      "cohort_year": 2022,
+      "dec_deg": -0.4098,
+      "features": {
+        "ecliptic_latitude_deg": 21.522323,
+        "eligible": false,
+        "elongation_deg": 63.198864,
+        "geometry_score": 0.0,
+        "hours_visible": 7.90537,
+        "novelty_score": 1.0,
+        "population_score": 0.469463,
+        "score": 0.623339,
+        "survey_scarcity_score": 0.95
+      },
+      "outcome": "positive",
+      "ra_deg": 249.85185,
+      "ranking_jd": 2459609.0333634373,
+      "ranking_mode": "ieo",
+      "record_id": "mpc-discovery-observation:2022 BJ8",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2023,
+      "dec_deg": 61.633968,
+      "features": {
+        "ecliptic_latitude_deg": 44.454601,
+        "eligible": false,
+        "elongation_deg": 66.412267,
+        "geometry_score": 0.0,
+        "hours_visible": 10.0,
+        "novelty_score": 1.0,
+        "population_score": 0.24799,
+        "score": 0.556897,
+        "survey_scarcity_score": 0.95
+      },
+      "outcome": "positive",
+      "ra_deg": 145.52424,
+      "ranking_jd": 2460093.811628472,
+      "ranking_mode": "ieo",
+      "record_id": "mpc-discovery-observation:2023 KQ5",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2023,
+      "dec_deg": 31.64198,
+      "features": {
+        "ecliptic_latitude_deg": 17.216194,
+        "eligible": false,
+        "elongation_deg": 51.952553,
+        "geometry_score": 0.0,
+        "hours_visible": 10.0,
+        "novelty_score": 1.0,
+        "population_score": 0.537298,
+        "score": 0.643689,
+        "survey_scarcity_score": 0.95
+      },
+      "outcome": "positive",
+      "ra_deg": 33.182325,
+      "ranking_jd": 2460016.6253003934,
+      "ranking_mode": "ieo",
+      "record_id": "mpc-discovery-observation:2023 EY2",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2023,
+      "dec_deg": -23.33394,
+      "features": {
+        "ecliptic_latitude_deg": -32.353448,
+        "eligible": false,
+        "elongation_deg": 77.002348,
+        "geometry_score": 0.0,
+        "hours_visible": 4.451217,
+        "novelty_score": 1.0,
+        "population_score": 0.341727,
+        "score": 0.585018,
+        "survey_scarcity_score": 0.95
+      },
+      "outcome": "positive",
+      "ra_deg": 151.95308,
+      "ranking_jd": 2460269.585578704,
+      "ranking_mode": "ieo",
+      "record_id": "mpc-discovery-observation:2023 WK3",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2023,
+      "dec_deg": -5.879708,
+      "features": {
+        "ecliptic_latitude_deg": -17.122547,
+        "eligible": false,
+        "elongation_deg": 45.063578,
+        "geometry_score": 0.0,
+        "hours_visible": 7.306642,
+        "novelty_score": 1.0,
+        "population_score": 0.538908,
+        "score": 0.644172,
+        "survey_scarcity_score": 0.95
+      },
+      "outcome": "positive",
+      "ra_deg": 30.433508,
+      "ranking_jd": 2460008.50841,
+      "ranking_mode": "ieo",
+      "record_id": "mpc-discovery-observation:2023 EL",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2024,
+      "dec_deg": 33.52082,
+      "features": {
+        "ecliptic_latitude_deg": 16.298768,
+        "eligible": false,
+        "elongation_deg": 116.180485,
+        "geometry_score": 0.0,
+        "hours_visible": 10.0,
+        "novelty_score": 1.0,
+        "population_score": 0.553336,
+        "score": 0.648501,
+        "survey_scarcity_score": 0.95
+      },
+      "outcome": "positive",
+      "ra_deg": 42.966735,
+      "ranking_jd": 2460323.7093570833,
+      "ranking_mode": "ieo",
+      "record_id": "mpc-discovery-observation:2024 AM4",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2024,
+      "dec_deg": 41.50505,
+      "features": {
+        "ecliptic_latitude_deg": 33.764191,
+        "eligible": false,
+        "elongation_deg": 66.0178,
+        "geometry_score": 0.0,
+        "hours_visible": 10.0,
+        "novelty_score": 1.0,
+        "population_score": 0.328606,
+        "score": 0.581082,
+        "survey_scarcity_score": 0.95
+      },
+      "outcome": "positive",
+      "ra_deg": 169.90281,
+      "ranking_jd": 2460610.0023592245,
+      "ranking_mode": "ieo",
+      "record_id": "mpc-discovery-observation:2024 UM9",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2024,
+      "dec_deg": -2.62626,
+      "features": {
+        "ecliptic_latitude_deg": 3.676019,
+        "eligible": false,
+        "elongation_deg": 51.329789,
+        "geometry_score": 0.0,
+        "hours_visible": 7.672147,
+        "novelty_score": 1.0,
+        "population_score": 0.849225,
+        "score": 0.737267,
+        "survey_scarcity_score": 0.95
+      },
+      "outcome": "positive",
+      "ra_deg": 195.49472,
+      "ranking_jd": 2460643.1197655094,
+      "ranking_mode": "ieo",
+      "record_id": "mpc-discovery-observation:2024 WD19",
+      "source_aligned_ztf_i41": false
+    },
+    {
+      "cohort_year": 2018,
+      "dec_deg": -15.0,
+      "features": {
+        "ecliptic_latitude_deg": -0.231507,
+        "eligible": true,
+        "elongation_deg": 82.811823,
+        "geometry_score": 0.985706,
+        "hours_visible": 6.074227,
+        "novelty_score": 1.0,
+        "population_score": 0.842821,
+        "score": 0.930775,
+        "survey_scarcity_score": 0.945107
+      },
+      "outcome": "null_result",
+      "ra_deg": 217.41,
+      "ranking_jd": 2458340.5,
+      "ranking_mode": "aten",
+      "record_id": "ztf-null-2018-ra217410-dec-15000",
+      "recorded_score": 0.9308,
+      "source_aligned_ztf_i41": true
+    },
+    {
+      "cohort_year": 2018,
+      "dec_deg": 15.0,
+      "features": {
+        "ecliptic_latitude_deg": -4.287156,
+        "eligible": true,
+        "elongation_deg": 81.475898,
+        "geometry_score": 0.99603,
+        "hours_visible": 9.289312,
+        "novelty_score": 1.0,
+        "population_score": 0.728154,
+        "score": 0.899677,
+        "survey_scarcity_score": 0.948642
+      },
+      "outcome": "null_result",
+      "ra_deg": 54.35,
+      "ranking_jd": 2458340.5,
+      "ranking_mode": "aten",
+      "record_id": "ztf-null-2018-ra054350-dec015000",
+      "recorded_score": 0.8997,
+      "source_aligned_ztf_i41": true
+    },
+    {
+      "cohort_year": 2018,
+      "dec_deg": 22.5,
+      "features": {
+        "ecliptic_latitude_deg": 4.299759,
+        "eligible": true,
+        "elongation_deg": 84.7836,
+        "geometry_score": 0.959485,
+        "hours_visible": 9.871851,
+        "novelty_score": 1.0,
+        "population_score": 0.727828,
+        "score": 0.88788,
+        "survey_scarcity_score": 0.9361
+      },
+      "outcome": "null_result",
+      "ra_deg": 48.71,
+      "ranking_jd": 2458340.5,
+      "ranking_mode": "aten",
+      "record_id": "ztf-null-2018-ra048710-dec022500",
+      "recorded_score": 0.8879,
+      "source_aligned_ztf_i41": true
+    },
+    {
+      "cohort_year": 2018,
+      "dec_deg": 15.0,
+      "features": {
+        "ecliptic_latitude_deg": -2.38758,
+        "eligible": true,
+        "elongation_deg": 88.716131,
+        "geometry_score": 0.874951,
+        "hours_visible": 9.289312,
+        "novelty_score": 1.0,
+        "population_score": 0.779346,
+        "score": 0.876158,
+        "survey_scarcity_score": 0.906755
+      },
+      "outcome": "null_result",
+      "ra_deg": 46.59,
+      "ranking_jd": 2458340.5,
+      "ranking_mode": "aten",
+      "record_id": "ztf-null-2018-ra046590-dec015000",
+      "recorded_score": 0.8761,
+      "source_aligned_ztf_i41": true
+    },
+    {
+      "cohort_year": 2024,
+      "dec_deg": -22.5,
+      "features": {
+        "ecliptic_latitude_deg": -0.130265,
+        "eligible": true,
+        "elongation_deg": 80.771771,
+        "geometry_score": 0.920221,
+        "hours_visible": 4.65101,
+        "novelty_score": 1.0,
+        "population_score": 0.845952,
+        "score": 0.920199,
+        "survey_scarcity_score": 0.949628
+      },
+      "outcome": "null_result",
+      "ra_deg": 251.66,
+      "ranking_jd": 2459107.5,
+      "ranking_mode": "aten",
+      "record_id": "ztf-null-2024-ra251660-dec-22500",
+      "recorded_score": 0.9202,
+      "source_aligned_ztf_i41": true
+    },
+    {
+      "cohort_year": 2024,
+      "dec_deg": -22.5,
+      "features": {
+        "ecliptic_latitude_deg": -1.266564,
+        "eligible": true,
+        "elongation_deg": 73.360842,
+        "geometry_score": 0.845523,
+        "hours_visible": 4.65101,
+        "novelty_score": 1.0,
+        "population_score": 0.811602,
+        "score": 0.885955,
+        "survey_scarcity_score": 0.923915
+      },
+      "outcome": "null_result",
+      "ra_deg": 243.54,
+      "ranking_jd": 2459107.5,
+      "ranking_mode": "aten",
+      "record_id": "ztf-null-2024-ra243540-dec-22500",
+      "recorded_score": 0.8859,
+      "source_aligned_ztf_i41": true
+    },
+    {
+      "cohort_year": 2024,
+      "dec_deg": -7.5,
+      "features": {
+        "ecliptic_latitude_deg": 2.419834,
+        "eligible": true,
+        "elongation_deg": 32.958694,
+        "geometry_score": 0.999016,
+        "hours_visible": 7.112637,
+        "novelty_score": 1.0,
+        "population_score": 0.888339,
+        "score": 0.948805,
+        "survey_scarcity_score": 0.95
+      },
+      "outcome": "null_result",
+      "ra_deg": 204.25,
+      "ranking_jd": 2459107.5,
+      "ranking_mode": "ieo",
+      "record_id": "ztf-null-2024-ra204250-dec-07500",
+      "recorded_score": 0.9488,
+      "source_aligned_ztf_i41": true
+    },
+    {
+      "cohort_year": 2024,
+      "dec_deg": -7.5,
+      "features": {
+        "ecliptic_latitude_deg": -0.375846,
+        "eligible": true,
+        "elongation_deg": 25.915459,
+        "geometry_score": 0.82571,
+        "hours_visible": 7.112637,
+        "novelty_score": 1.0,
+        "population_score": 0.956742,
+        "score": 0.934665,
+        "survey_scarcity_score": 0.95
+      },
+      "outcome": "null_result",
+      "ra_deg": 196.68,
+      "ranking_jd": 2459107.5,
+      "ranking_mode": "ieo",
+      "record_id": "ztf-null-2024-ra196680-dec-07500",
+      "recorded_score": 0.9347,
+      "source_aligned_ztf_i41": true
+    },
+    {
+      "cohort_year": 2024,
+      "dec_deg": 15.0,
+      "features": {
+        "ecliptic_latitude_deg": 1.787257,
+        "eligible": true,
+        "elongation_deg": 27.76196,
+        "geometry_score": 0.90299,
+        "hours_visible": 9.289312,
+        "novelty_score": 1.0,
+        "population_score": 0.90886,
+        "score": 0.935756,
+        "survey_scarcity_score": 0.95
+      },
+      "outcome": "null_result",
+      "ra_deg": 147.53,
+      "ranking_jd": 2459107.5,
+      "ranking_mode": "ieo",
+      "record_id": "ztf-null-2024-ra147530-dec015000",
+      "recorded_score": 0.9358,
+      "source_aligned_ztf_i41": true
+    }
+  ],
+  "schema_version": "ztf-field-ranking-retrospective-audit-v1",
+  "score_reproduction": {
+    "maximum_absolute_drift": 5.8e-05,
+    "searched_null_count": 9,
+    "tolerance": 0.0002
+  },
+  "sources": {
+    "positive_envelopes": [
+      {
+        "path": "data_selection/calibration/mpc_aten_discovery_fields_v2.json",
+        "sha256": "a33c1067e1478d95c921de1f8a0bfda872bfc5e65f800bbef6331f19aa6c2e38"
+      },
+      {
+        "path": "data_selection/calibration/mpc_atira_discovery_fields_v2.json",
+        "sha256": "3dbee749fb7322f13960b935503c0fc98919dd488d516585d8217214168c2eba"
+      }
+    ],
+    "searched_nulls": {
+      "path": "data_selection/calibration/ztf_field_null_outcomes_v1.json",
+      "sha256": "1ad884e5b15790b3bf9d6dafcdb6476f1ad40b2a71215cbe08f22f2242830fc1"
+    }
+  },
+  "status": "audit_complete_not_calibrated",
+  "ztf_i41_source_aligned_metrics": {
+    "aten": {
+      "all": {
+        "eligible_pairwise_auc": null,
+        "positive_count": 1,
+        "positive_eligibility_recall": 0.0,
+        "positive_eligible_count": 0,
+        "searched_null_count": 6,
+        "searched_null_eligible_count": 6
+      },
+      "development_through_2023": {
+        "eligible_pairwise_auc": null,
+        "positive_count": 1,
+        "positive_eligibility_recall": 0.0,
+        "positive_eligible_count": 0,
+        "searched_null_count": 4,
+        "searched_null_eligible_count": 4
+      },
+      "holdout_2024": {
+        "eligible_pairwise_auc": null,
+        "positive_count": 0,
+        "positive_eligibility_recall": null,
+        "positive_eligible_count": 0,
+        "searched_null_count": 2,
+        "searched_null_eligible_count": 2
+      }
+    },
+    "ieo": {
+      "all": {
+        "eligible_pairwise_auc": 0.0,
+        "positive_count": 7,
+        "positive_eligibility_recall": 0.142857,
+        "positive_eligible_count": 1,
+        "searched_null_count": 3,
+        "searched_null_eligible_count": 3
+      },
+      "development_through_2023": {
+        "eligible_pairwise_auc": null,
+        "positive_count": 7,
+        "positive_eligibility_recall": 0.142857,
+        "positive_eligible_count": 1,
+        "searched_null_count": 0,
+        "searched_null_eligible_count": 0
+      },
+      "holdout_2024": {
+        "eligible_pairwise_auc": null,
+        "positive_count": 0,
+        "positive_eligibility_recall": null,
+        "positive_eligible_count": 0,
+        "searched_null_count": 3,
+        "searched_null_eligible_count": 3
+      }
+    }
+  }
+}
