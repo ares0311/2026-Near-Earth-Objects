@@ -39,6 +39,28 @@ def _write_empty_target_queue(path: Path) -> Path:
     return path
 
 
+def _write_target_queue_with_rows(path: Path, rows: list[dict]) -> Path:
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=_TARGET_QUEUE_HEADER)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(row)
+    return path
+
+
+def _insufficient_coverage_row(rank: int, ra_deg: float, dec_deg: float) -> dict:
+    return {
+        "rank": rank,
+        "priority": 0.8,
+        "status": "insufficient_coverage",
+        "data_role": "live_search",
+        "source": "sky_field_selector",
+        "selection_rule": "test",
+        "evidence_path": "",
+        "notes": f"ra_deg={ra_deg} dec_deg={dec_deg} field_radius_deg=3.5; test row",
+    }
+
+
 def _coverage_field_result(field_id: str, ra_deg: float, dec_deg: float, n_nights: int = 3) -> dict:
     nights = [f"2024010{i + 1}" for i in range(n_nights)]
     return {
@@ -747,6 +769,83 @@ def test_execute_target_raises_when_insufficient_coverage(
         hunter_cli.execute_target(target, tmp_path / "checkpoints", 2.0)
 
 
+def test_execute_target_skips_a_night_that_fails_to_resolve_and_tries_the_next(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_dirs(monkeypatch, tmp_path)
+    inv_dir = hunter_cli._COVERAGE_INVENTORY_DIR
+    _write_coverage_inventory(
+        inv_dir / "seed.json", [_coverage_field_result("field-a", 10.0, 5.0, n_nights=4)]
+    )
+
+    def _fake_acquire(ra_deg, dec_deg, night, size_deg, target_root):
+        if night == "20240101":
+            raise RuntimeError("no exposure found for RA=10.0 Dec=5.0 on 20240101")
+        return None
+
+    monkeypatch.setattr(hunter_cli, "_acquire_and_convert_night", _fake_acquire)
+    monkeypatch.setattr(
+        hunter_cli.positive_control,
+        "run_positive_control",
+        lambda **kwargs: {"n_tracklets_linked": 0, "review_packets": []},
+    )
+    target = {"target_id": "radec_10.00_5.00", "ra_deg": 10.0, "dec_deg": 5.0}
+
+    result = hunter_cli.execute_target(target, tmp_path / "checkpoints", 2.0)
+
+    # 4 nights available (20240101..20240104); 20240101 fails and is skipped,
+    # so the 3 required successes come from the next 3 nights.
+    assert result["nights_acquired"] == ["20240102", "20240103", "20240104"]
+
+
+def test_execute_target_stops_once_min_observations_reached(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_dirs(monkeypatch, tmp_path)
+    inv_dir = hunter_cli._COVERAGE_INVENTORY_DIR
+    _write_coverage_inventory(
+        inv_dir / "seed.json", [_coverage_field_result("field-a", 10.0, 5.0, n_nights=5)]
+    )
+    attempted: list[str] = []
+
+    def _fake_acquire(ra_deg, dec_deg, night, size_deg, target_root):
+        attempted.append(night)
+
+    monkeypatch.setattr(hunter_cli, "_acquire_and_convert_night", _fake_acquire)
+    monkeypatch.setattr(
+        hunter_cli.positive_control,
+        "run_positive_control",
+        lambda **kwargs: {"n_tracklets_linked": 0, "review_packets": []},
+    )
+    target = {"target_id": "radec_10.00_5.00", "ra_deg": 10.0, "dec_deg": 5.0}
+
+    result = hunter_cli.execute_target(target, tmp_path / "checkpoints", 2.0)
+
+    # 5 real covered nights exist, but only the first 3 should ever be
+    # attempted once min_observations=3 is satisfied.
+    assert attempted == ["20240101", "20240102", "20240103"]
+    assert result["nights_acquired"] == ["20240101", "20240102", "20240103"]
+
+
+def test_execute_target_raises_when_too_few_nights_resolve(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_dirs(monkeypatch, tmp_path)
+    inv_dir = hunter_cli._COVERAGE_INVENTORY_DIR
+    _write_coverage_inventory(
+        inv_dir / "seed.json", [_coverage_field_result("field-a", 10.0, 5.0, n_nights=4)]
+    )
+
+    def _fake_acquire_always_fails(ra_deg, dec_deg, night, size_deg, target_root):
+        raise RuntimeError(f"no exposure found for RA=10.0 Dec=5.0 on {night}")
+
+    monkeypatch.setattr(hunter_cli, "_acquire_and_convert_night", _fake_acquire_always_fails)
+    target = {"target_id": "radec_10.00_5.00", "ra_deg": 10.0, "dec_deg": 5.0}
+
+    with pytest.raises(RuntimeError, match="only acquired 0/3 real exposure"):
+        hunter_cli.execute_target(target, tmp_path / "checkpoints", 2.0)
+
+
 def test_execute_target_null_result_when_zero_tracklets(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1078,6 +1177,79 @@ def test_run_search_ingests_scored_candidate_and_registers_followup(
     assert follow_ups[0]["originating_run_id"] == result["run_id"]
 
 
+def test_run_search_marks_originating_followup_actioned_after_execution(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    db_path = tmp_path / "hunter_state.sqlite"
+    ledger_db_path = tmp_path / "candidate_ledger.sqlite"
+    follow_up_id = hunter_state.add_follow_up(
+        db_path,
+        target_id="radec_10.00_5.00",
+        reason="prior borderline candidate",
+        priority=0.6,
+        recommended_action="operator review",
+        evidence_ref="candidate_ledger:cand-1",
+    )
+    targets = [
+        hunter_state.ManifestTarget(
+            target_id="radec_10.00_5.00", ra_deg=10.0, dec_deg=5.0, score=0.6,
+            selection_reason="open follow-up (registry): prior borderline candidate",
+            coverage_inventory_id=None,
+        )
+    ]
+    hunter_state.create_search_manifest(
+        db_path, "search-followup-1", "follow_up", 1, "p", "d", targets, 1, True, {}
+    )
+    monkeypatch.setattr(
+        hunter_cli,
+        "execute_target",
+        lambda *a, **k: {
+            "execution_status": "null_result",
+            "candidate_ids": [],
+            "nights_acquired": [],
+            "scored_candidates": [],
+        },
+    )
+
+    hunter_cli.run_search(db_path, ledger_db_path, "search-followup-1", tmp_path / "checkpoints")
+
+    assert hunter_state.list_follow_ups(db_path, status="open") == []
+    actioned = hunter_state.list_follow_ups(db_path, status="actioned")
+    assert len(actioned) == 1
+    assert actioned[0]["follow_up_id"] == follow_up_id
+
+
+def test_run_search_does_not_action_followups_for_new_mode_manifests(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    db_path = tmp_path / "hunter_state.sqlite"
+    ledger_db_path = tmp_path / "candidate_ledger.sqlite"
+    hunter_state.add_follow_up(
+        db_path,
+        target_id="radec_10.00_5.00",
+        reason="unrelated open follow-up",
+        priority=0.6,
+        recommended_action="operator review",
+        evidence_ref="candidate_ledger:cand-1",
+    )
+    _seed_pending_manifest(db_path)  # mode="new", same target_id coincidentally
+    monkeypatch.setattr(
+        hunter_cli,
+        "execute_target",
+        lambda *a, **k: {
+            "execution_status": "null_result",
+            "candidate_ids": [],
+            "nights_acquired": [],
+            "scored_candidates": [],
+        },
+    )
+
+    hunter_cli.run_search(db_path, ledger_db_path, "search-1", tmp_path / "checkpoints")
+
+    # A "new"-mode search must never touch the follow-up registry.
+    assert len(hunter_state.list_follow_ups(db_path, status="open")) == 1
+
+
 def test_main_dispatches_run_new_search(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -1179,3 +1351,396 @@ def test_build_parser_run_new_search_requires_search_id_or_latest() -> None:
     parser = hunter_cli.build_parser()
     with pytest.raises(SystemExit):
         parser.parse_args(["run-new-search"])
+
+
+# ---------------------------------------------------------------------------
+# create-new-search --mode follow-up, show-follow-ups
+# ---------------------------------------------------------------------------
+
+
+def test_followup_candidates_from_registry_extracts_radec_and_ranks(tmp_path: Path) -> None:
+    db_path = tmp_path / "hunter_state.sqlite"
+    hunter_state.add_follow_up(
+        db_path,
+        target_id="radec_10.00_5.00",
+        reason="borderline candidate",
+        priority=0.4,
+        recommended_action="operator review",
+        evidence_ref="candidate_ledger:cand-1",
+    )
+    hunter_state.add_follow_up(
+        db_path,
+        target_id="radec_20.00_5.00",
+        reason="survive candidate",
+        priority=0.9,
+        recommended_action="operator review",
+        evidence_ref="candidate_ledger:cand-2",
+    )
+
+    candidates = hunter_cli._followup_candidates_from_registry(db_path)
+
+    # list_follow_ups already orders by priority DESC -- the 0.9-priority
+    # entry (ra=20.0) comes first.
+    assert [c["ra_deg"] for c in candidates] == [20.0, 10.0]
+    assert all(c["field_id"] is None for c in candidates)
+    assert "survive candidate" in candidates[0]["reason"]
+
+
+def test_followup_candidates_from_insufficient_coverage_already_sufficient(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_dirs(monkeypatch, tmp_path)
+    inv_dir = hunter_cli._COVERAGE_INVENTORY_DIR
+    _write_coverage_inventory(
+        inv_dir / "seed.json", [_coverage_field_result("field-a", 10.0, 5.0, n_nights=5)]
+    )
+    queue_path = _write_target_queue_with_rows(
+        tmp_path / "target_priority_queue.csv", [_insufficient_coverage_row(1, 10.0, 5.0)]
+    )
+
+    def _fail_if_called(*a, **k):
+        raise AssertionError("no live recheck needed -- already covered")
+
+    monkeypatch.setattr(
+        hunter_cli.coverage_inventory.bounded_ingest, "run_bounded_ingest", _fail_if_called
+    )
+
+    candidates, n_still_insufficient = hunter_cli._followup_candidates_from_insufficient_coverage(
+        queue_path
+    )
+
+    assert n_still_insufficient == 0
+    assert len(candidates) == 1
+    assert candidates[0]["field_id"] == "field-a"
+    assert "5 real distinct night(s)" in candidates[0]["reason"]
+
+
+def test_followup_candidates_from_insufficient_coverage_still_insufficient(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_dirs(monkeypatch, tmp_path)
+    inv_dir = hunter_cli._COVERAGE_INVENTORY_DIR
+    _write_coverage_inventory(
+        inv_dir / "seed.json", [_coverage_field_result("field-a", 10.0, 5.0, n_nights=2)]
+    )
+    queue_path = _write_target_queue_with_rows(
+        tmp_path / "target_priority_queue.csv", [_insufficient_coverage_row(1, 10.0, 5.0)]
+    )
+
+    candidates, n_still_insufficient = hunter_cli._followup_candidates_from_insufficient_coverage(
+        queue_path
+    )
+
+    assert candidates == []
+    assert n_still_insufficient == 1
+
+
+def test_followup_candidates_from_insufficient_coverage_triggers_live_recheck(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_dirs(monkeypatch, tmp_path)
+    queue_path = _write_target_queue_with_rows(
+        tmp_path / "target_priority_queue.csv", [_insufficient_coverage_row(1, 10.0, 5.0)]
+    )
+
+    def _fake_run_bounded_ingest(*, ra, dec, size_deg, start_jd, end_jd, out_dir, **_):
+        return {
+            "n_rows": 30,
+            "distinct_nights_yyyymmdd": ["20240101", "20240102", "20240103", "20240104"],
+            "raw_response_sha256": "d" * 64,
+            "raw_response_path": str(out_dir / "raw.ipac"),
+        }
+
+    monkeypatch.setattr(
+        hunter_cli.coverage_inventory.bounded_ingest, "run_bounded_ingest", _fake_run_bounded_ingest
+    )
+
+    candidates, n_still_insufficient = hunter_cli._followup_candidates_from_insufficient_coverage(
+        queue_path
+    )
+
+    assert n_still_insufficient == 0
+    assert len(candidates) == 1
+    assert candidates[0]["ra_deg"] == 10.0
+    committed = list(hunter_cli._COVERAGE_INVENTORY_DIR.glob("*.json"))
+    assert len(committed) == 1
+
+
+def test_followup_candidates_from_insufficient_coverage_no_matching_rows(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_dirs(monkeypatch, tmp_path)
+    queue_path = _write_empty_target_queue(tmp_path / "target_priority_queue.csv")
+
+    candidates, n_still_insufficient = hunter_cli._followup_candidates_from_insufficient_coverage(
+        queue_path
+    )
+
+    assert candidates == []
+    assert n_still_insufficient == 0
+
+
+def test_followup_candidates_from_insufficient_coverage_skips_other_statuses_and_bad_notes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_dirs(monkeypatch, tmp_path)
+    inv_dir = hunter_cli._COVERAGE_INVENTORY_DIR
+    _write_coverage_inventory(
+        inv_dir / "seed.json", [_coverage_field_result("field-a", 10.0, 5.0, n_nights=5)]
+    )
+    rows = [
+        {
+            "rank": 1,
+            "priority": 0.9,
+            "status": "null_result",
+            "data_role": "live_search",
+            "source": "test",
+            "selection_rule": "test",
+            "evidence_path": "",
+            "notes": "ra_deg=99.0 dec_deg=1.0; not insufficient_coverage, must be skipped",
+        },
+        {
+            "rank": 2,
+            "priority": 0.8,
+            "status": "insufficient_coverage",
+            "data_role": "live_search",
+            "source": "test",
+            "selection_rule": "test",
+            "evidence_path": "",
+            "notes": "no coordinates in this row at all",
+        },
+        _insufficient_coverage_row(3, 10.0, 5.0),
+    ]
+    queue_path = _write_target_queue_with_rows(tmp_path / "target_priority_queue.csv", rows)
+
+    candidates, n_still_insufficient = hunter_cli._followup_candidates_from_insufficient_coverage(
+        queue_path
+    )
+
+    assert n_still_insufficient == 0
+    assert len(candidates) == 1
+    assert candidates[0]["ra_deg"] == 10.0
+
+
+def test_discover_followup_targets_combines_and_ranks_both_sources(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_dirs(monkeypatch, tmp_path)
+    db_path = tmp_path / "hunter_state.sqlite"
+    hunter_state.add_follow_up(
+        db_path,
+        target_id="radec_30.00_5.00",
+        reason="high-priority registry entry",
+        priority=0.95,
+        recommended_action="operator review",
+        evidence_ref="candidate_ledger:cand-1",
+    )
+    inv_dir = hunter_cli._COVERAGE_INVENTORY_DIR
+    _write_coverage_inventory(
+        inv_dir / "seed.json", [_coverage_field_result("field-a", 10.0, 5.0, n_nights=5)]
+    )
+    queue_path = _write_target_queue_with_rows(
+        tmp_path / "target_priority_queue.csv", [_insufficient_coverage_row(1, 10.0, 5.0)]
+    )
+
+    result = hunter_cli.discover_followup_targets(
+        db_path, requested_n=2, target_queue_path=queue_path
+    )
+
+    assert result["sufficiency_met"] is True
+    assert len(result["eligible"]) == 2
+    # Registry entry (priority 0.95) ranks ahead of the recovered-coverage
+    # candidate (fixed priority 0.5).
+    assert result["eligible"][0]["ra_deg"] == 30.0
+    assert result["eligible"][1]["ra_deg"] == 10.0
+
+
+def test_discover_followup_targets_reports_insufficiency_honestly(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_dirs(monkeypatch, tmp_path)
+    db_path = tmp_path / "hunter_state.sqlite"
+    queue_path = _write_empty_target_queue(tmp_path / "target_priority_queue.csv")
+
+    result = hunter_cli.discover_followup_targets(
+        db_path, requested_n=3, target_queue_path=queue_path
+    )
+
+    assert result["sufficiency_met"] is False
+    assert result["eligible"] == []
+
+
+def test_cmd_create_new_search_follow_up_mode_end_to_end(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _patch_dirs(monkeypatch, tmp_path)
+    db_path = tmp_path / "hunter_state.sqlite"
+    hunter_state.add_follow_up(
+        db_path,
+        target_id="radec_30.00_5.00",
+        reason="high-priority registry entry",
+        priority=0.95,
+        recommended_action="operator review",
+        evidence_ref="candidate_ledger:cand-1",
+    )
+    queue_path = _write_empty_target_queue(tmp_path / "target_priority_queue.csv")
+
+    args = argparse.Namespace(
+        targets=1,
+        mode="follow-up",
+        neo_class="all",
+        jd="now",
+        max_pool=200,
+        target_queue=str(queue_path),
+        ranking_policy=str(field_selector._DEFAULT_RANKING_POLICY_PATH),
+        db=str(db_path),
+    )
+
+    exit_code = hunter_cli.cmd_create_new_search(args)
+
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "sufficiency_met=True" in out
+    manifest = hunter_state.get_latest_pending_manifest(db_path, mode="follow_up")
+    assert manifest["targets"][0]["ra_deg"] == 30.0
+
+
+def test_cmd_show_follow_ups_prints_table_with_review_status(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    db_path = tmp_path / "hunter_state.sqlite"
+    ledger_db_path = tmp_path / "candidate_ledger.sqlite"
+    packet = _minimal_scored_neo_packet()
+    from candidate_ledger import CandidateLedgerDefaults, record_from_packet, upsert_record
+
+    defaults = CandidateLedgerDefaults(
+        source_dataset_id="search-1",
+        candidate_generator="test",
+        regeneration_command="test",
+        review_status="survive",
+    )
+    record = record_from_packet(packet, defaults)
+    upsert_record(ledger_db_path, record)
+    hunter_state.add_follow_up(
+        db_path,
+        target_id="radec_10.00_5.00",
+        reason="test reason",
+        priority=0.9,
+        recommended_action="operator review before submission",
+        evidence_ref="candidate_ledger:hunter-test-T1",
+        candidate_id="hunter-test-T1",
+    )
+
+    args = argparse.Namespace(
+        status="open", limit=None, db=str(db_path), candidate_ledger_db=str(ledger_db_path)
+    )
+    exit_code = hunter_cli.cmd_show_follow_ups(args)
+
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "radec_10.00_5.00" in out
+    assert "survive" in out
+    assert "operator review before submission" in out
+
+
+def test_cmd_show_follow_ups_reports_none_message(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    db_path = tmp_path / "hunter_state.sqlite"
+    args = argparse.Namespace(
+        status="open",
+        limit=None,
+        db=str(db_path),
+        candidate_ledger_db=str(tmp_path / "missing.sqlite"),
+    )
+
+    exit_code = hunter_cli.cmd_show_follow_ups(args)
+
+    assert exit_code == 0
+    assert "No follow-ups with status='open'" in capsys.readouterr().out
+
+
+def test_cmd_show_follow_ups_status_all_shows_every_entry(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    db_path = tmp_path / "hunter_state.sqlite"
+    follow_up_id = hunter_state.add_follow_up(
+        db_path,
+        target_id="radec_10.00_5.00",
+        reason="test",
+        priority=0.5,
+        recommended_action="review",
+        evidence_ref="candidate_ledger:x",
+    )
+    hunter_state.update_follow_up_status(db_path, follow_up_id, "dismissed")
+
+    args = argparse.Namespace(
+        status="all",
+        limit=None,
+        db=str(db_path),
+        candidate_ledger_db=str(tmp_path / "missing.sqlite"),
+    )
+    exit_code = hunter_cli.cmd_show_follow_ups(args)
+
+    assert exit_code == 0
+    assert "radec_10.00_5.00" in capsys.readouterr().out
+
+
+def test_build_parser_create_new_search_accepts_follow_up_mode() -> None:
+    parser = hunter_cli.build_parser()
+    args = parser.parse_args(["create-new-search", "--targets", "1", "--mode", "follow-up"])
+    assert args.mode == "follow-up"
+
+
+def test_build_parser_show_follow_ups_defaults() -> None:
+    parser = hunter_cli.build_parser()
+    args = parser.parse_args(["show-follow-ups"])
+    assert args.status == "open"
+    assert args.limit is None
+
+
+def test_main_dispatches_show_follow_ups(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    db_path = tmp_path / "hunter_state.sqlite"
+    exit_code = hunter_cli.main(["show-follow-ups", "--db", str(db_path)])
+    assert exit_code == 0
+    assert "No follow-ups" in capsys.readouterr().out
+
+
+def test_cmd_run_new_search_latest_picks_follow_up_mode_manifest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    db_path = tmp_path / "hunter_state.sqlite"
+    ledger_db_path = tmp_path / "candidate_ledger.sqlite"
+    targets = [
+        hunter_state.ManifestTarget(
+            target_id="radec_10.00_5.00", ra_deg=10.0, dec_deg=5.0, score=0.9,
+            selection_reason="test", coverage_inventory_id="field-a",
+        )
+    ]
+    hunter_state.create_search_manifest(
+        db_path, "search-followup-1", "follow_up", 1, "p", "d", targets, 1, True, {}
+    )
+    monkeypatch.setattr(
+        hunter_cli,
+        "execute_target",
+        lambda *a, **k: {
+            "execution_status": "null_result",
+            "candidate_ids": [],
+            "nights_acquired": [],
+            "scored_candidates": [],
+        },
+    )
+    args = argparse.Namespace(
+        search_id=None,
+        db=str(db_path),
+        candidate_ledger_db=str(ledger_db_path),
+        checkpoint_root=str(tmp_path / "checkpoints"),
+        size_deg=2.0,
+    )
+
+    exit_code = hunter_cli.cmd_run_new_search(args)
+
+    assert exit_code == 0
+    assert "status=completed" in capsys.readouterr().out
