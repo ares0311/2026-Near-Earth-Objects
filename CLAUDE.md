@@ -126,67 +126,117 @@ passed with 2,067 tests and 100% `src/` coverage. Evidence:
 `docs/evidence/live/2026-07-19-phase1-detection-hardening.md`. The operator
 explicitly closed Phase 1 after reviewing this evidence; PR #258 merged.
 
-**Phase 2 — Harden the search algorithm (ACTIVE — work here now).**
-Reframed 2026-07-19 in terms of `docs/HUNTER_PROD_DIRECTIVE.md`'s
-"ranking/selection" and "eligibility" pipeline stages (see the mapping
-below): evaluating/improving `Skills/select_survey_fields.py`'s field
-scoring against real outcomes, evaluating/improving the adversarial
-review challenge set (`Skills/adversarial_review.py`), and building the
-Hunter directive's required deterministic, explainable, reproducible
-ranking model (not opaque LLM judgment as core ranking logic).
+**Phase 2 — Harden the search algorithm (ACTIVE — ranking calibration is the
+remaining open item; not a blocker on Phase 3, see reframing below).**
+`Skills/select_survey_fields.py`'s eligibility/preference split was fixed
+(PR #264, merged 2026-07-22 — the old conflated windows were excluding
+55/56 real historical Aten discoveries from ever being "eligible"). Real
+selector-feature/weight provenance auditing, ATLAS cross-survey
+confirmation hardening, and time-aware known-object eligibility all
+closed. **Still open**: fitting real ranking coefficients requires ≥20
+source-aligned positives + 20 searched controls per mode
+(`docs/evidence/live/2026-07-21-phase2-field-ranking-calibration.md`);
+only 1 Aten and 7 Atira source-aligned positives exist today, so no
+coefficient fit is authorized yet. The current v2 policy is explicitly
+labeled `uncalibrated_transparent_prior` and is not blocked on this — see
+the reframing below for why.
 
-**Phase 3 — Package the application (BLOCKED on Phase 2 closing).**
-Concretized 2026-07-19 by `docs/HUNTER_PROD_DIRECTIVE.md`: build the
-required CLI (`/Create-New-Search`, `/Run-New-Search`, `/Show-Follow-Ups`)
-and the 5 distinct durable-state entities (candidate catalog, search
-manifest, search run, target search history, follow-up registry) so the
-pipeline can run autonomously while both operator and coding agent are
-offline. Do not start this phase early.
+**Phase 3 — Package the application (REFRAMED 2026-07-23/24 — CLI +
+durable state now built and real-live-validated, not blocked).** The
+operator issued a HUNTER PROD CLOSURE DIRECTIVE (2026-07-23) whose
+explicit authority order is: current business requirements → current PROD
+contract → verified system reality → ... → recent PR history → older
+docs/TODOs. That directive states plainly: "Do not fail a normal top-N
+request because no candidate crosses an arbitrary quality threshold" and
+requires a **deterministic, explainable, reproducible** ranker — not a
+*calibrated* one. Per that authority order, the Phase 2 ranking-coefficient
+threshold (20+20 samples) gates *fitting new coefficients*, not *having* a
+transparent, already-reviewed ranking model — which already existed. This
+reframing was applied explicitly, not silently: Phase 3's CLI and 5
+durable-state entities were built on top of the current v2 policy as-is,
+with calibration left tracked as a separate, still-open scientific
+refinement. Four PRs closed this, each independently tested and
+real-live-validated in this sandbox (which reaches `ztf.uw.edu`/
+`irsa.ipac.caltech.edu` directly):
 
-### Hunter-directive pipeline mapping (verified 2026-07-19, not guessed)
+- PR #265 (`src/hunter_state.py`) — durable-state library for
+  `search_manifests`/`search_manifest_targets`, `search_runs`/
+  `search_run_targets`, `follow_up_registry`. Target search history stays
+  in `data_selection/target_priority_queue.csv` (reused via
+  `select_survey_fields.py`'s existing functions), deliberately not
+  duplicated into a new table.
+- PR #266 (`Skills/hunter_cli.py create-new-search --mode new`) —
+  adaptive discovery loop: scores the full planning grid, checks all
+  committed coverage inventories, and — only if insufficient — runs real
+  live IRSA coverage-preflight expansion until sufficient or the pool is
+  exhausted, persisting the exact selection as a durable pending manifest.
+  Live-validated: a real adaptive-expansion round found real measured
+  coverage (67-111 distinct nights) for 15 new fields and produced a
+  5-target pending manifest. Evidence:
+  `docs/evidence/live/2026-07-23-hunter-create-new-search-first-live-run.md`.
+- PR #267 (`run-new-search`) — executes the exact persisted manifest:
+  real per-night acquisition (deriving a single-exposure JD window from
+  already-fetched real metadata, no guessing), linking, scoring,
+  adversarial review, and candidate-ledger ingestion, with per-target
+  checkpoint/resume and loud failure handling. Live-validated end to end:
+  3 real ZTF DR24 nights, 600 real observations, 9 real tracklets linked,
+  9 real `ScoredNEO` packets reviewed (all REJECT, consistent with every
+  prior field test in this repo's history) and ledger-ingested. Evidence:
+  `docs/evidence/live/2026-07-24-hunter-run-new-search-first-live-run.md`.
+- PR #268 (`create-new-search --mode follow-up`, `show-follow-ups`) —
+  ranks real open `follow_up_registry` entries plus
+  `insufficient_coverage` queue rows re-checked against the *current*
+  coverage window. Live-validated: one such field, originally found with
+  2 real nights under a 2018-era window, now shows 62 real distinct
+  nights under the current window — a genuine recovery. Also found (and
+  disclosed, not hidden) that this specific field's exact narrow-box
+  acquisition then failed systematically across 10+ real nights tried —
+  a real ZTF field/CCD-grid alignment limitation, correctly surfaced as a
+  clean per-target `failed` status rather than crashing the run. A
+  registry-sourced follow-up target (the already-validated field from
+  PR #266/#267) executed completely: `status=completed`. Evidence:
+  `docs/evidence/live/2026-07-24-hunter-followup-mode-first-live-run.md`.
+
+**What remains open, not blocking**: ranking-coefficient calibration
+(Phase 2, tracked above); a cross-repo shared package for Techno-Hunter/
+EXO-Hunter object-identity sharing (the Hunter directive explicitly says
+this "must not block PROD" and no such mechanism exists yet — deferred,
+not missing-by-oversight); visual CLI polish (explicitly secondary to
+correctness per the directive). None of these were treated as blockers for
+this closure, per the directive's own authority order.
+
+### Hunter-directive pipeline mapping (updated 2026-07-24, verified against
+actual code — supersedes the 2026-07-19 mapping below)
 
 `docs/HUNTER_PROD_DIRECTIVE.md`'s required pipeline is: candidate universe
 → identity/history resolution → eligibility → ranking/selection →
 manifest → durable search creation → data acquisition → preprocessing →
 scoring → composite interpretation → durable results/provenance →
 follow-up creation → follow-up recommendation, behind a
-`/Create-New-Search` / `/Run-New-Search` / `/Show-Follow-Ups` CLI. Checked
-against this repo's actual code (not assumed) on 2026-07-19:
+`/Create-New-Search` / `/Run-New-Search` / `/Show-Follow-Ups` CLI.
 
 | Hunter stage | This repo's implementation | Status |
 |---|---|---|
-| Candidate universe | `Skills/select_survey_fields.py` scores sky fields (geometry/coverage/novelty); real detections come from per-exposure pixel extraction, not a pre-existing catalog | Exists, domain-shaped differently (fields, not catalog objects) — see note below |
-| Identity/history resolution | `src/known_object_exclusion.py` (Gate Z2, closed) | Exists |
-| Eligibility | `detect.py` real/bogus threshold; `Skills/adversarial_review.py`'s challenge set | Exists, but real/bogus is structurally `None` for the pixel-extraction path (Phase 1 gap #1) |
-| Ranking/selection | `Skills/select_survey_fields.py` (field level); `src/score.py` discovery_priority (candidate level) | Exists at two levels, not evaluated/hardened as an algorithm (Phase 2) |
-| Manifest | `data_selection/target_priority_queue.csv` | Exists, but is a running append-only priority list, not a per-run "exact selected targets" manifest tied to one search |
-| Durable search creation | None — a search today is just directly invoking Skills scripts with explicit CLI args | **Gap**: no discrete "pending search" entity exists before execution |
-| Data acquisition | `Skills/ztf_dr24_bounded_ingest.py` | Exists, checkpointed/resumable |
+| Candidate universe | `Skills/select_survey_fields.py` scores the full planning grid; `Skills/hunter_cli.py`'s adaptive-expansion loop grows real coverage data live when the known pool is insufficient | Exists, real, live-validated |
+| Identity/history resolution | `src/known_object_exclusion.py` (Gate Z2); `target_priority_queue.csv` history via `select_survey_fields.py` | Exists |
+| Eligibility | `select_survey_fields.py`'s v2 eligibility/preference split (PR #264); `Skills/adversarial_review.py`'s challenge set | Exists; real/bogus for pixel-extraction candidates is the Phase 1 disposition (PSF-shape evidence, not a fabricated probability) |
+| Ranking/selection | `select_survey_fields.py` (deterministic, transparent-prior weights); `src/score.py` discovery_priority | Exists; coefficient calibration is the one still-open Phase 2 item (not blocking, see reframing above) |
+| Manifest | `hunter_state.search_manifests`/`search_manifest_targets` (durable, per-search, unique `target_id`) | **Exists** (PR #265/#266) — `target_priority_queue.csv` remains the human-readable export, not the system of record |
+| Durable search creation | `Skills/hunter_cli.py create-new-search` persists the exact selection as `status=pending` before any execution | **Exists** (PR #265/#266) |
+| Data acquisition | `Skills/ztf_dr24_bounded_ingest.py`, orchestrated automatically per target by `run-new-search` | Exists, checkpointed/resumable, live-validated |
 | Preprocessing | `src/preprocess.py` | Exists |
-| Scoring | `src/classify.py` + `src/score.py` | Exists; Phase 1 gap #1 (real/bogus) and gap #2 (`fit_orbit()` quality code) sit here |
-| Composite interpretation | `src/score.py` hazard assessment; `Skills/adversarial_review.py` verdict | Exists |
-| Durable results/provenance | `Skills/candidate_ledger.py` + `data_selection/candidate_ledger.sqlite` (Gate A2, closed) — single `candidates` table with review_status, model versions/scores, regeneration_command | Exists, but is one denormalized table, not Hunter's 5 distinct durable entities |
-| Follow-up creation/recommendation | `Skills/export_followup_requests.py`, `Skills/generate_obs_schedule.py` | Exists as ad hoc scripts; no durable "follow-up registry" |
-| CLI (`/Create-New-Search` etc.) | None — verified via `pyproject.toml` (no `[project.scripts]`) and repo root (no CLI wrapper script) | **Gap**: no unified CLI exists at all |
-
-**Highest-priority gap, per this mapping**: the missing durable-search
-entity + unified CLI (the "durable search creation" and CLI rows above)
-is the single largest structural gap relative to the Hunter directive —
-but per the directive's own `HARD INVARIANTS` sequence
-("READ HISTORY → MAP PIPELINE → CLOSE GAPS → BUILD END-TO-END"), Phase
-1's two named gaps (scoring-stage correctness) should close first, since
-building a polished CLI/durable-state layer on top of a scoring stage
-with a known structural gap would just make the gap harder to find later.
-**Work Phase 1 first; Phase 3's CLI/durable-state build is the concrete
-target once Phase 2 closes.**
+| Scoring | `src/classify.py` + `src/score.py` + `src/orbit.py` (Phase 1 gaps closed 2026-07-19) | Exists |
+| Composite interpretation | `src/score.py` hazard assessment; `Skills/adversarial_review.py` verdict, invoked automatically per candidate | Exists |
+| Durable results/provenance | `Skills/candidate_ledger.py` (candidate catalog) + `hunter_state.search_runs`/`search_run_targets` (search run) | **Exists** (PR #265/#267) — 6 tables across 2 SQLite files covering all 5 required entities (candidate catalog stayed in the existing ledger, unchanged) |
+| Follow-up creation/recommendation | `hunter_state.follow_up_registry`, written by `run-new-search` on SURVIVE/BORDERLINE, closed out on re-execution; read by `show-follow-ups` | **Exists** (PR #265/#268) |
+| CLI | `Skills/hunter_cli.py`: `create-new-search --mode {new,follow-up}`, `run-new-search [--search-id\|--latest]`, `show-follow-ups` | **Exists** (PR #266/#267/#268) |
 
 **How to use this section each session**: before proposing any task,
-check which phase is active (this section is kept current — see the
-"Latest sync" entry under Current State for the most recent phase-status
-update) and confirm the specific task maps to that phase's open items.
-If a task doesn't map to the active phase's named items, it fails the
-PRIMARY DIRECTIVE gate above, regardless of how otherwise reasonable it
-seems.
+check which phase is active (Phase 2's calibration item is the only
+concrete open item; Phase 3 is closed) and confirm the specific task maps
+to real, current work — not a re-read of the superseded 2026-07-19 framing
+above. If a task doesn't map to real open work, it fails the PRIMARY
+DIRECTIVE gate above, regardless of how otherwise reasonable it seems.
 
 ---
 
@@ -1082,7 +1132,73 @@ and excluded from CI.
 
 ## Current State (v0.91.0)
 
-**Latest sync (2026-07-19, Hunter PROD Directive integrated)**: Jerome W.
+**Latest sync (2026-07-23/24, Hunter CLI + durable state built and
+real-live-validated — Phase 3 closed)**: Under an operator-issued HUNTER
+PROD CLOSURE DIRECTIVE (2026-07-23), built and merged the full required
+Hunter CLI and durable-state layer across four PRs (#265-#268), each with
+real live validation in this sandbox (which reaches `ztf.uw.edu`/
+`irsa.ipac.caltech.edu` directly, unlike prior GPU-training work in this
+repo's history that needed the operator's Mac). Full detail is in the
+"Current Roadmap Phase" section's rewritten Phase 3 entry and pipeline
+mapping table above; summarized here:
+
+- `src/hunter_state.py` (PR #265): durable SQLite state for
+  `search_manifests`/`search_manifest_targets`, `search_runs`/
+  `search_run_targets`, `follow_up_registry` — the 3 Hunter durable
+  entities that didn't exist. Deliberately did not duplicate target search
+  history into a new table; it stays in the already-working, already-
+  tested `data_selection/target_priority_queue.csv`.
+- `Skills/hunter_cli.py create-new-search --mode new` (PR #266): adaptive
+  discovery loop composing `select_survey_fields.py`'s scorer and
+  `inventory_ztf_field_night_coverage.py`'s live coverage preflight.
+  Real live run: adaptively expanded coverage for 15 new fields (real
+  measured 67-111 distinct nights each), produced a durable 5-target
+  pending manifest, `sufficiency_met=true`.
+- `run-new-search` (PR #267): executes the exact persisted manifest —
+  real per-night acquisition, linking, scoring, adversarial review,
+  candidate-ledger ingestion, with checkpoint/resume and loud per-target
+  failure handling. Real live run: 3 real nights, 600 real observations,
+  9 real tracklets, 9 real `ScoredNEO` packets reviewed (all REJECT, per
+  this project's existing offline-review gate — consistent with this
+  repo's entire prior history, not a new finding) and ledger-ingested,
+  `status=completed`.
+- `create-new-search --mode follow-up` + `show-follow-ups` (PR #268):
+  ranks real open registry entries plus `insufficient_coverage` queue
+  rows re-checked against the current coverage window. Real live run
+  recovered 62 real distinct nights for a field previously found with
+  only 2 (under an older replay window) — a genuine improvement, not a
+  guess — and separately found (disclosed honestly) that this specific
+  field's narrow-box acquisition fails systematically across 10+ real
+  nights, a likely ZTF field/CCD-grid alignment limitation surfaced
+  cleanly as a per-target failure rather than crashing the run. A
+  registry-sourced follow-up execution (using the already-validated field
+  from PR #266/#267) completed successfully end to end.
+
+Two real bugs were found and fixed by live validation, not by inspection:
+(1) per-night acquisition used the coverage-preflight's 2.0-degree search
+box instead of a dedicated 0.01-degree single-exposure box, so a
+wide-box-covered night could span multiple CCD/quadrant footprints and
+never resolve to exactly one exposure; (2) a fully/partially failed
+`run-new-search` pass permanently marked its manifest `executed`, blocking
+retry — fixed so only a fully `completed` pass retires the manifest.
+A third gap (originating `follow_up_registry` entries never closing out
+after execution, which would have caused indefinite re-selection) was
+found and fixed within PR #268 itself.
+
+Full suite: 2222 passed, 2 deselected, 100% coverage on `src/` maintained
+throughout. All 6 reliability checks pass on every PR. Real evidence:
+`docs/evidence/live/2026-07-23-hunter-create-new-search-first-live-run.md`,
+`docs/evidence/live/2026-07-24-hunter-run-new-search-first-live-run.md`,
+`docs/evidence/live/2026-07-24-hunter-followup-mode-first-live-run.md`.
+
+**What this does not claim**: no real candidate has ever survived
+adversarial review in this project's history (this sync doesn't change
+that), no external submission or MPC/NEOCP contact happened, and ranking-
+coefficient calibration (Phase 2) remains open as a separately-tracked
+scientific refinement — the CLI/durable-state build did not wait for it,
+per the reframing recorded in "Current Roadmap Phase" above.
+
+**Earlier sync (2026-07-19, Hunter PROD Directive integrated)**: Jerome W.
 Lindsey III confirmed a cross-project "Hunter PROD Directive" (covering
 this repo as NEO-Hunter, plus sibling repos Techno-Hunter and EXO-Hunter,
 each independently sandboxed) is real and intentional, not a misdirected
@@ -2253,6 +2369,7 @@ consult it only for historical context on a specific gate, blocker, or bug.
 | `Skills/load_credentials.py` | Loads project credentials (ATLAS/ZTF) from macOS Keychain into environment variables; called at the start of any Skill needing live network credentials |
 | `Skills/train_ensemble_stacker.py` | Trains the 10-feature ensemble stacking meta-learner (logistic regression) over Tier 1 XGBoost + Tier 2 CNN outputs; saves `models/stacker_coef.json`; supports `--grouped-split-report`/`--production-candidate` |
 | `Skills/run_canonical_evals.py` | A5 canonical regression eval suite runner; evaluates a frozen `canonical_evals/*.json` suite and reports pass/fail per case with `--out` for a persisted report |
+| `Skills/hunter_cli.py` | The required Hunter CLI: `create-new-search --targets N --mode {new,follow-up}` (adaptive discovery/eligibility/sufficiency loop for new targets; real open-registry + recovered-insufficient-coverage ranking for follow-up), `run-new-search [--search-id ID\|--latest]` (executes the exact persisted manifest — acquisition through candidate-ledger ingestion and follow-up registration), `show-follow-ups` (reads the durable follow-up registry). Composes `select_survey_fields.py`, `inventory_ztf_field_night_coverage.py`, `ztf_dr24_bounded_ingest.py`, `convert_pixel_extraction_to_observations.py`, `run_pixel_extraction_positive_control.py`, `adversarial_review.py`, and `candidate_ledger.py` rather than reimplementing any of them |
 
 ### Docs
 

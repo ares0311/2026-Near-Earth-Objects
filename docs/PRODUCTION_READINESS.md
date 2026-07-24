@@ -1,10 +1,56 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
 **Current version**: v0.91.0
-**Last updated**: 2026-07-17 (header/sync line only — the P1-P5 gate register
-body below is unchanged historical evidence from 2026-07-02; current gate
-status for the active ZTF DR24 path lives in
-`docs/ZTF_DR24_PRODUCTION_GATES.md`, which is kept current every session)
+**Last updated**: 2026-07-24 (Hunter CLI + durable state closed — see the
+sync entry immediately below; the P1-P5 gate register body further down is
+unchanged historical evidence from 2026-07-02; current gate status for the
+active ZTF DR24 path lives in `docs/ZTF_DR24_PRODUCTION_GATES.md`)
+
+**Latest sync (2026-07-23/24, Hunter PROD CLOSURE DIRECTIVE — CLI and
+durable state built, real-live-validated)**: Under an operator-issued
+directive whose authority order places current business requirements
+above older docs/roadmap phrasing, four merged PRs (#265-#268) closed the
+Hunter directive's previously-named structural gaps (durable search
+creation, per-run manifest, follow-up registry, unified CLI — see
+`CLAUDE.md`'s "Current Roadmap Phase" section for the full pipeline-mapping
+table). This did not wait for Phase 2's ranking-coefficient calibration
+(still open, ≥20 source-aligned positives + 20 controls per mode required,
+only 1 Aten/7 Atira exist today) — the directive explicitly requires a
+deterministic/explainable/reproducible ranker, not a calibrated one, and the
+existing `uncalibrated_transparent_prior` v2 policy already satisfies that.
+
+Real, live end-to-end validation (this sandbox reaches `ztf.uw.edu`/
+`irsa.ipac.caltech.edu` directly, unlike prior GPU-training work in this
+repo's history): `create-new-search --mode new` adaptively expanded real
+coverage for 15 fields and produced a durable 5-target pending manifest;
+`run-new-search` executed a manifest completely for real (3 nights, 600
+observations, 9 tracklets, 9 `ScoredNEO` packets reviewed — all REJECT,
+consistent with this project's entire prior null-result history — and
+ledger-ingested, `status=completed`); `create-new-search --mode follow-up`
+genuinely recovered a field from 2 to 62 real distinct nights under this
+project's current coverage window, and separately (disclosed honestly, not
+hidden) found that same field's narrow-box acquisition fails systematically
+across 10+ real nights — a likely ZTF field/CCD-grid alignment limitation
+surfaced as a clean per-target failure, not a crash; a registry-sourced
+follow-up execution completed successfully end to end. `show-follow-ups`
+reads the durable registry back correctly.
+
+Two real bugs were found and fixed by live validation, not inspection: the
+per-night acquisition box size was wrong (reused the coverage-preflight's
+2.0-degree box instead of a dedicated 0.01-degree single-exposure box,
+which can span multiple CCD/quadrant footprints); and a fully/partially
+failed run permanently marked its manifest `executed`, blocking retry
+(fixed so only a fully `completed` pass retires the manifest). A third gap
+— originating follow-up registry entries never closing out after
+execution — was found and fixed within the same PR that introduced it.
+
+Full suite: 2222 passed, 2 deselected, 100% coverage on `src/` maintained
+throughout all four PRs; all 6 reliability checks pass on every PR. This
+does **not** claim a real discovery (none exists in this project's history,
+unchanged by this sync) and does not authorize any external submission.
+Evidence: `docs/evidence/live/2026-07-23-hunter-create-new-search-first-live-run.md`,
+`docs/evidence/live/2026-07-24-hunter-run-new-search-first-live-run.md`,
+`docs/evidence/live/2026-07-24-hunter-followup-mode-first-live-run.md`.
 
 **Active-directive sync (2026-07-17, MP6/MP7 closed — all seven
 Motion-Product Gates now CLOSED)**: The formal gap flagged by the entry
