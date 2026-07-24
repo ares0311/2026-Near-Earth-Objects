@@ -1,0 +1,114 @@
+{
+  "batch_id": "hunter_expand_all_r1_766ba194",
+  "data_role": "metadata_only_coverage_preflight",
+  "end_jd_exclusive": 2460574.5,
+  "fields": [
+    {
+      "dec_deg": -15.0,
+      "field_id": "hx1_217p41_m15p00",
+      "ra_deg": 217.41,
+      "role": "live_search"
+    },
+    {
+      "dec_deg": 7.5,
+      "field_id": "hx1_015p13_p07p50",
+      "ra_deg": 15.13,
+      "role": "live_search"
+    },
+    {
+      "dec_deg": 7.5,
+      "field_id": "hx1_022p69_p07p50",
+      "ra_deg": 22.69,
+      "role": "live_search"
+    },
+    {
+      "dec_deg": -15.0,
+      "field_id": "hx1_225p17_m15p00",
+      "ra_deg": 225.17,
+      "role": "live_search"
+    },
+    {
+      "dec_deg": -15.0,
+      "field_id": "hx1_209p64_m15p00",
+      "ra_deg": 209.64,
+      "role": "live_search"
+    },
+    {
+      "dec_deg": 15.0,
+      "field_id": "hx1_031p06_p15p00",
+      "ra_deg": 31.06,
+      "role": "live_search"
+    },
+    {
+      "dec_deg": 15.0,
+      "field_id": "hx1_023p29_p15p00",
+      "ra_deg": 23.29,
+      "role": "live_search"
+    },
+    {
+      "dec_deg": 7.5,
+      "field_id": "hx1_030p26_p07p50",
+      "ra_deg": 30.26,
+      "role": "live_search"
+    },
+    {
+      "dec_deg": -7.5,
+      "field_id": "hx1_211p81_m07p50",
+      "ra_deg": 211.81,
+      "role": "live_search"
+    },
+    {
+      "dec_deg": 7.5,
+      "field_id": "hx1_007p56_p07p50",
+      "ra_deg": 7.56,
+      "role": "live_search"
+    },
+    {
+      "dec_deg": 0.0,
+      "field_id": "hx1_015p00_p00p00",
+      "ra_deg": 15.0,
+      "role": "live_search"
+    },
+    {
+      "dec_deg": -7.5,
+      "field_id": "hx1_219p38_m07p50",
+      "ra_deg": 219.38,
+      "role": "live_search"
+    },
+    {
+      "dec_deg": 15.0,
+      "field_id": "hx1_038p82_p15p00",
+      "ra_deg": 38.82,
+      "role": "live_search"
+    },
+    {
+      "dec_deg": 15.0,
+      "field_id": "hx1_015p53_p15p00",
+      "ra_deg": 15.53,
+      "role": "live_search"
+    },
+    {
+      "dec_deg": 0.0,
+      "field_id": "hx1_007p50_p00p00",
+      "ra_deg": 7.5,
+      "role": "live_search"
+    }
+  ],
+  "footprint_note": "Each query covers the central size_deg x size_deg IRSA search box.",
+  "min_distinct_nights": 3,
+  "project": "2026 Near Earth Objects",
+  "replay_cutoff_utc": "2024-09-21T00:00:00Z",
+  "safety": {
+    "candidate_scoring": false,
+    "external_submission": false,
+    "impact_claims": false,
+    "metadata_only": true,
+    "raw_alert_archives_downloaded": false
+  },
+  "selection_source": "Skills/hunter_cli.py create-new-search adaptive expansion",
+  "size_deg": 2.0,
+  "source": "IRSA ZTF public science-image metadata",
+  "source_url": "https://irsa.ipac.caltech.edu/ibe/search/ztf/products/sci",
+  "start_jd_exclusive": 2460209.5,
+  "window_days": 365.0
+}
