@@ -231,12 +231,22 @@ class TestGeometryScoreBatch:
         score = ssf.geometry_score_batch(elong, hours, "aten")
         assert score[0] > 0.5
 
-    def test_zero_outside_window(self):
-        # 180° is outside Aten window (60-100°); full score should be 0 (not just elong component)
-        elong = np.array([180.0])
+    def test_preference_falls_outside_peak_without_becoming_ineligible(self):
+        elong = np.array([80.0, 138.0])
         hours = np.array([6.0])
         score = ssf.geometry_score_batch(elong, hours, "aten")
-        assert score[0] == pytest.approx(0.0, abs=1e-9)
+        assert score[0] > score[1] > 0.0
+        assert ssf.eligibility_mask_batch(elong, np.array([6.0, 6.0]), "aten").all()
+
+    def test_ieo_hard_eligibility_is_broader_than_preference(self):
+        elong = np.array([19.9, 32.5, 53.2, 60.1])
+        hours = np.full(4, 6.0)
+        assert ssf.eligibility_mask_batch(elong, hours, "ieo").tolist() == [
+            False,
+            True,
+            True,
+            False,
+        ]
 
     def test_zero_hours_reduces_score(self):
         elong = np.array([80.0, 80.0])
@@ -343,14 +353,15 @@ class TestRankingPolicyProvenance:
     def test_committed_policy_is_versioned_honest_and_digest_stamped(self):
         policy = ssf.load_ranking_policy()
 
-        assert policy["schema_version"] == "ztf-field-ranking-policy-v1"
-        assert policy["policy_id"] == "ztf-field-ranking-v1"
+        assert policy["schema_version"] == "ztf-field-ranking-policy-v2"
+        assert policy["policy_id"] == "ztf-field-ranking-v2"
         assert policy["coefficient_status"] == "uncalibrated_transparent_prior"
         assert len(policy["sha256"]) == 64
         assert policy["path"] == (
-            "data_selection/ranking_policies/ztf_field_ranking_v1.json"
+            "data_selection/ranking_policies/ztf_field_ranking_v2.json"
         )
         assert any("calibrated" in limitation for limitation in policy["limitations"])
+        assert policy["empirical_evidence"]
 
     def test_tampered_coefficient_fails_loudly(self, tmp_path):
         payload = json.loads(ssf._DEFAULT_RANKING_POLICY_PATH.read_text())
@@ -372,6 +383,7 @@ class TestRankingPolicyProvenance:
                 "coefficient_status",
             ),
             (lambda payload: payload.update(references=[]), "references"),
+            (lambda payload: payload.update(empirical_evidence=[]), "empirical_evidence"),
             (lambda payload: payload.update(limitations=[]), "limitations"),
         ],
     )
@@ -433,7 +445,7 @@ class TestSelectFields:
                     "field_radius_deg", "reason"}
         for f in fields:
             assert required.issubset(f.keys())
-            assert f["ranking_policy"]["policy_id"] == "ztf-field-ranking-v1"
+            assert f["ranking_policy"]["policy_id"] == "ztf-field-ranking-v2"
 
     def test_scores_in_range(self):
         fields = ssf.select_fields(jd=2461000.5, mode="aten", top_n=10)

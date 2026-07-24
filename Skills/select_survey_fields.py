@@ -6,9 +6,9 @@ Granvik et al. (2018) supports debiased NEO orbit/population priors, Ye et al.
 (2020) supports low-elongation ZTF twilight searches, and Harris & D'Abramo
 (2015) supports population-completeness estimation. Those papers do not supply
 this selector's exact weights, exponentials, windows, or completeness values.
-The exact v1 coefficients are transparent, uncalibrated operator priors recorded
-in data_selection/ranking_policies/ztf_field_ranking_v1.json; every result is
-stamped with that file's SHA256 and limitations.
+The v2 policy retains the exact transparent, uncalibrated v1 coefficient priors
+and separates evidence-audited eligibility bounds from preference peaks. Every
+result is stamped with the policy file's SHA256 and limitations.
 
 Scoring formula:
 
@@ -86,6 +86,13 @@ _ELONG_WINDOWS: dict[str, tuple[float, float, float]] = {
     "recovery": (120.0, 180.0, 165.0),  # opposition-side fields rich in known objects
 }
 
+_ELIGIBILITY_WINDOWS: dict[str, tuple[float, float]] = {
+    "aten": (60.0, 180.0),
+    "ieo": (20.0, 60.0),
+    "all": (60.0, 180.0),
+    "recovery": (120.0, 180.0),
+}
+
 # Approximate catalog-completeness operator priors. The cited population papers
 # support the feature direction, not these exact values; see the policy file.
 _COMPLETENESS: dict[str, float] = {
@@ -106,13 +113,13 @@ _HISTORY_OVERLAP_DEG = 5.0
 _WISE_PARENT_RADIUS_DEG = 0.2
 
 _COVERAGE_SCHEMA_VERSION = "ztf-field-night-coverage-inventory-v1"
-_RANKING_POLICY_SCHEMA_VERSION = "ztf-field-ranking-policy-v1"
+_RANKING_POLICY_SCHEMA_VERSION = "ztf-field-ranking-policy-v2"
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _DEFAULT_RANKING_POLICY_PATH = (
     _REPO_ROOT
     / "data_selection"
     / "ranking_policies"
-    / "ztf_field_ranking_v1.json"
+    / "ztf_field_ranking_v2.json"
 )
 _TARGET_QUEUE_FIELDS = {
     "rank",
@@ -240,17 +247,24 @@ def geometry_score_batch(elong: np.ndarray, hours: np.ndarray, mode: str) -> np.
     """Geometry score: elongation match for the target class + observable hours tonight.
 
     Elongation score is a Gaussian centred on the mode's optimal elongation,
-    with sigma = 1/3 of the window width. Fields outside the window get 0.
+    with sigma = 1/3 of the preference-window width. Eligibility is evaluated
+    separately so a priority peak cannot silently become a hard search veto.
     Hours score is linear up to 6 hours (0.35 weight).
     """
     e_min, e_max, e_peak = _ELONG_WINDOWS.get(mode, _ELONG_WINDOWS["all"])
     sigma = (e_max - e_min) / 3.0
     elong_score = np.exp(-((elong - e_peak) ** 2) / (2.0 * sigma ** 2))
-    in_window  = (elong >= e_min) & (elong <= e_max)
     hour_score = np.minimum(hours / 6.0, 1.0)
     combined   = np.clip(0.65 * elong_score + 0.35 * hour_score, 0.0, 1.0)
-    # Fields outside the mode's elongation window are entirely unsuitable.
-    return np.where(in_window, combined, 0.0)
+    return combined
+
+
+def eligibility_mask_batch(
+    elong: np.ndarray, hours: np.ndarray, mode: str
+) -> np.ndarray:
+    """Return the versioned hard search-eligibility mask for one mode."""
+    minimum, maximum = _ELIGIBILITY_WINDOWS.get(mode, _ELIGIBILITY_WINDOWS["all"])
+    return (elong >= minimum) & (elong <= maximum) & (hours > 0.5)
 
 
 # ── Run history / novelty ─────────────────────────────────────────────────────
@@ -339,8 +353,11 @@ def load_ranking_policy(path: Path = _DEFAULT_RANKING_POLICY_PATH) -> dict:
             "geometry": 0.35,
             "novelty": 0.20,
         },
-        "elongation_windows_deg": {
+        "preference_windows_deg": {
             key: list(value) for key, value in _ELONG_WINDOWS.items()
+        },
+        "eligibility_windows_deg": {
+            key: list(value) for key, value in _ELIGIBILITY_WINDOWS.items()
         },
         "class_completeness_priors": _COMPLETENESS,
         "eligibility": {
@@ -366,6 +383,27 @@ def load_ranking_policy(path: Path = _DEFAULT_RANKING_POLICY_PATH) -> dict:
     limitations = payload.get("limitations")
     if not isinstance(limitations, list) or not limitations:
         raise ValueError("ranking policy must disclose its limitations")
+    empirical_evidence = payload.get("empirical_evidence")
+    if not isinstance(empirical_evidence, list) or not empirical_evidence:
+        raise ValueError("ranking policy must contain empirical_evidence")
+    for evidence in empirical_evidence:
+        if not isinstance(evidence, dict) or not all(
+            str(evidence.get(key, "")).strip()
+            for key in ("id", "path", "sha256", "supports", "does_not_support")
+        ):
+            raise ValueError("ranking policy empirical evidence is incomplete")
+        evidence_path = (_REPO_ROOT / str(evidence["path"])).resolve()
+        try:
+            evidence_path.relative_to(_REPO_ROOT.resolve())
+        except ValueError as exc:
+            raise ValueError("ranking policy empirical evidence escapes repository") from exc
+        if not evidence_path.is_file():
+            raise ValueError(f"ranking policy empirical evidence not found: {evidence_path}")
+        expected_digest = _required_sha256(
+            evidence["sha256"], "ranking policy empirical evidence sha256"
+        )
+        if hashlib.sha256(evidence_path.read_bytes()).hexdigest() != expected_digest:
+            raise ValueError("ranking policy empirical evidence hash mismatch")
     try:
         recorded_path = str(path.resolve().relative_to(_REPO_ROOT))
     except ValueError:
@@ -377,6 +415,7 @@ def load_ranking_policy(path: Path = _DEFAULT_RANKING_POLICY_PATH) -> dict:
         "sha256": hashlib.sha256(raw).hexdigest(),
         "path": recorded_path,
         "limitations": list(limitations),
+        "empirical_evidence": list(empirical_evidence),
     }
 
 
@@ -668,7 +707,7 @@ def select_fields(jd: float,
         )
 
     # Mask non-observable fields (below horizon or outside elongation window)
-    observable = (geom_s > 0.01) & (hours > 0.5)
+    observable = eligibility_mask_batch(elong, hours, mode)
     total      = np.where(observable, total, -1.0)
 
     # Sort descending; grab extra candidates to absorb deduplication losses

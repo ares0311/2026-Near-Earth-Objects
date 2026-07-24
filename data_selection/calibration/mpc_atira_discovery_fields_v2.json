@@ -1,0 +1,665 @@
+{
+  "created_at_utc": "2026-07-22T01:18:39.854873+00:00",
+  "events": [
+    {
+      "designation": "2018 JB3",
+      "discovery_observation": {
+        "dec_deg": 37.50431,
+        "jd": 2458251.95551,
+        "obs_id": "MPC_166aacb5825d7872",
+        "ra_deg": 350.85504,
+        "station": "703"
+      },
+      "discovery_year": 2018,
+      "earliest_published_observation_jd": 2457215.7630300927,
+      "event_id": "mpc-discovery-observation:2018 JB3",
+      "label": "later_confirmed_neo_discovery_field",
+      "neo_class": "atira",
+      "permanent_id": null,
+      "published_night_count": 32,
+      "published_observation_count": 133,
+      "replay_cutoff_jd": 2458251.9555090005
+    },
+    {
+      "designation": "2019 AQ3",
+      "discovery_observation": {
+        "dec_deg": 0.35289,
+        "jd": 2458487.5792002315,
+        "obs_id": "MPC_8be229246ec386f5",
+        "ra_deg": 325.66325,
+        "station": "I41"
+      },
+      "discovery_year": 2019,
+      "earliest_published_observation_jd": 2457309.11304,
+      "event_id": "mpc-discovery-observation:2019 AQ3",
+      "label": "later_confirmed_neo_discovery_field",
+      "neo_class": "atira",
+      "permanent_id": null,
+      "published_night_count": 37,
+      "published_observation_count": 148,
+      "replay_cutoff_jd": 2458487.5791992317
+    },
+    {
+      "designation": "2019 LF6",
+      "discovery_observation": {
+        "dec_deg": 47.34783,
+        "jd": 2458644.6723029977,
+        "obs_id": "MPC_446b252d43c43626",
+        "ra_deg": 131.1855,
+        "station": "I41"
+      },
+      "discovery_year": 2019,
+      "earliest_published_observation_jd": 2458609.6659609955,
+      "event_id": "mpc-discovery-observation:2019 LF6",
+      "label": "later_confirmed_neo_discovery_field",
+      "neo_class": "atira",
+      "permanent_id": null,
+      "published_night_count": 31,
+      "published_observation_count": 118,
+      "replay_cutoff_jd": 2458644.672301998
+    },
+    {
+      "designation": "2020 AV2",
+      "discovery_observation": {
+        "dec_deg": -6.14494,
+        "jd": 2458852.5770694446,
+        "obs_id": "MPC_52109a30dfb3768a",
+        "ra_deg": 321.20792,
+        "station": "I41"
+      },
+      "discovery_year": 2020,
+      "earliest_published_observation_jd": 2458852.5770694446,
+      "event_id": "mpc-discovery-observation:2020 AV2",
+      "label": "later_confirmed_neo_discovery_field",
+      "neo_class": "atira",
+      "permanent_id": "594913",
+      "published_night_count": 76,
+      "published_observation_count": 407,
+      "replay_cutoff_jd": 2458852.577068445
+    },
+    {
+      "designation": "2020 HA10",
+      "discovery_observation": {
+        "dec_deg": 10.466,
+        "jd": 2458967.96153,
+        "obs_id": "MPC_d03dee3fd5ede9c4",
+        "ra_deg": 337.86854,
+        "station": "G96"
+      },
+      "discovery_year": 2020,
+      "earliest_published_observation_jd": 2455724.900302002,
+      "event_id": "mpc-discovery-observation:2020 HA10",
+      "label": "later_confirmed_neo_discovery_field",
+      "neo_class": "atira",
+      "permanent_id": null,
+      "published_night_count": 12,
+      "published_observation_count": 43,
+      "replay_cutoff_jd": 2458967.961529
+    },
+    {
+      "designation": "2020 OV1",
+      "discovery_observation": {
+        "dec_deg": 46.63564,
+        "jd": 2459049.9708298612,
+        "obs_id": "MPC_aea5f60772fe43d4",
+        "ra_deg": 68.54896,
+        "station": "I41"
+      },
+      "discovery_year": 2020,
+      "earliest_published_observation_jd": 2458307.9693509955,
+      "event_id": "mpc-discovery-observation:2020 OV1",
+      "label": "later_confirmed_neo_discovery_field",
+      "neo_class": "atira",
+      "permanent_id": null,
+      "published_night_count": 19,
+      "published_observation_count": 58,
+      "replay_cutoff_jd": 2459049.9708288615
+    },
+    {
+      "designation": "2021 PB2",
+      "discovery_observation": {
+        "dec_deg": 49.07458,
+        "jd": 2459429.977519676,
+        "obs_id": "MPC_8fb1592d1c51dddd",
+        "ra_deg": 80.17846,
+        "station": "I41"
+      },
+      "discovery_year": 2021,
+      "earliest_published_observation_jd": 2456084.9656859953,
+      "event_id": "mpc-discovery-observation:2021 PB2",
+      "label": "later_confirmed_neo_discovery_field",
+      "neo_class": "atira",
+      "permanent_id": null,
+      "published_night_count": 15,
+      "published_observation_count": 52,
+      "replay_cutoff_jd": 2459429.9775186763
+    },
+    {
+      "designation": "2021 BS1",
+      "discovery_observation": {
+        "dec_deg": 6.69336,
+        "jd": 2459233.0716400463,
+        "obs_id": "MPC_0465f9aeb426ee8e",
+        "ra_deg": 258.61167,
+        "station": "I41"
+      },
+      "discovery_year": 2021,
+      "earliest_published_observation_jd": 2459229.07122,
+      "event_id": "mpc-discovery-observation:2021 BS1",
+      "label": "later_confirmed_neo_discovery_field",
+      "neo_class": "atira",
+      "permanent_id": null,
+      "published_night_count": 16,
+      "published_observation_count": 49,
+      "replay_cutoff_jd": 2459233.0716390465
+    },
+    {
+      "designation": "2021 LJ4",
+      "discovery_observation": {
+        "dec_deg": 10.793175,
+        "jd": 2459372.45171,
+        "obs_id": "MPC_b49cf9935be89689",
+        "ra_deg": 123.770117,
+        "station": "807"
+      },
+      "discovery_year": 2021,
+      "earliest_published_observation_jd": 2457452.7331471876,
+      "event_id": "mpc-discovery-observation:2021 LJ4",
+      "label": "later_confirmed_neo_discovery_field",
+      "neo_class": "atira",
+      "permanent_id": null,
+      "published_night_count": 10,
+      "published_observation_count": 26,
+      "replay_cutoff_jd": 2459372.4517090004
+    },
+    {
+      "designation": "2021 PH27",
+      "discovery_observation": {
+        "dec_deg": -2.152977,
+        "jd": 2459440.4676973377,
+        "obs_id": "MPC_756c8f956a3ad1ec",
+        "ra_deg": 176.705036,
+        "station": "807"
+      },
+      "discovery_year": 2021,
+      "earliest_published_observation_jd": 2457951.47176,
+      "event_id": "mpc-discovery-observation:2021 PH27",
+      "label": "later_confirmed_neo_discovery_field",
+      "neo_class": "atira",
+      "permanent_id": null,
+      "published_night_count": 23,
+      "published_observation_count": 105,
+      "replay_cutoff_jd": 2459440.467696338
+    },
+    {
+      "designation": "2021 VR3",
+      "discovery_observation": {
+        "dec_deg": -10.75528,
+        "jd": 2459522.026829861,
+        "obs_id": "MPC_0841e99bbdf0dbb1",
+        "ra_deg": 167.96388,
+        "station": "I41"
+      },
+      "discovery_year": 2021,
+      "earliest_published_observation_jd": 2458514.6002690047,
+      "event_id": "mpc-discovery-observation:2021 VR3",
+      "label": "later_confirmed_neo_discovery_field",
+      "neo_class": "atira",
+      "permanent_id": null,
+      "published_night_count": 15,
+      "published_observation_count": 52,
+      "replay_cutoff_jd": 2459522.0268288613
+    },
+    {
+      "designation": "2022 BJ8",
+      "discovery_observation": {
+        "dec_deg": -0.4098,
+        "jd": 2459609.0333634373,
+        "obs_id": "MPC_6d02ece5c5cf42f2",
+        "ra_deg": 249.85185,
+        "station": "V00"
+      },
+      "discovery_year": 2022,
+      "earliest_published_observation_jd": 2459609.0333634373,
+      "event_id": "mpc-discovery-observation:2022 BJ8",
+      "label": "later_confirmed_neo_discovery_field",
+      "neo_class": "atira",
+      "permanent_id": null,
+      "published_night_count": 24,
+      "published_observation_count": 87,
+      "replay_cutoff_jd": 2459609.0333624375
+    },
+    {
+      "designation": "2023 KQ5",
+      "discovery_observation": {
+        "dec_deg": 61.633968,
+        "jd": 2460093.811628472,
+        "obs_id": "MPC_c9cd30582e7d9f8a",
+        "ra_deg": 145.52424,
+        "station": "F51"
+      },
+      "discovery_year": 2023,
+      "earliest_published_observation_jd": 2456816.766219479,
+      "event_id": "mpc-discovery-observation:2023 KQ5",
+      "label": "later_confirmed_neo_discovery_field",
+      "neo_class": "atira",
+      "permanent_id": null,
+      "published_night_count": 17,
+      "published_observation_count": 55,
+      "replay_cutoff_jd": 2460093.8116274723
+    },
+    {
+      "designation": "2023 EY2",
+      "discovery_observation": {
+        "dec_deg": 31.64198,
+        "jd": 2460016.6253003934,
+        "obs_id": "MPC_bf2582306c361495",
+        "ra_deg": 33.182325,
+        "station": "V00"
+      },
+      "discovery_year": 2023,
+      "earliest_published_observation_jd": 2460016.6253003934,
+      "event_id": "mpc-discovery-observation:2023 EY2",
+      "label": "later_confirmed_neo_discovery_field",
+      "neo_class": "atira",
+      "permanent_id": null,
+      "published_night_count": 10,
+      "published_observation_count": 33,
+      "replay_cutoff_jd": 2460016.6252993937
+    },
+    {
+      "designation": "2023 WK3",
+      "discovery_observation": {
+        "dec_deg": -23.33394,
+        "jd": 2460269.585578704,
+        "obs_id": "MPC_8028dcefffeb0c1e",
+        "ra_deg": 151.95308,
+        "station": "L87"
+      },
+      "discovery_year": 2023,
+      "earliest_published_observation_jd": 2457039.75812,
+      "event_id": "mpc-discovery-observation:2023 WK3",
+      "label": "later_confirmed_neo_discovery_field",
+      "neo_class": "atira",
+      "permanent_id": null,
+      "published_night_count": 13,
+      "published_observation_count": 48,
+      "replay_cutoff_jd": 2460269.585577704
+    },
+    {
+      "designation": "2023 EL",
+      "discovery_observation": {
+        "dec_deg": -5.879708,
+        "jd": 2460008.50841,
+        "obs_id": "MPC_1c1ae04bc2171744",
+        "ra_deg": 30.433508,
+        "station": "W84"
+      },
+      "discovery_year": 2023,
+      "earliest_published_observation_jd": 2457858.895460464,
+      "event_id": "mpc-discovery-observation:2023 EL",
+      "label": "later_confirmed_neo_discovery_field",
+      "neo_class": "atira",
+      "permanent_id": null,
+      "published_night_count": 24,
+      "published_observation_count": 68,
+      "replay_cutoff_jd": 2460008.508409
+    },
+    {
+      "designation": "2024 AM4",
+      "discovery_observation": {
+        "dec_deg": 33.52082,
+        "jd": 2460323.7093570833,
+        "obs_id": "MPC_e9f0f4cf45d88dd9",
+        "ra_deg": 42.966735,
+        "station": "703"
+      },
+      "discovery_year": 2024,
+      "earliest_published_observation_jd": 2460323.7093570833,
+      "event_id": "mpc-discovery-observation:2024 AM4",
+      "label": "later_confirmed_neo_discovery_field",
+      "neo_class": "atira",
+      "permanent_id": null,
+      "published_night_count": 7,
+      "published_observation_count": 55,
+      "replay_cutoff_jd": 2460323.7093560835
+    },
+    {
+      "designation": "2024 UM9",
+      "discovery_observation": {
+        "dec_deg": 41.50505,
+        "jd": 2460610.0023592245,
+        "obs_id": "MPC_310d2db0e509fb40",
+        "ra_deg": 169.90281,
+        "station": "G96"
+      },
+      "discovery_year": 2024,
+      "earliest_published_observation_jd": 2458872.7262725,
+      "event_id": "mpc-discovery-observation:2024 UM9",
+      "label": "later_confirmed_neo_discovery_field",
+      "neo_class": "atira",
+      "permanent_id": null,
+      "published_night_count": 9,
+      "published_observation_count": 32,
+      "replay_cutoff_jd": 2460610.0023582247
+    },
+    {
+      "designation": "2024 WD19",
+      "discovery_observation": {
+        "dec_deg": -2.62626,
+        "jd": 2460643.1197655094,
+        "obs_id": "MPC_cd2add5127e7c062",
+        "ra_deg": 195.49472,
+        "station": "T09"
+      },
+      "discovery_year": 2024,
+      "earliest_published_observation_jd": 2460643.1197655094,
+      "event_id": "mpc-discovery-observation:2024 WD19",
+      "label": "later_confirmed_neo_discovery_field",
+      "neo_class": "atira",
+      "permanent_id": null,
+      "published_night_count": 4,
+      "published_observation_count": 14,
+      "replay_cutoff_jd": 2460643.1197645096
+    }
+  ],
+  "leakage_policy": {
+    "feature_cutoff": "discovery_observation_jd_minus_epsilon",
+    "future_catalog_identity_allowed_in_features": false,
+    "label_source": "current MPC-confirmed NEO list",
+    "replay_epsilon_days": 1e-06
+  },
+  "query_log": [
+    {
+      "attempts": 1,
+      "designation": "2018 JB3",
+      "event_id": "mpc-discovery-observation:2018 JB3",
+      "status": "accepted"
+    },
+    {
+      "attempts": 1,
+      "designation": "2019 AQ3",
+      "event_id": "mpc-discovery-observation:2019 AQ3",
+      "status": "accepted"
+    },
+    {
+      "attempts": 1,
+      "designation": "2019 LF6",
+      "event_id": "mpc-discovery-observation:2019 LF6",
+      "status": "accepted"
+    },
+    {
+      "attempts": 1,
+      "designation": "2020 AV2",
+      "event_id": "mpc-discovery-observation:2020 AV2",
+      "status": "accepted"
+    },
+    {
+      "attempts": 1,
+      "designation": "2020 HA10",
+      "event_id": "mpc-discovery-observation:2020 HA10",
+      "status": "accepted"
+    },
+    {
+      "attempts": 1,
+      "designation": "2020 OV1",
+      "event_id": "mpc-discovery-observation:2020 OV1",
+      "status": "accepted"
+    },
+    {
+      "attempts": 1,
+      "designation": "2021 PB2",
+      "event_id": "mpc-discovery-observation:2021 PB2",
+      "status": "accepted"
+    },
+    {
+      "attempts": 1,
+      "designation": "2021 BS1",
+      "event_id": "mpc-discovery-observation:2021 BS1",
+      "status": "accepted"
+    },
+    {
+      "attempts": 1,
+      "designation": "2021 LJ4",
+      "event_id": "mpc-discovery-observation:2021 LJ4",
+      "status": "accepted"
+    },
+    {
+      "attempts": 1,
+      "designation": "2021 PH27",
+      "event_id": "mpc-discovery-observation:2021 PH27",
+      "status": "accepted"
+    },
+    {
+      "attempts": 1,
+      "designation": "2021 VR3",
+      "event_id": "mpc-discovery-observation:2021 VR3",
+      "status": "accepted"
+    },
+    {
+      "attempts": 1,
+      "designation": "2022 BJ8",
+      "event_id": "mpc-discovery-observation:2022 BJ8",
+      "status": "accepted"
+    },
+    {
+      "attempts": 1,
+      "designation": "2023 KQ5",
+      "event_id": "mpc-discovery-observation:2023 KQ5",
+      "status": "accepted"
+    },
+    {
+      "attempts": 1,
+      "designation": "2023 EY2",
+      "event_id": "mpc-discovery-observation:2023 EY2",
+      "status": "accepted"
+    },
+    {
+      "attempts": 1,
+      "designation": "2023 WK3",
+      "event_id": "mpc-discovery-observation:2023 WK3",
+      "status": "accepted"
+    },
+    {
+      "attempts": 1,
+      "designation": "2023 EL",
+      "event_id": "mpc-discovery-observation:2023 EL",
+      "status": "accepted"
+    },
+    {
+      "attempts": 1,
+      "designation": "2024 AM4",
+      "event_id": "mpc-discovery-observation:2024 AM4",
+      "status": "accepted"
+    },
+    {
+      "attempts": 1,
+      "designation": "2024 UM9",
+      "event_id": "mpc-discovery-observation:2024 UM9",
+      "status": "accepted"
+    },
+    {
+      "attempts": 1,
+      "designation": "2024 WD19",
+      "event_id": "mpc-discovery-observation:2024 WD19",
+      "status": "accepted"
+    }
+  ],
+  "schema_version": "mpc-discovery-field-calibration-v2",
+  "selection": {
+    "all_per_year": true,
+    "candidate_universe_sha256": "9c98da71152e9c87fa26fcaa78136c7df0759aec5d47354773631f0e3d61caa0",
+    "evaluated_by_year": {
+      "2018": 1,
+      "2019": 2,
+      "2020": 3,
+      "2021": 5,
+      "2022": 1,
+      "2023": 4,
+      "2024": 3
+    },
+    "evaluated_count": 19,
+    "method": "sha256_ordered_year_stratified_mpc_neo_list",
+    "per_year": null,
+    "seed": 42,
+    "selected": [
+      {
+        "designation": "2018 JB3",
+        "discovery_year": 2018,
+        "name": null,
+        "neo_class": "atira",
+        "permanent_id": null
+      },
+      {
+        "designation": "2019 AQ3",
+        "discovery_year": 2019,
+        "name": null,
+        "neo_class": "atira",
+        "permanent_id": null
+      },
+      {
+        "designation": "2019 LF6",
+        "discovery_year": 2019,
+        "name": null,
+        "neo_class": "atira",
+        "permanent_id": null
+      },
+      {
+        "designation": "2020 AV2",
+        "discovery_year": 2020,
+        "name": "'Ayl\u00f3'chaxnim",
+        "neo_class": "atira",
+        "permanent_id": "594913"
+      },
+      {
+        "designation": "2020 HA10",
+        "discovery_year": 2020,
+        "name": null,
+        "neo_class": "atira",
+        "permanent_id": null
+      },
+      {
+        "designation": "2020 OV1",
+        "discovery_year": 2020,
+        "name": null,
+        "neo_class": "atira",
+        "permanent_id": null
+      },
+      {
+        "designation": "2021 PB2",
+        "discovery_year": 2021,
+        "name": null,
+        "neo_class": "atira",
+        "permanent_id": null
+      },
+      {
+        "designation": "2021 BS1",
+        "discovery_year": 2021,
+        "name": null,
+        "neo_class": "atira",
+        "permanent_id": null
+      },
+      {
+        "designation": "2021 LJ4",
+        "discovery_year": 2021,
+        "name": null,
+        "neo_class": "atira",
+        "permanent_id": null
+      },
+      {
+        "designation": "2021 PH27",
+        "discovery_year": 2021,
+        "name": null,
+        "neo_class": "atira",
+        "permanent_id": null
+      },
+      {
+        "designation": "2021 VR3",
+        "discovery_year": 2021,
+        "name": null,
+        "neo_class": "atira",
+        "permanent_id": null
+      },
+      {
+        "designation": "2022 BJ8",
+        "discovery_year": 2022,
+        "name": null,
+        "neo_class": "atira",
+        "permanent_id": null
+      },
+      {
+        "designation": "2023 KQ5",
+        "discovery_year": 2023,
+        "name": null,
+        "neo_class": "atira",
+        "permanent_id": null
+      },
+      {
+        "designation": "2023 EY2",
+        "discovery_year": 2023,
+        "name": null,
+        "neo_class": "atira",
+        "permanent_id": null
+      },
+      {
+        "designation": "2023 WK3",
+        "discovery_year": 2023,
+        "name": null,
+        "neo_class": "atira",
+        "permanent_id": null
+      },
+      {
+        "designation": "2023 EL",
+        "discovery_year": 2023,
+        "name": null,
+        "neo_class": "atira",
+        "permanent_id": null
+      },
+      {
+        "designation": "2024 AM4",
+        "discovery_year": 2024,
+        "name": null,
+        "neo_class": "atira",
+        "permanent_id": null
+      },
+      {
+        "designation": "2024 UM9",
+        "discovery_year": 2024,
+        "name": null,
+        "neo_class": "atira",
+        "permanent_id": null
+      },
+      {
+        "designation": "2024 WD19",
+        "discovery_year": 2024,
+        "name": null,
+        "neo_class": "atira",
+        "permanent_id": null
+      }
+    ],
+    "selected_count": 19,
+    "years": [
+      2018,
+      2019,
+      2020,
+      2021,
+      2022,
+      2023,
+      2024
+    ]
+  },
+  "source": {
+    "candidate_api": "https://data.minorplanetcenter.net/api/list",
+    "candidate_list": "atiras",
+    "observation_api": "https://data.minorplanetcenter.net/api/get-obs",
+    "observation_format": "ADES_DF",
+    "provider": "Minor Planet Center"
+  },
+  "status": "complete",
+  "summary": {
+    "accepted_count": 19,
+    "complete": true,
+    "selected_count": 19
+  },
+  "updated_at_utc": "2026-07-22T01:19:19.327949+00:00"
+}
