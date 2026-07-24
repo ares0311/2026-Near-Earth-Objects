@@ -20,6 +20,7 @@ from hunter_state import (
     init_db,
     list_follow_ups,
     mark_manifest_status,
+    radec_from_target_id,
     target_id_from_radec,
     update_follow_up_status,
     upsert_run_target,
@@ -55,6 +56,16 @@ def test_init_db_records_schema_version(tmp_path: Path) -> None:
 def test_target_id_from_radec_matches_coordinate_key_rounding() -> None:
     assert target_id_from_radec(251.664, -22.501) == "radec_251.66_-22.50"
     assert target_id_from_radec(0.0, 0.0) == "radec_0.00_0.00"
+
+
+def test_radec_from_target_id_is_the_inverse_of_target_id_from_radec() -> None:
+    assert radec_from_target_id("radec_251.66_-22.50") == (251.66, -22.50)
+    assert radec_from_target_id("radec_0.00_0.00") == (0.0, 0.0)
+
+
+def test_radec_from_target_id_rejects_malformed_input() -> None:
+    with pytest.raises(ValueError, match="not a radec_<ra>_<dec> key"):
+        radec_from_target_id("not-a-target-id")
 
 
 def test_create_and_get_search_manifest_round_trip(tmp_path: Path) -> None:

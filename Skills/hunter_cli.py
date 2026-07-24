@@ -190,6 +190,29 @@ def _next_uncovered_planning_candidates(
     return candidates
 
 
+def _live_coverage_check(
+    fields: list[tuple[str, float, float]], batch_id_prefix: str
+) -> dict[str, Any]:
+    """Run one real, live coverage-preflight batch for the given fields and
+    commit the resulting inventory. Shared by ``create-new-search --mode new``'s
+    adaptive expansion and ``--mode follow-up``'s insufficient-coverage rechecks."""
+    batch_id = f"{batch_id_prefix}_{uuid.uuid4().hex[:8]}"
+    manifest_path = _BATCH_MANIFEST_DIR / f"{batch_id}.json"
+    _write_expansion_batch_manifest(batch_id, fields, manifest_path)
+    batch = coverage_inventory.load_batch_manifest(manifest_path)
+    workers = max(1, min(_MAX_AGGREGATE_IRSA_REQUESTS, len(batch.fields)))
+    shard_out_dir = _WORKING_DIR / "coverage_shards"
+    coverage_inventory.run_shard(batch, shard_out_dir, 0, 1, workers)
+    merged = coverage_inventory.merge_shards(batch, shard_out_dir, 1)
+
+    committed_inventory_path = _COVERAGE_INVENTORY_DIR / f"{batch_id}.json"
+    committed_inventory_path.parent.mkdir(parents=True, exist_ok=True)
+    committed_inventory_path.write_text(
+        json.dumps(merged, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    return merged
+
+
 def discover_new_targets(
     jd: float,
     neo_class: str,
@@ -241,24 +264,11 @@ def discover_new_targets(
             break  # planning grid itself is exhausted for this class/night
 
         round_index += 1
-        batch_id = f"hunter_expand_{neo_class}_r{round_index}_{uuid.uuid4().hex[:8]}"
-        manifest_path = _BATCH_MANIFEST_DIR / f"{batch_id}.json"
         fields = [
             (_field_id_from_radec(f"hx{round_index}", ra, dec), ra, dec)
             for ra, dec in candidates
         ]
-        _write_expansion_batch_manifest(batch_id, fields, manifest_path)
-        batch = coverage_inventory.load_batch_manifest(manifest_path)
-        workers = max(1, min(_MAX_AGGREGATE_IRSA_REQUESTS, len(batch.fields)))
-        shard_out_dir = _WORKING_DIR / "coverage_shards"
-        coverage_inventory.run_shard(batch, shard_out_dir, 0, 1, workers)
-        merged = coverage_inventory.merge_shards(batch, shard_out_dir, 1)
-
-        committed_inventory_path = _COVERAGE_INVENTORY_DIR / f"{batch_id}.json"
-        committed_inventory_path.parent.mkdir(parents=True, exist_ok=True)
-        committed_inventory_path.write_text(
-            json.dumps(merged, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-        )
+        merged = _live_coverage_check(fields, f"hunter_expand_{neo_class}_r{round_index}")
         for field in merged["field_results"]:
             key = field_selector._coordinate_key(field["ra_deg"], field["dec_deg"])
             combined[key] = field
@@ -303,28 +313,140 @@ def _print_table(search_id: str, rows: list[dict[str, Any]]) -> None:
     print()
 
 
+_INSUFFICIENT_COVERAGE_STATUS = "insufficient_coverage"
+
+
+def _followup_candidates_from_registry(db_path: Path) -> list[dict[str, Any]]:
+    """Real, durable follow-up-worthy targets: open registry entries left by a
+    prior SURVIVE/BORDERLINE adversarial-review verdict (see run-new-search)."""
+    candidates = []
+    for entry in hunter_state.list_follow_ups(db_path, status="open"):
+        ra_deg, dec_deg = hunter_state.radec_from_target_id(entry["target_id"])
+        candidates.append(
+            {
+                "ra_deg": ra_deg,
+                "dec_deg": dec_deg,
+                "score": float(entry["priority"]),
+                "reason": f"open follow-up (registry): {entry['reason']}",
+                "field_id": None,
+            }
+        )
+    return candidates
+
+
+def _followup_candidates_from_insufficient_coverage(
+    target_queue_path: Path,
+) -> tuple[list[dict[str, Any]], int]:
+    """Real target_priority_queue.csv rows marked insufficient_coverage,
+    re-checked against this project's *current* coverage window -- a
+    genuinely different historical slice of the real ZTF archive than
+    whichever window originally found them insufficient -- via one real,
+    live IRSA metadata query per not-yet-known field. Returns
+    (candidates_now_sufficient, n_still_insufficient)."""
+    rows: list[tuple[float, float]] = []
+    with target_queue_path.open(newline="", encoding="utf-8") as handle:
+        for row in csv.DictReader(handle):
+            if row.get("status") != _INSUFFICIENT_COVERAGE_STATUS:
+                continue
+            match = field_selector._COORDINATE_PATTERN.search(row.get("notes", ""))
+            if match is None:
+                continue
+            rows.append((float(match.group(1)), float(match.group(2))))
+    if not rows:
+        return [], 0
+
+    combined = _combined_known_coverage()
+    to_check = [
+        (ra, dec) for ra, dec in rows if field_selector._coordinate_key(ra, dec) not in combined
+    ]
+    if to_check:
+        fields = [
+            (_field_id_from_radec("followup_recheck", ra, dec), ra, dec) for ra, dec in to_check
+        ]
+        merged = _live_coverage_check(fields, "hunter_followup_recheck")
+        for field in merged["field_results"]:
+            key = field_selector._coordinate_key(field["ra_deg"], field["dec_deg"])
+            combined[key] = field
+
+    candidates: list[dict[str, Any]] = []
+    n_still_insufficient = 0
+    for ra, dec in rows:
+        field = combined.get(field_selector._coordinate_key(ra, dec))
+        if field is None or not field["passes_min_distinct_nights"]:
+            n_still_insufficient += 1
+            continue
+        candidates.append(
+            {
+                "ra_deg": ra,
+                "dec_deg": dec,
+                "score": 0.5,
+                "reason": (
+                    f"previously {_INSUFFICIENT_COVERAGE_STATUS}; now has "
+                    f"{field['n_distinct_nights']} real distinct night(s) under the "
+                    "current coverage window"
+                ),
+                "field_id": field["field_id"],
+            }
+        )
+    return candidates, n_still_insufficient
+
+
+def discover_followup_targets(
+    db_path: Path, requested_n: int, target_queue_path: Path
+) -> dict[str, Any]:
+    """Follow-up mode selection for ``create-new-search --mode follow-up``.
+
+    Ranks real, existing follow-up-worthy targets from two sources: open
+    ``follow_up_registry`` entries (candidates that survived adversarial
+    review and await operator attention) and ``target_priority_queue.csv``
+    rows marked ``insufficient_coverage`` that have since become sufficient
+    under this project's current coverage window (one more real night closes
+    the 3-night minimum). No fabricated evidence -- a field that is still
+    insufficient after a live recheck is reported, not silently dropped.
+    """
+    registry_candidates = _followup_candidates_from_registry(db_path)
+    recovered_candidates, n_still_insufficient = _followup_candidates_from_insufficient_coverage(
+        target_queue_path
+    )
+    all_candidates = registry_candidates + recovered_candidates
+    all_candidates.sort(key=lambda c: c["score"], reverse=True)
+    return {
+        "eligible": all_candidates,
+        "pool_size_explored": len(all_candidates) + n_still_insufficient,
+        "sufficiency_met": len(all_candidates) >= requested_n,
+    }
+
+
 def cmd_create_new_search(args: argparse.Namespace) -> int:
     ranking_policy_path = Path(args.ranking_policy)
     ranking_policy = field_selector.load_ranking_policy(ranking_policy_path)
     target_queue_path = Path(args.target_queue)
+    db_path = Path(args.db)
 
-    if args.jd == "now":
-        from astropy.time import Time
+    if args.mode == "new":
+        if args.jd == "now":
+            from astropy.time import Time
 
-        jd = float(Time.now().jd)
+            jd = float(Time.now().jd)
+        else:
+            jd = float(args.jd)
+
+        out_dir = _WORKING_DIR / "coverage_expansion"
+        result = discover_new_targets(
+            jd=jd,
+            neo_class=args.neo_class,
+            requested_n=args.targets,
+            max_pool=args.max_pool,
+            out_dir=out_dir,
+            target_queue_path=target_queue_path,
+            ranking_policy_path=ranking_policy_path,
+        )
+        config: dict[str, Any] = {"neo_class": args.neo_class, "jd": jd, "max_pool": args.max_pool}
     else:
-        jd = float(args.jd)
-
-    out_dir = _WORKING_DIR / "coverage_expansion"
-    result = discover_new_targets(
-        jd=jd,
-        neo_class=args.neo_class,
-        requested_n=args.targets,
-        max_pool=args.max_pool,
-        out_dir=out_dir,
-        target_queue_path=target_queue_path,
-        ranking_policy_path=ranking_policy_path,
-    )
+        result = discover_followup_targets(
+            db_path=db_path, requested_n=args.targets, target_queue_path=target_queue_path
+        )
+        config = {"neo_class": args.neo_class}
 
     selected = result["eligible"][: args.targets]
     manifest_targets = [
@@ -339,19 +461,21 @@ def cmd_create_new_search(args: argparse.Namespace) -> int:
         for row in selected
     ]
 
-    search_id = f"search_new_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}_{uuid.uuid4().hex[:8]}"
-    db_path = Path(args.db)
+    mode_slug = args.mode.replace("-", "_")
+    search_id = (
+        f"search_{mode_slug}_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}_{uuid.uuid4().hex[:8]}"
+    )
     hunter_state.create_search_manifest(
         db_path=db_path,
         search_id=search_id,
-        mode="new",
+        mode=mode_slug,
         requested_n=args.targets,
         ranking_policy_path=ranking_policy["path"],
         ranking_policy_digest=ranking_policy["sha256"],
         targets=manifest_targets,
         discovery_pool_size_explored=result["pool_size_explored"],
         sufficiency_met=result["sufficiency_met"],
-        config={"neo_class": args.neo_class, "jd": jd, "max_pool": args.max_pool},
+        config=config,
     )
 
     manifest_rows = [
@@ -497,14 +621,38 @@ def execute_target(
             f"target {target['target_id']} has only {len(nights_available)} known covered "
             f"night(s), fewer than min_observations={min_observations}"
         )
-    chosen_nights = nights_available[:min_observations]
 
     target_root = checkpoint_root / target["target_id"]
     obs_dir = target_root / "observations"
     acquired_nights: list[str] = []
-    for night in chosen_nights:
-        _acquire_and_convert_night(ra_deg, dec_deg, night, size_deg, target_root)
-        acquired_nights.append(night)
+    skipped_nights: list[str] = []
+    for night in nights_available:
+        if len(acquired_nights) >= min_observations:
+            break
+        try:
+            _acquire_and_convert_night(ra_deg, dec_deg, night, size_deg, target_root)
+            acquired_nights.append(night)
+        except RuntimeError as exc:
+            # A night the wide coverage-preflight box (size_deg=2.0) recorded
+            # as covered can still miss at the narrow single-exposure
+            # acquisition box: real ZTF field pointing can be offset from the
+            # nominal RA/Dec by up to ~1 degree. Try the next available night
+            # (nights_available is usually much larger than min_observations)
+            # rather than failing the whole target over one bad night.
+            print(
+                f"[run-new-search] night {night} did not resolve at the narrow "
+                f"acquisition box ({exc}); trying next available night",
+                flush=True,
+            )
+            skipped_nights.append(night)
+
+    if len(acquired_nights) < min_observations:
+        raise RuntimeError(
+            f"only acquired {len(acquired_nights)}/{min_observations} real exposure(s) for "
+            f"target {target['target_id']} after trying "
+            f"{len(acquired_nights) + len(skipped_nights)}/{len(nights_available)} "
+            "available covered night(s)"
+        )
 
     control_report = positive_control.run_positive_control(
         nights=acquired_nights,
@@ -569,6 +717,17 @@ def _ingest_and_maybe_register_followup(
             candidate_id=record["candidate_id"],
             originating_run_id=run_id,
         )
+
+
+def _mark_originating_followups_actioned(db_path: Path, target_id: str) -> None:
+    """After a follow-up-mode target is genuinely executed (success or
+    null_result -- not failed), close out any open registry entry that
+    selected it, so it is not re-selected by a future follow-up search.
+    Matches by target_id rather than a dedicated foreign key -- the registry
+    is small and this avoids a schema migration for a one-to-few lookup."""
+    for entry in hunter_state.list_follow_ups(db_path, status="open"):
+        if entry["target_id"] == target_id:
+            hunter_state.update_follow_up_status(db_path, entry["follow_up_id"], "actioned")
 
 
 def run_search(
@@ -644,6 +803,8 @@ def run_search(
             candidate_ids=result["candidate_ids"],
             nights_acquired=result["nights_acquired"],
         )
+        if manifest["mode"] == "follow_up":
+            _mark_originating_followups_actioned(db_path, target_id)
         for scored in result["scored_candidates"]:
             _ingest_and_maybe_register_followup(
                 db_path, ledger_db_path, search_id, run_id, target, scored
@@ -681,7 +842,9 @@ def cmd_run_new_search(args: argparse.Namespace) -> int:
     if args.search_id is not None:
         search_id = args.search_id
     else:
-        search_id = hunter_state.get_latest_pending_manifest(db_path, mode="new")["search_id"]
+        # --latest picks the most recent pending manifest regardless of mode
+        # (new or follow-up) -- execution is identical either way.
+        search_id = hunter_state.get_latest_pending_manifest(db_path)["search_id"]
 
     result = run_search(
         db_path=db_path,
@@ -697,6 +860,42 @@ def cmd_run_new_search(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_show_follow_ups(args: argparse.Namespace) -> int:
+    db_path = Path(args.db)
+    status = None if args.status == "all" else args.status
+    entries = hunter_state.list_follow_ups(db_path, status=status, limit=args.limit)
+    ledger_records: dict[str, dict[str, Any]] = {}
+    ledger_db_path = Path(args.candidate_ledger_db)
+    if ledger_db_path.is_file():
+        ledger_records = {
+            record["candidate_id"]: record
+            for record in candidate_ledger.list_records(ledger_db_path)
+        }
+
+    if not entries:
+        print(f"No follow-ups with status={status!r}." if status else "No follow-ups.")
+        return 0
+
+    header = (
+        f"{'target':<22}  {'priority':>8}  {'status':<10}  {'flagged_at':<20}  "
+        f"{'review':<10}  reason / recommended action"
+    )
+    print(header)
+    print("-" * len(header))
+    for entry in entries:
+        review_status = ""
+        if entry["candidate_id"] is not None:
+            record = ledger_records.get(entry["candidate_id"])
+            if record is not None:
+                review_status = record["review_status"]
+        print(
+            f"{entry['target_id']:<22}  {entry['priority']:>8.3f}  {entry['status']:<10}  "
+            f"{entry['flagged_at']:<20}  {review_status:<10}  {entry['reason']}"
+        )
+        print(f"{'':<22}  {'':>8}  {'':<10}  {'':<20}  {'':<10}  -> {entry['recommended_action']}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -705,7 +904,7 @@ def build_parser() -> argparse.ArgumentParser:
         "create-new-search", help="rank/select targets and create a durable pending search"
     )
     create_cmd.add_argument("--targets", type=int, required=True, help="number of targets (N)")
-    create_cmd.add_argument("--mode", choices=["new"], required=True)
+    create_cmd.add_argument("--mode", choices=["new", "follow-up"], required=True)
     create_cmd.add_argument("--neo-class", choices=_NEO_CLASSES, default="all")
     create_cmd.add_argument("--jd", default="now")
     create_cmd.add_argument("--max-pool", type=int, default=200)
@@ -726,6 +925,16 @@ def build_parser() -> argparse.ArgumentParser:
     run_cmd.add_argument("--checkpoint-root", default=str(_CHECKPOINT_ROOT))
     run_cmd.add_argument("--size-deg", type=float, default=_DEFAULT_SIZE_DEG)
 
+    show_cmd = sub.add_parser(
+        "show-follow-ups", help="show durable follow-up registry entries"
+    )
+    show_cmd.add_argument(
+        "--status", default="open", choices=["open", "actioned", "dismissed", "expired", "all"]
+    )
+    show_cmd.add_argument("--limit", type=int, default=None)
+    show_cmd.add_argument("--db", default=str(_DEFAULT_DB))
+    show_cmd.add_argument("--candidate-ledger-db", default=str(_DEFAULT_LEDGER_DB))
+
     return parser
 
 
@@ -736,6 +945,8 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_create_new_search(args)
         if args.command == "run-new-search":
             return cmd_run_new_search(args)
+        if args.command == "show-follow-ups":
+            return cmd_show_follow_ups(args)
         raise AssertionError(f"unhandled command {args.command}")  # pragma: no cover
     except (KeyError, TypeError, ValueError, RuntimeError, json.JSONDecodeError) as exc:
         raise SystemExit(str(exc)) from exc

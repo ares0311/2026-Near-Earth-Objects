@@ -20,6 +20,7 @@ CSV record always resolve to the identical key.
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from contextlib import closing
 from dataclasses import dataclass
@@ -58,6 +59,19 @@ def _non_empty(value: str, field_name: str) -> str:
 def target_id_from_radec(ra_deg: float, dec_deg: float) -> str:
     """Deterministic target key shared across manifests, runs, and follow-ups."""
     return f"radec_{round(float(ra_deg), 2):.2f}_{round(float(dec_deg), 2):.2f}"
+
+
+_TARGET_ID_PATTERN = re.compile(r"^radec_(-?\d+\.\d+)_(-?\d+\.\d+)$")
+
+
+def radec_from_target_id(target_id: str) -> tuple[float, float]:
+    """Inverse of ``target_id_from_radec`` -- used where a target's RA/Dec is
+    needed but only its durable ``target_id`` string is stored (e.g. the
+    follow-up registry)."""
+    match = _TARGET_ID_PATTERN.match(target_id)
+    if match is None:
+        raise ValueError(f"target_id {target_id!r} is not a radec_<ra>_<dec> key")
+    return float(match.group(1)), float(match.group(2))
 
 
 def connect(db_path: Path) -> sqlite3.Connection:
