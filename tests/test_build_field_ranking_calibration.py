@@ -367,6 +367,98 @@ def test_builder_retries_and_fails_loudly_during_universe_acquisition(
     assert attempts == 3
 
 
+def _single_night_observations(designation: str) -> list[SimpleNamespace]:
+    """All observations on the same UTC night -- deterministically ineligible
+    (fewer than two nights), regardless of how many times it is fetched."""
+    first_jd = 2460310.5
+    return [
+        SimpleNamespace(
+            obs_id=f"{designation}-{index}",
+            jd=first_jd + offset,
+            ra_deg=10.0 + index,
+            dec_deg=-5.0,
+            station="F51",
+            discovery=index == 0,
+        )
+        for index, offset in enumerate((0.0, 0.1, 0.2))
+    ]
+
+
+def test_builder_rejects_ineligible_candidate_and_continues_to_next(tmp_path: Path) -> None:
+    out = tmp_path / "events.json"
+    fetch_calls: list[str] = []
+
+    def observation_fetcher(designation: str) -> list[SimpleNamespace]:
+        fetch_calls.append(designation)
+        if designation == "2024 AA":
+            return _single_night_observations(designation)
+        return _observations(2024, designation)
+
+    result = calibration.build_calibration_events(
+        out,
+        years=(2024,),
+        per_year=2,
+        query_delay_seconds=0,
+        list_fetcher=lambda year: _candidates(year, 2),
+        observation_fetcher=observation_fetcher,
+    )
+
+    # Both candidates were fetched exactly once each -- no retry of the
+    # deterministically-ineligible one -- and the run completed rather than
+    # aborting. Selection order is SHA256-based, not alphabetical, so only
+    # the multiset of calls (not their order) is meaningful here.
+    assert sorted(fetch_calls) == ["2024 AA", "2024 AB"]
+    assert len(fetch_calls) == 2
+    assert result["status"] == "complete"
+    assert result["summary"] == {"accepted_count": 1, "complete": True, "selected_count": 2}
+    assert [event["designation"] for event in result["events"]] == ["2024 AB"]
+    rejected_entries = [
+        entry for entry in result["query_log"] if entry["status"] == "rejected_ineligible"
+    ]
+    assert len(rejected_entries) == 1
+    assert rejected_entries[0]["designation"] == "2024 AA"
+    assert "fewer than two UTC nights" in rejected_entries[0]["reason"]
+
+
+def test_resume_skips_previously_rejected_candidate_without_refetch(tmp_path: Path) -> None:
+    out = tmp_path / "events.json"
+    first_run_fetches: list[str] = []
+
+    def failing_fetcher(designation: str) -> list[SimpleNamespace]:
+        first_run_fetches.append(designation)
+        return _single_night_observations(designation)
+
+    calibration.build_calibration_events(
+        out,
+        years=(2024,),
+        per_year=1,
+        query_delay_seconds=0,
+        list_fetcher=lambda year: _candidates(year, 1),
+        observation_fetcher=failing_fetcher,
+    )
+    assert first_run_fetches == ["2024 AA"]
+
+    resumed_fetches: list[str] = []
+
+    def should_not_be_called(designation: str) -> list[SimpleNamespace]:
+        resumed_fetches.append(designation)
+        return _single_night_observations(designation)
+
+    resumed = calibration.build_calibration_events(
+        out,
+        years=(2024,),
+        per_year=1,
+        resume=True,
+        query_delay_seconds=0,
+        list_fetcher=lambda year: _candidates(year, 1),
+        observation_fetcher=should_not_be_called,
+    )
+
+    assert resumed_fetches == []  # already-rejected candidate is not re-fetched on resume
+    assert resumed["status"] == "complete"
+    assert resumed["summary"]["accepted_count"] == 0
+
+
 def test_resume_rejects_changed_selection_parameters(tmp_path: Path) -> None:
     out = tmp_path / "events.json"
     calibration.build_calibration_events(
