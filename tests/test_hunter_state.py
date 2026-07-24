@@ -13,6 +13,7 @@ from hunter_state import (
     create_search_manifest,
     create_search_run,
     get_latest_pending_manifest,
+    get_latest_run_for_search,
     get_run_targets,
     get_search_manifest,
     get_search_run,
@@ -227,6 +228,27 @@ def test_get_search_run_missing_raises(tmp_path: Path) -> None:
     init_db(db_path)
     with pytest.raises(ValueError, match="no search run found"):
         get_search_run(db_path, "missing")
+
+
+def test_get_latest_run_for_search_returns_none_when_absent(tmp_path: Path) -> None:
+    db_path = tmp_path / "hunter_state.sqlite"
+    create_search_manifest(
+        db_path, "search-1", "new", 1, "p", "d", _targets(1), 1, True, {}
+    )
+    assert get_latest_run_for_search(db_path, "search-1") is None
+
+
+def test_get_latest_run_for_search_returns_most_recent(tmp_path: Path) -> None:
+    db_path = tmp_path / "hunter_state.sqlite"
+    create_search_manifest(
+        db_path, "search-1", "new", 1, "p", "d", _targets(1), 1, True, {}
+    )
+    create_search_run(db_path, "run-1", "search-1", "abc123", {})
+
+    found = get_latest_run_for_search(db_path, "search-1")
+
+    assert found is not None
+    assert found["run_id"] == "run-1"
 
 
 def test_complete_search_run_rejects_running_and_invalid(tmp_path: Path) -> None:
