@@ -480,6 +480,11 @@ def build_calibration_events(
         )
     selected = envelope["selection"]["selected"]
     completed = {str(event["designation"]) for event in envelope["events"]}
+    rejected = {
+        str(entry["designation"])
+        for entry in envelope.get("query_log", [])
+        if entry.get("status") == "rejected_ineligible"
+    }
     fetch = observation_fetcher or fetch_mpc_observations_api
 
     total = len(selected)
@@ -488,37 +493,28 @@ def build_calibration_events(
         if designation in completed:
             print(f"[calibration] event {index}/{total} {designation}: checkpointed", flush=True)
             continue
+        if designation in rejected:
+            print(
+                f"[calibration] event {index}/{total} {designation}: "
+                "checkpointed as ineligible, skipping",
+                flush=True,
+            )
+            continue
         print(f"[calibration] event {index}/{total} {designation}: querying MPC", flush=True)
+
+        # Fetching is retried (transient provider/network errors are worth
+        # retrying); the whole run aborts loudly if the provider itself is
+        # unavailable after retries -- that is a real acquisition problem.
         last_error: Exception | None = None
+        observations: Sequence[Any] | None = None
         for attempt in range(retries + 1):
             try:
-                event = _event_from_observations(candidate, fetch(designation))
-                envelope["events"].append(event)
-                envelope["query_log"].append(
-                    {
-                        "designation": designation,
-                        "status": "accepted",
-                        "attempts": attempt + 1,
-                        "event_id": event["event_id"],
-                    }
-                )
-                envelope["updated_at_utc"] = _utc_now()
-                envelope["summary"] = {
-                    "selected_count": total,
-                    "accepted_count": len(envelope["events"]),
-                    "complete": len(envelope["events"]) == total,
-                }
-                _atomic_write(out, envelope)
-                print(
-                    f"[calibration] event {index}/{total} {designation}: accepted "
-                    f"JD {event['discovery_observation']['jd']:.5f}",
-                    flush=True,
-                )
+                observations = fetch(designation)
                 break
             except Exception as exc:
                 last_error = exc
                 print(
-                    f"[calibration] event {index}/{total} {designation}: attempt "
+                    f"[calibration] event {index}/{total} {designation}: fetch attempt "
                     f"{attempt + 1}/{retries + 1} failed: {type(exc).__name__}: {exc}",
                     flush=True,
                 )
@@ -545,6 +541,53 @@ def build_calibration_events(
             raise RuntimeError(
                 f"MPC acquisition failed for {designation}; checkpoint is resumable at {out}"
             ) from last_error
+
+        # Eligibility (year drift, single published night, no discovery marker)
+        # is a deterministic property of this candidate's published history --
+        # retrying the same fetch cannot change it. Reject and move to the
+        # next candidate rather than aborting the whole run: a real
+        # calibration batch across hundreds of real MPC candidates always
+        # includes some with single-night-only published histories, and that
+        # is expected, not a failure of this run.
+        assert observations is not None
+        try:
+            event = _event_from_observations(candidate, observations)
+        except ValueError as exc:
+            envelope["query_log"].append(
+                {
+                    "designation": designation,
+                    "status": "rejected_ineligible",
+                    "reason": str(exc),
+                }
+            )
+            envelope["updated_at_utc"] = _utc_now()
+            _atomic_write(out, envelope)
+            print(
+                f"[calibration] event {index}/{total} {designation}: rejected ({exc})",
+                flush=True,
+            )
+        else:
+            envelope["events"].append(event)
+            envelope["query_log"].append(
+                {
+                    "designation": designation,
+                    "status": "accepted",
+                    "attempts": attempt + 1,
+                    "event_id": event["event_id"],
+                }
+            )
+            envelope["updated_at_utc"] = _utc_now()
+            envelope["summary"] = {
+                "selected_count": total,
+                "accepted_count": len(envelope["events"]),
+                "complete": len(envelope["events"]) == total,
+            }
+            _atomic_write(out, envelope)
+            print(
+                f"[calibration] event {index}/{total} {designation}: accepted "
+                f"JD {event['discovery_observation']['jd']:.5f}",
+                flush=True,
+            )
         if index < total and query_delay_seconds:
             time.sleep(query_delay_seconds)
 
@@ -556,7 +599,14 @@ def build_calibration_events(
         "complete": True,
     }
     _atomic_write(out, envelope)
-    print(f"[calibration] complete: {total}/{total} events -> {out}", flush=True)
+    n_rejected = sum(
+        1 for entry in envelope["query_log"] if entry.get("status") == "rejected_ineligible"
+    )
+    print(
+        f"[calibration] complete: {len(envelope['events'])}/{total} accepted, "
+        f"{n_rejected} rejected as ineligible -> {out}",
+        flush=True,
+    )
     return envelope
 
 
