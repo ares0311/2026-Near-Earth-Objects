@@ -301,6 +301,21 @@ def get_latest_pending_manifest(db_path: Path, mode: str | None = None) -> dict[
     return get_search_manifest(db_path, row["search_id"])
 
 
+def get_latest_run_for_search(db_path: Path, search_id: str) -> dict[str, Any] | None:
+    """Used by ``run-new-search`` to resume an interrupted run or refuse to
+    silently re-execute an already-completed one, instead of always minting
+    a fresh run_id."""
+    init_db(db_path)
+    with closing(connect(db_path)) as conn:
+        row = conn.execute(
+            "SELECT run_id FROM search_runs WHERE search_id = ? ORDER BY started_at DESC LIMIT 1",
+            (search_id,),
+        ).fetchone()
+    if row is None:
+        return None
+    return get_search_run(db_path, row["run_id"])
+
+
 def mark_manifest_status(db_path: Path, search_id: str, status: str) -> None:
     if status not in _MANIFEST_STATUSES:
         raise ValueError(f"status must be one of {sorted(_MANIFEST_STATUSES)}, got {status!r}")
