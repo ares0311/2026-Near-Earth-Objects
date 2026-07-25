@@ -37,6 +37,19 @@ def test_real_audit_reproduces_scores_and_blocks_unsupported_fit() -> None:
     }
     assert result["all_source_metrics"]["aten"]["all"]["positive_count"] == 2085
     assert result["all_source_metrics"]["ieo"]["all"]["positive_count"] == 23
+    assert gate["minimum_thresholds"] == {
+        "aten": {"positive": 20, "searched_null": 20},
+        "ieo": {"positive": 7, "searched_null": 7},
+    }
+
+
+def test_gate_uses_per_mode_thresholds_ieo_ceiling_lower_than_aten() -> None:
+    """The 2026-07-25 operator-approved revision: Atira/ieo's real
+    population caps at 7 positives, so its threshold is 7/7, not the flat
+    20/20 aten still uses."""
+    assert audit.MINIMUM_SAMPLE_THRESHOLDS["aten"]["positive"] == 20
+    assert audit.MINIMUM_SAMPLE_THRESHOLDS["ieo"]["positive"] == 7
+    assert audit.MINIMUM_SAMPLE_THRESHOLDS["ieo"]["searched_null"] == 7
 
 
 def test_audit_rejects_recorded_score_drift(tmp_path: Path) -> None:
