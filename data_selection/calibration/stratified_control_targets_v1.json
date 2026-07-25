@@ -1,0 +1,20 @@
+{
+  "schema_version": "hunter-stratified-control-targets-v1",
+  "purpose": "Predeclared, stratified (top/middle/bottom/random) Aten-mode field sample for building searched-null-control records via Skills/build_field_null_outcome_controls.py, extending data_selection/calibration/ztf_field_null_outcomes_v1.json's biased top-ranked-only control cohort per that dataset's own interpretation_limits.",
+  "selection_method": "select_survey_fields.select_fields(jd=2461246.64, mode='aten', top_n=99999) over the full eligible field set (388 fields), excluding the 43 coordinates already present in data_selection/target_priority_queue.csv, then stratified sampling: 3 highest-ranked (top), 3 middle-ranked (middle), 3 lowest-ranked (bottom), 3 uniform-random draws from the remaining pool (random), seed=20260724.",
+  "predeclared_at_utc": "2026-07-24T00:00:00+00:00",
+  "fields": [
+    {"stratum": "top", "ra_deg": 31.06, "dec_deg": 15.0, "rank": 5, "score": 0.8850, "mode": "aten", "ranking_jd": 2461246.64},
+    {"stratum": "top", "ra_deg": 40.59, "dec_deg": 22.5, "rank": 7, "score": 0.8794, "mode": "aten", "ranking_jd": 2461246.64},
+    {"stratum": "top", "ra_deg": 37.82, "dec_deg": 7.5, "rank": 8, "score": 0.8719, "mode": "aten", "ranking_jd": 2461246.64},
+    {"stratum": "middle", "ra_deg": 310.15, "dec_deg": -7.5, "rank": 210, "score": 0.6413, "mode": "aten", "ranking_jd": 2461246.64},
+    {"stratum": "middle", "ra_deg": 324.72, "dec_deg": -22.5, "rank": 211, "score": 0.6412, "mode": "aten", "ranking_jd": 2461246.64},
+    {"stratum": "middle", "ra_deg": 236.34, "dec_deg": 37.5, "rank": 212, "score": 0.6399, "mode": "aten", "ranking_jd": 2461246.64},
+    {"stratum": "bottom", "ra_deg": 17.32, "dec_deg": -30.0, "rank": 386, "score": 0.5145, "mode": "aten", "ranking_jd": 2461246.64},
+    {"stratum": "bottom", "ra_deg": 293.06, "dec_deg": 37.5, "rank": 387, "score": 0.5142, "mode": "aten", "ranking_jd": 2461246.64},
+    {"stratum": "bottom", "ra_deg": 283.61, "dec_deg": 37.5, "rank": 388, "score": 0.5136, "mode": "aten", "ranking_jd": 2461246.64},
+    {"stratum": "random", "ra_deg": 330.0, "dec_deg": 60.0, "rank": 271, "score": 0.6024, "mode": "aten", "ranking_jd": 2461246.64},
+    {"stratum": "random", "ra_deg": 243.54, "dec_deg": 22.5, "rank": 319, "score": 0.5623, "mode": "aten", "ranking_jd": 2461246.64},
+    {"stratum": "random", "ra_deg": 194.83, "dec_deg": -22.5, "rank": 23, "score": 0.8185, "mode": "aten", "ranking_jd": 2461246.64}
+  ]
+}
