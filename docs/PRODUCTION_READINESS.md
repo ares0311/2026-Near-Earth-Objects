@@ -6,7 +6,28 @@ sync entry immediately below; the P1-P5 gate register body further down is
 unchanged historical evidence from 2026-07-02; current gate status for the
 active ZTF DR24 path lives in `docs/ZTF_DR24_PRODUCTION_GATES.md`)
 
-**Latest sync (2026-07-25, stratified Aten searched-null controls: 17/20)**:
+**Latest sync (2026-07-25, Aten calibration-eligibility bar fully closed:
+21/20 searched-null controls)**: A second predeclared batch of 4
+bottom-stratum fields (`stratified_control_targets_v2.json`) closed the
+17/20 gap left by the first batch's one genuine acquisition failure — all
+4 produced real `null_result` outcomes, no bugs found this time (the
+three fixes from the first batch held up cleanly). Combined:
+6 (v1, top-ranked) + 11 (batch 1) + 4 (batch 2) = **21 Aten-mode real
+searched-null controls**, clearing the ≥20 threshold. Both halves of the
+Aten calibration-eligibility bar (≥20 source-aligned positives, closed
+2026-07-24 at 57; ≥20 searched controls, closed here) are now met.
+**This does not itself fit or promote new ranking coefficients** — the
+`Skills/evaluate_field_ranking_policy.py` evaluator's own default
+`--positive` input is still a smaller, stale sample (reports `positive: 1`
+for Aten); wiring the real 57-positive exhaustive result in as its default
+is separate follow-on integration work. The deterministic
+`uncalibrated_transparent_prior` v2 policy remains in force; no
+coefficient change has been made. `data_selection/calibration/
+ztf_field_null_outcomes_v3.json` is the current combined dataset (extends,
+does not overwrite, v1/v2). Full detail:
+`docs/evidence/live/2026-07-25-stratified-null-outcome-controls-second-batch.md`.
+
+**Earlier sync (2026-07-25, stratified Aten searched-null controls: 17/20)**:
 Executed the 12 predeclared stratified fields from PR #271 for real, fixing
 three real bugs found live along the way (PRs #272-274: missing
 coverage-preflight step, a dotted `field_id` the coverage validator

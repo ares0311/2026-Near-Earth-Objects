@@ -1,0 +1,648 @@
+{
+  "schema_version": "ztf-field-null-outcomes-v1",
+  "dataset_id": "ztf-dr24-searched-field-nulls-v3",
+  "created_at_utc": "2026-07-21T00:00:00+00:00",
+  "purpose": "Leakage-safe real searched-field null outcomes for transparent field-ranking calibration and audit. v2 adds a predeclared, stratified (top/middle/bottom/random) sample to reduce the top-ranked-only selection bias flagged in v1's interpretation_limits. v3 adds 4 more bottom-stratum fields closing the gap left by v2's one genuine acquisition failure, reaching the >=20-per-mode Aten threshold.",
+  "outcome_definition": "A bounded ZTF DR24 search with at least three populated observation nights produced no candidate surviving the applicable production association and review path.",
+  "interpretation_limits": [
+    "A null_result is a bounded search outcome, not evidence that no NEO was present in the field.",
+    "Entries 1-9 (v1) were selected for search and are not a random or bottom-ranked control sample.",
+    "Entries 10-20 (v2 addendum) are a predeclared, stratified top/middle/bottom/random sample -- see selection_stratum on each entry and data_selection/calibration/stratified_control_targets_v1.json for the exact predeclaration.",
+    "This dataset can measure review burden and retrospective ranking behavior but cannot alone identify causal discovery-yield weights.",
+    "Entries 21-24 (v3 addendum) are a second predeclared bottom-stratum batch closing the 17/20 gap left after v2's one acquisition failure -- see selection_stratum on each entry and data_selection/calibration/stratified_control_targets_v2.json for the exact predeclaration."
+  ],
+  "source_queue": {
+    "origin_path": "data_selection/target_priority_queue.csv",
+    "path": "data_selection/calibration/ztf_field_null_outcome_queue_rows_v1.csv",
+    "sha256": "62d3fe954c8b8ce5fc36923efbe09f600132b6ced4cee1d64717098807c9b912"
+  },
+  "eligibility": {
+    "minimum_populated_nights": 3,
+    "required_outcome": "null_result"
+  },
+  "entries": [
+    {
+      "outcome_id": "ztf-null-2018-ra217410-dec-15000",
+      "ra_deg": 217.41,
+      "dec_deg": -15.0,
+      "field_radius_deg": 3.5,
+      "observation_nights_yyyymmdd": [
+        "20180327",
+        "20180330",
+        "20180409"
+      ],
+      "outcome": "null_result",
+      "recorded_rank": 1,
+      "recorded_score": 0.9308,
+      "ranking_mode": "aten",
+      "ranking_jd": 2458340.5,
+      "pipeline_path": "motion_product_pixel_extraction",
+      "execution_ids": [
+        "ztf-dr24-selected-field-linking-2026-07-17"
+      ],
+      "production_tracklet_count": 5,
+      "surviving_review_count": 0,
+      "evidence_path": "docs/evidence/live/2026-07-17-ztf-dr24-selected-field-linking-test.md",
+      "evidence_sha256": "b8110a4ae9ccce915bc5734dd35339a871a6e6749bc182ba4adda020649466b9"
+    },
+    {
+      "outcome_id": "ztf-null-2018-ra054350-dec015000",
+      "ra_deg": 54.35,
+      "dec_deg": 15.0,
+      "field_radius_deg": 3.5,
+      "observation_nights_yyyymmdd": [
+        "20180807",
+        "20180810",
+        "20180813"
+      ],
+      "outcome": "null_result",
+      "recorded_rank": 2,
+      "recorded_score": 0.8997,
+      "ranking_mode": "aten",
+      "ranking_jd": 2458340.5,
+      "pipeline_path": "motion_product_pixel_extraction",
+      "execution_ids": [
+        "ztf-dr24-third-field-linking-2026-07-17"
+      ],
+      "production_tracklet_count": 0,
+      "surviving_review_count": 0,
+      "evidence_path": "docs/evidence/live/2026-07-17-ztf-dr24-third-field-linking-test.md",
+      "evidence_sha256": "0def530dea307476c3ade186bd80dedf31b60338deb07fec9c3dbef36d80f83a"
+    },
+    {
+      "outcome_id": "ztf-null-2018-ra048710-dec022500",
+      "ra_deg": 48.71,
+      "dec_deg": 22.5,
+      "field_radius_deg": 3.5,
+      "observation_nights_yyyymmdd": [
+        "20180713",
+        "20180716",
+        "20180719"
+      ],
+      "outcome": "null_result",
+      "recorded_rank": 3,
+      "recorded_score": 0.8879,
+      "ranking_mode": "aten",
+      "ranking_jd": 2458340.5,
+      "pipeline_path": "motion_product_pixel_extraction",
+      "execution_ids": [
+        "ztf-dr24-fourth-field-linking-2026-07-18"
+      ],
+      "production_tracklet_count": 6,
+      "surviving_review_count": 0,
+      "evidence_path": "docs/evidence/live/2026-07-18-ztf-dr24-fourth-field-linking-test.md",
+      "evidence_sha256": "17b2d887411e03ce90cd8b53e4b37d4e1928ad6ddf7514619854cd2f87000abb"
+    },
+    {
+      "outcome_id": "ztf-null-2018-ra046590-dec015000",
+      "ra_deg": 46.59,
+      "dec_deg": 15.0,
+      "field_radius_deg": 3.5,
+      "observation_nights_yyyymmdd": [
+        "20180714",
+        "20180717",
+        "20180720"
+      ],
+      "outcome": "null_result",
+      "recorded_rank": 5,
+      "recorded_score": 0.8761,
+      "ranking_mode": "aten",
+      "ranking_jd": 2458340.5,
+      "pipeline_path": "motion_product_pixel_extraction",
+      "execution_ids": [
+        "ztf-dr24-sixth-field-linking-2026-07-19"
+      ],
+      "production_tracklet_count": 2,
+      "surviving_review_count": 0,
+      "evidence_path": "docs/evidence/live/2026-07-19-ztf-dr24-sixth-field-linking-test.md",
+      "evidence_sha256": "e52b2302ba220158a782cf3b80a191db088c6476fc78e1f635b85afe9285ccf8"
+    },
+    {
+      "outcome_id": "ztf-null-2024-ra251660-dec-22500",
+      "ra_deg": 251.66,
+      "dec_deg": -22.5,
+      "field_radius_deg": 3.5,
+      "observation_nights_yyyymmdd": [
+        "20240422",
+        "20240504",
+        "20240603"
+      ],
+      "outcome": "null_result",
+      "recorded_rank": 1,
+      "recorded_score": 0.9202,
+      "ranking_mode": "aten",
+      "ranking_jd": 2459107.5,
+      "pipeline_path": "alert_archive_portfolio",
+      "execution_ids": [
+        "017eb50381badb75"
+      ],
+      "production_tracklet_count": 0,
+      "surviving_review_count": 0,
+      "evidence_path": "docs/evidence/live/2026-07-14-ztf-coverage-qualified-search-result.md",
+      "evidence_sha256": "1867cb9c8ef64c3886471840e9022caecc641bca65ae105942ee34cf6d1ef9d2"
+    },
+    {
+      "outcome_id": "ztf-null-2024-ra243540-dec-22500",
+      "ra_deg": 243.54,
+      "dec_deg": -22.5,
+      "field_radius_deg": 3.5,
+      "observation_nights_yyyymmdd": [
+        "20240422",
+        "20240504",
+        "20240603"
+      ],
+      "outcome": "null_result",
+      "recorded_rank": 2,
+      "recorded_score": 0.8859,
+      "ranking_mode": "aten",
+      "ranking_jd": 2459107.5,
+      "pipeline_path": "alert_archive_portfolio",
+      "execution_ids": [
+        "017eb50381badb75"
+      ],
+      "production_tracklet_count": 0,
+      "surviving_review_count": 0,
+      "evidence_path": "docs/evidence/live/2026-07-14-ztf-coverage-qualified-search-result.md",
+      "evidence_sha256": "1867cb9c8ef64c3886471840e9022caecc641bca65ae105942ee34cf6d1ef9d2"
+    },
+    {
+      "outcome_id": "ztf-null-2024-ra204250-dec-07500",
+      "ra_deg": 204.25,
+      "dec_deg": -7.5,
+      "field_radius_deg": 3.5,
+      "observation_nights_yyyymmdd": [
+        "20240321",
+        "20240504",
+        "20240603"
+      ],
+      "outcome": "null_result",
+      "recorded_rank": 4,
+      "recorded_score": 0.9488,
+      "ranking_mode": "ieo",
+      "ranking_jd": 2459107.5,
+      "pipeline_path": "alert_archive_portfolio",
+      "execution_ids": [
+        "017eb50381badb75"
+      ],
+      "production_tracklet_count": 0,
+      "surviving_review_count": 0,
+      "evidence_path": "docs/evidence/live/2026-07-14-ztf-coverage-qualified-search-result.md",
+      "evidence_sha256": "1867cb9c8ef64c3886471840e9022caecc641bca65ae105942ee34cf6d1ef9d2"
+    },
+    {
+      "outcome_id": "ztf-null-2024-ra196680-dec-07500",
+      "ra_deg": 196.68,
+      "dec_deg": -7.5,
+      "field_radius_deg": 3.5,
+      "observation_nights_yyyymmdd": [
+        "20240321",
+        "20240504",
+        "20240603"
+      ],
+      "outcome": "null_result",
+      "recorded_rank": 5,
+      "recorded_score": 0.9347,
+      "ranking_mode": "ieo",
+      "ranking_jd": 2459107.5,
+      "pipeline_path": "alert_archive_portfolio",
+      "execution_ids": [
+        "017eb50381badb75"
+      ],
+      "production_tracklet_count": 0,
+      "surviving_review_count": 0,
+      "evidence_path": "docs/evidence/live/2026-07-14-ztf-coverage-qualified-search-result.md",
+      "evidence_sha256": "1867cb9c8ef64c3886471840e9022caecc641bca65ae105942ee34cf6d1ef9d2"
+    },
+    {
+      "outcome_id": "ztf-null-2024-ra147530-dec015000",
+      "ra_deg": 147.53,
+      "dec_deg": 15.0,
+      "field_radius_deg": 3.5,
+      "observation_nights_yyyymmdd": [
+        "20231029",
+        "20240422",
+        "20240429",
+        "20240504"
+      ],
+      "outcome": "null_result",
+      "recorded_rank": 6,
+      "recorded_score": 0.9358,
+      "ranking_mode": "ieo",
+      "ranking_jd": 2459107.5,
+      "pipeline_path": "alert_archive_portfolio_cross_batch",
+      "execution_ids": [
+        "017eb50381badb75",
+        "56c2348f31302291"
+      ],
+      "production_tracklet_count": 0,
+      "surviving_review_count": 0,
+      "evidence_path": "docs/evidence/live/2026-07-14-ztf-sparse-expansion-and-cross-batch-result.md",
+      "evidence_sha256": "cde4c0605c7683fa8e5cb285ca1e886177e80bb107bad8bc9290e9b6646ac2d9"
+    },
+    {
+      "outcome_id": "ztf-null-top-ra0031p06-decp015p00",
+      "ra_deg": 31.06,
+      "dec_deg": 15.0,
+      "field_radius_deg": 3.5,
+      "observation_nights_yyyymmdd": [
+        "20230924",
+        "20230926",
+        "20230927"
+      ],
+      "outcome": "null_result",
+      "recorded_rank": 5,
+      "recorded_score": 0.885,
+      "ranking_mode": "aten",
+      "ranking_jd": 2461246.64,
+      "pipeline_path": "motion_product_pixel_extraction",
+      "execution_ids": [
+        "stratified-null-controls-2026-07-25"
+      ],
+      "production_tracklet_count": 0,
+      "surviving_review_count": 0,
+      "selection_stratum": "top",
+      "evidence_path": "docs/evidence/live/2026-07-25-stratified-null-outcome-controls-first-live-run.md",
+      "evidence_sha256": "61f17dbf02391eb258872cb810987c577cadaadbae67fe0df5b359bf56717209"
+    },
+    {
+      "outcome_id": "ztf-null-top-ra0040p59-decp022p50",
+      "ra_deg": 40.59,
+      "dec_deg": 22.5,
+      "field_radius_deg": 3.5,
+      "observation_nights_yyyymmdd": [
+        "20230924",
+        "20230926",
+        "20230927"
+      ],
+      "outcome": "null_result",
+      "recorded_rank": 7,
+      "recorded_score": 0.8794,
+      "ranking_mode": "aten",
+      "ranking_jd": 2461246.64,
+      "pipeline_path": "motion_product_pixel_extraction",
+      "execution_ids": [
+        "stratified-null-controls-2026-07-25"
+      ],
+      "production_tracklet_count": 0,
+      "surviving_review_count": 0,
+      "selection_stratum": "top",
+      "evidence_path": "docs/evidence/live/2026-07-25-stratified-null-outcome-controls-first-live-run.md",
+      "evidence_sha256": "61f17dbf02391eb258872cb810987c577cadaadbae67fe0df5b359bf56717209"
+    },
+    {
+      "outcome_id": "ztf-null-top-ra0037p82-decp007p50",
+      "ra_deg": 37.82,
+      "dec_deg": 7.5,
+      "field_radius_deg": 3.5,
+      "observation_nights_yyyymmdd": [
+        "20230924",
+        "20230926",
+        "20230927"
+      ],
+      "outcome": "null_result",
+      "recorded_rank": 8,
+      "recorded_score": 0.8719,
+      "ranking_mode": "aten",
+      "ranking_jd": 2461246.64,
+      "pipeline_path": "motion_product_pixel_extraction",
+      "execution_ids": [
+        "stratified-null-controls-2026-07-25"
+      ],
+      "production_tracklet_count": 0,
+      "surviving_review_count": 0,
+      "selection_stratum": "top",
+      "evidence_path": "docs/evidence/live/2026-07-25-stratified-null-outcome-controls-first-live-run.md",
+      "evidence_sha256": "61f17dbf02391eb258872cb810987c577cadaadbae67fe0df5b359bf56717209"
+    },
+    {
+      "outcome_id": "ztf-null-middle-ra0310p15-decm007p50",
+      "ra_deg": 310.15,
+      "dec_deg": -7.5,
+      "field_radius_deg": 3.5,
+      "observation_nights_yyyymmdd": [
+        "20230922",
+        "20230924",
+        "20230927"
+      ],
+      "outcome": "null_result",
+      "recorded_rank": 210,
+      "recorded_score": 0.6413,
+      "ranking_mode": "aten",
+      "ranking_jd": 2461246.64,
+      "pipeline_path": "motion_product_pixel_extraction",
+      "execution_ids": [
+        "stratified-null-controls-2026-07-25"
+      ],
+      "production_tracklet_count": 1,
+      "surviving_review_count": 0,
+      "selection_stratum": "middle",
+      "evidence_path": "docs/evidence/live/2026-07-25-stratified-null-outcome-controls-first-live-run.md",
+      "evidence_sha256": "61f17dbf02391eb258872cb810987c577cadaadbae67fe0df5b359bf56717209"
+    },
+    {
+      "outcome_id": "ztf-null-middle-ra0324p72-decm022p50",
+      "ra_deg": 324.72,
+      "dec_deg": -22.5,
+      "field_radius_deg": 3.5,
+      "observation_nights_yyyymmdd": [
+        "20230924",
+        "20230928",
+        "20230930"
+      ],
+      "outcome": "null_result",
+      "recorded_rank": 211,
+      "recorded_score": 0.6412,
+      "ranking_mode": "aten",
+      "ranking_jd": 2461246.64,
+      "pipeline_path": "motion_product_pixel_extraction",
+      "execution_ids": [
+        "stratified-null-controls-2026-07-25"
+      ],
+      "production_tracklet_count": 6,
+      "surviving_review_count": 0,
+      "selection_stratum": "middle",
+      "evidence_path": "docs/evidence/live/2026-07-25-stratified-null-outcome-controls-first-live-run.md",
+      "evidence_sha256": "61f17dbf02391eb258872cb810987c577cadaadbae67fe0df5b359bf56717209"
+    },
+    {
+      "outcome_id": "ztf-null-middle-ra0236p34-decp037p50",
+      "ra_deg": 236.34,
+      "dec_deg": 37.5,
+      "field_radius_deg": 3.5,
+      "observation_nights_yyyymmdd": [
+        "20231005",
+        "20231007",
+        "20231011"
+      ],
+      "outcome": "null_result",
+      "recorded_rank": 212,
+      "recorded_score": 0.6399,
+      "ranking_mode": "aten",
+      "ranking_jd": 2461246.64,
+      "pipeline_path": "motion_product_pixel_extraction",
+      "execution_ids": [
+        "stratified-null-controls-2026-07-25"
+      ],
+      "production_tracklet_count": 8,
+      "surviving_review_count": 0,
+      "selection_stratum": "middle",
+      "evidence_path": "docs/evidence/live/2026-07-25-stratified-null-outcome-controls-first-live-run.md",
+      "evidence_sha256": "61f17dbf02391eb258872cb810987c577cadaadbae67fe0df5b359bf56717209"
+    },
+    {
+      "outcome_id": "ztf-null-bottom-ra0293p06-decp037p50",
+      "ra_deg": 293.06,
+      "dec_deg": 37.5,
+      "field_radius_deg": 3.5,
+      "observation_nights_yyyymmdd": [
+        "20230924",
+        "20230926",
+        "20230930"
+      ],
+      "outcome": "null_result",
+      "recorded_rank": 387,
+      "recorded_score": 0.5142,
+      "ranking_mode": "aten",
+      "ranking_jd": 2461246.64,
+      "pipeline_path": "motion_product_pixel_extraction",
+      "execution_ids": [
+        "stratified-null-controls-2026-07-25"
+      ],
+      "production_tracklet_count": 2,
+      "surviving_review_count": 0,
+      "selection_stratum": "bottom",
+      "evidence_path": "docs/evidence/live/2026-07-25-stratified-null-outcome-controls-first-live-run.md",
+      "evidence_sha256": "61f17dbf02391eb258872cb810987c577cadaadbae67fe0df5b359bf56717209"
+    },
+    {
+      "outcome_id": "ztf-null-bottom-ra0283p61-decp037p50",
+      "ra_deg": 283.61,
+      "dec_deg": 37.5,
+      "field_radius_deg": 3.5,
+      "observation_nights_yyyymmdd": [
+        "20230922",
+        "20230925",
+        "20230927"
+      ],
+      "outcome": "null_result",
+      "recorded_rank": 388,
+      "recorded_score": 0.5136,
+      "ranking_mode": "aten",
+      "ranking_jd": 2461246.64,
+      "pipeline_path": "motion_product_pixel_extraction",
+      "execution_ids": [
+        "stratified-null-controls-2026-07-25"
+      ],
+      "production_tracklet_count": 1,
+      "surviving_review_count": 0,
+      "selection_stratum": "bottom",
+      "evidence_path": "docs/evidence/live/2026-07-25-stratified-null-outcome-controls-first-live-run.md",
+      "evidence_sha256": "61f17dbf02391eb258872cb810987c577cadaadbae67fe0df5b359bf56717209"
+    },
+    {
+      "outcome_id": "ztf-null-random-ra0330p00-decp060p00",
+      "ra_deg": 330.0,
+      "dec_deg": 60.0,
+      "field_radius_deg": 3.5,
+      "observation_nights_yyyymmdd": [
+        "20230924",
+        "20230926",
+        "20230927"
+      ],
+      "outcome": "null_result",
+      "recorded_rank": 271,
+      "recorded_score": 0.6024,
+      "ranking_mode": "aten",
+      "ranking_jd": 2461246.64,
+      "pipeline_path": "motion_product_pixel_extraction",
+      "execution_ids": [
+        "stratified-null-controls-2026-07-25"
+      ],
+      "production_tracklet_count": 2,
+      "surviving_review_count": 0,
+      "selection_stratum": "random",
+      "evidence_path": "docs/evidence/live/2026-07-25-stratified-null-outcome-controls-first-live-run.md",
+      "evidence_sha256": "61f17dbf02391eb258872cb810987c577cadaadbae67fe0df5b359bf56717209"
+    },
+    {
+      "outcome_id": "ztf-null-random-ra0243p54-decp022p50",
+      "ra_deg": 243.54,
+      "dec_deg": 22.5,
+      "field_radius_deg": 3.5,
+      "observation_nights_yyyymmdd": [
+        "20230928",
+        "20231004",
+        "20231006"
+      ],
+      "outcome": "null_result",
+      "recorded_rank": 319,
+      "recorded_score": 0.5623,
+      "ranking_mode": "aten",
+      "ranking_jd": 2461246.64,
+      "pipeline_path": "motion_product_pixel_extraction",
+      "execution_ids": [
+        "stratified-null-controls-2026-07-25"
+      ],
+      "production_tracklet_count": 0,
+      "surviving_review_count": 0,
+      "selection_stratum": "random",
+      "evidence_path": "docs/evidence/live/2026-07-25-stratified-null-outcome-controls-first-live-run.md",
+      "evidence_sha256": "61f17dbf02391eb258872cb810987c577cadaadbae67fe0df5b359bf56717209"
+    },
+    {
+      "outcome_id": "ztf-null-random-ra0194p83-decm022p50",
+      "ra_deg": 194.83,
+      "dec_deg": -22.5,
+      "field_radius_deg": 3.5,
+      "observation_nights_yyyymmdd": [
+        "20240114",
+        "20240118",
+        "20240211"
+      ],
+      "outcome": "null_result",
+      "recorded_rank": 23,
+      "recorded_score": 0.8185,
+      "ranking_mode": "aten",
+      "ranking_jd": 2461246.64,
+      "pipeline_path": "motion_product_pixel_extraction",
+      "execution_ids": [
+        "stratified-null-controls-2026-07-25"
+      ],
+      "production_tracklet_count": 52,
+      "surviving_review_count": 0,
+      "selection_stratum": "random",
+      "evidence_path": "docs/evidence/live/2026-07-25-stratified-null-outcome-controls-first-live-run.md",
+      "evidence_sha256": "61f17dbf02391eb258872cb810987c577cadaadbae67fe0df5b359bf56717209"
+    },
+    {
+      "outcome_id": "ztf-null-bottom-ra0307p59-decp045p00",
+      "ra_deg": 307.59,
+      "dec_deg": 45.0,
+      "field_radius_deg": 3.5,
+      "observation_nights_yyyymmdd": [
+        "20230922",
+        "20230924",
+        "20230925"
+      ],
+      "outcome": "null_result",
+      "recorded_rank": 380,
+      "recorded_score": 0.5175,
+      "ranking_mode": "aten",
+      "ranking_jd": 2461246.64,
+      "pipeline_path": "motion_product_pixel_extraction",
+      "execution_ids": [
+        "stratified-null-controls-2026-07-25-batch2"
+      ],
+      "production_tracklet_count": 0,
+      "surviving_review_count": 0,
+      "selection_stratum": "bottom",
+      "evidence_path": "docs/evidence/live/2026-07-25-stratified-null-outcome-controls-second-batch.md",
+      "evidence_sha256": "20260b439e228fe28399a778bf910abaee8a40b887e4aaf9426a25cbbc46a13e"
+    },
+    {
+      "outcome_id": "ztf-null-bottom-ra0302p51-decp037p50",
+      "ra_deg": 302.51,
+      "dec_deg": 37.5,
+      "field_radius_deg": 3.5,
+      "observation_nights_yyyymmdd": [
+        "20230922",
+        "20230930",
+        "20231003"
+      ],
+      "outcome": "null_result",
+      "recorded_rank": 381,
+      "recorded_score": 0.5166,
+      "ranking_mode": "aten",
+      "ranking_jd": 2461246.64,
+      "pipeline_path": "motion_product_pixel_extraction",
+      "execution_ids": [
+        "stratified-null-controls-2026-07-25-batch2"
+      ],
+      "production_tracklet_count": 1,
+      "surviving_review_count": 0,
+      "selection_stratum": "bottom",
+      "evidence_path": "docs/evidence/live/2026-07-25-stratified-null-outcome-controls-second-batch.md",
+      "evidence_sha256": "20260b439e228fe28399a778bf910abaee8a40b887e4aaf9426a25cbbc46a13e"
+    },
+    {
+      "outcome_id": "ztf-null-bottom-ra0274p15-decp037p50",
+      "ra_deg": 274.15,
+      "dec_deg": 37.5,
+      "field_radius_deg": 3.5,
+      "observation_nights_yyyymmdd": [
+        "20230922",
+        "20230925",
+        "20230927"
+      ],
+      "outcome": "null_result",
+      "recorded_rank": 382,
+      "recorded_score": 0.5159,
+      "ranking_mode": "aten",
+      "ranking_jd": 2461246.64,
+      "pipeline_path": "motion_product_pixel_extraction",
+      "execution_ids": [
+        "stratified-null-controls-2026-07-25-batch2"
+      ],
+      "production_tracklet_count": 1,
+      "surviving_review_count": 0,
+      "selection_stratum": "bottom",
+      "evidence_path": "docs/evidence/live/2026-07-25-stratified-null-outcome-controls-second-batch.md",
+      "evidence_sha256": "20260b439e228fe28399a778bf910abaee8a40b887e4aaf9426a25cbbc46a13e"
+    },
+    {
+      "outcome_id": "ztf-null-bottom-ra0008p66-decm030p00",
+      "ra_deg": 8.66,
+      "dec_deg": -30.0,
+      "field_radius_deg": 3.5,
+      "observation_nights_yyyymmdd": [
+        "20240822",
+        "20240901",
+        "20240902"
+      ],
+      "outcome": "null_result",
+      "recorded_rank": 383,
+      "recorded_score": 0.5153,
+      "ranking_mode": "aten",
+      "ranking_jd": 2461246.64,
+      "pipeline_path": "motion_product_pixel_extraction",
+      "execution_ids": [
+        "stratified-null-controls-2026-07-25-batch2"
+      ],
+      "production_tracklet_count": 8,
+      "surviving_review_count": 0,
+      "selection_stratum": "bottom",
+      "evidence_path": "docs/evidence/live/2026-07-25-stratified-null-outcome-controls-second-batch.md",
+      "evidence_sha256": "20260b439e228fe28399a778bf910abaee8a40b887e4aaf9426a25cbbc46a13e"
+    }
+  ],
+  "excluded_searches": [
+    {
+      "ra_deg": 211.81,
+      "dec_deg": -7.5,
+      "recorded_rank": 4,
+      "recorded_score": 0.8821,
+      "status": "insufficient_coverage",
+      "reason": "Only two real observation nights were available; no production linking test was run.",
+      "evidence_path": "docs/evidence/live/2026-07-19-ztf-dr24-sixth-field-linking-test.md"
+    },
+    {
+      "ra_deg": 81.18,
+      "dec_deg": 22.5,
+      "recorded_rank": 3,
+      "recorded_score": 0.8756,
+      "status": "insufficient_retained_coverage",
+      "reason": "Only two populated retained nights were available after the cross-batch replay.",
+      "evidence_path": "docs/evidence/live/2026-07-14-ztf-sparse-expansion-and-cross-batch-result.md"
+    },
+    {
+      "ra_deg": 17.32,
+      "dec_deg": -30.0,
+      "recorded_rank": 386,
+      "recorded_score": 0.5145,
+      "status": "acquisition_failed",
+      "reason": "All 29 covered nights failed to resolve a single exposure at the narrow 0.01-degree acquisition box, despite the wide 2.0-degree coverage-preflight box recording them as covered -- a real ZTF field/CCD-grid alignment limitation, not a search outcome.",
+      "evidence_path": "docs/evidence/live/2026-07-25-stratified-null-outcome-controls-first-live-run.md"
+    }
+  ],
+  "updated_at_utc": "2026-07-25T06:00:00+00:00"
+}

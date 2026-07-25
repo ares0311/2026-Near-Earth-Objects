@@ -1,0 +1,12 @@
+{
+  "schema_version": "hunter-stratified-control-targets-v1",
+  "purpose": "Second predeclared batch of bottom-stratum Aten-mode fields, closing the gap left by v1's field 7 (RA 17.32, Dec -30.0, rank 386) which genuinely failed acquisition (exhausted all 29 covered nights) and was not usable as a control -- v1's 11 real successes plus v1's own 6 pre-existing top-ranked controls total 17/20; this batch supplies a margin buffer above the 3 needed to close the gap.",
+  "selection_method": "select_survey_fields.select_fields(jd=2461246.64, mode='aten', top_n=99999) over the full eligible field set (388 fields), excluding the 55 coordinates already present in data_selection/target_priority_queue.csv (parsed from its notes/selection_rule columns) plus the 12 fields already used in stratified_control_targets_v1.json, then taking the next 4 lowest-ranked (bottom stratum) fields from the remaining 344-field pool.",
+  "predeclared_at_utc": "2026-07-25T00:00:00+00:00",
+  "fields": [
+    {"stratum": "bottom", "ra_deg": 307.59, "dec_deg": 45.0, "rank": 380, "score": 0.5175, "mode": "aten", "ranking_jd": 2461246.64},
+    {"stratum": "bottom", "ra_deg": 302.51, "dec_deg": 37.5, "rank": 381, "score": 0.5166, "mode": "aten", "ranking_jd": 2461246.64},
+    {"stratum": "bottom", "ra_deg": 274.15, "dec_deg": 37.5, "rank": 382, "score": 0.5159, "mode": "aten", "ranking_jd": 2461246.64},
+    {"stratum": "bottom", "ra_deg": 8.66, "dec_deg": -30.0, "rank": 383, "score": 0.5153, "mode": "aten", "ranking_jd": 2461246.64}
+  ]
+}
