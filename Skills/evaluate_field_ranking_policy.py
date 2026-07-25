@@ -17,10 +17,10 @@ ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_VERSION = "ztf-field-ranking-retrospective-audit-v1"
 POSITIVE_SCHEMA_VERSION = "mpc-discovery-field-calibration-v2"
 DEFAULT_POSITIVES = (
-    ROOT / "data_selection/calibration/mpc_aten_discovery_fields_v2.json",
-    ROOT / "data_selection/calibration/mpc_atira_discovery_fields_v2.json",
+    ROOT / "data_selection/calibration/mpc_aten_discovery_fields_v3.json",
+    ROOT / "data_selection/calibration/mpc_atira_discovery_fields_v3.json",
 )
-DEFAULT_NULLS = ROOT / "data_selection/calibration/ztf_field_null_outcomes_v1.json"
+DEFAULT_NULLS = ROOT / "data_selection/calibration/ztf_field_null_outcomes_v3.json"
 DEFAULT_POLICY = ROOT / "data_selection/ranking_policies/ztf_field_ranking_v2.json"
 
 
@@ -48,12 +48,28 @@ def _load_positive_envelope(path: Path) -> dict[str, Any]:
     events = payload.get("events")
     if not isinstance(selected, list) or not isinstance(events, list) or not events:
         raise ValueError(f"positive-event envelope is empty: {path}")
-    if len(events) != len(selected) or len(events) != payload["summary"].get("accepted_count"):
+    if len(events) != payload["summary"].get("accepted_count"):
         raise ValueError(f"positive-event counts disagree: {path}")
     selected_ids = {str(row.get("designation")) for row in selected}
     event_ids = [str(row.get("designation")) for row in events]
-    if len(set(event_ids)) != len(event_ids) or set(event_ids) != selected_ids:
+    if len(set(event_ids)) != len(event_ids) or not set(event_ids).issubset(selected_ids):
         raise ValueError(f"positive-event identities disagree: {path}")
+    # A selected candidate that produced no event must be explicitly
+    # accounted for as a rejected_ineligible query_log entry (a
+    # deterministic ineligibility, e.g. too few published nights) -- never
+    # silently missing. Older envelopes with no rejections at all
+    # (selected == events) remain valid with an empty query_log.
+    unresolved = selected_ids - set(event_ids)
+    if unresolved:
+        rejected_ids = {
+            str(row.get("designation"))
+            for row in payload.get("query_log", [])
+            if row.get("status") == "rejected_ineligible"
+        }
+        if not unresolved.issubset(rejected_ids):
+            raise ValueError(
+                f"positive-event envelope has unexplained missing events: {path}"
+            )
     return payload
 
 
