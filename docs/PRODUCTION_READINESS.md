@@ -6,7 +6,29 @@ sync entry immediately below; the P1-P5 gate register body further down is
 unchanged historical evidence from 2026-07-02; current gate status for the
 active ZTF DR24 path lives in `docs/ZTF_DR24_PRODUCTION_GATES.md`)
 
-**Latest sync (2026-07-25, Aten calibration-eligibility bar fully closed:
+**Latest sync (2026-07-25, real calibration data wired in — gate is
+all-modes-joint, still blocked by the Atira ceiling)**: Promoted the real
+exhaustive MPC positive files and the v3 null-outcomes dataset into
+`data_selection/calibration/` as `evaluate_field_ranking_policy.py`'s
+defaults (PR #275), fixing a real compatibility gap found along the way
+(`_load_positive_envelope()` predated PR #270's legitimate-rejection
+path; fixed to accept an explained gap, still fail loudly on any
+unexplained one). **Real result: Aten alone now clears both thresholds
+(57 positives, 21 searched nulls), but `coefficient_update_authorized` is
+still `false`** — the gate is `all(...)` across every mode (aten AND
+ieo), guarded by a deliberate tripwire that raises if the gate would ever
+return `true`, forcing an explicit human code change rather than a silent
+authorization. Since Atira/ieo is structurally capped at 7 real positives
+(the entire population MPC has ever recorded), **this gate can never
+authorize fitting for any mode, including Aten, until the Atira ceiling
+is resolved.** This sharpens the still-open operator decision below: it
+is not just "revise the Atira threshold in isolation" — it is also
+"should authorization be per-mode independent, or should it stay
+all-or-nothing across every mode." No code change proposed; flagged for
+explicit operator decision. Full detail:
+`docs/evidence/live/2026-07-25-calibration-gate-blocked-by-atira-ceiling.md`.
+
+**Earlier sync (2026-07-25, Aten calibration-eligibility bar fully closed:
 21/20 searched-null controls)**: A second predeclared batch of 4
 bottom-stratum fields (`stratified_control_targets_v2.json`) closed the
 17/20 gap left by the first batch's one genuine acquisition failure — all
