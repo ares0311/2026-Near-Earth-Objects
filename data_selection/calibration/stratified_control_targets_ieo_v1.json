@@ -1,0 +1,14 @@
+{
+  "schema_version": "hunter-stratified-control-targets-v1",
+  "purpose": "Predeclared, stratified (top/middle/bottom) IEO/Atira-mode field sample closing the 3-to-7 searched-null-control gap left by the operator-approved threshold revision (PR #276): ieo's positive count already meets its revised 7/7 threshold, but searched_null (3) still needs 4 more real controls. This batch supplies 6 (a margin buffer above the 4 needed) in case of acquisition failures like the Aten batch's field 7.",
+  "selection_method": "select_survey_fields.select_fields(jd=2461246.64, mode='ieo', top_n=99999) over the full eligible field set (161 fields), excluding the 59 coordinates already present in data_selection/target_priority_queue.csv (parsed from its notes/selection_rule columns) plus the 3 existing ieo entries in ztf_field_null_outcomes_v3.json plus the 12 Aten-mode stratified fields already used, then taking 2 top-ranked, 2 middle-ranked, and 2 bottom-ranked fields from the remaining 151-field pool.",
+  "predeclared_at_utc": "2026-07-25T00:00:00+00:00",
+  "fields": [
+    {"stratum": "top", "ra_deg": 158.86, "dec_deg": 7.5, "rank": 2, "score": 0.9502, "mode": "ieo", "ranking_jd": 2461246.64},
+    {"stratum": "top", "ra_deg": 155.29, "dec_deg": 15.0, "rank": 3, "score": 0.9254, "mode": "ieo", "ranking_jd": 2461246.64},
+    {"stratum": "middle", "ra_deg": 127.5, "dec_deg": 0.0, "rank": 86, "score": 0.7501, "mode": "ieo", "ranking_jd": 2461246.64},
+    {"stratum": "middle", "ra_deg": 108.7, "dec_deg": -15.0, "rank": 87, "score": 0.7482, "mode": "ieo", "ranking_jd": 2461246.64},
+    {"stratum": "bottom", "ra_deg": 103.92, "dec_deg": -30.0, "rank": 160, "score": 0.5732, "mode": "ieo", "ranking_jd": 2461246.64},
+    {"stratum": "bottom", "ra_deg": 95.26, "dec_deg": -30.0, "rank": 161, "score": 0.5682, "mode": "ieo", "ranking_jd": 2461246.64}
+  ]
+}

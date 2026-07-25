@@ -1,0 +1,30 @@
+{
+  "batch_id": "null_control_coverage_affb3451",
+  "data_role": "metadata_only_coverage_preflight",
+  "end_jd_exclusive": 2460574.5,
+  "fields": [
+    {
+      "dec_deg": -15.0,
+      "field_id": "null_ctrl_108p70_m15p00",
+      "ra_deg": 108.7,
+      "role": "live_search"
+    }
+  ],
+  "footprint_note": "Each query covers the central size_deg x size_deg IRSA search box.",
+  "min_distinct_nights": 3,
+  "project": "2026 Near Earth Objects",
+  "replay_cutoff_utc": "2024-09-21T00:00:00Z",
+  "safety": {
+    "candidate_scoring": false,
+    "external_submission": false,
+    "impact_claims": false,
+    "metadata_only": true,
+    "raw_alert_archives_downloaded": false
+  },
+  "selection_source": "Skills/hunter_cli.py create-new-search adaptive expansion",
+  "size_deg": 2.0,
+  "source": "IRSA ZTF public science-image metadata",
+  "source_url": "https://irsa.ipac.caltech.edu/ibe/search/ztf/products/sci",
+  "start_jd_exclusive": 2460209.5,
+  "window_days": 365.0
+}

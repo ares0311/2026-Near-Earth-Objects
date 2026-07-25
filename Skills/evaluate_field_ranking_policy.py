@@ -20,7 +20,7 @@ DEFAULT_POSITIVES = (
     ROOT / "data_selection/calibration/mpc_aten_discovery_fields_v3.json",
     ROOT / "data_selection/calibration/mpc_atira_discovery_fields_v3.json",
 )
-DEFAULT_NULLS = ROOT / "data_selection/calibration/ztf_field_null_outcomes_v3.json"
+DEFAULT_NULLS = ROOT / "data_selection/calibration/ztf_field_null_outcomes_v4.json"
 DEFAULT_POLICY = ROOT / "data_selection/ranking_policies/ztf_field_ranking_v2.json"
 # Operator-approved revision (2026-07-25): the original flat 20/20 bar was
 # unreachable for ieo/Atira -- MPC's entire real Atira population (23/23,

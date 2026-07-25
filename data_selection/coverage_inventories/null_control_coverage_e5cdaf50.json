@@ -1,0 +1,83 @@
+{
+  "all_fields_pass": true,
+  "batch_id": "null_control_coverage_e5cdaf50",
+  "batch_manifest": "data_selection/batch_manifests/null_control_coverage_e5cdaf50.json",
+  "batch_manifest_sha256": "e20303f2a0f2ccb9596c55f2d7d4a9c8137a0528a242fd4472d8b850a0d40948",
+  "field_results": [
+    {
+      "dec_deg": -30.0,
+      "distinct_nights_yyyymmdd": [
+        "20231018",
+        "20231020",
+        "20231022",
+        "20231027",
+        "20231029",
+        "20231104",
+        "20231106",
+        "20231112",
+        "20231114",
+        "20231208",
+        "20231210",
+        "20231212",
+        "20240105",
+        "20240114",
+        "20240116",
+        "20240118",
+        "20240127",
+        "20240201",
+        "20240212",
+        "20240214",
+        "20240215",
+        "20240217",
+        "20240223"
+      ],
+      "field_id": "null_ctrl_095p26_m30p00",
+      "n_distinct_nights": 23,
+      "n_rows": 159,
+      "passes_min_distinct_nights": true,
+      "ra_deg": 95.26,
+      "raw_response_path": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Near Earth Objects/Logs/pipeline_runs/hunter_cli/coverage_shards/null_control_coverage_e5cdaf50/148d20d7123c68b9/fields/null_ctrl_095p26_m30p00/0bcc384ffa2b/ztf_sci_metadata.ipac",
+      "raw_response_sha256": "46ebcde9ba39fb4d1dba4e8846a02e7dbaed4567a5fa7f67e2451ab0bb57752a",
+      "role": "live_search"
+    }
+  ],
+  "metadata_only": true,
+  "min_distinct_nights": 3,
+  "n_fields": 1,
+  "n_fields_passing": 1,
+  "night_field_counts": {
+    "20231018": 1,
+    "20231020": 1,
+    "20231022": 1,
+    "20231027": 1,
+    "20231029": 1,
+    "20231104": 1,
+    "20231106": 1,
+    "20231112": 1,
+    "20231114": 1,
+    "20231208": 1,
+    "20231210": 1,
+    "20231212": 1,
+    "20240105": 1,
+    "20240114": 1,
+    "20240116": 1,
+    "20240118": 1,
+    "20240127": 1,
+    "20240201": 1,
+    "20240212": 1,
+    "20240214": 1,
+    "20240215": 1,
+    "20240217": 1,
+    "20240223": 1
+  },
+  "passing_field_ids": [
+    "null_ctrl_095p26_m30p00"
+  ],
+  "query": {
+    "end_jd_exclusive": 2460574.5,
+    "size_deg": 2.0,
+    "start_jd_exclusive": 2460209.5
+  },
+  "query_key": "148d20d7123c68b9",
+  "schema_version": "ztf-field-night-coverage-inventory-v1"
+}
