@@ -62,7 +62,7 @@ def test_ensure_coverage_committed_skips_live_check_when_already_covered(
     calls = []
     monkeypatch.setattr(hunter_cli, "_live_coverage_check", lambda *a, **k: calls.append(a))
 
-    controls._ensure_coverage_committed("t1", 10.0, 5.0)
+    controls._ensure_coverage_committed(10.0, 5.0)
 
     assert calls == []
 
@@ -76,9 +76,11 @@ def test_ensure_coverage_committed_runs_live_check_when_missing(
         hunter_cli, "_live_coverage_check", lambda fields, prefix: calls.append((fields, prefix))
     )
 
-    controls._ensure_coverage_committed("t1", 10.0, 5.0)
+    controls._ensure_coverage_committed(10.0, 5.0)
 
-    assert calls == [([("t1", 10.0, 5.0)], "null_control_coverage")]
+    expected_field_id = hunter_cli._field_id_from_radec("null_ctrl", 10.0, 5.0)
+    assert "." not in expected_field_id
+    assert calls == [([(expected_field_id, 10.0, 5.0)], "null_control_coverage")]
 
 
 def test_build_control_record_null_result_when_zero_survive(
