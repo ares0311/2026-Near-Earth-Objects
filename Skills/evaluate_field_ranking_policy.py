@@ -263,8 +263,17 @@ def build_policy_audit(
         and counts["searched_null"] >= MINIMUM_SAMPLE_THRESHOLDS[mode]["searched_null"]
         for mode, counts in source_counts.items()
     )
-    if coefficient_update_authorized:
-        raise ValueError("sample gate unexpectedly authorizes an unaudited coefficient fit")
+    # Operator decision 2026-07-25: once every mode clears
+    # MINIMUM_SAMPLE_THRESHOLDS, this audit no longer blocks -- attempting a
+    # real coefficient fit is authorized, but only via the separate,
+    # explicitly-invoked Skills/fit_field_ranking_coefficients.py, which
+    # applies its own regularization/cross-validation/promotion criteria
+    # and never auto-promotes. This function stays a read-only audit.
+    decision = (
+        "coefficient_fit_attempt_authorized"
+        if coefficient_update_authorized
+        else "retain_transparent_v2_prior"
+    )
 
     return {
         "schema_version": SCHEMA_VERSION,
@@ -291,12 +300,16 @@ def build_policy_audit(
             "minimum_thresholds": MINIMUM_SAMPLE_THRESHOLDS,
             "observed_counts": source_counts,
             "coefficient_update_authorized": coefficient_update_authorized,
-            "decision": "retain_transparent_v2_prior",
+            "decision": decision,
         },
         "limitations": [
-            "Searched nulls are top-selected fields, not random or bottom-ranked controls.",
+            "Searched nulls include a predeclared stratified sample as well as "
+            "top-selected fields; see each entry's selection_stratum.",
             "Non-I41 positives establish discovery geometry but are not ZTF source-aligned.",
-            "The I41 subset is too small for coefficient fitting or probability calibration.",
+            "Whether the I41-aligned sample is large enough for a *stable* coefficient "
+            "fit is mode-specific and much smaller for ieo than aten -- see "
+            "Skills/fit_field_ranking_coefficients.py's own cross-validation and "
+            "sample-size reporting, not just the raw counts here.",
             "Pairwise AUC is a diagnostic ordering statistic, not discovery-yield validation.",
         ],
         "records": records,
