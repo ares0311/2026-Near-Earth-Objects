@@ -22,6 +22,20 @@ DEFAULT_POSITIVES = (
 )
 DEFAULT_NULLS = ROOT / "data_selection/calibration/ztf_field_null_outcomes_v3.json"
 DEFAULT_POLICY = ROOT / "data_selection/ranking_policies/ztf_field_ranking_v2.json"
+# Operator-approved revision (2026-07-25): the original flat 20/20 bar was
+# unreachable for ieo/Atira -- MPC's entire real Atira population (23/23,
+# exhaustively verified) yields only 7 I41-attributed positives, a
+# permanent ceiling, not a data-gathering gap. The operator chose to
+# revise this mode's threshold to its actual ceiling rather than make
+# authorization per-mode independent or freeze calibration indefinitely.
+# The searched_null minimum is set to match (7), since that side has no
+# hard population cap -- it is an achievable, not-yet-done gathering task.
+# See docs/evidence/live/2026-07-24-phase2-aten-exhaustive-calibration-and-null-controls.md
+# and docs/evidence/live/2026-07-25-calibration-gate-blocked-by-atira-ceiling.md.
+MINIMUM_SAMPLE_THRESHOLDS = {
+    "aten": {"positive": 20, "searched_null": 20},
+    "ieo": {"positive": 7, "searched_null": 7},
+}
 
 
 def _sha256(path: Path) -> str:
@@ -245,8 +259,9 @@ def build_policy_audit(
         for mode in ("aten", "ieo")
     }
     coefficient_update_authorized = all(
-        counts["positive"] >= 20 and counts["searched_null"] >= 20
-        for counts in source_counts.values()
+        counts["positive"] >= MINIMUM_SAMPLE_THRESHOLDS[mode]["positive"]
+        and counts["searched_null"] >= MINIMUM_SAMPLE_THRESHOLDS[mode]["searched_null"]
+        for mode, counts in source_counts.items()
     )
     if coefficient_update_authorized:
         raise ValueError("sample gate unexpectedly authorizes an unaudited coefficient fit")
@@ -273,8 +288,7 @@ def build_policy_audit(
         "all_source_metrics": _metrics(records),
         "ztf_i41_source_aligned_metrics": _metrics(source_aligned),
         "coefficient_promotion_gate": {
-            "minimum_positive_per_mode": 20,
-            "minimum_searched_null_per_mode": 20,
+            "minimum_thresholds": MINIMUM_SAMPLE_THRESHOLDS,
             "observed_counts": source_counts,
             "coefficient_update_authorized": coefficient_update_authorized,
             "decision": "retain_transparent_v2_prior",
