@@ -70,12 +70,29 @@ def test_fit_mode_coefficients_ignores_ineligible_records() -> None:
 def test_fit_mode_coefficients_recovers_strong_synthetic_signal() -> None:
     """Oracle check: when scarcity cleanly separates positives from nulls
     but the existing hand-set `score` does not (deliberately uninformative
-    here), the fit should find real signal and clearly beat baseline."""
+    here), the fit should find real signal and clearly beat baseline.
+
+    Baseline scores use distinct, deterministic values with no
+    relationship to class (score = f(i) unrelated to i < 15 meaning
+    positive) rather than one identical constant -- an exactly-tied
+    baseline exposed a real, environment-dependent tie-breaking
+    instability in calibration.compute_roc_auc's sort-based AUC (0.19
+    locally vs 1.0 in CI for the same all-tied input), which is a
+    property of that existing, separately-used function, not something
+    to route around by relying on ties here."""
     records = []
-    for i in range(15):
-        records.append(_record("positive", 0.9 + i * 0.001, 0.5, 0.5, score=0.5))
-    for i in range(15):
-        records.append(_record("null_result", 0.1 + i * 0.001, 0.5, 0.5, score=0.5))
+    for i in range(30):
+        # (i * 7) % 30 is a bijection over 0..29 (gcd(7, 30) == 1), so
+        # every baseline score is distinct -- no ties at all, regardless
+        # of class, avoiding compute_roc_auc's tie-breaking instability
+        # entirely rather than just reducing how often it triggers.
+        baseline_score = 0.1 + 0.8 * ((i * 7) % 30) / 29
+        if i < 15:
+            records.append(_record("positive", 0.9 + i * 0.001, 0.5, 0.5, score=baseline_score))
+        else:
+            records.append(
+                _record("null_result", 0.1 + i * 0.001, 0.5, 0.5, score=baseline_score)
+            )
 
     result = fitter.fit_mode_coefficients(records, n_bootstrap=100)
 
@@ -83,10 +100,10 @@ def test_fit_mode_coefficients_recovers_strong_synthetic_signal() -> None:
     assert result["n_positive"] == 15
     assert result["n_null"] == 15
     assert result["leave_one_out_auc"] > 0.9
-    # All records share an identical, uninformative baseline `score` by
-    # construction -- the fit should clearly beat whatever that baseline
-    # AUC comes out to (tie-handling artifacts aside, it carries no
-    # signal), since only the fit's features actually separate the classes.
+    # The baseline score is deliberately uncorrelated with class, so it
+    # should land near 0.5 -- the fit (which uses the real separating
+    # feature) should clearly beat it.
+    assert 0.3 < result["baseline_policy_auc"] < 0.7
     assert result["leave_one_out_auc"] > result["baseline_policy_auc"] + 0.3
     assert result["promotion_candidate"] is True
     assert result["fitted_coefficients"]["survey_scarcity_score"] > 0
