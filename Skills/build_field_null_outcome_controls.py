@@ -69,6 +69,25 @@ def load_predeclared_fields(path: Path) -> list[dict[str, Any]]:
     return fields
 
 
+def _ensure_coverage_committed(target_id: str, ra_deg: float, dec_deg: float) -> None:
+    """Run a real, live coverage-preflight check for this field if no
+    committed coverage inventory already covers it.
+
+    ``hunter_cli.execute_target()`` requires a pre-committed coverage
+    record (built by ``create-new-search --mode new``'s adaptive expansion
+    loop); a predeclared field selected directly from the planning grid,
+    as this script's inputs are, has not necessarily been through that
+    step yet. Mirrors ``discover_new_targets()``'s own coverage-check call
+    rather than duplicating its logic.
+    """
+    key = hunter_cli.field_selector._coordinate_key(ra_deg, dec_deg)
+    if key in hunter_cli._combined_known_coverage():
+        return
+    hunter_cli._live_coverage_check(
+        [(target_id, ra_deg, dec_deg)], "null_control_coverage"
+    )
+
+
 def build_control_record(
     field: dict[str, Any],
     checkpoint_root: Path,
@@ -86,6 +105,7 @@ def build_control_record(
     target_id = hunter_cli.hunter_state.target_id_from_radec(ra_deg, dec_deg)
     target = {"target_id": target_id, "ra_deg": ra_deg, "dec_deg": dec_deg}
 
+    _ensure_coverage_committed(target_id, ra_deg, dec_deg)
     result = hunter_cli.execute_target(
         target, checkpoint_root, size_deg, min_observations=min_observations
     )
