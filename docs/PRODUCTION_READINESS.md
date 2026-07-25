@@ -6,7 +6,34 @@ sync entry immediately below; the P1-P5 gate register body further down is
 unchanged historical evidence from 2026-07-02; current gate status for the
 active ZTF DR24 path lives in `docs/ZTF_DR24_PRODUCTION_GATES.md`)
 
-**Latest sync (2026-07-23/24, Hunter PROD CLOSURE DIRECTIVE — CLI and
+**Latest sync (2026-07-24, Aten side of Phase 2 calibration eligibility
+closed; Atira ceiling under re-verification)**: An exhaustive MPC Aten
+query (`--all-per-year`, 2018-2026, 2,085 accepted candidates) found **57
+real I41 (ZTF)-attributed discovery events** — supersedes the "only 1
+Aten" figure below, which was the 2026-07-21 audit's smaller 56-candidate
+sample. The Aten side of the ≥20-source-aligned-positive bar is now
+definitively cleared. A real bug in the calibration builder (aborted the
+whole run on the first deterministically-ineligible candidate instead of
+skipping it) was found and fixed en route (PR #270). Started closing the
+searched-null-control side (currently 6, all top-ranked, flagged biased by
+its own audit): `Skills/build_field_null_outcome_controls.py` + a
+predeclared 12-field top/middle/bottom/random stratified sample merged
+(PR #271); the 12 fields have not yet been executed. **Atira ceiling now
+definitive**: a fresh exhaustive `--list-name atiras` query (replacing the
+earlier incomplete `mpc_atira_all_discovery_fields_v2.json`) returned all
+23/23 Atiras MPC has ever recorded (2018-2026) — the entire real
+population, not a sample — of which exactly **7** are I41 (ZTF)-attributed.
+Since this is the full population, 7 is a hard ceiling, not a
+data-gathering gap: the ≥20-source-aligned-positive bar as written is
+structurally unreachable for Atira mode and will stay so unless ZTF
+discovers more Atiras. **Open operator decision, not yet made**: whether
+to revise the Atira threshold, treat Atira mode as permanently
+non-calibratable (keep the deterministic-transparent-prior path
+indefinitely), or something else. No threshold has been changed; Atira
+mode's v2 deterministic prior is unaffected. Full detail:
+`docs/evidence/live/2026-07-24-phase2-aten-exhaustive-calibration-and-null-controls.md`.
+
+**Earlier sync (2026-07-23/24, Hunter PROD CLOSURE DIRECTIVE — CLI and
 durable state built, real-live-validated)**: Under an operator-issued
 directive whose authority order places current business requirements
 above older docs/roadmap phrasing, four merged PRs (#265-#268) closed the
@@ -14,8 +41,9 @@ Hunter directive's previously-named structural gaps (durable search
 creation, per-run manifest, follow-up registry, unified CLI — see
 `CLAUDE.md`'s "Current Roadmap Phase" section for the full pipeline-mapping
 table). This did not wait for Phase 2's ranking-coefficient calibration
-(still open, ≥20 source-aligned positives + 20 controls per mode required,
-only 1 Aten/7 Atira exist today) — the directive explicitly requires a
+(then open, ≥20 source-aligned positives + 20 controls per mode required,
+only 1 Aten/7 Atira known at that time — now superseded by the sync
+immediately above) — the directive explicitly requires a
 deterministic/explainable/reproducible ranker, not a calibrated one, and the
 existing `uncalibrated_transparent_prior` v2 policy already satisfies that.
 
