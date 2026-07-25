@@ -173,6 +173,13 @@ def build_controls(
             f"(stratum={field['stratum']}, rank={field['rank']})",
             flush=True,
         )
+        # Drop any failure recorded for this field by an earlier resumed
+        # attempt -- otherwise a field that failed once (e.g. a since-fixed
+        # bug) and later succeeds keeps a stale, misleading failure entry
+        # alongside its real result.
+        envelope["failures"] = [
+            f for f in envelope["failures"] if f["outcome_id"] != outcome_id
+        ]
         try:
             record = build_control_record(field, checkpoint_root, size_deg)
         except hunter_cli._RUN_TARGET_EXPECTED_EXCEPTIONS as exc:
