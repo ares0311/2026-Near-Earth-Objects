@@ -6,7 +6,31 @@ sync entry immediately below; the P1-P5 gate register body further down is
 unchanged historical evidence from 2026-07-02; current gate status for the
 active ZTF DR24 path lives in `docs/ZTF_DR24_PRODUCTION_GATES.md`)
 
-**Latest sync (2026-07-25, real calibration data wired in — gate is
+**Latest sync (2026-07-25, operator revised the Atira threshold; every
+mode now jointly qualifies; the gate's tripwire has fired)**: Operator
+decision: revise the Atira threshold (not make gate authorization
+per-mode independent, not freeze calibration indefinitely). Implemented
+as `MINIMUM_SAMPLE_THRESHOLDS`, a per-mode dict in
+`evaluate_field_ranking_policy.py`: `aten` stays 20/20 (already met);
+`ieo` becomes 7/7, matching its verified population ceiling (7 real
+I41-attributed positives out of all 23 Atiras MPC has ever recorded).
+Closed the resulting 3-to-7 `ieo` searched-null-control gap with one more
+stratified batch (4/6 real successes; 2 genuine acquisition failures, both
+at Dec=-30.0, the same disclosed CCD-alignment limitation) —
+`data_selection/calibration/ztf_field_null_outcomes_v4.json` now has 7
+real `ieo` controls. **Both `aten` (57 positives/21 nulls) and `ieo`
+(7/7) now jointly clear their thresholds for the first time.**
+`build_policy_audit()`'s deliberate tripwire
+(`if coefficient_update_authorized: raise ValueError(...)`) fired exactly
+as designed when run against the real, current defaults — this is the
+intended signal that real coefficient-fitting logic (which does not yet
+exist) needs to be designed, implemented, tested, and reviewed before any
+fit or promotion proceeds. **No coefficient has been fit or promoted.**
+The deterministic `uncalibrated_transparent_prior` v2 policy remains in
+force. Full detail:
+`docs/evidence/live/2026-07-25-ieo-stratified-null-outcome-controls-first-live-run.md`.
+
+**Earlier sync (2026-07-25, real calibration data wired in — gate is
 all-modes-joint, still blocked by the Atira ceiling)**: Promoted the real
 exhaustive MPC positive files and the v3 null-outcomes dataset into
 `data_selection/calibration/` as `evaluate_field_ranking_policy.py`'s
