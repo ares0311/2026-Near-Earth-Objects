@@ -6,7 +6,32 @@ sync entry immediately below; the P1-P5 gate register body further down is
 unchanged historical evidence from 2026-07-02; current gate status for the
 active ZTF DR24 path lives in `docs/ZTF_DR24_PRODUCTION_GATES.md`)
 
-**Latest sync (2026-07-25, operator revised the Atira threshold; every
+**Latest sync (2026-07-25, first real coefficient fit attempted — result
+flagged for operator interpretation, nothing promoted)**: Operator
+decision ("A" of a three-way choice): attempt a real per-mode coefficient
+fit now that both modes clear their thresholds. Removed the audit's
+tripwire (its job — forcing a human decision — is done); added
+`Skills/fit_field_ranking_coefficients.py` (per-mode logistic regression,
+leave-one-out CV, bootstrap coefficient-stability check, report-only —
+never writes to the production ranking policy). Found and fixed a real
+bug before the first correct result (used every accepted MPC positive per
+mode instead of only the ZTF/I41-source-aligned ones — 2,017 vs. the
+correct 56 for aten). **Real result: both modes come back as mechanical
+"promotion candidates," but the current hand-set policy's baseline AUC is
+below 0.5 for both** (0.364 aten, 0.082 ieo) — anti-correlated with real
+outcomes on this sample, not just weakly correlated. This could reflect
+the searched-null sample's composition (mixes top-ranked and stratified
+fields) rather than a genuine flaw in the formula; both samples remain
+small (77 and 14 records). **No coefficient has been promoted or
+applied** — the active ranking policy is completely unchanged. Full
+detail, including both live hypotheses for the anti-correlated baseline:
+`docs/evidence/live/2026-07-25-first-real-coefficient-fit-attempt.md`.
+**Open operator decision**: how to interpret this finding before any
+further action (investigate the null-sample composition confound, design
+a promotion/sign-off workflow if the finding holds up, gather more data,
+or something else).
+
+**Earlier sync (2026-07-25, operator revised the Atira threshold; every
 mode now jointly qualifies; the gate's tripwire has fired)**: Operator
 decision: revise the Atira threshold (not make gate authorization
 per-mode independent, not freeze calibration indefinitely). Implemented
