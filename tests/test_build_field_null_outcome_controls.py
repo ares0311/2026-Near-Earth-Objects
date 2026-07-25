@@ -54,9 +54,37 @@ def test_load_predeclared_fields_rejects_empty(tmp_path: Path) -> None:
         controls.load_predeclared_fields(path)
 
 
+def test_ensure_coverage_committed_skips_live_check_when_already_covered(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    key = hunter_cli.field_selector._coordinate_key(10.0, 5.0)
+    monkeypatch.setattr(hunter_cli, "_combined_known_coverage", lambda: {key: {}})
+    calls = []
+    monkeypatch.setattr(hunter_cli, "_live_coverage_check", lambda *a, **k: calls.append(a))
+
+    controls._ensure_coverage_committed("t1", 10.0, 5.0)
+
+    assert calls == []
+
+
+def test_ensure_coverage_committed_runs_live_check_when_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(hunter_cli, "_combined_known_coverage", lambda: {})
+    calls = []
+    monkeypatch.setattr(
+        hunter_cli, "_live_coverage_check", lambda fields, prefix: calls.append((fields, prefix))
+    )
+
+    controls._ensure_coverage_committed("t1", 10.0, 5.0)
+
+    assert calls == [([("t1", 10.0, 5.0)], "null_control_coverage")]
+
+
 def test_build_control_record_null_result_when_zero_survive(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    monkeypatch.setattr(controls, "_ensure_coverage_committed", lambda *a, **k: None)
     monkeypatch.setattr(
         hunter_cli,
         "execute_target",
@@ -86,6 +114,7 @@ def test_build_control_record_null_result_when_tracklets_but_zero_survive(
         object_id="T1", verdict="REJECT", challenges=(), fail_count=1, warning_count=0,
         summary="test", reviewed_at_utc="2024-01-01T00:00:00+00:00",
     )
+    monkeypatch.setattr(controls, "_ensure_coverage_committed", lambda *a, **k: None)
     monkeypatch.setattr(
         hunter_cli,
         "execute_target",
@@ -111,6 +140,7 @@ def test_build_control_record_survivor_found_when_something_survives(
         object_id="T1", verdict="SURVIVE", challenges=(), fail_count=0, warning_count=0,
         summary="test", reviewed_at_utc="2024-01-01T00:00:00+00:00",
     )
+    monkeypatch.setattr(controls, "_ensure_coverage_committed", lambda *a, **k: None)
     monkeypatch.setattr(
         hunter_cli,
         "execute_target",
@@ -143,6 +173,7 @@ def test_build_controls_checkpoints_and_resumes_without_reexecuting(
             "scored_candidates": [],
         }
 
+    monkeypatch.setattr(controls, "_ensure_coverage_committed", lambda *a, **k: None)
     monkeypatch.setattr(hunter_cli, "execute_target", _fake_execute_target)
     fields = [_field("top", 10.0, 5.0, 1), _field("middle", 20.0, 5.0, 200)]
 
@@ -174,6 +205,7 @@ def test_build_controls_records_failure_and_continues(
             "scored_candidates": [],
         }
 
+    monkeypatch.setattr(controls, "_ensure_coverage_committed", lambda *a, **k: None)
     monkeypatch.setattr(hunter_cli, "execute_target", _fake_execute_target)
     fields = [_field("top", 10.0, 5.0, 1), _field("middle", 20.0, 5.0, 200)]
 
@@ -190,6 +222,7 @@ def test_main_end_to_end(
     fields_path = tmp_path / "fields.json"
     fields_path.write_text(json.dumps({"fields": [_field()]}), encoding="utf-8")
     out_path = tmp_path / "controls.json"
+    monkeypatch.setattr(controls, "_ensure_coverage_committed", lambda *a, **k: None)
     monkeypatch.setattr(
         hunter_cli,
         "execute_target",
