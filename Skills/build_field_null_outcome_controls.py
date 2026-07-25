@@ -69,7 +69,7 @@ def load_predeclared_fields(path: Path) -> list[dict[str, Any]]:
     return fields
 
 
-def _ensure_coverage_committed(target_id: str, ra_deg: float, dec_deg: float) -> None:
+def _ensure_coverage_committed(ra_deg: float, dec_deg: float) -> None:
     """Run a real, live coverage-preflight check for this field if no
     committed coverage inventory already covers it.
 
@@ -78,13 +78,17 @@ def _ensure_coverage_committed(target_id: str, ra_deg: float, dec_deg: float) ->
     loop); a predeclared field selected directly from the planning grid,
     as this script's inputs are, has not necessarily been through that
     step yet. Mirrors ``discover_new_targets()``'s own coverage-check call
-    rather than duplicating its logic.
+    rather than duplicating its logic -- including its use of
+    ``_field_id_from_radec`` (dot-free, unlike ``hunter_state``'s
+    ``target_id_from_radec``) since the coverage batch manifest's
+    ``field_id`` only accepts letters, digits, ``-``, and ``_``.
     """
     key = hunter_cli.field_selector._coordinate_key(ra_deg, dec_deg)
     if key in hunter_cli._combined_known_coverage():
         return
+    field_id = hunter_cli._field_id_from_radec("null_ctrl", ra_deg, dec_deg)
     hunter_cli._live_coverage_check(
-        [(target_id, ra_deg, dec_deg)], "null_control_coverage"
+        [(field_id, ra_deg, dec_deg)], "null_control_coverage"
     )
 
 
@@ -105,7 +109,7 @@ def build_control_record(
     target_id = hunter_cli.hunter_state.target_id_from_radec(ra_deg, dec_deg)
     target = {"target_id": target_id, "ra_deg": ra_deg, "dec_deg": dec_deg}
 
-    _ensure_coverage_committed(target_id, ra_deg, dec_deg)
+    _ensure_coverage_committed(ra_deg, dec_deg)
     result = hunter_cli.execute_target(
         target, checkpoint_root, size_deg, min_observations=min_observations
     )
