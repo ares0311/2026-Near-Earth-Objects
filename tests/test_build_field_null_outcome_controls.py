@@ -218,6 +218,38 @@ def test_build_controls_records_failure_and_continues(
     assert result["failures"][0]["error"] == "simulated acquisition failure"
 
 
+def test_build_controls_drops_stale_failure_when_field_later_succeeds(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A field that fails on one resumed attempt and succeeds on the next
+    must not keep a stale failure entry alongside its real result."""
+    out = tmp_path / "controls.json"
+    attempt = {"count": 0}
+
+    def _flaky_execute_target(target, *a, **k):
+        attempt["count"] += 1
+        if attempt["count"] == 1:
+            raise RuntimeError("transient failure on first attempt")
+        return {
+            "execution_status": "null_result",
+            "candidate_ids": [],
+            "nights_acquired": ["20240101", "20240102", "20240103"],
+            "scored_candidates": [],
+        }
+
+    monkeypatch.setattr(controls, "_ensure_coverage_committed", lambda *a, **k: None)
+    monkeypatch.setattr(hunter_cli, "execute_target", _flaky_execute_target)
+    fields = [_field("top", 10.0, 5.0, 1)]
+
+    first = controls.build_controls(fields, out, tmp_path / "checkpoints")
+    assert len(first["entries"]) == 0
+    assert len(first["failures"]) == 1
+
+    second = controls.build_controls(fields, out, tmp_path / "checkpoints")
+    assert len(second["entries"]) == 1
+    assert second["failures"] == []
+
+
 def test_main_end_to_end(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
