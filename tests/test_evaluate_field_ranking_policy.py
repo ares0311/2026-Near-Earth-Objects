@@ -56,20 +56,28 @@ def test_gate_uses_per_mode_thresholds_ieo_ceiling_lower_than_aten() -> None:
     assert audit.MINIMUM_SAMPLE_THRESHOLDS["ieo"]["searched_null"] == 7
 
 
-def test_real_defaults_fire_tripwire_now_that_every_mode_qualifies() -> None:
+def test_real_defaults_authorize_fit_attempt_now_that_every_mode_qualifies() -> None:
     """2026-07-25: a second stratified IEO/Atira batch closed the last gap
-    (searched_null 3 -> 7), so DEFAULT_NULLS (v4) now has both modes
-    meeting MINIMUM_SAMPLE_THRESHOLDS simultaneously for the first time.
-    The gate's own deliberate tripwire must fire -- this is the designed
-    signal that real coefficient-fitting logic (which does not exist yet)
-    needs to be implemented and reviewed before any fit proceeds, not a
-    bug to silently work around."""
-    with pytest.raises(ValueError, match="unexpectedly authorizes"):
-        audit.build_policy_audit(
-            audit.DEFAULT_POSITIVES,
-            audit.DEFAULT_NULLS,
-            audit.DEFAULT_POLICY,
-        )
+    (searched_null 3 -> 7), so DEFAULT_NULLS (v4) has both modes meeting
+    MINIMUM_SAMPLE_THRESHOLDS for the first time. Per the operator's
+    2026-07-25 decision to proceed with real coefficient fitting, this
+    audit no longer raises when that happens -- it reports
+    coefficient_update_authorized=True and decision=
+    "coefficient_fit_attempt_authorized", leaving any actual fit to the
+    separate Skills/fit_field_ranking_coefficients.py."""
+    result = audit.build_policy_audit(
+        audit.DEFAULT_POSITIVES,
+        audit.DEFAULT_NULLS,
+        audit.DEFAULT_POLICY,
+    )
+
+    gate = result["coefficient_promotion_gate"]
+    assert gate["coefficient_update_authorized"] is True
+    assert gate["decision"] == "coefficient_fit_attempt_authorized"
+    assert gate["observed_counts"] == {
+        "aten": {"positive": 57, "searched_null": 21},
+        "ieo": {"positive": 7, "searched_null": 7},
+    }
 
 
 def test_audit_rejects_recorded_score_drift(tmp_path: Path) -> None:
