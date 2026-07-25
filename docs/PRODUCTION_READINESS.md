@@ -6,7 +6,23 @@ sync entry immediately below; the P1-P5 gate register body further down is
 unchanged historical evidence from 2026-07-02; current gate status for the
 active ZTF DR24 path lives in `docs/ZTF_DR24_PRODUCTION_GATES.md`)
 
-**Latest sync (2026-07-24, Aten side of Phase 2 calibration eligibility
+**Latest sync (2026-07-25, stratified Aten searched-null controls: 17/20)**:
+Executed the 12 predeclared stratified fields from PR #271 for real, fixing
+three real bugs found live along the way (PRs #272-274: missing
+coverage-preflight step, a dotted `field_id` the coverage validator
+rejected, and stale failure records surviving a resumed run). Real result:
+11/12 fields produced genuine `null_result` outcomes (0-52 raw tracklets,
+zero survivors every time); 1 field (bottom stratum) genuinely failed
+acquisition after exhausting all 29 covered nights — the same disclosed
+ZTF CCD-alignment limitation from PR #268, not a new bug, and not usable as
+a control. `data_selection/calibration/ztf_field_null_outcomes_v2.json`
+extends (does not overwrite) v1's 9 entries with these 11, bringing
+Aten-mode searched-null controls to **17/20** — up from 6, still 3 short.
+Both `validate_field_null_outcomes.py` and `evaluate_field_ranking_policy.py`
+accept an explicit override path, so no default-path change was needed.
+Full detail: `docs/evidence/live/2026-07-25-stratified-null-outcome-controls-first-live-run.md`.
+
+**Earlier sync (2026-07-24, Aten side of Phase 2 calibration eligibility
 closed; Atira ceiling under re-verification)**: An exhaustive MPC Aten
 query (`--all-per-year`, 2018-2026, 2,085 accepted candidates) found **57
 real I41 (ZTF)-attributed discovery events** — supersedes the "only 1
@@ -18,7 +34,8 @@ skipping it) was found and fixed en route (PR #270). Started closing the
 searched-null-control side (currently 6, all top-ranked, flagged biased by
 its own audit): `Skills/build_field_null_outcome_controls.py` + a
 predeclared 12-field top/middle/bottom/random stratified sample merged
-(PR #271); the 12 fields have not yet been executed. **Atira ceiling now
+(PR #271); the 12 fields were executed 2026-07-25, see the sync above.
+**Atira ceiling now
 definitive**: a fresh exhaustive `--list-name atiras` query (replacing the
 earlier incomplete `mpc_atira_all_discovery_fields_v2.json`) returned all
 23/23 Atiras MPC has ever recorded (2018-2026) — the entire real
