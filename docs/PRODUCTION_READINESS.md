@@ -1,10 +1,28 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
 **Current version**: v0.91.0
-**Last updated**: 2026-07-24 (Hunter CLI + durable state closed — see the
+**Last updated**: 2026-07-25 (Hunter PROD adversarial re-closure — see the
 sync entry immediately below; the P1-P5 gate register body further down is
 unchanged historical evidence from 2026-07-02; current gate status for the
 active ZTF DR24 path lives in `docs/ZTF_DR24_PRODUCTION_GATES.md`)
+
+**Latest Hunter sync (2026-07-25, adversarial PROD re-closure)**: The
+2026-07-24 feature-level Hunter closure below is superseded. A fresh audit
+found nine canonical-path defects behind it, recorded before remediation as
+HP-01 through HP-09 in `docs/OPERATOR_GO_NO_GO_RUNBOOK.md`. The integrated
+fixes add governing append-only target history, remove the default fixed pool
+ceiling, fail non-completed runs at the process boundary, close the
+checkpoint/side-effect crash window idempotently, derive follow-ups and
+remaining nights from executed history, use live epoch-aware known-object
+evidence, carry current-valid provenance and exact commit/worktree state,
+install one three-command CLI, and demote direct lower-level product bypasses.
+A real exact new manifest completed, a second new request excluded it, and an
+unseeded history-derived follow-up completed on three additional nights.
+Canonical negative controls cover outside-initial-sample discovery, weak-score
+top-N, explicit exploration-limit failure, crash/restart, validity rejection,
+and product-path uniqueness. No submission or discovery claim was made.
+Evidence:
+`docs/evidence/live/2026-07-25-hunter-prod-adversarial-closure.md`.
 
 **Latest sync (2026-07-25, aten/ieo elongation preference peaks revised —
 v3 ranking policy, live default)**: Operator-approved, data-defended fix

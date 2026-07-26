@@ -3,18 +3,15 @@
 Complements src/candidate_ledger.py (candidate provenance -- the "candidate catalog"
 Hunter entity, unchanged by this module) with the remaining required durable Hunter
 entities: search manifest (``search_manifests`` + ``search_manifest_targets``), search
-run (``search_runs`` + ``search_run_targets``), and follow-up registry
-(``follow_up_registry``).
+run (``search_runs`` + ``search_run_targets``), append-only target search history
+(``target_search_history``), and follow-up registry (``follow_up_registry``).
 
-Target search history is intentionally NOT duplicated here. It already exists, tested
-and wired into the production selector, as ``data_selection/target_priority_queue.csv``
-via ``Skills/select_survey_fields.py``'s ``load_target_queue_history()`` /
-``append_fields_to_target_queue()`` / ``update_target_queue_status()``. Building a
-parallel SQLite history table would create exactly the kind of duplicate,
-drift-prone store the Hunter directive warns against. Instead, ``target_id_from_radec``
-below intentionally mirrors ``select_survey_fields._coordinate_key``'s
-``round(x, 2)`` rounding convention, so a freshly ranked grid cell and its historical
-CSV record always resolve to the identical key.
+The legacy ``target_priority_queue.csv`` remains an imported scientific-planning
+source, but it is not safe as the transactional production history store: ranks are
+not stable identifiers and manifest/run writes cannot be committed with CSV updates.
+This module is therefore the canonical history system of record. Existing durable
+manifest targets are backfilled as history during the schema-v2 migration so a
+previously selected target cannot silently become ``new`` again.
 """
 
 from __future__ import annotations
@@ -28,7 +25,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = "1"
+SCHEMA_VERSION = "2"
 
 _SEARCH_MODES = {"new", "follow_up"}
 _MANIFEST_STATUSES = {"pending", "executed", "expired"}
@@ -36,6 +33,13 @@ _RUN_STATUSES = {"running", "completed", "partial", "failed"}
 _RUN_TERMINAL_STATUSES = _RUN_STATUSES - {"running"}
 _TARGET_EXECUTION_STATUSES = {"success", "null_result", "failed", "skipped"}
 _FOLLOW_UP_STATUSES = {"open", "actioned", "dismissed", "expired"}
+_VALIDITY_STATES = {
+    "valid",
+    "stale-but-usable",
+    "refresh-required",
+    "invalid",
+    "unknown",
+}
 
 
 def _utc_now() -> str:
@@ -120,10 +124,26 @@ def init_db(db_path: Path) -> None:
                 score REAL NOT NULL,
                 selection_reason TEXT NOT NULL,
                 coverage_inventory_id TEXT,
+                coverage_provenance_json TEXT NOT NULL DEFAULT '{}',
+                validity_state TEXT NOT NULL DEFAULT 'unknown',
                 PRIMARY KEY (search_id, target_id)
             )
             """
         )
+        manifest_columns = {
+            row["name"]
+            for row in conn.execute("PRAGMA table_info(search_manifest_targets)").fetchall()
+        }
+        if "coverage_provenance_json" not in manifest_columns:
+            conn.execute(
+                "ALTER TABLE search_manifest_targets "
+                "ADD COLUMN coverage_provenance_json TEXT NOT NULL DEFAULT '{}'"
+            )
+        if "validity_state" not in manifest_columns:
+            conn.execute(
+                "ALTER TABLE search_manifest_targets "
+                "ADD COLUMN validity_state TEXT NOT NULL DEFAULT 'unknown'"
+            )
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_manifest_targets_search "
             "ON search_manifest_targets(search_id)"
@@ -161,6 +181,27 @@ def init_db(db_path: Path) -> None:
         )
         conn.execute(
             """
+            CREATE TABLE IF NOT EXISTS target_search_history (
+                history_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                target_id TEXT NOT NULL,
+                search_id TEXT NOT NULL REFERENCES search_manifests(search_id),
+                run_id TEXT,
+                mode TEXT NOT NULL,
+                status TEXT NOT NULL,
+                occurred_at TEXT NOT NULL,
+                source TEXT NOT NULL,
+                nights_json TEXT NOT NULL,
+                provenance_json TEXT NOT NULL,
+                UNIQUE(search_id, target_id, status)
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_target_history_target "
+            "ON target_search_history(target_id, occurred_at)"
+        )
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS follow_up_registry (
                 follow_up_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 target_id TEXT NOT NULL,
@@ -183,6 +224,25 @@ def init_db(db_path: Path) -> None:
             "CREATE INDEX IF NOT EXISTS idx_follow_up_target ON follow_up_registry(target_id)"
         )
         now = _utc_now()
+        # Schema-v1 manifests are real prior selection evidence. Import them
+        # idempotently so upgrading cannot make an old target appear new.
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO target_search_history(
+                target_id, search_id, run_id, mode, status, occurred_at,
+                source, nights_json, provenance_json
+            )
+            SELECT t.target_id, m.search_id, NULL, m.mode, 'legacy_manifest_import',
+                   m.created_at, 'hunter_state_schema_v2_migration', '[]',
+                   '{"migration":"manifest-target-backfill"}'
+            FROM search_manifest_targets AS t
+            JOIN search_manifests AS m ON m.search_id = t.search_id
+            WHERE NOT EXISTS (
+                SELECT 1 FROM target_search_history AS h
+                WHERE h.search_id = t.search_id AND h.target_id = t.target_id
+            )
+            """
+        )
         conn.execute(
             """
             INSERT INTO hunter_state_metadata(key, value, updated_at)
@@ -202,6 +262,8 @@ class ManifestTarget:
     score: float
     selection_reason: str
     coverage_inventory_id: str | None = None
+    coverage_provenance: dict[str, Any] | None = None
+    validity_state: str = "unknown"
 
 
 def create_search_manifest(
@@ -230,6 +292,11 @@ def create_search_manifest(
         raise ValueError("targets must not exceed requested_n")
     if len({t.target_id for t in targets}) != len(targets):
         raise ValueError("manifest targets must have unique target_id values")
+    invalid_validity = [
+        t.validity_state for t in targets if t.validity_state not in _VALIDITY_STATES
+    ]
+    if invalid_validity:
+        raise ValueError(f"invalid manifest target validity_state {invalid_validity[0]!r}")
 
     init_db(db_path)
     now = _utc_now()
@@ -256,12 +323,23 @@ def create_search_manifest(
             ),
         )
         for rank, target in enumerate(targets, start=1):
+            if mode == "new":
+                prior = conn.execute(
+                    "SELECT 1 FROM target_search_history WHERE target_id = ? LIMIT 1",
+                    (target.target_id,),
+                ).fetchone()
+                if prior is not None:
+                    raise ValueError(
+                        f"target {target.target_id} already has governing search history "
+                        "and is not eligible for mode=new"
+                    )
             conn.execute(
                 """
                 INSERT INTO search_manifest_targets(
                     search_id, rank, target_id, ra_deg, dec_deg, score,
-                    selection_reason, coverage_inventory_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    selection_reason, coverage_inventory_id,
+                    coverage_provenance_json, validity_state
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     search_id,
@@ -272,6 +350,29 @@ def create_search_manifest(
                     target.score,
                     target.selection_reason,
                     target.coverage_inventory_id,
+                    _json(target.coverage_provenance or {}),
+                    target.validity_state,
+                ),
+            )
+            conn.execute(
+                """
+                INSERT INTO target_search_history(
+                    target_id, search_id, run_id, mode, status, occurred_at,
+                    source, nights_json, provenance_json
+                ) VALUES (?, ?, NULL, ?, 'selected_pending', ?,
+                          'hunter_manifest_selection', '[]', ?)
+                """,
+                (
+                    target.target_id,
+                    search_id,
+                    mode,
+                    now,
+                    _json(
+                        {
+                            "ranking_policy_digest": ranking_policy_digest,
+                            "selection_reason": target.selection_reason,
+                        }
+                    ),
                 ),
             )
         conn.commit()
@@ -292,7 +393,13 @@ def get_search_manifest(db_path: Path, search_id: str) -> dict[str, Any]:
     manifest = dict(manifest_row)
     manifest["config"] = _loads(manifest.pop("config_json"))
     manifest["sufficiency_met"] = bool(manifest["sufficiency_met"])
-    manifest["targets"] = [dict(row) for row in target_rows]
+    manifest["targets"] = []
+    for row in target_rows:
+        target = dict(row)
+        target["coverage_provenance"] = _loads(
+            target.pop("coverage_provenance_json")
+        )
+        manifest["targets"].append(target)
     return manifest
 
 
@@ -464,6 +571,122 @@ def get_run_targets(db_path: Path, run_id: str) -> dict[str, dict[str, Any]]:
     return result
 
 
+def commit_target_result(
+    db_path: Path,
+    *,
+    run_id: str,
+    search_id: str,
+    mode: str,
+    target_id: str,
+    execution_status: str,
+    candidate_ids: list[str],
+    error_message: str | None,
+    nights_acquired: list[str],
+    provenance: dict[str, Any],
+) -> None:
+    """Atomically checkpoint a run target and append its governing history.
+
+    Candidate-ledger/follow-up side effects happen before this transaction and
+    are idempotent. A crash therefore leaves this target retryable; once this
+    transaction commits, resume may safely skip it without losing downstream
+    results.
+    """
+    if execution_status not in _TARGET_EXECUTION_STATUSES:
+        raise ValueError(
+            f"execution_status must be one of {sorted(_TARGET_EXECUTION_STATUSES)}, "
+            f"got {execution_status!r}"
+        )
+    if mode not in _SEARCH_MODES:
+        raise ValueError(f"mode must be one of {sorted(_SEARCH_MODES)}, got {mode!r}")
+    init_db(db_path)
+    now = _utc_now()
+    with closing(connect(db_path)) as conn:
+        conn.execute(
+            """
+            INSERT INTO target_search_history(
+                target_id, search_id, run_id, mode, status, occurred_at,
+                source, nights_json, provenance_json
+            ) VALUES (?, ?, ?, ?, ?, ?, 'hunter_run_execution', ?, ?)
+            ON CONFLICT(search_id, target_id, status) DO UPDATE SET
+                run_id=excluded.run_id,
+                nights_json=excluded.nights_json,
+                provenance_json=excluded.provenance_json
+            """,
+            (
+                _non_empty(target_id, "target_id"),
+                _non_empty(search_id, "search_id"),
+                _non_empty(run_id, "run_id"),
+                mode,
+                execution_status,
+                now,
+                _json(nights_acquired),
+                _json(provenance),
+            ),
+        )
+        conn.execute(
+            """
+            INSERT INTO search_run_targets(
+                run_id, target_id, execution_status, candidate_ids_json,
+                error_message, nights_acquired_json, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(run_id, target_id) DO UPDATE SET
+                execution_status=excluded.execution_status,
+                candidate_ids_json=excluded.candidate_ids_json,
+                error_message=excluded.error_message,
+                nights_acquired_json=excluded.nights_acquired_json,
+                updated_at=excluded.updated_at
+            """,
+            (
+                run_id,
+                target_id,
+                execution_status,
+                _json(candidate_ids),
+                error_message,
+                _json(nights_acquired),
+                now,
+            ),
+        )
+        conn.commit()
+
+
+def list_target_history(
+    db_path: Path, target_id: str | None = None
+) -> list[dict[str, Any]]:
+    """Return append-only history in chronological order with decoded evidence."""
+    init_db(db_path)
+    query = "SELECT * FROM target_search_history"
+    params: tuple[Any, ...] = ()
+    if target_id is not None:
+        query += " WHERE target_id = ?"
+        params = (target_id,)
+    query += " ORDER BY occurred_at, history_id"
+    with closing(connect(db_path)) as conn:
+        rows = conn.execute(query, params).fetchall()
+    result: list[dict[str, Any]] = []
+    for row in rows:
+        item = dict(row)
+        item["nights"] = _loads(item.pop("nights_json"))
+        item["provenance"] = _loads(item.pop("provenance_json"))
+        result.append(item)
+    return result
+
+
+def searched_target_ids(db_path: Path) -> set[str]:
+    """All stable identities ever reserved or searched under governing history."""
+    init_db(db_path)
+    with closing(connect(db_path)) as conn:
+        rows = conn.execute("SELECT DISTINCT target_id FROM target_search_history").fetchall()
+    return {str(row["target_id"]) for row in rows}
+
+
+def acquired_nights_for_target(db_path: Path, target_id: str) -> set[str]:
+    """Union the real nights already acquired for a target across all runs."""
+    nights: set[str] = set()
+    for event in list_target_history(db_path, target_id):
+        nights.update(str(night) for night in event["nights"])
+    return nights
+
+
 def add_follow_up(
     db_path: Path,
     target_id: str,
@@ -477,6 +700,18 @@ def add_follow_up(
     init_db(db_path)
     now = _utc_now()
     with closing(connect(db_path)) as conn:
+        existing = conn.execute(
+            """
+            SELECT follow_up_id FROM follow_up_registry
+            WHERE target_id = ?
+              AND candidate_id IS ?
+              AND originating_run_id IS ?
+            LIMIT 1
+            """,
+            (target_id, candidate_id, originating_run_id),
+        ).fetchone()
+        if existing is not None:
+            return int(existing["follow_up_id"])
         cur = conn.execute(
             """
             INSERT INTO follow_up_registry(

@@ -752,6 +752,24 @@ def _challenge_known_object_epoch_association(
         "policy_input_sha256": input_sha256,
         "radius_arcsec": _KNOWN_OBJECT_RADIUS_ARCSEC,
         "observer_code": _KNOWN_OBJECT_OBSERVER_CODE,
+        "sources": [
+            {
+                "name": "IMCCE SkyBoT",
+                "version": "live epoch cone-search response",
+                "url": "https://vo.imcce.fr/webservices/skybot/",
+            },
+            {
+                "name": "Minor Planet Center published observations",
+                "version": "live first-observation lookup",
+                "url": "https://data.minorplanetcenter.net/api/get-obs",
+            },
+        ],
+        "retrieved_at_utc": datetime.now(UTC).isoformat(),
+        "transformations": [
+            "10 arcsec epoch cone association",
+            "published first-observation temporal eligibility",
+        ],
+        "validity_state": "valid",
     }
     if not observations:
         return ChallengeResult(
@@ -795,7 +813,12 @@ def _challenge_known_object_epoch_association(
             name="known_object_epoch_association",
             outcome="FAIL",
             reason=f"Time-aware known-object association could not be verified: {exc}",
-            details={**common, "error_type": type(exc).__name__, "error": str(exc)},
+            details={
+                **common,
+                "validity_state": "invalid",
+                "error_type": type(exc).__name__,
+                "error": str(exc),
+            },
         )
 
     if not associations:

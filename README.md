@@ -1,12 +1,53 @@
 # 2026 Near-Earth Object Detection & Ranking Pipeline
 
 ![Status](https://img.shields.io/badge/status-active%20development-blue)
-![Version](https://img.shields.io/badge/version-0.90.98-informational)
+![Version](https://img.shields.io/badge/version-0.91.0-informational)
 ![License](https://img.shields.io/badge/license-Apache%202.0-green)
 ![Tests](https://img.shields.io/badge/tests-1900%2B%20passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
 ![Python](https://img.shields.io/badge/python-3.14.3-blue)
 ![CI](https://img.shields.io/badge/CI-passing-brightgreen)
+
+---
+
+## Canonical Hunter product workflow
+
+The product entry points below are the one production path. They adaptively
+discover beyond the requested count, resolve durable target history, persist an
+exact pending manifest, execute or resume those exact targets, write candidate
+and provenance records, and make prior results available to follow-up ranking.
+Install the locked project once with `uv sync --all-extras --all-groups
+--python 3.14`, then run:
+
+```bash
+# Select the best available N targets not previously searched and reserve them.
+Create-New-Search --targets 5 --mode new
+
+# Execute or resume the exact most-recent pending manifest.
+caffeinate -i Run-New-Search --latest
+
+# Rank prior searches by current additional-work value and inspect evidence.
+Create-New-Search --targets 5 --mode follow-up
+Show-Follow-Ups
+```
+
+`--max-pool` is optional and has no default: normal selection expands until N
+valid targets are supported or the accessible planning universe is exhausted.
+If an explicit `--max-pool` prevents sufficiency, creation fails visibly and
+does not persist a misleading pending search. A completed new search becomes
+governing history immediately; a follow-up run excludes already acquired nights
+and performs additional work.
+
+`Skills/select_survey_fields.py`, `Skills/run_pipeline.py`, positive-control
+scripts, batch scorers, and direct adversarial-review/export commands are
+lower-level scientific diagnostics. They do not create a durable Hunter search
+and are not alternate product entry points. Use them only for the explicitly
+documented diagnostic, calibration, or operator-review procedures later in this
+README and the runbook.
+
+No command submits to MPC, announces a candidate, or makes an impact claim.
+External submission remains separately human-gated by
+`docs/OPERATOR_GO_NO_GO_RUNBOOK.md`.
 
 ---
 
@@ -698,9 +739,10 @@ PYTHONPATH=src uv run --python 3.14 python Skills/batch_score.py data/sample_tra
 | `estimated_diameter_m` | Rough size estimate in metres, assuming a typical rocky asteroid reflectivity. Treat as order-of-magnitude only. |
 | `alert_pathway` | What the pipeline recommends doing next (see §10.5 below). |
 
-### 10.4 Running on a Discovery Sky Region
+### 10.4 Lower-level diagnostic on a discovery sky region
 
-Discovery runs target unreviewed archival sources such as WISE/NEOWISE, DECam,
+This section is a preserved scientific diagnostic, not the canonical Hunter
+product workflow above. Historical discovery runs targeted WISE/NEOWISE, DECam,
 and TESS. Do not use ZTF or ATLAS as discovery sources; they are training and
 calibration sources only. Use coordinates and windows emitted by
 `Skills/select_survey_fields.py --wise-archive-probes` or by a documented
@@ -1115,7 +1157,11 @@ Deprecated one-file background wrapper scripts have been removed.
 PYTHONPATH=src uv run --python 3.14 python Skills/export_mpc_report.py results/scored_neos.json --out reports/mpc_report.txt
 ```
 
-### 13.8 End-to-End Pipeline Run
+### 13.8 Lower-level pipeline diagnostic
+
+This command exercises a legacy component pipeline directly. It does not perform
+adaptive target selection, durable search creation, or governing history
+updates, so it must not be represented as a Hunter production run.
 
 ```bash
 # Full dry-run pipeline diagnostic against a verified WISE/NEOWISE archive window

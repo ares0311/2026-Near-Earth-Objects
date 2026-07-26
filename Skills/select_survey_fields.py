@@ -1,4 +1,7 @@
-"""Select optimal sky fields for NEO discovery, targeting Aten and IEO/Atira classes.
+"""Diagnostic field scorer used internally by the canonical Hunter selector.
+
+Direct invocation does not create a durable search and is not an alternate
+production entry point. Use Create-New-Search for product selection.
 
 Scientific basis and coefficient status
 ---------------------------------------
@@ -459,6 +462,32 @@ def load_coverage_inventory(path: Path) -> dict:
     if not isinstance(raw_results, list) or not raw_results:
         raise ValueError("coverage inventory field_results must be a non-empty list")
 
+    validity_state = str(payload.get("validity_state") or "stale-but-usable")
+    allowed_validity = {
+        "valid",
+        "stale-but-usable",
+        "refresh-required",
+        "invalid",
+        "unknown",
+    }
+    if validity_state not in allowed_validity:
+        raise ValueError(f"invalid coverage inventory validity_state {validity_state!r}")
+    if validity_state in {"invalid", "refresh-required"}:
+        raise ValueError(
+            f"coverage inventory {path} is not usable: validity_state={validity_state}"
+        )
+    provenance = {
+        "source": str(payload.get("source") or "IRSA ZTF public science-image metadata"),
+        "source_url": str(
+            payload.get("source_url")
+            or "https://irsa.ipac.caltech.edu/ibe/search/ztf/products/sci"
+        ),
+        "source_version": str(payload.get("source_version") or "legacy-unversioned"),
+        "as_of_jd_exclusive": payload.get("as_of_jd_exclusive"),
+        "retrieved_at_utc": payload.get("retrieved_at_utc"),
+        "transformations": list(payload.get("transformations") or ["legacy inventory import"]),
+        "validity_state": validity_state,
+    }
     results: list[dict] = []
     seen_ids: set[str] = set()
     seen_coordinates: set[tuple[float, float]] = set()
@@ -501,6 +530,9 @@ def load_coverage_inventory(path: Path) -> dict:
                     raw.get("raw_response_sha256"),
                     f"coverage field {field_id} raw_response_sha256",
                 ),
+                "coverage_provenance": dict(
+                    raw.get("coverage_provenance") or provenance
+                ),
             }
         )
         seen_ids.add(field_id)
@@ -517,6 +549,7 @@ def load_coverage_inventory(path: Path) -> dict:
         "batch_id": batch_id,
         "batch_manifest_sha256": batch_manifest_sha256,
         "min_distinct_nights": minimum,
+        "provenance": provenance,
         "field_results": results,
     }
 
@@ -804,6 +837,7 @@ def select_fields(jd: float,
                         "batch_id": coverage["batch_id"],
                         "batch_manifest_sha256": coverage["batch_manifest_sha256"],
                         "min_distinct_nights": coverage["min_distinct_nights"],
+                        **metadata["coverage_provenance"],
                     },
                     "prior_searches": metadata["prior_searches"],
                 }

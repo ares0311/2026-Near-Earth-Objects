@@ -15,6 +15,34 @@ detail than this, the full references are linked at the bottom.
 
 ---
 
+## Hunter PROD closure remediation (verified 2026-07-25)
+
+This is the durable execution ledger for the adversarial re-audit of the
+canonical Hunter workflow. Current business requirements and
+`docs/HUNTER_PROD_DIRECTIVE.md` supersede the older Phase 3 closure claim where
+real behavior contradicts it. Do not restore that claim until every item below
+has passing behavioral and live-workflow evidence.
+
+| ID | Finding to remediate | Required acceptance evidence | Status |
+|---|---|---|---|
+| HP-01 | New-search execution did not update the governing target history, so an executed target could be selected as `new` again. | Durable, stable-ID target history is written for pending and executed targets; a second new request excludes every previously selected target. | VERIFIED |
+| HP-02 | Discovery stopped at the default fixed `--max-pool 200`, even when the accessible planning universe was not exhausted. | The normal path expands adaptively until top-N is supported or the planning universe is exhausted; an explicit operator limit fails loudly when it prevents sufficiency. | VERIFIED |
+| HP-03 | `run-new-search` returned success even when the durable run was `partial` or `failed`. | CLI exit status is non-zero for every mandatory incomplete/failed outcome and zero only for a completed exact manifest. | VERIFIED |
+| HP-04 | A crash after a target checkpoint but before ledger/follow-up ingestion could resume as `completed` while silently losing results. | Side effects are idempotent and precede the terminal target checkpoint; an injected crash/resume test proves no candidate or follow-up loss or duplication. | VERIFIED |
+| HP-05 | Follow-up selection was limited to manually seeded registry/legacy CSV cases and could repeat the same nights instead of selecting additional work from real prior search history. | A completed new run becomes valid follow-up evidence; follow-up ranking uses remaining unsearched coverage and execution acquires different nights. | VERIFIED |
+| HP-06 | The canonical executor invoked adversarial review offline without time-aware known-object evidence, forcing the known-object challenge to fail regardless of the candidate. | The production path obtains and provenance-stamps time-aware known-object evidence (or fails visibly); no unconditional missing-evidence verdict remains. | VERIFIED |
+| HP-07 | Coverage/model/scorer/result provenance was incomplete or synthetic in durable manifests and ledgers. | Durable records carry source, source version/as-of, retrieval time, transformations, versions, exact commit/worktree state, and one of `valid`, `stale-but-usable`, `refresh-required`, `invalid`, or `unknown`; selected inputs are current-valid or visibly refreshed. | VERIFIED |
+| HP-08 | README/operator commands presented lower-level scripts as product paths and there were no installed canonical Hunter entry points. | Installed `Create-New-Search`, `Run-New-Search`, and `Show-Follow-Ups` commands drive the one durable pipeline; lower-level tools are explicitly diagnostic and contract-tested as non-production bypasses. | VERIFIED |
+| HP-09 | Prior live evidence did not execute the exact selected new manifest and used a seeded follow-up stand-in. | A real new-target request executes its exact durable manifest; a subsequent real history-derived follow-up executes additional exact nights; adaptive expansion, provenance, results, and restart state are preserved. | VERIFIED |
+
+Execution followed the recorded order: HP-01/02, HP-03/04/05, HP-06/07/08,
+independent negative controls, canonical/adversarial verification, then the
+real HP-09 new/follow-up sequence. Exact commands, IDs, nights, provenance,
+results, and limitations are in
+`docs/evidence/live/2026-07-25-hunter-prod-adversarial-closure.md`.
+
+---
+
 ## ZTF DR24 path (current primary discovery path)
 
 This section covers the primary path per `docs/MISSION.md` and

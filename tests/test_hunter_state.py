@@ -8,7 +8,9 @@ import pytest
 
 from hunter_state import (
     ManifestTarget,
+    acquired_nights_for_target,
     add_follow_up,
+    commit_target_result,
     complete_search_run,
     create_search_manifest,
     create_search_run,
@@ -19,8 +21,10 @@ from hunter_state import (
     get_search_run,
     init_db,
     list_follow_ups,
+    list_target_history,
     mark_manifest_status,
     radec_from_target_id,
+    searched_target_ids,
     target_id_from_radec,
     update_follow_up_status,
     upsert_run_target,
@@ -50,7 +54,53 @@ def test_init_db_records_schema_version(tmp_path: Path) -> None:
         row = conn.execute(
             "SELECT value FROM hunter_state_metadata WHERE key = 'schema_version'"
         ).fetchone()
-    assert row == ("1",)
+    assert row == ("2",)
+
+
+def test_init_db_migrates_v1_manifest_targets_and_backfills_history(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "hunter_state.sqlite"
+    with closing(sqlite3.connect(db_path)) as conn:
+        conn.execute(
+            """
+            CREATE TABLE search_manifests (
+                search_id TEXT PRIMARY KEY, created_at TEXT NOT NULL, mode TEXT NOT NULL,
+                requested_n INTEGER NOT NULL, actual_n_selected INTEGER NOT NULL,
+                ranking_policy_path TEXT NOT NULL, ranking_policy_digest TEXT NOT NULL,
+                discovery_pool_size_explored INTEGER NOT NULL, sufficiency_met INTEGER NOT NULL,
+                config_json TEXT NOT NULL, status TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE search_manifest_targets (
+                search_id TEXT NOT NULL, rank INTEGER NOT NULL, target_id TEXT NOT NULL,
+                ra_deg REAL NOT NULL, dec_deg REAL NOT NULL, score REAL NOT NULL,
+                selection_reason TEXT NOT NULL, coverage_inventory_id TEXT,
+                PRIMARY KEY (search_id, target_id)
+            )
+            """
+        )
+        conn.execute(
+            "INSERT INTO search_manifests VALUES "
+            "('legacy-search', '2026-07-24T00:00:00Z', 'new', 1, 1, 'p', 'd', "
+            "1, 1, '{}', 'executed')"
+        )
+        conn.execute(
+            "INSERT INTO search_manifest_targets VALUES "
+            "('legacy-search', 1, 'radec_10.00_5.00', 10.0, 5.0, 0.5, 'legacy', 'field')"
+        )
+        conn.commit()
+
+    init_db(db_path)
+
+    manifest = get_search_manifest(db_path, "legacy-search")
+    assert manifest["targets"][0]["coverage_provenance"] == {}
+    assert manifest["targets"][0]["validity_state"] == "unknown"
+    history = list_target_history(db_path, "radec_10.00_5.00")
+    assert history[0]["status"] == "legacy_manifest_import"
 
 
 def test_target_id_from_radec_matches_coordinate_key_rounding() -> None:
@@ -94,6 +144,91 @@ def test_create_and_get_search_manifest_round_trip(tmp_path: Path) -> None:
     assert manifest["status"] == "pending"
     assert [t["target_id"] for t in manifest["targets"]] == [t.target_id for t in targets]
     assert [t["rank"] for t in manifest["targets"]] == [1, 2, 3]
+    assert searched_target_ids(db_path) == {target.target_id for target in targets}
+    assert {event["status"] for event in list_target_history(db_path)} == {
+        "selected_pending"
+    }
+
+
+def test_new_manifest_reservation_blocks_duplicate_but_followup_is_allowed(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "hunter_state.sqlite"
+    target = _targets(1)
+    create_search_manifest(
+        db_path, "search-new-1", "new", 1, "p", "d", target, 1, True, {}
+    )
+    with pytest.raises(ValueError, match="governing search history"):
+        create_search_manifest(
+            db_path, "search-new-2", "new", 1, "p", "d", target, 1, True, {}
+        )
+    create_search_manifest(
+        db_path, "search-followup", "follow_up", 1, "p", "d", target, 1, True, {}
+    )
+
+
+def test_commit_target_result_atomically_records_history_and_nights(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "hunter_state.sqlite"
+    target = _targets(1)[0]
+    create_search_manifest(
+        db_path, "search-1", "new", 1, "p", "d", [target], 1, True, {}
+    )
+    create_search_run(db_path, "run-1", "search-1", "abc", {"score": "v1"})
+
+    commit_target_result(
+        db_path,
+        run_id="run-1",
+        search_id="search-1",
+        mode="new",
+        target_id=target.target_id,
+        execution_status="success",
+        candidate_ids=["candidate-1"],
+        error_message=None,
+        nights_acquired=["20240101", "20240102", "20240103"],
+        provenance={"validity_state": "valid"},
+    )
+
+    assert get_run_targets(db_path, "run-1")[target.target_id]["candidate_ids"] == [
+        "candidate-1"
+    ]
+    assert acquired_nights_for_target(db_path, target.target_id) == {
+        "20240101",
+        "20240102",
+        "20240103",
+    }
+    terminal = [
+        event
+        for event in list_target_history(db_path, target.target_id)
+        if event["status"] == "success"
+    ]
+    assert terminal[0]["provenance"]["validity_state"] == "valid"
+
+
+@pytest.mark.parametrize(
+    ("mode", "status", "message"),
+    [
+        ("new", "bogus", "execution_status must be one of"),
+        ("bogus", "success", "mode must be one of"),
+    ],
+)
+def test_commit_target_result_rejects_invalid_enums(
+    tmp_path: Path, mode: str, status: str, message: str
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        commit_target_result(
+            tmp_path / "hunter.sqlite",
+            run_id="run",
+            search_id="search",
+            mode=mode,
+            target_id="radec_1.00_1.00",
+            execution_status=status,
+            candidate_ids=[],
+            error_message=None,
+            nights_acquired=[],
+            provenance={},
+        )
 
 
 def test_create_search_manifest_rejects_invalid_mode(tmp_path: Path) -> None:
@@ -162,6 +297,31 @@ def test_create_search_manifest_rejects_duplicate_target_ids(tmp_path: Path) -> 
             discovery_pool_size_explored=2,
             sufficiency_met=True,
             config={},
+        )
+
+
+def test_create_search_manifest_rejects_invalid_validity_state(tmp_path: Path) -> None:
+    target = _targets(1)[0]
+    invalid = ManifestTarget(
+        target_id=target.target_id,
+        ra_deg=target.ra_deg,
+        dec_deg=target.dec_deg,
+        score=target.score,
+        selection_reason=target.selection_reason,
+        validity_state="fresh-enough",
+    )
+    with pytest.raises(ValueError, match="invalid manifest target validity_state"):
+        create_search_manifest(
+            tmp_path / "hunter.sqlite",
+            "search-1",
+            "new",
+            1,
+            "p",
+            "d",
+            [invalid],
+            1,
+            True,
+            {},
         )
 
 
@@ -361,6 +521,32 @@ def test_add_follow_up_and_list_ordering(tmp_path: Path) -> None:
 
     all_statuses = list_follow_ups(db_path, status=None)
     assert len(all_statuses) == 2
+
+
+def test_add_follow_up_is_idempotent_for_same_run_candidate(tmp_path: Path) -> None:
+    db_path = tmp_path / "hunter_state.sqlite"
+    first = add_follow_up(
+        db_path,
+        "radec_1.00_1.00",
+        "reason",
+        0.5,
+        "action",
+        "evidence",
+        candidate_id="candidate",
+        originating_run_id="run",
+    )
+    second = add_follow_up(
+        db_path,
+        "radec_1.00_1.00",
+        "reason",
+        0.5,
+        "action",
+        "evidence",
+        candidate_id="candidate",
+        originating_run_id="run",
+    )
+    assert second == first
+    assert len(list_follow_ups(db_path)) == 1
 
 
 def test_add_follow_up_rejects_empty_fields(tmp_path: Path) -> None:
