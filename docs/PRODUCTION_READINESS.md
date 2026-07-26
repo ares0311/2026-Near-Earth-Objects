@@ -6,7 +6,33 @@ sync entry immediately below; the P1-P5 gate register body further down is
 unchanged historical evidence from 2026-07-02; current gate status for the
 active ZTF DR24 path lives in `docs/ZTF_DR24_PRODUCTION_GATES.md`)
 
-**Latest sync (2026-07-25, first real coefficient fit attempted — result
+**Latest sync (2026-07-25, aten/ieo elongation preference peaks revised —
+v3 ranking policy, live default)**: Operator-approved, data-defended fix
+following the coefficient-fit result below. Root cause confirmed directly
+from raw data: every one of the 56 real Aten I41 discoveries falls at
+elongation 99.4°-173.7° (none inside the old 60-100° preference window,
+peak 80°); every one of the 7 real Atira discoveries falls at
+39.5°-53.1° (none inside the old 20-45° window, peak 32.5°). Two
+independent NEO classes, same directional error — not sample noise. Only
+`geometry_score`'s peak was changed (the one feature with a reliable,
+zero-excluding, cross-mode bootstrap signal); `survey_scarcity_score` and
+`population_score` were left untouched since their fitted directions
+aren't reliably established by this data. New
+`data_selection/ranking_policies/ztf_field_ranking_v3.json` (v2 frozen,
+untouched); `Skills/select_survey_fields.py`'s live default now points at
+v3 — **a real change to future field selection**, not just a
+retrospective-audit update. Found and resolved a real architectural
+constraint while shipping this: `load_ranking_policy()` requires an exact
+match against the live code, so v2 stopped validating the instant the
+peaks changed, and the existing 21-aten/7-ieo null-outcomes evidence base
+(scored under v2) could no longer be reproduced by any code path.
+Resolved by mechanically rescoring the same real search facts (RA/Dec/
+nights/tracklet counts/review outcomes all unchanged) under v3 as
+`ztf_field_null_outcomes_v5.json` — same 28 real controls, now genuinely
+reproducible (max drift 5.6e-05). Full detail:
+`docs/evidence/live/2026-07-25-elongation-peak-revision.md`.
+
+**Earlier sync (2026-07-25, first real coefficient fit attempted — result
 flagged for operator interpretation, nothing promoted)**: Operator
 decision ("A" of a three-way choice): attempt a real per-mode coefficient
 fit now that both modes clear their thresholds. Removed the audit's
