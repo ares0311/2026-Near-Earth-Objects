@@ -7,7 +7,14 @@ Granvik et al. (2018) supports debiased NEO orbit/population priors, Ye et al.
 (2015) supports population-completeness estimation. Those papers do not supply
 this selector's exact weights, exponentials, windows, or completeness values.
 The v2 policy retains the exact transparent, uncalibrated v1 coefficient priors
-and separates evidence-audited eligibility bounds from preference peaks. Every
+and separates evidence-audited eligibility bounds from preference peaks. The v3
+policy (2026-07-25) keeps the same weights and eligibility bounds but revises
+the aten/ieo elongation preference peaks: a real coefficient-fit attempt
+(Skills/fit_field_ranking_coefficients.py) found the same feature
+(geometry_score) stably anti-correlated with real discovery outcome in both
+modes, and the raw elongation data showed why -- every real Aten/Atira I41
+discovery on record falls outside the old preference peak's core range, not
+inside it (docs/evidence/live/2026-07-25-elongation-peak-revision.md). Every
 result is stamped with the policy file's SHA256 and limitations.
 
 Scoring formula:
@@ -78,11 +85,23 @@ _WEIGHTS: dict[str, float] = {
     "novelty": 0.15,
 }
 
-# Elongation windows (min, max, peak) per mode, in degrees
+# Elongation windows (min, max, peak) per mode, in degrees.
+#
+# aten/ieo peaks revised 2026-07-25 (v3): the original peaks (80.0/32.5,
+# a "dawn/dusk quadrature" and "twilight zone" cadence-scarcity argument)
+# predate any real discovery data. Real ZTF/I41-attributed discoveries now
+# on record show the opposite pattern -- all 56 real Aten discoveries fall
+# at elongation 99.4-173.7 deg (none inside the old 60-100 window), and all
+# 7 real Atira discoveries fall at 39.5-53.1 deg (none inside the old
+# 20-45 window). A real coefficient-fit attempt independently found
+# geometry_score stably anti-correlated with discovery outcome in both
+# modes (bootstrap CIs excluding zero), consistent with this raw pattern.
+# New peaks are set near the real median elongation for each mode. See
+# docs/evidence/live/2026-07-25-elongation-peak-revision.md.
 _ELONG_WINDOWS: dict[str, tuple[float, float, float]] = {
-    "aten": (60.0, 100.0, 80.0),   # dawn/dusk quadrature sector
-    "ieo":  (20.0,  45.0, 32.5),   # twilight zone (civil to nautical twilight)
-    "all":  (60.0, 160.0, 110.0),  # general NEO (broad anti-helion sector)
+    "aten": (100.0, 180.0, 145.0),
+    "ieo":  (30.0,   60.0,  48.0),
+    "all":  (60.0, 160.0, 110.0),  # general NEO (broad anti-helion sector); unrevised
     "recovery": (120.0, 180.0, 165.0),  # opposition-side fields rich in known objects
 }
 
@@ -119,7 +138,7 @@ _DEFAULT_RANKING_POLICY_PATH = (
     _REPO_ROOT
     / "data_selection"
     / "ranking_policies"
-    / "ztf_field_ranking_v2.json"
+    / "ztf_field_ranking_v3.json"
 )
 _TARGET_QUEUE_FIELDS = {
     "rank",

@@ -24,7 +24,7 @@ hand-set policy's own AUC on the same data -- otherwise the reason is
 stated explicitly.
 
 This script NEVER writes to the production ranking policy file
-(data_selection/ranking_policies/ztf_field_ranking_v2.json). It only
+(data_selection/ranking_policies/ztf_field_ranking_v3.json). It only
 produces a report. Promoting a fit into the active policy is a separate,
 later, explicitly operator-reviewed step -- this project's existing CNN
 promotion workflow (Skills/build_promotion_report.py) is the template for

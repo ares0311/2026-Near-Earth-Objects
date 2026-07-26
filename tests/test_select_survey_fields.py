@@ -225,14 +225,17 @@ class TestKnownObjectDensityScoreBatch:
 
 
 class TestGeometryScoreBatch:
-    def test_aten_peak_at_80_degrees(self):
-        elong = np.array([80.0])
+    def test_aten_peak_at_145_degrees(self):
+        """v3 revision (2026-07-25): peak moved from 80 to 145 deg -- every
+        real Aten I41 discovery on record falls at elongation >= 99.4 deg,
+        none inside the old 60-100 deg window."""
+        elong = np.array([145.0])
         hours = np.array([6.0])
         score = ssf.geometry_score_batch(elong, hours, "aten")
         assert score[0] > 0.5
 
     def test_preference_falls_outside_peak_without_becoming_ineligible(self):
-        elong = np.array([80.0, 138.0])
+        elong = np.array([145.0, 80.0])
         hours = np.array([6.0])
         score = ssf.geometry_score_batch(elong, hours, "aten")
         assert score[0] > score[1] > 0.0
@@ -254,8 +257,11 @@ class TestGeometryScoreBatch:
         scores = ssf.geometry_score_batch(elong, hours, "aten")
         assert scores[1] > scores[0]
 
-    def test_ieo_peak_in_twilight_window(self):
-        elong = np.array([32.5])
+    def test_ieo_peak_at_48_degrees(self):
+        """v3 revision (2026-07-25): peak moved from 32.5 to 48 deg -- every
+        real Atira I41 discovery on record falls at elongation >= 39.5 deg,
+        none inside the old 20-45 deg window."""
+        elong = np.array([48.0])
         hours = np.array([5.0])
         score = ssf.geometry_score_batch(elong, hours, "ieo")
         assert score[0] > 0.5
@@ -354,14 +360,39 @@ class TestRankingPolicyProvenance:
         policy = ssf.load_ranking_policy()
 
         assert policy["schema_version"] == "ztf-field-ranking-policy-v2"
-        assert policy["policy_id"] == "ztf-field-ranking-v2"
+        assert policy["policy_id"] == "ztf-field-ranking-v3"
         assert policy["coefficient_status"] == "uncalibrated_transparent_prior"
         assert len(policy["sha256"]) == 64
         assert policy["path"] == (
-            "data_selection/ranking_policies/ztf_field_ranking_v2.json"
+            "data_selection/ranking_policies/ztf_field_ranking_v3.json"
         )
         assert any("calibrated" in limitation for limitation in policy["limitations"])
         assert policy["empirical_evidence"]
+
+    def test_v3_preference_windows_match_elong_windows_constant(self):
+        """The v3 revision's committed windows must equal the live
+        _ELONG_WINDOWS constant exactly -- load_ranking_policy() would
+        already fail loudly if not, but pinning the exact values here
+        guards against silently drifting one without the other."""
+        policy_raw = json.loads(ssf._DEFAULT_RANKING_POLICY_PATH.read_text())
+        assert policy_raw["preference_windows_deg"]["aten"] == [100.0, 180.0, 145.0]
+        assert policy_raw["preference_windows_deg"]["ieo"] == [30.0, 60.0, 48.0]
+
+    def test_frozen_v2_policy_no_longer_matches_the_revised_code(self):
+        """ztf_field_ranking_v2.json is a frozen historical artifact as of
+        the 2026-07-25 elongation-peak revision -- load_ranking_policy()
+        requires an exact match against the live code, and there is only
+        ever one live formula, so the pre-revision file can no longer
+        validate. This is intentional fail-loud behavior, not a bug: it
+        stops v2 from being silently (mis)treated as still-current."""
+        v2_path = (
+            ssf._REPO_ROOT
+            / "data_selection"
+            / "ranking_policies"
+            / "ztf_field_ranking_v2.json"
+        )
+        with pytest.raises(ValueError, match="preference_windows_deg"):
+            ssf.load_ranking_policy(v2_path)
 
     def test_tampered_coefficient_fails_loudly(self, tmp_path):
         payload = json.loads(ssf._DEFAULT_RANKING_POLICY_PATH.read_text())
@@ -445,7 +476,7 @@ class TestSelectFields:
                     "field_radius_deg", "reason"}
         for f in fields:
             assert required.issubset(f.keys())
-            assert f["ranking_policy"]["policy_id"] == "ztf-field-ranking-v2"
+            assert f["ranking_policy"]["policy_id"] == "ztf-field-ranking-v3"
 
     def test_scores_in_range(self):
         fields = ssf.select_fields(jd=2461000.5, mode="aten", top_n=10)

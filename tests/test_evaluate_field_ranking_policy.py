@@ -19,25 +19,28 @@ def test_pairwise_auc_uses_independent_pair_ordering() -> None:
     assert audit._pairwise_auc([], [1.0]) is None
 
 
-def test_real_audit_reproduces_scores_at_v3_when_ieo_not_yet_qualified() -> None:
-    """v3 (24 entries, ieo searched_null=3 < its 7 threshold) is the last
-    real snapshot where the gate returns normally instead of firing its
-    tripwire -- kept as a fixed point to assert the detailed metrics
-    against, since DEFAULT_NULLS (v4) now trips the gate below."""
+def test_real_audit_reproduces_scores_and_reports_detailed_metrics() -> None:
+    """DEFAULT_NULLS (v5) rescored every real search fact from v4 under the
+    v3 ranking policy (revised aten/ieo elongation peaks) -- the pre-v3
+    ztf_field_null_outcomes_v3.json (null-outcomes dataset; unrelated
+    numbering collision with the ranking-policy version) can no longer be
+    reproduced by the current code at all, by design: load_ranking_policy()
+    requires an exact match against the live formula, and there is only
+    ever one live formula. v5 is the current, valid fixed point."""
     result = audit.build_policy_audit(
         audit.DEFAULT_POSITIVES,
-        ROOT / "data_selection/calibration/ztf_field_null_outcomes_v3.json",
+        audit.DEFAULT_NULLS,
         audit.DEFAULT_POLICY,
     )
 
     assert result["status"] == "audit_complete_not_calibrated"
-    assert result["score_reproduction"]["searched_null_count"] == 24
+    assert result["score_reproduction"]["searched_null_count"] == 28
     assert result["score_reproduction"]["maximum_absolute_drift"] <= 0.0002
     gate = result["coefficient_promotion_gate"]
-    assert gate["coefficient_update_authorized"] is False
+    assert gate["coefficient_update_authorized"] is True
     assert gate["observed_counts"] == {
         "aten": {"positive": 57, "searched_null": 21},
-        "ieo": {"positive": 7, "searched_null": 3},
+        "ieo": {"positive": 7, "searched_null": 7},
     }
     assert result["all_source_metrics"]["aten"]["all"]["positive_count"] == 2085
     assert result["all_source_metrics"]["ieo"]["all"]["positive_count"] == 23
@@ -58,10 +61,10 @@ def test_gate_uses_per_mode_thresholds_ieo_ceiling_lower_than_aten() -> None:
 
 def test_real_defaults_authorize_fit_attempt_now_that_every_mode_qualifies() -> None:
     """2026-07-25: a second stratified IEO/Atira batch closed the last gap
-    (searched_null 3 -> 7), so DEFAULT_NULLS (v4) has both modes meeting
-    MINIMUM_SAMPLE_THRESHOLDS for the first time. Per the operator's
-    2026-07-25 decision to proceed with real coefficient fitting, this
-    audit no longer raises when that happens -- it reports
+    (searched_null 3 -> 7), so DEFAULT_NULLS (now v5, rescored under the v3
+    ranking policy) has both modes meeting MINIMUM_SAMPLE_THRESHOLDS. Per
+    the operator's 2026-07-25 decision to proceed with real coefficient
+    fitting, this audit no longer raises when that happens -- it reports
     coefficient_update_authorized=True and decision=
     "coefficient_fit_attempt_authorized", leaving any actual fit to the
     separate Skills/fit_field_ranking_coefficients.py."""
