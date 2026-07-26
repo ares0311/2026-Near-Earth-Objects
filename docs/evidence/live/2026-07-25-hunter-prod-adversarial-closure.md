@@ -95,6 +95,15 @@ A second identical new-target request on the same database selected
 `search_new_20260726T010023Z_b608b777`; this proves future new-target
 eligibility was updated rather than relying on an operator-maintained CSV.
 
+That second exact manifest was then executed from clean remediation commit
+`661a0f2ce9fc7cd6dc02670f7ee271fcf7d9db2f` as run
+`run_search_new_20260726T010023Z_b608b777_d2dfb39a`. It acquired 600 real
+observations on `20230922`, `20230924`, and `20230925`, reproduced nine
+deterministic tracklets, performed live epoch-aware SkyBoT checks, persisted
+all nine candidates with `REJECT` review status, and completed with zero
+failed targets. Both the run record and every candidate record contain the
+exact commit and `tracked_worktree_dirty=false`.
+
 ## Real history-derived follow-up workflow
 
 Command:
