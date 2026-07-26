@@ -31,7 +31,7 @@
   },
   {
     "path": "Skills/run_pipeline.py",
-    "line": 522,
+    "line": 526,
     "exception_types": "OSError",
     "reason": "Pre-existing silent-swallow predating REL-01 (2026-07-16), catalogued not fixed. Cache-file cleanup loop; a file that fails to unlink is simply absent from the returned `deleted` list (an implicit signal) but the specific OSError itself is never surfaced or logged."
   },

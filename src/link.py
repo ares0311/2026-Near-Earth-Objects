@@ -9,6 +9,7 @@ __all__ = [
     "compute_observation_rate",
 ]
 
+import json
 import math
 import uuid
 from collections import defaultdict
@@ -190,8 +191,15 @@ def _make_tracklet(observations: list[Observation]) -> Tracklet:
     else:
         rate, pa = 0.0, 0.0
 
+    # Stable identity makes candidate-ledger upserts idempotent when a Hunter
+    # run crashes after ingestion and replays this exact observation set.
+    identity_payload = json.dumps(
+        [observation.model_dump(mode="json") for observation in obs_sorted],
+        sort_keys=True,
+        separators=(",", ":"),
+    )
     return Tracklet(
-        object_id=str(uuid.uuid4()),
+        object_id=str(uuid.uuid5(uuid.NAMESPACE_URL, identity_payload)),
         observations=tuple(obs_sorted),
         arc_days=arc_days,
         motion_rate_arcsec_per_hour=rate,

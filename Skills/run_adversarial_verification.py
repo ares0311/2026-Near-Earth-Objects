@@ -31,6 +31,7 @@ _ADVERSARIAL_TEST_MODULES = [
     "tests/test_check_incomplete_implementations.py",
     "tests/test_check_silent_exceptions.py",
     "tests/test_verify_reliability_controls.py",
+    "tests/test_hunter_prod_acceptance.py",
 ]
 
 

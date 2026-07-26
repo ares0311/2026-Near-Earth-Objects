@@ -21,6 +21,11 @@ dependencies = [
     "fastavro>=1.9,<2",
 ]
 
+[project.scripts]
+Create-New-Search = "hunter_commands:create_new_search"
+Run-New-Search = "hunter_commands:run_new_search"
+Show-Follow-Ups = "hunter_commands:show_follow_ups"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=7.4",

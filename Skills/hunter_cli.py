@@ -109,7 +109,17 @@ def _combined_known_coverage() -> dict[tuple[float, float], dict[str, Any]]:
         inventory = field_selector.load_coverage_inventory(path)
         for field in inventory["field_results"]:
             key = field_selector._coordinate_key(field["ra_deg"], field["dec_deg"])
-            combined[key] = field
+            combined[key] = {
+                **field,
+                "coverage_provenance": {
+                    **field["coverage_provenance"],
+                    "inventory_path": path.relative_to(REPO_ROOT).as_posix()
+                    if path.is_relative_to(REPO_ROOT)
+                    else str(path),
+                    "batch_id": inventory["batch_id"],
+                    "batch_manifest_sha256": inventory["batch_manifest_sha256"],
+                },
+            }
     return combined
 
 
@@ -121,6 +131,11 @@ def _write_combined_inventory(
         "schema_version": "ztf-field-night-coverage-inventory-v1",
         "batch_id": "hunter_cli_combined_working_inventory",
         "batch_manifest_sha256": _content_sha256(field_results),
+        "source": "merged validated Hunter coverage inventories",
+        "source_version": f"content-sha256:{_content_sha256(field_results)}",
+        "retrieved_at_utc": datetime.now(UTC).isoformat(),
+        "transformations": ["coordinate-keyed deterministic inventory merge"],
+        "validity_state": "valid",
         "metadata_only": True,
         "min_distinct_nights": _DEFAULT_COVERAGE_WINDOW["min_distinct_nights"],
         "field_results": field_results,
@@ -217,25 +232,34 @@ def discover_new_targets(
     jd: float,
     neo_class: str,
     requested_n: int,
-    max_pool: int,
+    max_pool: int | None,
     out_dir: Path,
     target_queue_path: Path,
     ranking_policy_path: Path,
+    db_path: Path,
 ) -> dict[str, Any]:
     """Adaptive discovery loop for ``create-new-search --mode new``.
 
     Repeatedly grows the working coverage inventory (real, live IRSA metadata
     checks via inventory_ztf_field_night_coverage.py) for the next batch of
-    top-ranked, not-yet-covered planning-grid fields until either
-    ``requested_n`` eligible candidates exist or ``max_pool`` fields have been
-    coverage-checked -- whichever comes first. Returns the eligible ranked
-    results plus sufficiency/pool-size bookkeeping for the durable manifest.
+    top-ranked, not-yet-covered planning-grid fields until ``requested_n``
+    eligible candidates exist or the reasonably accessible planning universe
+    is exhausted. ``max_pool`` is an explicit operator safety limit only; if it
+    prevents sufficiency, the caller must fail rather than persist a misleading
+    short manifest.
     """
+    if requested_n <= 0:
+        raise ValueError("requested_n must be positive")
+    if max_pool is not None and max_pool <= 0:
+        raise ValueError("max_pool must be positive when supplied")
     combined = _combined_known_coverage()
     checked_coords: set[tuple[float, float]] = set(combined.keys())
+    governing_history = hunter_state.searched_target_ids(db_path)
     eligible: list[dict[str, Any]] = []
     working_inventory_path = out_dir / "working_coverage_inventory.json"
     round_index = 0
+    universe_exhausted = False
+    exploration_limited = False
 
     while True:
         if combined:
@@ -249,19 +273,55 @@ def discover_new_targets(
                 search_mode="new",
                 ranking_policy_path=ranking_policy_path,
             )
-        if len(eligible) >= requested_n or len(checked_coords) >= max_pool:
+            eligible = [
+                row
+                for row in eligible
+                if hunter_state.target_id_from_radec(row["ra_deg"], row["dec_deg"])
+                not in governing_history
+            ]
+        if len(eligible) >= requested_n:
+            stale_selected = [
+                row
+                for row in eligible[:requested_n]
+                if row["coverage_provenance"]["validity_state"] != "valid"
+            ]
+            if stale_selected:
+                # A legacy inventory may support broad ranking, but exact
+                # selected targets are refreshed before durable creation.
+                for offset in range(0, len(stale_selected), coverage_inventory.MAX_FIELDS):
+                    chunk = stale_selected[offset : offset + coverage_inventory.MAX_FIELDS]
+                    fields = [
+                        (
+                            _field_id_from_radec("refresh", row["ra_deg"], row["dec_deg"]),
+                            row["ra_deg"],
+                            row["dec_deg"],
+                        )
+                        for row in chunk
+                    ]
+                    merged = _live_coverage_check(fields, "hunter_selected_refresh")
+                    refreshed = field_selector.load_coverage_inventory(
+                        _COVERAGE_INVENTORY_DIR / f"{merged['batch_id']}.json"
+                    )
+                    for field in refreshed["field_results"]:
+                        key = field_selector._coordinate_key(
+                            field["ra_deg"], field["dec_deg"]
+                        )
+                        combined[key] = field
+                continue
+            break
+        if max_pool is not None and len(checked_coords) >= max_pool:
+            exploration_limited = True
             break
 
-        # max_pool - len(checked_coords) > 0 here: the prior break condition
-        # above already ruled out len(checked_coords) >= max_pool.
-        batch_size = min(
-            max(3 * requested_n, 10) * (2**round_index), max_pool - len(checked_coords)
-        )
+        batch_size = max(3 * requested_n, 10) * (2**round_index)
+        if max_pool is not None:
+            batch_size = min(batch_size, max_pool - len(checked_coords))
         candidates = _next_uncovered_planning_candidates(
             jd, neo_class, checked_coords, batch_size, ranking_policy_path
         )
         if not candidates:
-            break  # planning grid itself is exhausted for this class/night
+            universe_exhausted = True
+            break
 
         round_index += 1
         fields = [
@@ -278,6 +338,8 @@ def discover_new_targets(
         "eligible": eligible,
         "pool_size_explored": len(checked_coords),
         "sufficiency_met": len(eligible) >= requested_n,
+        "universe_exhausted": universe_exhausted,
+        "exploration_limited": exploration_limited,
     }
 
 
@@ -292,6 +354,8 @@ def _write_manifest_csv(search_id: str, rows: list[dict[str, Any]]) -> Path:
         "score",
         "selection_reason",
         "coverage_inventory_id",
+        "validity_state",
+        "coverage_source",
     ]
     with path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
@@ -391,6 +455,45 @@ def _followup_candidates_from_insufficient_coverage(
     return candidates, n_still_insufficient
 
 
+def _followup_candidates_from_history(db_path: Path) -> list[dict[str, Any]]:
+    """Rank prior executed targets by real remaining, not-yet-acquired nights."""
+    combined = _combined_known_coverage()
+    by_target: dict[str, list[dict[str, Any]]] = {}
+    for event in hunter_state.list_target_history(db_path):
+        if event["status"] not in {"success", "null_result", "failed"}:
+            continue
+        by_target.setdefault(event["target_id"], []).append(event)
+
+    candidates: list[dict[str, Any]] = []
+    for target_id, events in by_target.items():
+        ra_deg, dec_deg = hunter_state.radec_from_target_id(target_id)
+        field = combined.get(field_selector._coordinate_key(ra_deg, dec_deg))
+        if field is None:
+            continue
+        acquired = hunter_state.acquired_nights_for_target(db_path, target_id)
+        remaining = [
+            night for night in field["distinct_nights_yyyymmdd"] if night not in acquired
+        ]
+        if len(remaining) < int(_DEFAULT_COVERAGE_WINDOW["min_distinct_nights"]):
+            continue
+        latest_status = events[-1]["status"]
+        status_bonus = {"failed": 0.25, "null_result": 0.15, "success": 0.10}[latest_status]
+        score = min(0.95, 0.40 + status_bonus + min(0.20, len(remaining) / 100.0))
+        candidates.append(
+            {
+                "ra_deg": ra_deg,
+                "dec_deg": dec_deg,
+                "score": score,
+                "reason": (
+                    f"prior search status={latest_status}; {len(remaining)} current-valid "
+                    f"covered night(s) remain after {len(acquired)} acquired night(s)"
+                ),
+                "field_id": field["field_id"],
+            }
+        )
+    return candidates
+
+
 def discover_followup_targets(
     db_path: Path, requested_n: int, target_queue_path: Path
 ) -> dict[str, Any]:
@@ -405,11 +508,24 @@ def discover_followup_targets(
     insufficient after a live recheck is reported, not silently dropped.
     """
     registry_candidates = _followup_candidates_from_registry(db_path)
+    history_candidates = _followup_candidates_from_history(db_path)
     recovered_candidates, n_still_insufficient = _followup_candidates_from_insufficient_coverage(
         target_queue_path
     )
-    all_candidates = registry_candidates + recovered_candidates
-    all_candidates.sort(key=lambda c: c["score"], reverse=True)
+    # One target may be supported by both a candidate-level registry entry and
+    # target-level search history. Keep the strongest explainable reason.
+    deduplicated: dict[str, dict[str, Any]] = {}
+    for candidate in registry_candidates + history_candidates + recovered_candidates:
+        target_id = hunter_state.target_id_from_radec(
+            candidate["ra_deg"], candidate["dec_deg"]
+        )
+        prior = deduplicated.get(target_id)
+        if prior is None or candidate["score"] > prior["score"]:
+            deduplicated[target_id] = candidate
+    all_candidates = sorted(
+        deduplicated.values(),
+        key=lambda c: (-float(c["score"]), float(c["ra_deg"]), float(c["dec_deg"])),
+    )
     return {
         "eligible": all_candidates,
         "pool_size_explored": len(all_candidates) + n_still_insufficient,
@@ -417,7 +533,56 @@ def discover_followup_targets(
     }
 
 
+def _attach_current_coverage(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Attach current-valid exact-target coverage, refreshing legacy evidence."""
+    combined = _combined_known_coverage()
+    needs_refresh = []
+    for row in rows:
+        field = combined.get(field_selector._coordinate_key(row["ra_deg"], row["dec_deg"]))
+        if (
+            field is None
+            or field["coverage_provenance"]["validity_state"] != "valid"
+        ):
+            needs_refresh.append(row)
+    for offset in range(0, len(needs_refresh), coverage_inventory.MAX_FIELDS):
+        chunk = needs_refresh[offset : offset + coverage_inventory.MAX_FIELDS]
+        fields = [
+            (
+                _field_id_from_radec("selected", row["ra_deg"], row["dec_deg"]),
+                row["ra_deg"],
+                row["dec_deg"],
+            )
+            for row in chunk
+        ]
+        merged = _live_coverage_check(fields, "hunter_exact_target_refresh")
+        refreshed = field_selector.load_coverage_inventory(
+            _COVERAGE_INVENTORY_DIR / f"{merged['batch_id']}.json"
+        )
+        for field in refreshed["field_results"]:
+            combined[field_selector._coordinate_key(field["ra_deg"], field["dec_deg"])] = field
+
+    enriched = []
+    for row in rows:
+        field = combined.get(field_selector._coordinate_key(row["ra_deg"], row["dec_deg"]))
+        if field is None or not field["passes_min_distinct_nights"]:
+            raise RuntimeError(
+                f"selected target RA={row['ra_deg']} Dec={row['dec_deg']} does not have "
+                "current-valid minimum coverage"
+            )
+        enriched.append(
+            {
+                **row,
+                "field_id": field["field_id"],
+                "coverage_provenance": field["coverage_provenance"],
+                "coverage_nights": field["distinct_nights_yyyymmdd"],
+            }
+        )
+    return enriched
+
+
 def cmd_create_new_search(args: argparse.Namespace) -> int:
+    if args.targets <= 0:
+        raise ValueError("requested_n must be positive")
     ranking_policy_path = Path(args.ranking_policy)
     ranking_policy = field_selector.load_ranking_policy(ranking_policy_path)
     target_queue_path = Path(args.target_queue)
@@ -440,6 +605,7 @@ def cmd_create_new_search(args: argparse.Namespace) -> int:
             out_dir=out_dir,
             target_queue_path=target_queue_path,
             ranking_policy_path=ranking_policy_path,
+            db_path=db_path,
         )
         config: dict[str, Any] = {"neo_class": args.neo_class, "jd": jd, "max_pool": args.max_pool}
     else:
@@ -448,7 +614,14 @@ def cmd_create_new_search(args: argparse.Namespace) -> int:
         )
         config = {"neo_class": args.neo_class}
 
-    selected = result["eligible"][: args.targets]
+    if result.get("exploration_limited") and not result["sufficiency_met"]:
+        raise RuntimeError(
+            f"explicit --max-pool={args.max_pool} stopped discovery after "
+            f"{result['pool_size_explored']} field(s) before {args.targets} valid targets "
+            "were found; remove or increase the limit"
+        )
+
+    selected = _attach_current_coverage(result["eligible"][: args.targets])
     manifest_targets = [
         hunter_state.ManifestTarget(
             target_id=hunter_state.target_id_from_radec(row["ra_deg"], row["dec_deg"]),
@@ -457,6 +630,8 @@ def cmd_create_new_search(args: argparse.Namespace) -> int:
             score=row["score"],
             selection_reason=row["reason"],
             coverage_inventory_id=row.get("field_id"),
+            coverage_provenance=row["coverage_provenance"],
+            validity_state=row["coverage_provenance"]["validity_state"],
         )
         for row in selected
     ]
@@ -486,6 +661,8 @@ def cmd_create_new_search(args: argparse.Namespace) -> int:
             "score": t.score,
             "selection_reason": t.selection_reason,
             "coverage_inventory_id": t.coverage_inventory_id,
+            "validity_state": t.validity_state,
+            "coverage_source": (t.coverage_provenance or {}).get("source", "unknown"),
         }
         for t in manifest_targets
     ]
@@ -502,11 +679,15 @@ def cmd_create_new_search(args: argparse.Namespace) -> int:
         f"sufficiency_met={result['sufficiency_met']}"
     )
     if len(manifest_targets) < args.targets:
+        exhaustion = (
+            "the full accessible planning universe was exhausted"
+            if result.get("universe_exhausted", True)
+            else "all valid follow-up evidence was exhausted"
+        )
         print(
             f"WARNING: only {len(manifest_targets)}/{args.targets} eligible targets found "
-            f"after exploring {result['pool_size_explored']} candidate field(s) -- the "
-            "reachable pool is exhausted for this class/night, not a bug. Use --max-pool "
-            "to search further, or retry on a different --jd.",
+            f"after exploring {result['pool_size_explored']} candidate field(s) -- "
+            f"{exhaustion}; retry with different scientific constraints only if desired.",
             flush=True,
         )
     return 0
@@ -517,6 +698,21 @@ def _git_sha() -> str:
         ["git", "rev-parse", "HEAD"], capture_output=True, text=True, cwd=REPO_ROOT, check=False
     )
     return result.stdout.strip() or "unknown"
+
+
+def _git_provenance() -> dict[str, Any]:
+    """Return the exact commit plus whether tracked pipeline code is modified."""
+    status = subprocess.run(
+        ["git", "status", "--porcelain", "--untracked-files=no"],
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+        check=False,
+    )
+    return {
+        "commit": _git_sha(),
+        "tracked_worktree_dirty": status.returncode != 0 or bool(status.stdout.strip()),
+    }
 
 
 def _day_jd_bounds(night_yyyymmdd: str) -> tuple[float, float]:
@@ -605,7 +801,11 @@ def _acquire_and_convert_night(
 
 
 def execute_target(
-    target: dict[str, Any], checkpoint_root: Path, size_deg: float, min_observations: int = 3
+    target: dict[str, Any],
+    checkpoint_root: Path,
+    size_deg: float,
+    min_observations: int = 3,
+    previously_acquired_nights: set[str] | None = None,
 ) -> dict[str, Any]:
     """Acquire, link/score, and adversarially review one manifest target.
 
@@ -615,7 +815,10 @@ def execute_target(
     never silently abort the whole run, per the Hunter directive).
     """
     ra_deg, dec_deg = target["ra_deg"], target["dec_deg"]
-    nights_available = _nights_for_target(ra_deg, dec_deg)
+    prior_nights = previously_acquired_nights or set()
+    nights_available = [
+        night for night in _nights_for_target(ra_deg, dec_deg) if night not in prior_nights
+    ]
     if len(nights_available) < min_observations:
         raise RuntimeError(
             f"target {target['target_id']} has only {len(nights_available)} known covered "
@@ -671,7 +874,15 @@ def execute_target(
     scored_candidates = []
     for packet in control_report["review_packets"]:
         neo = schemas.ScoredNEO.model_validate(packet)
-        verdict = adversarial_review.run_adversarial_review(neo, offline=True)
+        # Cross-survey confirmation is optional, but epoch-specific known-object
+        # eligibility is mandatory. Reuse the review module's live, fail-closed
+        # SkyBoT/MPC providers while keeping optional enrichment offline.
+        verdict = adversarial_review.run_adversarial_review(
+            neo,
+            offline=True,
+            skybot_query=adversarial_review._query_skybot_at_epoch,
+            first_observation_query=adversarial_review._query_mpc_first_observation_jd,
+        )
         scored_candidates.append({"packet": packet, "verdict": verdict})
 
     return {
@@ -692,16 +903,52 @@ def _ingest_and_maybe_register_followup(
 ) -> None:
     packet = scored["packet"]
     verdict = scored["verdict"]
+    git_provenance = _git_provenance()
+    known_object_challenge = next(
+        (
+            {
+                "name": challenge.name,
+                "outcome": challenge.outcome,
+                "reason": challenge.reason,
+                "details": challenge.details,
+            }
+            for challenge in verdict.challenges
+            if challenge.name == "known_object_epoch_association"
+        ),
+        None,
+    )
     defaults = candidate_ledger.CandidateLedgerDefaults(
-        source_dataset_id=search_id,
+        source_dataset_id=f"hunter-search:{search_id}",
         candidate_generator="Skills/hunter_cli.py run-new-search",
         regeneration_command=(
             f"uv run --python 3.14 python Skills/hunter_cli.py run-new-search "
             f"--search-id {search_id}"
         ),
         target_id=target["target_id"],
+        raw_uri=f"hunter-checkpoint:{run_id}/{target['target_id']}",
+        preprocess_version=(
+            f"git:{git_provenance['commit']}:"
+            f"dirty={str(git_provenance['tracked_worktree_dirty']).lower()}:"
+            "src/preprocess.py"
+        ),
         review_status=verdict.verdict.lower(),
         review_notes=verdict.summary,
+        candidate_generator_params={
+            "search_id": search_id,
+            "run_id": run_id,
+            "known_object_association": known_object_challenge,
+            "validity_state": (
+                "valid"
+                if known_object_challenge
+                and known_object_challenge["outcome"] in {"PASS", "WARNING", "FAIL"}
+                and "error" not in known_object_challenge["details"]
+                else "invalid"
+            ),
+        },
+        model_versions={
+            "pipeline_git": git_provenance,
+            "known_object_policy": adversarial_review._KNOWN_OBJECT_POLICY_VERSION,
+        },
     )
     record = candidate_ledger.record_from_packet(packet, defaults)
     candidate_ledger.upsert_record(ledger_db_path, record)
@@ -719,14 +966,19 @@ def _ingest_and_maybe_register_followup(
         )
 
 
-def _mark_originating_followups_actioned(db_path: Path, target_id: str) -> None:
+def _mark_originating_followups_actioned(
+    db_path: Path, target_id: str, current_run_id: str
+) -> None:
     """After a follow-up-mode target is genuinely executed (success or
     null_result -- not failed), close out any open registry entry that
     selected it, so it is not re-selected by a future follow-up search.
     Matches by target_id rather than a dedicated foreign key -- the registry
     is small and this avoids a schema migration for a one-to-few lookup."""
     for entry in hunter_state.list_follow_ups(db_path, status="open"):
-        if entry["target_id"] == target_id:
+        if (
+            entry["target_id"] == target_id
+            and entry["originating_run_id"] != current_run_id
+        ):
             hunter_state.update_follow_up_status(db_path, entry["follow_up_id"], "actioned")
 
 
@@ -742,6 +994,7 @@ def run_search(
     fully failed run in place (retrying only the not-yet-successful targets);
     refuses to silently re-execute a run that fully completed."""
     manifest = hunter_state.get_search_manifest(db_path, search_id)
+    git_provenance = _git_provenance()
     if manifest["status"] == "executed":
         existing_run = hunter_state.get_latest_run_for_search(db_path, search_id)
         raise ValueError(
@@ -765,11 +1018,18 @@ def run_search(
     else:
         run_id = f"run_{search_id}_{uuid.uuid4().hex[:8]}"
         hunter_state.create_search_run(
-            db_path, run_id, search_id, _git_sha(), model_versions={}
+            db_path,
+            run_id,
+            search_id,
+            git_provenance["commit"],
+            model_versions={
+                "ranking_policy_digest": manifest["ranking_policy_digest"],
+                "known_object_policy": adversarial_review._KNOWN_OBJECT_POLICY_VERSION,
+                "pipeline_git": git_provenance,
+            },
         )
 
     already_done = hunter_state.get_run_targets(db_path, run_id)
-    n_failed = 0
     for target in manifest["targets"]:
         target_id = target["target_id"]
         prior = already_done.get(target_id)
@@ -786,36 +1046,77 @@ def run_search(
             flush=True,
         )
         try:
-            result = execute_target(target, checkpoint_root, size_deg)
+            prior_nights = (
+                hunter_state.acquired_nights_for_target(db_path, target_id)
+                if manifest["mode"] == "follow_up"
+                else set()
+            )
+            result = execute_target(
+                target,
+                checkpoint_root,
+                size_deg,
+                previously_acquired_nights=prior_nights,
+            )
+            for scored in result["scored_candidates"]:
+                _ingest_and_maybe_register_followup(
+                    db_path, ledger_db_path, search_id, run_id, target, scored
+                )
+            if manifest["mode"] == "follow_up":
+                _mark_originating_followups_actioned(db_path, target_id, run_id)
+            # This single transaction is deliberately last. Resume can skip a
+            # terminal target only after every external durable side effect
+            # above has completed successfully.
+            hunter_state.commit_target_result(
+                db_path,
+                run_id=run_id,
+                search_id=search_id,
+                mode=manifest["mode"],
+                target_id=target_id,
+                execution_status=result["execution_status"],
+                candidate_ids=result["candidate_ids"],
+                error_message=None,
+                nights_acquired=result["nights_acquired"],
+                provenance={
+                    "coverage_inventory_id": target["coverage_inventory_id"],
+                    "coverage": target["coverage_provenance"],
+                    "ranking_policy_digest": manifest["ranking_policy_digest"],
+                    "pipeline_git": git_provenance,
+                    "validity_state": "valid",
+                },
+            )
         except _RUN_TARGET_EXPECTED_EXCEPTIONS as exc:
             print(f"[run-new-search] target {target_id} FAILED: {exc}", flush=True)
-            hunter_state.upsert_run_target(
-                db_path, run_id, target_id, "failed", error_message=str(exc)
+            hunter_state.commit_target_result(
+                db_path,
+                run_id=run_id,
+                search_id=search_id,
+                mode=manifest["mode"],
+                target_id=target_id,
+                execution_status="failed",
+                candidate_ids=[],
+                error_message=str(exc),
+                nights_acquired=[],
+                provenance={
+                    "pipeline_git": git_provenance,
+                    "error_type": type(exc).__name__,
+                    "validity_state": "invalid",
+                },
             )
-            n_failed += 1
             continue
 
-        hunter_state.upsert_run_target(
-            db_path,
-            run_id,
-            target_id,
-            result["execution_status"],
-            candidate_ids=result["candidate_ids"],
-            nights_acquired=result["nights_acquired"],
-        )
-        if manifest["mode"] == "follow_up":
-            _mark_originating_followups_actioned(db_path, target_id)
-        for scored in result["scored_candidates"]:
-            _ingest_and_maybe_register_followup(
-                db_path, ledger_db_path, search_id, run_id, target, scored
-            )
         print(
             f"[run-new-search] target {target_id}: {result['execution_status']} "
             f"({len(result['candidate_ids'])} candidate(s))",
             flush=True,
         )
 
+    target_states = hunter_state.get_run_targets(db_path, run_id)
     n_targets = len(manifest["targets"])
+    n_failed = sum(
+        1
+        for target in manifest["targets"]
+        if target_states.get(target["target_id"], {}).get("execution_status") == "failed"
+    )
     if n_failed == 0:
         final_status = "completed"
     elif n_failed == n_targets:
@@ -857,7 +1158,7 @@ def cmd_run_new_search(args: argparse.Namespace) -> int:
         f"search_id={search_id}  run_id={result['run_id']}  status={result['status']}  "
         f"targets={result['n_targets']}  failed={result['n_failed']}"
     )
-    return 0
+    return 0 if result["status"] == "completed" else 1
 
 
 def cmd_show_follow_ups(args: argparse.Namespace) -> int:
@@ -907,7 +1208,12 @@ def build_parser() -> argparse.ArgumentParser:
     create_cmd.add_argument("--mode", choices=["new", "follow-up"], required=True)
     create_cmd.add_argument("--neo-class", choices=_NEO_CLASSES, default="all")
     create_cmd.add_argument("--jd", default="now")
-    create_cmd.add_argument("--max-pool", type=int, default=200)
+    create_cmd.add_argument(
+        "--max-pool",
+        type=int,
+        default=None,
+        help="optional explicit safety limit; normal discovery explores adaptively",
+    )
     create_cmd.add_argument("--target-queue", default=str(_DEFAULT_TARGET_QUEUE))
     create_cmd.add_argument(
         "--ranking-policy", default=str(field_selector._DEFAULT_RANKING_POLICY_PATH)

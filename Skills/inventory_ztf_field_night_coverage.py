@@ -19,6 +19,7 @@ import hashlib
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -322,6 +323,17 @@ def merge_shards(batch: CoverageBatch, out_dir: Path, shard_count: int) -> dict[
         "batch_manifest": batch.source_path.relative_to(REPO_ROOT).as_posix(),
         "batch_manifest_sha256": batch.manifest_sha256,
         "query_key": query_key(batch),
+        "source": "IRSA ZTF public science-image metadata",
+        "source_url": "https://irsa.ipac.caltech.edu/ibe/search/ztf/products/sci",
+        "source_version": f"batch-manifest-sha256:{batch.manifest_sha256}",
+        "as_of_jd_exclusive": batch.end_jd,
+        "retrieved_at_utc": datetime.now(UTC).isoformat(),
+        "transformations": [
+            "bounded IRSA metadata query",
+            "UTC-night extraction",
+            "distinct-night deduplication",
+        ],
+        "validity_state": "valid",
         "metadata_only": True,
         "query": {
             "start_jd_exclusive": batch.start_jd,

@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Skills/run_pipeline.py — End-to-end NEO pipeline runner.
+"""Skills/run_pipeline.py — lower-level NEO pipeline diagnostic.
+
+This does not perform adaptive Hunter selection, durable search creation, or
+governing history updates. It is not a production product entry point; use the
+installed Create-New-Search / Run-New-Search commands for canonical searches.
 
 Checkpoint/resume: after each major stage the pipeline writes
 Logs/pipeline_runs/<param_key>/checkpoint.json.  Re-running the same

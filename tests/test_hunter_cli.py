@@ -4,6 +4,7 @@ import argparse
 import csv
 import io
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -81,6 +82,11 @@ def _write_coverage_inventory(path: Path, fields: list[dict]) -> None:
         "batch_manifest_sha256": "b" * 64,
         "metadata_only": True,
         "min_distinct_nights": 3,
+        "source": "test IRSA fixture",
+        "source_version": "test-v1",
+        "retrieved_at_utc": "2026-07-25T00:00:00Z",
+        "transformations": ["known-ground-truth fixture"],
+        "validity_state": "valid",
         "field_results": fields,
     }
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -212,6 +218,7 @@ def test_discover_new_targets_sufficient_from_existing_inventory(
         out_dir=tmp_path / "expansion",
         target_queue_path=target_queue_path,
         ranking_policy_path=field_selector._DEFAULT_RANKING_POLICY_PATH,
+        db_path=tmp_path / "hunter_state.sqlite",
     )
 
     assert result["sufficiency_met"] is True
@@ -251,6 +258,7 @@ def test_discover_new_targets_expands_when_insufficient(
         out_dir=tmp_path / "expansion",
         target_queue_path=target_queue_path,
         ranking_policy_path=field_selector._DEFAULT_RANKING_POLICY_PATH,
+        db_path=tmp_path / "hunter_state.sqlite",
     )
 
     assert result["sufficiency_met"] is True
@@ -258,6 +266,74 @@ def test_discover_new_targets_expands_when_insufficient(
     assert result["pool_size_explored"] >= 1
     committed = list(hunter_cli._COVERAGE_INVENTORY_DIR.glob("*.json"))
     assert len(committed) >= 1
+
+
+def test_discovery_finds_high_value_candidate_outside_initial_expansion(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_dirs(monkeypatch, tmp_path)
+    queue = _write_empty_target_queue(tmp_path / "target_priority_queue.csv")
+    calls = {"live": 0}
+
+    def _fake_select(*, coverage_inventory_path=None, **kwargs):
+        if coverage_inventory_path is None:
+            return [
+                {"ra_deg": float(index), "dec_deg": 5.0}
+                for index in range(1, 31)
+            ]
+        inventory = field_selector.load_coverage_inventory(coverage_inventory_path)
+        passing = [
+            field
+            for field in inventory["field_results"]
+            if field["passes_min_distinct_nights"]
+        ]
+        return [
+            {
+                "ra_deg": field["ra_deg"],
+                "dec_deg": field["dec_deg"],
+                "score": 0.01,
+                "reason": "best available despite weak absolute quality",
+                "field_id": field["field_id"],
+                "coverage_provenance": field["coverage_provenance"],
+            }
+            for field in passing
+        ]
+
+    def _fake_live(fields, prefix):
+        calls["live"] += 1
+        passing_round = calls["live"] == 2
+        results = []
+        for index, (field_id, ra_deg, dec_deg) in enumerate(fields):
+            nights = ["20240101", "20240102", "20240103"] if passing_round and index == 0 else []
+            results.append(
+                {
+                    "field_id": field_id,
+                    "ra_deg": ra_deg,
+                    "dec_deg": dec_deg,
+                    "n_distinct_nights": len(nights),
+                    "distinct_nights_yyyymmdd": nights,
+                    "passes_min_distinct_nights": len(nights) >= 3,
+                    "raw_response_sha256": f"{calls['live']:064x}",
+                }
+            )
+        return {"batch_id": f"round-{calls['live']}", "field_results": results}
+
+    monkeypatch.setattr(hunter_cli.field_selector, "select_fields", _fake_select)
+    monkeypatch.setattr(hunter_cli, "_live_coverage_check", _fake_live)
+    result = hunter_cli.discover_new_targets(
+        jd=2461000.5,
+        neo_class="all",
+        requested_n=1,
+        max_pool=None,
+        out_dir=tmp_path / "working",
+        target_queue_path=queue,
+        ranking_policy_path=field_selector._DEFAULT_RANKING_POLICY_PATH,
+        db_path=tmp_path / "hunter.sqlite",
+    )
+
+    assert calls["live"] == 2
+    assert result["pool_size_explored"] == 30
+    assert result["eligible"][0]["score"] == 0.01
 
 
 def test_discover_new_targets_reports_insufficient_when_pool_exhausted(
@@ -268,15 +344,17 @@ def test_discover_new_targets_reports_insufficient_when_pool_exhausted(
     from astropy.time import Time
 
     jd = float(Time.now().jd)
+    monkeypatch.setattr(hunter_cli, "_next_uncovered_planning_candidates", lambda *a, **k: [])
 
     result = hunter_cli.discover_new_targets(
         jd=jd,
         neo_class="all",
         requested_n=5,
-        max_pool=0,
+        max_pool=None,
         out_dir=tmp_path / "expansion",
         target_queue_path=target_queue_path,
         ranking_policy_path=field_selector._DEFAULT_RANKING_POLICY_PATH,
+        db_path=tmp_path / "hunter_state.sqlite",
     )
 
     assert result["sufficiency_met"] is False
@@ -302,6 +380,7 @@ def test_discover_new_targets_stops_when_planning_grid_exhausted(
         out_dir=tmp_path / "expansion",
         target_queue_path=target_queue_path,
         ranking_policy_path=field_selector._DEFAULT_RANKING_POLICY_PATH,
+        db_path=tmp_path / "hunter_state.sqlite",
     )
 
     assert result["sufficiency_met"] is False
@@ -353,7 +432,6 @@ def test_cmd_create_new_search_persists_manifest_and_prints_table(
     _write_coverage_inventory(inv_dir / "seed.json", fields)
     target_queue_path = _write_empty_target_queue(tmp_path / "target_priority_queue.csv")
     db_path = tmp_path / "hunter_state.sqlite"
-
     args = argparse.Namespace(
         targets=2,
         mode="new",
@@ -384,13 +462,36 @@ def test_cmd_create_new_search_accepts_explicit_jd(
     _patch_dirs(monkeypatch, tmp_path)
     target_queue_path = _write_empty_target_queue(tmp_path / "target_priority_queue.csv")
     db_path = tmp_path / "hunter_state.sqlite"
+    monkeypatch.setattr(
+        hunter_cli,
+        "discover_new_targets",
+        lambda **kwargs: {
+            "eligible": [],
+            "pool_size_explored": 0,
+            "sufficiency_met": False,
+            "universe_exhausted": True,
+            "exploration_limited": False,
+        },
+    )
+    monkeypatch.setattr(
+        hunter_cli,
+        "_attach_current_coverage",
+        lambda rows: [
+            {
+                **row,
+                "coverage_provenance": {"validity_state": "valid"},
+                "coverage_nights": ["20240101", "20240102", "20240103"],
+            }
+            for row in rows
+        ],
+    )
 
     args = argparse.Namespace(
         targets=1,
         mode="new",
         neo_class="all",
         jd="2461000.5",
-        max_pool=0,
+        max_pool=None,
         target_queue=str(target_queue_path),
         ranking_policy=str(field_selector._DEFAULT_RANKING_POLICY_PATH),
         db=str(db_path),
@@ -409,7 +510,6 @@ def test_cmd_create_new_search_writes_csv_manifest_over_100_targets(
     _patch_dirs(monkeypatch, tmp_path)
     target_queue_path = _write_empty_target_queue(tmp_path / "target_priority_queue.csv")
     db_path = tmp_path / "hunter_state.sqlite"
-
     fake_eligible = [
         {
             "ra_deg": float(i),
@@ -428,6 +528,18 @@ def test_cmd_create_new_search_writes_csv_manifest_over_100_targets(
             "pool_size_explored": 150,
             "sufficiency_met": True,
         },
+    )
+    monkeypatch.setattr(
+        hunter_cli,
+        "_attach_current_coverage",
+        lambda rows: [
+            {
+                **row,
+                "coverage_provenance": {"validity_state": "valid"},
+                "coverage_nights": ["20240101", "20240102", "20240103"],
+            }
+            for row in rows
+        ],
     )
 
     args = argparse.Namespace(
@@ -459,13 +571,24 @@ def test_cmd_create_new_search_reports_shortfall_honestly(
     _patch_dirs(monkeypatch, tmp_path)
     target_queue_path = _write_empty_target_queue(tmp_path / "target_priority_queue.csv")
     db_path = tmp_path / "hunter_state.sqlite"
+    monkeypatch.setattr(
+        hunter_cli,
+        "discover_new_targets",
+        lambda **kwargs: {
+            "eligible": [],
+            "pool_size_explored": 0,
+            "sufficiency_met": False,
+            "universe_exhausted": True,
+            "exploration_limited": False,
+        },
+    )
 
     args = argparse.Namespace(
         targets=5,
         mode="new",
         neo_class="all",
         jd="now",
-        max_pool=0,
+        max_pool=None,
         target_queue=str(target_queue_path),
         ranking_policy=str(field_selector._DEFAULT_RANKING_POLICY_PATH),
         db=str(db_path),
@@ -479,6 +602,40 @@ def test_cmd_create_new_search_reports_shortfall_honestly(
     manifest = hunter_state.get_latest_pending_manifest(db_path, mode="new")
     assert manifest["sufficiency_met"] is False
     assert manifest["actual_n_selected"] == 0
+
+
+def test_cmd_create_new_search_fails_when_explicit_pool_limit_blocks_sufficiency(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_dirs(monkeypatch, tmp_path)
+    db_path = tmp_path / "hunter_state.sqlite"
+    queue = _write_empty_target_queue(tmp_path / "target_priority_queue.csv")
+    monkeypatch.setattr(
+        hunter_cli,
+        "discover_new_targets",
+        lambda **kwargs: {
+            "eligible": [],
+            "pool_size_explored": 7,
+            "sufficiency_met": False,
+            "universe_exhausted": False,
+            "exploration_limited": True,
+        },
+    )
+    args = argparse.Namespace(
+        targets=3,
+        mode="new",
+        neo_class="all",
+        jd="now",
+        max_pool=7,
+        target_queue=str(queue),
+        ranking_policy=str(field_selector._DEFAULT_RANKING_POLICY_PATH),
+        db=str(db_path),
+    )
+
+    with pytest.raises(RuntimeError, match="explicit --max-pool=7"):
+        hunter_cli.cmd_create_new_search(args)
+    with pytest.raises(ValueError, match="no pending search manifest"):
+        hunter_state.get_latest_pending_manifest(db_path)
 
 
 def test_main_rejects_non_positive_targets_with_system_exit(
@@ -618,6 +775,35 @@ def _minimal_scored_neo_packet(object_id: str = "hunter-test-T1") -> dict:
 
 def test_git_sha_returns_nonempty_string() -> None:
     assert len(hunter_cli._git_sha()) > 0
+
+
+def test_git_provenance_reports_tracked_dirty_state(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    completed = [
+        subprocess.CompletedProcess(
+            args=["git", "status"], returncode=0, stdout=" M Skills/hunter_cli.py\n"
+        ),
+        subprocess.CompletedProcess(args=["git", "rev-parse"], returncode=0, stdout="abc123\n"),
+    ]
+    monkeypatch.setattr(hunter_cli.subprocess, "run", lambda *_args, **_kwargs: completed.pop(0))
+
+    assert hunter_cli._git_provenance() == {
+        "commit": "abc123",
+        "tracked_worktree_dirty": True,
+    }
+
+
+def test_git_provenance_fails_closed_when_status_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    completed = [
+        subprocess.CompletedProcess(args=["git", "status"], returncode=1, stdout=""),
+        subprocess.CompletedProcess(args=["git", "rev-parse"], returncode=0, stdout="abc123\n"),
+    ]
+    monkeypatch.setattr(hunter_cli.subprocess, "run", lambda *_args, **_kwargs: completed.pop(0))
+
+    assert hunter_cli._git_provenance()["tracked_worktree_dirty"] is True
 
 
 def test_day_jd_bounds_spans_exactly_one_day() -> None:
@@ -887,6 +1073,9 @@ def test_execute_target_success_reviews_real_scored_candidate(
         "run_positive_control",
         lambda **kwargs: {"n_tracklets_linked": 1, "review_packets": [packet]},
     )
+    monkeypatch.setattr(
+        hunter_cli.adversarial_review, "_query_skybot_at_epoch", lambda observation: []
+    )
     target = {"target_id": "radec_10.00_5.00", "ra_deg": 10.0, "dec_deg": 5.0}
 
     result = hunter_cli.execute_target(target, tmp_path / "checkpoints", 2.0)
@@ -895,10 +1084,11 @@ def test_execute_target_success_reviews_real_scored_candidate(
     assert result["candidate_ids"] == ["hunter-test-T1"]
     assert len(result["scored_candidates"]) == 1
     verdict = result["scored_candidates"][0]["verdict"]
-    # Offline review always fails known-object association (no live evidence
-    # available) -- this is the project's own intentional, conservative gate,
-    # not a bug in this orchestration.
-    assert verdict.verdict == "REJECT"
+    assert verdict.verdict == "SURVIVE"
+    known_object = next(
+        c for c in verdict.challenges if c.name == "known_object_epoch_association"
+    )
+    assert known_object.outcome == "PASS"
 
 
 def test_ingest_and_maybe_register_followup_skips_registry_on_reject(
@@ -1177,6 +1367,63 @@ def test_run_search_ingests_scored_candidate_and_registers_followup(
     assert follow_ups[0]["originating_run_id"] == result["run_id"]
 
 
+def test_run_search_replays_idempotent_side_effects_after_precheckpoint_crash(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    db_path = tmp_path / "hunter_state.sqlite"
+    ledger_db_path = tmp_path / "candidate_ledger.sqlite"
+    _seed_pending_manifest(db_path)
+    packet = _minimal_scored_neo_packet()
+    verdict = adversarial_review.ReviewVerdict(
+        object_id="hunter-test-T1",
+        verdict="SURVIVE",
+        challenges=[],
+        fail_count=0,
+        warning_count=0,
+        summary="known-good acceptance fixture",
+        reviewed_at_utc="2026-07-25T00:00:00Z",
+    )
+    monkeypatch.setattr(
+        hunter_cli,
+        "execute_target",
+        lambda *a, **k: {
+            "execution_status": "success",
+            "candidate_ids": ["hunter-test-T1"],
+            "nights_acquired": ["20240101", "20240102", "20240103"],
+            "scored_candidates": [{"packet": packet, "verdict": verdict}],
+        },
+    )
+    real_commit = hunter_state.commit_target_result
+    injected = {"raised": False}
+
+    def _crash_once(*args, **kwargs):
+        if kwargs["execution_status"] == "success" and not injected["raised"]:
+            injected["raised"] = True
+            raise RuntimeError("injected crash after ledger/follow-up side effects")
+        return real_commit(*args, **kwargs)
+
+    monkeypatch.setattr(hunter_state, "commit_target_result", _crash_once)
+    first = hunter_cli.run_search(
+        db_path, ledger_db_path, "search-1", tmp_path / "checkpoints"
+    )
+    assert first["status"] == "failed"
+
+    second = hunter_cli.run_search(
+        db_path, ledger_db_path, "search-1", tmp_path / "checkpoints"
+    )
+    assert second["status"] == "completed"
+    from candidate_ledger import list_records
+
+    assert len(list_records(ledger_db_path)) == 1
+    assert len(hunter_state.list_follow_ups(db_path, status="open")) == 1
+    assert (
+        hunter_state.get_run_targets(db_path, second["run_id"])["radec_10.00_5.00"][
+            "execution_status"
+        ]
+        == "success"
+    )
+
+
 def test_run_search_marks_originating_followup_actioned_after_execution(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1314,6 +1561,29 @@ def test_cmd_run_new_search_with_explicit_search_id(
     assert exit_code == 0
     out = capsys.readouterr().out
     assert "status=completed" in out
+
+
+def test_cmd_run_new_search_returns_nonzero_for_failed_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        hunter_cli,
+        "run_search",
+        lambda **kwargs: {
+            "run_id": "run-failed",
+            "status": "failed",
+            "n_targets": 2,
+            "n_failed": 2,
+        },
+    )
+    args = argparse.Namespace(
+        search_id="search-1",
+        db=str(tmp_path / "hunter.sqlite"),
+        candidate_ledger_db=str(tmp_path / "ledger.sqlite"),
+        checkpoint_root=str(tmp_path / "checkpoints"),
+        size_deg=0.01,
+    )
+    assert hunter_cli.cmd_run_new_search(args) == 1
 
 
 def test_cmd_run_new_search_with_latest(
@@ -1583,6 +1853,10 @@ def test_cmd_create_new_search_follow_up_mode_end_to_end(
         recommended_action="operator review",
         evidence_ref="candidate_ledger:cand-1",
     )
+    _write_coverage_inventory(
+        hunter_cli._COVERAGE_INVENTORY_DIR / "seed.json",
+        [_coverage_field_result("field-registry", 30.0, 5.0, n_nights=5)],
+    )
     queue_path = _write_empty_target_queue(tmp_path / "target_priority_queue.csv")
 
     args = argparse.Namespace(
@@ -1690,6 +1964,69 @@ def test_build_parser_create_new_search_accepts_follow_up_mode() -> None:
     parser = hunter_cli.build_parser()
     args = parser.parse_args(["create-new-search", "--targets", "1", "--mode", "follow-up"])
     assert args.mode == "follow-up"
+    assert args.max_pool is None
+
+
+def test_history_derived_followup_executes_only_additional_nights(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    db_path = tmp_path / "hunter_state.sqlite"
+    target = hunter_state.ManifestTarget(
+        target_id="radec_10.00_5.00",
+        ra_deg=10.0,
+        dec_deg=5.0,
+        score=0.8,
+        selection_reason="test",
+        coverage_inventory_id="field-a",
+        coverage_provenance={"validity_state": "valid"},
+        validity_state="valid",
+    )
+    hunter_state.create_search_manifest(
+        db_path, "search-new", "new", 1, "p", "d", [target], 1, True, {}
+    )
+    hunter_state.create_search_run(db_path, "run-new", "search-new", "abc", {})
+    hunter_state.commit_target_result(
+        db_path,
+        run_id="run-new",
+        search_id="search-new",
+        mode="new",
+        target_id=target.target_id,
+        execution_status="null_result",
+        candidate_ids=[],
+        error_message=None,
+        nights_acquired=["20240101", "20240102", "20240103"],
+        provenance={"validity_state": "valid"},
+    )
+    field = {
+        **_coverage_field_result("field-a", 10.0, 5.0, n_nights=6),
+        "coverage_provenance": {"validity_state": "valid"},
+    }
+    monkeypatch.setattr(
+        hunter_cli, "_combined_known_coverage", lambda: {(10.0, 5.0): field}
+    )
+    queue = _write_empty_target_queue(tmp_path / "target_priority_queue.csv")
+
+    candidates = hunter_cli.discover_followup_targets(db_path, 1, queue)
+    assert candidates["eligible"][0]["ra_deg"] == 10.0
+    monkeypatch.setattr(hunter_cli, "_acquire_and_convert_night", lambda *a, **k: None)
+    monkeypatch.setattr(
+        hunter_cli.positive_control,
+        "run_positive_control",
+        lambda **kwargs: {"n_tracklets_linked": 0, "review_packets": []},
+    )
+    result = hunter_cli.execute_target(
+        {
+            "target_id": target.target_id,
+            "ra_deg": target.ra_deg,
+            "dec_deg": target.dec_deg,
+        },
+        tmp_path / "checkpoints",
+        0.01,
+        previously_acquired_nights=hunter_state.acquired_nights_for_target(
+            db_path, target.target_id
+        ),
+    )
+    assert result["nights_acquired"] == ["20240104", "20240105", "20240106"]
 
 
 def test_build_parser_show_follow_ups_defaults() -> None:

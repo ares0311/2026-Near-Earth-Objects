@@ -168,6 +168,13 @@ class TestMakeTracklet:
         t = _make_tracklet(obs)
         assert t.arc_days == pytest.approx(3.0, abs=1e-6)
 
+    def test_object_id_is_stable_for_crash_replay(self):
+        obs = [
+            make_obs(obs_id=f"o{i}", jd=2460000.0 + i, ra_deg=180.0 + i * 0.01)
+            for i in range(3)
+        ]
+        assert _make_tracklet(obs).object_id == _make_tracklet(list(reversed(obs))).object_id
+
 
 class TestLinkPipeline:
     def test_empty_input(self):

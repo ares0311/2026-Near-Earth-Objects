@@ -321,49 +321,39 @@ passed with 2,067 tests and 100% `src/` coverage. Evidence:
 `docs/evidence/live/2026-07-19-phase1-detection-hardening.md`. The operator
 explicitly closed Phase 1 after reviewing this evidence; PR #258 merged.
 
-**Phase 2 — Harden the search algorithm (ACTIVE — ranking calibration is
-the remaining item; not a blocker on Phase 3).** `select_survey_fields.py`'s
-eligibility/preference split was fixed (PR #264, merged 2026-07-22 — the
-old conflated windows excluded 55/56 real historical Aten discoveries from
-ever being "eligible"). Fitting real ranking coefficients still requires
-≥20 source-aligned positives + 20 controls per mode (only 1 Aten/7 Atira
-exist today) — the current v2 policy stays `uncalibrated_transparent_prior`
-and is not blocked on this; see the Phase 3 reframing below.
+**Phase 2 — Harden the search algorithm (scientific calibration work is
+separate from Hunter closure).** Eligibility/preference separation closed in
+PR #264. The 2026-07-25 calibration work later assembled the real source-
+aligned samples, attempted the first coefficient fit, and revised the
+scientifically supported elongation preference in ranking policy v3. See the
+latest sync in `docs/PRODUCTION_READINESS.md`. Hunter selection must remain
+deterministic, explainable, and reproducible; no absolute score threshold may
+replace rank or prevent returning the best available N.
 
-**Phase 3 — Package the application (REFRAMED 2026-07-23/24 — CLI +
-durable state now built and real-live-validated, not blocked).** The
-operator's HUNTER PROD CLOSURE DIRECTIVE (2026-07-23) set authority order:
-current business requirements outrank older docs/roadmap phrasing, and
-requires a deterministic/explainable/reproducible ranker, not a
-*calibrated* one — so the Phase 2 coefficient-fitting threshold gates
-fitting new coefficients, not having a transparent ranking model that
-already existed. Four merged PRs closed this, each real-live-validated in
-this sandbox (`ztf.uw.edu`/`irsa.ipac.caltech.edu` reachable directly):
-PR #265 `src/hunter_state.py` (durable `search_manifests`/
-`search_manifest_targets`, `search_runs`/`search_run_targets`,
-`follow_up_registry` — target history stays in the existing
-`target_priority_queue.csv`, not duplicated); PR #266
-`Skills/hunter_cli.py create-new-search --mode new` (adaptive discovery,
-live coverage-preflight expansion, durable pending manifest — live-verified
-15-field expansion, 5-target manifest); PR #267 `run-new-search` (real
-per-night acquisition/linking/scoring/review/ledger-ingestion with
-checkpoint/resume — live-verified 3-night/9-tracklet end-to-end run,
-`status=completed`); PR #268 `create-new-search --mode follow-up` +
-`show-follow-ups` (real registry + recovered-insufficient-coverage
-ranking — live-verified a field's real coverage recovering from 2 to 62
-nights, plus a disclosed narrow-box execution limitation for that same
-field, plus a full registry-sourced follow-up execution). Full detail
-including the two real bugs found and fixed by live validation (wrong
-acquisition box size; failed runs permanently locking their manifest) is
-in `CLAUDE.md`'s equivalent section and the three
-`docs/evidence/live/2026-07-2{3,4}-hunter-*.md` files.
+**Phase 3 — Package the application (ADVERSARIALLY RECLOSED 2026-07-25).**
+The 2026-07-24 feature-level closure was superseded after an adversarial audit
+found nine canonical-path defects: non-governing search history, a fixed
+default pool ceiling, successful exit on failed/partial runs, a crash window
+that could lose durable side effects, follow-ups disconnected from executed
+history and repeating nights, unconditional missing known-object evidence,
+incomplete provenance, product bypasses, and seeded rather than history-derived
+live follow-up evidence. HP-01 through HP-09 in
+`docs/OPERATOR_GO_NO_GO_RUNBOOK.md` are the authoritative remediation ledger.
+All are closed by the integrated pipeline and independent controls. Real live
+validation executed an exact new manifest and then an unseeded follow-up
+derived from its durable history, acquiring three different nights. Evidence:
+`docs/evidence/live/2026-07-25-hunter-prod-adversarial-closure.md`.
 
-**Hunter-directive pipeline mapping (updated 2026-07-24 — supersedes the
-2026-07-19 mapping)**: checked against actual code. Manifest, durable
-search creation, follow-up registry, and CLI rows all moved from "gap" to
-"exists, real evidence" — full stage-by-stage table is in `CLAUDE.md`'s
-equivalent section. Remaining open item: ranking-coefficient calibration
-(Phase 2, not blocking).
+**Hunter-directive pipeline mapping (updated 2026-07-25 — supersedes the
+2026-07-24 mapping)**: one installed CLI delegates to
+`Skills/hunter_cli.py`; adaptive discovery has no default fixed pool cap;
+selected coverage is current-valid and provenance-stamped; SQLite
+`target_search_history` governs identity and new/follow-up eligibility; exact
+manifests create durable runs; checkpointed acquisition, preprocessing,
+scoring, live epoch-aware known-object review, candidate-ledger persistence,
+and atomic result/history update execute in one path; follow-ups derive
+remaining work from real history. Lower-level selectors and `run_pipeline.py`
+are diagnostics, not alternate product commands.
 
 ---
 
