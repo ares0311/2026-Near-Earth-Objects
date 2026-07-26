@@ -9,21 +9,17 @@ Granvik et al. (2018) supports debiased NEO orbit/population priors, Ye et al.
 (2020) supports low-elongation ZTF twilight searches, and Harris & D'Abramo
 (2015) supports population-completeness estimation. Those papers do not supply
 this selector's exact weights, exponentials, windows, or completeness values.
-The v2 policy retains the exact transparent, uncalibrated v1 coefficient priors
-and separates evidence-audited eligibility bounds from preference peaks. The v3
-policy (2026-07-25) keeps the same weights and eligibility bounds but revises
-the aten/ieo elongation preference peaks: a real coefficient-fit attempt
-(Skills/fit_field_ranking_coefficients.py) found the same feature
-(geometry_score) stably anti-correlated with real discovery outcome in both
-modes, and the raw elongation data showed why -- every real Aten/Atira I41
-discovery on record falls outside the old preference peak's core range, not
-inside it (docs/evidence/live/2026-07-25-elongation-peak-revision.md). Every
+The v4 production policy ranks on the single component most strongly supported
+by the currently accessible, source-aligned real outcomes: geometry. It was
+selected only after comparison with the former weighted policy and each
+single-component baseline. This is an ordering score, not a calibrated
+discovery probability or a causal-yield estimate. New-target history remains a
+hard eligibility rule rather than an unsupported soft coefficient. Every
 result is stamped with the policy file's SHA256 and limitations.
 
 Scoring formula:
 
-    S = 0.35 * SurveyScarcity  +  0.30 * PopulationDensity
-      + 0.20 * Geometry      +  0.15 * Novelty
+    S = Geometry
 
   SurveyScarcity — geometric prior for historically sparse survey cadence;
                   this is not measured archive coverage.
@@ -80,12 +76,12 @@ _ECL_OBLIQUITY_RAD = math.radians(23.4393)
 # Minimum altitude for practical observability
 _MIN_ALT_DEG = 25.0
 
-# Scoring weights (Aten/IEO priority mode)
+# Scoring weights for the empirically selected v4 ordering contract.
 _WEIGHTS: dict[str, float] = {
-    "scarcity": 0.35,
-    "population": 0.30,
-    "geometry": 0.20,
-    "novelty": 0.15,
+    "scarcity": 0.0,
+    "population": 0.0,
+    "geometry": 1.0,
+    "novelty": 0.0,
 }
 
 # Elongation windows (min, max, peak) per mode, in degrees.
@@ -135,13 +131,13 @@ _HISTORY_OVERLAP_DEG = 5.0
 _WISE_PARENT_RADIUS_DEG = 0.2
 
 _COVERAGE_SCHEMA_VERSION = "ztf-field-night-coverage-inventory-v1"
-_RANKING_POLICY_SCHEMA_VERSION = "ztf-field-ranking-policy-v2"
+_RANKING_POLICY_SCHEMA_VERSION = "ztf-field-ranking-policy-v3"
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _DEFAULT_RANKING_POLICY_PATH = (
     _REPO_ROOT
     / "data_selection"
     / "ranking_policies"
-    / "ztf_field_ranking_v3.json"
+    / "ztf_field_ranking_v4.json"
 )
 _TARGET_QUEUE_FIELDS = {
     "rank",
@@ -364,9 +360,11 @@ def load_ranking_policy(path: Path = _DEFAULT_RANKING_POLICY_PATH) -> dict:
         )
     if not str(payload.get("policy_id", "")).strip():
         raise ValueError("ranking policy must have a non-empty policy_id")
-    if payload.get("model_type") != "deterministic_analytic":
-        raise ValueError("ranking policy model_type must be deterministic_analytic")
-    if payload.get("coefficient_status") != "uncalibrated_transparent_prior":
+    if payload.get("model_type") != "deterministic_empirical_ordering":
+        raise ValueError(
+            "ranking policy model_type must be deterministic_empirical_ordering"
+        )
+    if payload.get("coefficient_status") != "outcome_ordered_real_evidence":
         raise ValueError("ranking policy coefficient_status is unsupported")
     expected = {
         "discovery_weights": _WEIGHTS,
@@ -733,13 +731,31 @@ def select_fields(jd: float,
     hours   = hours_visible_batch(dec_arr, lat)
 
     # Vectorised scoring components
-    scarcity_s = survey_scarcity_score_batch(elong, mode)
-    pop_s   = (
-        known_object_density_score_batch(ecl_lat, elong)
-        if mode == "recovery"
-        else population_score_batch(ecl_lat, elong, mode)
-    )
-    geom_s  = geometry_score_batch(elong, hours, mode)
+    if mode == "all":
+        # ``all`` is the union of the two product discovery modes, not the old
+        # Aten-only convenience window. A candidate receives its strongest
+        # supported class-specific geometry score and is eligible if either
+        # class-specific observing window admits it.
+        scarcity_s = np.maximum(
+            survey_scarcity_score_batch(elong, "aten"),
+            survey_scarcity_score_batch(elong, "ieo"),
+        )
+        pop_s = np.maximum(
+            population_score_batch(ecl_lat, elong, "aten"),
+            population_score_batch(ecl_lat, elong, "ieo"),
+        )
+        geom_s = np.maximum(
+            geometry_score_batch(elong, hours, "aten"),
+            geometry_score_batch(elong, hours, "ieo"),
+        )
+    else:
+        scarcity_s = survey_scarcity_score_batch(elong, mode)
+        pop_s = (
+            known_object_density_score_batch(ecl_lat, elong)
+            if mode == "recovery"
+            else population_score_batch(ecl_lat, elong, mode)
+        )
+        geom_s = geometry_score_batch(elong, hours, mode)
     history = load_run_history(history_dir) if history_dir else []
     if search_mode is not None:
         history.extend(target_history)
@@ -759,7 +775,12 @@ def select_fields(jd: float,
         )
 
     # Mask non-observable fields (below horizon or outside elongation window)
-    observable = eligibility_mask_batch(elong, hours, mode)
+    observable = (
+        eligibility_mask_batch(elong, hours, "aten")
+        | eligibility_mask_batch(elong, hours, "ieo")
+        if mode == "all"
+        else eligibility_mask_batch(elong, hours, mode)
+    )
     total      = np.where(observable, total, -1.0)
 
     # Sort descending; grab extra candidates to absorb deduplication losses
@@ -795,15 +816,20 @@ def select_fields(jd: float,
 
         # Human-readable reason string
         parts: list[str] = []
-        if scarcity_s[idx] > 0.7:
-            parts.append(f"survey scarcity prior {scarcity_s[idx]:.2f}")
-        if pop_s[idx] > 0.4:
-            label = "known-object density" if mode == "recovery" else "pop density"
-            parts.append(f"{label} {pop_s[idx]:.2f}")
-        if geom_s[idx] > 0.4:
-            parts.append(f"geometry {geom_s[idx]:.2f} ({hours[idx]:.1f}h vis)")
-        if novel_s[idx] == 0.0:
-            parts.append("WARNING: recently processed")
+        if mode == "recovery":
+            if pop_s[idx] > 0.4:
+                parts.append(f"known-object density {pop_s[idx]:.2f}")
+            if geom_s[idx] > 0.4:
+                parts.append(
+                    f"geometry {geom_s[idx]:.2f} ({hours[idx]:.1f}h vis)"
+                )
+            if novel_s[idx] == 0.0:
+                parts.append("WARNING: recently processed")
+        else:
+            parts.append(
+                f"outcome-supported geometry {geom_s[idx]:.2f} "
+                f"({hours[idx]:.1f}h vis)"
+            )
         reason = "; ".join(parts) or f"elong {elong[idx]:.1f}°"
 
         result = {

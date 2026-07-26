@@ -67,7 +67,7 @@
   },
   {
     "path": "src/classify.py",
-    "line": 1039,
+    "line": 1038,
     "exception_types": "Exception",
     "reason": "Pre-existing silent-swallow predating REL-01 (2026-07-16), catalogued not fixed. Writing the ensemble-stacker coefficient JSON to disk; a write failure (e.g. permissions, disk full) leaves `coef_path` unset with no error surfaced to the caller."
   },

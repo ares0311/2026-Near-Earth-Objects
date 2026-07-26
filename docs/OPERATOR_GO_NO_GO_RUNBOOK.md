@@ -15,7 +15,7 @@ detail than this, the full references are linked at the bottom.
 
 ---
 
-## Hunter PROD closure remediation (verified 2026-07-25)
+## Hunter PROD closure remediation (reopened 2026-07-25)
 
 This is the durable execution ledger for the adversarial re-audit of the
 canonical Hunter workflow. Current business requirements and
@@ -40,6 +40,34 @@ independent negative controls, canonical/adversarial verification, then the
 real HP-09 new/follow-up sequence. Exact commands, IDs, nights, provenance,
 results, and limitations are in
 `docs/evidence/live/2026-07-25-hunter-prod-adversarial-closure.md`.
+
+The HP-01 through HP-09 implementation remains valid hardening, but the PROD
+claim made after that sequence is revoked. A limitation review found that
+three facts previously disclosed as non-blocking actually prevent the stronger
+business claim that Hunter returns the best *executable* next searches and
+preserves them safely. Do not claim Hunter PROD until HP-10 through HP-12 are
+VERIFIED against clean current `main`.
+
+| ID | Blocking finding | Required acceptance evidence | Status |
+|---|---|---|---|
+| HP-10 | New ranking policy v3 is explicitly not known to be optimal, and follow-up history uses hand-set bonuses without outcome validation. Deterministic/explainable ranking alone does not demonstrate “best available N.” | Define separate, versioned new and follow-up value contracts; compare each policy with independent real or known-ground-truth outcomes and simple baselines; require the promoted policy to be the best supported available policy without imposing an absolute-quality threshold. | ACTIVE |
+| HP-11 | Selection validates a 2° regional coverage box while execution requires a resolvable 0.01° exact target. A predictably unexecutable target can therefore consume a top-N slot. | Before durable manifest creation, validate at least three exact-position nights plus required product availability for each selected target; reject infeasible candidates, continue adaptive expansion, and prove a lower-ranked feasible replacement outside the initial frontier is selected and executed. | ACTIVE |
+| HP-12 | The canonical suite emits unclosed-SQLite `ResourceWarning`s and an obsolete XGBoost-parameter warning. Passing tests do not establish durable restart hygiene while those warnings remain unattributed. | Trace warnings to their allocation sites, close production resources and remove obsolete configuration without broad suppression; production-relevant tests must pass with `ResourceWarning` promoted to an error, and the canonical suite must finish warning-free or explicitly prove any remaining warning is outside every Hunter production path. | ACTIVE |
+
+Execution order: formalize HP-10’s value contracts first so selection has a
+valid objective; integrate HP-11’s exact-position feasibility into that
+selector; close HP-12 resource lifecycle defects; add independent negative
+controls; run exact new/follow-up live workflows; then run canonical and
+adversarial verification on a clean commit, merge only with passing CI, and
+repeat verification on the clean merge commit.
+
+External MPC/NEOCP submission, impact claims, the absence of a discovery, and
+a scientifically valid null result are not Hunter PROD limitations. They are,
+respectively, a required human safety boundary, an authority boundary, a
+non-guaranteed scientific outcome, and a valid search result. Cross-project
+history sharing is `not-applicable` for NEO field/candidate identities unless
+future evidence establishes a governing identity shared with the stellar
+Hunter projects.
 
 ---
 

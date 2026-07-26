@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import subprocess
 import sys
@@ -57,6 +58,12 @@ _RUN_TARGET_EXPECTED_EXCEPTIONS = (
 _DEFAULT_TARGET_QUEUE = REPO_ROOT / "data_selection" / "target_priority_queue.csv"
 _DEFAULT_DB = REPO_ROOT / "data_selection" / "hunter_state.sqlite"
 _DEFAULT_LEDGER_DB = REPO_ROOT / "data_selection" / "candidate_ledger.sqlite"
+_DEFAULT_FOLLOW_UP_POLICY = (
+    REPO_ROOT
+    / "data_selection"
+    / "ranking_policies"
+    / "hunter_follow_up_value_v1.json"
+)
 _BATCH_MANIFEST_DIR = REPO_ROOT / "data_selection" / "batch_manifests"
 _COVERAGE_INVENTORY_DIR = REPO_ROOT / "data_selection" / "coverage_inventories"
 _SEARCH_MANIFEST_CSV_DIR = REPO_ROOT / "data_selection" / "search_manifests"
@@ -71,6 +78,7 @@ _MAX_AGGREGATE_IRSA_REQUESTS = 6
 # docs/evidence/live/2026-07-16-ztf-dr24-pixel-extraction-pilot-first-live-run.md).
 _DEFAULT_SIZE_DEG = 0.01
 _FOLLOW_UP_VERDICTS = ("SURVIVE", "BORDERLINE")
+_FOLLOW_UP_POLICY_SCHEMA = "hunter-follow-up-value-policy-v1"
 
 # Same bounded historical-replay window already established and used by this
 # repo's committed coverage batch manifests (data_selection/batch_manifests/
@@ -86,11 +94,45 @@ _DEFAULT_COVERAGE_WINDOW: dict[str, Any] = {
 
 
 def _content_sha256(payload: Any) -> str:
-    import hashlib
-
     return hashlib.sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
+
+
+def _load_follow_up_policy(path: Path = _DEFAULT_FOLLOW_UP_POLICY) -> dict[str, Any]:
+    """Load the canonical follow-up value contract and fail closed on drift."""
+    try:
+        raw = path.read_bytes()
+        payload = json.loads(raw)
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"invalid follow-up policy {path}: {exc}") from exc
+    if payload.get("schema_version") != _FOLLOW_UP_POLICY_SCHEMA:
+        raise ValueError(f"follow-up policy schema must be {_FOLLOW_UP_POLICY_SCHEMA}")
+    if payload.get("model_type") != "deterministic_lexicographic_value":
+        raise ValueError("follow-up policy model_type is unsupported")
+    expected_bases = {
+        "open_review_survivor": 2.0,
+        "failed_execution_retry": 1.0,
+        "recovered_coverage_retry": 0.0,
+    }
+    tiers = payload.get("tiers")
+    if not isinstance(tiers, dict) or {
+        name: tier.get("base") for name, tier in tiers.items()
+    } != expected_bases:
+        raise ValueError("follow-up policy tiers do not match implementation")
+    if not payload.get("exclusions") or not payload.get("limitations"):
+        raise ValueError("follow-up policy must document exclusions and limitations")
+    return {
+        "schema_version": payload["schema_version"],
+        "policy_id": payload["policy_id"],
+        "path": (
+            path.resolve().relative_to(REPO_ROOT).as_posix()
+            if path.resolve().is_relative_to(REPO_ROOT)
+            else str(path)
+        ),
+        "sha256": hashlib.sha256(raw).hexdigest(),
+        "limitations": payload["limitations"],
+    }
 
 
 def _field_id_from_radec(prefix: str, ra_deg: float, dec_deg: float) -> str:
@@ -101,15 +143,22 @@ def _field_id_from_radec(prefix: str, ra_deg: float, dec_deg: float) -> str:
 
 
 def _combined_known_coverage() -> dict[tuple[float, float], dict[str, Any]]:
-    """Merge every committed coverage inventory into one coordinate-keyed dict."""
+    """Merge inventories, preferring current-valid and then newest evidence."""
     combined: dict[tuple[float, float], dict[str, Any]] = {}
+    validity_rank = {
+        "valid": 4,
+        "stale-but-usable": 3,
+        "refresh-required": 2,
+        "unknown": 1,
+        "invalid": 0,
+    }
     if not _COVERAGE_INVENTORY_DIR.is_dir():
         return combined
     for path in sorted(_COVERAGE_INVENTORY_DIR.glob("*.json")):
         inventory = field_selector.load_coverage_inventory(path)
         for field in inventory["field_results"]:
             key = field_selector._coordinate_key(field["ra_deg"], field["dec_deg"])
-            combined[key] = {
+            candidate = {
                 **field,
                 "coverage_provenance": {
                     **field["coverage_provenance"],
@@ -120,6 +169,19 @@ def _combined_known_coverage() -> dict[tuple[float, float], dict[str, Any]]:
                     "batch_manifest_sha256": inventory["batch_manifest_sha256"],
                 },
             }
+            prior = combined.get(key)
+            candidate_provenance = candidate["coverage_provenance"]
+            prior_provenance = (prior or {}).get("coverage_provenance", {})
+            candidate_order = (
+                validity_rank.get(candidate_provenance["validity_state"], -1),
+                candidate_provenance.get("retrieved_at_utc") or "",
+            )
+            prior_order = (
+                validity_rank.get(prior_provenance.get("validity_state"), -1),
+                prior_provenance.get("retrieved_at_utc") or "",
+            )
+            if prior is None or candidate_order > prior_order:
+                combined[key] = candidate
     return combined
 
 
@@ -390,8 +452,13 @@ def _followup_candidates_from_registry(db_path: Path) -> list[dict[str, Any]]:
             {
                 "ra_deg": ra_deg,
                 "dec_deg": dec_deg,
-                "score": float(entry["priority"]),
-                "reason": f"open follow-up (registry): {entry['reason']}",
+                "score": 2.0 + float(entry["priority"]),
+                "absolute_quality": float(entry["priority"]),
+                "value_tier": "open_review_survivor",
+                "reason": (
+                    "tier=open_review_survivor; "
+                    f"followup_value={float(entry['priority']):.4f}; {entry['reason']}"
+                ),
                 "field_id": None,
             }
         )
@@ -443,8 +510,11 @@ def _followup_candidates_from_insufficient_coverage(
             {
                 "ra_deg": ra,
                 "dec_deg": dec,
-                "score": 0.5,
+                "score": min(1.0, field["n_distinct_nights"] / 100.0),
+                "absolute_quality": min(1.0, field["n_distinct_nights"] / 100.0),
+                "value_tier": "recovered_coverage_retry",
                 "reason": (
+                    "tier=recovered_coverage_retry; "
                     f"previously {_INSUFFICIENT_COVERAGE_STATUS}; now has "
                     f"{field['n_distinct_nights']} real distinct night(s) under the "
                     "current coverage window"
@@ -456,7 +526,12 @@ def _followup_candidates_from_insufficient_coverage(
 
 
 def _followup_candidates_from_history(db_path: Path) -> list[dict[str, Any]]:
-    """Rank prior executed targets by real remaining, not-yet-acquired nights."""
+    """Rank only unresolved failed executions by remaining covered nights.
+
+    A success or null result closes the ordinary search obligation. Such a
+    target becomes eligible again only through an explicit open follow-up
+    registry entry produced by SURVIVE/BORDERLINE adversarial review.
+    """
     combined = _combined_known_coverage()
     by_target: dict[str, list[dict[str, Any]]] = {}
     for event in hunter_state.list_target_history(db_path):
@@ -476,16 +551,19 @@ def _followup_candidates_from_history(db_path: Path) -> list[dict[str, Any]]:
         ]
         if len(remaining) < int(_DEFAULT_COVERAGE_WINDOW["min_distinct_nights"]):
             continue
-        latest_status = events[-1]["status"]
-        status_bonus = {"failed": 0.25, "null_result": 0.15, "success": 0.10}[latest_status]
-        score = min(0.95, 0.40 + status_bonus + min(0.20, len(remaining) / 100.0))
+        if events[-1]["status"] != "failed":
+            continue
+        remaining_fraction = min(1.0, len(remaining) / 100.0)
         candidates.append(
             {
                 "ra_deg": ra_deg,
                 "dec_deg": dec_deg,
-                "score": score,
+                "score": 1.0 + remaining_fraction,
+                "absolute_quality": remaining_fraction,
+                "value_tier": "failed_execution_retry",
                 "reason": (
-                    f"prior search status={latest_status}; {len(remaining)} current-valid "
+                    "tier=failed_execution_retry; "
+                    f"{len(remaining)} current-valid "
                     f"covered night(s) remain after {len(acquired)} acquired night(s)"
                 ),
                 "field_id": field["field_id"],
@@ -495,7 +573,10 @@ def _followup_candidates_from_history(db_path: Path) -> list[dict[str, Any]]:
 
 
 def discover_followup_targets(
-    db_path: Path, requested_n: int, target_queue_path: Path
+    db_path: Path,
+    requested_n: int,
+    target_queue_path: Path,
+    follow_up_policy_path: Path = _DEFAULT_FOLLOW_UP_POLICY,
 ) -> dict[str, Any]:
     """Follow-up mode selection for ``create-new-search --mode follow-up``.
 
@@ -507,6 +588,7 @@ def discover_followup_targets(
     the 3-night minimum). No fabricated evidence -- a field that is still
     insufficient after a live recheck is reported, not silently dropped.
     """
+    policy = _load_follow_up_policy(follow_up_policy_path)
     registry_candidates = _followup_candidates_from_registry(db_path)
     history_candidates = _followup_candidates_from_history(db_path)
     recovered_candidates, n_still_insufficient = _followup_candidates_from_insufficient_coverage(
@@ -530,53 +612,201 @@ def discover_followup_targets(
         "eligible": all_candidates,
         "pool_size_explored": len(all_candidates) + n_still_insufficient,
         "sufficiency_met": len(all_candidates) >= requested_n,
+        "ranking_policy": policy,
     }
 
 
-def _attach_current_coverage(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Attach current-valid exact-target coverage, refreshing legacy evidence."""
-    combined = _combined_known_coverage()
-    needs_refresh = []
-    for row in rows:
-        field = combined.get(field_selector._coordinate_key(row["ra_deg"], row["dec_deg"]))
-        if (
-            field is None
-            or field["coverage_provenance"]["validity_state"] != "valid"
-        ):
-            needs_refresh.append(row)
-    for offset in range(0, len(needs_refresh), coverage_inventory.MAX_FIELDS):
-        chunk = needs_refresh[offset : offset + coverage_inventory.MAX_FIELDS]
-        fields = [
-            (
-                _field_id_from_radec("selected", row["ra_deg"], row["dec_deg"]),
-                row["ra_deg"],
-                row["dec_deg"],
-            )
-            for row in chunk
-        ]
-        merged = _live_coverage_check(fields, "hunter_exact_target_refresh")
-        refreshed = field_selector.load_coverage_inventory(
-            _COVERAGE_INVENTORY_DIR / f"{merged['batch_id']}.json"
-        )
-        for field in refreshed["field_results"]:
-            combined[field_selector._coordinate_key(field["ra_deg"], field["dec_deg"])] = field
+def _exact_target_feasibility(
+    row: dict[str, Any],
+    broad_nights: list[str],
+    min_observations: int = 3,
+) -> dict[str, Any]:
+    """Prove that the exact 0.01-degree target can execute before selection.
 
-    enriched = []
-    for row in rows:
-        field = combined.get(field_selector._coordinate_key(row["ra_deg"], row["dec_deg"]))
-        if field is None or not field["passes_min_distinct_nights"]:
+    Wide coverage is only a discovery hint. For each candidate night this
+    performs an exact-position metadata query, narrows to one exposure, and
+    HEAD-checks every product required by pixel extraction. No product body is
+    downloaded. Expected exact-footprint misses are recorded as ineligible;
+    provider/parse failures still propagate and fail the production request.
+    """
+    target_id = hunter_state.target_id_from_radec(row["ra_deg"], row["dec_deg"])
+    root = _WORKING_DIR / "exact_feasibility" / target_id
+    window = _DEFAULT_COVERAGE_WINDOW
+    exact_report = bounded_ingest.run_bounded_ingest(
+        ra=row["ra_deg"],
+        dec=row["dec_deg"],
+        size_deg=_DEFAULT_SIZE_DEG,
+        start_jd=float(window["start_jd_exclusive"]),
+        end_jd=float(window["end_jd_exclusive"]),
+        out_dir=root / "exact_inventory",
+    )
+    exact_table = bounded_ingest._parse_ipac_table(
+        Path(exact_report["raw_response_path"]).read_text(encoding="utf-8")
+    )
+    allowed_nights = set(broad_nights)
+    obsjds = sorted(float(value) for value in exact_table["obsjd"])
+    from astropy.time import Time
+
+    first_obsjd_by_night: dict[str, float] = {}
+    for obsjd in obsjds:
+        night = Time(obsjd, format="jd").datetime.strftime("%Y%m%d")
+        if night in allowed_nights:
+            first_obsjd_by_night.setdefault(night, obsjd)
+
+    verified: list[dict[str, Any]] = []
+    misses: list[dict[str, str]] = []
+    for night, target_jd in first_obsjd_by_night.items():
+        if len(verified) >= min_observations:
+            break
+        epsilon = 1.0 / 1440.0
+        for _ in range(4):
+            start_jd, end_jd = target_jd - epsilon, target_jd + epsilon
+            if sum(1 for obsjd in obsjds if start_jd < obsjd < end_jd) == 1:
+                break
+            epsilon /= 10.0
+        else:
             raise RuntimeError(
-                f"selected target RA={row['ra_deg']} Dec={row['dec_deg']} does not have "
-                "current-valid minimum coverage"
+                f"could not isolate one exact exposure at JD={target_jd}"
             )
-        enriched.append(
+        try:
+            report = bounded_ingest.run_bounded_ingest(
+                ra=row["ra_deg"],
+                dec=row["dec_deg"],
+                size_deg=_DEFAULT_SIZE_DEG,
+                start_jd=start_jd,
+                end_jd=end_jd,
+                out_dir=root / "product_preflight" / night,
+                emit_motion_product_manifest=True,
+                preflight_motion_products=True,
+                max_preflight_exposures=1,
+                preflight_workers=1,
+            )
+        except RuntimeError as exc:
+            message = str(exc)
+            if not (
+                message.startswith("no exposure found")
+                or message.startswith("motion-product preflight failed")
+            ):
+                raise
+            misses.append({"night": night, "reason": message})
+            continue
+        manifest_path = Path(report["motion_product_manifest_path"])
+        verified.append(
             {
-                **row,
-                "field_id": field["field_id"],
-                "coverage_provenance": field["coverage_provenance"],
-                "coverage_nights": field["distinct_nights_yyyymmdd"],
+                "night_yyyymmdd": night,
+                "start_jd": start_jd,
+                "end_jd": end_jd,
+                "metadata_sha256": report["raw_response_sha256"],
+                "product_manifest_sha256": hashlib.sha256(
+                    manifest_path.read_bytes()
+                ).hexdigest(),
             }
         )
+    return {
+        "schema_version": "hunter-exact-target-feasibility-v1",
+        "source": "IRSA ZTF science metadata plus required-product HEAD preflight",
+        "source_version": (
+            f"exact-inventory-sha256:{exact_report['raw_response_sha256']}"
+        ),
+        "retrieved_at_utc": datetime.now(UTC).isoformat(),
+        "transformations": [
+            "exact 0.01-degree metadata query",
+            "single-exposure window isolation",
+            "difference-image, mask, and PSF HEAD availability preflight",
+        ],
+        "validity_state": "valid" if len(verified) >= min_observations else "invalid",
+        "size_deg": _DEFAULT_SIZE_DEG,
+        "exact_inventory_rows": len(exact_table),
+        "exact_inventory_distinct_nights": len(first_obsjd_by_night),
+        "minimum_nights": min_observations,
+        "verified_nights": verified,
+        "exact_misses": misses,
+        "passes": len(verified) >= min_observations,
+    }
+
+
+def _attach_current_coverage(
+    rows: list[dict[str, Any]], requested_n: int | None = None
+) -> list[dict[str, Any]]:
+    """Return the highest-ranked exact-executable rows with current evidence.
+
+    Candidates that pass the broad 2-degree discovery preflight but fail at
+    the exact 0.01-degree execution footprint are rejected here and the next
+    ranked candidate is tested. This is selection, not an execution fallback.
+    """
+    needed = len(rows) if requested_n is None else requested_n
+    combined = _combined_known_coverage()
+    enriched: list[dict[str, Any]] = []
+    # Refresh only the ranked frontier currently needed. If exact footprints
+    # fail, advance to the next frontier chunk. This keeps provider work
+    # adaptive instead of eagerly refreshing the entire broad eligible set.
+    frontier_size = max(needed, min(coverage_inventory.MAX_FIELDS, 3 * needed))
+    for frontier_offset in range(0, len(rows), frontier_size):
+        frontier = rows[frontier_offset : frontier_offset + frontier_size]
+        needs_refresh = [
+            row
+            for row in frontier
+            if (
+                (field := combined.get(
+                    field_selector._coordinate_key(row["ra_deg"], row["dec_deg"])
+                ))
+                is None
+                or field["coverage_provenance"]["validity_state"] != "valid"
+            )
+        ]
+        for offset in range(0, len(needs_refresh), coverage_inventory.MAX_FIELDS):
+            chunk = needs_refresh[offset : offset + coverage_inventory.MAX_FIELDS]
+            fields = [
+                (
+                    _field_id_from_radec("selected", row["ra_deg"], row["dec_deg"]),
+                    row["ra_deg"],
+                    row["dec_deg"],
+                )
+                for row in chunk
+            ]
+            merged = _live_coverage_check(fields, "hunter_exact_target_refresh")
+            refreshed = field_selector.load_coverage_inventory(
+                _COVERAGE_INVENTORY_DIR / f"{merged['batch_id']}.json"
+            )
+            for field in refreshed["field_results"]:
+                combined[
+                    field_selector._coordinate_key(field["ra_deg"], field["dec_deg"])
+                ] = field
+
+        for row in frontier:
+            if len(enriched) >= needed:
+                return enriched
+            field = combined.get(
+                field_selector._coordinate_key(row["ra_deg"], row["dec_deg"])
+            )
+            if field is None or not field["passes_min_distinct_nights"]:
+                continue
+            exact = _exact_target_feasibility(
+                row,
+                field["distinct_nights_yyyymmdd"],
+                int(_DEFAULT_COVERAGE_WINDOW["min_distinct_nights"]),
+            )
+            if not exact["passes"]:
+                print(
+                    f"[exact-feasibility] rejected RA={row['ra_deg']} "
+                    f"Dec={row['dec_deg']}: {len(exact['verified_nights'])}/"
+                    f"{exact['minimum_nights']} exact executable night(s)",
+                    flush=True,
+                )
+                continue
+            enriched.append(
+                {
+                    **row,
+                    "field_id": field["field_id"],
+                    "coverage_provenance": {
+                        **field["coverage_provenance"],
+                        "exact_feasibility": exact,
+                    },
+                    "coverage_nights": [
+                        item["night_yyyymmdd"] for item in exact["verified_nights"]
+                    ],
+                }
+            )
     return enriched
 
 
@@ -584,11 +814,11 @@ def cmd_create_new_search(args: argparse.Namespace) -> int:
     if args.targets <= 0:
         raise ValueError("requested_n must be positive")
     ranking_policy_path = Path(args.ranking_policy)
-    ranking_policy = field_selector.load_ranking_policy(ranking_policy_path)
     target_queue_path = Path(args.target_queue)
     db_path = Path(args.db)
 
     if args.mode == "new":
+        ranking_policy = field_selector.load_ranking_policy(ranking_policy_path)
         if args.jd == "now":
             from astropy.time import Time
 
@@ -609,9 +839,16 @@ def cmd_create_new_search(args: argparse.Namespace) -> int:
         )
         config: dict[str, Any] = {"neo_class": args.neo_class, "jd": jd, "max_pool": args.max_pool}
     else:
-        result = discover_followup_targets(
-            db_path=db_path, requested_n=args.targets, target_queue_path=target_queue_path
+        follow_up_policy_path = Path(
+            getattr(args, "follow_up_policy", _DEFAULT_FOLLOW_UP_POLICY)
         )
+        result = discover_followup_targets(
+            db_path=db_path,
+            requested_n=args.targets,
+            target_queue_path=target_queue_path,
+            follow_up_policy_path=follow_up_policy_path,
+        )
+        ranking_policy = result["ranking_policy"]
         config = {"neo_class": args.neo_class}
 
     if result.get("exploration_limited") and not result["sufficiency_met"]:
@@ -621,7 +858,49 @@ def cmd_create_new_search(args: argparse.Namespace) -> int:
             "were found; remove or increase the limit"
         )
 
-    selected = _attach_current_coverage(result["eligible"][: args.targets])
+    selected = _attach_current_coverage(result["eligible"], requested_n=args.targets)
+    # Broad coverage can overstate exact executability. If it did, expand the
+    # broad universe and keep testing lower-ranked candidates until N exact
+    # targets are supported or the accessible universe/operator limit ends.
+    while (
+        args.mode == "new"
+        and len(selected) < args.targets
+        and not result.get("universe_exhausted", False)
+        and not result.get("exploration_limited", False)
+    ):
+        prior_eligible_count = len(result["eligible"])
+        support_target = prior_eligible_count + max(3 * args.targets, 10)
+        result = discover_new_targets(
+            jd=config["jd"],
+            neo_class=args.neo_class,
+            requested_n=support_target,
+            max_pool=args.max_pool,
+            out_dir=_WORKING_DIR / "coverage_expansion",
+            target_queue_path=target_queue_path,
+            ranking_policy_path=ranking_policy_path,
+            db_path=db_path,
+        )
+        selected = _attach_current_coverage(
+            result["eligible"], requested_n=args.targets
+        )
+        if len(result["eligible"]) <= prior_eligible_count:
+            # Fail closed against a provider/selector implementation that
+            # claims expansion but makes no progress.
+            if not (
+                result.get("universe_exhausted")
+                or result.get("exploration_limited")
+            ):
+                raise RuntimeError(
+                    "adaptive exact-feasibility expansion made no progress"
+                )
+            break
+    exact_sufficiency_met = len(selected) >= args.targets
+    if result.get("exploration_limited") and not exact_sufficiency_met:
+        raise RuntimeError(
+            f"explicit --max-pool={args.max_pool} stopped discovery after "
+            f"{result['pool_size_explored']} field(s) before {args.targets} exact "
+            "executable targets were found; remove or increase the limit"
+        )
     manifest_targets = [
         hunter_state.ManifestTarget(
             target_id=hunter_state.target_id_from_radec(row["ra_deg"], row["dec_deg"]),
@@ -649,7 +928,7 @@ def cmd_create_new_search(args: argparse.Namespace) -> int:
         ranking_policy_digest=ranking_policy["sha256"],
         targets=manifest_targets,
         discovery_pool_size_explored=result["pool_size_explored"],
-        sufficiency_met=result["sufficiency_met"],
+        sufficiency_met=exact_sufficiency_met,
         config=config,
     )
 
@@ -676,13 +955,17 @@ def cmd_create_new_search(args: argparse.Namespace) -> int:
         f"search_id={search_id}  status=pending  requested_n={args.targets}  "
         f"selected_n={len(manifest_targets)}  "
         f"pool_explored={result['pool_size_explored']}  "
-        f"sufficiency_met={result['sufficiency_met']}"
+        f"sufficiency_met={exact_sufficiency_met}"
     )
     if len(manifest_targets) < args.targets:
         exhaustion = (
-            "the full accessible planning universe was exhausted"
-            if result.get("universe_exhausted", True)
-            else "all valid follow-up evidence was exhausted"
+            "all valid follow-up evidence was exhausted"
+            if args.mode == "follow-up"
+            else (
+                "the full accessible planning universe was exhausted"
+                if result.get("universe_exhausted", True)
+                else "the currently supported candidate frontier was exhausted"
+            )
         )
         print(
             f"WARNING: only {len(manifest_targets)}/{args.targets} eligible targets found "
@@ -816,8 +1099,15 @@ def execute_target(
     """
     ra_deg, dec_deg = target["ra_deg"], target["dec_deg"]
     prior_nights = previously_acquired_nights or set()
+    exact = (target.get("coverage_provenance") or {}).get("exact_feasibility")
+    if not isinstance(exact, dict) or exact.get("validity_state") != "valid":
+        raise RuntimeError(
+            f"target {target['target_id']} lacks valid exact-feasibility provenance"
+        )
     nights_available = [
-        night for night in _nights_for_target(ra_deg, dec_deg) if night not in prior_nights
+        item["night_yyyymmdd"]
+        for item in exact.get("verified_nights", [])
+        if item["night_yyyymmdd"] not in prior_nights
     ]
     if len(nights_available) < min_observations:
         raise RuntimeError(
@@ -836,12 +1126,9 @@ def execute_target(
             _acquire_and_convert_night(ra_deg, dec_deg, night, size_deg, target_root)
             acquired_nights.append(night)
         except RuntimeError as exc:
-            # A night the wide coverage-preflight box (size_deg=2.0) recorded
-            # as covered can still miss at the narrow single-exposure
-            # acquisition box: real ZTF field pointing can be offset from the
-            # nominal RA/Dec by up to ~1 degree. Try the next available night
-            # (nights_available is usually much larger than min_observations)
-            # rather than failing the whole target over one bad night.
+            # Product state may change after manifest creation. Preserve the
+            # durable failure and try another preflight-verified night if one
+            # exists; never substitute a different target during execution.
             print(
                 f"[run-new-search] night {night} did not resolve at the narrow "
                 f"acquisition box ({exc}); trying next available night",
@@ -954,11 +1241,12 @@ def _ingest_and_maybe_register_followup(
     candidate_ledger.upsert_record(ledger_db_path, record)
 
     if verdict.verdict in _FOLLOW_UP_VERDICTS:
+        followup_value = float((packet.get("metadata") or {}).get("followup_value") or 0.0)
         hunter_state.add_follow_up(
             db_path,
             target_id=target["target_id"],
             reason=f"adversarial review verdict={verdict.verdict}: {verdict.summary}",
-            priority=float((packet.get("metadata") or {}).get("discovery_priority") or 0.5),
+            priority=followup_value,
             recommended_action="operator review before any MPC submission consideration",
             evidence_ref=f"candidate_ledger:{record['candidate_id']}",
             candidate_id=record["candidate_id"],
@@ -1217,6 +1505,9 @@ def build_parser() -> argparse.ArgumentParser:
     create_cmd.add_argument("--target-queue", default=str(_DEFAULT_TARGET_QUEUE))
     create_cmd.add_argument(
         "--ranking-policy", default=str(field_selector._DEFAULT_RANKING_POLICY_PATH)
+    )
+    create_cmd.add_argument(
+        "--follow-up-policy", default=str(_DEFAULT_FOLLOW_UP_POLICY)
     )
     create_cmd.add_argument("--db", default=str(_DEFAULT_DB))
 

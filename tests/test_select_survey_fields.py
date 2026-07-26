@@ -359,12 +359,12 @@ class TestRankingPolicyProvenance:
     def test_committed_policy_is_versioned_honest_and_digest_stamped(self):
         policy = ssf.load_ranking_policy()
 
-        assert policy["schema_version"] == "ztf-field-ranking-policy-v2"
-        assert policy["policy_id"] == "ztf-field-ranking-v3"
-        assert policy["coefficient_status"] == "uncalibrated_transparent_prior"
+        assert policy["schema_version"] == "ztf-field-ranking-policy-v3"
+        assert policy["policy_id"] == "ztf-field-ranking-v4"
+        assert policy["coefficient_status"] == "outcome_ordered_real_evidence"
         assert len(policy["sha256"]) == 64
         assert policy["path"] == (
-            "data_selection/ranking_policies/ztf_field_ranking_v3.json"
+            "data_selection/ranking_policies/ztf_field_ranking_v4.json"
         )
         assert any("calibrated" in limitation for limitation in policy["limitations"])
         assert policy["empirical_evidence"]
@@ -391,7 +391,7 @@ class TestRankingPolicyProvenance:
             / "ranking_policies"
             / "ztf_field_ranking_v2.json"
         )
-        with pytest.raises(ValueError, match="preference_windows_deg"):
+        with pytest.raises(ValueError, match="schema"):
             ssf.load_ranking_policy(v2_path)
 
     def test_tampered_coefficient_fails_loudly(self, tmp_path):
@@ -476,7 +476,7 @@ class TestSelectFields:
                     "field_radius_deg", "reason"}
         for f in fields:
             assert required.issubset(f.keys())
-            assert f["ranking_policy"]["policy_id"] == "ztf-field-ranking-v3"
+            assert f["ranking_policy"]["policy_id"] == "ztf-field-ranking-v4"
 
     def test_scores_in_range(self):
         fields = ssf.select_fields(jd=2461000.5, mode="aten", top_n=10)
@@ -536,12 +536,7 @@ class TestSelectFields:
 
     def test_score_matches_documented_formula(self):
         field = ssf.select_fields(jd=2461000.5, mode="aten", top_n=1)[0]
-        expected = (
-            0.35 * field["survey_scarcity_score"]
-            + 0.30 * field["pop_score"]
-            + 0.20 * field["geom_score"]
-            + 0.15 * field["novelty_score"]
-        )
+        expected = field["geom_score"]
         assert field["score"] == pytest.approx(expected, abs=2e-4)
 
     def test_repeated_selection_is_identical(self):

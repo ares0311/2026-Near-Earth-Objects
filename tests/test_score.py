@@ -16,6 +16,7 @@ from score import (
     _determine_alert_pathway,
     _diameter_from_h,
     _discovery_priority,
+    _followup_value,
     rank_candidates,
     score,
     score_batch,
@@ -194,6 +195,44 @@ class TestScoreFunction:
         assert result.metadata.scorer_version == "0.1.0"
         assert result.hazard.arc_quality_tier == 2
         assert result.hazard.orbit_fit_status == "fitted"
+
+    def test_followup_value_has_independent_monotonic_need_oracles(self):
+        baseline = _followup_value(
+            make_features(
+                brightness_score=0.5,
+                arc_coverage_score=0.5,
+                orbit_quality_score=0.5,
+            ),
+            None,
+        )
+        brighter = _followup_value(
+            make_features(
+                brightness_score=0.8,
+                arc_coverage_score=0.5,
+                orbit_quality_score=0.5,
+            ),
+            None,
+        )
+        shorter_arc = _followup_value(
+            make_features(
+                brightness_score=0.5,
+                arc_coverage_score=0.2,
+                orbit_quality_score=0.5,
+            ),
+            None,
+        )
+        lower_orbit_quality = _followup_value(
+            make_features(
+                brightness_score=0.5,
+                arc_coverage_score=0.5,
+                orbit_quality_score=0.2,
+            ),
+            None,
+        )
+
+        assert brighter > baseline
+        assert shorter_arc > baseline
+        assert lower_orbit_quality > baseline
 
     def test_no_orbital_gives_unknown_class(self):
         t = make_tracklet()
@@ -610,5 +649,4 @@ class TestGetTopCandidates:
         sys.path.insert(0, "src")
         import score
         assert "get_top_candidates" in score.__all__
-
 

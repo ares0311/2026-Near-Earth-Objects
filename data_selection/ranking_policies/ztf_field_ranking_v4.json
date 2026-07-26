@@ -1,0 +1,92 @@
+{
+  "schema_version": "ztf-field-ranking-policy-v3",
+  "policy_id": "ztf-field-ranking-v4",
+  "model_type": "deterministic_empirical_ordering",
+  "coefficient_status": "outcome_ordered_real_evidence",
+  "discovery_weights": {
+    "scarcity": 0.0,
+    "population": 0.0,
+    "geometry": 1.0,
+    "novelty": 0.0
+  },
+  "recovery_weights": {
+    "population": 0.45,
+    "geometry": 0.35,
+    "novelty": 0.2
+  },
+  "preference_windows_deg": {
+    "aten": [100.0, 180.0, 145.0],
+    "ieo": [30.0, 60.0, 48.0],
+    "all": [60.0, 160.0, 110.0],
+    "recovery": [120.0, 180.0, 165.0]
+  },
+  "eligibility_windows_deg": {
+    "aten": [60.0, 180.0],
+    "ieo": [20.0, 60.0],
+    "all": [60.0, 180.0],
+    "recovery": [120.0, 180.0]
+  },
+  "class_completeness_priors": {
+    "aten": 0.15,
+    "ieo": 0.03,
+    "all": 0.45,
+    "recovery": 0.95
+  },
+  "eligibility": {
+    "min_distinct_nights": 3,
+    "min_hours_visible": 0.5,
+    "min_altitude_deg": 25.0,
+    "history_overlap_deg": 5.0,
+    "dedup_radius_deg": 3.5
+  },
+  "references": [
+    {
+      "id": "granvik-2018",
+      "url": "https://doi.org/10.1016/j.icarus.2018.04.018",
+      "supports": "Debiased NEO orbital and absolute-magnitude distributions and source-region priors.",
+      "does_not_support": "The exact production ordering score or discovery probability."
+    },
+    {
+      "id": "ye-2020",
+      "url": "https://arxiv.org/abs/1912.06109",
+      "supports": "ZTF twilight searches for interior-Earth objects at solar elongations down to about 35 degrees.",
+      "does_not_support": "The selector's exact preference peak, eligibility bounds, or expected yield."
+    },
+    {
+      "id": "harris-dabramo-2015",
+      "url": "https://doi.org/10.1016/j.icarus.2015.05.004",
+      "supports": "Population-completeness estimation using discovery and re-detection statistics.",
+      "does_not_support": "The production ordering score or absolute candidate quality."
+    }
+  ],
+  "empirical_evidence": [
+    {
+      "id": "ztf-field-ranking-v4-promotion",
+      "path": "data_selection/calibration/ztf_field_ranking_v4_promotion_report.json",
+      "sha256": "f9969ba63e6c2d0b5e06a756de5d4840788d51ca179ecd62ac5f733b2e815f06",
+      "supports": "Promotion of geometry-only ordering over the former weighted policy and a regularized three-feature alternative, including the small available 2024 Aten holdout.",
+      "does_not_support": "A calibrated probability, causal yield, adequately powered IEO holdout, or globally optimal ranking rule."
+    },
+    {
+      "id": "ztf-ranking-component-comparison-v1",
+      "path": "data_selection/calibration/ztf_field_ranking_component_comparison_v1.json",
+      "sha256": "3e26072e4cccce1c6333a0dc5ee9fa694186e03bcfce8680351fea31c69a4a87",
+      "supports": "Geometry is the strongest available single-component ordering for both source-aligned Aten and IEO outcome sets and materially exceeds the former weighted policy on the same recorded outcomes.",
+      "does_not_support": "A calibrated probability, causal yield, external holdout performance, or globally optimal coefficients."
+    },
+    {
+      "id": "ztf-i41-discovery-elongation-clustering-2026-07-25",
+      "path": "docs/evidence/live/2026-07-25-elongation-peak-revision.md",
+      "sha256": "7d4775d8df30f99cd938391de8b5b795152457f282a3d0b5dee6207220d9e008",
+      "supports": "The direction of the class-specific geometry revision using real source-aligned discovery observations.",
+      "does_not_support": "A precise optimum or an independent external validation sample."
+    }
+  ],
+  "limitations": [
+    "This is a deterministic ordering score, not a calibrated discovery probability.",
+    "The geometry preference peaks and component comparison use overlapping retrospective outcomes and may be optimistic.",
+    "The source-aligned ieo sample is small at 7 positive and 7 searched-null records.",
+    "Absolute quality is reported separately; no score threshold suppresses top-N selection.",
+    "New-target history and exact executability are hard eligibility gates, not soft ranking coefficients."
+  ]
+}
