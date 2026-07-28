@@ -74,12 +74,19 @@ def test_neohunter_entrypoint_loads_the_thin_persistent_shell(
 ) -> None:
     import hunter_shell
 
+    original_path = list(sys.path)
+    skills_path = str(ROOT / "Skills")
+    sys.path[:] = [entry for entry in sys.path if entry != skills_path]
     seen: list[list[str]] = []
     monkeypatch.setattr(hunter_shell, "main", lambda argv: seen.append(argv) or 0)
     monkeypatch.setattr(sys, "argv", ["NEOHunter", "--command", "/Help"])
 
-    assert hunter_commands.neo_hunter() == 0
-    assert seen == [["--command", "/Help"]]
+    try:
+        assert hunter_commands.neo_hunter() == 0
+        assert seen == [["--command", "/Help"]]
+        assert skills_path in sys.path
+    finally:
+        sys.path[:] = original_path
 
 
 def test_coverage_validity_rejects_refresh_required_input(tmp_path: Path) -> None:
