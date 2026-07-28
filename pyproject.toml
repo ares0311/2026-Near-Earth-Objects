@@ -22,6 +22,7 @@ dependencies = [
 ]
 
 [project.scripts]
+NEO-Hunter = "hunter_commands:neo_hunter"
 NEOHunter = "hunter_commands:neo_hunter"
 Create-New-Search = "hunter_commands:create_new_search"
 Run-New-Search = "hunter_commands:run_new_search"
