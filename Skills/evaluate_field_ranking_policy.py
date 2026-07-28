@@ -21,7 +21,8 @@ DEFAULT_POSITIVES = (
     ROOT / "data_selection/calibration/mpc_atira_discovery_fields_v3.json",
 )
 DEFAULT_NULLS = ROOT / "data_selection/calibration/ztf_field_null_outcomes_v5.json"
-DEFAULT_POLICY = ROOT / "data_selection/ranking_policies/ztf_field_ranking_v3.json"
+DEFAULT_POLICY = ROOT / "data_selection/ranking_policies/ztf_field_ranking_v4.json"
+RECORDED_NULL_POLICY = ROOT / "data_selection/ranking_policies/ztf_field_ranking_v3.json"
 # Operator-approved revision (2026-07-25): the original flat 20/20 bar was
 # unreachable for ieo/Atira -- MPC's entire real Atira population (23/23,
 # exhaustively verified) yields only 7 I41-attributed positives, a
@@ -180,6 +181,10 @@ def build_policy_audit(
     policy_raw = json.loads(policy_path.read_text(encoding="utf-8"))
     policy = selector.load_ranking_policy(policy_path)
     weights = policy_raw["discovery_weights"]
+    recorded_policy = json.loads(RECORDED_NULL_POLICY.read_text(encoding="utf-8"))
+    if recorded_policy.get("policy_id") != "ztf-field-ranking-v3":
+        raise ValueError("recorded-null historical policy identity drift")
+    recorded_weights = recorded_policy["discovery_weights"]
     records: list[dict[str, Any]] = []
 
     for path in positive_paths:
@@ -221,7 +226,14 @@ def build_policy_audit(
             str(entry["ranking_mode"]),
             weights,
         )
-        drift = abs(float(entry["recorded_score"]) - features["score"])
+        recorded_features = _score_field(
+            float(entry["ra_deg"]),
+            float(entry["dec_deg"]),
+            float(entry["ranking_jd"]),
+            str(entry["ranking_mode"]),
+            recorded_weights,
+        )
+        drift = abs(float(entry["recorded_score"]) - recorded_features["score"])
         maximum_score_drift = max(maximum_score_drift, drift)
         if drift > 0.0002:
             raise ValueError(
@@ -277,7 +289,7 @@ def build_policy_audit(
 
     return {
         "schema_version": SCHEMA_VERSION,
-        "status": "audit_complete_not_calibrated",
+        "status": "audit_complete_ordering_not_probability",
         "policy": policy,
         "sources": {
             "positive_envelopes": [
@@ -290,6 +302,8 @@ def build_policy_audit(
             },
         },
         "score_reproduction": {
+            "recorded_policy_id": recorded_policy["policy_id"],
+            "recorded_policy_sha256": _sha256(RECORDED_NULL_POLICY),
             "searched_null_count": len(null_payload["entries"]),
             "maximum_absolute_drift": round(maximum_score_drift, 8),
             "tolerance": 0.0002,

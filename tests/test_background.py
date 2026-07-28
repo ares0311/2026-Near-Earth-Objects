@@ -5,6 +5,7 @@ import os
 import sqlite3
 import subprocess
 import sys
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -22,6 +23,17 @@ from schemas import (
 from score import score
 
 from .conftest import build_orbital_elements, build_tracklet
+
+
+@contextmanager
+def sqlite_connection(path: Path):
+    """Mirror sqlite's commit/rollback context while also closing it."""
+    conn = sqlite3.connect(path)
+    try:
+        with conn:
+            yield conn
+    finally:
+        conn.close()
 
 
 @pytest.fixture(autouse=True)
@@ -143,7 +155,7 @@ def make_scored(
 
 
 def table_count(db_path: Path, table: str) -> int:
-    with sqlite3.connect(db_path) as conn:
+    with sqlite_connection(db_path) as conn:
         return int(conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0])
 
 
@@ -974,7 +986,7 @@ def test_background_cli_operations_snapshot_commands(monkeypatch, tmp_path):
 
 def test_background_operator_next_action_summary_blocks_old_schema(tmp_path):
     db_path = tmp_path / "old.sqlite"
-    with sqlite3.connect(db_path) as conn:
+    with sqlite_connection(db_path) as conn:
         conn.execute("CREATE TABLE signoff_packet_log (packet_id TEXT PRIMARY KEY)")
 
     summary = background.background_operator_next_action_summary(
@@ -1803,7 +1815,7 @@ def test_lock_conflict_is_logged_as_failure(tmp_path):
     db_path = tmp_path / "Logs" / "background.sqlite"
     write_fixture(fixture)
     background.init_log_db(db_path)
-    with sqlite3.connect(db_path) as conn:
+    with sqlite_connection(db_path) as conn:
         conn.execute(
             "INSERT INTO run_lock (lock_id, run_id, acquired_at_utc) VALUES (1, 'busy', 'now')"
         )
@@ -2817,7 +2829,7 @@ def test_deprecated_background_wrappers_are_removed():
 
 def test_init_log_db_migrates_existing_ledger(tmp_path):
     db_path = tmp_path / "old.sqlite"
-    with sqlite3.connect(db_path) as conn:
+    with sqlite_connection(db_path) as conn:
         conn.execute(
             """
             CREATE TABLE run_ledger (
@@ -2839,7 +2851,7 @@ def test_init_log_db_migrates_existing_ledger(tmp_path):
 
     background.init_log_db(db_path)
 
-    with sqlite3.connect(db_path) as conn:
+    with sqlite_connection(db_path) as conn:
         columns = {row[1] for row in conn.execute("PRAGMA table_info(run_ledger)")}
         tables = {
             row[0]
@@ -2897,7 +2909,7 @@ def test_background_schema_migration_preview_missing_db_is_read_only(tmp_path):
 
 def test_background_schema_status_summary_reports_old_db_missing_tables(tmp_path):
     db_path = tmp_path / "old.sqlite"
-    with sqlite3.connect(db_path) as conn:
+    with sqlite_connection(db_path) as conn:
         conn.execute("CREATE TABLE schema_metadata (key TEXT PRIMARY KEY, value TEXT)")
         conn.execute(
             "INSERT INTO schema_metadata (key, value) VALUES ('schema_version', 'old')"
@@ -2915,7 +2927,7 @@ def test_background_schema_status_summary_reports_old_db_missing_tables(tmp_path
 
 def test_background_schema_migration_preview_reports_old_db_without_writing(tmp_path):
     db_path = tmp_path / "old.sqlite"
-    with sqlite3.connect(db_path) as conn:
+    with sqlite_connection(db_path) as conn:
         conn.execute("CREATE TABLE signoff_packet_log (packet_id TEXT PRIMARY KEY)")
 
     preview = background.background_schema_migration_preview(db_path)
@@ -2961,7 +2973,7 @@ def test_background_schema_operations_summary_missing_db_is_read_only(tmp_path):
 
 def test_background_schema_operations_summary_old_db_recommends_migration(tmp_path):
     db_path = tmp_path / "old.sqlite"
-    with sqlite3.connect(db_path) as conn:
+    with sqlite_connection(db_path) as conn:
         conn.execute("CREATE TABLE signoff_packet_log (packet_id TEXT PRIMARY KEY)")
 
     summary = background.background_schema_operations_summary(db_path)
@@ -2990,7 +3002,7 @@ def test_background_schema_operations_summary_current_db_ready(tmp_path):
 
 def test_migrate_background_log_db_adds_missing_tables(tmp_path):
     db_path = tmp_path / "old.sqlite"
-    with sqlite3.connect(db_path) as conn:
+    with sqlite_connection(db_path) as conn:
         conn.execute(
             """
             CREATE TABLE run_ledger (
@@ -3026,7 +3038,7 @@ def test_migrate_background_log_db_adds_missing_tables(tmp_path):
 def test_background_cli_schema_status_and_init_log_db(tmp_path):
     repo = Path(__file__).resolve().parents[1]
     db_path = tmp_path / "old.sqlite"
-    with sqlite3.connect(db_path) as conn:
+    with sqlite_connection(db_path) as conn:
         conn.execute("CREATE TABLE signoff_packet_log (packet_id TEXT PRIMARY KEY)")
     env = {**os.environ, "PYTHONPATH": str(repo / "src")}
 
@@ -3072,7 +3084,7 @@ def test_background_cli_schema_status_and_init_log_db(tmp_path):
 def test_background_cli_init_log_db_preview(tmp_path):
     repo = Path(__file__).resolve().parents[1]
     db_path = tmp_path / "preview.sqlite"
-    with sqlite3.connect(db_path) as conn:
+    with sqlite_connection(db_path) as conn:
         conn.execute("CREATE TABLE signoff_packet_log (packet_id TEXT PRIMARY KEY)")
     env = {**os.environ, "PYTHONPATH": str(repo / "src")}
 
@@ -3101,7 +3113,7 @@ def test_background_cli_init_log_db_preview(tmp_path):
 def test_background_cli_schema_operations_summary(tmp_path):
     repo = Path(__file__).resolve().parents[1]
     db_path = tmp_path / "operations.sqlite"
-    with sqlite3.connect(db_path) as conn:
+    with sqlite_connection(db_path) as conn:
         conn.execute("CREATE TABLE signoff_packet_log (packet_id TEXT PRIMARY KEY)")
     env = {**os.environ, "PYTHONPATH": str(repo / "src")}
 

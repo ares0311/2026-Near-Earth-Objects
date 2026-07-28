@@ -33,7 +33,9 @@ def test_real_audit_reproduces_scores_and_reports_detailed_metrics() -> None:
         audit.DEFAULT_POLICY,
     )
 
-    assert result["status"] == "audit_complete_not_calibrated"
+    assert result["status"] == "audit_complete_ordering_not_probability"
+    assert result["policy"]["policy_id"] == "ztf-field-ranking-v4"
+    assert result["score_reproduction"]["recorded_policy_id"] == "ztf-field-ranking-v3"
     assert result["score_reproduction"]["searched_null_count"] == 28
     assert result["score_reproduction"]["maximum_absolute_drift"] <= 0.0002
     gate = result["coefficient_promotion_gate"]

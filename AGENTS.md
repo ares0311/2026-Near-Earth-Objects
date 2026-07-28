@@ -330,7 +330,7 @@ latest sync in `docs/PRODUCTION_READINESS.md`. Hunter selection must remain
 deterministic, explainable, and reproducible; no absolute score threshold may
 replace rank or prevent returning the best available N.
 
-**Phase 3 — Package the application (ADVERSARIALLY RECLOSED 2026-07-25).**
+**Phase 3 — Package the application (FINAL CLOSURE VERIFIED 2026-07-27).**
 The 2026-07-24 feature-level closure was superseded after an adversarial audit
 found nine canonical-path defects: non-governing search history, a fixed
 default pool ceiling, successful exit on failed/partial runs, a crash window
@@ -343,10 +343,17 @@ All are closed by the integrated pipeline and independent controls. Real live
 validation executed an exact new manifest and then an unseeded follow-up
 derived from its durable history, acquiring three different nights. Evidence:
 `docs/evidence/live/2026-07-25-hunter-prod-adversarial-closure.md`.
+The stronger business re-audit then recorded HP-10 through HP-13: separate
+best-supported new/follow-up value contracts, exact target/product feasibility
+before manifest creation, warning-free resource lifecycle, and the persistent
+`NEOHunter` slash-command product terminal. All are verified. Final evidence:
+`docs/evidence/live/2026-07-25-hunter-prod-final-remediation.md`.
 
-**Hunter-directive pipeline mapping (updated 2026-07-25 — supersedes the
-2026-07-24 mapping)**: one installed CLI delegates to
-`Skills/hunter_cli.py`; adaptive discovery has no default fixed pool cap;
+**Hunter-directive pipeline mapping (updated 2026-07-27 — supersedes the
+2026-07-24 mapping)**: the installed persistent `NEOHunter` application and
+three equivalent one-shot entry points delegate to `Skills/hunter_cli.py`;
+slash commands add no scientific or persistence logic; adaptive discovery has
+no default fixed pool cap;
 selected coverage is current-valid and provenance-stamped; SQLite
 `target_search_history` governs identity and new/follow-up eligibility; exact
 manifests create durable runs; checkpointed acquisition, preprocessing,

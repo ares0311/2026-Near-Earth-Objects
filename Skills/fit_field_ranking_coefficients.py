@@ -23,12 +23,11 @@ if its honest out-of-fold AUC clearly and stably beats the current
 hand-set policy's own AUC on the same data -- otherwise the reason is
 stated explicitly.
 
-This script NEVER writes to the production ranking policy file
-(data_selection/ranking_policies/ztf_field_ranking_v3.json). It only
-produces a report. Promoting a fit into the active policy is a separate,
-later, explicitly operator-reviewed step -- this project's existing CNN
-promotion workflow (Skills/build_promotion_report.py) is the template for
-that step once/if a fit here is worth promoting.
+This script NEVER writes to a production ranking policy file. It only produces
+a report. The current v4 policy intentionally remains the simpler
+geometry-only ordering because this regularized alternative does not beat it
+under leave-one-out prediction; a future fit must clear the same comparison
+before promotion.
 
 Usage::
 

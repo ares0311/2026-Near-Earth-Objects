@@ -51,6 +51,17 @@ class PilotPaths:
         )
 
 
+@contextmanager
+def _sqlite_connection(db_path: Path):
+    """Commit/rollback like sqlite's context manager and always close."""
+    connection = sqlite3.connect(db_path)
+    try:
+        with connection:
+            yield connection
+    finally:
+        connection.close()
+
+
 def _utc_now() -> str:
     """Return an ISO-8601 UTC timestamp."""
     return datetime.now(UTC).isoformat()
@@ -119,7 +130,7 @@ def _assert_repo_unchanged(expected: dict[str, str]) -> None:
 def _init_db(db_path: Path) -> None:
     """Create the append-only top-level SQLite pilot ledger."""
     db_path.parent.mkdir(parents=True, exist_ok=True)
-    with sqlite3.connect(db_path) as connection:
+    with _sqlite_connection(db_path) as connection:
         connection.executescript(
             """
             CREATE TABLE IF NOT EXISTS pilot_runs (
@@ -150,7 +161,7 @@ def _init_db(db_path: Path) -> None:
 
 def _insert_run(db_path: Path, run_id: str, workspace: Path) -> None:
     """Record a new run before performing preflight or network work."""
-    with sqlite3.connect(db_path) as connection:
+    with _sqlite_connection(db_path) as connection:
         connection.execute(
             """
             INSERT INTO pilot_runs (
@@ -171,7 +182,7 @@ def _update_run(
     error: BaseException | None = None,
 ) -> None:
     """Finish or enrich one run ledger row without storing sensitive values."""
-    with sqlite3.connect(db_path) as connection:
+    with _sqlite_connection(db_path) as connection:
         connection.execute(
             """
             UPDATE pilot_runs
@@ -207,7 +218,7 @@ def _record_stage(
     detail: dict[str, Any],
 ) -> None:
     """Append one durable stage outcome to SQLite."""
-    with sqlite3.connect(db_path) as connection:
+    with _sqlite_connection(db_path) as connection:
         connection.execute(
             """
             INSERT INTO pilot_stage_log (
@@ -442,7 +453,7 @@ def latest_status(db_path: Path) -> dict[str, Any]:
     """Return the latest run and its ordered stage outcomes."""
     if not db_path.exists():
         return {"status": "not_started", "db_path": str(db_path)}
-    with sqlite3.connect(db_path) as connection:
+    with _sqlite_connection(db_path) as connection:
         connection.row_factory = sqlite3.Row
         run = connection.execute(
             "SELECT * FROM pilot_runs ORDER BY started_at_utc DESC LIMIT 1"

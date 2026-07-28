@@ -50,6 +50,7 @@ def test_installed_entrypoints_delegate_to_one_canonical_cli(
 def test_packaging_and_readme_demote_shadow_product_paths() -> None:
     pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     assert pyproject["project"]["scripts"] == {
+        "NEOHunter": "hunter_commands:neo_hunter",
         "Create-New-Search": "hunter_commands:create_new_search",
         "Run-New-Search": "hunter_commands:run_new_search",
         "Show-Follow-Ups": "hunter_commands:show_follow_ups",
@@ -58,6 +59,34 @@ def test_packaging_and_readme_demote_shadow_product_paths() -> None:
     assert "## Canonical Hunter product workflow" in readme
     assert "lower-level scientific diagnostics" in readme
     assert "are not alternate product entry points" in readme
+    for slash_command in (
+        "/New-Search",
+        "/Follow-Up-Search",
+        "/Run-Search",
+        "/Show-Follow-Ups",
+        "/Exit",
+    ):
+        assert slash_command in readme
+
+
+def test_neohunter_entrypoint_loads_the_thin_persistent_shell(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import hunter_shell
+
+    original_path = list(sys.path)
+    skills_path = str(ROOT / "Skills")
+    sys.path[:] = [entry for entry in sys.path if entry != skills_path]
+    seen: list[list[str]] = []
+    monkeypatch.setattr(hunter_shell, "main", lambda argv: seen.append(argv) or 0)
+    monkeypatch.setattr(sys, "argv", ["NEOHunter", "--command", "/Help"])
+
+    try:
+        assert hunter_commands.neo_hunter() == 0
+        assert seen == [["--command", "/Help"]]
+        assert skills_path in sys.path
+    finally:
+        sys.path[:] = original_path
 
 
 def test_coverage_validity_rejects_refresh_required_input(tmp_path: Path) -> None:
@@ -99,6 +128,6 @@ def test_runbook_contains_fail_closed_acceptance_ledger() -> None:
     runbook = (ROOT / "docs" / "OPERATOR_GO_NO_GO_RUNBOOK.md").read_text(
         encoding="utf-8"
     )
-    for finding_id in (f"HP-{number:02d}" for number in range(1, 10)):
+    for finding_id in (f"HP-{number:02d}" for number in range(1, 14)):
         assert finding_id in runbook
     assert "Do not restore that claim" in runbook

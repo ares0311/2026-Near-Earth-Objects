@@ -3,7 +3,7 @@
 ![Status](https://img.shields.io/badge/status-active%20development-blue)
 ![Version](https://img.shields.io/badge/version-0.91.0-informational)
 ![License](https://img.shields.io/badge/license-Apache%202.0-green)
-![Tests](https://img.shields.io/badge/tests-1900%2B%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-2300%2B%20passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
 ![Python](https://img.shields.io/badge/python-3.14.3-blue)
 ![CI](https://img.shields.io/badge/CI-passing-brightgreen)
@@ -12,14 +12,36 @@
 
 ## Canonical Hunter product workflow
 
-The product entry points below are the one production path. They adaptively
-discover beyond the requested count, resolve durable target history, persist an
-exact pending manifest, execute or resume those exact targets, write candidate
-and provenance records, and make prior results available to follow-up ranking.
-Install the locked project once with `uv sync --all-extras --all-groups
---python 3.14`, then run:
+`NEOHunter` is the persistent product terminal. It exposes slash-command
+history and completion, restrained semantic color, an NEO orbital-sweep motif,
+and real canonical-pipeline progress. Type `/` and press Enter to list the
+workflow, or press Tab to complete a slash command. Color and animation disable
+automatically for redirected output, `NO_COLOR`, `TERM=dumb`, `CI=true`, or
+`NEOHUNTER_NO_ANIMATION=1`; `--no-color` and `--no-animation` are explicit
+accessibility/automation controls.
+
+The product entry points below all delegate to the same production path. They
+adaptively discover beyond the requested count, resolve durable target history,
+persist an exact pending manifest, execute or resume those exact targets, write
+candidate and provenance records, and make prior results available to follow-up
+ranking. Install the locked project once with `uv sync --all-extras
+--all-groups --python 3.14`, then run:
 
 ```bash
+# Persistent terminal application (remains active until /Exit).
+NEOHunter
+
+# Inside NEOHunter:
+/New-Search 5
+/Run-Search
+/Follow-Up-Search 5
+/Show-Follow-Ups
+/Exit
+
+# Scriptable slash operation (animation/color degrade cleanly when redirected).
+NEOHunter --command "/New-Search 5 --neo-class all"
+
+# Equivalent one-shot entry points:
 # Select the best available N targets not previously searched and reserve them.
 Create-New-Search --targets 5 --mode new
 

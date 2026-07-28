@@ -1,0 +1,61 @@
+{
+  "schema_version": "ztf-field-ranking-component-comparison-v1",
+  "status": "complete",
+  "evaluated_policy_id": "ztf-field-ranking-v3",
+  "selection_decision": {
+    "selected_component": "geometry_score",
+    "production_policy_id": "ztf-field-ranking-v4",
+    "reason": "Geometry has the strongest observed pairwise ordering in both source-aligned modes and is the smallest deterministic policy supported by the currently accessible outcomes.",
+    "not_claimed": [
+      "calibrated discovery probability",
+      "causal discovery-yield estimate",
+      "globally optimal ranking rule"
+    ]
+  },
+  "sources": {
+    "positive_envelopes": [
+      {
+        "path": "data_selection/calibration/mpc_aten_discovery_fields_v3.json",
+        "sha256": "99f054be0bda154292346554e67b2dead5a779b18904b453c45312f5ffeb2acd"
+      },
+      {
+        "path": "data_selection/calibration/mpc_atira_discovery_fields_v3.json",
+        "sha256": "a5743a667d0dc3257d8bab386e1f25c18e226060066cc01dd2ea4226c081471e"
+      }
+    ],
+    "searched_nulls": {
+      "path": "data_selection/calibration/ztf_field_null_outcomes_v4.json",
+      "sha256": "f6480b2538f44b933e006d7d8603230b48378c92431aac3cdf0fd2b392d9902f"
+    },
+    "transformation": "Skills/evaluate_field_ranking_policy.py v3 feature records; source_aligned_ztf_i41=true and eligible=true; pairwise ROC AUC computed independently by src/calibration.py"
+  },
+  "comparisons": {
+    "aten": {
+      "n_positive": 56,
+      "n_searched_null": 21,
+      "former_weighted_policy_auc": 0.454082,
+      "survey_scarcity_component_auc": 0.145408,
+      "population_component_auc": 0.431973,
+      "geometry_component_auc": 0.869048
+    },
+    "ieo": {
+      "n_positive": 7,
+      "n_searched_null": 7,
+      "former_weighted_policy_auc": 0.489796,
+      "survey_scarcity_component_auc": 1.0,
+      "population_component_auc": 0.204082,
+      "geometry_component_auc": 1.0
+    }
+  },
+  "validity": {
+    "state": "valid",
+    "as_of_utc": "2026-07-25T00:00:00Z",
+    "freshness_rule": "Recompute when either source envelope, searched-null ledger, feature definition, or eligibility contract changes.",
+    "limitations": [
+      "The ieo comparison is small at 7 positive and 7 searched-null records.",
+      "The geometry preference peaks were revised using these same accessible outcomes, so the component comparison is retrospective and optimistic.",
+      "The searched-null sample is not a randomized survey-control sample.",
+      "AUC measures ordering on recorded outcomes, not absolute candidate quality or expected discovery yield."
+    ]
+  }
+}

@@ -934,7 +934,6 @@ def retrain_tier1(
         clf = xgb.XGBClassifier(
             n_estimators=100,
             max_depth=4,
-            use_label_encoder=False,
             eval_metric="mlogloss",
         )
         clf.fit(X, y)
@@ -1180,7 +1179,6 @@ def compute_calibration_gain(
     eps = 1e-12
     kl = float(np.sum(p * np.log((p + eps) / (q + eps))))
     return round(kl, 6)
-
 
 
 

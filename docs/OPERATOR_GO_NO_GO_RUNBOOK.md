@@ -15,7 +15,7 @@ detail than this, the full references are linked at the bottom.
 
 ---
 
-## Hunter PROD closure remediation (verified 2026-07-25)
+## Hunter PROD closure remediation (VERIFIED 2026-07-27)
 
 This is the durable execution ledger for the adversarial re-audit of the
 canonical Hunter workflow. Current business requirements and
@@ -40,6 +40,48 @@ independent negative controls, canonical/adversarial verification, then the
 real HP-09 new/follow-up sequence. Exact commands, IDs, nights, provenance,
 results, and limitations are in
 `docs/evidence/live/2026-07-25-hunter-prod-adversarial-closure.md`.
+
+The HP-01 through HP-09 implementation remains valid hardening, but the PROD
+claim made after that sequence is revoked. A limitation review found that
+three facts previously disclosed as non-blocking actually prevent the stronger
+business claim that Hunter returns the best *executable* next searches and
+preserves them safely. The later HP-13 reopening added the missing persistent
+product terminal. Do not claim Hunter PROD unless HP-10 through HP-13 are
+VERIFIED against clean current `main`.
+
+| ID | Blocking finding | Required acceptance evidence | Status |
+|---|---|---|---|
+| HP-10 | New ranking policy v3 is explicitly not known to be optimal, and follow-up history uses hand-set bonuses without outcome validation. Deterministic/explainable ranking alone does not demonstrate “best available N.” | Define separate, versioned new and follow-up value contracts; compare each policy with independent real or known-ground-truth outcomes and simple baselines; require the promoted policy to be the best supported available policy without imposing an absolute-quality threshold. | **VERIFIED** — v4 geometry ordering beats the former policy and the regularized alternative on current real outcomes; the small 2024 Aten holdout also orders correctly. Follow-up uses a separate tiered contract, dedicated follow-up value, and excludes success/null history without an open registry item. |
+| HP-11 | Selection validates a 2° regional coverage box while execution requires a resolvable 0.01° exact target. A predictably unexecutable target can therefore consume a top-N slot. | Before durable manifest creation, validate at least three exact-position nights plus required product availability for each selected target; reject infeasible candidates, continue adaptive expansion, and prove a lower-ranked feasible replacement outside the initial frontier is selected and executed. | **VERIFIED** — exact 0.01° inventory/product preflight is a manifest gate; ranked replacement and adaptive re-expansion have independent controls; the real new run executed three exact nights, while the real follow-up retry was correctly rejected after exact product 404s. |
+| HP-12 | The canonical suite emits unclosed-SQLite `ResourceWarning`s and an obsolete XGBoost-parameter warning. Passing tests do not establish durable restart hygiene while those warnings remain unattributed. | Trace warnings to their allocation sites, close production resources and remove obsolete configuration without broad suppression; production-relevant tests must pass with `ResourceWarning` promoted to an error, and the canonical suite must finish warning-free or explicitly prove any remaining warning is outside every Hunter production path. | **VERIFIED** — SQLite lifecycle defects in tests and the Tier 3 runner are closed, the obsolete XGBoost option is removed, warning-as-error focused tests pass, and the canonical 2,279-test run completed with no warning summary. |
+| HP-13 | The canonical lifecycle existed only as three one-shot commands; the required persistent `NEOHunter` terminal, slash-command discovery/history, domain-specific visual progress, and scriptable slash interface were absent. | Install `NEOHunter`; keep it active until `/Exit`; expose `/New-Search`, `/Follow-Up-Search`, `/Run-Search`, `/Show-Follow-Ups`, `/Help`, and `/Exit` through `/` discovery and Tab completion; delegate every scientific action to the one canonical pipeline; preserve exit failures in script mode; and disable color/animation cleanly for redirection, accessibility settings, and automation. | **VERIFIED** — installed `NEOHunter` is a thin canonical adapter with persisted history, semantic color, real-transition orbital-sweep events, redirect/accessibility degradation, and repeatable `--command` automation. A macOS PTY probe verified bare-`/` discovery, libedit Tab completion, persistence until `/Exit`, and clean exit. Script mode preserved a real already-executed manifest failure as exit 1. Canonical verification passed 2,307 tests at 100% coverage; all 81 adversarial controls passed. |
+
+Execution order: formalize HP-10’s value contracts first so selection has a
+valid objective; integrate HP-11’s exact-position feasibility into that
+selector; close HP-12 resource lifecycle defects; add the HP-13 persistent
+terminal without duplicating the canonical pipeline; add independent negative
+controls; run exact new/follow-up live workflows; then run canonical and
+adversarial verification on a clean commit, merge only with passing CI, and
+repeat verification on the clean merge commit.
+
+External MPC/NEOCP submission, impact claims, the absence of a discovery, and
+a scientifically valid null result are not Hunter PROD limitations. They are,
+respectively, a required human safety boundary, an authority boundary, a
+non-guaranteed scientific outcome, and a valid search result. Cross-project
+history sharing is `not-applicable` for NEO field/candidate identities unless
+future evidence establishes a governing identity shared with the stellar
+Hunter projects.
+
+Closure evidence:
+`docs/evidence/live/2026-07-25-hunter-prod-final-remediation.md`.
+Implementation commit `3437e4799c4988ed36e019ea28f4756f5c550c92`
+passed all six canonical reliability stages (2,279 tests, 100% `src/`
+coverage) and all 53 then-current adversarial negative controls. Clean HP-13
+implementation commit `9f7e5cadf046970ad36d24a5baee18300b5d796c`
+passed all six canonical stages (2,307 tests, 100% `src/` coverage), all 81
+expanded adversarial controls, and the freshness check. The final
+documentation commit repeats both workflows and the freshness check before
+merge.
 
 ---
 

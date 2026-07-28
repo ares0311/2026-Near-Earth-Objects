@@ -1,0 +1,50 @@
+{
+  "schema_version": "hunter-follow-up-value-policy-v1",
+  "policy_id": "hunter-follow-up-value-v1",
+  "model_type": "deterministic_lexicographic_value",
+  "tiers": {
+    "open_review_survivor": {
+      "base": 2.0,
+      "within_tier_value": "scoring_metadata.followup_value",
+      "eligibility": "open follow_up_registry entry created only by SURVIVE or BORDERLINE adversarial review"
+    },
+    "failed_execution_retry": {
+      "base": 1.0,
+      "within_tier_value": "remaining_exactly_executable_nights_fraction",
+      "eligibility": "latest durable target-history status is failed and at least three exact executable nights remain"
+    },
+    "recovered_coverage_retry": {
+      "base": 0.0,
+      "within_tier_value": "current_distinct_nights_fraction",
+      "eligibility": "committed insufficient_coverage target now has at least three exact executable nights"
+    }
+  },
+  "exclusions": [
+    "success or null_result without an open follow_up_registry entry",
+    "actioned, dismissed, or expired follow_up_registry entries",
+    "targets with fewer than three exact executable nights"
+  ],
+  "ordering": "tier base descending, then within-tier value descending, then RA and Dec ascending",
+  "evidence": [
+    {
+      "id": "adversarial-review-contract",
+      "path": "Skills/adversarial_review.py",
+      "supports": "SURVIVE and BORDERLINE are the only review outcomes that create an open scientific follow-up obligation."
+    },
+    {
+      "id": "scoring-followup-value-contract",
+      "path": "src/score.py",
+      "supports": "Candidate follow-up value is explicitly distinct from discovery priority and increases for brighter, shorter-arc, lower-orbit-quality candidates."
+    },
+    {
+      "id": "durable-history-contract",
+      "path": "src/hunter_state.py",
+      "supports": "Failed execution is durable retry evidence while success and null_result close the ordinary search obligation."
+    }
+  ],
+  "limitations": [
+    "Within-tier followup_value is deterministic and explainable but not calibrated to a future recovery probability.",
+    "Tier ordering is a product-state contract: unresolved reviewed candidates outrank execution retries; it is not a scientific probability model.",
+    "Absolute value is reported separately and never used as a threshold that suppresses the best available eligible top-N."
+  ]
+}

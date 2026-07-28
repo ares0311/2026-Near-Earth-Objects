@@ -93,12 +93,53 @@ def _write_coverage_inventory(path: Path, fields: list[dict]) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+def _exact_feasibility(nights: list[str]) -> dict:
+    return {
+        "schema_version": "hunter-exact-target-feasibility-v1",
+        "source": "known-ground-truth test fixture",
+        "source_version": "test-v1",
+        "retrieved_at_utc": "2026-07-25T00:00:00Z",
+        "transformations": ["independent exact-position fixture"],
+        "validity_state": "valid" if len(nights) >= 3 else "invalid",
+        "size_deg": 0.01,
+        "minimum_nights": 3,
+        "verified_nights": [
+            {
+                "night_yyyymmdd": night,
+                "start_jd": 2460000.0 + i,
+                "end_jd": 2460000.01 + i,
+                "metadata_sha256": "a" * 64,
+                "product_manifest_sha256": "b" * 64,
+            }
+            for i, night in enumerate(nights)
+        ],
+        "exact_misses": [],
+        "passes": len(nights) >= 3,
+    }
+
+
+def _target_with_exact(ra_deg: float, dec_deg: float, nights: list[str]) -> dict:
+    return {
+        "target_id": hunter_state.target_id_from_radec(ra_deg, dec_deg),
+        "ra_deg": ra_deg,
+        "dec_deg": dec_deg,
+        "coverage_provenance": {"exact_feasibility": _exact_feasibility(nights)},
+    }
+
+
 def _patch_dirs(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr(hunter_cli, "_COVERAGE_INVENTORY_DIR", tmp_path / "coverage_inventories")
     monkeypatch.setattr(hunter_cli, "_BATCH_MANIFEST_DIR", tmp_path / "batch_manifests")
     monkeypatch.setattr(hunter_cli, "_SEARCH_MANIFEST_CSV_DIR", tmp_path / "search_manifests")
     monkeypatch.setattr(hunter_cli, "_WORKING_DIR", tmp_path / "working")
     monkeypatch.setattr(hunter_cli.coverage_inventory, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(
+        hunter_cli,
+        "_exact_target_feasibility",
+        lambda row, broad_nights, min_observations=3: _exact_feasibility(
+            list(broad_nights)[:min_observations]
+        ),
+    )
 
 
 def test_field_id_from_radec_format() -> None:
@@ -129,6 +170,29 @@ def test_combined_known_coverage_merges_multiple_files(
 
     assert set(combined.keys()) == {(10.0, 5.0), (20.0, -5.0)}
     assert combined[(10.0, 5.0)]["field_id"] == "field-a"
+
+
+def test_combined_known_coverage_prefers_valid_over_later_named_stale_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_dirs(monkeypatch, tmp_path)
+    inventory_dir = hunter_cli._COVERAGE_INVENTORY_DIR
+    field = _coverage_field_result("valid-field", 10.0, 5.0)
+    _write_coverage_inventory(inventory_dir / "a_valid.json", [field])
+    stale_path = inventory_dir / "z_stale.json"
+    _write_coverage_inventory(
+        stale_path,
+        [{**field, "field_id": "stale-field"}],
+    )
+    stale = json.loads(stale_path.read_text())
+    stale["validity_state"] = "stale-but-usable"
+    stale["retrieved_at_utc"] = "2020-01-01T00:00:00Z"
+    stale_path.write_text(json.dumps(stale), encoding="utf-8")
+
+    selected = hunter_cli._combined_known_coverage()[(10.0, 5.0)]
+
+    assert selected["field_id"] == "valid-field"
+    assert selected["coverage_provenance"]["validity_state"] == "valid"
 
 
 def test_combined_known_coverage_empty_when_no_directory(
@@ -163,6 +227,82 @@ def test_write_expansion_batch_manifest_round_trips_with_loader(
     assert batch.batch_id == "hunter_expand_test"
     assert batch.fields[0].ra_deg == 10.0
     assert batch.min_distinct_nights == 3
+
+
+def test_exact_target_feasibility_requires_three_product_preflighted_nights(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    nights = ["20240101", "20240102", "20240103"]
+
+    def fake_preflight(**kwargs):
+        out_dir = kwargs["out_dir"]
+        out_dir.mkdir(parents=True, exist_ok=True)
+        if not kwargs.get("preflight_motion_products"):
+            from astropy.time import Time
+
+            raw = out_dir / "exact.ipac"
+            raw.write_text(
+                _ipac_text(
+                    [
+                        float(Time(f"2024-01-0{day}T01:00:00", format="isot").jd)
+                        for day in (1, 2, 3)
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            return {
+                "raw_response_path": str(raw),
+                "raw_response_sha256": "d" * 64,
+            }
+        manifest = out_dir / "motion_product_manifest.json"
+        manifest.write_text('{"products":"available"}', encoding="utf-8")
+        return {
+            "raw_response_sha256": "c" * 64,
+            "motion_product_manifest_path": str(manifest),
+        }
+
+    monkeypatch.setattr(
+        hunter_cli.bounded_ingest, "run_bounded_ingest", fake_preflight
+    )
+    monkeypatch.setattr(hunter_cli, "_WORKING_DIR", tmp_path / "working")
+
+    result = hunter_cli._exact_target_feasibility(
+        {"ra_deg": 10.0, "dec_deg": 5.0}, nights
+    )
+
+    assert result["passes"] is True
+    assert result["validity_state"] == "valid"
+    assert [row["night_yyyymmdd"] for row in result["verified_nights"]] == nights
+    assert all(len(row["product_manifest_sha256"]) == 64 for row in result["verified_nights"])
+
+
+def test_exact_feasibility_replaces_a_higher_ranked_wide_only_candidate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_dirs(monkeypatch, tmp_path)
+    _write_coverage_inventory(
+        hunter_cli._COVERAGE_INVENTORY_DIR / "seed.json",
+        [
+            _coverage_field_result("wide-only", 10.0, 5.0, n_nights=5),
+            _coverage_field_result("exact", 20.0, 5.0, n_nights=5),
+        ],
+    )
+
+    def exact_or_not(row, broad_nights, min_observations=3):
+        if row["ra_deg"] == 10.0:
+            return _exact_feasibility(["20240101", "20240102"])
+        return _exact_feasibility(["20240101", "20240102", "20240103"])
+
+    monkeypatch.setattr(hunter_cli, "_exact_target_feasibility", exact_or_not)
+    rows = [
+        {"ra_deg": 10.0, "dec_deg": 5.0, "score": 0.9, "reason": "rank 1"},
+        {"ra_deg": 20.0, "dec_deg": 5.0, "score": 0.8, "reason": "rank 2"},
+    ]
+
+    selected = hunter_cli._attach_current_coverage(rows, requested_n=1)
+
+    assert [row["ra_deg"] for row in selected] == [20.0]
+    assert selected[0]["coverage_nights"] == ["20240101", "20240102", "20240103"]
 
 
 def test_next_uncovered_planning_candidates_excludes_checked(tmp_path: Path) -> None:
@@ -476,13 +616,13 @@ def test_cmd_create_new_search_accepts_explicit_jd(
     monkeypatch.setattr(
         hunter_cli,
         "_attach_current_coverage",
-        lambda rows: [
+        lambda rows, requested_n=None: [
             {
                 **row,
                 "coverage_provenance": {"validity_state": "valid"},
                 "coverage_nights": ["20240101", "20240102", "20240103"],
             }
-            for row in rows
+            for row in rows[:requested_n]
         ],
     )
 
@@ -532,13 +672,13 @@ def test_cmd_create_new_search_writes_csv_manifest_over_100_targets(
     monkeypatch.setattr(
         hunter_cli,
         "_attach_current_coverage",
-        lambda rows: [
+        lambda rows, requested_n=None: [
             {
                 **row,
                 "coverage_provenance": {"validity_state": "valid"},
                 "coverage_nights": ["20240101", "20240102", "20240103"],
             }
-            for row in rows
+            for row in rows[:requested_n]
         ],
     )
 
@@ -941,7 +1081,7 @@ def test_acquire_and_convert_night_writes_observation_checkpoint(
     assert written["observations"][0]["jd"] == obsjd
 
 
-def test_execute_target_raises_when_insufficient_coverage(
+def test_execute_target_rejects_missing_exact_feasibility(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _patch_dirs(monkeypatch, tmp_path)
@@ -951,7 +1091,7 @@ def test_execute_target_raises_when_insufficient_coverage(
     )
     target = {"target_id": "radec_10.00_5.00", "ra_deg": 10.0, "dec_deg": 5.0}
 
-    with pytest.raises(RuntimeError, match="fewer than min_observations"):
+    with pytest.raises(RuntimeError, match="lacks valid exact-feasibility provenance"):
         hunter_cli.execute_target(target, tmp_path / "checkpoints", 2.0)
 
 
@@ -975,7 +1115,9 @@ def test_execute_target_skips_a_night_that_fails_to_resolve_and_tries_the_next(
         "run_positive_control",
         lambda **kwargs: {"n_tracklets_linked": 0, "review_packets": []},
     )
-    target = {"target_id": "radec_10.00_5.00", "ra_deg": 10.0, "dec_deg": 5.0}
+    target = _target_with_exact(
+        10.0, 5.0, ["20240101", "20240102", "20240103", "20240104"]
+    )
 
     result = hunter_cli.execute_target(target, tmp_path / "checkpoints", 2.0)
 
@@ -1003,7 +1145,9 @@ def test_execute_target_stops_once_min_observations_reached(
         "run_positive_control",
         lambda **kwargs: {"n_tracklets_linked": 0, "review_packets": []},
     )
-    target = {"target_id": "radec_10.00_5.00", "ra_deg": 10.0, "dec_deg": 5.0}
+    target = _target_with_exact(
+        10.0, 5.0, ["20240101", "20240102", "20240103", "20240104", "20240105"]
+    )
 
     result = hunter_cli.execute_target(target, tmp_path / "checkpoints", 2.0)
 
@@ -1026,7 +1170,9 @@ def test_execute_target_raises_when_too_few_nights_resolve(
         raise RuntimeError(f"no exposure found for RA=10.0 Dec=5.0 on {night}")
 
     monkeypatch.setattr(hunter_cli, "_acquire_and_convert_night", _fake_acquire_always_fails)
-    target = {"target_id": "radec_10.00_5.00", "ra_deg": 10.0, "dec_deg": 5.0}
+    target = _target_with_exact(
+        10.0, 5.0, ["20240101", "20240102", "20240103", "20240104"]
+    )
 
     with pytest.raises(RuntimeError, match="only acquired 0/3 real exposure"):
         hunter_cli.execute_target(target, tmp_path / "checkpoints", 2.0)
@@ -1046,7 +1192,7 @@ def test_execute_target_null_result_when_zero_tracklets(
         "run_positive_control",
         lambda **kwargs: {"n_tracklets_linked": 0, "review_packets": []},
     )
-    target = {"target_id": "radec_10.00_5.00", "ra_deg": 10.0, "dec_deg": 5.0}
+    target = _target_with_exact(10.0, 5.0, ["20240101", "20240102", "20240103"])
 
     result = hunter_cli.execute_target(target, tmp_path / "checkpoints", 2.0)
 
@@ -1076,7 +1222,7 @@ def test_execute_target_success_reviews_real_scored_candidate(
     monkeypatch.setattr(
         hunter_cli.adversarial_review, "_query_skybot_at_epoch", lambda observation: []
     )
-    target = {"target_id": "radec_10.00_5.00", "ra_deg": 10.0, "dec_deg": 5.0}
+    target = _target_with_exact(10.0, 5.0, ["20240101", "20240102", "20240103"])
 
     result = hunter_cli.execute_target(target, tmp_path / "checkpoints", 2.0)
 
@@ -1136,7 +1282,8 @@ def test_ingest_and_maybe_register_followup_registers_on_survive(tmp_path: Path)
     follow_ups = hunter_state.list_follow_ups(db_path, status="open")
     assert len(follow_ups) == 1
     assert follow_ups[0]["target_id"] == "radec_10.00_5.00"
-    assert follow_ups[0]["priority"] == pytest.approx(0.8)
+    # Registry priority is the dedicated follow-up value, not discovery priority.
+    assert follow_ups[0]["priority"] == pytest.approx(0.6)
 
 
 def _seed_pending_manifest(db_path: Path, search_id: str = "search-1") -> None:
@@ -1656,6 +1803,62 @@ def test_followup_candidates_from_registry_extracts_radec_and_ranks(tmp_path: Pa
     assert "survive candidate" in candidates[0]["reason"]
 
 
+def test_followup_policy_is_versioned_and_fails_closed_on_tier_drift(
+    tmp_path: Path,
+) -> None:
+    policy = hunter_cli._load_follow_up_policy()
+    assert policy["policy_id"] == "hunter-follow-up-value-v1"
+    assert len(policy["sha256"]) == 64
+
+    payload = json.loads(hunter_cli._DEFAULT_FOLLOW_UP_POLICY.read_text())
+    payload["tiers"]["open_review_survivor"]["base"] = 0.0
+    tampered = tmp_path / "tampered.json"
+    tampered.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(ValueError, match="tiers"):
+        hunter_cli._load_follow_up_policy(tampered)
+
+
+def test_null_history_is_not_followup_eligible_without_open_registry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    db_path = tmp_path / "hunter.sqlite"
+    target = hunter_state.ManifestTarget(
+        target_id="radec_10.00_5.00",
+        ra_deg=10.0,
+        dec_deg=5.0,
+        score=0.8,
+        selection_reason="test",
+        coverage_inventory_id="field-a",
+        coverage_provenance={"validity_state": "valid"},
+        validity_state="valid",
+    )
+    hunter_state.create_search_manifest(
+        db_path, "search-null", "new", 1, "p", "d", [target], 1, True, {}
+    )
+    hunter_state.create_search_run(db_path, "run-null", "search-null", "abc", {})
+    hunter_state.commit_target_result(
+        db_path,
+        run_id="run-null",
+        search_id="search-null",
+        mode="new",
+        target_id=target.target_id,
+        execution_status="null_result",
+        candidate_ids=[],
+        error_message=None,
+        nights_acquired=["20240101", "20240102", "20240103"],
+        provenance={"validity_state": "valid"},
+    )
+    field = {
+        **_coverage_field_result("field-a", 10.0, 5.0, n_nights=6),
+        "coverage_provenance": {"validity_state": "valid"},
+    }
+    monkeypatch.setattr(
+        hunter_cli, "_combined_known_coverage", lambda: {(10.0, 5.0): field}
+    )
+
+    assert hunter_cli._followup_candidates_from_history(db_path) == []
+
+
 def test_followup_candidates_from_insufficient_coverage_already_sufficient(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1967,7 +2170,7 @@ def test_build_parser_create_new_search_accepts_follow_up_mode() -> None:
     assert args.max_pool is None
 
 
-def test_history_derived_followup_executes_only_additional_nights(
+def test_failed_history_followup_executes_only_additional_nights(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     db_path = tmp_path / "hunter_state.sqlite"
@@ -1991,9 +2194,9 @@ def test_history_derived_followup_executes_only_additional_nights(
         search_id="search-new",
         mode="new",
         target_id=target.target_id,
-        execution_status="null_result",
+        execution_status="failed",
         candidate_ids=[],
-        error_message=None,
+        error_message="transient acquisition failure",
         nights_acquired=["20240101", "20240102", "20240103"],
         provenance={"validity_state": "valid"},
     )
@@ -2008,6 +2211,7 @@ def test_history_derived_followup_executes_only_additional_nights(
 
     candidates = hunter_cli.discover_followup_targets(db_path, 1, queue)
     assert candidates["eligible"][0]["ra_deg"] == 10.0
+    assert candidates["eligible"][0]["value_tier"] == "failed_execution_retry"
     monkeypatch.setattr(hunter_cli, "_acquire_and_convert_night", lambda *a, **k: None)
     monkeypatch.setattr(
         hunter_cli.positive_control,
@@ -2019,6 +2223,18 @@ def test_history_derived_followup_executes_only_additional_nights(
             "target_id": target.target_id,
             "ra_deg": target.ra_deg,
             "dec_deg": target.dec_deg,
+            "coverage_provenance": {
+                "exact_feasibility": _exact_feasibility(
+                    [
+                        "20240101",
+                        "20240102",
+                        "20240103",
+                        "20240104",
+                        "20240105",
+                        "20240106",
+                    ]
+                )
+            },
         },
         tmp_path / "checkpoints",
         0.01,
