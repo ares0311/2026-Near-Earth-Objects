@@ -30,3 +30,13 @@ def run_new_search() -> int:
 def show_follow_ups() -> int:
     """Show actionable durable follow-up evidence."""
     return _hunter_main()(["show-follow-ups", *sys.argv[1:]])
+
+
+def neo_hunter() -> int:
+    """Launch the persistent slash-command NEOHunter terminal."""
+    skills_dir = Path(__file__).resolve().parents[1] / "Skills"
+    if str(skills_dir) not in sys.path:
+        sys.path.insert(0, str(skills_dir))
+    from hunter_shell import main
+
+    return main(sys.argv[1:])

@@ -138,6 +138,48 @@ registry item.
 
 No warning suppression or broad ignore was added.
 
+## HP-13 — persistent NEOHunter terminal
+
+The prior closure exposed only three one-shot process entry points. The current
+PROD contract also requires a persistent, discoverable terminal application.
+`NEOHunter` is now installed through `pyproject.toml` and delegates slash
+commands to `Skills/hunter_cli.py`:
+
+```text
+/New-Search <N>        -> create-new-search --targets N --mode new
+/Follow-Up-Search <N>  -> create-new-search --targets N --mode follow-up
+/Run-Search            -> run-new-search --latest
+/Run-Search <search-id> -> run-new-search --search-id <search-id>
+/Show-Follow-Ups       -> show-follow-ups
+/Help
+/Exit
+```
+
+The shell remains active until `/Exit`, persists history under ignored
+`Logs/`, treats a bare `/` as command discovery, and provides Tab completion.
+It adds no scientific or persistence logic: selection, execution, scoring, and
+durable state stay in the canonical Hunter modules.
+
+Before each real canonical transition, the terminal renders an NEO-specific
+orbital-sweep event naming the actual workflow about to run (adaptive
+discovery, history-ranked trajectory revisit, exact-manifest execution, or
+follow-up-registry read). The canonical pipeline's own live target/stage output
+continues unchanged. Animation and color are automatically disabled for
+redirected output and support `NO_COLOR`, `TERM=dumb`,
+`NEOHUNTER_NO_ANIMATION`, `CI`, `--no-color`, and `--no-animation`.
+Non-interactive `--command` mode returns the canonical command's nonzero
+status and stops the sequence rather than hiding a failed or partial run.
+
+Focused behavioral evidence:
+
+```bash
+PYTHONPATH=src UV_CACHE_DIR=.uv-cache uv run --no-sync --python 3.14 \
+  python -m pytest tests/test_hunter_shell.py \
+  tests/test_hunter_prod_acceptance.py -q
+```
+
+Observed before the final canonical pass: 35 passed.
+
 ## Verification commands
 
 Focused behavioral verification:
@@ -154,8 +196,33 @@ UV_CACHE_DIR=.uv-cache uv run --no-sync --python 3.14 ruff check .
 UV_CACHE_DIR=.uv-cache uv run --no-sync --python 3.14 mypy src
 ```
 
-Clean-commit canonical and adversarial results are appended only after the
-exact committed state passes both mandatory workflows.
+Clean implementation commit
+`3437e4799c4988ed36e019ea28f4756f5c550c92`:
+
+```text
+directive parity: PASS
+silent-exception gate: PASS
+incomplete-implementation gate: PASS
+ruff: PASS
+mypy src: PASS
+pytest: 2,279 passed, 2 deselected, 100.00% src coverage, no warning summary
+adversarial verification: 53 passed
+freshness: CURRENT AND VERIFIED
+```
+
+Commands:
+
+```bash
+UV_CACHE_DIR=.uv-cache uv run --no-sync --python 3.14 \
+  python Skills/verify_reliability_controls.py
+UV_CACHE_DIR=.uv-cache uv run --no-sync --python 3.14 \
+  python Skills/run_adversarial_verification.py
+UV_CACHE_DIR=.uv-cache uv run --no-sync --python 3.14 \
+  python Skills/verify_reliability_controls.py --check-freshness
+```
+
+The documentation-only closure commit repeats canonical freshness before
+merge so this evidence remains tied to the final branch state.
 
 ## Genuine scientific limitations
 
