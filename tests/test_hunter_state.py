@@ -27,6 +27,7 @@ from hunter_state import (
     searched_target_ids,
     target_id_from_radec,
     update_follow_up_status,
+    update_search_run_model_versions,
     upsert_run_target,
 )
 
@@ -392,6 +393,35 @@ def test_create_search_run_and_get_round_trip(tmp_path: Path) -> None:
     assert run["status"] == "running"
     assert run["completed_at"] is None
     assert run["model_versions"] == {"link": "v1"}
+
+
+def test_update_search_run_model_versions_merges_without_discarding_prior_values(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "hunter_state.sqlite"
+    create_search_manifest(
+        db_path, "search-1", "new", 1, "p", "d", _targets(1), 1, True, {}
+    )
+    create_search_run(db_path, "run-1", "search-1", "abc123", {"link": "v1"})
+
+    update_search_run_model_versions(
+        db_path, "run-1", {"execution_contract": {"configured_workers": 3}}
+    )
+
+    assert get_search_run(db_path, "run-1")["model_versions"] == {
+        "link": "v1",
+        "execution_contract": {"configured_workers": 3},
+    }
+
+
+def test_update_search_run_model_versions_rejects_empty_or_missing_run(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "hunter_state.sqlite"
+    with pytest.raises(ValueError, match="must not be empty"):
+        update_search_run_model_versions(db_path, "run-1", {})
+    with pytest.raises(ValueError, match="no search run found"):
+        update_search_run_model_versions(db_path, "run-1", {"worker": 3})
 
 
 def test_get_search_run_missing_raises(tmp_path: Path) -> None:
