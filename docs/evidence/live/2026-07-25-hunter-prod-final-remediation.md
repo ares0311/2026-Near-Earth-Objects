@@ -1,8 +1,8 @@
-# Hunter PROD final remediation evidence — 2026-07-25
+# Hunter PROD final remediation evidence — 2026-07-25 through 2026-07-27
 
 ## Scope and authority
 
-This record closes the three blockers reopened as HP-10 through HP-12 in
+This record closes the four blockers recorded as HP-10 through HP-13 in
 `docs/OPERATOR_GO_NO_GO_RUNBOOK.md`. It supersedes the earlier claim that the
 v3 weighted prior plus 2-degree coverage eligibility was sufficient to call
 Hunter PROD.
@@ -180,6 +180,20 @@ PYTHONPATH=src UV_CACHE_DIR=.uv-cache uv run --no-sync --python 3.14 \
 
 Observed before the final canonical pass: 35 passed.
 
+Installed-entrypoint behavioral probes on macOS:
+
+- `NEOHunter --command /Help` exercised the installed script, not a direct
+  module call;
+- an interactive PTY remained active after bare-`/` discovery and exited only
+  on `/Exit`;
+- `/He<Tab>` completed to `/Help` through the platform's libedit readline
+  binding;
+- `NEOHunter --command "/Run-Search
+  search_new_20260726T015430Z_485aeacb"` returned exit 1 for the already
+  executed durable manifest, preserving the canonical failure boundary; and
+- `Logs/neo_hunter_history` is ignored operational state, not a repository
+  artifact.
+
 ## Verification commands
 
 Focused behavioral verification:
@@ -196,7 +210,7 @@ UV_CACHE_DIR=.uv-cache uv run --no-sync --python 3.14 ruff check .
 UV_CACHE_DIR=.uv-cache uv run --no-sync --python 3.14 mypy src
 ```
 
-Clean implementation commit
+Clean HP-10 through HP-12 implementation commit
 `3437e4799c4988ed36e019ea28f4756f5c550c92`:
 
 ```text
@@ -207,6 +221,20 @@ ruff: PASS
 mypy src: PASS
 pytest: 2,279 passed, 2 deselected, 100.00% src coverage, no warning summary
 adversarial verification: 53 passed
+freshness: CURRENT AND VERIFIED
+```
+
+Clean HP-13 implementation commit
+`9f7e5cadf046970ad36d24a5baee18300b5d796c`:
+
+```text
+directive parity: PASS
+silent-exception gate: PASS
+incomplete-implementation gate: PASS
+ruff: PASS
+mypy src: PASS
+pytest: 2,307 passed, 2 deselected, 100.00% src coverage, no warning summary
+adversarial verification: 81 passed
 freshness: CURRENT AND VERIFIED
 ```
 
@@ -221,8 +249,9 @@ UV_CACHE_DIR=.uv-cache uv run --no-sync --python 3.14 \
   python Skills/verify_reliability_controls.py --check-freshness
 ```
 
-The documentation-only closure commit repeats canonical freshness before
-merge so this evidence remains tied to the final branch state.
+The documentation-only closure commit repeats the full canonical and
+adversarial workflows plus canonical freshness before merge so the final
+branch state, rather than only the implementation commit, is verified.
 
 ## Genuine scientific limitations
 

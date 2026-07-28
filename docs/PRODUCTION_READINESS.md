@@ -1,12 +1,30 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
 **Current version**: v0.91.0
-**Last updated**: 2026-07-25 (Hunter PROD adversarial re-closure — see the
+**Last updated**: 2026-07-27 (Hunter PROD final closure — see the
 sync entry immediately below; the P1-P5 gate register body further down is
 unchanged historical evidence from 2026-07-02; current gate status for the
 active ZTF DR24 path lives in `docs/ZTF_DR24_PRODUCTION_GATES.md`)
 
-**Latest Hunter sync (2026-07-25, adversarial PROD re-closure)**: The
+**Latest Hunter sync (2026-07-27, final PROD closure)**: The stronger business
+contract is closed through HP-13 in
+`docs/OPERATOR_GO_NO_GO_RUNBOOK.md`. Separate versioned new/follow-up value
+contracts replace the unsupported optimality claim; exact 0.01-degree
+night/product feasibility is now a pre-manifest gate with adaptive
+replacement; SQLite/XGBoost lifecycle warnings are fixed; and installed
+`NEOHunter` provides one persistent slash-command terminal over the canonical
+pipeline, including history, completion, NEO-specific real-transition
+progress, accessibility degradation, and scriptable failure-preserving
+operation. A real exact new run completed on three verified nights. The
+isolated follow-up universe was exhausted honestly at zero after exact product
+404s rather than fabricating a target. The earlier real history-derived
+follow-up evidence below remains the nonzero lifecycle proof. Clean HP-13
+implementation verification passed all six canonical stages (2,307 tests,
+100% `src/` coverage), all 81 adversarial controls, and freshness. No
+submission, discovery, or impact claim was made. Evidence:
+`docs/evidence/live/2026-07-25-hunter-prod-final-remediation.md`.
+
+**Earlier Hunter sync (2026-07-25, adversarial PROD re-closure)**: The
 2026-07-24 feature-level Hunter closure below is superseded. A fresh audit
 found nine canonical-path defects behind it, recorded before remediation as
 HP-01 through HP-09 in `docs/OPERATOR_GO_NO_GO_RUNBOOK.md`. The integrated
@@ -15,7 +33,8 @@ ceiling, fail non-completed runs at the process boundary, close the
 checkpoint/side-effect crash window idempotently, derive follow-ups and
 remaining nights from executed history, use live epoch-aware known-object
 evidence, carry current-valid provenance and exact commit/worktree state,
-install one three-command CLI, and demote direct lower-level product bypasses.
+install three one-shot canonical entry points, and demote direct lower-level
+product bypasses.
 A real exact new manifest completed, a second new request excluded it, and an
 unseeded history-derived follow-up completed on three additional nights.
 Canonical negative controls cover outside-initial-sample discovery, weak-score
