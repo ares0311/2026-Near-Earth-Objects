@@ -50,6 +50,7 @@ def test_installed_entrypoints_delegate_to_one_canonical_cli(
 def test_packaging_and_readme_demote_shadow_product_paths() -> None:
     pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     assert pyproject["project"]["scripts"] == {
+        "NEO-Hunter": "hunter_commands:neo_hunter",
         "NEOHunter": "hunter_commands:neo_hunter",
         "Create-New-Search": "hunter_commands:create_new_search",
         "Run-New-Search": "hunter_commands:run_new_search",
@@ -57,6 +58,7 @@ def test_packaging_and_readme_demote_shadow_product_paths() -> None:
     }
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     assert "## Canonical Hunter product workflow" in readme
+    assert "`NEO-Hunter` is the persistent product terminal" in readme
     assert "lower-level scientific diagnostics" in readme
     assert "are not alternate product entry points" in readme
     for slash_command in (

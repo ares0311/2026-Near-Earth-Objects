@@ -12,13 +12,14 @@
 
 ## Canonical Hunter product workflow
 
-`NEOHunter` is the persistent product terminal. It exposes slash-command
-history and completion, restrained semantic color, an NEO orbital-sweep motif,
-and real canonical-pipeline progress. Type `/` and press Enter to list the
-workflow, or press Tab to complete a slash command. Color and animation disable
-automatically for redirected output, `NO_COLOR`, `TERM=dumb`, `CI=true`, or
-`NEOHUNTER_NO_ANIMATION=1`; `--no-color` and `--no-animation` are explicit
-accessibility/automation controls.
+`NEO-Hunter` is the persistent product terminal required by the Hunter
+contract; `NEOHunter` remains an equivalent compatibility spelling. Both
+launch the same slash-command history and completion, restrained semantic
+color, NEO orbital-sweep motif, and real canonical-pipeline progress. Type `/`
+and press Enter to list the workflow, or press Tab to complete a slash command.
+Color and animation disable automatically for redirected output, `NO_COLOR`,
+`TERM=dumb`, `CI=true`, or `NEOHUNTER_NO_ANIMATION=1`; `--no-color` and
+`--no-animation` are explicit accessibility/automation controls.
 
 The product entry points below all delegate to the same production path. They
 adaptively discover beyond the requested count, resolve durable target history,
@@ -29,9 +30,9 @@ ranking. Install the locked project once with `uv sync --all-extras
 
 ```bash
 # Persistent terminal application (remains active until /Exit).
-NEOHunter
+NEO-Hunter
 
-# Inside NEOHunter:
+# Inside NEO-Hunter:
 /New-Search 5
 /Run-Search
 /Follow-Up-Search 5
@@ -39,7 +40,10 @@ NEOHunter
 /Exit
 
 # Scriptable slash operation (animation/color degrade cleanly when redirected).
-NEOHunter --command "/New-Search 5 --neo-class all"
+NEO-Hunter --command "/New-Search 5 --neo-class all"
+
+# Compatibility spelling; launches the identical terminal.
+NEOHunter
 
 # Equivalent one-shot entry points:
 # Select the best available N targets not previously searched and reserve them.
