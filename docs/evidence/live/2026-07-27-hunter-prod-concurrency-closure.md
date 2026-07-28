@@ -71,9 +71,25 @@ mypy src: PASS
 Hunter/state/shell/acceptance tests: 152 passed
 ```
 
-Final clean-commit canonical, adversarial, CI, and post-merge freshness results
-are recorded in the PR handoff before this evidence is used for a current
-`VERIFIED` claim.
+Clean implementation commit
+`cd41bf47a3ce66e1881203350eb8c810bff2bf7a`:
+
+```text
+directive parity: PASS
+silent-exception gate: PASS
+incomplete-implementation gate: PASS
+ruff: PASS
+mypy src: PASS
+pytest: 2,314 passed, 2 deselected, 100.00% src coverage
+adversarial verification: 81 passed
+freshness: CURRENT AND VERIFIED
+```
+
+The clean verification used an isolated same-repository checkout of the exact
+commit so the operator's unrelated `.codex/config.toml` working-tree change
+could not contaminate REL-05 freshness. Hosted CI and clean post-merge
+verification remain required before the branch is represented as merged
+current `main`.
 
 ## Genuine limitations
 
