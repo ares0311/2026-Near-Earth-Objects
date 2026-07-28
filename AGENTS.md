@@ -348,6 +348,10 @@ best-supported new/follow-up value contracts, exact target/product feasibility
 before manifest creation, warning-free resource lifecycle, and the persistent
 `NEOHunter` slash-command product terminal. All are verified. Final evidence:
 `docs/evidence/live/2026-07-25-hunter-prod-final-remediation.md`.
+The final performance audit recorded HP-14: bounded configurable multi-target
+execution with isolated checkpoints, serialized manifest-order durable writes,
+worker-contract provenance, and a real overlap control. It is verified in
+`docs/evidence/live/2026-07-27-hunter-prod-concurrency-closure.md`.
 
 **Hunter-directive pipeline mapping (updated 2026-07-27 — supersedes the
 2026-07-24 mapping)**: the installed persistent `NEOHunter` application and

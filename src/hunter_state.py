@@ -491,6 +491,22 @@ def get_search_run(db_path: Path, run_id: str) -> dict[str, Any]:
     return run
 
 
+def update_search_run_model_versions(
+    db_path: Path, run_id: str, updates: dict[str, Any]
+) -> None:
+    """Add provenance fields to an existing run without discarding prior versions."""
+    if not updates:
+        raise ValueError("model-version updates must not be empty")
+    run = get_search_run(db_path, run_id)
+    merged = {**run["model_versions"], **updates}
+    with closing(connect(db_path)) as conn:
+        conn.execute(
+            "UPDATE search_runs SET model_versions_json = ? WHERE run_id = ?",
+            (_json(merged), run_id),
+        )
+        conn.commit()
+
+
 def complete_search_run(
     db_path: Path, run_id: str, status: str, failure_reason: str | None = None
 ) -> None:

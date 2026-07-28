@@ -6,6 +6,7 @@ import io
 import json
 import subprocess
 import sys
+import threading
 from pathlib import Path
 
 import pytest
@@ -1327,6 +1328,115 @@ def test_run_search_completes_and_marks_manifest_executed(
     assert manifest["status"] == "executed"
     run = hunter_state.get_search_run(db_path, result["run_id"])
     assert run["status"] == "completed"
+    assert run["model_versions"]["execution_contract"] == {
+        "scheduler": "thread_pool_manifest_order_commit_v1",
+        "configured_workers": 3,
+        "max_workers": 3,
+        "durable_commit_order": "manifest_rank",
+    }
+
+
+def test_run_search_executes_targets_concurrently_but_commits_in_manifest_order(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    db_path = tmp_path / "hunter_state.sqlite"
+    ledger_db_path = tmp_path / "candidate_ledger.sqlite"
+    targets = [
+        hunter_state.ManifestTarget(
+            target_id=f"radec_{ra:.2f}_5.00",
+            ra_deg=ra,
+            dec_deg=5.0,
+            score=1.0 - (index / 10),
+            selection_reason="concurrency control",
+            coverage_inventory_id=f"field-{index}",
+        )
+        for index, ra in enumerate((10.0, 20.0, 30.0), start=1)
+    ]
+    hunter_state.create_search_manifest(
+        db_path, "search-concurrent", "new", 3, "p", "d", targets, 30, True, {}
+    )
+
+    lock = threading.Lock()
+    all_started = threading.Event()
+    active = 0
+    max_active = 0
+
+    def _fake_execute(target, *args, **kwargs):
+        nonlocal active, max_active
+        with lock:
+            active += 1
+            max_active = max(max_active, active)
+            if active == 3:
+                all_started.set()
+        assert all_started.wait(timeout=2), "three targets did not execute concurrently"
+        with lock:
+            active -= 1
+        return {
+            "execution_status": "null_result",
+            "candidate_ids": [],
+            "nights_acquired": ["20240101", "20240102", "20240103"],
+            "scored_candidates": [],
+        }
+
+    monkeypatch.setattr(hunter_cli, "execute_target", _fake_execute)
+
+    result = hunter_cli.run_search(
+        db_path,
+        ledger_db_path,
+        "search-concurrent",
+        tmp_path / "checkpoints",
+        workers=3,
+    )
+
+    assert result["status"] == "completed"
+    assert max_active == 3
+    execution_history = [
+        item
+        for item in hunter_state.list_target_history(db_path)
+        if item["source"] == "hunter_run_execution"
+    ]
+    assert [item["target_id"] for item in execution_history] == [
+        target.target_id for target in targets
+    ]
+    assert all(
+        item["provenance"]["execution_contract"]["configured_workers"] == 3
+        for item in execution_history
+    )
+
+
+@pytest.mark.parametrize("workers", [0, 4])
+def test_run_search_rejects_workers_outside_documented_service_limit(
+    tmp_path: Path, workers: int
+) -> None:
+    with pytest.raises(ValueError, match="workers must be between 1 and 3"):
+        hunter_cli.run_search(
+            tmp_path / "hunter.sqlite",
+            tmp_path / "ledger.sqlite",
+            "search-1",
+            tmp_path / "checkpoints",
+            workers=workers,
+        )
+
+
+def test_run_search_resume_requires_original_worker_contract(tmp_path: Path) -> None:
+    db_path = tmp_path / "hunter_state.sqlite"
+    _seed_pending_manifest(db_path)
+    hunter_state.create_search_run(
+        db_path,
+        "run-existing",
+        "search-1",
+        "abc123",
+        {"execution_contract": hunter_cli._execution_contract(1)},
+    )
+
+    with pytest.raises(ValueError, match="resume with the same --workers value"):
+        hunter_cli.run_search(
+            db_path,
+            tmp_path / "ledger.sqlite",
+            "search-1",
+            tmp_path / "checkpoints",
+            workers=2,
+        )
 
 
 def test_run_search_rejects_rerun_of_already_executed_search(
@@ -1768,6 +1878,12 @@ def test_build_parser_run_new_search_requires_search_id_or_latest() -> None:
     parser = hunter_cli.build_parser()
     with pytest.raises(SystemExit):
         parser.parse_args(["run-new-search"])
+
+
+def test_build_parser_run_new_search_worker_default_and_override() -> None:
+    parser = hunter_cli.build_parser()
+    assert parser.parse_args(["run-new-search", "--latest"]).workers == 3
+    assert parser.parse_args(["run-new-search", "--latest", "--workers", "1"]).workers == 1
 
 
 # ---------------------------------------------------------------------------

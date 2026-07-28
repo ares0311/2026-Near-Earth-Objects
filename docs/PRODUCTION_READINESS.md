@@ -1,10 +1,24 @@
 # PRODUCTION_READINESS.md — NEO Pipeline Production Gap Register
 
 **Current version**: v0.91.0
-**Last updated**: 2026-07-27 (Hunter PROD final closure — see the
+**Last updated**: 2026-07-27 (Hunter PROD configurable-concurrency closure — see the
 sync entry immediately below; the P1-P5 gate register body further down is
 unchanged historical evidence from 2026-07-02; current gate status for the
 active ZTF DR24 path lives in `docs/ZTF_DR24_PRODUCTION_GATES.md`)
+
+**Latest Hunter sync (2026-07-27, configurable execution closure)**:
+Adversarial re-audit found that the exact multi-target executor was serial and
+had no worker configuration or concurrency control, contrary to the Hunter
+performance contract. HP-14 in `docs/OPERATOR_GO_NO_GO_RUNBOOK.md` is now
+closed. `Run-New-Search --workers 1..3` defaults to three, matching the
+documented conservative IRSA pixel-product concurrency limit. Only
+target-local acquisition/processing executes concurrently; candidate-ledger,
+follow-up, governing-history, and run-state writes remain serialized in
+manifest rank order. Run and target provenance record the scheduler and worker
+contract, and resume refuses a changed contract. An independent behavioral
+control proves three targets genuinely overlap while their durable execution
+history remains manifest ordered. Evidence:
+`docs/evidence/live/2026-07-27-hunter-prod-concurrency-closure.md`.
 
 **Latest Hunter sync (2026-07-27, final PROD closure)**: The stronger business
 contract is closed through HP-13 in

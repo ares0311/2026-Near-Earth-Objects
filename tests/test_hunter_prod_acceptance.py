@@ -130,6 +130,6 @@ def test_runbook_contains_fail_closed_acceptance_ledger() -> None:
     runbook = (ROOT / "docs" / "OPERATOR_GO_NO_GO_RUNBOOK.md").read_text(
         encoding="utf-8"
     )
-    for finding_id in (f"HP-{number:02d}" for number in range(1, 14)):
+    for finding_id in (f"HP-{number:02d}" for number in range(1, 15)):
         assert finding_id in runbook
     assert "Do not restore that claim" in runbook

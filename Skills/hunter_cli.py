@@ -28,6 +28,7 @@ import json
 import subprocess
 import sys
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -70,6 +71,8 @@ _SEARCH_MANIFEST_CSV_DIR = REPO_ROOT / "data_selection" / "search_manifests"
 _WORKING_DIR = REPO_ROOT / "Logs" / "pipeline_runs" / "hunter_cli"
 _CHECKPOINT_ROOT = _WORKING_DIR / "search_runs"
 _MAX_AGGREGATE_IRSA_REQUESTS = 6
+_DEFAULT_RUN_WORKERS = 3
+_MAX_RUN_WORKERS = 3
 # Deliberately small: a wide box (e.g. the coverage-preflight's 2.0deg) spans
 # multiple ZTF CCD/quadrant footprints, each producing its own near-identical
 # obsjd metadata row -- breaking the single-exposure-per-window assumption
@@ -1270,17 +1273,41 @@ def _mark_originating_followups_actioned(
             hunter_state.update_follow_up_status(db_path, entry["follow_up_id"], "actioned")
 
 
+def _execution_contract(workers: int) -> dict[str, Any]:
+    """Validate and provenance-stamp bounded target concurrency.
+
+    Each target owns an isolated checkpoint directory. Only target execution
+    runs in worker threads; candidate-ledger, follow-up, history, and run-state
+    writes remain serialized in manifest rank order. The three-worker ceiling
+    is the repository's documented conservative limit for concurrent IRSA
+    pixel-product downloads.
+    """
+    if workers < 1 or workers > _MAX_RUN_WORKERS:
+        raise ValueError(
+            f"workers must be between 1 and {_MAX_RUN_WORKERS} "
+            "(the documented IRSA pixel-product concurrency limit)"
+        )
+    return {
+        "scheduler": "thread_pool_manifest_order_commit_v1",
+        "configured_workers": workers,
+        "max_workers": _MAX_RUN_WORKERS,
+        "durable_commit_order": "manifest_rank",
+    }
+
+
 def run_search(
     db_path: Path,
     ledger_db_path: Path,
     search_id: str,
     checkpoint_root: Path,
     size_deg: float = _DEFAULT_SIZE_DEG,
+    workers: int = _DEFAULT_RUN_WORKERS,
 ) -> dict[str, Any]:
     """Execute the exact persisted manifest for ``search_id``. Never
     regenerates the target selection. Resumes an interrupted OR partially/
     fully failed run in place (retrying only the not-yet-successful targets);
     refuses to silently re-execute a run that fully completed."""
+    execution_contract = _execution_contract(workers)
     manifest = hunter_state.get_search_manifest(db_path, search_id)
     git_provenance = _git_provenance()
     if manifest["status"] == "executed":
@@ -1295,6 +1322,17 @@ def run_search(
 
     existing_run = hunter_state.get_latest_run_for_search(db_path, search_id)
     if existing_run is not None and existing_run["status"] != "completed":
+        prior_contract = existing_run["model_versions"].get("execution_contract")
+        if prior_contract is not None and prior_contract != execution_contract:
+            raise ValueError(
+                f"run {existing_run['run_id']} was created with "
+                f"workers={prior_contract.get('configured_workers')}; resume with the "
+                "same --workers value to preserve its execution contract"
+            )
+        if prior_contract is None:
+            hunter_state.update_search_run_model_versions(
+                db_path, existing_run["run_id"], {"execution_contract": execution_contract}
+            )
         # "running" (interrupted mid-execution) or "partial"/"failed" (a prior
         # pass finished but some targets still need retrying) are both resumed
         # into the same run record -- only a fully "completed" run is terminal.
@@ -1314,10 +1352,13 @@ def run_search(
                 "ranking_policy_digest": manifest["ranking_policy_digest"],
                 "known_object_policy": adversarial_review._KNOWN_OBJECT_POLICY_VERSION,
                 "pipeline_git": git_provenance,
+                "execution_contract": execution_contract,
             },
         )
 
     already_done = hunter_state.get_run_targets(db_path, run_id)
+    pending_targets: list[dict[str, Any]] = []
+    prior_nights_by_target: dict[str, set[str]] = {}
     for target in manifest["targets"]:
         target_id = target["target_id"]
         prior = already_done.get(target_id)
@@ -1328,75 +1369,97 @@ def run_search(
             )
             continue
 
-        print(
-            f"[run-new-search] executing target {target_id} "
-            f"({target['ra_deg']}, {target['dec_deg']})",
-            flush=True,
+        prior_nights_by_target[target_id] = (
+            hunter_state.acquired_nights_for_target(db_path, target_id)
+            if manifest["mode"] == "follow_up"
+            else set()
         )
-        try:
-            prior_nights = (
-                hunter_state.acquired_nights_for_target(db_path, target_id)
-                if manifest["mode"] == "follow_up"
-                else set()
-            )
-            result = execute_target(
-                target,
-                checkpoint_root,
-                size_deg,
-                previously_acquired_nights=prior_nights,
-            )
-            for scored in result["scored_candidates"]:
-                _ingest_and_maybe_register_followup(
-                    db_path, ledger_db_path, search_id, run_id, target, scored
-                )
-            if manifest["mode"] == "follow_up":
-                _mark_originating_followups_actioned(db_path, target_id, run_id)
-            # This single transaction is deliberately last. Resume can skip a
-            # terminal target only after every external durable side effect
-            # above has completed successfully.
-            hunter_state.commit_target_result(
-                db_path,
-                run_id=run_id,
-                search_id=search_id,
-                mode=manifest["mode"],
-                target_id=target_id,
-                execution_status=result["execution_status"],
-                candidate_ids=result["candidate_ids"],
-                error_message=None,
-                nights_acquired=result["nights_acquired"],
-                provenance={
-                    "coverage_inventory_id": target["coverage_inventory_id"],
-                    "coverage": target["coverage_provenance"],
-                    "ranking_policy_digest": manifest["ranking_policy_digest"],
-                    "pipeline_git": git_provenance,
-                    "validity_state": "valid",
-                },
-            )
-        except _RUN_TARGET_EXPECTED_EXCEPTIONS as exc:
-            print(f"[run-new-search] target {target_id} FAILED: {exc}", flush=True)
-            hunter_state.commit_target_result(
-                db_path,
-                run_id=run_id,
-                search_id=search_id,
-                mode=manifest["mode"],
-                target_id=target_id,
-                execution_status="failed",
-                candidate_ids=[],
-                error_message=str(exc),
-                nights_acquired=[],
-                provenance={
-                    "pipeline_git": git_provenance,
-                    "error_type": type(exc).__name__,
-                    "validity_state": "invalid",
-                },
-            )
-            continue
+        pending_targets.append(target)
 
+    futures: dict[str, Any] = {}
+    if pending_targets:
+        active_workers = min(workers, len(pending_targets))
         print(
-            f"[run-new-search] target {target_id}: {result['execution_status']} "
-            f"({len(result['candidate_ids'])} candidate(s))",
+            f"[run-new-search] dispatching {len(pending_targets)} target(s) with "
+            f"workers={active_workers}; durable commits remain in manifest rank order",
             flush=True,
         )
+        with ThreadPoolExecutor(
+            max_workers=active_workers, thread_name_prefix="neo-hunter-target"
+        ) as executor:
+            for target in pending_targets:
+                target_id = target["target_id"]
+                print(
+                    f"[run-new-search] queued target {target_id} "
+                    f"({target['ra_deg']}, {target['dec_deg']})",
+                    flush=True,
+                )
+                futures[target_id] = executor.submit(
+                    execute_target,
+                    target,
+                    checkpoint_root,
+                    size_deg,
+                    previously_acquired_nights=prior_nights_by_target[target_id],
+                )
+
+            for target in pending_targets:
+                target_id = target["target_id"]
+                try:
+                    result = futures[target_id].result()
+                    for scored in result["scored_candidates"]:
+                        _ingest_and_maybe_register_followup(
+                            db_path, ledger_db_path, search_id, run_id, target, scored
+                        )
+                    if manifest["mode"] == "follow_up":
+                        _mark_originating_followups_actioned(db_path, target_id, run_id)
+                    # This single transaction is deliberately last. Resume can skip a
+                    # terminal target only after every external durable side effect
+                    # above has completed successfully.
+                    hunter_state.commit_target_result(
+                        db_path,
+                        run_id=run_id,
+                        search_id=search_id,
+                        mode=manifest["mode"],
+                        target_id=target_id,
+                        execution_status=result["execution_status"],
+                        candidate_ids=result["candidate_ids"],
+                        error_message=None,
+                        nights_acquired=result["nights_acquired"],
+                        provenance={
+                            "coverage_inventory_id": target["coverage_inventory_id"],
+                            "coverage": target["coverage_provenance"],
+                            "ranking_policy_digest": manifest["ranking_policy_digest"],
+                            "pipeline_git": git_provenance,
+                            "execution_contract": execution_contract,
+                            "validity_state": "valid",
+                        },
+                    )
+                except _RUN_TARGET_EXPECTED_EXCEPTIONS as exc:
+                    print(f"[run-new-search] target {target_id} FAILED: {exc}", flush=True)
+                    hunter_state.commit_target_result(
+                        db_path,
+                        run_id=run_id,
+                        search_id=search_id,
+                        mode=manifest["mode"],
+                        target_id=target_id,
+                        execution_status="failed",
+                        candidate_ids=[],
+                        error_message=str(exc),
+                        nights_acquired=[],
+                        provenance={
+                            "pipeline_git": git_provenance,
+                            "execution_contract": execution_contract,
+                            "error_type": type(exc).__name__,
+                            "validity_state": "invalid",
+                        },
+                    )
+                    continue
+
+                print(
+                    f"[run-new-search] target {target_id}: {result['execution_status']} "
+                    f"({len(result['candidate_ids'])} candidate(s))",
+                    flush=True,
+                )
 
     target_states = hunter_state.get_run_targets(db_path, run_id)
     n_targets = len(manifest["targets"])
@@ -1441,6 +1504,7 @@ def cmd_run_new_search(args: argparse.Namespace) -> int:
         search_id=search_id,
         checkpoint_root=Path(args.checkpoint_root),
         size_deg=args.size_deg,
+        workers=getattr(args, "workers", _DEFAULT_RUN_WORKERS),
     )
     print(
         f"search_id={search_id}  run_id={result['run_id']}  status={result['status']}  "
@@ -1521,6 +1585,15 @@ def build_parser() -> argparse.ArgumentParser:
     run_cmd.add_argument("--candidate-ledger-db", default=str(_DEFAULT_LEDGER_DB))
     run_cmd.add_argument("--checkpoint-root", default=str(_CHECKPOINT_ROOT))
     run_cmd.add_argument("--size-deg", type=float, default=_DEFAULT_SIZE_DEG)
+    run_cmd.add_argument(
+        "--workers",
+        type=int,
+        default=_DEFAULT_RUN_WORKERS,
+        help=(
+            "concurrent target workers "
+            f"(1-{_MAX_RUN_WORKERS}; default {_DEFAULT_RUN_WORKERS})"
+        ),
+    )
 
     show_cmd = sub.add_parser(
         "show-follow-ups", help="show durable follow-up registry entries"

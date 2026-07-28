@@ -50,7 +50,8 @@ NEOHunter
 Create-New-Search --targets 5 --mode new
 
 # Execute or resume the exact most-recent pending manifest.
-caffeinate -i Run-New-Search --latest
+# Three target workers is the documented IRSA pixel-product safety limit.
+caffeinate -i Run-New-Search --latest --workers 3
 
 # Rank prior searches by current additional-work value and inspect evidence.
 Create-New-Search --targets 5 --mode follow-up
@@ -63,6 +64,15 @@ If an explicit `--max-pool` prevents sufficiency, creation fails visibly and
 does not persist a misleading pending search. A completed new search becomes
 governing history immediately; a follow-up run excludes already acquired nights
 and performs additional work.
+
+`Run-New-Search` executes independent manifest targets concurrently with
+`--workers 1..3` (default `3`). Each target has an isolated checkpoint
+directory. Candidate-ledger, follow-up, target-history, and run-state writes
+remain serialized in manifest rank order, and the worker contract is persisted
+with the run. A resume must use the same worker count. The ceiling of three is
+the repository's documented conservative limit for concurrent IRSA ZTF
+pixel-product downloads; it must not be raised without a new clean service
+probe recorded in `docs/SYSTEM_PROFILE.md`.
 
 `Skills/select_survey_fields.py`, `Skills/run_pipeline.py`, positive-control
 scripts, batch scorers, and direct adversarial-review/export commands are
