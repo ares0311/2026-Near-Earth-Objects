@@ -57,6 +57,16 @@ def test_ci_uses_bounded_test_workers_and_native_threads() -> None:
     assert 'OPENBLAS_NUM_THREADS: "1"' in ci
 
 
+def test_integration_policy_notice_has_no_dependency_install_boundary() -> None:
+    integration = (WORKFLOWS / "integration.yml").read_text()
+
+    assert "timeout-minutes: 2" in integration
+    assert "Skip notice (credentials kept off GitHub by policy)" in integration
+    assert "uv sync" not in integration
+    assert "uses: actions/checkout@" not in integration
+    assert "uses: astral-sh/setup-uv@" not in integration
+
+
 def test_workflows_use_node24_action_versions() -> None:
     for workflow in sorted(WORKFLOWS.glob("*.yml")):
         text = workflow.read_text()

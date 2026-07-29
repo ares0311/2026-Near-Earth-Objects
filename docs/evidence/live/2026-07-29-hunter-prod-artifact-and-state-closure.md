@@ -205,6 +205,28 @@ loss or reached the job timeout.
 satisfy the NEO-Hunter software PROD threshold subject to the genuine separate
 scientific and authority limitations below.
 
+## HP-22 — honest hosted integration boundary
+
+Final documentation-bearing main commit `8cdff05d` passed CI run
+`30441323215`, all six E2E jobs in `30441323151`, the clean local canonical
+verifier, REL-05 freshness, all 85 adversarial controls, and isolated wheel
+validation. Its separate Integration run `30441323193` then exposed another
+acceptance-infrastructure defect: a workflow documented to skip all hosted
+live tests still performed checkout, Python/uv setup, and a full dependency
+sync before printing the policy notice. The run spent more than ten minutes in
+those irrelevant setup/network operations, while the job had no explicit
+timeout.
+
+The hosted boundary now does exactly what it claims. It contains one notice
+step, performs no checkout/interpreter/dependency operation, and has a
+two-minute job timeout. The operator-Mac live-test command remains unchanged
+and credential-gated. A workflow contract test rejects reintroducing setup or
+dependency installation into the skip-only job.
+
+**Current status**: IMPLEMENTED BUT NOT VERIFIED. The branch must pass its
+normal PR checks, and the Integration workflow must complete on merged `main`
+before HP-22 and the Hunter PROD claim may close.
+
 ## Genuine limitations and separate gates
 
 - Broader ZTF DR24 scientific-capability gate M8 remains separate and open
