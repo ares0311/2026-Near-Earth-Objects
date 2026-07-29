@@ -35,6 +35,18 @@ def test_release_workflow_uses_locked_python_314_uv_environment() -> None:
     assert "actions/setup-python" not in release
 
 
+def test_pr_ci_installs_and_launches_built_hunter_artifact() -> None:
+    ci = (WORKFLOWS / "ci.yml").read_text()
+
+    assert "hunter-distribution:" in ci
+    assert "uv sync --locked --extra dev" in ci
+    assert "run: uv build" in ci
+    assert (
+        "uv run --python 3.14 python Skills/verify_hunter_distribution.py "
+        "--wheel-dir dist"
+    ) in ci
+
+
 def test_workflows_use_node24_action_versions() -> None:
     for workflow in sorted(WORKFLOWS.glob("*.yml")):
         text = workflow.read_text()

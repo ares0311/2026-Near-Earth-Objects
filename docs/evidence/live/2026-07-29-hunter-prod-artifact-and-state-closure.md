@@ -56,8 +56,8 @@ Show-Follow-Ups --help
 
 It also runs an installed state operation and proves that only the configured
 state root receives the SQLite database and JSONL event log. A metadata-only
-wheel is an explicit negative control. Release CI now invokes this verifier on
-the artifact it builds.
+wheel is an explicit negative control. Pull-request/main CI and release CI now
+invoke this verifier on the artifact each workflow builds.
 
 ## HP-17 — durable planning catalog and scale
 
