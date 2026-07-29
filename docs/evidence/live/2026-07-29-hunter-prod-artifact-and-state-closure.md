@@ -167,14 +167,43 @@ This is a blocking acceptance defect even though the exact repository tree
 passes the serial canonical verifier. A production claim cannot depend on
 rerunning an unstable gate until it happens to pass.
 
-The CI workflow now replaces runner-dependent `-n auto` with two explicit
+The CI workflow replaces runner-dependent `-n auto` with two explicit
 `loadfile` workers and caps OpenMP, MKL, and OpenBLAS to one native thread per
 worker. A workflow contract test rejects a return to automatic worker sizing
 or removal of the thread caps. Two consecutive hosted full-suite passes on the
 same pull-request tree, followed by a full-suite pass on merged `main`, are
 required before HP-21 and the Hunter PROD claim may be closed.
 
-**Current status**: IMPLEMENTED BUT NOT VERIFIED.
+Implementation commit `1eced6f427a001aa2957d3fd96295de59086bda0`
+produced the following clean local evidence:
+
+```text
+exact two-worker CI-shaped suite: 2,336 passed, 100% src coverage
+canonical reliability stages: 6/6 PASS
+canonical pytest: 2,336 passed, 2 deselected
+canonical src coverage: 5,993/5,993 statements, 100.00%
+adversarial verification: 85 passed
+isolated wheel contents/install/launch/state isolation: PASS
+repository unchanged by adversarial run: PASS
+freshness: CURRENT AND VERIFIED
+```
+
+The clean PR commit then passed hosted CI run `30439389527` twice without a
+tree change:
+
+- attempt 1: `success`, full suite 2 minutes 46 seconds;
+- attempt 2: `success`, full suite 2 minutes 42 seconds.
+
+PR #286 merged that exact implementation as clean `main` commit
+`759b4f9664878987f13116138638982ff9678f87`. Main CI run `30440700068`
+passed the full suite in 2 minutes 41 seconds and the isolated distribution
+job in 4 minutes 3 seconds. Main Integration run `30440699904` and all six
+E2E jobs in run `30440699893` also passed. No accepted run reported worker
+loss or reached the job timeout.
+
+**Current status**: VERIFIED. HP-21 is closed, and HP-15 through HP-21 now
+satisfy the NEO-Hunter software PROD threshold subject to the genuine separate
+scientific and authority limitations below.
 
 ## Genuine limitations and separate gates
 
