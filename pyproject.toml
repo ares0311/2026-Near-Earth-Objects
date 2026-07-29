@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "neo-detection"
-version = "0.91.0"
+version = "0.91.1"
 description = "Near-Earth Object Detection and Ranking Pipeline"
 requires-python = ">=3.11"
 dependencies = [
@@ -42,8 +42,44 @@ training = [
     "alerce>=2,<3",
 ]
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[tool.setuptools]
+package-dir = {"" = "src", "Skills" = "Skills"}
+packages = ["Skills"]
+py-modules = [
+    "alert",
+    "background",
+    "calibration",
+    "candidate_ledger",
+    "canonical_eval",
+    "classify",
+    "detect",
+    "fetch",
+    "grouped_splits",
+    "hunter_commands",
+    "hunter_config",
+    "hunter_logging",
+    "hunter_state",
+    "known_object_exclusion",
+    "link",
+    "orbit",
+    "preprocess",
+    "promotion_report",
+    "recovery_curves",
+    "schemas",
+    "score",
+]
+
+[tool.setuptools.data-files]
+"data_selection" = ["data_selection/target_priority_queue.csv"]
+"data_selection/ranking_policies" = ["data_selection/ranking_policies/*.json"]
+"data_selection/coverage_inventories" = ["data_selection/coverage_inventories/*.json"]
+"docs/evidence/live" = ["docs/evidence/live/2026-07-25-elongation-peak-revision.md"]
+"models" = [
+    "models/tier1_xgb.json",
+    "models/tier2_cnn_v4.pt",
+    "models/tier3_transformer.pt",
+    "models/stacker_coef.json",
+]
 
 [tool.ruff]
 line-length = 100

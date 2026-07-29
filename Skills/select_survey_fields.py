@@ -60,6 +60,8 @@ from pathlib import Path
 
 import numpy as np
 
+from hunter_config import get_hunter_paths
+
 # ── Constants ──────────────────────────────────────────────────────────────────
 
 # Default observer: Palomar Mountain (ZTF primary site, latitude +33.36°)
@@ -67,7 +69,7 @@ _PALOMAR_LAT = 33.3563   # degrees North
 _PALOMAR_LON = -116.8650  # degrees East (unused in Phase 1 analytic scoring)
 
 # Candidate field grid resolution and ZTF field radius
-_GRID_STEP_DEG = 7.5   # degrees between field centres (balances coverage vs. speed)
+_GRID_STEP_DEG = 1.0  # fine planning mesh; >10,000 viable fields where geometry permits
 _FIELD_RADIUS_DEG = 3.5  # degrees — ZTF focal plane inscribed radius ≈ 3.8°
 
 # Mean obliquity of the ecliptic (J2000); constant is accurate to ~0.01° over decades
@@ -132,7 +134,8 @@ _WISE_PARENT_RADIUS_DEG = 0.2
 
 _COVERAGE_SCHEMA_VERSION = "ztf-field-night-coverage-inventory-v1"
 _RANKING_POLICY_SCHEMA_VERSION = "ztf-field-ranking-policy-v3"
-_REPO_ROOT = Path(__file__).resolve().parent.parent
+
+_REPO_ROOT = get_hunter_paths().resource_root
 _DEFAULT_RANKING_POLICY_PATH = (
     _REPO_ROOT
     / "data_selection"
@@ -643,7 +646,8 @@ def select_fields(jd: float,
                   coverage_inventory_path: Path | None = None,
                   target_queue_path: Path | None = None,
                   search_mode: str | None = None,
-                  ranking_policy_path: Path = _DEFAULT_RANKING_POLICY_PATH) -> list[dict]:
+                  ranking_policy_path: Path = _DEFAULT_RANKING_POLICY_PATH,
+                  deduplicate: bool = True) -> list[dict]:
     """Score all candidate sky fields and return the top-N for the current night.
 
     All geometry is computed analytically over a vectorised NumPy array for
@@ -666,6 +670,10 @@ def select_fields(jd: float,
                   eligibility semantics.
     ranking_policy_path: Versioned analytic policy whose digest and limitations
                   are stamped into every selected row.
+    deduplicate:  Whether selected pointings must be separated by one field
+                  radius. Production manifests keep this enabled; durable
+                  planning-catalog materialization disables it to preserve the
+                  complete candidate universe.
 
     Returns
     -------
@@ -800,15 +808,23 @@ def select_fields(jd: float,
         ra_i  = float(ra_arr[idx])
         dec_i = float(dec_arr[idx])
 
-        # Deduplicate: reject fields within one FoV of an already-selected field
+        # Deduplicate executable pointings, but retain the full fine-grained
+        # universe when materializing the durable planning catalog.
         too_close = False
-        for s_ra, s_dec in selected_positions:
-            cos_sep = (math.sin(math.radians(s_dec)) * math.sin(math.radians(dec_i))
-                       + math.cos(math.radians(s_dec)) * math.cos(math.radians(dec_i))
-                       * math.cos(math.radians(ra_i) - math.radians(s_ra)))
-            if math.degrees(math.acos(max(-1.0, min(1.0, cos_sep)))) < _DEDUP_RADIUS_DEG:
-                too_close = True
-                break
+        if deduplicate:
+            for s_ra, s_dec in selected_positions:
+                cos_sep = (
+                    math.sin(math.radians(s_dec)) * math.sin(math.radians(dec_i))
+                    + math.cos(math.radians(s_dec))
+                    * math.cos(math.radians(dec_i))
+                    * math.cos(math.radians(ra_i) - math.radians(s_ra))
+                )
+                if (
+                    math.degrees(math.acos(max(-1.0, min(1.0, cos_sep))))
+                    < _DEDUP_RADIUS_DEG
+                ):
+                    too_close = True
+                    break
         if too_close:
             continue
 

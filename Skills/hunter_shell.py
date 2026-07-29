@@ -18,13 +18,14 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TextIO
 
+from hunter_config import get_hunter_paths
+
 try:
     import readline
 except ImportError:  # pragma: no cover - readline ships with the supported macOS runtime
     readline = None  # type: ignore[assignment]
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_HISTORY_PATH = REPO_ROOT / "Logs" / "neo_hunter_history"
+DEFAULT_HISTORY_PATH = get_hunter_paths().shell_history
 
 _SLASH_COMMANDS = (
     "/New-Search",
@@ -57,7 +58,10 @@ InputFunction = Callable[[str], str]
 
 def _canonical_runner(argv: list[str] | None) -> int:
     """Delegate to the one production orchestration module."""
-    from hunter_cli import main as hunter_main
+    if __package__:
+        from .hunter_cli import main as hunter_main
+    else:
+        from hunter_cli import main as hunter_main
 
     return hunter_main(argv)
 

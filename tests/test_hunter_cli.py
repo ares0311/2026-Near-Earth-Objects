@@ -4,9 +4,11 @@ import argparse
 import csv
 import io
 import json
+import sqlite3
 import subprocess
 import sys
 import threading
+from contextlib import closing
 from pathlib import Path
 
 import pytest
@@ -130,10 +132,19 @@ def _target_with_exact(ra_deg: float, dec_deg: float, nights: list[str]) -> dict
 
 def _patch_dirs(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr(hunter_cli, "_COVERAGE_INVENTORY_DIR", tmp_path / "coverage_inventories")
+    monkeypatch.setattr(
+        hunter_cli, "_RESOURCE_COVERAGE_INVENTORY_DIR", tmp_path / "resource_inventories"
+    )
     monkeypatch.setattr(hunter_cli, "_BATCH_MANIFEST_DIR", tmp_path / "batch_manifests")
     monkeypatch.setattr(hunter_cli, "_SEARCH_MANIFEST_CSV_DIR", tmp_path / "search_manifests")
     monkeypatch.setattr(hunter_cli, "_WORKING_DIR", tmp_path / "working")
+    monkeypatch.setattr(hunter_cli, "_EVENT_LOG", tmp_path / "hunter_events.jsonl")
     monkeypatch.setattr(hunter_cli.coverage_inventory, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(
+        hunter_cli,
+        "_materialize_planning_catalog",
+        lambda **kwargs: ("test-planning-catalog-v1", 30_000),
+    )
     monkeypatch.setattr(
         hunter_cli,
         "_exact_target_feasibility",
@@ -146,6 +157,41 @@ def _patch_dirs(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
 def test_field_id_from_radec_format() -> None:
     assert hunter_cli._field_id_from_radec("hx1", 251.664, -22.501) == "hx1_251p66_m22p50"
     assert hunter_cli._field_id_from_radec("hx1", 10.0, 5.0) == "hx1_010p00_p05p00"
+
+
+def test_materialized_all_mode_catalog_exceeds_ten_thousand(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "hunter.sqlite"
+
+    catalog_version, count = hunter_cli._materialize_planning_catalog(
+        db_path=db_path,
+        jd=2461000.5,
+        neo_class="all",
+        ranking_policy_path=field_selector._DEFAULT_RANKING_POLICY_PATH,
+    )
+
+    assert count >= 10_000
+    with closing(sqlite3.connect(db_path)) as connection:
+        stored_count = connection.execute(
+            "SELECT COUNT(*) FROM target_catalog WHERE catalog_version = ?",
+            (catalog_version,),
+        ).fetchone()[0]
+        row = connection.execute(
+            "SELECT primary_survey_id, canonical_id, target_kind, survey, "
+            "estimated_storage_mb, estimated_compute_seconds, "
+            "scientific_metrics_json, source_provenance_json "
+            "FROM target_catalog WHERE catalog_version = ? LIMIT 1",
+            (catalog_version,),
+        ).fetchone()
+    assert stored_count == count
+    assert row[0].startswith("ztf-dr24-field:")
+    assert row[1].startswith("icrs:")
+    assert row[2] == "sky_field"
+    assert row[3] == "ZTF DR24 archival science images"
+    assert row[4:6] == (78.1, 180.0)
+    assert "geometry_score" in json.loads(row[6])
+    assert json.loads(row[7])["schema_version"] == "ztf-dr24-planning-catalog-v1"
 
 
 def test_content_sha256_is_deterministic_and_order_independent() -> None:
@@ -256,7 +302,15 @@ def test_exact_target_feasibility_requires_three_product_preflighted_nights(
                 "raw_response_sha256": "d" * 64,
             }
         manifest = out_dir / "motion_product_manifest.json"
-        manifest.write_text('{"products":"available"}', encoding="utf-8")
+        manifest.write_text(
+            json.dumps(
+                {
+                    "products": "available",
+                    "preflight": {"total_content_bytes": 27_311_040},
+                }
+            ),
+            encoding="utf-8",
+        )
         return {
             "raw_response_sha256": "c" * 64,
             "motion_product_manifest_path": str(manifest),
@@ -275,6 +329,13 @@ def test_exact_target_feasibility_requires_three_product_preflighted_nights(
     assert result["validity_state"] == "valid"
     assert [row["night_yyyymmdd"] for row in result["verified_nights"]] == nights
     assert all(len(row["product_manifest_sha256"]) == 64 for row in result["verified_nights"])
+    assert all(
+        row["required_product_bytes"] == 27_311_040
+        for row in result["verified_nights"]
+    )
+    assert hunter_cli._estimated_storage_mb(
+        {"coverage_provenance": {"exact_feasibility": result}}
+    ) == 78.1
 
 
 def test_exact_feasibility_replaces_a_higher_ranked_wide_only_candidate(
@@ -535,11 +596,24 @@ def test_write_manifest_csv_and_print_table(tmp_path: Path, monkeypatch: pytest.
     rows = [
         {
             "target_id": f"radec_{i}.00_0.00",
+            "primary_survey_id": f"ztf-dr24-field:{i}",
+            "canonical_id": f"icrs:{i}.00:0.00:r3.5deg",
+            "target_kind": "sky_field",
+            "survey": "ZTF DR24 archival science images",
+            "search_mode": "new",
             "ra_deg": float(i),
             "dec_deg": 0.0,
+            "distance_ly": "not_applicable_solar_system_sky_field",
+            "estimated_storage_mb": 60.0,
+            "estimated_compute_seconds": 180.0,
+            "prior_search_count": 0,
+            "prior_search_provenance": [],
             "score": 0.9,
             "selection_reason": "test",
+            "scientific_metrics": {"geometry_score": 0.9},
             "coverage_inventory_id": "field-x",
+            "validity_state": "valid",
+            "coverage_source": "test",
         }
         for i in range(3)
     ]
@@ -607,10 +681,18 @@ def test_cmd_create_new_search_accepts_explicit_jd(
         hunter_cli,
         "discover_new_targets",
         lambda **kwargs: {
-            "eligible": [],
-            "pool_size_explored": 0,
-            "sufficiency_met": False,
-            "universe_exhausted": True,
+            "eligible": [
+                {
+                    "ra_deg": 10.0,
+                    "dec_deg": 5.0,
+                    "score": 0.9,
+                    "reason": "test exact target",
+                    "field_id": "field-1",
+                }
+            ],
+            "pool_size_explored": 100,
+            "sufficiency_met": True,
+            "universe_exhausted": False,
             "exploration_limited": False,
         },
     )
@@ -735,14 +817,60 @@ def test_cmd_create_new_search_reports_shortfall_honestly(
         db=str(db_path),
     )
 
-    exit_code = hunter_cli.cmd_create_new_search(args)
+    with pytest.raises(RuntimeError, match="only 0/5 exact eligible"):
+        hunter_cli.cmd_create_new_search(args)
 
-    assert exit_code == 0
-    out = capsys.readouterr().out
-    assert "WARNING: only 0/5 eligible targets found" in out
-    manifest = hunter_state.get_latest_pending_manifest(db_path, mode="new")
-    assert manifest["sufficiency_met"] is False
-    assert manifest["actual_n_selected"] == 0
+    with pytest.raises(ValueError, match="no pending search manifest"):
+        hunter_state.get_latest_pending_manifest(db_path, mode="new")
+
+
+def test_command_boundary_logs_natural_shortfall_and_exits_nonzero(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_dirs(monkeypatch, tmp_path)
+    queue = _write_empty_target_queue(tmp_path / "target_priority_queue.csv")
+    event_log = tmp_path / "events.jsonl"
+    db_path = tmp_path / "hunter.sqlite"
+    monkeypatch.setattr(
+        hunter_cli,
+        "discover_new_targets",
+        lambda **kwargs: {
+            "eligible": [],
+            "pool_size_explored": 30_000,
+            "sufficiency_met": False,
+            "universe_exhausted": True,
+            "exploration_limited": False,
+        },
+    )
+
+    with pytest.raises(SystemExit, match="only 0/100 exact eligible"):
+        hunter_cli.main(
+            [
+                "create-new-search",
+                "--targets",
+                "100",
+                "--mode",
+                "new",
+                "--jd",
+                "2461000.5",
+                "--target-queue",
+                str(queue),
+                "--db",
+                str(db_path),
+                "--event-log",
+                str(event_log),
+            ]
+        )
+
+    events = [
+        json.loads(line) for line in event_log.read_text(encoding="utf-8").splitlines()
+    ]
+    assert [(event["event"], event["status"]) for event in events] == [
+        ("create_search", "started"),
+        ("command", "failed"),
+    ]
+    with pytest.raises(ValueError, match="no pending search manifest"):
+        hunter_state.get_latest_pending_manifest(db_path)
 
 
 def test_cmd_create_new_search_fails_when_explicit_pool_limit_blocks_sufficiency(
@@ -1584,6 +1712,43 @@ def test_run_search_rejects_expired_manifest(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="unexpected status"):
         hunter_cli.run_search(db_path, ledger_db_path, "search-1", tmp_path / "checkpoints")
+
+
+@pytest.mark.parametrize(
+    ("actual_n_selected", "sufficiency_met", "delete_targets"),
+    [(1, 1, True), (0, 1, False), (1, 0, False)],
+)
+def test_run_search_rejects_malformed_legacy_manifest_before_run_creation(
+    tmp_path: Path,
+    actual_n_selected: int,
+    sufficiency_met: int,
+    delete_targets: bool,
+) -> None:
+    db_path = tmp_path / "hunter_state.sqlite"
+    _seed_pending_manifest(db_path)
+    with closing(sqlite3.connect(db_path)) as connection:
+        connection.execute(
+            "UPDATE search_manifests SET actual_n_selected = ?, sufficiency_met = ? "
+            "WHERE search_id = 'search-1'",
+            (actual_n_selected, sufficiency_met),
+        )
+        if delete_targets:
+            connection.execute(
+                "DELETE FROM search_manifest_targets WHERE search_id = 'search-1'"
+            )
+        connection.commit()
+
+    with pytest.raises(ValueError, match="search search-1 is incomplete"):
+        hunter_cli.run_search(
+            db_path,
+            tmp_path / "ledger.sqlite",
+            "search-1",
+            tmp_path / "checkpoints",
+            event_log=tmp_path / "events.jsonl",
+        )
+
+    with closing(sqlite3.connect(db_path)) as connection:
+        assert connection.execute("SELECT COUNT(*) FROM search_runs").fetchone()[0] == 0
 
 
 def test_run_search_ingests_scored_candidate_and_registers_followup(

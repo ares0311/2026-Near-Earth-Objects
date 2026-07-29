@@ -23,7 +23,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-import ztf_dr24_bounded_ingest as bounded_ingest
+if __package__:
+    from . import ztf_dr24_bounded_ingest as bounded_ingest
+else:
+    import ztf_dr24_bounded_ingest as bounded_ingest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUT_DIR = Path("Logs/pipeline_runs/ztf_field_night_coverage")

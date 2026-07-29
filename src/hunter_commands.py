@@ -4,17 +4,16 @@ from __future__ import annotations
 
 import sys
 from collections.abc import Callable
-from pathlib import Path
+from importlib import import_module
+from typing import cast
 
 
 def _hunter_main() -> Callable[[list[str] | None], int]:
-    """Load the repository-owned orchestration module without duplicating it."""
-    skills_dir = Path(__file__).resolve().parents[1] / "Skills"
-    if str(skills_dir) not in sys.path:
-        sys.path.insert(0, str(skills_dir))
-    from hunter_cli import main
-
-    return main
+    """Load the packaged orchestration module without duplicating it."""
+    return cast(
+        Callable[[list[str] | None], int],
+        getattr(import_module("Skills.hunter_cli"), "main"),
+    )
 
 
 def create_new_search() -> int:
@@ -34,9 +33,8 @@ def show_follow_ups() -> int:
 
 def neo_hunter() -> int:
     """Launch the persistent slash-command NEOHunter terminal."""
-    skills_dir = Path(__file__).resolve().parents[1] / "Skills"
-    if str(skills_dir) not in sys.path:
-        sys.path.insert(0, str(skills_dir))
-    from hunter_shell import main
-
+    main = cast(
+        Callable[[list[str] | None], int],
+        getattr(import_module("Skills.hunter_shell"), "main"),
+    )
     return main(sys.argv[1:])

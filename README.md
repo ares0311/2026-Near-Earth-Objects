@@ -1,7 +1,7 @@
 # 2026 Near-Earth Object Detection & Ranking Pipeline
 
 ![Status](https://img.shields.io/badge/status-active%20development-blue)
-![Version](https://img.shields.io/badge/version-0.91.0-informational)
+![Version](https://img.shields.io/badge/version-0.91.1-informational)
 ![License](https://img.shields.io/badge/license-Apache%202.0-green)
 ![Tests](https://img.shields.io/badge/tests-2300%2B%20passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
@@ -25,8 +25,11 @@ The product entry points below all delegate to the same production path. They
 adaptively discover beyond the requested count, resolve durable target history,
 persist an exact pending manifest, execute or resume those exact targets, write
 candidate and provenance records, and make prior results available to follow-up
-ranking. Install the locked project once with `uv sync --all-extras
---all-groups --python 3.14`, then run:
+ranking. A pending search is created only when `requested_n > 0`, exactly N
+targets passed exact feasibility, and `sufficiency_met=true`; natural universe
+exhaustion and explicit pool limits both exit non-zero without creating partial
+state. Install the locked checkout with `uv sync --all-extras --all-groups
+--python 3.14`, or install the released wheel with its dependencies, then run:
 
 ```bash
 # Persistent terminal application (remains active until /Exit).
@@ -64,6 +67,49 @@ If an explicit `--max-pool` prevents sufficiency, creation fails visibly and
 does not persist a misleading pending search. A completed new search becomes
 governing history immediately; a follow-up run excludes already acquired nights
 and performs additional work.
+
+Before selection, new mode materializes a versioned SQLite `target_catalog`
+that is distinct from the post-detection candidate ledger. The 1° deterministic
+planning mesh yields more than 10,000 viable `all`-mode candidates at supported
+epochs, and preserves stable survey/canonical IDs, sky-field type, coordinates,
+ranking metrics, resource estimates, and policy/source provenance. Requested
+sets of 100 or fewer print as an operator table; larger requests write a
+timestamped CSV under the Search Manifest Directory. Both formats include mode,
+prior-search count/provenance, scientific metrics, estimates, and selection
+reason. Planning storage uses the committed MP1 live HEAD measurement
+(27,311,040 bytes per exposure times the three-exposure minimum); exact selected
+targets replace it with their own summed HEAD content lengths. The 180-second
+compute value is explicitly an uncalibrated transparent operator prior and is
+not used for ranking.
+
+Mutable state never belongs inside an installed wheel. A source checkout uses
+its repository directories for backward compatibility. An installed
+application uses `~/Library/Application Support/NEO-Hunter` on macOS or
+`$XDG_STATE_HOME/neo-hunter` on Linux; set `NEOHUNTER_HOME` to choose an
+explicit operator state root. Immutable packaged resources resolve from the
+installation prefix and may be overridden with `NEOHUNTER_RESOURCE_ROOT`;
+`NEOHUNTER_MODEL_ROOT` is the narrower model-only override. The principal
+locations below are relative to the selected state root:
+
+```text
+data_selection/hunter_state.sqlite          # schema-v3 catalog/manifests/runs/history/follow-ups
+data_selection/candidate_ledger.sqlite       # post-detection candidate evidence
+data_selection/search_manifests/             # large CSV manifests
+data_selection/coverage_inventories/         # runtime coverage evidence
+Logs/pipeline_runs/hunter_cli/                # isolated work/checkpoints
+Logs/reports/hunter_events.jsonl              # append-only structured lifecycle events
+```
+
+Every create/run/target/follow-up/validation/terminal transition is JSONL
+logged. A logging failure is a command failure, not a silent fallback. The
+release workflow independently installs the built wheel outside the checkout,
+launches both terminal spellings and all one-shot commands, checks immutable
+resource hashes, and proves `Show-Follow-Ups` writes only beneath the configured
+state root:
+
+```bash
+uv run --python 3.14 python Skills/verify_hunter_distribution.py
+```
 
 `Run-New-Search` executes independent manifest targets concurrently with
 `--workers 1..3` (default `3`). Each target has an isolated checkpoint
@@ -1311,7 +1357,7 @@ evidence. MPC submission remains disabled until a real candidate survives
 adversarial plus operator review and the applicable source/submission protocol
 is satisfied.
 
-### 15.1 Current State Snapshot (v0.91.0)
+### 15.1 Historical Pipeline Snapshot (v0.91.0)
 
 The optional ZTF motion-product plan now supports bounded, checkpointed HEAD
 preflight. It records availability and byte estimates without downloading
