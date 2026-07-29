@@ -126,11 +126,32 @@ freshness: CURRENT AND VERIFIED
 The REL-05 record identifies that exact commit, a clean working tree, and UTC
 check time `2026-07-29T06:23:16.481410+00:00`.
 
-PR CI run `30427815869` passed both `lint-and-test (3.14)` and the new
-`hunter-distribution` job. E2E run `30427816053` passed all six independent
-pipeline, model, recovery, and alert controls. The remaining HP-20 evidence
-boundary is clean post-merge verification. Until it passes, this record does
-not restore a merged-current-main PROD claim.
+PR CI run `30428208537` passed both `lint-and-test (3.14)` and the new
+`hunter-distribution` job on its successful attempt. The first test attempt
+reached 99%, lost two xdist workers without an assertion failure, and hit the
+15-minute job limit; the unchanged failed-job rerun passed in 2 minutes
+8 seconds. E2E run `30428208539` passed all six independent pipeline, model,
+recovery, and alert controls.
+
+PR #284 merged as `c73455c64c1474d6c270569bafe45779126626b9`.
+Clean merged `main` then repeated:
+
+```text
+directive parity: PASS
+silent-exception gate: PASS
+incomplete-implementation gate: PASS
+ruff: PASS
+mypy src: PASS
+pytest: 2,335 passed, 2 deselected
+src coverage: 5,993/5,993 statements, 100.00%
+adversarial verification: 85 passed
+isolated wheel contents/install/launch/state isolation: PASS
+repository unchanged by adversarial run: PASS
+freshness: CURRENT AND VERIFIED
+```
+
+The post-merge REL-05 record identifies clean commit `c73455c6` and UTC check
+time `2026-07-29T06:48:54.686871+00:00`. HP-15 through HP-20 are closed.
 
 ## Genuine limitations and separate gates
 
