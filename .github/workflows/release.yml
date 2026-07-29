@@ -30,6 +30,9 @@ jobs:
       - name: Build distribution
         run: uv build
 
+      - name: Install and smoke-test built Hunter artifact
+        run: uv run --python 3.14 python Skills/verify_hunter_distribution.py --wheel-dir dist
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:

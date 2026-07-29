@@ -1,9 +1,9 @@
 """SQLite durable-state store for the Hunter search lifecycle.
 
-Complements src/candidate_ledger.py (candidate provenance -- the "candidate catalog"
-Hunter entity, unchanged by this module) with the remaining required durable Hunter
-entities: search manifest (``search_manifests`` + ``search_manifest_targets``), search
-run (``search_runs`` + ``search_run_targets``), append-only target search history
+Keeps the planning ``target_catalog`` distinct from src/candidate_ledger.py's
+post-detection candidate evidence. The other durable entities are search manifest
+(``search_manifests`` + ``search_manifest_targets``), search run
+(``search_runs`` + ``search_run_targets``), append-only target search history
 (``target_search_history``), and follow-up registry (``follow_up_registry``).
 
 The legacy ``target_priority_queue.csv`` remains an imported scientific-planning
@@ -25,7 +25,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = "2"
+SCHEMA_VERSION = "3"
 
 _SEARCH_MODES = {"new", "follow_up"}
 _MANIFEST_STATUSES = {"pending", "executed", "expired"}
@@ -98,6 +98,33 @@ def init_db(db_path: Path) -> None:
         )
         conn.execute(
             """
+            CREATE TABLE IF NOT EXISTS target_catalog (
+                target_id TEXT NOT NULL,
+                primary_survey_id TEXT NOT NULL,
+                canonical_id TEXT NOT NULL,
+                target_kind TEXT NOT NULL,
+                survey TEXT NOT NULL,
+                ra_deg REAL NOT NULL,
+                dec_deg REAL NOT NULL,
+                neo_class TEXT NOT NULL,
+                catalog_version TEXT NOT NULL,
+                ranking_score REAL NOT NULL,
+                estimated_storage_mb REAL NOT NULL,
+                estimated_compute_seconds REAL NOT NULL,
+                scientific_metrics_json TEXT NOT NULL,
+                source_provenance_json TEXT NOT NULL,
+                first_seen_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (catalog_version, target_id)
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_target_catalog_class_score "
+            "ON target_catalog(neo_class, ranking_score DESC)"
+        )
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS search_manifests (
                 search_id TEXT PRIMARY KEY,
                 created_at TEXT NOT NULL,
@@ -126,6 +153,15 @@ def init_db(db_path: Path) -> None:
                 coverage_inventory_id TEXT,
                 coverage_provenance_json TEXT NOT NULL DEFAULT '{}',
                 validity_state TEXT NOT NULL DEFAULT 'unknown',
+                primary_survey_id TEXT NOT NULL DEFAULT '',
+                canonical_id TEXT NOT NULL DEFAULT '',
+                target_kind TEXT NOT NULL DEFAULT 'sky_field',
+                survey TEXT NOT NULL DEFAULT 'ZTF DR24',
+                prior_search_count INTEGER NOT NULL DEFAULT 0,
+                prior_search_provenance_json TEXT NOT NULL DEFAULT '[]',
+                estimated_storage_mb REAL NOT NULL DEFAULT 0,
+                estimated_compute_seconds REAL NOT NULL DEFAULT 0,
+                scientific_metrics_json TEXT NOT NULL DEFAULT '{}',
                 PRIMARY KEY (search_id, target_id)
             )
             """
@@ -144,6 +180,22 @@ def init_db(db_path: Path) -> None:
                 "ALTER TABLE search_manifest_targets "
                 "ADD COLUMN validity_state TEXT NOT NULL DEFAULT 'unknown'"
             )
+        manifest_additions = {
+            "primary_survey_id": "TEXT NOT NULL DEFAULT ''",
+            "canonical_id": "TEXT NOT NULL DEFAULT ''",
+            "target_kind": "TEXT NOT NULL DEFAULT 'sky_field'",
+            "survey": "TEXT NOT NULL DEFAULT 'ZTF DR24'",
+            "prior_search_count": "INTEGER NOT NULL DEFAULT 0",
+            "prior_search_provenance_json": "TEXT NOT NULL DEFAULT '[]'",
+            "estimated_storage_mb": "REAL NOT NULL DEFAULT 0",
+            "estimated_compute_seconds": "REAL NOT NULL DEFAULT 0",
+            "scientific_metrics_json": "TEXT NOT NULL DEFAULT '{}'",
+        }
+        for column, definition in manifest_additions.items():
+            if column not in manifest_columns:
+                conn.execute(
+                    f"ALTER TABLE search_manifest_targets ADD COLUMN {column} {definition}"
+                )
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_manifest_targets_search "
             "ON search_manifest_targets(search_id)"
@@ -213,10 +265,27 @@ def init_db(db_path: Path) -> None:
                 status TEXT NOT NULL,
                 recommended_action TEXT NOT NULL,
                 originating_run_id TEXT,
+                required_data TEXT NOT NULL DEFAULT '',
+                estimated_storage_mb REAL NOT NULL DEFAULT 0,
+                estimated_compute_seconds REAL NOT NULL DEFAULT 0,
                 updated_at TEXT NOT NULL
             )
             """
         )
+        follow_up_columns = {
+            row["name"]
+            for row in conn.execute("PRAGMA table_info(follow_up_registry)").fetchall()
+        }
+        follow_up_additions = {
+            "required_data": "TEXT NOT NULL DEFAULT ''",
+            "estimated_storage_mb": "REAL NOT NULL DEFAULT 0",
+            "estimated_compute_seconds": "REAL NOT NULL DEFAULT 0",
+        }
+        for column, definition in follow_up_additions.items():
+            if column not in follow_up_columns:
+                conn.execute(
+                    f"ALTER TABLE follow_up_registry ADD COLUMN {column} {definition}"
+                )
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_follow_up_status ON follow_up_registry(status)"
         )
@@ -264,6 +333,128 @@ class ManifestTarget:
     coverage_inventory_id: str | None = None
     coverage_provenance: dict[str, Any] | None = None
     validity_state: str = "unknown"
+    primary_survey_id: str = ""
+    canonical_id: str = ""
+    target_kind: str = "sky_field"
+    survey: str = "ZTF DR24"
+    prior_search_count: int = 0
+    prior_search_provenance: list[dict[str, Any]] | None = None
+    estimated_storage_mb: float = 0.0
+    estimated_compute_seconds: float = 0.0
+    scientific_metrics: dict[str, Any] | None = None
+
+
+@dataclass(frozen=True)
+class CatalogTarget:
+    target_id: str
+    primary_survey_id: str
+    canonical_id: str
+    target_kind: str
+    survey: str
+    ra_deg: float
+    dec_deg: float
+    neo_class: str
+    ranking_score: float
+    estimated_storage_mb: float
+    estimated_compute_seconds: float
+    scientific_metrics: dict[str, Any]
+    source_provenance: dict[str, Any]
+
+
+def upsert_target_catalog(
+    db_path: Path,
+    *,
+    catalog_version: str,
+    targets: list[CatalogTarget],
+) -> int:
+    """Durably materialize a versioned planning universe."""
+
+    _non_empty(catalog_version, "catalog_version")
+    if not targets:
+        raise ValueError("target catalog must contain at least one target")
+    if len({target.target_id for target in targets}) != len(targets):
+        raise ValueError("target catalog must contain unique target_id values")
+    init_db(db_path)
+    now = _utc_now()
+    with closing(connect(db_path)) as conn:
+        for target in targets:
+            conn.execute(
+                """
+                INSERT INTO target_catalog(
+                    target_id, primary_survey_id, canonical_id, target_kind, survey,
+                    ra_deg, dec_deg, neo_class, catalog_version, ranking_score,
+                    estimated_storage_mb, estimated_compute_seconds,
+                    scientific_metrics_json, source_provenance_json,
+                    first_seen_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(catalog_version, target_id) DO UPDATE SET
+                    primary_survey_id=excluded.primary_survey_id,
+                    canonical_id=excluded.canonical_id,
+                    target_kind=excluded.target_kind,
+                    survey=excluded.survey,
+                    ra_deg=excluded.ra_deg,
+                    dec_deg=excluded.dec_deg,
+                    neo_class=excluded.neo_class,
+                    catalog_version=excluded.catalog_version,
+                    ranking_score=excluded.ranking_score,
+                    estimated_storage_mb=excluded.estimated_storage_mb,
+                    estimated_compute_seconds=excluded.estimated_compute_seconds,
+                    scientific_metrics_json=excluded.scientific_metrics_json,
+                    source_provenance_json=excluded.source_provenance_json,
+                    updated_at=excluded.updated_at
+                """,
+                (
+                    _non_empty(target.target_id, "target_id"),
+                    _non_empty(target.primary_survey_id, "primary_survey_id"),
+                    _non_empty(target.canonical_id, "canonical_id"),
+                    _non_empty(target.target_kind, "target_kind"),
+                    _non_empty(target.survey, "survey"),
+                    target.ra_deg,
+                    target.dec_deg,
+                    _non_empty(target.neo_class, "neo_class"),
+                    catalog_version,
+                    target.ranking_score,
+                    target.estimated_storage_mb,
+                    target.estimated_compute_seconds,
+                    _json(target.scientific_metrics),
+                    _json(target.source_provenance),
+                    now,
+                    now,
+                ),
+            )
+        conn.commit()
+    return len(targets)
+
+
+def list_target_catalog(
+    db_path: Path, *, catalog_version: str | None = None
+) -> list[dict[str, Any]]:
+    init_db(db_path)
+    query = "SELECT * FROM target_catalog"
+    params: tuple[Any, ...] = ()
+    if catalog_version is not None:
+        query += " WHERE catalog_version = ?"
+        params = (catalog_version,)
+    query += " ORDER BY ranking_score DESC, target_id"
+    with closing(connect(db_path)) as conn:
+        rows = conn.execute(query, params).fetchall()
+    result: list[dict[str, Any]] = []
+    for row in rows:
+        item = dict(row)
+        item["scientific_metrics"] = _loads(item.pop("scientific_metrics_json"))
+        item["source_provenance"] = _loads(item.pop("source_provenance_json"))
+        result.append(item)
+    return result
+
+
+def target_catalog_count(db_path: Path, *, catalog_version: str) -> int:
+    init_db(db_path)
+    with closing(connect(db_path)) as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) AS n FROM target_catalog WHERE catalog_version = ?",
+            (_non_empty(catalog_version, "catalog_version"),),
+        ).fetchone()
+    return int(row["n"])
 
 
 def create_search_manifest(
@@ -288,8 +479,13 @@ def create_search_manifest(
         raise ValueError(f"mode must be one of {sorted(_SEARCH_MODES)}, got {mode!r}")
     if requested_n <= 0:
         raise ValueError("requested_n must be positive")
-    if len(targets) > requested_n:
-        raise ValueError("targets must not exceed requested_n")
+    if not sufficiency_met:
+        raise ValueError("search manifest requires sufficiency_met=true")
+    if len(targets) != requested_n:
+        raise ValueError(
+            "search manifest target count must exactly match requested_n "
+            f"({len(targets)} != {requested_n})"
+        )
     if len({t.target_id for t in targets}) != len(targets):
         raise ValueError("manifest targets must have unique target_id values")
     invalid_validity = [
@@ -338,8 +534,11 @@ def create_search_manifest(
                 INSERT INTO search_manifest_targets(
                     search_id, rank, target_id, ra_deg, dec_deg, score,
                     selection_reason, coverage_inventory_id,
-                    coverage_provenance_json, validity_state
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    coverage_provenance_json, validity_state, primary_survey_id,
+                    canonical_id, target_kind, survey, prior_search_count,
+                    prior_search_provenance_json, estimated_storage_mb,
+                    estimated_compute_seconds, scientific_metrics_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     search_id,
@@ -352,6 +551,15 @@ def create_search_manifest(
                     target.coverage_inventory_id,
                     _json(target.coverage_provenance or {}),
                     target.validity_state,
+                    target.primary_survey_id,
+                    target.canonical_id,
+                    target.target_kind,
+                    target.survey,
+                    target.prior_search_count,
+                    _json(target.prior_search_provenance or []),
+                    target.estimated_storage_mb,
+                    target.estimated_compute_seconds,
+                    _json(target.scientific_metrics or {}),
                 ),
             )
             conn.execute(
@@ -399,6 +607,10 @@ def get_search_manifest(db_path: Path, search_id: str) -> dict[str, Any]:
         target["coverage_provenance"] = _loads(
             target.pop("coverage_provenance_json")
         )
+        target["prior_search_provenance"] = _loads(
+            target.pop("prior_search_provenance_json")
+        )
+        target["scientific_metrics"] = _loads(target.pop("scientific_metrics_json"))
         manifest["targets"].append(target)
     return manifest
 
@@ -712,6 +924,9 @@ def add_follow_up(
     evidence_ref: str,
     candidate_id: str | None = None,
     originating_run_id: str | None = None,
+    required_data: str = "operator review packet and independent follow-up astrometry",
+    estimated_storage_mb: float = 0.0,
+    estimated_compute_seconds: float = 0.0,
 ) -> int:
     init_db(db_path)
     now = _utc_now()
@@ -732,8 +947,10 @@ def add_follow_up(
             """
             INSERT INTO follow_up_registry(
                 target_id, candidate_id, flagged_at, reason, evidence_ref,
-                priority, status, recommended_action, originating_run_id, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, 'open', ?, ?, ?)
+                priority, status, recommended_action, originating_run_id,
+                required_data, estimated_storage_mb, estimated_compute_seconds,
+                updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?)
             """,
             (
                 _non_empty(target_id, "target_id"),
@@ -744,6 +961,9 @@ def add_follow_up(
                 priority,
                 _non_empty(recommended_action, "recommended_action"),
                 originating_run_id,
+                _non_empty(required_data, "required_data"),
+                estimated_storage_mb,
+                estimated_compute_seconds,
                 now,
             ),
         )

@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from hunter_state import (
+    CatalogTarget,
     ManifestTarget,
     acquired_nights_for_target,
     add_follow_up,
@@ -21,14 +22,17 @@ from hunter_state import (
     get_search_run,
     init_db,
     list_follow_ups,
+    list_target_catalog,
     list_target_history,
     mark_manifest_status,
     radec_from_target_id,
     searched_target_ids,
+    target_catalog_count,
     target_id_from_radec,
     update_follow_up_status,
     update_search_run_model_versions,
     upsert_run_target,
+    upsert_target_catalog,
 )
 
 
@@ -46,6 +50,24 @@ def _targets(n: int) -> list[ManifestTarget]:
     ]
 
 
+def _catalog_target(target_id: str = "radec_10.00_5.00") -> CatalogTarget:
+    return CatalogTarget(
+        target_id=target_id,
+        primary_survey_id=f"ztf-dr24-field:{target_id}",
+        canonical_id="icrs:10.00:5.00:r3.5deg",
+        target_kind="sky_field",
+        survey="ZTF DR24 archival science images",
+        ra_deg=10.0,
+        dec_deg=5.0,
+        neo_class="all",
+        ranking_score=0.9,
+        estimated_storage_mb=60.0,
+        estimated_compute_seconds=180.0,
+        scientific_metrics={"geometry_score": 0.9},
+        source_provenance={"source": "known-ground-truth fixture"},
+    )
+
+
 def test_init_db_records_schema_version(tmp_path: Path) -> None:
     db_path = tmp_path / "hunter_state.sqlite"
 
@@ -55,7 +77,65 @@ def test_init_db_records_schema_version(tmp_path: Path) -> None:
         row = conn.execute(
             "SELECT value FROM hunter_state_metadata WHERE key = 'schema_version'"
         ).fetchone()
-    assert row == ("2",)
+    assert row == ("3",)
+
+
+def test_target_catalog_is_distinct_versioned_and_upsertable(tmp_path: Path) -> None:
+    db_path = tmp_path / "hunter.sqlite"
+    target = _catalog_target()
+
+    assert (
+        upsert_target_catalog(
+            db_path, catalog_version="planning-v1", targets=[target]
+        )
+        == 1
+    )
+    stored = list_target_catalog(db_path, catalog_version="planning-v1")
+    assert len(stored) == 1
+    assert stored[0]["primary_survey_id"] == target.primary_survey_id
+    assert stored[0]["scientific_metrics"] == {"geometry_score": 0.9}
+    assert stored[0]["source_provenance"] == {
+        "source": "known-ground-truth fixture"
+    }
+
+    replacement = CatalogTarget(
+        **{
+            **target.__dict__,
+            "ranking_score": 0.8,
+            "scientific_metrics": {"geometry_score": 0.8},
+        }
+    )
+    upsert_target_catalog(
+        db_path, catalog_version="planning-v2", targets=[replacement]
+    )
+    all_rows = list_target_catalog(db_path)
+    assert len(all_rows) == 2
+    v2_rows = list_target_catalog(db_path, catalog_version="planning-v2")
+    assert v2_rows[0]["catalog_version"] == "planning-v2"
+    assert v2_rows[0]["ranking_score"] == 0.8
+    assert len(list_target_catalog(db_path, catalog_version="planning-v1")) == 1
+    assert target_catalog_count(db_path, catalog_version="planning-v1") == 1
+    assert target_catalog_count(db_path, catalog_version="planning-v2") == 1
+
+
+def test_target_catalog_rejects_empty_duplicate_and_invalid_records(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "hunter.sqlite"
+    target = _catalog_target()
+    with pytest.raises(ValueError, match="catalog_version"):
+        upsert_target_catalog(db_path, catalog_version="", targets=[target])
+    with pytest.raises(ValueError, match="at least one"):
+        upsert_target_catalog(db_path, catalog_version="v1", targets=[])
+    with pytest.raises(ValueError, match="unique target_id"):
+        upsert_target_catalog(
+            db_path, catalog_version="v1", targets=[target, target]
+        )
+    invalid = CatalogTarget(**{**target.__dict__, "canonical_id": ""})
+    with pytest.raises(ValueError, match="canonical_id"):
+        upsert_target_catalog(
+            db_path, catalog_version="v1", targets=[invalid]
+        )
 
 
 def test_init_db_migrates_v1_manifest_targets_and_backfills_history(
@@ -102,6 +182,41 @@ def test_init_db_migrates_v1_manifest_targets_and_backfills_history(
     assert manifest["targets"][0]["validity_state"] == "unknown"
     history = list_target_history(db_path, "radec_10.00_5.00")
     assert history[0]["status"] == "legacy_manifest_import"
+
+
+def test_init_db_migrates_legacy_follow_up_fields(tmp_path: Path) -> None:
+    db_path = tmp_path / "hunter.sqlite"
+    with closing(sqlite3.connect(db_path)) as conn:
+        conn.execute(
+            """
+            CREATE TABLE follow_up_registry (
+                follow_up_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                target_id TEXT NOT NULL,
+                candidate_id TEXT,
+                flagged_at TEXT NOT NULL,
+                reason TEXT NOT NULL,
+                evidence_ref TEXT NOT NULL,
+                priority REAL NOT NULL,
+                status TEXT NOT NULL,
+                recommended_action TEXT NOT NULL,
+                originating_run_id TEXT,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.commit()
+
+    init_db(db_path)
+
+    with closing(sqlite3.connect(db_path)) as conn:
+        columns = {
+            row[1] for row in conn.execute("PRAGMA table_info(follow_up_registry)")
+        }
+    assert {
+        "required_data",
+        "estimated_storage_mb",
+        "estimated_compute_seconds",
+    } <= columns
 
 
 def test_target_id_from_radec_matches_coordinate_key_rounding() -> None:
@@ -266,9 +381,25 @@ def test_create_search_manifest_rejects_non_positive_requested_n(tmp_path: Path)
         )
 
 
-def test_create_search_manifest_rejects_too_many_targets(tmp_path: Path) -> None:
+def test_create_search_manifest_rejects_false_sufficiency(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="requires sufficiency_met=true"):
+        create_search_manifest(
+            tmp_path / "hunter.sqlite",
+            search_id="search-1",
+            mode="new",
+            requested_n=1,
+            ranking_policy_path="p",
+            ranking_policy_digest="d",
+            targets=_targets(1),
+            discovery_pool_size_explored=1,
+            sufficiency_met=False,
+            config={},
+        )
+
+
+def test_create_search_manifest_rejects_non_exact_target_count(tmp_path: Path) -> None:
     db_path = tmp_path / "hunter_state.sqlite"
-    with pytest.raises(ValueError, match="must not exceed requested_n"):
+    with pytest.raises(ValueError, match="must exactly match requested_n"):
         create_search_manifest(
             db_path,
             search_id="search-1",

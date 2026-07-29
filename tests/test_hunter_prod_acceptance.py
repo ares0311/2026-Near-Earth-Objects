@@ -17,13 +17,13 @@ sys.path.insert(0, str(ROOT / "Skills"))
 import select_survey_fields  # noqa: E402
 
 
-def test_entrypoint_loader_resolves_repository_cli() -> None:
+def test_entrypoint_loader_resolves_packaged_cli_without_path_mutation() -> None:
     original_path = list(sys.path)
     skills_path = str(ROOT / "Skills")
     sys.path[:] = [entry for entry in sys.path if entry != skills_path]
     try:
-        assert hunter_commands._hunter_main().__module__ == "hunter_cli"
-        assert skills_path in sys.path
+        assert hunter_commands._hunter_main().__module__ == "Skills.hunter_cli"
+        assert skills_path not in sys.path
     finally:
         sys.path[:] = original_path
 
@@ -56,6 +56,14 @@ def test_packaging_and_readme_demote_shadow_product_paths() -> None:
         "Run-New-Search": "hunter_commands:run_new_search",
         "Show-Follow-Ups": "hunter_commands:show_follow_ups",
     }
+    packaged_modules = set(pyproject["tool"]["setuptools"]["py-modules"])
+    assert {"hunter_commands", "hunter_config", "hunter_state", "hunter_logging"} <= (
+        packaged_modules
+    )
+    assert pyproject["tool"]["setuptools"]["packages"] == ["Skills"]
+    packaged_data = pyproject["tool"]["setuptools"]["data-files"]
+    assert "models" in packaged_data
+    assert "data_selection/ranking_policies" in packaged_data
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     assert "## Canonical Hunter product workflow" in readme
     assert "`NEO-Hunter` is the persistent product terminal" in readme
@@ -74,7 +82,7 @@ def test_packaging_and_readme_demote_shadow_product_paths() -> None:
 def test_neohunter_entrypoint_loads_the_thin_persistent_shell(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import hunter_shell
+    from Skills import hunter_shell
 
     original_path = list(sys.path)
     skills_path = str(ROOT / "Skills")
@@ -86,7 +94,7 @@ def test_neohunter_entrypoint_loads_the_thin_persistent_shell(
     try:
         assert hunter_commands.neo_hunter() == 0
         assert seen == [["--command", "/Help"]]
-        assert skills_path in sys.path
+        assert skills_path not in sys.path
     finally:
         sys.path[:] = original_path
 
@@ -130,6 +138,21 @@ def test_runbook_contains_fail_closed_acceptance_ledger() -> None:
     runbook = (ROOT / "docs" / "OPERATOR_GO_NO_GO_RUNBOOK.md").read_text(
         encoding="utf-8"
     )
-    for finding_id in (f"HP-{number:02d}" for number in range(1, 15)):
+    for finding_id in (f"HP-{number:02d}" for number in range(1, 21)):
         assert finding_id in runbook
     assert "Do not restore that claim" in runbook
+
+
+def test_all_mode_ranks_one_hundred_from_over_ten_thousand_candidates() -> None:
+    rows = select_survey_fields.select_fields(
+        jd=2461000.5,
+        mode="all",
+        top_n=100_000,
+        deduplicate=False,
+    )
+
+    assert len(rows) >= 10_000
+    assert len(rows[:100]) == 100
+    assert [row["score"] for row in rows[:100]] == sorted(
+        (row["score"] for row in rows[:100]), reverse=True
+    )

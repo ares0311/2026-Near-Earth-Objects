@@ -24,6 +24,7 @@ from __future__ import annotations
 import argparse
 import csv
 import hashlib
+import importlib.metadata
 import json
 import subprocess
 import sys
@@ -34,18 +35,29 @@ from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(Path(__file__).resolve().parent))  # sibling Skills/ imports
+if not __package__:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import adversarial_review  # noqa: E402
-import convert_pixel_extraction_to_observations as pixel_convert  # noqa: E402
-import inventory_ztf_field_night_coverage as coverage_inventory  # noqa: E402
-import run_pixel_extraction_positive_control as positive_control  # noqa: E402
-import select_survey_fields as field_selector  # noqa: E402
-import ztf_dr24_bounded_ingest as bounded_ingest  # noqa: E402
+if __package__:
+    from . import adversarial_review  # noqa: E402
+    from . import convert_pixel_extraction_to_observations as pixel_convert  # noqa: E402
+    from . import inventory_ztf_field_night_coverage as coverage_inventory  # noqa: E402
+    from . import run_pixel_extraction_positive_control as positive_control  # noqa: E402
+    from . import select_survey_fields as field_selector  # noqa: E402
+    from . import ztf_dr24_bounded_ingest as bounded_ingest  # noqa: E402
+else:
+    import adversarial_review  # noqa: E402
+    import convert_pixel_extraction_to_observations as pixel_convert  # noqa: E402
+    import inventory_ztf_field_night_coverage as coverage_inventory  # noqa: E402
+    import run_pixel_extraction_positive_control as positive_control  # noqa: E402
+    import select_survey_fields as field_selector  # noqa: E402
+    import ztf_dr24_bounded_ingest as bounded_ingest  # noqa: E402
 
 import candidate_ledger  # noqa: E402
 import hunter_state  # noqa: E402
 import schemas  # noqa: E402
+from hunter_config import get_hunter_paths  # noqa: E402
+from hunter_logging import emit_event  # noqa: E402
 
 _NEO_CLASSES = ("aten", "ieo", "all")
 _RUN_TARGET_EXPECTED_EXCEPTIONS = (
@@ -56,20 +68,21 @@ _RUN_TARGET_EXPECTED_EXCEPTIONS = (
     OSError,
     json.JSONDecodeError,
 )
-_DEFAULT_TARGET_QUEUE = REPO_ROOT / "data_selection" / "target_priority_queue.csv"
-_DEFAULT_DB = REPO_ROOT / "data_selection" / "hunter_state.sqlite"
-_DEFAULT_LEDGER_DB = REPO_ROOT / "data_selection" / "candidate_ledger.sqlite"
+_PATHS = get_hunter_paths()
+_RESOURCE_ROOT = _PATHS.resource_root
+_DEFAULT_TARGET_QUEUE = _PATHS.target_queue
+_DEFAULT_DB = _PATHS.hunter_db
+_DEFAULT_LEDGER_DB = _PATHS.candidate_ledger_db
 _DEFAULT_FOLLOW_UP_POLICY = (
-    REPO_ROOT
-    / "data_selection"
-    / "ranking_policies"
-    / "hunter_follow_up_value_v1.json"
+    _PATHS.ranking_policy_dir / "hunter_follow_up_value_v1.json"
 )
-_BATCH_MANIFEST_DIR = REPO_ROOT / "data_selection" / "batch_manifests"
-_COVERAGE_INVENTORY_DIR = REPO_ROOT / "data_selection" / "coverage_inventories"
-_SEARCH_MANIFEST_CSV_DIR = REPO_ROOT / "data_selection" / "search_manifests"
-_WORKING_DIR = REPO_ROOT / "Logs" / "pipeline_runs" / "hunter_cli"
-_CHECKPOINT_ROOT = _WORKING_DIR / "search_runs"
+_BATCH_MANIFEST_DIR = _PATHS.batch_manifest_dir
+_RESOURCE_COVERAGE_INVENTORY_DIR = _PATHS.static_coverage_dir
+_COVERAGE_INVENTORY_DIR = _PATHS.runtime_coverage_dir
+_SEARCH_MANIFEST_CSV_DIR = _PATHS.search_manifest_dir
+_WORKING_DIR = _PATHS.work_dir
+_CHECKPOINT_ROOT = _PATHS.checkpoint_dir
+_EVENT_LOG = _PATHS.event_log
 _MAX_AGGREGATE_IRSA_REQUESTS = 6
 _DEFAULT_RUN_WORKERS = 3
 _MAX_RUN_WORKERS = 3
@@ -82,6 +95,16 @@ _MAX_RUN_WORKERS = 3
 _DEFAULT_SIZE_DEG = 0.01
 _FOLLOW_UP_VERDICTS = ("SURVIVE", "BORDERLINE")
 _FOLLOW_UP_POLICY_SCHEMA = "hunter-follow-up-value-policy-v1"
+_PLANNING_CATALOG_SCHEMA = "ztf-dr24-planning-catalog-v1"
+_LIVE_PREFLIGHT_BYTES_PER_EXPOSURE = 27_311_040
+_MINIMUM_EXECUTION_EXPOSURES = 3
+_ESTIMATED_TARGET_STORAGE_MB = round(
+    _LIVE_PREFLIGHT_BYTES_PER_EXPOSURE
+    * _MINIMUM_EXECUTION_EXPOSURES
+    / (1024 * 1024),
+    1,
+)
+_UNCALIBRATED_TARGET_COMPUTE_SECONDS = 180.0
 
 # Same bounded historical-replay window already established and used by this
 # repo's committed coverage batch manifests (data_selection/batch_manifests/
@@ -94,6 +117,10 @@ _DEFAULT_COVERAGE_WINDOW: dict[str, Any] = {
     "size_deg": 2.0,
     "min_distinct_nights": 3,
 }
+
+
+def _event_path(args: argparse.Namespace) -> Path:
+    return Path(getattr(args, "event_log", _EVENT_LOG))
 
 
 def _content_sha256(payload: Any) -> str:
@@ -129,8 +156,8 @@ def _load_follow_up_policy(path: Path = _DEFAULT_FOLLOW_UP_POLICY) -> dict[str, 
         "schema_version": payload["schema_version"],
         "policy_id": payload["policy_id"],
         "path": (
-            path.resolve().relative_to(REPO_ROOT).as_posix()
-            if path.resolve().is_relative_to(REPO_ROOT)
+            path.resolve().relative_to(_RESOURCE_ROOT).as_posix()
+            if path.resolve().is_relative_to(_RESOURCE_ROOT)
             else str(path)
         ),
         "sha256": hashlib.sha256(raw).hexdigest(),
@@ -155,9 +182,16 @@ def _combined_known_coverage() -> dict[tuple[float, float], dict[str, Any]]:
         "unknown": 1,
         "invalid": 0,
     }
-    if not _COVERAGE_INVENTORY_DIR.is_dir():
-        return combined
-    for path in sorted(_COVERAGE_INVENTORY_DIR.glob("*.json")):
+    inventory_dirs = {
+        _RESOURCE_COVERAGE_INVENTORY_DIR.resolve(),
+        _COVERAGE_INVENTORY_DIR.resolve(),
+    }
+    for path in sorted(
+        candidate
+        for directory in inventory_dirs
+        if directory.is_dir()
+        for candidate in directory.glob("*.json")
+    ):
         inventory = field_selector.load_coverage_inventory(path)
         for field in inventory["field_results"]:
             key = field_selector._coordinate_key(field["ra_deg"], field["dec_deg"])
@@ -165,8 +199,8 @@ def _combined_known_coverage() -> dict[tuple[float, float], dict[str, Any]]:
                 **field,
                 "coverage_provenance": {
                     **field["coverage_provenance"],
-                    "inventory_path": path.relative_to(REPO_ROOT).as_posix()
-                    if path.is_relative_to(REPO_ROOT)
+                    "inventory_path": path.relative_to(_RESOURCE_ROOT).as_posix()
+                    if path.is_relative_to(_RESOURCE_ROOT)
                     else str(path),
                     "batch_id": inventory["batch_id"],
                     "batch_manifest_sha256": inventory["batch_manifest_sha256"],
@@ -268,6 +302,106 @@ def _next_uncovered_planning_candidates(
         if len(candidates) >= batch_size:
             break
     return candidates
+
+
+def _materialize_planning_catalog(
+    *,
+    db_path: Path,
+    jd: float,
+    neo_class: str,
+    ranking_policy_path: Path,
+) -> tuple[str, int]:
+    """Persist the full explainable pre-selection universe before discovery."""
+
+    rows = field_selector.select_fields(
+        jd=jd,
+        mode=neo_class,
+        top_n=100_000,
+        ranking_policy_path=ranking_policy_path,
+        deduplicate=False,
+    )
+    if not rows:
+        raise RuntimeError("planning catalog contains no viable candidates")
+    policy = rows[0]["ranking_policy"]
+    catalog_version = (
+        f"{_PLANNING_CATALOG_SCHEMA}:{policy['sha256'][:16]}:"
+        f"{neo_class}:{jd:.5f}"
+    )
+    provenance = {
+        "schema_version": _PLANNING_CATALOG_SCHEMA,
+        "source": "deterministic ICRS sky mesh ranked for ZTF DR24 historical replay",
+        "ranking_policy": policy,
+        "jd": jd,
+        "grid_step_deg": field_selector._GRID_STEP_DEG,
+        "storage_estimate_basis": (
+            "3 * 27,311,040-byte live MP1 preflight; exact selected targets "
+            "replace this with their summed HEAD content lengths"
+        ),
+        "storage_estimate_evidence": (
+            "docs/evidence/live/2026-07-16-ztf-dr24-motion-product-"
+            "preflight-first-live-run.md"
+        ),
+        "compute_estimate_status": (
+            "uncalibrated transparent 180-second operator prior; not used in ranking"
+        ),
+    }
+    targets = [
+        _catalog_target_from_row(row, neo_class=neo_class, provenance=provenance)
+        for row in rows
+    ]
+    count = hunter_state.upsert_target_catalog(
+        db_path,
+        catalog_version=catalog_version,
+        targets=targets,
+    )
+    return catalog_version, count
+
+
+def _catalog_target_from_row(
+    row: dict[str, Any],
+    *,
+    neo_class: str,
+    provenance: dict[str, Any],
+) -> hunter_state.CatalogTarget:
+    target_id = hunter_state.target_id_from_radec(row["ra_deg"], row["dec_deg"])
+    return hunter_state.CatalogTarget(
+        target_id=target_id,
+        primary_survey_id=f"ztf-dr24-field:{target_id}",
+        canonical_id=f"icrs:{row['ra_deg']:.2f}:{row['dec_deg']:.2f}:r3.5deg",
+        target_kind="sky_field",
+        survey="ZTF DR24 archival science images",
+        ra_deg=row["ra_deg"],
+        dec_deg=row["dec_deg"],
+        neo_class=neo_class,
+        ranking_score=row["score"],
+        estimated_storage_mb=_estimated_storage_mb(row),
+        estimated_compute_seconds=_UNCALIBRATED_TARGET_COMPUTE_SECONDS,
+        scientific_metrics={
+            "survey_scarcity_score": row.get("survey_scarcity_score"),
+            "population_score": row.get("pop_score"),
+            "geometry_score": row.get("geom_score"),
+            "novelty_score": row.get("novelty_score"),
+            "solar_elongation_deg": row.get("elongation_deg"),
+            "ecliptic_latitude_deg": row.get("ecl_lat_deg"),
+            "hours_visible": row.get("hours_visible"),
+            "field_radius_deg": row.get("field_radius_deg", 3.5),
+            "n_distinct_nights": len(row.get("coverage_nights", [])),
+        },
+        source_provenance=provenance,
+    )
+
+
+def _estimated_storage_mb(row: dict[str, Any]) -> float:
+    exact = (row.get("coverage_provenance") or {}).get("exact_feasibility") or {}
+    measured_bytes = sum(
+        int(night.get("required_product_bytes") or 0)
+        for night in exact.get("verified_nights", [])
+    )
+    return (
+        round(measured_bytes / (1024 * 1024), 1)
+        if measured_bytes > 0
+        else _ESTIMATED_TARGET_STORAGE_MB
+    )
 
 
 def _live_coverage_check(
@@ -414,10 +548,21 @@ def _write_manifest_csv(search_id: str, rows: list[dict[str, Any]]) -> Path:
     fieldnames = [
         "rank",
         "target_id",
+        "primary_survey_id",
+        "canonical_id",
+        "target_kind",
+        "survey",
+        "search_mode",
         "ra_deg",
         "dec_deg",
+        "distance_ly",
+        "estimated_storage_mb",
+        "estimated_compute_seconds",
+        "prior_search_count",
+        "prior_search_provenance",
         "score",
         "selection_reason",
+        "scientific_metrics",
         "coverage_inventory_id",
         "validity_state",
         "coverage_source",
@@ -426,19 +571,45 @@ def _write_manifest_csv(search_id: str, rows: list[dict[str, Any]]) -> Path:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
         writer.writeheader()
         for i, row in enumerate(rows, start=1):
-            writer.writerow({"rank": i, **row})
+            serialized = {
+                **row,
+                "prior_search_provenance": _json_cell(
+                    row["prior_search_provenance"]
+                ),
+                "scientific_metrics": _json_cell(row["scientific_metrics"]),
+            }
+            writer.writerow({"rank": i, **serialized})
     return path
+
+
+def _json_cell(value: Any) -> str:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"))
 
 
 def _print_table(search_id: str, rows: list[dict[str, Any]]) -> None:
     print(f"\nSearch manifest {search_id} -- {len(rows)} target(s) selected (pending):\n")
-    header = f"{'rank':>4}  {'target_id':<22}  {'score':>7}  {'reason'}"
+    header = (
+        f"{'rank':>4}  {'target_id':<22}  {'survey':<9}  {'mode':<9}  "
+        f"{'prior':>5}  {'MB':>7}  {'CPU-s':>7}  {'score':>7}"
+    )
     print(header)
     print("-" * len(header))
     for i, row in enumerate(rows, start=1):
         print(
-            f"{i:>4}  {row['target_id']:<22}  {row['score']:>7.4f}  {row['selection_reason']}"
+            f"{i:>4}  {row['target_id']:<22}  {'ZTF DR24':<9}  "
+            f"{row['search_mode']:<9}  {row['prior_search_count']:>5}  "
+            f"{row['estimated_storage_mb']:>7.1f}  "
+            f"{row['estimated_compute_seconds']:>7.1f}  {row['score']:>7.4f}"
         )
+        print(
+            f"      primary={row['primary_survey_id']}  canonical={row['canonical_id']}  "
+            f"type={row['target_kind']}  distance_ly={row['distance_ly']}"
+        )
+        print(
+            f"      metrics={_json_cell(row['scientific_metrics'])}  "
+            f"prior={_json_cell(row['prior_search_provenance'])}"
+        )
+        print(f"      reason={row['selection_reason']}")
     print()
 
 
@@ -694,6 +865,7 @@ def _exact_target_feasibility(
             misses.append({"night": night, "reason": message})
             continue
         manifest_path = Path(report["motion_product_manifest_path"])
+        product_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         verified.append(
             {
                 "night_yyyymmdd": night,
@@ -703,6 +875,9 @@ def _exact_target_feasibility(
                 "product_manifest_sha256": hashlib.sha256(
                     manifest_path.read_bytes()
                 ).hexdigest(),
+                "required_product_bytes": product_manifest["preflight"][
+                    "total_content_bytes"
+                ],
             }
         )
     return {
@@ -816,6 +991,15 @@ def _attach_current_coverage(
 def cmd_create_new_search(args: argparse.Namespace) -> int:
     if args.targets <= 0:
         raise ValueError("requested_n must be positive")
+    emit_event(
+        _event_path(args),
+        event="create_search",
+        status="started",
+        command="Create-New-Search",
+        requested_n=args.targets,
+        mode=args.mode,
+        neo_class=args.neo_class,
+    )
     ranking_policy_path = Path(args.ranking_policy)
     target_queue_path = Path(args.target_queue)
     db_path = Path(args.db)
@@ -829,6 +1013,17 @@ def cmd_create_new_search(args: argparse.Namespace) -> int:
         else:
             jd = float(args.jd)
 
+        catalog_version, catalog_size = _materialize_planning_catalog(
+            db_path=db_path,
+            jd=jd,
+            neo_class=args.neo_class,
+            ranking_policy_path=ranking_policy_path,
+        )
+        if args.neo_class == "all" and catalog_size < 10_000:
+            raise RuntimeError(
+                "all-sky planning catalog must contain at least 10,000 viable "
+                f"candidates, found {catalog_size}"
+            )
         out_dir = _WORKING_DIR / "coverage_expansion"
         result = discover_new_targets(
             jd=jd,
@@ -840,7 +1035,13 @@ def cmd_create_new_search(args: argparse.Namespace) -> int:
             ranking_policy_path=ranking_policy_path,
             db_path=db_path,
         )
-        config: dict[str, Any] = {"neo_class": args.neo_class, "jd": jd, "max_pool": args.max_pool}
+        config: dict[str, Any] = {
+            "neo_class": args.neo_class,
+            "jd": jd,
+            "max_pool": args.max_pool,
+            "catalog_version": catalog_version,
+            "catalog_size": catalog_size,
+        }
     else:
         follow_up_policy_path = Path(
             getattr(args, "follow_up_policy", _DEFAULT_FOLLOW_UP_POLICY)
@@ -852,7 +1053,13 @@ def cmd_create_new_search(args: argparse.Namespace) -> int:
             follow_up_policy_path=follow_up_policy_path,
         )
         ranking_policy = result["ranking_policy"]
-        config = {"neo_class": args.neo_class}
+        config = {
+            "neo_class": args.neo_class,
+            "catalog_version": (
+                f"{_PLANNING_CATALOG_SCHEMA}:follow-up:"
+                f"{ranking_policy['sha256'][:16]}"
+            ),
+        }
 
     if result.get("exploration_limited") and not result["sufficiency_met"]:
         raise RuntimeError(
@@ -904,9 +1111,77 @@ def cmd_create_new_search(args: argparse.Namespace) -> int:
             f"{result['pool_size_explored']} field(s) before {args.targets} exact "
             "executable targets were found; remove or increase the limit"
         )
-    manifest_targets = [
-        hunter_state.ManifestTarget(
-            target_id=hunter_state.target_id_from_radec(row["ra_deg"], row["dec_deg"]),
+    if not exact_sufficiency_met:
+        exhaustion = (
+            "all valid follow-up evidence was exhausted"
+            if args.mode == "follow-up"
+            else (
+                "the full accessible planning universe was exhausted"
+                if result.get("universe_exhausted", True)
+                else "the currently supported candidate frontier was exhausted"
+            )
+        )
+        raise RuntimeError(
+            f"cannot create search: only {len(selected)}/{args.targets} exact eligible "
+            f"target(s) were found after exploring {result['pool_size_explored']} "
+            f"candidate field(s); {exhaustion}"
+        )
+    selected_catalog_provenance = {
+        "schema_version": _PLANNING_CATALOG_SCHEMA,
+        "source": (
+            "exact-feasibility-selected ZTF DR24 planning target"
+            if args.mode == "new"
+            else "durable prior-search/follow-up evidence"
+        ),
+        "ranking_policy": ranking_policy,
+        "search_mode": args.mode,
+        "storage_estimate_basis": (
+            "selected targets sum exact HEAD content lengths; planning rows use "
+            "3 * 27,311,040-byte live MP1 preflight from "
+            "docs/evidence/live/2026-07-16-ztf-dr24-motion-product-"
+            "preflight-first-live-run.md"
+        ),
+        "compute_estimate_status": (
+            "uncalibrated transparent 180-second operator prior; not used in ranking"
+        ),
+    }
+    hunter_state.upsert_target_catalog(
+        db_path,
+        catalog_version=config["catalog_version"],
+        targets=[
+            _catalog_target_from_row(
+                row,
+                neo_class=args.neo_class,
+                provenance=selected_catalog_provenance,
+            )
+            for row in selected
+        ],
+    )
+    config["catalog_size"] = max(
+        int(config.get("catalog_size", 0)),
+        hunter_state.target_catalog_count(
+            db_path, catalog_version=config["catalog_version"]
+        ),
+    )
+    manifest_targets = []
+    for row in selected:
+        target_id = hunter_state.target_id_from_radec(row["ra_deg"], row["dec_deg"])
+        prior_history = hunter_state.list_target_history(db_path, target_id)
+        scientific_metrics = {
+            "geometry_score": row.get("geom_score"),
+            "population_score": row.get("pop_score"),
+            "survey_scarcity_score": row.get("survey_scarcity_score"),
+            "novelty_score": row.get("novelty_score"),
+            "solar_elongation_deg": row.get("elongation_deg"),
+            "ecliptic_latitude_deg": row.get("ecl_lat_deg"),
+            "hours_visible": row.get("hours_visible"),
+            "n_distinct_nights": len(row.get("coverage_nights", [])),
+            "coverage_nights": row.get("coverage_nights", []),
+            "neo_class": args.neo_class,
+        }
+        manifest_targets.append(
+            hunter_state.ManifestTarget(
+            target_id=target_id,
             ra_deg=row["ra_deg"],
             dec_deg=row["dec_deg"],
             score=row["score"],
@@ -914,9 +1189,26 @@ def cmd_create_new_search(args: argparse.Namespace) -> int:
             coverage_inventory_id=row.get("field_id"),
             coverage_provenance=row["coverage_provenance"],
             validity_state=row["coverage_provenance"]["validity_state"],
+            primary_survey_id=f"ztf-dr24-field:{target_id}",
+            canonical_id=f"icrs:{row['ra_deg']:.2f}:{row['dec_deg']:.2f}:r3.5deg",
+            target_kind="sky_field",
+            survey="ZTF DR24 archival science images",
+            prior_search_count=len(prior_history),
+            prior_search_provenance=[
+                {
+                    "search_id": event["search_id"],
+                    "run_id": event["run_id"],
+                    "status": event["status"],
+                    "occurred_at": event["occurred_at"],
+                    "source": event["source"],
+                }
+                for event in prior_history
+            ],
+            estimated_storage_mb=_estimated_storage_mb(row),
+            estimated_compute_seconds=_UNCALIBRATED_TARGET_COMPUTE_SECONDS,
+            scientific_metrics=scientific_metrics,
         )
-        for row in selected
-    ]
+        )
 
     mode_slug = args.mode.replace("-", "_")
     search_id = (
@@ -938,17 +1230,28 @@ def cmd_create_new_search(args: argparse.Namespace) -> int:
     manifest_rows = [
         {
             "target_id": t.target_id,
+            "primary_survey_id": t.primary_survey_id,
+            "canonical_id": t.canonical_id,
+            "target_kind": t.target_kind,
+            "survey": t.survey,
+            "search_mode": args.mode,
             "ra_deg": t.ra_deg,
             "dec_deg": t.dec_deg,
+            "distance_ly": "not_applicable_solar_system_sky_field",
+            "estimated_storage_mb": t.estimated_storage_mb,
+            "estimated_compute_seconds": t.estimated_compute_seconds,
+            "prior_search_count": t.prior_search_count,
+            "prior_search_provenance": t.prior_search_provenance or [],
             "score": t.score,
             "selection_reason": t.selection_reason,
+            "scientific_metrics": t.scientific_metrics or {},
             "coverage_inventory_id": t.coverage_inventory_id,
             "validity_state": t.validity_state,
             "coverage_source": (t.coverage_provenance or {}).get("source", "unknown"),
         }
         for t in manifest_targets
     ]
-    if len(manifest_rows) <= 100:
+    if args.targets <= 100:
         _print_table(search_id, manifest_rows)
     else:
         csv_path = _write_manifest_csv(search_id, manifest_rows)
@@ -960,22 +1263,18 @@ def cmd_create_new_search(args: argparse.Namespace) -> int:
         f"pool_explored={result['pool_size_explored']}  "
         f"sufficiency_met={exact_sufficiency_met}"
     )
-    if len(manifest_targets) < args.targets:
-        exhaustion = (
-            "all valid follow-up evidence was exhausted"
-            if args.mode == "follow-up"
-            else (
-                "the full accessible planning universe was exhausted"
-                if result.get("universe_exhausted", True)
-                else "the currently supported candidate frontier was exhausted"
-            )
-        )
-        print(
-            f"WARNING: only {len(manifest_targets)}/{args.targets} eligible targets found "
-            f"after exploring {result['pool_size_explored']} candidate field(s) -- "
-            f"{exhaustion}; retry with different scientific constraints only if desired.",
-            flush=True,
-        )
+    emit_event(
+        _event_path(args),
+        event="create_search",
+        status="completed",
+        command="Create-New-Search",
+        search_id=search_id,
+        requested_n=args.targets,
+        selected_n=len(manifest_targets),
+        mode=args.mode,
+        catalog_size=config.get("catalog_size"),
+        state_root=str(_PATHS.state_root),
+    )
     return 0
 
 
@@ -988,6 +1287,16 @@ def _git_sha() -> str:
 
 def _git_provenance() -> dict[str, Any]:
     """Return the exact commit plus whether tracked pipeline code is modified."""
+    if not (REPO_ROOT / ".git").exists():
+        try:
+            version = importlib.metadata.version("neo-detection")
+        except importlib.metadata.PackageNotFoundError:
+            version = "unknown"
+        return {
+            "commit": "installed-distribution",
+            "distribution_version": version,
+            "tracked_worktree_dirty": False,
+        }
     status = subprocess.run(
         ["git", "status", "--porcelain", "--untracked-files=no"],
         capture_output=True,
@@ -1254,6 +1563,13 @@ def _ingest_and_maybe_register_followup(
             evidence_ref=f"candidate_ledger:{record['candidate_id']}",
             candidate_id=record["candidate_id"],
             originating_run_id=run_id,
+            required_data=(
+                "operator review packet; if approved, independent follow-up astrometry"
+            ),
+            estimated_storage_mb=float(target.get("estimated_storage_mb", 0.0)),
+            estimated_compute_seconds=float(
+                target.get("estimated_compute_seconds", 0.0)
+            ),
         )
 
 
@@ -1302,6 +1618,7 @@ def run_search(
     checkpoint_root: Path,
     size_deg: float = _DEFAULT_SIZE_DEG,
     workers: int = _DEFAULT_RUN_WORKERS,
+    event_log: Path = _EVENT_LOG,
 ) -> dict[str, Any]:
     """Execute the exact persisted manifest for ``search_id``. Never
     regenerates the target selection. Resumes an interrupted OR partially/
@@ -1319,6 +1636,18 @@ def run_search(
         )
     if manifest["status"] != "pending":
         raise ValueError(f"search {search_id} has unexpected status {manifest['status']!r}")
+    if (
+        not manifest["sufficiency_met"]
+        or manifest["requested_n"] <= 0
+        or manifest["actual_n_selected"] != manifest["requested_n"]
+        or len(manifest["targets"]) != manifest["requested_n"]
+    ):
+        raise ValueError(
+            f"search {search_id} is incomplete: requested_n={manifest['requested_n']} "
+            f"actual_n_selected={manifest['actual_n_selected']} "
+            f"sufficiency_met={manifest['sufficiency_met']}; "
+            "create a new sufficient search instead of executing partial work"
+        )
 
     existing_run = hunter_state.get_latest_run_for_search(db_path, search_id)
     if existing_run is not None and existing_run["status"] != "completed":
@@ -1355,6 +1684,16 @@ def run_search(
                 "execution_contract": execution_contract,
             },
         )
+    emit_event(
+        event_log,
+        event="run_search",
+        status="started",
+        command="Run-New-Search",
+        search_id=search_id,
+        run_id=run_id,
+        requested_n=manifest["requested_n"],
+        workers=workers,
+    )
 
     already_done = hunter_state.get_run_targets(db_path, run_id)
     pending_targets: list[dict[str, Any]] = []
@@ -1434,6 +1773,17 @@ def run_search(
                             "validity_state": "valid",
                         },
                     )
+                    emit_event(
+                        event_log,
+                        event="target_execution",
+                        status=result["execution_status"],
+                        command="Run-New-Search",
+                        search_id=search_id,
+                        run_id=run_id,
+                        target_id=target_id,
+                        candidate_count=len(result["candidate_ids"]),
+                        nights_acquired=result["nights_acquired"],
+                    )
                 except _RUN_TARGET_EXPECTED_EXCEPTIONS as exc:
                     print(f"[run-new-search] target {target_id} FAILED: {exc}", flush=True)
                     hunter_state.commit_target_result(
@@ -1452,6 +1802,17 @@ def run_search(
                             "error_type": type(exc).__name__,
                             "validity_state": "invalid",
                         },
+                    )
+                    emit_event(
+                        event_log,
+                        event="target_execution",
+                        status="failed",
+                        command="Run-New-Search",
+                        search_id=search_id,
+                        run_id=run_id,
+                        target_id=target_id,
+                        error_type=type(exc).__name__,
+                        error_message=str(exc),
                     )
                     continue
 
@@ -1486,6 +1847,16 @@ def run_search(
     # than being permanently locked out by one bad target.
     if final_status == "completed":
         hunter_state.mark_manifest_status(db_path, search_id, "executed")
+    emit_event(
+        event_log,
+        event="run_search",
+        status=final_status,
+        command="Run-New-Search",
+        search_id=search_id,
+        run_id=run_id,
+        target_count=n_targets,
+        failed_count=n_failed,
+    )
     return {"run_id": run_id, "status": final_status, "n_targets": n_targets, "n_failed": n_failed}
 
 
@@ -1505,6 +1876,7 @@ def cmd_run_new_search(args: argparse.Namespace) -> int:
         checkpoint_root=Path(args.checkpoint_root),
         size_deg=args.size_deg,
         workers=getattr(args, "workers", _DEFAULT_RUN_WORKERS),
+        event_log=_event_path(args),
     )
     print(
         f"search_id={search_id}  run_id={result['run_id']}  status={result['status']}  "
@@ -1527,11 +1899,19 @@ def cmd_show_follow_ups(args: argparse.Namespace) -> int:
 
     if not entries:
         print(f"No follow-ups with status={status!r}." if status else "No follow-ups.")
+        emit_event(
+            _event_path(args),
+            event="show_follow_ups",
+            status="completed",
+            command="Show-Follow-Ups",
+            requested_status=status,
+            result_count=0,
+        )
         return 0
 
     header = (
-        f"{'target':<22}  {'priority':>8}  {'status':<10}  {'flagged_at':<20}  "
-        f"{'review':<10}  reason / recommended action"
+        f"{'target':<22}  {'priority':>8}  {'status':<10}  {'prior':>5}  "
+        f"{'MB':>7}  {'CPU-s':>7}  reason"
     )
     print(header)
     print("-" * len(header))
@@ -1541,11 +1921,45 @@ def cmd_show_follow_ups(args: argparse.Namespace) -> int:
             record = ledger_records.get(entry["candidate_id"])
             if record is not None:
                 review_status = record["review_status"]
+        history = hunter_state.list_target_history(db_path, entry["target_id"])
         print(
-            f"{entry['target_id']:<22}  {entry['priority']:>8.3f}  {entry['status']:<10}  "
-            f"{entry['flagged_at']:<20}  {review_status:<10}  {entry['reason']}"
+            f"{entry['target_id']:<22}  {entry['priority']:>8.3f}  "
+            f"{entry['status']:<10}  {len(history):>5}  "
+            f"{entry['estimated_storage_mb']:>7.1f}  "
+            f"{entry['estimated_compute_seconds']:>7.1f}  {entry['reason']}"
         )
-        print(f"{'':<22}  {'':>8}  {'':<10}  {'':<20}  {'':<10}  -> {entry['recommended_action']}")
+        print(
+            f"      flagged_at={entry['flagged_at']}  review={review_status or 'n/a'}  "
+            f"originating_run={entry['originating_run_id'] or 'external/unknown'}  "
+            f"evidence={entry['evidence_ref']}"
+        )
+        print(
+            f"      required_data={entry['required_data']}  "
+            f"recommended_action={entry['recommended_action']}"
+        )
+        print(
+            "      prior_search_provenance="
+            + _json_cell(
+                [
+                    {
+                        "search_id": item["search_id"],
+                        "run_id": item["run_id"],
+                        "status": item["status"],
+                        "source": item["source"],
+                        "occurred_at": item["occurred_at"],
+                    }
+                    for item in history
+                ]
+            )
+        )
+    emit_event(
+        _event_path(args),
+        event="show_follow_ups",
+        status="completed",
+        command="Show-Follow-Ups",
+        requested_status=status,
+        result_count=len(entries),
+    )
     return 0
 
 
@@ -1574,6 +1988,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--follow-up-policy", default=str(_DEFAULT_FOLLOW_UP_POLICY)
     )
     create_cmd.add_argument("--db", default=str(_DEFAULT_DB))
+    create_cmd.add_argument("--event-log", default=str(_EVENT_LOG))
 
     run_cmd = sub.add_parser(
         "run-new-search", help="execute the exact targets from a durable pending search"
@@ -1584,6 +1999,7 @@ def build_parser() -> argparse.ArgumentParser:
     run_cmd.add_argument("--db", default=str(_DEFAULT_DB))
     run_cmd.add_argument("--candidate-ledger-db", default=str(_DEFAULT_LEDGER_DB))
     run_cmd.add_argument("--checkpoint-root", default=str(_CHECKPOINT_ROOT))
+    run_cmd.add_argument("--event-log", default=str(_EVENT_LOG))
     run_cmd.add_argument("--size-deg", type=float, default=_DEFAULT_SIZE_DEG)
     run_cmd.add_argument(
         "--workers",
@@ -1604,6 +2020,7 @@ def build_parser() -> argparse.ArgumentParser:
     show_cmd.add_argument("--limit", type=int, default=None)
     show_cmd.add_argument("--db", default=str(_DEFAULT_DB))
     show_cmd.add_argument("--candidate-ledger-db", default=str(_DEFAULT_LEDGER_DB))
+    show_cmd.add_argument("--event-log", default=str(_EVENT_LOG))
 
     return parser
 
@@ -1618,7 +2035,15 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "show-follow-ups":
             return cmd_show_follow_ups(args)
         raise AssertionError(f"unhandled command {args.command}")  # pragma: no cover
-    except (KeyError, TypeError, ValueError, RuntimeError, json.JSONDecodeError) as exc:
+    except (KeyError, TypeError, ValueError, RuntimeError, OSError, json.JSONDecodeError) as exc:
+        emit_event(
+            _event_path(args),
+            event="command",
+            status="failed",
+            command=args.command,
+            error_type=type(exc).__name__,
+            error_message=str(exc),
+        )
         raise SystemExit(str(exc)) from exc
 
 

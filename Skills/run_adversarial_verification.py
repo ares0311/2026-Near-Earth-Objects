@@ -33,6 +33,7 @@ _ADVERSARIAL_TEST_MODULES = [
     "tests/test_verify_reliability_controls.py",
     "tests/test_hunter_prod_acceptance.py",
     "tests/test_hunter_shell.py",
+    "tests/test_verify_hunter_distribution.py",
 ]
 
 
@@ -58,12 +59,21 @@ def main() -> int:
         env={**__import__("os").environ, "PYTHONPATH": "src"},
     )
     tests_passed = result.returncode == 0
+    distribution = subprocess.run(
+        [sys.executable, "Skills/verify_hunter_distribution.py"],
+        cwd=_REPO_ROOT,
+    )
+    distribution_passed = distribution.returncode == 0
 
     after = _git_status_porcelain()
     repo_unchanged = before == after
 
     print("\n" + "=" * 72)
     print(f"  [{'PASS' if tests_passed else 'FAIL'}] all negative-control tests passed")
+    print(
+        f"  [{'PASS' if distribution_passed else 'FAIL'}] isolated Hunter artifact "
+        "installed and launched"
+    )
     print(
         f"  [{'PASS' if repo_unchanged else 'FAIL'}] repository working tree unchanged by this run"
     )
@@ -78,7 +88,7 @@ def main() -> int:
         )
         print(after, file=sys.stderr)
 
-    all_ok = tests_passed and repo_unchanged
+    all_ok = tests_passed and distribution_passed and repo_unchanged
     if all_ok:
         print("\n[adversarial-verification] PASS -- every critical control demonstrated it "
               "can detect the failure it claims to detect, and the repo is untouched.")

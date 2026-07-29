@@ -23,6 +23,7 @@ from typing import Any
 
 import numpy as np
 
+from hunter_config import get_hunter_paths
 from schemas import (
     CandidateFeatures,
     NEOPosterior,
@@ -30,7 +31,7 @@ from schemas import (
     Tracklet,
 )
 
-_MODEL_DIR = Path("models")
+_MODEL_DIR = get_hunter_paths().model_dir
 _MODEL_VERSION = "0.1.0"
 
 # ---------------------------------------------------------------------------
@@ -1179,8 +1180,6 @@ def compute_calibration_gain(
     eps = 1e-12
     kl = float(np.sum(p * np.log((p + eps) / (q + eps))))
     return round(kl, 6)
-
-
 
 
 
