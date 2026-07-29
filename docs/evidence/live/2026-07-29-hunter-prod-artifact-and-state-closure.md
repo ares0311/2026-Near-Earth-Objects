@@ -106,8 +106,8 @@ isolation and that no secret-bearing configuration is written to events.
 
 ## HP-20 — verification boundary
 
-Clean implementation commit
-`fd9897509d2fe2c65f1b3f0e97be5489a20415ce` produced:
+Clean hosted-boundary commit
+`7b8bb59e6f3855eae2fce43e69b0ff5065a448a2` produced:
 
 ```text
 directive parity: PASS
@@ -115,7 +115,7 @@ silent-exception gate: PASS
 incomplete-implementation gate: PASS
 ruff: PASS
 mypy src: PASS
-pytest: 2,334 passed, 2 deselected
+pytest: 2,335 passed, 2 deselected
 src coverage: 5,993/5,993 statements, 100.00%
 adversarial verification: 85 passed
 isolated wheel contents/install/launch/state isolation: PASS
@@ -124,11 +124,13 @@ freshness: CURRENT AND VERIFIED
 ```
 
 The REL-05 record identifies that exact commit, a clean working tree, and UTC
-check time `2026-07-29T05:58:26.805228+00:00`.
+check time `2026-07-29T06:23:16.481410+00:00`.
 
-Hosted CI and clean post-merge verification remain the final HP-20 evidence
-boundary. Until both pass, this record proves local implementation and
-verification but does not restore a merged-current-main PROD claim.
+PR CI run `30427815869` passed both `lint-and-test (3.14)` and the new
+`hunter-distribution` job. E2E run `30427816053` passed all six independent
+pipeline, model, recovery, and alert controls. The remaining HP-20 evidence
+boundary is clean post-merge verification. Until it passes, this record does
+not restore a merged-current-main PROD claim.
 
 ## Genuine limitations and separate gates
 
