@@ -223,9 +223,16 @@ two-minute job timeout. The operator-Mac live-test command remains unchanged
 and credential-gated. A workflow contract test rejects reintroducing setup or
 dependency installation into the skip-only job.
 
-**Current status**: IMPLEMENTED BUT NOT VERIFIED. The branch must pass its
-normal PR checks, and the Integration workflow must complete on merged `main`
-before HP-22 and the Hunter PROD claim may close.
+PR #288 passed full CI run `30442352193` and all six E2E jobs in
+`30442353757`. It merged as clean `main` commit
+`fc46c0c8559fbbb8fe7ad427b4d30b9a49286e09`. Main Integration run
+`30442543264` completed successfully in three seconds: set up job, emit the
+policy notice, complete job. Main CI `30442543025` and all six E2E jobs in
+`30442543061` also passed.
+
+**Current status**: VERIFIED. HP-22 is closed. HP-15 through HP-22 satisfy the
+NEO-Hunter software PROD threshold subject to the genuine separate scientific
+and authority limitations below.
 
 ## Genuine limitations and separate gates
 
