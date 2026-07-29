@@ -54,7 +54,7 @@ jobs:
           uv run python -m pytest \
             -m "not integration_live" \
             -vv \
-            -n auto \
+            -n 2 \
             --dist=loadfile \
             --timeout=120 \
             --timeout-method=thread \
@@ -63,6 +63,12 @@ jobs:
             --cov-fail-under=100
         env:
           PYTHONPATH: src
+          # Keep each xdist process from creating a second, unbounded native
+          # thread pool. Two pytest workers still overlap independent test
+          # files while remaining below the hosted runner's process ceiling.
+          OMP_NUM_THREADS: "1"
+          MKL_NUM_THREADS: "1"
+          OPENBLAS_NUM_THREADS: "1"
 
   hunter-distribution:
     runs-on: ubuntu-latest

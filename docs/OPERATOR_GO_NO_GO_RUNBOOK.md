@@ -7,8 +7,9 @@ steps below remain valid for the secondary WISE/DECam/TESS path.
 below), the current primary sub-approach as of the 2026-07-16 pivot; the
 2026-07-04 ZTF DR24 (alert-replay) section remains valid for that
 now-superseded sub-approach.
-**Updated**: 2026-07-29 — recorded the HP-15 through HP-20 adversarial
-re-audit and its verified remediation on clean merged `main`.
+**Updated**: 2026-07-29 — reopened Hunter PROD after repeated hosted-CI
+worker loss exposed HP-21; remediation is in progress and PROD must not be
+claimed until its repeated-acceptance boundary passes.
 **Status**: Closes `docs/PRODUCTION_READINESS.md` Gate P5 (WISE/DECam/TESS
 path), `docs/ZTF_DR24_PRODUCTION_GATES.md` Gate Z7 (ZTF DR24 alert-replay
 path), and Gate MP7 (ZTF DR24 motion-product path).
@@ -64,6 +65,7 @@ VERIFIED against clean current `main`.
 | HP-18 | Operator manifest and follow-up tables omitted mandatory decision fields. Manifests lacked explicit mode, prior-search count/provenance, resource estimates, and several domain metrics; `/Show-Follow-Ups` stored but did not display evidence reference, originating run, prior history, required data, or estimated resources. The `N>100` export decision was based on actual rows rather than requested `N`. | Persist and display/export the complete operator contract with honest not-applicable values where necessary; base grid-versus-CSV behavior on requested `N`; add schema/behavior tests for both small tables and large or exhausted requests; make follow-up rows independently actionable from displayed/exported information. | **VERIFIED** — durable small tables and large CSVs expose the required manifest fields; follow-up output is independently actionable; requested N governs display behavior. |
 | HP-19 | Hunter emitted human-readable `print` progress but had no structured operational event log, and installed-path configuration assumed repository-relative mutable state. | Add explicit, documented resource/state/config resolution with an operator override; write append-only structured JSONL events for create, run, per-target outcome, follow-up display, validation failure, and terminal status; keep secrets out; prove installed operation writes only to the configured state root and that log failures fail visibly. | **VERIFIED** — immutable resources and mutable `NEOHUNTER_HOME` state are separate; JSONL events cover required transitions; log failures surface; isolated installed operation writes only its configured SQLite/event state. |
 | HP-20 | The canonical and adversarial suites passed despite HP-15 and HP-16, and the local REL-05 record was stale. Release CI built an artifact but never installed or launched it. | Add independent negative controls for empty/short manifests, isolated artifact contents and launch, catalog scale, complete operator fields, structured events, and installed state isolation; make release CI run the isolated artifact smoke test; rerun canonical, adversarial, artifact, hosted-CI, and clean-commit freshness checks before restoring any Hunter PROD claim. Keep broader ZTF DR24 scientific-capability gate M8 explicitly separate and open until its own evidence closes it. | **VERIFIED** — PR CI `30428208537` (successful attempt) passed lint, type checks, 2,335 tests at 100% coverage, and isolated `hunter-distribution`; E2E `30428208539` passed all six jobs. Clean merged `main` commit `c73455c6` repeated all six canonical stages, 85 adversarial controls, isolated artifact validation, and REL-05 freshness. |
+| HP-21 | Hosted full-suite CI twice reached 99%, lost an xdist worker without an assertion failure, and hung until the 15-minute job limit. An unchanged successful rerun masked the first occurrence; merged-main CI reproduced it. `-n auto` also allowed each worker's native numerical libraries to create additional unbounded thread pools. | Replace machine-dependent `-n auto` with a reviewed bounded worker count and cap native-library threads; contract-test those workflow controls; require two consecutive successful hosted full-suite executions on the same PR tree and a successful full suite on the merged `main`, with no worker loss or timeout. | **IMPLEMENTED BUT NOT VERIFIED** — CI is bounded to two loadfile workers and one native thread per worker. Local and hosted acceptance evidence is still required. |
 
 Execution order: formalize HP-10’s value contracts first so selection has a
 valid objective; integrate HP-11’s exact-position feasibility into that
@@ -73,9 +75,10 @@ target concurrency and serialized deterministic persistence. The 2026-07-27
 re-audit then reopens the claim through HP-15 to HP-20. Remediate in dependency
 order: fail-closed lifecycle semantics; distributable runtime/configuration;
 durable 10,000-plus planning catalog; complete operator tables; structured
-events; independent artifact and acceptance controls. Only then run canonical
-and adversarial verification on a clean commit, merge only with passing CI, and
-repeat verification on the clean merge commit.
+events; independent artifact and acceptance controls. HP-21 then requires
+bounded CI processes plus repeated hosted execution to establish stability.
+Only then run canonical and adversarial verification on a clean commit, merge
+only with passing CI, and repeat verification on the clean merge commit.
 
 External MPC/NEOCP submission, impact claims, the absence of a discovery, and
 a scientifically valid null result are not Hunter PROD limitations. They are,
@@ -96,7 +99,7 @@ expanded adversarial controls, and the freshness check. The final
 documentation commit repeats both workflows and the freshness check before
 merge.
 
-HP-15 through HP-20 local closure evidence:
+HP-15 through HP-21 local and hosted closure evidence:
 `docs/evidence/live/2026-07-29-hunter-prod-artifact-and-state-closure.md`.
 
 ---

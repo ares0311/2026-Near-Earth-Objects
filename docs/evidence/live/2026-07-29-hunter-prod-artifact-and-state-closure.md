@@ -153,6 +153,29 @@ freshness: CURRENT AND VERIFIED
 The post-merge REL-05 record identifies clean commit `c73455c6` and UTC check
 time `2026-07-29T06:48:54.686871+00:00`. HP-15 through HP-20 are closed.
 
+## HP-21 — hosted test-process stability
+
+The successful retry cited above was not sufficient evidence of stable hosted
+acceptance. After PR #285 merged, main CI run `30430070885` independently
+reproduced the same failure class: the suite reached 99%, reported
+`gw2 node down: Not properly terminated`, and remained alive until GitHub
+cancelled it at the 15-minute job limit. The earlier failed attempt in run
+`30428208537` had likewise reached 99%, lost xdist workers, and timed out
+before its unchanged rerun passed.
+
+This is a blocking acceptance defect even though the exact repository tree
+passes the serial canonical verifier. A production claim cannot depend on
+rerunning an unstable gate until it happens to pass.
+
+The CI workflow now replaces runner-dependent `-n auto` with two explicit
+`loadfile` workers and caps OpenMP, MKL, and OpenBLAS to one native thread per
+worker. A workflow contract test rejects a return to automatic worker sizing
+or removal of the thread caps. Two consecutive hosted full-suite passes on the
+same pull-request tree, followed by a full-suite pass on merged `main`, are
+required before HP-21 and the Hunter PROD claim may be closed.
+
+**Current status**: IMPLEMENTED BUT NOT VERIFIED.
+
 ## Genuine limitations and separate gates
 
 - Broader ZTF DR24 scientific-capability gate M8 remains separate and open

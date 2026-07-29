@@ -47,6 +47,16 @@ def test_pr_ci_installs_and_launches_built_hunter_artifact() -> None:
     ) in ci
 
 
+def test_ci_uses_bounded_test_workers_and_native_threads() -> None:
+    ci = (WORKFLOWS / "ci.yml").read_text()
+
+    assert "-n 2" in ci
+    assert "-n auto" not in ci
+    assert 'OMP_NUM_THREADS: "1"' in ci
+    assert 'MKL_NUM_THREADS: "1"' in ci
+    assert 'OPENBLAS_NUM_THREADS: "1"' in ci
+
+
 def test_workflows_use_node24_action_versions() -> None:
     for workflow in sorted(WORKFLOWS.glob("*.yml")):
         text = workflow.read_text()
