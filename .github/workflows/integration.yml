@@ -22,20 +22,12 @@ jobs:
   integration-live:
     name: Integration tests (live APIs — local Mac only)
     runs-on: ubuntu-latest
+    timeout-minutes: 2
 
     steps:
-      - uses: actions/checkout@v5
-
-      - name: Set up uv with Python 3.14
-        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
-        with:
-          python-version: "3.14"
-
-      - name: Install dependencies (from uv.lock)
-        run: uv sync --extra dev
-
       # Credentials are kept off GitHub by operator policy.
-      # This step always emits a skip notice; live tests run on the operator Mac.
+      # Do not install the application or its dependencies here: this hosted job
+      # intentionally executes no test and exists only to expose the policy.
       - name: Skip notice (credentials kept off GitHub by policy)
         run: |
           echo "::notice title=Integration tests skipped::Credentials are kept off GitHub by operator policy. Run locally: source Skills/verify_live_credentials.sh && PYTHONPATH=src uv run python -m pytest -m integration_live -v --timeout=120"
