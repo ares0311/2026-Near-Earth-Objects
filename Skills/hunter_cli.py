@@ -490,6 +490,17 @@ def discover_new_targets(
         raise ValueError("requested_n must be positive")
     if max_pool is not None and max_pool <= 0:
         raise ValueError("max_pool must be positive when supplied")
+
+    # IDENT-03 gate. Deliberately the first thing this function does, before any
+    # discovery, ranking, inventory write, or manifest freeze: a New search
+    # claims its targets have never been searched by *any* Astrometrics Hunter,
+    # and that claim cannot be made from history that is absent, malformed,
+    # schema-incompatible, or not decision-grade. Raising here means nothing is
+    # persisted -- a refusal after selection would leave a frozen manifest whose
+    # novelty claim was never established.
+    from hunter_cross_project import require_decision_grade_history
+
+    history_state, history_detail = require_decision_grade_history()
     combined = _combined_known_coverage()
     checked_coords: set[tuple[float, float]] = set(combined.keys())
     # Local search history: targets this Hunter has already searched.
@@ -594,7 +605,12 @@ def discover_new_targets(
         # that was 'unknown' or 'stale-but-usable' is not authoritative, and a
         # reader must be able to see that after the fact rather than assume the
         # exclusion was complete.
-        "cross_project_history_validity": cross_project_validity,
+        # IDENT-04: the federated validity that authorised this New selection,
+        # recorded with its per-project source so any inclusion can be audited
+        # later rather than taken on trust.
+        "cross_project_history_validity": history_state,
+        "cross_project_history_source": history_detail,
+        "cross_project_import_validity": cross_project_validity,
         "cross_project_identities_known": len(cross_project_identities),
         "cross_project_limitation": (
             ""

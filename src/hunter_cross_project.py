@@ -158,6 +158,209 @@ def normalize_neo_identity(value: object) -> str | None:
     return None
 
 
+# --- Federated novelty: this project plus both siblings --------------------
+#
+# Mirrors TechnoHunter's hunter_search.py. Novelty is a claim about every
+# Astrometrics Hunter, so consulting only this repository's own export would
+# establish "not searched by NEOHunter" and then report it as novelty -- the
+# narrower form of the defect recorded as EXO-FIELD-01.
+
+#: Sibling repositories, by directory name. Never includes this project.
+CROSS_PROJECT_ROOT_NAMES = {
+    "exo_hunter": "2026 Exoplanet Research",
+    "techno_hunter": "2026 Technosignatures",
+}
+
+#: Only these two states can justify a novelty decision (IDENT-03).
+CROSS_PROJECT_DECISION_STATES = frozenset({"valid", "stale-but-usable"})
+
+#: This project's key in the federation map.
+OWN_PROJECT_KEY = "neo_hunter"
+
+#: Ranked weakest-first. Ordering decides only which state is *reported* as
+#: blocking; any single non-decision-grade project closes the gate.
+_HISTORY_STATE_RANK = (
+    "invalid",
+    "refresh-required",
+    "unknown",
+    "stale-but-usable",
+    "valid",
+)
+
+
+class CrossProjectHistoryError(RuntimeError):
+    """Raised when history cannot justify a novelty decision (IDENT-03)."""
+
+
+def sibling_history_export_path(project: str) -> Path:
+    """Resolve a sibling Hunter's live export path, relative to this repo.
+
+    Computed from this repository's own location -- never a hardcoded absolute
+    path, a symlink, a copy pulled inward, or a runtime import from a sibling
+    (WS-03). A sibling that is not checked out simply yields a path that does
+    not exist, which the caller resolves to ``unknown`` rather than treating as
+    evidence of novelty.
+
+    Derived from :data:`REPOSITORY_ROOT` rather than a fixed ``parents[N]``
+    index, because this module sits one directory deeper than TechnoHunter's
+    equivalent and a copied index would silently resolve to the wrong level.
+    """
+    root_name = CROSS_PROJECT_ROOT_NAMES.get(project)
+    if root_name is None:
+        allowed = ", ".join(sorted(CROSS_PROJECT_ROOT_NAMES))
+        raise ValueError(f"unknown sibling project {project!r}; allowed: {allowed}")
+    return (
+        REPOSITORY_ROOT.parent / root_name / "data_selection"
+        / "hunter_prior_search_history_v1.json"
+    )
+
+
+def load_cross_project_history_export(path: Path) -> dict[str, Any]:
+    """Structural load of a published export, stamping validity **per source**.
+
+    There is deliberately no top-level validity field: an export is only as
+    trustworthy as its weakest source, and a single unverifiable source must not
+    be averaged away by the others.
+
+    A source whose artifact is present is re-hashed and is ``valid`` on match and
+    ``invalid`` on mismatch. A source whose artifact is absent -- the normal case
+    for an operator-copied export -- is ``stale-but-usable``: its entries stay
+    visible but are never represented as freshly verified.
+    """
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError(f"cross-project history export must be a JSON object: {path}")
+    if payload.get("schema_version") != CROSS_PROJECT_SCHEMA_VERSION:
+        raise ValueError(
+            "cross-project history export must use schema_version="
+            f"{CROSS_PROJECT_SCHEMA_VERSION}: {path}"
+        )
+    sources = payload.get("sources")
+    if not isinstance(sources, list) or not sources:
+        raise ValueError(
+            f"cross-project history export sources must be a non-empty list: {path}"
+        )
+
+    # The exporting repository's root: <repo>/data_selection/<export>.json
+    export_root = path.resolve().parents[1]
+    stamped: list[dict[str, Any]] = []
+    for index, source in enumerate(sources, 1):
+        if not isinstance(source, Mapping):
+            raise ValueError(f"cross-project source {index} must be an object: {path}")
+        source_path = str(source.get("source_path", "")).strip()
+        source_sha256 = str(source.get("source_sha256", "")).strip()
+        if not str(source.get("source_project", "")).strip() or not source_path:
+            raise ValueError(f"cross-project source {index} lacks provenance: {path}")
+
+        artifact = (export_root / source_path).resolve()
+        try:
+            artifact.relative_to(export_root)
+        except ValueError:
+            state = "invalid"
+        else:
+            if not artifact.is_file():
+                state = "stale-but-usable"
+            elif len(source_sha256) != 64:
+                state = "invalid"
+            elif hashlib.sha256(artifact.read_bytes()).hexdigest() != source_sha256:
+                state = "invalid"
+            else:
+                state = "valid"
+        stamped.append({**dict(source), "validity_state": state})
+
+    return {**payload, "sources": stamped}
+
+
+def cross_project_history_validity(
+    history_path: Path | None = None,
+) -> tuple[str, str, dict[str, Any] | None]:
+    """Resolve one export's validity, degraded to its weakest source."""
+    path = history_path or DEFAULT_PUBLISH_PATH
+    if not path.is_file():
+        return "unknown", f"absent: {path}", None
+    try:
+        payload = load_cross_project_history_export(path)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return "invalid", f"{path}: {exc}", None
+
+    sources = payload.get("sources") or []
+    states = [str(source.get("validity_state", "unknown")) for source in sources]
+    if not states:
+        return "unknown", f"{path}: no sources", payload
+    degraded = [state for state in states if state not in CROSS_PROJECT_DECISION_STATES]
+    if degraded:
+        return degraded[0], f"{path}: {degraded[0]} source(s)", payload
+    state = "stale-but-usable" if "stale-but-usable" in states else "valid"
+    return state, f"{path}: {state} across {len(states)} source(s)", payload
+
+
+def cross_project_history_federation_validity(
+    history_path: Path | None = None,
+) -> tuple[str, str, dict[str, tuple[str, str]]]:
+    """Resolve history validity across this project **and both siblings**.
+
+    A sibling that is not checked out, has never published, or published
+    something malformed resolves to ``unknown`` -- never silently skipped, and
+    never read as evidence of novelty. Absence of a label is not evidence.
+
+    Returns ``(weakest_state, detail, per_project)``.
+    """
+    per_project: dict[str, tuple[str, str]] = {}
+    own_state, own_detail, _ = cross_project_history_validity(history_path)
+    per_project[OWN_PROJECT_KEY] = (own_state, own_detail)
+
+    for project in sorted(CROSS_PROJECT_ROOT_NAMES):
+        try:
+            sibling_path = sibling_history_export_path(project)
+        except ValueError as exc:  # unknown project name -- never assume novelty
+            per_project[project] = ("unknown", f"unresolvable sibling: {exc}")
+            continue
+        # Validated by exactly the same rules as our own export: a sibling is
+        # trusted neither more nor less for being remote.
+        state, detail, _ = cross_project_history_validity(sibling_path)
+        per_project[project] = (state, detail)
+
+    weakest = min(
+        (state for state, _ in per_project.values()),
+        key=lambda state: (
+            _HISTORY_STATE_RANK.index(state) if state in _HISTORY_STATE_RANK else 0
+        ),
+    )
+    detail = "; ".join(
+        f"{project}={state} ({project_detail})"
+        for project, (state, project_detail) in sorted(per_project.items())
+    )
+    return weakest, detail, per_project
+
+
+def require_decision_grade_history(
+    history_path: Path | None = None,
+) -> tuple[str, str]:
+    """Fail closed unless cross-project history can justify a novelty decision.
+
+    Raises before any durable state is written. Selecting targets first and
+    validating afterwards would leave a frozen manifest whose novelty claim was
+    never established -- the failure IDENT-03 exists to prevent.
+    """
+    state, detail, per_project = cross_project_history_federation_validity(history_path)
+    if state not in CROSS_PROJECT_DECISION_STATES:
+        blocking = sorted(
+            project
+            for project, (project_state, _) in per_project.items()
+            if project_state not in CROSS_PROJECT_DECISION_STATES
+        )
+        raise CrossProjectHistoryError(
+            "New eligibility requires decision-grade cross-project history from "
+            f"all {len(per_project)} Astrometrics Hunter projects; weakest "
+            f"validity is {state!r} from {', '.join(blocking)}. {detail}. "
+            "Publish or refresh the blocking project's export "
+            "(data_selection hunter_prior_search_history_v1.json), or run a "
+            "follow-up search instead. New selection fails closed rather than "
+            "assuming novelty (IDENT-03)."
+        )
+    return state, detail
+
+
 def load_cross_project_history(
     path: Path | Mapping[str, Any],
     *,
