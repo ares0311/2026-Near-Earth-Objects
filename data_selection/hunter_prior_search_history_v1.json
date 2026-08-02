@@ -1,0 +1,178 @@
+{
+  "description": "NEOHunter (2026 Near Earth Objects) real prior search history, derived from the committed target priority queue. Targets are SKY FIELDS identified by rounded RA/Dec, not catalogued minor planets: this project's discovery path searches archival survey fields. A sibling matching on object identity will correctly find no overlap with these entries -- that is honest disjointness, not missing data.",
+  "disclaimer": "Cross-project Hunter search-history exports are local scheduling aids shared between independently sandboxed Astrometrics search projects. They do not constitute a detection, discovery, expert review, external validation, or authorization for external submission.",
+  "manifest_id": "hunter-prior-search-history-v1",
+  "schema_version": 1,
+  "sources": [
+    {
+      "completed_at": "2026-08-01T23:31:02.354403+00:00",
+      "entries": [
+        {
+          "canonical_id": "radec_267.89_-22.50",
+          "dec_deg": -22.5,
+          "evidence_path": "Logs/reports/wise_selected2_review_packets.json",
+          "native_status": "null_result",
+          "ra_deg": 267.89,
+          "searched_at": "2026-07-11T00:00:00+00:00",
+          "status": "no_signal",
+          "survey": "WISE",
+          "target_id": "radec_267.89_-22.50",
+          "target_kind": "sky_field"
+        },
+        {
+          "canonical_id": "radec_89.30_22.50",
+          "dec_deg": 22.5,
+          "evidence_path": "",
+          "native_status": "null_result",
+          "ra_deg": 89.3,
+          "searched_at": "2026-07-11T00:00:00+00:00",
+          "status": "no_signal",
+          "survey": "sky_field_selector",
+          "target_id": "radec_89.30_22.50",
+          "target_kind": "sky_field"
+        },
+        {
+          "canonical_id": "radec_217.41_-15.00",
+          "dec_deg": -15.0,
+          "evidence_path": "docs/evidence/live/2026-07-17-ztf-dr24-selected-field-linking-test.md",
+          "native_status": "null_result",
+          "ra_deg": 217.41,
+          "searched_at": "2026-07-17T00:00:00+00:00",
+          "status": "no_signal",
+          "survey": "sky_field_selector",
+          "target_id": "radec_217.41_-15.00",
+          "target_kind": "sky_field"
+        },
+        {
+          "canonical_id": "radec_54.35_15.00",
+          "dec_deg": 15.0,
+          "evidence_path": "docs/evidence/live/2026-07-17-ztf-dr24-third-field-linking-test.md",
+          "native_status": "null_result",
+          "ra_deg": 54.35,
+          "searched_at": "2026-07-17T00:00:00+00:00",
+          "status": "no_signal",
+          "survey": "sky_field_selector",
+          "target_id": "radec_54.35_15.00",
+          "target_kind": "sky_field"
+        },
+        {
+          "canonical_id": "radec_48.71_22.50",
+          "dec_deg": 22.5,
+          "evidence_path": "docs/evidence/live/2026-07-18-ztf-dr24-fourth-field-linking-test.md",
+          "native_status": "null_result",
+          "ra_deg": 48.71,
+          "searched_at": "2026-07-18T00:00:00+00:00",
+          "status": "no_signal",
+          "survey": "sky_field_selector",
+          "target_id": "radec_48.71_22.50",
+          "target_kind": "sky_field"
+        },
+        {
+          "canonical_id": "radec_211.81_-7.50",
+          "dec_deg": -7.5,
+          "evidence_path": "",
+          "native_status": "insufficient_coverage",
+          "ra_deg": 211.81,
+          "searched_at": "2026-07-18T00:00:00+00:00",
+          "status": "no_data",
+          "survey": "sky_field_selector",
+          "target_id": "radec_211.81_-7.50",
+          "target_kind": "sky_field"
+        },
+        {
+          "canonical_id": "radec_46.59_15.00",
+          "dec_deg": 15.0,
+          "evidence_path": "docs/evidence/live/2026-07-19-ztf-dr24-sixth-field-linking-test.md",
+          "native_status": "null_result",
+          "ra_deg": 46.59,
+          "searched_at": "2026-07-19T00:00:00+00:00",
+          "status": "no_signal",
+          "survey": "sky_field_selector",
+          "target_id": "radec_46.59_15.00",
+          "target_kind": "sky_field"
+        },
+        {
+          "canonical_id": "radec_251.66_-22.50",
+          "dec_deg": -22.5,
+          "evidence_path": "docs/evidence/live/2026-07-14-ztf-coverage-qualified-search-result.md",
+          "native_status": "null_result",
+          "ra_deg": 251.66,
+          "searched_at": "2026-07-14T00:00:00+00:00",
+          "status": "no_signal",
+          "survey": "ZTF",
+          "target_id": "radec_251.66_-22.50",
+          "target_kind": "sky_field"
+        },
+        {
+          "canonical_id": "radec_243.54_-22.50",
+          "dec_deg": -22.5,
+          "evidence_path": "docs/evidence/live/2026-07-14-ztf-coverage-qualified-search-result.md",
+          "native_status": "null_result",
+          "ra_deg": 243.54,
+          "searched_at": "2026-07-14T00:00:00+00:00",
+          "status": "no_signal",
+          "survey": "ZTF",
+          "target_id": "radec_243.54_-22.50",
+          "target_kind": "sky_field"
+        },
+        {
+          "canonical_id": "radec_81.18_22.50",
+          "dec_deg": 22.5,
+          "evidence_path": "docs/evidence/live/2026-07-14-ztf-sparse-expansion-and-cross-batch-result.md",
+          "native_status": "insufficient_retained_coverage",
+          "ra_deg": 81.18,
+          "searched_at": "2026-07-14T00:00:00+00:00",
+          "status": "no_data",
+          "survey": "ZTF",
+          "target_id": "radec_81.18_22.50",
+          "target_kind": "sky_field"
+        },
+        {
+          "canonical_id": "radec_204.25_-7.50",
+          "dec_deg": -7.5,
+          "evidence_path": "docs/evidence/live/2026-07-14-ztf-coverage-qualified-search-result.md",
+          "native_status": "null_result",
+          "ra_deg": 204.25,
+          "searched_at": "2026-07-14T00:00:00+00:00",
+          "status": "no_signal",
+          "survey": "ZTF",
+          "target_id": "radec_204.25_-7.50",
+          "target_kind": "sky_field"
+        },
+        {
+          "canonical_id": "radec_196.68_-7.50",
+          "dec_deg": -7.5,
+          "evidence_path": "docs/evidence/live/2026-07-14-ztf-coverage-qualified-search-result.md",
+          "native_status": "null_result",
+          "ra_deg": 196.68,
+          "searched_at": "2026-07-14T00:00:00+00:00",
+          "status": "no_signal",
+          "survey": "ZTF",
+          "target_id": "radec_196.68_-7.50",
+          "target_kind": "sky_field"
+        },
+        {
+          "canonical_id": "radec_147.53_15.00",
+          "dec_deg": 15.0,
+          "evidence_path": "docs/evidence/live/2026-07-14-ztf-sparse-expansion-and-cross-batch-result.md",
+          "native_status": "null_result",
+          "ra_deg": 147.53,
+          "searched_at": "2026-07-14T00:00:00+00:00",
+          "status": "no_signal",
+          "survey": "ZTF",
+          "target_id": "radec_147.53_15.00",
+          "target_kind": "sky_field"
+        }
+      ],
+      "method_or_data": "ZTF DR24 archival historical replay and WISE/NEOWISE archival field sweeps; bounded pixel extraction, multi-night tracklet linking, and adversarial candidate review",
+      "mode": "new",
+      "provenance_uri": "local-artifact:data_selection/target_priority_queue.csv#sha256=382539a66aec9d80f442a4cc2e767d56ac37ffe1b3eda64c11125a8049050b84",
+      "search_id": "neo-hunter-target-queue-export-2026-08-01T23:31:02.354403+00:00",
+      "searched_by": "NEO-Hunter",
+      "source_path": "data_selection/target_priority_queue.csv",
+      "source_project": "2026 Near Earth Objects",
+      "source_sha256": "382539a66aec9d80f442a4cc2e767d56ac37ffe1b3eda64c11125a8049050b84",
+      "started_at": "2026-07-11T00:00:00+00:00"
+    }
+  ]
+}
