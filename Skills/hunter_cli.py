@@ -30,6 +30,7 @@ import subprocess
 import sys
 import uuid
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import closing
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -45,6 +46,8 @@ if __package__:
     from . import run_pixel_extraction_positive_control as positive_control  # noqa: E402
     from . import select_survey_fields as field_selector  # noqa: E402
     from . import ztf_dr24_bounded_ingest as bounded_ingest  # noqa: E402
+    from .hunter_ux import table as ux_table  # noqa: E402
+    from .hunter_ux import theme as ux_theme  # noqa: E402
 else:
     import adversarial_review  # noqa: E402
     import convert_pixel_extraction_to_observations as pixel_convert  # noqa: E402
@@ -52,8 +55,11 @@ else:
     import run_pixel_extraction_positive_control as positive_control  # noqa: E402
     import select_survey_fields as field_selector  # noqa: E402
     import ztf_dr24_bounded_ingest as bounded_ingest  # noqa: E402
+    from hunter_ux import table as ux_table  # noqa: E402
+    from hunter_ux import theme as ux_theme  # noqa: E402
 
 import candidate_ledger  # noqa: E402
+import hunter_cross_project  # noqa: E402
 import hunter_state  # noqa: E402
 import schemas  # noqa: E402
 from hunter_config import get_hunter_paths  # noqa: E402
@@ -83,6 +89,10 @@ _SEARCH_MANIFEST_CSV_DIR = _PATHS.search_manifest_dir
 _WORKING_DIR = _PATHS.work_dir
 _CHECKPOINT_ROOT = _PATHS.checkpoint_dir
 _EVENT_LOG = _PATHS.event_log
+# Deliverable A publish target. Taken from hunter_cross_project rather than
+# rebuilt from _PATHS so the CLI default and the module's own WS-01 containment
+# check can never point at different roots.
+_DEFAULT_CROSS_PROJECT_EXPORT = hunter_cross_project.DEFAULT_PUBLISH_PATH
 _MAX_AGGREGATE_IRSA_REQUESTS = 6
 _DEFAULT_RUN_WORKERS = 3
 _MAX_RUN_WORKERS = 3
@@ -427,6 +437,35 @@ def _live_coverage_check(
     return merged
 
 
+def _searched_by_sibling(
+    row: dict[str, Any], cross_project_identities: frozenset[str]
+) -> bool:
+    """True when a sibling Hunter has already searched this candidate (IDENT-02).
+
+    Matching is by *normalized minor-planet identity*, never by sky position: a
+    field centre is not an object, and two Hunters agreeing on coordinates would
+    be a coincidence rather than a shared target. A candidate carrying no
+    interoperable designation cannot be matched and is therefore not excluded --
+    that is the correct direction to fail, because excluding on a guess would
+    silently discard real work.
+    """
+    if not cross_project_identities:
+        return False
+    from hunter_cross_project import normalize_neo_identity
+
+    candidates = (
+        row.get("canonical_id"),
+        row.get("designation"),
+        row.get("primary_survey_id"),
+        *(row.get("aliases") or ()),
+    )
+    for raw in candidates:
+        identity = normalize_neo_identity(raw)
+        if identity is not None and identity in cross_project_identities:
+            return True
+    return False
+
+
 def discover_new_targets(
     jd: float,
     neo_class: str,
@@ -453,7 +492,17 @@ def discover_new_targets(
         raise ValueError("max_pool must be positive when supplied")
     combined = _combined_known_coverage()
     checked_coords: set[tuple[float, float]] = set(combined.keys())
+    # Local search history: targets this Hunter has already searched.
     governing_history = hunter_state.searched_target_ids(db_path)
+
+    # Cross-project search history (IDENT-02/IDENT-03). A target another Hunter
+    # has already searched is not New here. The validity state is carried
+    # alongside so the caller can disclose incompleteness rather than presenting
+    # an unverified novelty decision as authoritative -- IDENT-03 forbids
+    # 'stale-but-usable' from justifying a known-incomplete decision, and
+    # 'unknown' means no sibling history has been imported at all.
+    cross_project_identities = hunter_state.cross_project_searched_identities(db_path)
+    cross_project_validity = hunter_state.cross_project_history_validity(db_path)
     eligible: list[dict[str, Any]] = []
     working_inventory_path = out_dir / "working_coverage_inventory.json"
     round_index = 0
@@ -477,6 +526,7 @@ def discover_new_targets(
                 for row in eligible
                 if hunter_state.target_id_from_radec(row["ra_deg"], row["dec_deg"])
                 not in governing_history
+                and not _searched_by_sibling(row, cross_project_identities)
             ]
         if len(eligible) >= requested_n:
             stale_selected = [
@@ -539,6 +589,22 @@ def discover_new_targets(
         "sufficiency_met": len(eligible) >= requested_n,
         "universe_exhausted": universe_exhausted,
         "exploration_limited": exploration_limited,
+        # Cross-project novelty evidence (IDENT-03, IDENT-04, DISC-02). Persisted
+        # rather than merely consulted: a novelty decision made against history
+        # that was 'unknown' or 'stale-but-usable' is not authoritative, and a
+        # reader must be able to see that after the fact rather than assume the
+        # exclusion was complete.
+        "cross_project_history_validity": cross_project_validity,
+        "cross_project_identities_known": len(cross_project_identities),
+        "cross_project_limitation": (
+            ""
+            if cross_project_validity == "valid"
+            else (
+                "Sibling search history is "
+                f"'{cross_project_validity}'. Targets already searched by another "
+                "Hunter may not have been excluded."
+            )
+        ),
     }
 
 
@@ -1885,6 +1951,41 @@ def cmd_run_new_search(args: argparse.Namespace) -> int:
     return 0 if result["status"] == "completed" else 1
 
 
+def cmd_export_cross_project_history(args: argparse.Namespace) -> int:
+    """Publish THIS repository's own prior-search history export (deliverable A).
+
+    The publishing half of the cross-project contract: the two sibling Hunters
+    read this file to answer "has NEOHunter already searched this target?"
+    without importing anything from this repository at runtime.
+
+    Writes exactly one file, always inside this repository (WS-01). It never
+    reads or writes a sibling.
+    """
+    summary = hunter_cross_project.write_own_history_export(
+        Path(args.out),
+        target_queue_path=Path(args.target_queue),
+        generated_at_utc=args.generated_at,
+    )
+
+    print(f"Published cross-project history export -> {summary['output_path']}")
+    print(f"  schema_version   : {summary['schema_version']}")
+    print(f"  entries          : {summary['entry_count']}")
+    print(f"  unique targets   : {summary['unique_target_count']}")
+    print(f"  source sha256    : {summary['source_sha256']}")
+    print(f"  {summary['disclaimer']}")
+
+    emit_event(
+        _event_path(args),
+        event="export_cross_project_history",
+        status="completed",
+        command="Export-Cross-Project-History",
+        output_path=summary["output_path"],
+        entry_count=summary["entry_count"],
+        unique_target_count=summary["unique_target_count"],
+    )
+    return 0
+
+
 def cmd_show_follow_ups(args: argparse.Namespace) -> int:
     db_path = Path(args.db)
     status = None if args.status == "all" else args.status
@@ -1963,6 +2064,134 @@ def cmd_show_follow_ups(args: argparse.Namespace) -> int:
     return 0
 
 
+def _resolve_inspect_manifest(db_path: Path, search_id: str | None) -> dict[str, Any]:
+    """Resolve which frozen manifest ``inspect-target`` should read.
+
+    An explicit ``--search-id`` wins. Otherwise the most recent manifest is used,
+    preferring a pending one (the search the operator is most likely looking at)
+    and falling back to the newest manifest of any status.
+    """
+    if search_id:
+        return hunter_state.get_search_manifest(db_path, search_id)
+    try:
+        return hunter_state.get_latest_pending_manifest(db_path)
+    except ValueError:
+        # No pending manifest: fall back to the newest manifest of any status so
+        # a completed search remains inspectable.
+        hunter_state.init_db(db_path)
+        with closing(hunter_state.connect(db_path)) as conn:
+            row = conn.execute(
+                "SELECT search_id FROM search_manifests ORDER BY created_at DESC LIMIT 1"
+            ).fetchone()
+        if row is None:
+            raise ValueError(
+                "no search manifest exists yet; create one with create-new-search"
+            ) from None
+        return hunter_state.get_search_manifest(db_path, row["search_id"])
+
+
+def _select_manifest_target(
+    manifest: dict[str, Any], reference: str
+) -> dict[str, Any]:
+    """Find one frozen target by rank number or by identifier.
+
+    Matching by identifier accepts the canonical ``target_id`` as well as the
+    survey-native and canonical identifiers carried alongside it, so an operator
+    can paste whichever identity the detail view showed them.
+    """
+    targets = manifest.get("targets", [])
+    if not targets:
+        raise ValueError(f"search {manifest['search_id']!r} has no frozen targets")
+
+    if reference.isdigit():
+        rank = int(reference)
+        for target in targets:
+            if int(target.get("rank", -1)) == rank:
+                return target
+        raise ValueError(
+            f"rank {rank} is out of range; search {manifest['search_id']!r} "
+            f"froze {len(targets)} target(s)"
+        )
+
+    folded = reference.casefold()
+    for target in targets:
+        candidates = {
+            str(target.get("target_id", "")).casefold(),
+            str(target.get("canonical_id", "")).casefold(),
+            str(target.get("primary_survey_id", "")).casefold(),
+        }
+        if folded in candidates:
+            return target
+    raise ValueError(
+        f"no target matching {reference!r} in search {manifest['search_id']!r}"
+    )
+
+
+def cmd_inspect_target(args: argparse.Namespace) -> int:
+    """Render the full detail view for one frozen target (UX-TABLE-02).
+
+    This is a read-only projection of already-persisted durable state. It runs no
+    discovery, performs no acquisition, and mutates nothing.
+    """
+    db_path = Path(args.db)
+    manifest = _resolve_inspect_manifest(db_path, args.search_id)
+    target = _select_manifest_target(manifest, str(args.target))
+    target_id = str(target.get("target_id", ""))
+
+    # Prior-search evidence comes from the append-only history table rather than
+    # the manifest, so the view reflects everything known about the target.
+    history = hunter_state.list_target_history(db_path, target_id)
+
+    detail = {
+        "target_id": target_id,
+        "identity": {
+            "target_id": target_id,
+            "canonical_id": target.get("canonical_id"),
+            "primary_survey_id": target.get("primary_survey_id"),
+            "target_kind": target.get("target_kind"),
+            "survey": target.get("survey"),
+            "search_mode": target.get("search_mode"),
+        },
+        "metrics": target.get("scientific_metrics") or {},
+        "score_components": target.get("score_components") or {},
+        "selection_reason": target.get("selection_reason"),
+        "provenance": {
+            "search_id": manifest.get("search_id"),
+            "manifest_status": manifest.get("status"),
+            "created_at": manifest.get("created_at"),
+            "coverage": target.get("coverage_provenance") or {},
+            "prior_search": target.get("prior_search_provenance") or {},
+        },
+        "prior_search_evidence": [
+            f"{item.get('occurred_at')}  {item.get('outcome')}  "
+            f"nights={len(item.get('nights') or [])}"
+            for item in history
+        ],
+        "resources": {
+            "estimated_storage_mb": target.get("estimated_storage_mb"),
+            "rank": target.get("rank"),
+        },
+        "limitations": target.get("limitations") or [],
+    }
+
+    if args.json:
+        print(json.dumps(detail, indent=2, sort_keys=True, default=str))
+    else:
+        capabilities = ux_theme.detect(sys.stdout, no_color=args.no_color)
+        for line in ux_table.render_detail(detail, capabilities):
+            print(line)
+
+    emit_event(
+        _event_path(args),
+        event="command",
+        status="ok",
+        command="inspect-target",
+        search_id=manifest.get("search_id"),
+        target_id=target_id,
+    )
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -2022,6 +2251,51 @@ def build_parser() -> argparse.ArgumentParser:
     show_cmd.add_argument("--candidate-ledger-db", default=str(_DEFAULT_LEDGER_DB))
     show_cmd.add_argument("--event-log", default=str(_EVENT_LOG))
 
+    # Deliverable A: publish this repo's own history so the siblings can consume
+    # it. Defaults are the shared contract path used identically by all three
+    # Hunters, so the normal invocation takes no arguments at all.
+    export_cmd = sub.add_parser(
+        "export-cross-project-history",
+        help="publish this repo's own prior-search history for sibling Hunters",
+    )
+    export_cmd.add_argument(
+        "--out",
+        default=str(_DEFAULT_CROSS_PROJECT_EXPORT),
+        help="output path (must be inside this repository)",
+    )
+    export_cmd.add_argument(
+        "--target-queue",
+        default=str(_DEFAULT_TARGET_QUEUE),
+        help="committed target priority queue to derive history from",
+    )
+    export_cmd.add_argument(
+        "--generated-at",
+        default=None,
+        help="explicit ISO-8601 UTC generation timestamp (for reproducible builds)",
+    )
+    export_cmd.add_argument("--event-log", default=str(_EVENT_LOG))
+
+    inspect_cmd = sub.add_parser(
+        "inspect-target",
+        help="show full scientific detail and provenance for one frozen target",
+    )
+    inspect_cmd.add_argument(
+        "--target",
+        required=True,
+        help="result rank number from the last table, or a target identifier",
+    )
+    inspect_cmd.add_argument(
+        "--search-id",
+        default=None,
+        help="which frozen search to read; defaults to the most recent",
+    )
+    inspect_cmd.add_argument(
+        "--json", action="store_true", help="emit machine-readable JSON detail"
+    )
+    inspect_cmd.add_argument("--no-color", action="store_true")
+    inspect_cmd.add_argument("--db", default=str(_DEFAULT_DB))
+    inspect_cmd.add_argument("--event-log", default=str(_EVENT_LOG))
+
     return parser
 
 
@@ -2034,6 +2308,10 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_run_new_search(args)
         if args.command == "show-follow-ups":
             return cmd_show_follow_ups(args)
+        if args.command == "inspect-target":
+            return cmd_inspect_target(args)
+        if args.command == "export-cross-project-history":
+            return cmd_export_cross_project_history(args)
         raise AssertionError(f"unhandled command {args.command}")  # pragma: no cover
     except (KeyError, TypeError, ValueError, RuntimeError, OSError, json.JSONDecodeError) as exc:
         emit_event(

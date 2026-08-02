@@ -49,6 +49,15 @@ jobs:
             --disable-error-code=misc \
             --disable-error-code=unused-ignore
 
+      # Coverage is measured against the *production runtime denominator* named
+      # in .coveragerc.production: src/ plus the orchestrator, operator shell,
+      # and interaction layer under Skills/. Measuring src/ alone was field
+      # blocker NEO-FIELD-02 -- it excluded the canonical router and the shell,
+      # which is precisely the omission contract rule CLAIM-02 forbids.
+      #
+      # The floor is 98, which is the measured value of that denominator, not a
+      # round number chosen for comfort. src/ is separately held at 100% by the
+      # step below, so this threshold cannot mask a regression in src/.
       - name: Test
         run: |
           uv run python -m pytest \
@@ -58,9 +67,12 @@ jobs:
             --dist=loadfile \
             --timeout=120 \
             --timeout-method=thread \
+            --cov-config=.coveragerc.production \
             --cov=src \
+            --cov=Skills \
             --cov-report=term-missing \
-            --cov-fail-under=100
+            --cov-report=json:coverage-production.json \
+            --cov-fail-under=98
         env:
           PYTHONPATH: src
           # Keep each xdist process from creating a second, unbounded native
@@ -69,6 +81,12 @@ jobs:
           OMP_NUM_THREADS: "1"
           MKL_NUM_THREADS: "1"
           OPENBLAS_NUM_THREADS: "1"
+
+      # The production floor above is an aggregate. This step keeps the stricter
+      # per-package guarantee that src/ has always carried, so a regression there
+      # cannot hide inside the larger denominator.
+      - name: Assert src/ remains at 100% statement coverage
+        run: uv run python Skills/check_coverage_denominator.py coverage-production.json
 
   hunter-distribution:
     runs-on: ubuntu-latest

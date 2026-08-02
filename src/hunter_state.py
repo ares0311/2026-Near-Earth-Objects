@@ -16,6 +16,7 @@ previously selected target cannot silently become ``new`` again.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import sqlite3
@@ -251,6 +252,29 @@ def init_db(db_path: Path) -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_target_history_target "
             "ON target_search_history(target_id, occurred_at)"
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS cross_project_search_history (
+                entry_id TEXT PRIMARY KEY,
+                manifest_sha256 TEXT NOT NULL,
+                manifest_path TEXT NOT NULL,
+                source_project TEXT NOT NULL,
+                source_search_id TEXT NOT NULL,
+                source_path TEXT NOT NULL,
+                source_sha256 TEXT NOT NULL,
+                identities_json TEXT NOT NULL,
+                searched_at TEXT NOT NULL,
+                source_status TEXT NOT NULL,
+                validity_state TEXT NOT NULL,
+                provenance_json TEXT NOT NULL,
+                imported_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_cross_project_validity "
+            "ON cross_project_search_history(validity_state)"
         )
         conn.execute(
             """
@@ -897,6 +921,125 @@ def list_target_history(
         item["provenance"] = _loads(item.pop("provenance_json"))
         result.append(item)
     return result
+
+
+def import_cross_project_history(
+    db_path: Path,
+    path: Path | Any,
+    *,
+    source_root: Path | None,
+    imported_at: str | None = None,
+) -> dict[str, Any]:
+    """Durably import verified sibling identities without remapping outcomes.
+
+    Mirrors EXOHunter's ``SearchLifecycle.import_cross_project_history``: the
+    manifest is verified by :mod:`hunter_cross_project`, then each entry is
+    stored with the full provenance needed to audit any later exclusion --
+    manifest hash, producing project, source artifact and its hash, and the
+    validity state the verification produced.
+
+    Idempotent by construction: ``entry_id`` is the hash of the entry's own
+    content, so re-importing the same manifest inserts nothing new.
+    """
+    import hunter_cross_project
+
+    payload = hunter_cross_project.load_cross_project_history(
+        path, source_root=source_root
+    )
+    created_at = imported_at or _utc_now()
+    created = 0
+    with connect(db_path) as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        for index, entry in enumerate(payload["entries"], 1):
+            identity = {
+                "manifest_sha256": payload["manifest_sha256"],
+                "source_project": entry["source_project"],
+                "source_search_id": entry["source_search_id"],
+                "source_path": entry["source_path"],
+                "source_sha256": entry["source_sha256"],
+                "identities": entry["identities"],
+                "searched_at": entry["searched_at"],
+                "status": entry["status"],
+                "source_entry": entry["source_entry"],
+            }
+            entry_id = hashlib.sha256(f"{index}:{_json(identity)}".encode()).hexdigest()
+            cursor = conn.execute(
+                """
+                INSERT OR IGNORE INTO cross_project_search_history (
+                    entry_id, manifest_sha256, manifest_path, source_project,
+                    source_search_id, source_path, source_sha256,
+                    identities_json, searched_at, source_status,
+                    validity_state, provenance_json, imported_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    entry_id,
+                    payload["manifest_sha256"],
+                    payload["manifest_path"],
+                    entry["source_project"],
+                    entry["source_search_id"],
+                    entry["source_path"],
+                    entry["source_sha256"],
+                    _json(entry["identities"]),
+                    entry["searched_at"],
+                    entry["status"],
+                    payload["validity_state"],
+                    _json(identity),
+                    created_at,
+                ),
+            )
+            created += int(cursor.rowcount > 0)
+    return {
+        "manifest_path": payload["manifest_path"],
+        "manifest_sha256": payload["manifest_sha256"],
+        "validity_state": payload["validity_state"],
+        "source_hashes_verified": payload["source_hashes_verified"],
+        "entries_total": len(payload["entries"]),
+        "entries_created": created,
+    }
+
+
+def cross_project_searched_identities(db_path: Path) -> frozenset[str]:
+    """Every usable normalized identity a sibling Hunter has already searched.
+
+    Only ``valid`` and ``stale-but-usable`` rows contribute. ``refresh-required``,
+    ``invalid``, and ``unknown`` are deliberately excluded: IDENT-03 requires New
+    eligibility to fail closed on incomplete history, and treating an unverifiable
+    row as "not searched" would do the opposite -- it would make an already
+    searched target look novel.
+    """
+    with connect(db_path) as conn:
+        rows = conn.execute(
+            "SELECT identities_json FROM cross_project_search_history "
+            "WHERE validity_state IN ('valid', 'stale-but-usable')"
+        ).fetchall()
+    return frozenset(
+        identity
+        for row in rows
+        for identity in _loads(str(row["identities_json"]))
+    )
+
+
+def cross_project_history_validity(db_path: Path) -> str:
+    """Worst validity state across imported sibling history.
+
+    ``unknown`` when nothing has been imported at all. Callers deciding New
+    eligibility must treat anything other than ``valid`` as a reason to disclose
+    incompleteness rather than silently proceed.
+    """
+    with connect(db_path) as conn:
+        states = {
+            str(row["validity_state"])
+            for row in conn.execute(
+                "SELECT DISTINCT validity_state FROM cross_project_search_history"
+            )
+        }
+    if not states:
+        return "unknown"
+    for state in ("invalid", "refresh-required", "unknown", "stale-but-usable"):
+        if state in states:
+            return state
+    return "valid"
 
 
 def searched_target_ids(db_path: Path) -> set[str]:

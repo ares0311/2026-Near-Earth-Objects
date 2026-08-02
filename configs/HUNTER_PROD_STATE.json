@@ -1,0 +1,825 @@
+{
+  "artifact": "configs/HUNTER_PROD_STATE.json",
+  "schema_version": "1.2.0",
+  "contract_version": "HUNTER-PROD-2026-07-30.3",
+  "cli_ux_version": "HUNTER-CLI-UX-2026-07-30.3",
+  "active_repository": "NEOHunter",
+  "repository_profile": "NEOHunter",
+  "bootstrap_complete": true,
+  "prod_status": "REVOKED_UNTIL_VERIFIED",
+  "current_priority": "P1",
+  "active_requirement_id": "PIPE-01",
+  "artifact_defects": [
+    {
+      "path": "configs/HUNTER_PROD_STATE.json",
+      "defect": "Supplied as an RTF document with a .json extension; not parseable as JSON, so it could not function as machine-readable durable state. Internal artifact field read 'ARTIFACT 3 - docs/HUNTER_PROD_STATE.json', which is neither this file's path nor the path the launch prompt specifies.",
+      "resolution": "Converted losslessly to valid JSON at the canonical path with every field and value carried over verbatim; artifact field corrected to configs/HUNTER_PROD_STATE.json. Original bytes preserved at configs/originals/HUNTER_PROD_STATE.rtf.original.",
+      "status": "RESOLVED"
+    },
+    {
+      "path": "docs/HUNTER_PROD_CONTRACT.md",
+      "defect": "Supplied as an RTF document carrying a .md extension, so the governing contract was not readable as Markdown by any tooling that trusts the extension.",
+      "resolution": "Converted to real Markdown at operator direction (2026-07-31) using textutil. Fidelity verified: all 14 numbered sections, all 39 requirement IDs, the PIPE-01 arrow pipeline block, and all tables are present, with zero residual RTF control words. Original bytes preserved at configs/originals/HUNTER_PROD_CONTRACT.rtf.original.",
+      "status": "RESOLVED"
+    },
+    {
+      "path": "docs/CLI_UX_SPEC.md",
+      "defect": "Supplied as an RTF document carrying a .md extension, so the governing CLI/UX specification was not readable as Markdown by any tooling that trusts the extension.",
+      "resolution": "Converted to real Markdown at operator direction (2026-07-31) using textutil. Fidelity verified: all 14 numbered sections, all 22 UX requirement IDs, and the UX acceptance matrix table are present, with zero residual RTF control words. Original bytes preserved at configs/originals/CLI_UX_SPEC.rtf.original.",
+      "status": "RESOLVED"
+    },
+    {
+      "path": "docs/README_SPEC.md",
+      "defect": "The contract (WS-02) and the launch prompt both describe this file as staged-and-uncommitted. Verified reality: it is committed and unmodified in the working tree; git status, git diff, and git diff --cached all report no changes for it.",
+      "resolution": "Preserved untouched. The preserved_user_changes entry below records the verified state rather than the asserted one, per contract authority order WS-04 item 3 (reproducible observed behavior outranks older documentation).",
+      "status": "DISCLOSED_NOT_MODIFIED"
+    }
+  ],
+  "preserved_user_changes": [
+    {
+      "path": "docs/README_SPEC.md",
+      "asserted_state": "staged-and-uncommitted",
+      "verified_state": "committed-and-unmodified",
+      "policy": "Preserve. Do not unstage, replace, discard, or silently rewrite."
+    },
+    {
+      "path": ".codex/config.toml",
+      "verified_state": "modified-unstaged",
+      "policy": "Pre-existing user change unrelated to PROD closure. Preserve untouched."
+    }
+  ],
+  "operator_environment": {
+    "documented_install_command": "uv sync --all-extras --all-groups --python 3.14",
+    "canonical_executable": "NEOHunter",
+    "compatibility_aliases": [
+      "NEO-Hunter",
+      "Create-New-Search",
+      "Run-New-Search",
+      "Show-Follow-Ups"
+    ],
+    "python_version": "3.14.3",
+    "package_manager_version": "uv 0.11.3",
+    "virtual_environment": ".venv",
+    "resolved_executable": ".venv/bin/NEOHunter",
+    "installation_mode": "editable (uv sync managed)",
+    "last_verified_commit": "000e0c2421c8ca15807fe46d3426bc02654573b5",
+    "last_verified_at_utc": null
+  },
+  "blocker_profiles": {
+    "NEOHunter": [
+      {
+        "id": "NEO-FIELD-01",
+        "priority": "P0",
+        "requirements": [
+          "LAUNCH-01",
+          "LAUNCH-02",
+          "LAUNCH-04",
+          "CLAIM-01"
+        ],
+        "summary": "The documented uv-synced operator environment failed to launch NEO-Hunter and NEOHunter because Skills was not importable.",
+        "observed_command": "uv sync --all-extras --all-groups --python 3.14 && NEO-Hunter",
+        "observed_result": "ModuleNotFoundError: No module named 'Skills'",
+        "status": "BLOCKING"
+      },
+      {
+        "id": "NEO-FIELD-02",
+        "priority": "P0",
+        "requirements": [
+          "CLAIM-02"
+        ],
+        "summary": "Coverage reported against src excluded production runtime modules under Skills.",
+        "status": "BLOCKING"
+      },
+      {
+        "id": "NEO-FIELD-03",
+        "priority": "P0",
+        "requirements": [
+          "CLAIM-03",
+          "CLAIM-04"
+        ],
+        "summary": "A notice-only Integration workflow executed no integration assertions but appeared among passed PROD evidence.",
+        "status": "BLOCKING"
+      }
+    ],
+    "EXOHunter": [
+      {
+        "id": "EXO-FIELD-01",
+        "priority": "P1",
+        "requirements": [
+          "IDENT-01",
+          "IDENT-03",
+          "IDENT-04"
+        ],
+        "summary": "Stale copied Techno history allowed known searched targets to remain eligible as New.",
+        "known_examples": [
+          "HIP 60759",
+          "HIP 61099",
+          "HIP 3419"
+        ],
+        "status": "NOT_APPLICABLE"
+      },
+      {
+        "id": "EXO-FIELD-02",
+        "priority": "P1",
+        "requirements": [
+          "IDENT-01",
+          "IDENT-04"
+        ],
+        "summary": "Approximately 590 HIP identities were flattened into one aliases field.",
+        "status": "NOT_APPLICABLE"
+      },
+      {
+        "id": "EXO-FIELD-03",
+        "priority": "P2",
+        "requirements": [
+          "E2E-01",
+          "E2E-04",
+          "CLAIM-04"
+        ],
+        "summary": "A claimed 39053-row live-source smoke was supported only by prose while the acceptance harness was fixture-controlled.",
+        "status": "NOT_APPLICABLE"
+      },
+      {
+        "id": "EXO-FIELD-04",
+        "priority": "P1",
+        "requirements": [
+          "RANK-01"
+        ],
+        "summary": "The published follow-up expected-information-gain formula disagreed with registry-derived persistence.",
+        "documented_formula": "(1 - fpp) * confidence",
+        "observed_alternative": "follow_up_priority / 110",
+        "status": "NOT_APPLICABLE"
+      },
+      {
+        "id": "EXO-FIELD-05",
+        "priority": "P0",
+        "requirements": [
+          "LAUNCH-04",
+          "DUR-04",
+          "CLAIM-01"
+        ],
+        "summary": "Live TIC operation produced repeated RemoteDisconnected failures and raw exception-style output. Root cause and test escape are unknown.",
+        "status": "NOT_APPLICABLE"
+      },
+      {
+        "id": "EXO-FIELD-06",
+        "priority": "P3",
+        "requirements": [
+          "CLI-01",
+          "CLI-02",
+          "CLI-03"
+        ],
+        "summary": "The CLI lacks the required command palette, guided parameter entry, validity sentinels, engaging animation, and clean result tables.",
+        "status": "NOT_APPLICABLE"
+      }
+    ],
+    "TechnoHunter": [
+      {
+        "id": "TECHNO-FIELD-01",
+        "priority": "P3",
+        "requirements": [
+          "CLI-01"
+        ],
+        "summary": "No prominent, maximally engaging, domain-specific startup animation.",
+        "status": "NOT_APPLICABLE"
+      },
+      {
+        "id": "TECHNO-FIELD-02",
+        "priority": "P3",
+        "requirements": [
+          "CLI-01",
+          "CLI-02"
+        ],
+        "summary": "Typing slash does not immediately open a described searchable command palette.",
+        "status": "NOT_APPLICABLE"
+      },
+      {
+        "id": "TECHNO-FIELD-03",
+        "priority": "P3",
+        "requirements": [
+          "CLI-01",
+          "CLI-03"
+        ],
+        "summary": "Required parameters are not guided or validated inline and normal errors fall through to raw argparse.",
+        "status": "NOT_APPLICABLE"
+      },
+      {
+        "id": "TECHNO-FIELD-04",
+        "priority": "P3",
+        "requirements": [
+          "CLI-01"
+        ],
+        "summary": "Execution animation is insufficiently engaging and inadequately tied to pipeline stages.",
+        "status": "NOT_APPLICABLE"
+      },
+      {
+        "id": "TECHNO-FIELD-05",
+        "priority": "P3",
+        "requirements": [
+          "CLI-01"
+        ],
+        "summary": "Results wrap into unreadable multi-line records instead of a clean width-aware table and detail view.",
+        "status": "NOT_APPLICABLE"
+      }
+    ]
+  },
+  "applicable_blockers": [
+    {
+      "id": "NEO-FIELD-01",
+      "priority": "P0",
+      "requirements": [
+        "LAUNCH-01",
+        "LAUNCH-02",
+        "LAUNCH-04",
+        "CLAIM-01"
+      ],
+      "summary": "The documented uv-synced operator environment failed to launch NEO-Hunter and NEOHunter because Skills was not importable.",
+      "observed_command": "uv sync --all-extras --all-groups --python 3.14 && NEO-Hunter",
+      "observed_result": "ModuleNotFoundError: No module named 'Skills'",
+      "root_cause": "The operator .venv held a stale editable install of version 0.91.0, whose static __editable__.neo_detection-0.91.0.pth exposed only src/. The Skills package-dir mapping landed later in commit fd989750 (version 0.91.1) and uv sync had not been re-run, so the installed finder never mapped the Skills package.",
+      "test_escape": "Skills/verify_hunter_distribution.py verified only the wheel surface. The wheel always carried Skills/ as real package content, so no test could observe the editable/uv-sync surface where the failure actually lived. Contract LAUNCH-02 names this exact class of escape.",
+      "repair": "pyproject.toml already carried the corrective Skills package-dir mapping. Added editable-surface verification (Skills/verify_hunter_distribution.py --surface editable) plus tests/test_hunter_launch_surfaces.py, including a parametrized adversarial control proving the probe fails when the mapping is absent.",
+      "status": "CLOSED"
+    },
+    {
+      "id": "NEO-FIELD-02",
+      "priority": "P0",
+      "requirements": [
+        "CLAIM-02"
+      ],
+      "summary": "Coverage reported against src excluded production runtime modules under Skills.",
+      "status": "CLOSED",
+      "root_cause": "CI passed --cov=src only. The canonical orchestrator and operator shell live under Skills/ and were therefore never measured, while the result was presented as full production coverage.",
+      "repair": "CI now measures the .coveragerc.production denominator with a floor of 98 (the measured value), plus Skills/check_coverage_denominator.py which fails if any src/ module drops below 100%."
+    },
+    {
+      "id": "NEO-FIELD-03",
+      "priority": "P0",
+      "requirements": [
+        "CLAIM-03",
+        "CLAIM-04"
+      ],
+      "summary": "A notice-only Integration workflow executed no integration assertions but appeared among passed PROD evidence.",
+      "status": "BLOCKING"
+    }
+  ],
+  "requirements": {
+    "WS-01": {
+      "priority": "P0",
+      "status": "IMPLEMENTED_NOT_VERIFIED"
+    },
+    "WS-02": {
+      "priority": "P0",
+      "status": "IMPLEMENTED_NOT_VERIFIED"
+    },
+    "WS-03": {
+      "priority": "P0",
+      "status": "UNVERIFIED"
+    },
+    "WS-04": {
+      "priority": "P0",
+      "status": "UNVERIFIED"
+    },
+    "LAUNCH-01": {
+      "priority": "P0",
+      "status": "VERIFIED"
+    },
+    "LAUNCH-02": {
+      "priority": "P0",
+      "status": "VERIFIED"
+    },
+    "LAUNCH-03": {
+      "priority": "P0",
+      "status": "VERIFIED"
+    },
+    "LAUNCH-04": {
+      "priority": "P0",
+      "status": "VERIFIED"
+    },
+    "PIPE-01": {
+      "priority": "P1",
+      "status": "UNVERIFIED"
+    },
+    "PIPE-02": {
+      "priority": "P1",
+      "status": "IMPLEMENTED_NOT_VERIFIED"
+    },
+    "PIPE-03": {
+      "priority": "P1",
+      "status": "UNVERIFIED"
+    },
+    "IDENT-01": {
+      "priority": "P1",
+      "status": "UNVERIFIED"
+    },
+    "IDENT-02": {
+      "priority": "P1",
+      "status": "UNVERIFIED"
+    },
+    "IDENT-03": {
+      "priority": "P1",
+      "status": "UNVERIFIED"
+    },
+    "IDENT-04": {
+      "priority": "P1",
+      "status": "UNVERIFIED"
+    },
+    "DISC-01": {
+      "priority": "P1",
+      "status": "UNVERIFIED"
+    },
+    "DISC-02": {
+      "priority": "P1",
+      "status": "UNVERIFIED"
+    },
+    "DISC-03": {
+      "priority": "P1",
+      "status": "UNVERIFIED"
+    },
+    "RANK-01": {
+      "priority": "P1",
+      "status": "UNVERIFIED"
+    },
+    "DUR-01": {
+      "priority": "P1",
+      "status": "UNVERIFIED"
+    },
+    "DUR-02": {
+      "priority": "P1",
+      "status": "UNVERIFIED"
+    },
+    "DUR-03": {
+      "priority": "P1",
+      "status": "UNVERIFIED"
+    },
+    "DUR-04": {
+      "priority": "P1",
+      "status": "UNVERIFIED"
+    },
+    "E2E-01": {
+      "priority": "P2",
+      "status": "UNVERIFIED"
+    },
+    "E2E-02": {
+      "priority": "P2",
+      "status": "UNVERIFIED"
+    },
+    "E2E-03": {
+      "priority": "P2",
+      "status": "UNVERIFIED"
+    },
+    "E2E-04": {
+      "priority": "P2",
+      "status": "UNVERIFIED"
+    },
+    "CLI-01": {
+      "priority": "P3",
+      "status": "VERIFIED"
+    },
+    "CLI-02": {
+      "priority": "P3",
+      "status": "VERIFIED"
+    },
+    "CLI-03": {
+      "priority": "P3",
+      "status": "IMPLEMENTED_NOT_VERIFIED"
+    },
+    "CLAIM-01": {
+      "priority": "P4",
+      "status": "UNVERIFIED"
+    },
+    "CLAIM-02": {
+      "priority": "P4",
+      "status": "VERIFIED"
+    },
+    "CLAIM-03": {
+      "priority": "P4",
+      "status": "UNVERIFIED"
+    },
+    "CLAIM-04": {
+      "priority": "P4",
+      "status": "UNVERIFIED"
+    },
+    "PROD-01": {
+      "priority": "P4",
+      "status": "UNVERIFIED"
+    },
+    "EVAL-01": {
+      "priority": "P4",
+      "status": "UNVERIFIED"
+    },
+    "README-01": {
+      "priority": "P4",
+      "status": "UNVERIFIED"
+    },
+    "README-02": {
+      "priority": "P4",
+      "status": "UNVERIFIED"
+    },
+    "README-03": {
+      "priority": "P4",
+      "status": "UNVERIFIED"
+    },
+    "UX-CMD-01": {
+      "priority": "P3",
+      "status": "UNVERIFIED"
+    }
+  },
+  "allowed_statuses": [
+    "UNVERIFIED",
+    "BLOCKING",
+    "IN_PROGRESS",
+    "IMPLEMENTED_NOT_VERIFIED",
+    "VERIFIED",
+    "NOT_APPLICABLE"
+  ],
+  "evidence_contract": {
+    "required_fields": [
+      "requirement_id",
+      "exact_command",
+      "environment",
+      "observable_assertion",
+      "raw_evidence_path",
+      "tested_commit",
+      "tested_at_utc"
+    ],
+    "verified_rule": "A requirement may be VERIFIED only when every required evidence field is populated and the result is reproducible.",
+    "revocation_rule": "Any reproducible documented-user-workflow failure reopens every contradicted requirement."
+  },
+  "evidence": {
+    "WS-01": {
+      "requirement_id": "WS-01",
+      "status": "IMPLEMENTED_NOT_VERIFIED",
+      "exact_command": "git rev-parse --show-toplevel",
+      "environment": "macOS 25.6.0, zsh, repository working tree",
+      "observable_assertion": "All writes in this session resolved inside the active NEOHunter git root. No sibling Hunter repository path was written, and the session sandbox denies writes outside the active root, giving an enforced control rather than an assertion.",
+      "raw_evidence_path": "docs/evidence/prod/2026-07-31-p0-launch-surface-closure.md",
+      "tested_commit": "000e0c2421c8ca15807fe46d3426bc02654573b5",
+      "tested_at_utc": "2026-07-31T00:00:00+00:00",
+      "remaining_risk": "",
+      "implementation_paths": [],
+      "demotion_note": "Demoted from VERIFIED during the Phase 0 status-authority repair. The original record carried no bound gate result, so it was an agent-authored verification claim, which the repaired ledger no longer accepts. The underlying evidence text is preserved below and may be correct; it must be re-established by a deterministic gate before VERIFIED can be written."
+    },
+    "WS-02": {
+      "requirement_id": "WS-02",
+      "status": "IMPLEMENTED_NOT_VERIFIED",
+      "exact_command": "git status --short -- docs/README_SPEC.md && git diff -- docs/README_SPEC.md && git diff --cached -- docs/README_SPEC.md",
+      "environment": "macOS 25.6.0, zsh, repository working tree",
+      "observable_assertion": "docs/README_SPEC.md reports no working-tree or index changes and was not modified in this session. The pre-existing .codex/config.toml modification was likewise left untouched.",
+      "raw_evidence_path": "docs/evidence/prod/2026-07-31-p0-launch-surface-closure.md",
+      "tested_commit": "000e0c2421c8ca15807fe46d3426bc02654573b5",
+      "tested_at_utc": "2026-07-31T00:00:00+00:00",
+      "remaining_risk": "The contract asserts this file is staged-and-uncommitted; verified reality is committed-and-unmodified. Recorded in artifact_defects rather than silently reconciled.",
+      "implementation_paths": [],
+      "demotion_note": "Demoted from VERIFIED during the Phase 0 status-authority repair. The original record carried no bound gate result, so it was an agent-authored verification claim, which the repaired ledger no longer accepts. The underlying evidence text is preserved below and may be correct; it must be re-established by a deterministic gate before VERIFIED can be written."
+    },
+    "LAUNCH-01": {
+      "requirement_id": "LAUNCH-01",
+      "status": "VERIFIED",
+      "exact_command": "uv run --no-sync --python 3.14 python Skills/verify_hunter_distribution.py --surface both",
+      "environment": "macOS 25.6.0; Python 3.14.3; uv 0.11.3; venv .venv; editable install; PYTHONPATH emptied for every probe",
+      "observable_assertion": "The documented operator sync installs the product and the canonical console script launches from it.",
+      "raw_evidence_path": "Logs/prod_closure/phase1_surfaces.log; docs/evidence/prod/2026-08-01-phase0-gate-authority-and-phase2-pty-blocker.md",
+      "tested_commit": "000e0c2421c8ca15807fe46d3426bc02654573b5+dirty",
+      "tested_at_utc": "2026-08-01T07:07:24+00:00",
+      "remaining_risk": "The unrelated-working-directory surface runs from a system temporary directory rather than an arbitrary user directory; the sandbox restricts execution to paths it controls.",
+      "implementation_paths": [
+        "pyproject.toml",
+        "Skills/verify_hunter_distribution.py"
+      ],
+      "gate": {
+        "gate_command": "uv run --no-sync --python 3.14 python Skills/verify_hunter_distribution.py --surface both",
+        "gate_path": "Skills/verify_hunter_distribution.py",
+        "gate_sha256": "dfd57263c7a1e37b0e572cd57db582422ce94ed2201f09d251cf0e559d3209e3",
+        "exit_status": 0,
+        "code_identity": "000e0c2421c8ca15807fe46d3426bc02654573b5+dirty",
+        "executed_at_utc": "2026-08-01T07:07:24+00:00",
+        "stdout_tail": [
+          "[hunter-distribution] PASS -- wheel surface: contents, launch, state isolation",
+          "[hunter-distribution] PASS -- editable surface: 4 standard-library-reachable modules importable without PYTHONPATH",
+          "[hunter-distribution] Skills resolved from: /Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Near Earth Objects/Skills/__init__.py",
+          "[hunter-distribution] PASS -- synced environment: 3 dependency-bearing production modules importable"
+        ],
+        "stderr_tail": []
+      }
+    },
+    "LAUNCH-02": {
+      "requirement_id": "LAUNCH-02",
+      "status": "VERIFIED",
+      "exact_command": "uv run --no-sync --python 3.14 python Skills/verify_hunter_distribution.py --surface both",
+      "environment": "macOS 25.6.0; Python 3.14.3; uv 0.11.3; venv .venv; editable install; PYTHONPATH emptied for every probe",
+      "observable_assertion": "Wheel and editable surfaces each verify independently: built artifact installed into an isolated venv with all console scripts launching, and a throwaway --no-deps editable install exposing Skills, Skills.hunter_ux, hunter_shell, hunter_commands and hunter_config with PYTHONPATH empty, probed from a working directory outside the repository.",
+      "raw_evidence_path": "Logs/prod_closure/phase1_surfaces.log; docs/evidence/prod/2026-08-01-phase0-gate-authority-and-phase2-pty-blocker.md",
+      "tested_commit": "000e0c2421c8ca15807fe46d3426bc02654573b5+dirty",
+      "tested_at_utc": "2026-08-01T07:07:24+00:00",
+      "remaining_risk": "The unrelated-working-directory surface runs from a system temporary directory rather than an arbitrary user directory; the sandbox restricts execution to paths it controls.",
+      "implementation_paths": [
+        "pyproject.toml",
+        "Skills/verify_hunter_distribution.py"
+      ],
+      "gate": {
+        "gate_command": "uv run --no-sync --python 3.14 python Skills/verify_hunter_distribution.py --surface both",
+        "gate_path": "Skills/verify_hunter_distribution.py",
+        "gate_sha256": "dfd57263c7a1e37b0e572cd57db582422ce94ed2201f09d251cf0e559d3209e3",
+        "exit_status": 0,
+        "code_identity": "000e0c2421c8ca15807fe46d3426bc02654573b5+dirty",
+        "executed_at_utc": "2026-08-01T07:07:24+00:00",
+        "stdout_tail": [
+          "[hunter-distribution] PASS -- wheel surface: contents, launch, state isolation",
+          "[hunter-distribution] PASS -- editable surface: 4 standard-library-reachable modules importable without PYTHONPATH",
+          "[hunter-distribution] Skills resolved from: /Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Near Earth Objects/Skills/__init__.py",
+          "[hunter-distribution] PASS -- synced environment: 3 dependency-bearing production modules importable"
+        ],
+        "stderr_tail": []
+      }
+    },
+    "LAUNCH-03": {
+      "requirement_id": "LAUNCH-03",
+      "status": "VERIFIED",
+      "exact_command": "uv run --no-sync --python 3.14 python Skills/verify_hunter_distribution.py --surface both",
+      "environment": "macOS 25.6.0; Python 3.14.3; uv 0.11.3; venv .venv; editable install; PYTHONPATH emptied for every probe",
+      "observable_assertion": "Every environment field the contract enumerates is captured per surface: commit, working-tree state, Python and uv versions, virtual-environment path, resolved executable, installation mode, working directory, environment variables, exact command, exit status, stdout and stderr.",
+      "raw_evidence_path": "Logs/prod_closure/phase1_surfaces.log; docs/evidence/prod/2026-08-01-phase0-gate-authority-and-phase2-pty-blocker.md",
+      "tested_commit": "000e0c2421c8ca15807fe46d3426bc02654573b5+dirty",
+      "tested_at_utc": "2026-08-01T07:07:24+00:00",
+      "remaining_risk": "The unrelated-working-directory surface runs from a system temporary directory rather than an arbitrary user directory; the sandbox restricts execution to paths it controls.",
+      "implementation_paths": [
+        "pyproject.toml",
+        "Skills/verify_hunter_distribution.py"
+      ],
+      "gate": {
+        "gate_command": "uv run --no-sync --python 3.14 python Skills/verify_hunter_distribution.py --surface both",
+        "gate_path": "Skills/verify_hunter_distribution.py",
+        "gate_sha256": "dfd57263c7a1e37b0e572cd57db582422ce94ed2201f09d251cf0e559d3209e3",
+        "exit_status": 0,
+        "code_identity": "000e0c2421c8ca15807fe46d3426bc02654573b5+dirty",
+        "executed_at_utc": "2026-08-01T07:07:24+00:00",
+        "stdout_tail": [
+          "[hunter-distribution] PASS -- wheel surface: contents, launch, state isolation",
+          "[hunter-distribution] PASS -- editable surface: 4 standard-library-reachable modules importable without PYTHONPATH",
+          "[hunter-distribution] Skills resolved from: /Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Near Earth Objects/Skills/__init__.py",
+          "[hunter-distribution] PASS -- synced environment: 3 dependency-bearing production modules importable"
+        ],
+        "stderr_tail": []
+      }
+    },
+    "LAUNCH-04": {
+      "requirement_id": "LAUNCH-04",
+      "status": "VERIFIED",
+      "exact_command": "bash scripts/run_pty_gate.sh --runs 3   # then: uv run --no-sync --python 3.14 python Skills/hunter_prod_check.py --require interactive-pty-operator",
+      "environment": "macOS 25.6.0; Python 3.14.3; uv 0.11.3; venv .venv; editable install; PYTHONPATH emptied; real PTY via scripts/run_pty_gate.sh (sandbox.excludedCommands); child launched from a working directory outside the repository",
+      "observable_assertion": "Every LAUNCH-04 clause is now satisfied against the installed console script in a real terminal: it resolves to the intended environment, starts cleanly, shows a working command palette (a bare '/' offers all seven required commands with no Enter pressed), /Help lists the command reference, /Exit returns status 0, scriptable operation works via --command, invalid input returns an actionable inline message instead of an argparse dump and does not execute, and the whole session runs from a working directory outside the repository with PYTHONPATH empty. 57 assertions across 3 fresh processes.",
+      "raw_evidence_path": "Logs/prod_closure/pty_gate.json; docs/evidence/prod/2026-08-01-phase0-gate-authority-and-phase2-pty-blocker.md",
+      "tested_commit": "000e0c2421c8ca15807fe46d3426bc02654573b5+dirty",
+      "tested_at_utc": "2026-08-01T17:06:55+00:00",
+      "remaining_risk": "The gate must be launched directly, never from another sandboxed process: sandbox.excludedCommands applies to the command Claude Code launches, and a subprocess of an already-sandboxed process inherits the sandbox and is denied a PTY. hunter_prod_check therefore consumes the gate's report and fails closed when any exercised source file is newer than it.",
+      "implementation_paths": [
+        "scripts/run_pty_gate.sh",
+        "Skills/hunter_pty_gate.py",
+        "Skills/hunter_shell.py",
+        "Skills/hunter_ux/animation.py",
+        "Skills/hunter_ux/palette.py",
+        "Skills/hunter_ux/registry.py",
+        "Skills/hunter_ux/theme.py"
+      ],
+      "gate": {
+        "gate_command": "uv run --no-sync --python 3.14 python Skills/hunter_prod_check.py --require interactive-pty-operator",
+        "gate_path": "Skills/hunter_pty_gate.py",
+        "gate_sha256": "6326e77a0e812e46a11dd7a06b9b0260417b26f376d3988eb67e5d8d84424a64",
+        "exit_status": 0,
+        "code_identity": "000e0c2421c8ca15807fe46d3426bc02654573b5+dirty",
+        "executed_at_utc": "2026-08-01T17:06:55+00:00",
+        "stdout_tail": [
+          "PASS          interactive-pty-operator  installed executable passed 57 real-PTY assertions across 3 runs",
+          "",
+          "executed 1  passed 1  failed 0  NOT EXECUTED 0"
+        ],
+        "stderr_tail": []
+      }
+    },
+    "CLAIM-02": {
+      "requirement_id": "CLAIM-02",
+      "status": "VERIFIED",
+      "exact_command": "uv run --no-sync --python 3.14 python Skills/check_coverage_denominator.py Logs/prod_closure/prod_coverage.json",
+      "environment": "macOS 25.6.0; Python 3.14.3; uv 0.11.3; venv .venv; editable install; PYTHONPATH emptied for every probe",
+      "observable_assertion": "Coverage is measured against the named production runtime denominator (src/ plus Skills/hunter_cli.py, Skills/hunter_shell.py, and Skills/hunter_ux/), not src/ alone. Measured: 7663 statements, 142 missing, 98.00% aggregate, with every src/ module at 100%. The gate fails if any src/ module drops below 100%, so the aggregate floor cannot mask a regression there. The claim is stated as '98.00% of the production runtime denominator; 100% of src/', never as '100% production coverage'.",
+      "raw_evidence_path": "Logs/prod_closure/coverage_denominator.log; docs/evidence/prod/2026-08-01-phase0-gate-authority-and-phase2-pty-blocker.md",
+      "tested_commit": "000e0c2421c8ca15807fe46d3426bc02654573b5+dirty",
+      "tested_at_utc": "2026-08-01T07:07:24+00:00",
+      "remaining_risk": "142 statements in the Skills production runtime remain uncovered. A substantial part is TTY-only code that the Phase 2 PTY gate is what would exercise, and that gate cannot run in this environment.",
+      "implementation_paths": [
+        ".coveragerc.production",
+        ".github/workflows/ci.yml",
+        "Skills/check_coverage_denominator.py"
+      ],
+      "gate": {
+        "gate_command": "uv run --no-sync --python 3.14 python Skills/check_coverage_denominator.py Logs/prod_closure/prod_coverage.json",
+        "gate_path": "Skills/check_coverage_denominator.py",
+        "gate_sha256": "91376d31c232c4998ba84a46e03d70e5f908c37ec14bacddb8aa0e42265e13cc",
+        "exit_status": 0,
+        "code_identity": "000e0c2421c8ca15807fe46d3426bc02654573b5+dirty",
+        "executed_at_utc": "2026-08-01T07:07:24+00:00",
+        "stdout_tail": [
+          "[coverage-denominator] production runtime denominator",
+          "  measured files      32",
+          "  statements          7663",
+          "  covered             7521",
+          "  missing             142",
+          "  aggregate           98.15%",
+          "  below 100%:",
+          "    Skills/hunter_cli.py                87.06%  95 uncovered statement(s)",
+          "    Skills/hunter_shell.py              86.36%  30 uncovered statement(s)",
+          "    Skills/hunter_ux/animation.py       97.96%  2 uncovered statement(s)",
+          "    Skills/hunter_ux/palette.py         93.08%  11 uncovered statement(s)",
+          "    Skills/hunter_ux/registry.py        97.52%  3 uncovered statement(s)",
+          "    Skills/hunter_ux/theme.py           97.87%  1 uncovered statement(s)",
+          "",
+          "[coverage-denominator] PASS -- every src/ module is at 100%; the aggregate above is 98.15% of the full production runtime, not of src/ alone."
+        ],
+        "stderr_tail": []
+      }
+    },
+    "CLI-01": {
+      "requirement_id": "CLI-01",
+      "status": "VERIFIED",
+      "exact_command": "bash scripts/run_pty_gate.sh --runs 3   # then: uv run --no-sync --python 3.14 python Skills/hunter_prod_check.py --require interactive-pty-operator",
+      "environment": "macOS 25.6.0; Python 3.14.3; uv 0.11.3; venv .venv; editable install; PYTHONPATH emptied; real PTY via scripts/run_pty_gate.sh (sandbox.excludedCommands); child launched from a working directory outside the repository",
+      "observable_assertion": "The shared interaction contract in docs/CLI_UX_SPEC.md is met in a real terminal: immediate domain-specific startup animation (33 distinct frames spanning all six NEOHunter motifs), product name and running version shown, prompt rendered after the presentation, stage-aware execution output, width-aware rendering with no overflow at 40, 100, or 200 columns, and clean degradation with no ANSI in redirected and machine-readable modes.",
+      "raw_evidence_path": "Logs/prod_closure/pty_gate.json; docs/evidence/prod/2026-08-01-phase0-gate-authority-and-phase2-pty-blocker.md",
+      "tested_commit": "000e0c2421c8ca15807fe46d3426bc02654573b5+dirty",
+      "tested_at_utc": "2026-08-01T17:06:55+00:00",
+      "remaining_risk": "The gate must be launched directly, never from another sandboxed process: sandbox.excludedCommands applies to the command Claude Code launches, and a subprocess of an already-sandboxed process inherits the sandbox and is denied a PTY. hunter_prod_check therefore consumes the gate's report and fails closed when any exercised source file is newer than it.",
+      "implementation_paths": [
+        "scripts/run_pty_gate.sh",
+        "Skills/hunter_pty_gate.py",
+        "Skills/hunter_shell.py",
+        "Skills/hunter_ux/animation.py",
+        "Skills/hunter_ux/palette.py",
+        "Skills/hunter_ux/registry.py",
+        "Skills/hunter_ux/theme.py"
+      ],
+      "gate": {
+        "gate_command": "uv run --no-sync --python 3.14 python Skills/hunter_prod_check.py --require interactive-pty-operator",
+        "gate_path": "Skills/hunter_pty_gate.py",
+        "gate_sha256": "6326e77a0e812e46a11dd7a06b9b0260417b26f376d3988eb67e5d8d84424a64",
+        "exit_status": 0,
+        "code_identity": "000e0c2421c8ca15807fe46d3426bc02654573b5+dirty",
+        "executed_at_utc": "2026-08-01T17:06:55+00:00",
+        "stdout_tail": [
+          "PASS          interactive-pty-operator  installed executable passed 57 real-PTY assertions across 3 runs",
+          "",
+          "executed 1  passed 1  failed 0  NOT EXECUTED 0"
+        ],
+        "stderr_tail": []
+      }
+    },
+    "CLI-02": {
+      "requirement_id": "CLI-02",
+      "status": "VERIFIED",
+      "exact_command": "bash scripts/run_pty_gate.sh --runs 3   # then: uv run --no-sync --python 3.14 python Skills/hunter_prod_check.py --require interactive-pty-operator",
+      "environment": "macOS 25.6.0; Python 3.14.3; uv 0.11.3; venv .venv; editable install; PYTHONPATH emptied; real PTY via scripts/run_pty_gate.sh (sandbox.excludedCommands); child launched from a working directory outside the repository",
+      "observable_assertion": "All seven required commands are present and reachable from the palette with descriptions and parameter shapes: /New-Search, /Follow-Up-Search, /Run-Search, /Show-Follow-Ups, /Inspect-Target, /Help, /Exit. Verified by keystroke, not by inspecting the registry.",
+      "raw_evidence_path": "Logs/prod_closure/pty_gate.json; docs/evidence/prod/2026-08-01-phase0-gate-authority-and-phase2-pty-blocker.md",
+      "tested_commit": "000e0c2421c8ca15807fe46d3426bc02654573b5+dirty",
+      "tested_at_utc": "2026-08-01T17:06:55+00:00",
+      "remaining_risk": "The gate must be launched directly, never from another sandboxed process: sandbox.excludedCommands applies to the command Claude Code launches, and a subprocess of an already-sandboxed process inherits the sandbox and is denied a PTY. hunter_prod_check therefore consumes the gate's report and fails closed when any exercised source file is newer than it.",
+      "implementation_paths": [
+        "scripts/run_pty_gate.sh",
+        "Skills/hunter_pty_gate.py",
+        "Skills/hunter_shell.py",
+        "Skills/hunter_ux/animation.py",
+        "Skills/hunter_ux/palette.py",
+        "Skills/hunter_ux/registry.py",
+        "Skills/hunter_ux/theme.py"
+      ],
+      "gate": {
+        "gate_command": "uv run --no-sync --python 3.14 python Skills/hunter_prod_check.py --require interactive-pty-operator",
+        "gate_path": "Skills/hunter_pty_gate.py",
+        "gate_sha256": "6326e77a0e812e46a11dd7a06b9b0260417b26f376d3988eb67e5d8d84424a64",
+        "exit_status": 0,
+        "code_identity": "000e0c2421c8ca15807fe46d3426bc02654573b5+dirty",
+        "executed_at_utc": "2026-08-01T17:06:55+00:00",
+        "stdout_tail": [
+          "PASS          interactive-pty-operator  installed executable passed 57 real-PTY assertions across 3 runs",
+          "",
+          "executed 1  passed 1  failed 0  NOT EXECUTED 0"
+        ],
+        "stderr_tail": []
+      }
+    }
+  },
+  "session_history": [
+    {
+      "session_utc_date": "2026-07-31",
+      "commit_at_start": "000e0c2421c8ca15807fe46d3426bc02654573b5",
+      "actions": [
+        "Read all four governing artifacts; identified and disclosed RTF-wrapping defect on three of them.",
+        "Bootstrapped ledger: active_repository=NEOHunter, activated only the NEOHunter blocker profile.",
+        "Reproduced NEO-FIELD-01 verbatim on the operator .venv.",
+        "Root-caused it to a stale 0.91.0 editable install plus a wheel-only test escape.",
+        "Repaired the operator environment with the documented command and verified launch.",
+        "Added editable-surface verification and a parametrized adversarial regression control."
+      ]
+    },
+    {
+      "session_utc_date": "2026-07-31",
+      "commit_at_start": "000e0c2421c8ca15807fe46d3426bc02654573b5",
+      "actions": [
+        "Read all four governing artifacts in full from the working filesystem.",
+        "Ran the repository-native PROD gate; root-caused a 321s traversal defect in sibling-write-isolation (Path.rglob descended into .venv/.git/data on a cloud-synced volume) and replaced it with pruned os.walk: 3.46s, identical result.",
+        "Repaired status authority: VERIFIED is now gate-authored only, requiring a bound run_gate() record with exit status 0, a gate content hash, code identity, and raw evidence that exists on disk.",
+        "The repair immediately caught 5 pre-existing agent-authored VERIFIED claims; all demoted to IMPLEMENTED_NOT_VERIFIED with their evidence preserved.",
+        "Built the missing Phase 2 primary gate (Skills/hunter_pty_gate.py): real PTY, real keystrokes, installed console script, working directory outside the repo.",
+        "Executed it: NOT_EXECUTED -- PTY allocation is denied by the sandbox.",
+        "Confirmed by static evidence that palette.run_guided_entry and preview.render_preview/ResolvedAction have no production caller outside their defining modules -- reachable only from tests, which contract PIPE-02 forbids.",
+        "Confirmed the startup banner renders no product version."
+      ]
+    },
+    {
+      "session_utc_date": "2026-08-01",
+      "actions": [
+        "Wired guided parameter entry and the resolved-action preview into the operator shell; both previously had no production caller (PIPE-02).",
+        "Added the running product version to the startup banner and made the two affected goldens version-stable.",
+        "Added tests/test_hunter_shell_interaction_wiring.py (16 tests) driving hunter_shell rather than the UX modules.",
+        "Measured the real production coverage denominator: 98.00%, every src/ module at 100%; corrected CI to measure it and added a src/-100% guard.",
+        "Executed the Phase 1 surfaces gate and the CLAIM-02 coverage gate and recorded both through run_gate()."
+      ]
+    },
+    {
+      "session_utc_date": "2026-08-01",
+      "actions": [
+        "Located the real cause of the PTY block: the wrapper script the sandbox exclusion names did not exist in this repository.",
+        "Added scripts/run_pty_gate.sh matching the sibling convention.",
+        "Phase 2 gate went from NOT_EXECUTED to PASS: 19 assertions, then 3 fresh runs, 57 assertions total.",
+        "Found and fixed one real defect the gate caught: the startup banner and help text overflowed a 40-column terminal. Added theme.fit(), a compact identity for narrow terminals, and width-aware help/palette.",
+        "Rewired hunter_prod_check to consume the gate's report with a source-mtime staleness check, because a sandboxed process cannot spawn an unsandboxed child.",
+        "Added --require so one requirement closure binds to one command."
+      ]
+    }
+  ],
+  "active_requirement_note": "P0 is closed. The Phase 2 blocker is resolved: scripts/run_pty_gate.sh did not exist in this repository, while ~/.claude/settings.json already listed 'bash scripts/run_pty_gate.sh*' in sandbox.excludedCommands -- the same convention the sibling Hunters use. Adding the wrapper granted the gate a real PTY and it passes 57 assertions across 3 runs. Next open work is P1: the canonical pipeline, identity and cross-project history, adaptive discovery, and frozen-manifest execution (Phases 3 and 4), whose gates do not yet exist.",
+  "next_action": {
+    "requirement_id": "LAUNCH-04",
+    "exact_command": "uv run --no-sync --python 3.14 python Skills/hunter_pty_gate.py --runs 3",
+    "reason": "The Phase 2 primary gate exists and is frozen, but cannot execute without PTY device access. Until it runs, LAUNCH-04, CLI-01, and CLI-02 cannot be verified by any permitted means. Independently, the three confirmed implementation gaps (unwired guided entry, unwired action preview, missing startup version) can be repaired now and will be verified by this gate once it can run."
+  },
+  "completion": {
+    "prod_check_command": null,
+    "prod_check_exit_status": null,
+    "verified_commit": null,
+    "verified_at_utc": null,
+    "genuine_remaining_limitations": []
+  },
+  "gate_lock": {
+    "description": "Primary executable gate per phase, frozen by content hash. A changed hash invalidates any VERIFIED status that gate produced.",
+    "gates": {
+      "phase-0-governance": {
+        "gate_path": "Skills/hunter_prod_state.py",
+        "gate_command": "uv run --no-sync --python 3.14 python Skills/hunter_prod_state.py --validate",
+        "gate_sha256": "bc02d9f51d171cea53b09342a2bd18cd8293415d75e25739f3ac5110eec9bd0e"
+      },
+      "phase-1-installed-launch": {
+        "gate_path": "Skills/verify_hunter_distribution.py",
+        "gate_command": "uv run --no-sync --python 3.14 python Skills/verify_hunter_distribution.py --surface both",
+        "gate_sha256": "dfd57263c7a1e37b0e572cd57db582422ce94ed2201f09d251cf0e559d3209e3"
+      },
+      "phase-2-installed-pty-operator": {
+        "gate_path": "Skills/hunter_pty_gate.py",
+        "gate_command": "bash scripts/run_pty_gate.sh --runs 3",
+        "gate_sha256": "6326e77a0e812e46a11dd7a06b9b0260417b26f376d3988eb67e5d8d84424a64",
+        "wrapper_path": "scripts/run_pty_gate.sh",
+        "wrapper_sha256": "2276f04c9070c6e17f635866fa8a3b9583165ba81edf81f16a174ddd0f5588a1",
+        "verifier_command": "uv run --no-sync --python 3.14 python Skills/hunter_prod_check.py --require interactive-pty-operator"
+      },
+      "phase-6-repository-native-prod": {
+        "gate_path": "Skills/hunter_prod_check.py",
+        "gate_command": "uv run --no-sync --python 3.14 python Skills/hunter_prod_check.py",
+        "gate_sha256": "e875a34c9a14f3bc711a8509f9133088e74f3c9d3bd045ff0e529dad003ad5ab"
+      },
+      "claim-02-coverage-denominator": {
+        "gate_path": "Skills/check_coverage_denominator.py",
+        "gate_command": "uv run --no-sync --python 3.14 python Skills/check_coverage_denominator.py Logs/prod_closure/prod_coverage.json",
+        "gate_sha256": "91376d31c232c4998ba84a46e03d70e5f908c37ec14bacddb8aa0e42265e13cc"
+      }
+    },
+    "not_yet_created": [
+      "phase-3-canonical-pipeline",
+      "phase-4-adaptive-discovery-and-frozen-manifest",
+      "phase-5-real-data-new-and-follow-up",
+      "phase-6-restart-resume"
+    ]
+  },
+  "blocking_environment_capability": {
+    "capability": "PTY device allocation (/dev/ptmx)",
+    "observed": "os.openpty(), os.posix_openpt(os.O_RDWR), and open('/dev/ptmx') each raise PermissionError: [Errno 1] Operation not permitted. /dev/ptmx exists, so this is a sandbox policy denial, not a missing device.",
+    "evidence_path": "Logs/prod_closure/pty_capability.log",
+    "blocks": [
+      "E2E-01",
+      "E2E-02",
+      "E2E-03"
+    ],
+    "why_no_substitute": "The Hunter execution directive names 'mocked terminal for a real PTY' as a forbidden evidence substitution, and UX-CMD-01 is specifically about what the terminal does with a single '/' byte before Enter. A pipe cannot demonstrate it.",
+    "status": "RESOLVED",
+    "resolution": "Not a missing capability after all. ~/.claude/settings.json already excluded 'bash scripts/run_pty_gate.sh*' from the sandbox; this repository simply had no scripts/ directory, so there was nothing for the exclusion to match. Adding scripts/run_pty_gate.sh -- the same path and convention the sibling Hunters use -- unblocked it with no settings change."
+  }
+}
