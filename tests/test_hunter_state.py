@@ -17,6 +17,7 @@ from hunter_state import (
     create_search_run,
     get_latest_pending_manifest,
     get_latest_run_for_search,
+    get_operator_state,
     get_run_targets,
     get_search_manifest,
     get_search_run,
@@ -77,7 +78,43 @@ def test_init_db_records_schema_version(tmp_path: Path) -> None:
         row = conn.execute(
             "SELECT value FROM hunter_state_metadata WHERE key = 'schema_version'"
         ).fetchone()
-    assert row == ("3",)
+    assert row == ("5",)
+
+
+def test_operator_state_projects_pending_follow_up_and_latest_results(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "hunter_state.sqlite"
+    assert get_operator_state(db_path).pending_search_ids == ()
+
+    targets = _targets(1)
+    create_search_manifest(
+        db_path,
+        "search-1",
+        "new",
+        1,
+        "policy.json",
+        "digest",
+        targets,
+        10,
+        True,
+        {},
+    )
+    add_follow_up(
+        db_path,
+        targets[0].target_id,
+        "additional evidence warranted",
+        0.7,
+        "acquire another night",
+        "evidence.json",
+    )
+    create_search_run(db_path, "run-1", "search-1", "abc123", {})
+    upsert_run_target(db_path, "run-1", targets[0].target_id, "success")
+
+    state = get_operator_state(db_path)
+    assert state.pending_search_ids == ("search-1",)
+    assert state.open_follow_up_count == 1
+    assert state.last_result_count == 1
 
 
 def test_target_catalog_is_distinct_versioned_and_upsertable(tmp_path: Path) -> None:
@@ -182,6 +219,13 @@ def test_init_db_migrates_v1_manifest_targets_and_backfills_history(
     assert manifest["targets"][0]["validity_state"] == "unknown"
     history = list_target_history(db_path, "radec_10.00_5.00")
     assert history[0]["status"] == "legacy_manifest_import"
+    assert history[0]["contract_version"] == "hunter-identity-history-1.0.0"
+    assert history[0]["canonical_id"] == "radec_10.00_5.00"
+    assert history[0]["aliases"] == ["radec_10.00_5.00"]
+    assert history[0]["alias_provenance"][0]["kind"] == "hunter_target_id"
+    assert history[0]["producing_project"] == "NEOHunter"
+    assert history[0]["disposition"] == "new"
+    assert history[0]["completeness_state"] == "complete"
 
 
 def test_init_db_migrates_legacy_follow_up_fields(tmp_path: Path) -> None:
@@ -258,12 +302,45 @@ def test_create_and_get_search_manifest_round_trip(tmp_path: Path) -> None:
     assert manifest["sufficiency_met"] is True
     assert manifest["config"] == {"survey": "ztf-dr24"}
     assert manifest["status"] == "pending"
+    assert len(manifest["manifest_sha256"]) == 64
     assert [t["target_id"] for t in manifest["targets"]] == [t.target_id for t in targets]
     assert [t["rank"] for t in manifest["targets"]] == [1, 2, 3]
     assert searched_target_ids(db_path) == {target.target_id for target in targets}
     assert {event["status"] for event in list_target_history(db_path)} == {
         "selected_pending"
     }
+    selected = list_target_history(db_path)[0]
+    assert selected["canonical_id"] == targets[0].target_id
+    assert selected["aliases"] == [targets[0].target_id]
+    assert selected["alias_provenance"] == [
+        {
+            "alias": targets[0].target_id,
+            "kind": "hunter_target_id",
+            "source": "NEOHunter",
+        }
+    ]
+    assert selected["source_watermark"] == "coverage_inventory_id:inv-1"
+    assert selected["search_state"] == "pending"
+    assert selected["result_state"] == "not_executed"
+    assert selected["freshness_state"] == "unknown"
+    assert selected["completeness_state"] == "complete"
+
+
+def test_manifest_checksum_rejects_target_substitution(tmp_path: Path) -> None:
+    db_path = tmp_path / "hunter_state.sqlite"
+    target = _targets(1)[0]
+    create_search_manifest(
+        db_path, "search-1", "new", 1, "p", "d", [target], 1, True, {}
+    )
+    with closing(sqlite3.connect(db_path)) as conn:
+        conn.execute(
+            "UPDATE search_manifest_targets SET target_id = 'radec_99.00_5.00' "
+            "WHERE search_id = 'search-1'"
+        )
+        conn.commit()
+
+    with pytest.raises(ValueError, match="checksum mismatch"):
+        get_search_manifest(db_path, "search-1")
 
 
 def test_new_manifest_reservation_blocks_duplicate_but_followup_is_allowed(
@@ -320,6 +397,29 @@ def test_commit_target_result_atomically_records_history_and_nights(
         if event["status"] == "success"
     ]
     assert terminal[0]["provenance"]["validity_state"] == "valid"
+    assert terminal[0]["event_id"].startswith("run:run-1:")
+    assert terminal[0]["observation_time"] == "20240101"
+    assert terminal[0]["search_state"] == "executed"
+    assert terminal[0]["result_state"] == "success"
+    assert terminal[0]["disposition"] == "new"
+    assert terminal[0]["source_watermark"] == "coverage_inventory_id:inv-1"
+    assert terminal[0]["completeness_state"] == "complete"
+
+
+def test_history_rejects_malformed_structured_aliases(tmp_path: Path) -> None:
+    db_path = tmp_path / "hunter_state.sqlite"
+    target = _targets(1)[0]
+    create_search_manifest(
+        db_path, "search-1", "new", 1, "p", "d", [target], 1, True, {}
+    )
+    with closing(sqlite3.connect(db_path)) as conn:
+        conn.execute(
+            "UPDATE target_search_history SET aliases_json = 'not-json'"
+        )
+        conn.commit()
+
+    with pytest.raises(ValueError):
+        list_target_history(db_path)
 
 
 @pytest.mark.parametrize(

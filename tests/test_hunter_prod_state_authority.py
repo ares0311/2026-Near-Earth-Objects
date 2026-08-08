@@ -63,6 +63,92 @@ def _ledger(status: str, evidence_overrides: dict[str, object] | None = None) ->
     }
 
 
+def _phase0_ledger(tmp_path: Path) -> tuple[dict, Path]:
+    """A complete isolated Phase 0 ledger with frozen executable gate files."""
+    root = tmp_path / "neo"
+    (root / "Skills").mkdir(parents=True)
+    (root / "docs").mkdir()
+    (root / "configs").mkdir()
+
+    gate_records: dict[str, dict[str, str]] = {}
+    for index, name in enumerate(hps.REQUIRED_PHASE_GATES):
+        relative = f"Skills/gate_{index}.py"
+        path = root / relative
+        path.write_text("raise SystemExit(0)\n")
+        gate_records[name] = {
+            "gate_path": relative,
+            "gate_command": f"uv run --python 3.14 python {relative}",
+            "gate_sha256": hps.sha256_of(path),
+        }
+
+    artifacts = {
+        "contract": ("docs/HUNTER_PROD_CONTRACT.md", "HUNTER-PROD-TEST"),
+        "cli_ux": ("docs/CLI_UX_SPEC.md", "HUNTER-CLI-UX-TEST"),
+        "readme_spec": ("docs/README_SPEC.md", None),
+    }
+    artifact_records: dict[str, dict[str, str]] = {}
+    for key, (relative, version) in artifacts.items():
+        path = root / relative
+        path.write_text(f"# {key}\n")
+        artifact_records[key] = {
+            "path": relative,
+            "sha256": hps.sha256_of(path),
+        }
+        if version is not None:
+            artifact_records[key]["version"] = version
+
+    state = {
+        "artifact": "configs/HUNTER_PROD_STATE.json",
+        "schema_version": "test-1",
+        "contract_version": "HUNTER-PROD-TEST",
+        "cli_ux_version": "HUNTER-CLI-UX-TEST",
+        "active_repository": "NEOHunter",
+        "repository_profile": "NEOHunter",
+        "prod_status": "REVOKED_UNTIL_VERIFIED",
+        "requirements": {"WS-01": {"priority": "P0", "status": "UNVERIFIED"}},
+        "evidence": {},
+        "blocker_profiles": {"NEOHunter": [{"id": "NEO-TEST", "status": "CLOSED"}]},
+        "applicable_blockers": [{"id": "NEO-TEST", "status": "CLOSED"}],
+        "governing_artifacts": {
+            **artifact_records,
+            "state": {
+                "path": "configs/HUNTER_PROD_STATE.json",
+                "schema_version": "test-1",
+            },
+            "read_complete": True,
+        },
+        "workspace_boundary": {
+            "active_git_root": str(root.resolve()),
+            "writable_repository_root": str(root.resolve()),
+            "sibling_repositories": [
+                {
+                    "project": "EXOHunter",
+                    "path": str((tmp_path / "exo").resolve()),
+                    "access": "read-only",
+                },
+                {
+                    "project": "TechnoHunter",
+                    "path": str((tmp_path / "techno").resolve()),
+                    "access": "read-only",
+                },
+            ],
+            "shared_write_locations": [],
+            "locking_rule": {
+                "implemented": False,
+                "shared_writes_prohibited_without_lock": True,
+            },
+        },
+        "pre_existing_user_changes": [
+            {"path": ".codex/config.toml", "initial_status": " M", "policy": "preserve"}
+        ],
+        "gate_lock": {"gates": gate_records, "not_yet_created": []},
+        "execution_directive_v3": {"gate_result": "PASS"},
+        "completion": {"prod_check_exit_status": None},
+    }
+    (root / "configs" / "HUNTER_PROD_STATE.json").write_text(json.dumps(state))
+    return state, root
+
+
 # --- the control: a correct ledger must pass --------------------------------
 
 
@@ -224,10 +310,72 @@ def test_code_identity_marks_a_dirty_working_tree() -> None:
     assert identity.endswith("+dirty") or len(identity) >= 7
 
 
+# --- Phase 0 governance gate negative controls -----------------------------
+
+
+def test_phase0_complete_gate_inventory_is_accepted(tmp_path: Path) -> None:
+    """Known-good control for the complete Phase 0 validator."""
+    state, root = _phase0_ledger(tmp_path)
+    assert hps.validate_phase0(state, root) == []
+
+
+def test_phase0_missing_mandatory_gates_is_rejected(tmp_path: Path) -> None:
+    """The reproduced defect: syntax-valid state must not hide absent phase gates."""
+    state, root = _phase0_ledger(tmp_path)
+    missing = hps.REQUIRED_PHASE_GATES[-1]
+    del state["gate_lock"]["gates"][missing]
+    state["gate_lock"]["not_yet_created"] = [missing]
+
+    problems = hps.validate_phase0(state, root)
+
+    assert any("mandatory phase gates are not frozen" in problem for problem in problems)
+    assert any("remain not_yet_created" in problem for problem in problems)
+
+
+def test_phase0_malformed_gate_inventory_fails_loudly(tmp_path: Path) -> None:
+    state, root = _phase0_ledger(tmp_path)
+    state["gate_lock"] = "not-an-object"
+    problems = hps.validate_phase0(state, root)
+    assert "gate_lock is missing or malformed" in problems
+
+
+def test_phase0_changed_frozen_gate_is_rejected(tmp_path: Path) -> None:
+    state, root = _phase0_ledger(tmp_path)
+    name = hps.REQUIRED_PHASE_GATES[0]
+    state["gate_lock"]["gates"][name]["gate_sha256"] = "0" * 64
+    problems = hps.validate_phase0(state, root)
+    assert any("frozen gate sha256 does not match" in problem for problem in problems)
+
+
+def test_phase0_prod_status_fails_closed_on_unverified_requirement(tmp_path: Path) -> None:
+    state, root = _phase0_ledger(tmp_path)
+    state["prod_status"] = "PROD"
+    state["completion"]["prod_check_exit_status"] = 0
+    problems = hps.validate_phase0(state, root)
+    assert any("PROD status is forbidden" in problem for problem in problems)
+    assert any("prod_check_exit_status cannot be zero" in problem for problem in problems)
+
+
+def test_phase0_shared_write_without_lock_is_rejected(tmp_path: Path) -> None:
+    state, root = _phase0_ledger(tmp_path)
+    state["workspace_boundary"]["shared_write_locations"] = ["shared/history.json"]
+    problems = hps.validate_phase0(state, root)
+    assert any("without an implemented exclusive lock" in problem for problem in problems)
+
+
+def test_phase0_changed_governing_artifact_is_rejected(tmp_path: Path) -> None:
+    state, root = _phase0_ledger(tmp_path)
+    (root / "docs" / "README_SPEC.md").write_text("changed\n")
+    problems = hps.validate_phase0(state, root)
+    assert any(
+        "governing artifact 'docs/README_SPEC.md' changed" in problem for problem in problems
+    )
+
+
 def test_the_live_ledger_is_internally_consistent() -> None:
     """The committed ledger itself must satisfy every rule above."""
     state = hps.load_state()
-    assert hps.validate_state(state) == []
+    assert hps.validate_phase0(state) == []
     assert json.loads(hps.STATE_PATH.read_text())["artifact"] == (
         "configs/HUNTER_PROD_STATE.json"
     )

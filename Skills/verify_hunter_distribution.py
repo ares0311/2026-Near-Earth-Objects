@@ -1,13 +1,30 @@
 #!/usr/bin/env python3
-"""Build/install/smoke the NEO-Hunter wheel outside the source checkout."""
+"""Build/install/smoke the NEO-Hunter distribution outside the source checkout.
+
+Two distinct execution surfaces are verified, because a pass on one does not
+prove the other (Hunter contract LAUNCH-02):
+
+* ``wheel``    -- the built artifact installed into an isolated environment.
+* ``editable`` -- the synchronized/editable install that ``uv sync`` produces,
+  which is the surface the documented operator workflow actually uses.
+
+Field blocker NEO-FIELD-01 was an ``editable``-surface failure
+(``ModuleNotFoundError: No module named 'Skills'``) that the wheel-only
+verification could not detect: the wheel always carried ``Skills/`` as real
+package data, while the editable install exposed only ``src/`` until the
+``Skills`` ``package-dir`` mapping was added to ``pyproject.toml``. Verifying
+both surfaces is the regression control for that escape.
+"""
 
 from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import zipfile
 from pathlib import Path
@@ -19,6 +36,15 @@ REQUIRED_WHEEL_SUFFIXES = (
     "hunter_state.py",
     "Skills/hunter_cli.py",
     "Skills/hunter_shell.py",
+    # The interaction layer is production runtime, not a development helper.
+    "Skills/hunter_ux/__init__.py",
+    "Skills/hunter_ux/registry.py",
+    "Skills/hunter_ux/validation.py",
+    "Skills/hunter_ux/palette.py",
+    "Skills/hunter_ux/table.py",
+    "Skills/hunter_ux/theme.py",
+    "Skills/hunter_ux/animation.py",
+    "Skills/hunter_ux/preview.py",
     ".data/data/data_selection/target_priority_queue.csv",
     ".data/data/data_selection/ranking_policies/ztf_field_ranking_v4.json",
     ".data/data/models/tier1_xgb.json",
@@ -133,6 +159,131 @@ def verify_distribution(wheel: Path) -> None:
             raise ValueError("installed commands mutated immutable distribution resources")
 
 
+# Modules the editable install must expose using only the standard library.
+# These are exactly the modules the ``NEO-Hunter`` console script touches while
+# starting up, so their importability is the precise packaging question behind
+# field blocker NEO-FIELD-01. Because they need no third-party dependencies they
+# can be probed in a ``--no-deps`` environment in seconds.
+REQUIRED_EDITABLE_IMPORTS = (
+    "Skills",
+    "Skills.hunter_shell",
+    "hunter_commands",
+    "hunter_config",
+)
+
+# Production modules that additionally require the resolved dependency set.
+# These are probed against an already-synchronized environment rather than a
+# throwaway one, because installing the full dependency closure (torch and
+# friends) per verification run would cost minutes and gigabytes without
+# testing anything the dependency resolver has not already proven.
+REQUIRED_DEPENDENT_IMPORTS = (
+    "Skills.hunter_cli",
+    "hunter_state",
+    "known_object_exclusion",
+)
+
+
+def editable_import_probe_source(modules: tuple[str, ...]) -> str:
+    """Return a self-contained probe asserting each module imports and resolves.
+
+    The probe deliberately reports the resolved ``__file__`` of every module so a
+    failure distinguishes "not importable at all" from "importable but resolved
+    from the wrong tree" (for example editable-source leakage).
+    """
+
+    return (
+        "import importlib, json, sys\n"
+        f"names = {list(modules)!r}\n"
+        "resolved = {}\n"
+        "for name in names:\n"
+        "    module = importlib.import_module(name)\n"
+        "    resolved[name] = getattr(module, '__file__', None)\n"
+        "json.dump({'sys_path_has_cwd': '' in sys.path, 'resolved': resolved},"
+        " sys.stdout)\n"
+    )
+
+
+def verify_editable_surface(*, repo_root: Path | None = None) -> dict[str, str | None]:
+    """Install the project editable into a throwaway environment and smoke it.
+
+    Dependencies are intentionally skipped (``--no-deps``): the modules under
+    test here reach the operator shell using only the standard library, so the
+    probe isolates the *packaging* question (is ``Skills`` importable from an
+    editable install?) from unrelated dependency resolution, and stays fast
+    enough to run in the normal validation suite.
+    """
+
+    root = REPO_ROOT if repo_root is None else repo_root
+    uv = shutil.which("uv")
+    if uv is None:
+        raise RuntimeError("uv executable is required for editable-surface verification")
+
+    with tempfile.TemporaryDirectory(prefix="neo-hunter-editable-smoke-") as raw_tmp:
+        tmp = Path(raw_tmp)
+        venv = tmp / "venv"
+        state = tmp / "state"
+        env = {
+            **os.environ,
+            "NEOHUNTER_HOME": str(state),
+            # An empty PYTHONPATH proves the install itself supplies the modules.
+            "PYTHONPATH": "",
+            "UV_CACHE_DIR": str(root / ".uv-cache"),
+        }
+        _run([uv, "venv", "--python", "3.14", str(venv)], cwd=tmp, env=env)
+        python = venv / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+        scripts = venv / ("Scripts" if os.name == "nt" else "bin")
+        _run(
+            [uv, "pip", "install", "--python", str(python), "--no-deps", "-e", str(root)],
+            cwd=tmp,
+            env=env,
+        )
+
+        # Probe imports from a working directory that is NOT the repository root,
+        # so an accidental reliance on the caller's CWD cannot mask a real gap.
+        probe = _run(
+            [str(python), "-c", editable_import_probe_source(REQUIRED_EDITABLE_IMPORTS)],
+            cwd=tmp,
+            env=env,
+        )
+        resolved = json.loads(probe.stdout)["resolved"]
+
+        # Launch the documented console scripts as real subprocesses from that
+        # same unrelated working directory.
+        for executable in ("NEO-Hunter", "NEOHunter"):
+            for command in ("/Help", "/Exit"):
+                _run(
+                    [str(scripts / executable), "--no-animation", "--command", command],
+                    cwd=tmp,
+                    env=env,
+                )
+
+    return resolved
+
+
+def verify_dependent_imports(*, python: Path | None = None) -> dict[str, str | None]:
+    """Prove the dependency-bearing production modules import in a synced env.
+
+    ``python`` defaults to the interpreter running this verification, which under
+    the documented workflow is the ``uv sync``-managed environment.
+    """
+
+    interpreter = Path(sys.executable) if python is None else python
+    with tempfile.TemporaryDirectory(prefix="neo-hunter-dep-probe-") as raw_tmp:
+        tmp = Path(raw_tmp)
+        # Run from an unrelated working directory and with PYTHONPATH cleared so
+        # the probe cannot be satisfied by the source checkout being the CWD.
+        probe = _run(
+            [
+                str(interpreter),
+                "-c",
+                editable_import_probe_source(REQUIRED_DEPENDENT_IMPORTS),
+            ],
+            cwd=tmp,
+            env={**os.environ, "PYTHONPATH": "", "NEOHUNTER_HOME": str(tmp / "state")},
+        )
+    return json.loads(probe.stdout)["resolved"]
+
+
 def _select_wheel(wheel_dir: Path) -> Path:
     wheels = sorted(wheel_dir.glob("neo_detection-*.whl"))
     if len(wheels) != 1:
@@ -147,24 +298,46 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         help="directory containing one prebuilt wheel; otherwise build a temporary wheel",
     )
+    parser.add_argument(
+        "--surface",
+        choices=("wheel", "editable", "both"),
+        default="both",
+        help="execution surface(s) to verify; 'both' is the contract default (LAUNCH-02)",
+    )
     args = parser.parse_args(argv)
-    if args.wheel_dir is not None:
-        wheel = _select_wheel(args.wheel_dir)
-        verify_distribution(wheel)
-    else:
-        uv = shutil.which("uv")
-        if uv is None:
-            raise RuntimeError("uv executable is required for distribution verification")
-        with tempfile.TemporaryDirectory(prefix="neo-hunter-wheel-build-") as raw_tmp:
-            dist = Path(raw_tmp) / "dist"
-            env = {**os.environ, "UV_CACHE_DIR": str(REPO_ROOT / ".uv-cache")}
-            _run(
-                [uv, "build", "--wheel", "--out-dir", str(dist)],
-                cwd=REPO_ROOT,
-                env=env,
-            )
-            verify_distribution(_select_wheel(dist))
-    print("[hunter-distribution] PASS -- isolated wheel contents, launch, and state isolation")
+
+    if args.surface in {"wheel", "both"}:
+        if args.wheel_dir is not None:
+            wheel = _select_wheel(args.wheel_dir)
+            verify_distribution(wheel)
+        else:
+            uv = shutil.which("uv")
+            if uv is None:
+                raise RuntimeError("uv executable is required for distribution verification")
+            with tempfile.TemporaryDirectory(prefix="neo-hunter-wheel-build-") as raw_tmp:
+                dist = Path(raw_tmp) / "dist"
+                env = {**os.environ, "UV_CACHE_DIR": str(REPO_ROOT / ".uv-cache")}
+                _run(
+                    [uv, "build", "--wheel", "--out-dir", str(dist)],
+                    cwd=REPO_ROOT,
+                    env=env,
+                )
+                verify_distribution(_select_wheel(dist))
+        print("[hunter-distribution] PASS -- wheel surface: contents, launch, state isolation")
+
+    if args.surface in {"editable", "both"}:
+        resolved = verify_editable_surface()
+        print(
+            "[hunter-distribution] PASS -- editable surface: "
+            f"{len(resolved)} standard-library-reachable modules importable "
+            "without PYTHONPATH"
+        )
+        print(f"[hunter-distribution] Skills resolved from: {resolved['Skills']}")
+        dependent = verify_dependent_imports()
+        print(
+            "[hunter-distribution] PASS -- synced environment: "
+            f"{len(dependent)} dependency-bearing production modules importable"
+        )
     return 0
 
 

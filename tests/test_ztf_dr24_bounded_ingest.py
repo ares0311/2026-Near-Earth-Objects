@@ -214,6 +214,32 @@ def test_motion_product_preflight_records_headers_and_bytes(tmp_path):
     assert manifest["exposures"][0]["verified_content_bytes"] == 4096
 
 
+def test_explicit_row_preflight_uses_persisted_metadata_without_another_get(tmp_path):
+    table = ap_ascii.read(_ipac_response_text(n_rows=1), format="ipac")
+    head_response = _FakeResponse(
+        status=200,
+        headers={"content-length": "1024", "content-type": "application/octet-stream"},
+    )
+    with (
+        patch("requests.get") as get,
+        patch("requests.head", return_value=head_response) as head,
+    ):
+        report = ztf_dr24_bounded_ingest.preflight_motion_product_rows(
+            table,
+            query={"source": "persisted exact inventory"},
+            raw_metadata_sha256="a" * 64,
+            out_dir=tmp_path,
+        )
+
+    assert get.call_count == 0
+    assert head.call_count == 4
+    assert report["motion_product_preflight"]["status"] == "passed"
+    assert report["selected_products"] == [
+        {"pid": 1000, "obsjd": 2460310.7, "field": 100, "ccdid": 1, "qid": 1}
+    ]
+    assert (tmp_path / "explicit_product_preflight_report.json").is_file()
+
+
 def test_motion_product_preflight_resumes_completed_heads(tmp_path):
     """A repeated preflight must reuse its per-product checkpoint."""
     table = ap_ascii.read(_ipac_response_text(n_rows=1), format="ipac")

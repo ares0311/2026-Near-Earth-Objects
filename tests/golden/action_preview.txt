@@ -1,0 +1,13 @@
+Resolved action
+  Mode                             new
+  Requested targets                5
+  Scientific constraints           neo-class=aten
+  Primary sources                  ZTF DR24 (IRSA)
+  Source freshness                 coverage inventory rebuilt during discovery
+  Cross-project history freshness  hunter_state search history, read at creation
+  Estimated discovery universe     planning grid, expanded adaptively until sufficient
+  Estimated storage                512 MB per target (estimated)
+  Estimated compute                bounded local workers
+  Output behavior                  durable pending manifest; no external submission
+
+Confirm, edit, or cancel.

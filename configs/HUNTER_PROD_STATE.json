@@ -8,7 +8,378 @@
   "bootstrap_complete": true,
   "prod_status": "REVOKED_UNTIL_VERIFIED",
   "current_priority": "P1",
-  "active_requirement_id": "PIPE-01",
+  "active_requirement_id": "E2E-01",
+  "execution_directive_v3": {
+    "active_phase": 5,
+    "implementation_state": "IMPLEMENTED_NOT_VERIFIED",
+    "gate_execution_state": "NOT_EXECUTED",
+    "gate_result": "NOT_EXECUTED",
+    "gate_command": "UV_CACHE_DIR=.uv-cache uv run --no-sync --python 3.14 python Skills/hunter_live_acceptance_gate.py --state-root Logs/prod_closure/phase5_live_state_attempt4 --evidence-dir Logs/prod_closure/phase5_live_evidence_attempt4 --json Logs/prod_closure/phase5_live_evidence_attempt4/report.json",
+    "gate_path": "Skills/hunter_live_acceptance_gate.py",
+    "gate_sha256": "7e41fdc6b0515ba2b1d5017c8abb80b87fd745924230456af16ff67992d700a1",
+    "environment_identity": "macOS; Python 3.14.3; uv 0.11.3; venv .venv; working tree dirty",
+    "executable_path": ".venv/bin/NEOHunter",
+    "code_identity": "d3a6d0a24f11237caef625e5d1d61bd7f93dafc5+dirty",
+    "raw_evidence_paths": [
+      "Logs/prod_closure/phase0_governance_baseline_20260803T003126Z.log",
+      "Logs/prod_closure/phase0_governance_repaired_20260803T003955Z.log",
+      "Logs/prod_closure/phase0_governance_frozen_inventory_20260803.log",
+      "Logs/prod_closure/phase1_distribution_baseline_20260803.log",
+      "Logs/prod_closure/phase1_distribution_after_runtime_module_20260803.log",
+      "Logs/prod_closure/phase1_canonical_sync_existing_20260803.log",
+      "Logs/prod_closure/phase1_upgrade_in_place_20260803.log",
+      "Logs/prod_closure/phase1_canonical_sync_fresh_20260803.log",
+      "Logs/prod_closure/phase1_fresh_help_20260803.log",
+      "Logs/prod_closure/phase1_fresh_exit_20260803.log",
+      "Logs/prod_closure/phase1_fresh_invalid_20260803.log",
+      "Logs/prod_closure/pty_gate.json",
+      "Logs/prod_closure/phase2_prod_check_20260803.log",
+      "Logs/prod_closure/phase3_canonical_pipeline_current_20260803.log",
+      "Logs/prod_closure/phase3_canonical_pipeline_after_identity_20260803.log",
+      "Logs/prod_closure/phase3_focused_regressions_20260803.log",
+      "Logs/prod_closure/phase4_adaptive_manifest_current_20260803.log",
+      "Logs/prod_closure/phase4_adaptive_manifest_after_repair_20260803.log",
+      "Logs/prod_closure/phase4_focused_regressions_after_fixes_20260803.log",
+      "Logs/prod_closure/phase4_techno_history_hash_mismatch_20260803.log",
+      "Logs/prod_closure/phase4_adaptive_manifest_after_history_repair_20260803.log",
+      "Logs/prod_closure/phase4_frozen_oracle_defect_20260803.log",
+      "Logs/prod_closure/phase4_adaptive_manifest_refrozen_20260803.log",
+      "Logs/prod_closure/phase4_focused_regressions_final_20260803.log",
+      "Logs/prod_closure/phase5_live_gate_20260803.log",
+      "Logs/prod_closure/phase5_live_evidence/report.json",
+      "Logs/prod_closure/phase5_live_evidence/new_create.stdout.txt",
+      "Logs/prod_closure/phase5_live_evidence/new_create.stderr.txt",
+      "Logs/prod_closure/phase5_live_gate_attempt2_20260803.log",
+      "Logs/prod_closure/phase5_live_evidence_attempt2/report.json",
+      "Logs/prod_closure/phase5_live_evidence_attempt2/new_create.stdout.txt",
+      "Logs/prod_closure/phase5_live_evidence_attempt2/new_create.stderr.txt",
+      "Logs/prod_closure/phase5_live_evidence_attempt2/new_interrupted.stdout.txt",
+      "Logs/prod_closure/phase5_live_evidence_attempt2/new_interrupted.stderr.txt",
+      "Logs/prod_closure/phase5_shell_state_focused_20260803.log",
+      "Logs/prod_closure/phase5_shell_state_static_20260803.log",
+      "Logs/prod_closure/phase5_live_gate_attempt3_20260803.log",
+      "Logs/prod_closure/phase5_live_evidence_attempt3/report.json",
+      "Logs/prod_closure/phase5_live_evidence_attempt3/new_create.stdout.txt",
+      "Logs/prod_closure/phase5_live_evidence_attempt3/new_create.stderr.txt",
+      "Logs/prod_closure/phase5_live_state_attempt3/Logs/pipeline_runs/hunter_cli/exact_feasibility/radec_184.08_29.00/exact_inventory/0d32cdeab1d2/ztf_sci_metadata.ipac",
+      "Logs/prod_closure/phase5_duplicate_obsjd_focused_20260803.log",
+      "Logs/prod_closure/phase5_duplicate_obsjd_static_20260803.log",
+      "Logs/prod_closure/phase5_live_gate_attempt4_20260803.log",
+      "Logs/prod_closure/phase5_live_evidence_attempt4/new_create.stdout.txt",
+      "Logs/prod_closure/phase5_live_evidence_attempt4/new_create.stderr.txt"
+    ],
+    "executed_at_utc": "2026-08-03T03:03:24Z",
+    "blocker": "The frozen Phase 5 gate leaks one SQLite connection per 0.25-second interruption poll because sqlite3.Connection context management does not close the connection. It exhausted the process file-descriptor limit, crashed without a report, and left the mandatory gate NOT EXECUTED.",
+    "next_action": "Obtain authorization to repair only the frozen gate's SQLite connection lifetime and interruption-process cleanup, record the new gate hash as an authorized supersession, then rerun in attempt-5 isolated directories.",
+    "phase_results": {
+      "phase_0": {
+        "implementation_state": "IMPLEMENTED_NOT_VERIFIED",
+        "gate_result": "PASS",
+        "gate_command": "UV_CACHE_DIR=.uv-cache uv run --no-sync --python 3.14 python Skills/hunter_prod_state.py --validate",
+        "gate_sha256": "5f0fdeddac4d914936fe0e1c98ff51c827f0d29621edf2ff7c5097441977744d",
+        "raw_evidence_path": "Logs/prod_closure/phase0_governance_frozen_inventory_20260803.log",
+        "tested_at_utc": "2026-08-03T00:56:10Z"
+      },
+      "phase_1": {
+        "implementation_state": "IMPLEMENTED_NOT_VERIFIED",
+        "gate_result": "PASS",
+        "gate_command": "UV_CACHE_DIR=.uv-cache uv run --no-sync --python 3.14 python Skills/verify_hunter_distribution.py --surface both",
+        "gate_sha256": "dfd57263c7a1e37b0e572cd57db582422ce94ed2201f09d251cf0e559d3209e3",
+        "raw_evidence_path": "Logs/prod_closure/phase1_distribution_after_runtime_module_20260803.log",
+        "tested_at_utc": "2026-08-03T01:07:14Z"
+      },
+      "phase_2": {
+        "implementation_state": "IMPLEMENTED_NOT_VERIFIED",
+        "gate_result": "PASS",
+        "phase_result": "PASS",
+        "gate_command": "bash scripts/run_pty_gate.sh --runs 3",
+        "gate_sha256": "6f08d707ce7d87ae9f2acf90ef532b073f92cd3fee506b596f1ec7a31d594adc",
+        "raw_evidence_path": "Logs/prod_closure/pty_gate.json",
+        "tested_at_utc": "2026-08-03T01:27:19Z",
+        "blocker": null
+      },
+      "phase_3": {
+        "implementation_state": "IMPLEMENTED_NOT_VERIFIED",
+        "gate_result": "PASS",
+        "phase_result": "PASS",
+        "gate_command": "UV_CACHE_DIR=.uv-cache uv run --no-sync --python 3.14 python Skills/hunter_pipeline_gate.py --json Logs/prod_closure/phase3_canonical_pipeline_report.json",
+        "gate_sha256": "d63ac94ebff4e346c8bbce1d7ec9f8fd9172345cb80d0d7596fad3d71c17b1e4",
+        "material_fixture_hashes": {
+          "tests/test_hunter_state.py": "d5a4a8f23c77605047fa92958d70087022761c37729047a3931d954e285d0ee0"
+        },
+        "raw_evidence_path": "Logs/prod_closure/phase3_canonical_pipeline_after_identity_20260803.log",
+        "focused_regression_evidence_path": "Logs/prod_closure/phase3_focused_regressions_20260803.log",
+        "tested_code_identity": "d3a6d0a24f11237caef625e5d1d61bd7f93dafc5+dirty",
+        "tested_at_utc": "2026-08-03T01:35:35Z",
+        "blocker": null
+      },
+      "phase_4": {
+        "implementation_state": "IMPLEMENTED_NOT_VERIFIED",
+        "gate_result": "PASS",
+        "phase_result": "PASS",
+        "gate_command": "UV_CACHE_DIR=.uv-cache uv run --no-sync --python 3.14 python Skills/hunter_adaptive_manifest_gate.py --json Logs/prod_closure/phase4_adaptive_manifest_report.json",
+        "gate_sha256": "e193ce683b5e788e9fcfa1922ebcb39c76cc4979fa18ce7163d3a8549474760b",
+        "material_fixture_hashes": {
+          "tests/test_hunter_cli.py": "17405995c066daeacb0470734687ec55f3c9e78c12e43730bbd0c85aeddbe565",
+          "tests/test_hunter_state.py": "181ed48fc6fd8dcc11fcdd44c56ea1fe5ad261996ca5a40e4160d3d4a7ad1d9b"
+        },
+        "raw_evidence_path": "Logs/prod_closure/phase4_adaptive_manifest_refrozen_20260803.log",
+        "focused_regression_evidence_path": "Logs/prod_closure/phase4_focused_regressions_final_20260803.log",
+        "blocker_evidence_path": "Logs/prod_closure/phase4_frozen_oracle_defect_20260803.log",
+        "tested_code_identity": "d3a6d0a24f11237caef625e5d1d61bd7f93dafc5+dirty",
+        "tested_at_utc": "2026-08-03T02:12:43Z",
+        "blocker": null
+      },
+      "phase_5": {
+        "implementation_state": "IMPLEMENTED_NOT_VERIFIED",
+        "gate_result": "NOT_EXECUTED",
+        "phase_result": "BLOCKING",
+        "gate_command": "UV_CACHE_DIR=.uv-cache uv run --no-sync --python 3.14 python Skills/hunter_live_acceptance_gate.py --state-root Logs/prod_closure/phase5_live_state_attempt4 --evidence-dir Logs/prod_closure/phase5_live_evidence_attempt4 --json Logs/prod_closure/phase5_live_evidence_attempt4/report.json",
+        "gate_sha256": "7e41fdc6b0515ba2b1d5017c8abb80b87fd745924230456af16ff67992d700a1",
+        "attempts": [
+          {
+            "attempt": 1,
+            "gate_result": "FAIL",
+            "exact_command": "UV_CACHE_DIR=.uv-cache uv run --no-sync --python 3.14 python Skills/hunter_live_acceptance_gate.py --state-root Logs/prod_closure/phase5_live_state --evidence-dir Logs/prod_closure/phase5_live_evidence --json Logs/prod_closure/phase5_live_evidence/report.json",
+            "observable_result": "Installed /New-Search 5 failed because adaptive round 2 sent 30 fields to the authoritative coverage client, whose implemented service contract accepts at most 20 fields per batch.",
+            "raw_evidence_path": "Logs/prod_closure/phase5_live_evidence/report.json",
+            "tested_code_identity": "d3a6d0a24f11237caef625e5d1d61bd7f93dafc5+dirty",
+            "tested_at_utc": "2026-08-03T02:15:02Z"
+          },
+          {
+            "attempt": 2,
+            "gate_result": "FAIL",
+            "exact_command": "UV_CACHE_DIR=.uv-cache uv run --no-sync --python 3.14 python Skills/hunter_live_acceptance_gate.py --state-root Logs/prod_closure/phase5_live_state_attempt2 --evidence-dir Logs/prod_closure/phase5_live_evidence_attempt2 --json Logs/prod_closure/phase5_live_evidence_attempt2/report.json",
+            "observable_result": "Installed /New-Search 5 froze a pending five-target manifest, but installed /Run-Search rejected it before canonical execution because the shell supplied an empty in-memory availability state instead of hydrating the durable database.",
+            "raw_evidence_path": "Logs/prod_closure/phase5_live_evidence_attempt2/report.json",
+            "tested_code_identity": "d3a6d0a24f11237caef625e5d1d61bd7f93dafc5+dirty",
+            "tested_at_utc": "2026-08-03T02:26:16Z"
+          },
+          {
+            "attempt": 3,
+            "gate_result": "FAIL",
+            "exact_command": "UV_CACHE_DIR=.uv-cache uv run --no-sync --python 3.14 python Skills/hunter_live_acceptance_gate.py --state-root Logs/prod_closure/phase5_live_state_attempt3 --evidence-dir Logs/prod_closure/phase5_live_evidence_attempt3 --json Logs/prod_closure/phase5_live_evidence_attempt3/report.json",
+            "observable_result": "Installed /New-Search 5 failed exact target feasibility at JD 2460248.0248264 because the authoritative IRSA response contained two distinct products with that identical observation time; no manifest was frozen and Run-Search was not executed.",
+            "raw_evidence_path": "Logs/prod_closure/phase5_live_evidence_attempt3/report.json",
+            "supporting_evidence_path": "Logs/prod_closure/phase5_live_state_attempt3/Logs/pipeline_runs/hunter_cli/exact_feasibility/radec_184.08_29.00/exact_inventory/0d32cdeab1d2/ztf_sci_metadata.ipac",
+            "tested_code_identity": "d3a6d0a24f11237caef625e5d1d61bd7f93dafc5+dirty",
+            "tested_at_utc": "2026-08-03T02:49:33Z"
+          },
+          {
+            "attempt": 4,
+            "gate_result": "NOT_EXECUTED",
+            "exact_command": "UV_CACHE_DIR=.uv-cache uv run --no-sync --python 3.14 python Skills/hunter_live_acceptance_gate.py --state-root Logs/prod_closure/phase5_live_state_attempt4 --evidence-dir Logs/prod_closure/phase5_live_evidence_attempt4 --json Logs/prod_closure/phase5_live_evidence_attempt4/report.json",
+            "observable_result": "Real New froze five targets with manifest SHA-256 94a744bd8f80dfb11a7876ce9294d8f97a3b2810c148cf7c1f10a251dc38f0c8 and entered Run-Search, but the gate's polling process exhausted file descriptors and crashed before interruption evidence or a gate report was produced.",
+            "raw_evidence_path": "Logs/prod_closure/phase5_live_gate_attempt4_20260803.log",
+            "tested_code_identity": "d3a6d0a24f11237caef625e5d1d61bd7f93dafc5+dirty",
+            "tested_at_utc": "2026-08-03T03:03:24Z"
+          }
+        ],
+        "material_fixture_hashes": {
+          "tests/test_hunter_cli.py": "fa75b6c2fff17e780fb7ba99682eb4444e6cd9a924fa4a0a43207c6c36141cda",
+          "tests/test_ztf_dr24_bounded_ingest.py": "5f2730f192e241d01310e9b773c1257898e8d6811a480471c7eee785630e6fa2",
+          "tests/test_hunter_shell.py": "af0215139d90ea5f0be4af964e956138142e3fecee10cc8a1b6f6d4e7cf413f1",
+          "tests/test_hunter_state.py": "c36a7dcca15118c0f19f18ac0997247378de1c85bd357bbd270b4fd8cdd2ee80"
+        },
+        "blocker": "Frozen gate defect requires authorization: close every polling SQLite connection and guarantee child-process cleanup on polling exceptions."
+      }
+    }
+  },
+  "governing_artifacts": {
+    "contract": {
+      "path": "docs/HUNTER_PROD_CONTRACT.md",
+      "version": "HUNTER-PROD-2026-07-30.3",
+      "sha256": "337e77f1a60ffdccc81741f881b374969688249de3437fa6b82e127d362a5c0a"
+    },
+    "cli_ux": {
+      "path": "docs/CLI_UX_SPEC.md",
+      "version": "HUNTER-CLI-UX-2026-07-30.3",
+      "sha256": "0c63f2d5f2c37cb7ad3d347aee3fdf3a9ff5f75e000a5b5b6896ad89c280e2e8"
+    },
+    "state": {
+      "path": "configs/HUNTER_PROD_STATE.json",
+      "schema_version": "1.2.0"
+    },
+    "readme_spec": {
+      "path": "docs/README_SPEC.md",
+      "sha256": "f13543b3b33ab5aa71fccdd8bcae0ed13753039b7d7a3d01248b360d9df09840",
+      "preserve_unchanged_until_phase": 7
+    },
+    "read_complete": true,
+    "read_at_utc": "2026-08-03T00:31:26Z"
+  },
+  "workspace_boundary": {
+    "active_git_root": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Near Earth Objects",
+    "repository_identity": "ares0311/2026-Near-Earth-Objects",
+    "writable_repository_root": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Near Earth Objects",
+    "sibling_repositories": [
+      {
+        "project": "EXOHunter",
+        "path": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Exoplanet Research",
+        "access": "read-only"
+      },
+      {
+        "project": "TechnoHunter",
+        "path": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Technosignatures",
+        "access": "read-only"
+      }
+    ],
+    "repository_owned_publish_locations": [
+      "data_selection/hunter_prior_search_history_v1.json"
+    ],
+    "sibling_read_locations": [
+      "../2026 Exoplanet Research/data_selection/hunter_prior_search_history_v1.json",
+      "../2026 Technosignatures/data_selection/hunter_prior_search_history_v1.json"
+    ],
+    "shared_write_locations": [],
+    "locking_rule": {
+      "implemented": false,
+      "shared_writes_prohibited_without_lock": true,
+      "disposition": "Each Hunter writes only its repository-owned export and consumes sibling exports read-only. Any future shared mutable location is BLOCKING until an exclusive lock contract is authorized and implemented. Real-data phases that would mutate shared state must otherwise be serialized."
+    }
+  },
+  "pre_existing_user_changes": [
+    {
+      "path": ".codex/config.toml",
+      "initial_status": "M",
+      "policy": "preserve"
+    },
+    {
+      "path": "CLAUDE.md",
+      "initial_status": "M",
+      "policy": "preserve"
+    },
+    {
+      "path": "Skills/verify_hunter_distribution.py",
+      "initial_status": "M",
+      "policy": "preserve"
+    },
+    {
+      "path": "pyproject.toml",
+      "initial_status": "M",
+      "policy": "preserve"
+    },
+    {
+      "path": "tests/test_hunter_prod_acceptance.py",
+      "initial_status": "M",
+      "policy": "preserve"
+    },
+    {
+      "path": "tests/test_hunter_shell.py",
+      "initial_status": "M",
+      "policy": "preserve"
+    },
+    {
+      "path": "uv.lock",
+      "initial_status": "M",
+      "policy": "preserve"
+    },
+    {
+      "path": ".coveragerc.production",
+      "initial_status": "??",
+      "policy": "preserve"
+    },
+    {
+      "path": "Skills/hunter_ux/__init__.py",
+      "initial_status": "??",
+      "policy": "preserve"
+    },
+    {
+      "path": "Skills/hunter_ux/preview.py",
+      "initial_status": "??",
+      "policy": "preserve"
+    },
+    {
+      "path": "Skills/hunter_ux/table.py",
+      "initial_status": "??",
+      "policy": "preserve"
+    },
+    {
+      "path": "Skills/hunter_ux/validation.py",
+      "initial_status": "??",
+      "policy": "preserve"
+    },
+    {
+      "path": "configs/originals/",
+      "initial_status": "??",
+      "policy": "preserve"
+    },
+    {
+      "path": "docs/CLI_UX_SPEC.md",
+      "initial_status": "??",
+      "policy": "preserve"
+    },
+    {
+      "path": "docs/HUNTER_PROD_CONTRACT.md",
+      "initial_status": "??",
+      "policy": "preserve"
+    },
+    {
+      "path": "docs/evidence/live/2026-08-01-neo-cross-project-history-publish.md",
+      "initial_status": "??",
+      "policy": "preserve"
+    },
+    {
+      "path": "docs/evidence/prod/2026-07-31-p0-launch-surface-closure.md",
+      "initial_status": "??",
+      "policy": "preserve"
+    },
+    {
+      "path": "matplotlib-0ef9673i/",
+      "initial_status": "??",
+      "policy": "preserve"
+    },
+    {
+      "path": "matplotlib-j5biwomv/",
+      "initial_status": "??",
+      "policy": "preserve"
+    },
+    {
+      "path": "tests/golden/action_preview.txt",
+      "initial_status": "??",
+      "policy": "preserve"
+    },
+    {
+      "path": "tests/golden/command_palette.txt",
+      "initial_status": "??",
+      "policy": "preserve"
+    },
+    {
+      "path": "tests/golden/invalid_targets.txt",
+      "initial_status": "??",
+      "policy": "preserve"
+    },
+    {
+      "path": "tests/golden/new_search_fields.txt",
+      "initial_status": "??",
+      "policy": "preserve"
+    },
+    {
+      "path": "tests/golden/operator_error.txt",
+      "initial_status": "??",
+      "policy": "preserve"
+    },
+    {
+      "path": "tests/golden/results_table_140_columns.txt",
+      "initial_status": "??",
+      "policy": "preserve"
+    },
+    {
+      "path": "tests/golden/results_table_80_columns.txt",
+      "initial_status": "??",
+      "policy": "preserve"
+    },
+    {
+      "path": "tests/test_hunter_launch_surfaces.py",
+      "initial_status": "??",
+      "policy": "preserve"
+    },
+    {
+      "path": "tests/test_hunter_ux_units.py",
+      "initial_status": "??",
+      "policy": "preserve"
+    }
+  ],
   "artifact_defects": [
     {
       "path": "configs/HUNTER_PROD_STATE.json",
@@ -566,13 +937,13 @@
     "LAUNCH-04": {
       "requirement_id": "LAUNCH-04",
       "status": "VERIFIED",
-      "exact_command": "bash scripts/run_pty_gate.sh --runs 3   # then: uv run --no-sync --python 3.14 python Skills/hunter_prod_check.py --require interactive-pty-operator",
-      "environment": "macOS 25.6.0; Python 3.14.3; uv 0.11.3; venv .venv; editable install; PYTHONPATH emptied; real PTY via scripts/run_pty_gate.sh (sandbox.excludedCommands); child launched from a working directory outside the repository",
-      "observable_assertion": "Every LAUNCH-04 clause is now satisfied against the installed console script in a real terminal: it resolves to the intended environment, starts cleanly, shows a working command palette (a bare '/' offers all seven required commands with no Enter pressed), /Help lists the command reference, /Exit returns status 0, scriptable operation works via --command, invalid input returns an actionable inline message instead of an argparse dump and does not execute, and the whole session runs from a working directory outside the repository with PYTHONPATH empty. 57 assertions across 3 fresh processes.",
-      "raw_evidence_path": "Logs/prod_closure/pty_gate.json; docs/evidence/prod/2026-08-01-phase0-gate-authority-and-phase2-pty-blocker.md",
-      "tested_commit": "000e0c2421c8ca15807fe46d3426bc02654573b5+dirty",
-      "tested_at_utc": "2026-08-01T17:06:55+00:00",
-      "remaining_risk": "The gate must be launched directly, never from another sandboxed process: sandbox.excludedCommands applies to the command Claude Code launches, and a subprocess of an already-sandboxed process inherits the sandbox and is denied a PTY. hunter_prod_check therefore consumes the gate's report and fails closed when any exercised source file is newer than it.",
+      "exact_command": "bash scripts/run_pty_gate.sh --runs 3; UV_CACHE_DIR=.uv-cache uv run --no-sync --python 3.14 python Skills/hunter_prod_check.py --require interactive-pty-operator",
+      "environment": "macOS; Python 3.14.3; uv 0.11.3; venv .venv; working tree dirty; real installed PTY processes from unrelated directories with isolated NEOHUNTER_HOME",
+      "observable_assertion": "Every LAUNCH-04 clause is now satisfied against the installed console script in a real terminal: it resolves to the intended environment, starts cleanly, shows a working command palette (a bare '/' offers all seven required commands with no Enter pressed), /Help lists the command reference, /Exit returns status 0, scriptable operation works via --command, invalid input returns an actionable inline message instead of an argparse dump and does not execute, and the whole session runs from a working directory outside the repository with PYTHONPATH empty. 63 assertions across 3 fresh processes.",
+      "raw_evidence_path": "Logs/prod_closure/pty_gate.json; Logs/prod_closure/phase2_prod_check_20260803.log",
+      "tested_commit": "d3a6d0a24f11237caef625e5d1d61bd7f93dafc5+dirty",
+      "tested_at_utc": "2026-08-03T01:37:10+00:00",
+      "remaining_risk": "",
       "implementation_paths": [
         "scripts/run_pty_gate.sh",
         "Skills/hunter_pty_gate.py",
@@ -585,12 +956,12 @@
       "gate": {
         "gate_command": "uv run --no-sync --python 3.14 python Skills/hunter_prod_check.py --require interactive-pty-operator",
         "gate_path": "Skills/hunter_pty_gate.py",
-        "gate_sha256": "6326e77a0e812e46a11dd7a06b9b0260417b26f376d3988eb67e5d8d84424a64",
+        "gate_sha256": "6f08d707ce7d87ae9f2acf90ef532b073f92cd3fee506b596f1ec7a31d594adc",
         "exit_status": 0,
-        "code_identity": "000e0c2421c8ca15807fe46d3426bc02654573b5+dirty",
-        "executed_at_utc": "2026-08-01T17:06:55+00:00",
+        "code_identity": "d3a6d0a24f11237caef625e5d1d61bd7f93dafc5+dirty",
+        "executed_at_utc": "2026-08-03T01:37:10+00:00",
         "stdout_tail": [
-          "PASS          interactive-pty-operator  installed executable passed 57 real-PTY assertions across 3 runs",
+          "PASS          interactive-pty-operator  installed executable passed 63 real-PTY assertions across 3 runs",
           "",
           "executed 1  passed 1  failed 0  NOT EXECUTED 0"
         ],
@@ -642,13 +1013,13 @@
     "CLI-01": {
       "requirement_id": "CLI-01",
       "status": "VERIFIED",
-      "exact_command": "bash scripts/run_pty_gate.sh --runs 3   # then: uv run --no-sync --python 3.14 python Skills/hunter_prod_check.py --require interactive-pty-operator",
-      "environment": "macOS 25.6.0; Python 3.14.3; uv 0.11.3; venv .venv; editable install; PYTHONPATH emptied; real PTY via scripts/run_pty_gate.sh (sandbox.excludedCommands); child launched from a working directory outside the repository",
+      "exact_command": "bash scripts/run_pty_gate.sh --runs 3; UV_CACHE_DIR=.uv-cache uv run --no-sync --python 3.14 python Skills/hunter_prod_check.py --require interactive-pty-operator",
+      "environment": "macOS; Python 3.14.3; uv 0.11.3; venv .venv; working tree dirty; real installed PTY processes from unrelated directories with isolated NEOHUNTER_HOME",
       "observable_assertion": "The shared interaction contract in docs/CLI_UX_SPEC.md is met in a real terminal: immediate domain-specific startup animation (33 distinct frames spanning all six NEOHunter motifs), product name and running version shown, prompt rendered after the presentation, stage-aware execution output, width-aware rendering with no overflow at 40, 100, or 200 columns, and clean degradation with no ANSI in redirected and machine-readable modes.",
-      "raw_evidence_path": "Logs/prod_closure/pty_gate.json; docs/evidence/prod/2026-08-01-phase0-gate-authority-and-phase2-pty-blocker.md",
-      "tested_commit": "000e0c2421c8ca15807fe46d3426bc02654573b5+dirty",
-      "tested_at_utc": "2026-08-01T17:06:55+00:00",
-      "remaining_risk": "The gate must be launched directly, never from another sandboxed process: sandbox.excludedCommands applies to the command Claude Code launches, and a subprocess of an already-sandboxed process inherits the sandbox and is denied a PTY. hunter_prod_check therefore consumes the gate's report and fails closed when any exercised source file is newer than it.",
+      "raw_evidence_path": "Logs/prod_closure/pty_gate.json; Logs/prod_closure/phase2_prod_check_20260803.log",
+      "tested_commit": "d3a6d0a24f11237caef625e5d1d61bd7f93dafc5+dirty",
+      "tested_at_utc": "2026-08-03T01:37:10+00:00",
+      "remaining_risk": "",
       "implementation_paths": [
         "scripts/run_pty_gate.sh",
         "Skills/hunter_pty_gate.py",
@@ -661,12 +1032,12 @@
       "gate": {
         "gate_command": "uv run --no-sync --python 3.14 python Skills/hunter_prod_check.py --require interactive-pty-operator",
         "gate_path": "Skills/hunter_pty_gate.py",
-        "gate_sha256": "6326e77a0e812e46a11dd7a06b9b0260417b26f376d3988eb67e5d8d84424a64",
+        "gate_sha256": "6f08d707ce7d87ae9f2acf90ef532b073f92cd3fee506b596f1ec7a31d594adc",
         "exit_status": 0,
-        "code_identity": "000e0c2421c8ca15807fe46d3426bc02654573b5+dirty",
-        "executed_at_utc": "2026-08-01T17:06:55+00:00",
+        "code_identity": "d3a6d0a24f11237caef625e5d1d61bd7f93dafc5+dirty",
+        "executed_at_utc": "2026-08-03T01:37:10+00:00",
         "stdout_tail": [
-          "PASS          interactive-pty-operator  installed executable passed 57 real-PTY assertions across 3 runs",
+          "PASS          interactive-pty-operator  installed executable passed 63 real-PTY assertions across 3 runs",
           "",
           "executed 1  passed 1  failed 0  NOT EXECUTED 0"
         ],
@@ -676,13 +1047,13 @@
     "CLI-02": {
       "requirement_id": "CLI-02",
       "status": "VERIFIED",
-      "exact_command": "bash scripts/run_pty_gate.sh --runs 3   # then: uv run --no-sync --python 3.14 python Skills/hunter_prod_check.py --require interactive-pty-operator",
-      "environment": "macOS 25.6.0; Python 3.14.3; uv 0.11.3; venv .venv; editable install; PYTHONPATH emptied; real PTY via scripts/run_pty_gate.sh (sandbox.excludedCommands); child launched from a working directory outside the repository",
+      "exact_command": "bash scripts/run_pty_gate.sh --runs 3; UV_CACHE_DIR=.uv-cache uv run --no-sync --python 3.14 python Skills/hunter_prod_check.py --require interactive-pty-operator",
+      "environment": "macOS; Python 3.14.3; uv 0.11.3; venv .venv; working tree dirty; real installed PTY processes from unrelated directories with isolated NEOHUNTER_HOME",
       "observable_assertion": "All seven required commands are present and reachable from the palette with descriptions and parameter shapes: /New-Search, /Follow-Up-Search, /Run-Search, /Show-Follow-Ups, /Inspect-Target, /Help, /Exit. Verified by keystroke, not by inspecting the registry.",
-      "raw_evidence_path": "Logs/prod_closure/pty_gate.json; docs/evidence/prod/2026-08-01-phase0-gate-authority-and-phase2-pty-blocker.md",
-      "tested_commit": "000e0c2421c8ca15807fe46d3426bc02654573b5+dirty",
-      "tested_at_utc": "2026-08-01T17:06:55+00:00",
-      "remaining_risk": "The gate must be launched directly, never from another sandboxed process: sandbox.excludedCommands applies to the command Claude Code launches, and a subprocess of an already-sandboxed process inherits the sandbox and is denied a PTY. hunter_prod_check therefore consumes the gate's report and fails closed when any exercised source file is newer than it.",
+      "raw_evidence_path": "Logs/prod_closure/pty_gate.json; Logs/prod_closure/phase2_prod_check_20260803.log",
+      "tested_commit": "d3a6d0a24f11237caef625e5d1d61bd7f93dafc5+dirty",
+      "tested_at_utc": "2026-08-03T01:37:10+00:00",
+      "remaining_risk": "",
       "implementation_paths": [
         "scripts/run_pty_gate.sh",
         "Skills/hunter_pty_gate.py",
@@ -695,12 +1066,12 @@
       "gate": {
         "gate_command": "uv run --no-sync --python 3.14 python Skills/hunter_prod_check.py --require interactive-pty-operator",
         "gate_path": "Skills/hunter_pty_gate.py",
-        "gate_sha256": "6326e77a0e812e46a11dd7a06b9b0260417b26f376d3988eb67e5d8d84424a64",
+        "gate_sha256": "6f08d707ce7d87ae9f2acf90ef532b073f92cd3fee506b596f1ec7a31d594adc",
         "exit_status": 0,
-        "code_identity": "000e0c2421c8ca15807fe46d3426bc02654573b5+dirty",
-        "executed_at_utc": "2026-08-01T17:06:55+00:00",
+        "code_identity": "d3a6d0a24f11237caef625e5d1d61bd7f93dafc5+dirty",
+        "executed_at_utc": "2026-08-03T01:37:10+00:00",
         "stdout_tail": [
-          "PASS          interactive-pty-operator  installed executable passed 57 real-PTY assertions across 3 runs",
+          "PASS          interactive-pty-operator  installed executable passed 63 real-PTY assertions across 3 runs",
           "",
           "executed 1  passed 1  failed 0  NOT EXECUTED 0"
         ],
@@ -775,8 +1146,19 @@
     "gates": {
       "phase-0-governance": {
         "gate_path": "Skills/hunter_prod_state.py",
-        "gate_command": "uv run --no-sync --python 3.14 python Skills/hunter_prod_state.py --validate",
-        "gate_sha256": "bc02d9f51d171cea53b09342a2bd18cd8293415d75e25739f3ac5110eec9bd0e"
+        "gate_command": "UV_CACHE_DIR=.uv-cache uv run --no-sync --python 3.14 python Skills/hunter_prod_state.py --validate",
+        "gate_sha256": "5f0fdeddac4d914936fe0e1c98ff51c827f0d29621edf2ff7c5097441977744d",
+        "fixture_paths": [
+          "tests/test_hunter_prod_state_authority.py"
+        ],
+        "fixture_sha256": "bc955b04b1fb3cdea61b3c1bc130ea0dbe8d5f17265e3f9475fca3564e0114a2",
+        "superseded_gate_hashes": [
+          {
+            "sha256": "bc02d9f51d171cea53b09342a2bd18cd8293415d75e25739f3ac5110eec9bd0e",
+            "reason": "Operator-authorized repair after the gate returned PASS while mandatory phase gates remained not_yet_created.",
+            "raw_evidence_path": "Logs/prod_closure/phase0_governance_baseline_20260803T003126Z.log"
+          }
+        ]
       },
       "phase-1-installed-launch": {
         "gate_path": "Skills/verify_hunter_distribution.py",
@@ -786,15 +1168,76 @@
       "phase-2-installed-pty-operator": {
         "gate_path": "Skills/hunter_pty_gate.py",
         "gate_command": "bash scripts/run_pty_gate.sh --runs 3",
-        "gate_sha256": "6326e77a0e812e46a11dd7a06b9b0260417b26f376d3988eb67e5d8d84424a64",
+        "gate_sha256": "6f08d707ce7d87ae9f2acf90ef532b073f92cd3fee506b596f1ec7a31d594adc",
+        "fixture_paths": [
+          "tests/test_hunter_pty_gate_controls.py"
+        ],
+        "fixture_sha256": "58af98fbe4afd899536d14fd621dc6501cc8d84629107d83032dc393bd08e3cb",
+        "superseded_gate_hashes": [
+          {
+            "sha256": "6326e77a0e812e46a11dd7a06b9b0260417b26f376d3988eb67e5d8d84424a64",
+            "reason": "Operator-authorized repair after the gate returned PASS without testing terminal mode/cursor restoration or behavioral selection change, and without isolated state.",
+            "raw_evidence_path": "Logs/prod_closure/phase2_prod_check_20260803.log"
+          }
+        ],
         "wrapper_path": "scripts/run_pty_gate.sh",
         "wrapper_sha256": "2276f04c9070c6e17f635866fa8a3b9583165ba81edf81f16a174ddd0f5588a1",
         "verifier_command": "uv run --no-sync --python 3.14 python Skills/hunter_prod_check.py --require interactive-pty-operator"
+      },
+      "phase-3-canonical-pipeline": {
+        "gate_path": "Skills/hunter_pipeline_gate.py",
+        "gate_command": "UV_CACHE_DIR=.uv-cache uv run --no-sync --python 3.14 python Skills/hunter_pipeline_gate.py --json Logs/prod_closure/phase3_canonical_pipeline_report.json",
+        "gate_sha256": "d63ac94ebff4e346c8bbce1d7ec9f8fd9172345cb80d0d7596fad3d71c17b1e4",
+        "baseline_result": "FAIL",
+        "baseline_evidence_path": "Logs/prod_closure/phase3_canonical_pipeline_current_20260803.log",
+        "final_result": "PASS",
+        "final_evidence_path": "Logs/prod_closure/phase3_canonical_pipeline_after_identity_20260803.log"
+      },
+      "phase-4-adaptive-discovery-and-frozen-manifest": {
+        "gate_path": "Skills/hunter_adaptive_manifest_gate.py",
+        "gate_command": "UV_CACHE_DIR=.uv-cache uv run --no-sync --python 3.14 python Skills/hunter_adaptive_manifest_gate.py --json Logs/prod_closure/phase4_adaptive_manifest_report.json",
+        "gate_sha256": "e193ce683b5e788e9fcfa1922ebcb39c76cc4979fa18ce7163d3a8549474760b",
+        "superseded_gate_hashes": [
+          {
+            "sha256": "32717b8c036af8fb3d24dfafa27ab618f94b494c02f61d08c928429c29d210c2",
+            "reason": "Operator-authorized repair after the frozen oracle designated RA 126 degrees as high-value even though the production policy it invoked scored that candidate 0.6355 at rank four, below the initial segment's 0.9333 leader. The replacement RA 24 degrees independently scores 1.0000 under the same fixed JD and policy, preserving the adversarial outside-segment intent.",
+            "raw_evidence_path": "Logs/prod_closure/phase4_adaptive_manifest_after_history_repair_20260803.log",
+            "diagnostic_evidence_path": "Logs/prod_closure/phase4_frozen_oracle_defect_20260803.log"
+          }
+        ],
+        "baseline_result": "FAIL",
+        "baseline_evidence_path": "Logs/prod_closure/phase4_adaptive_manifest_baseline_frozen_20260803.log",
+        "latest_result": "FAIL",
+        "latest_evidence_path": "Logs/prod_closure/phase4_adaptive_manifest_after_history_repair_20260803.log",
+        "latest_blocker_evidence_path": "Logs/prod_closure/phase4_frozen_oracle_defect_20260803.log",
+        "final_result": "PASS",
+        "final_evidence_path": "Logs/prod_closure/phase4_adaptive_manifest_refrozen_20260803.log"
+      },
+      "phase-5-real-data-new-and-follow-up": {
+        "gate_path": "Skills/hunter_live_acceptance_gate.py",
+        "gate_command": "UV_CACHE_DIR=.uv-cache uv run --no-sync --python 3.14 python Skills/hunter_live_acceptance_gate.py --state-root Logs/prod_closure/phase5_live_state --evidence-dir Logs/prod_closure/phase5_live_evidence --json Logs/prod_closure/phase5_live_evidence/report.json",
+        "gate_sha256": "7e41fdc6b0515ba2b1d5017c8abb80b87fd745924230456af16ff67992d700a1",
+        "construction_control_result": "NOT_EXECUTED",
+        "construction_evidence_path": "Logs/prod_closure/phase5_gate_construction_20260803.log"
+      },
+      "phase-6-restart-resume": {
+        "gate_path": "Skills/hunter_restart_resume_gate.py",
+        "gate_command": "UV_CACHE_DIR=.uv-cache uv run --no-sync --python 3.14 python Skills/hunter_restart_resume_gate.py --phase5-report Logs/prod_closure/phase5_live_evidence/report.json --json Logs/prod_closure/phase6_restart_resume_report.json",
+        "gate_sha256": "6ee434a6a53452381c136da219aad12fa49b332f042d0e36f7d4c0e93af656f8",
+        "construction_control_result": "NOT_EXECUTED",
+        "construction_evidence_path": "Logs/prod_closure/phase6_restart_resume_construction_20260803.log"
       },
       "phase-6-repository-native-prod": {
         "gate_path": "Skills/hunter_prod_check.py",
         "gate_command": "uv run --no-sync --python 3.14 python Skills/hunter_prod_check.py",
         "gate_sha256": "e875a34c9a14f3bc711a8509f9133088e74f3c9d3bd045ff0e529dad003ad5ab"
+      },
+      "phase-7-readme-conformance": {
+        "gate_path": "Skills/hunter_prod_check.py",
+        "gate_command": "UV_CACHE_DIR=.uv-cache uv run --no-sync --python 3.14 python Skills/hunter_prod_check.py --require readme-conformance --json Logs/prod_closure/phase7_readme_conformance_report.json",
+        "gate_sha256": "e875a34c9a14f3bc711a8509f9133088e74f3c9d3bd045ff0e529dad003ad5ab",
+        "baseline_result": "FAIL",
+        "baseline_evidence_path": "Logs/prod_closure/phase7_readme_conformance_baseline_20260803.log"
       },
       "claim-02-coverage-denominator": {
         "gate_path": "Skills/check_coverage_denominator.py",
@@ -802,12 +1245,7 @@
         "gate_sha256": "91376d31c232c4998ba84a46e03d70e5f908c37ec14bacddb8aa0e42265e13cc"
       }
     },
-    "not_yet_created": [
-      "phase-3-canonical-pipeline",
-      "phase-4-adaptive-discovery-and-frozen-manifest",
-      "phase-5-real-data-new-and-follow-up",
-      "phase-6-restart-resume"
-    ]
+    "not_yet_created": []
   },
   "blocking_environment_capability": {
     "capability": "PTY device allocation (/dev/ptmx)",

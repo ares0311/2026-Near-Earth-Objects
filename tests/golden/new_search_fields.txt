@@ -1,0 +1,6 @@
+/New-Search
+
+> Targets  [20]  OK
+           How many targets to select and freeze into this search.
+
+  Scientific constraints  [Open...]

@@ -74,6 +74,32 @@ REQUIRED_EVIDENCE_FIELDS = (
     "tested_at_utc",
 )
 
+# Every executable acceptance surface required by the fixed PROD-closure phase
+# sequence. Phase 6 has a dedicated restart/resume gate in addition to the
+# repository-native aggregate PROD gate because restart/resume is a mandatory
+# black-box stage and cannot be inferred from the aggregate runner's presence.
+REQUIRED_PHASE_GATES = (
+    "phase-0-governance",
+    "phase-1-installed-launch",
+    "phase-2-installed-pty-operator",
+    "phase-3-canonical-pipeline",
+    "phase-4-adaptive-discovery-and-frozen-manifest",
+    "phase-5-real-data-new-and-follow-up",
+    "phase-6-restart-resume",
+    "phase-6-repository-native-prod",
+    "phase-7-readme-conformance",
+)
+
+GOVERNING_ARTIFACTS = {
+    "contract": "docs/HUNTER_PROD_CONTRACT.md",
+    "cli_ux": "docs/CLI_UX_SPEC.md",
+    "state": "configs/HUNTER_PROD_STATE.json",
+    "readme_spec": "docs/README_SPEC.md",
+}
+
+PROD_STATUSES = frozenset({"PROD", "PROD_ACCEPTED"})
+GATE_RESULTS = frozenset({"PASS", "FAIL", "NOT_EXECUTED", "UNKNOWN"})
+
 
 class LedgerError(RuntimeError):
     """Raised when the ledger is malformed or an update would violate the contract."""
@@ -244,6 +270,229 @@ def validate_state(state: dict[str, Any]) -> list[str]:
     return problems
 
 
+def _validate_governing_artifacts(
+    state: dict[str, Any], repo_root: Path,
+) -> list[str]:
+    """Validate the four governing artifacts and their frozen identities."""
+    problems: list[str] = []
+    records = state.get("governing_artifacts")
+    if not isinstance(records, dict):
+        return ["governing_artifacts must record all four governing files"]
+
+    for key, relative in GOVERNING_ARTIFACTS.items():
+        record = records.get(key)
+        if not isinstance(record, dict):
+            problems.append(f"governing_artifacts.{key} is missing or malformed")
+            continue
+        if record.get("path") != relative:
+            problems.append(
+                f"governing_artifacts.{key}.path must be {relative!r}, "
+                f"found {record.get('path')!r}"
+            )
+        path = repo_root / relative
+        if not path.is_file():
+            problems.append(f"governing artifact is missing: {relative}")
+            continue
+        if key != "state":
+            expected_hash = str(record.get("sha256", "")).strip()
+            if not expected_hash:
+                problems.append(f"governing_artifacts.{key}.sha256 is missing")
+            elif sha256_of(path) != expected_hash:
+                problems.append(
+                    f"governing artifact {relative!r} changed since startup "
+                    "(sha256 mismatch)"
+                )
+        if key in {"contract", "cli_ux", "readme_spec"}:
+            text = path.read_text(encoding="utf-8", errors="replace")
+            if text.lstrip().startswith("{\\rtf"):
+                problems.append(f"governing artifact is RTF content, not Markdown: {relative}")
+
+    if records.get("contract", {}).get("version") != state.get("contract_version"):
+        problems.append("governing contract version does not match contract_version")
+    if records.get("cli_ux", {}).get("version") != state.get("cli_ux_version"):
+        problems.append("CLI/UX specification version does not match cli_ux_version")
+    if records.get("state", {}).get("schema_version") != state.get("schema_version"):
+        problems.append("state artifact schema version does not match schema_version")
+    if records.get("read_complete") is not True:
+        problems.append("all four governing artifacts are not recorded as completely read")
+    return problems
+
+
+def _validate_workspace_boundary(state: dict[str, Any], repo_root: Path) -> list[str]:
+    """Enforce one writable repository and an explicit shared-write policy."""
+    problems: list[str] = []
+    boundary = state.get("workspace_boundary")
+    if not isinstance(boundary, dict):
+        return ["workspace_boundary is missing or malformed"]
+
+    expected_root = str(repo_root.resolve())
+    if boundary.get("active_git_root") != expected_root:
+        problems.append(
+            "workspace_boundary.active_git_root does not match the executing repository"
+        )
+    if boundary.get("writable_repository_root") != expected_root:
+        problems.append("exactly the active Git root must be the writable repository")
+    if (
+        state.get("active_repository") != "NEOHunter"
+        or state.get("repository_profile") != "NEOHunter"
+    ):
+        problems.append("active repository and blocker profile must both be NEOHunter")
+
+    siblings = boundary.get("sibling_repositories")
+    if not isinstance(siblings, list) or len(siblings) != 2:
+        problems.append("workspace_boundary must identify exactly two sibling repositories")
+    else:
+        for sibling in siblings:
+            if not isinstance(sibling, dict):
+                problems.append("sibling repository records must be objects")
+                continue
+            path_text = str(sibling.get("path", "")).strip()
+            if sibling.get("access") != "read-only":
+                problems.append(f"sibling repository is not read-only: {path_text!r}")
+            if not path_text:
+                problems.append("sibling repository path is missing")
+                continue
+            path = Path(path_text).resolve()
+            try:
+                path.relative_to(repo_root.resolve())
+            except ValueError:
+                pass
+            else:
+                problems.append(f"sibling repository resolves inside active root: {path}")
+
+    shared_writes = boundary.get("shared_write_locations")
+    locking = boundary.get("locking_rule")
+    if not isinstance(shared_writes, list):
+        problems.append("shared_write_locations must be an explicit list")
+    if not isinstance(locking, dict):
+        problems.append("locking_rule is missing or malformed")
+    elif shared_writes:
+        if locking.get("implemented") is not True or not locking.get("lock_path"):
+            problems.append(
+                "shared writes are configured without an implemented exclusive lock"
+            )
+    elif locking.get("shared_writes_prohibited_without_lock") is not True:
+        problems.append(
+            "the no-shared-write state must fail closed until a lock contract exists"
+        )
+
+    changes = state.get("pre_existing_user_changes")
+    if not isinstance(changes, list) or not changes:
+        problems.append("pre_existing_user_changes must preserve the startup worktree snapshot")
+    else:
+        for entry in changes:
+            if not isinstance(entry, dict):
+                problems.append("pre-existing change records must be objects")
+                continue
+            if not str(entry.get("path", "")).strip() or not str(
+                entry.get("initial_status", "")
+            ).strip():
+                problems.append("pre-existing change record lacks path or initial_status")
+            if entry.get("policy") != "preserve":
+                problems.append(
+                    f"pre-existing change is not marked preserve: {entry.get('path')!r}"
+                )
+    return problems
+
+
+def _validate_gate_lock(state: dict[str, Any], repo_root: Path) -> list[str]:
+    """Require every phase gate to exist and still match its frozen hash."""
+    problems: list[str] = []
+    lock = state.get("gate_lock")
+    if not isinstance(lock, dict):
+        return ["gate_lock is missing or malformed"]
+    gates = lock.get("gates")
+    if not isinstance(gates, dict):
+        return ["gate_lock.gates is missing or malformed"]
+
+    missing = [name for name in REQUIRED_PHASE_GATES if name not in gates]
+    if missing:
+        problems.append(f"mandatory phase gates are not frozen: {missing}")
+    not_created = lock.get("not_yet_created")
+    if not isinstance(not_created, list):
+        problems.append("gate_lock.not_yet_created must be a list")
+    elif not_created:
+        problems.append(f"mandatory phase gates remain not_yet_created: {not_created}")
+
+    for name in REQUIRED_PHASE_GATES:
+        record = gates.get(name)
+        if not isinstance(record, dict):
+            continue
+        gate_path_text = str(record.get("gate_path", "")).strip()
+        gate_command = str(record.get("gate_command", "")).strip()
+        expected_hash = str(record.get("gate_sha256", "")).strip()
+        if not gate_path_text or not gate_command or not expected_hash:
+            problems.append(f"{name}: gate path, command, and sha256 are required")
+            continue
+        gate_path = (repo_root / gate_path_text).resolve()
+        try:
+            gate_path.relative_to(repo_root.resolve())
+        except ValueError:
+            problems.append(f"{name}: gate path resolves outside the active repository")
+            continue
+        if not gate_path.is_file():
+            problems.append(f"{name}: gate file does not exist: {gate_path_text}")
+        elif sha256_of(gate_path) != expected_hash:
+            problems.append(f"{name}: frozen gate sha256 does not match {gate_path_text}")
+    return problems
+
+
+def _validate_prod_fail_closed(state: dict[str, Any]) -> list[str]:
+    """A mandatory unknown/failure may never coexist with PROD status."""
+    problems: list[str] = []
+    requirements = state.get("requirements", {})
+    incomplete = sorted(
+        requirement_id
+        for requirement_id, record in requirements.items()
+        if record.get("status") != "VERIFIED"
+    )
+    blockers = [
+        str(record.get("id", "unknown"))
+        for record in state.get("applicable_blockers", [])
+        if record.get("status") == "BLOCKING"
+    ]
+    execution = state.get("execution_directive_v3", {})
+    gate_result = execution.get("gate_result")
+    if gate_result is not None and gate_result not in GATE_RESULTS:
+        problems.append(f"execution gate_result is not recognized: {gate_result!r}")
+
+    if state.get("prod_status") in PROD_STATUSES and (incomplete or blockers):
+        problems.append(
+            "PROD status is forbidden while mandatory requirements or blockers remain: "
+            f"requirements={incomplete[:5]}, blockers={blockers}"
+        )
+    completion = state.get("completion", {})
+    if completion.get("prod_check_exit_status") == 0 and (incomplete or blockers):
+        problems.append(
+            "prod_check_exit_status cannot be zero while mandatory requirements "
+            "or blockers remain"
+        )
+    if gate_result in {"FAIL", "NOT_EXECUTED", "UNKNOWN"} and state.get(
+        "prod_status"
+    ) in PROD_STATUSES:
+        problems.append(f"PROD status is forbidden after mandatory gate result {gate_result}")
+    return problems
+
+
+def validate_phase0(state: dict[str, Any], repo_root: Path = REPO_ROOT) -> list[str]:
+    """Validate every Phase 0 pass criterion, not only ledger syntax."""
+    problems = validate_state(state)
+    problems.extend(_validate_governing_artifacts(state, repo_root))
+    problems.extend(_validate_workspace_boundary(state, repo_root))
+    problems.extend(_validate_gate_lock(state, repo_root))
+    problems.extend(_validate_prod_fail_closed(state))
+
+    profile_ids = {
+        str(record.get("id")) for record in state.get("blocker_profiles", {}).get("NEOHunter", [])
+    }
+    applicable_ids = {str(record.get("id")) for record in state.get("applicable_blockers", [])}
+    if not applicable_ids or applicable_ids != profile_ids:
+        problems.append(
+            "applicable blocker profile does not exactly match blocker_profiles.NEOHunter"
+        )
+    return problems
+
+
 def record_evidence(
     state: dict[str, Any],
     *,
@@ -341,9 +590,9 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  {status:<26} {counts[status]}")
 
     if args.validate:
-        problems = validate_state(state)
+        problems = validate_phase0(state)
         if problems:
-            print(f"[hunter-prod-state] FAIL -- {len(problems)} ledger violation(s):")
+            print(f"[hunter-prod-state] FAIL -- {len(problems)} Phase 0 violation(s):")
             for problem in problems:
                 print(f"  - {problem}")
             return 1

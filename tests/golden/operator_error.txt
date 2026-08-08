@@ -1,0 +1,4 @@
+IRSA connection closed before the response completed.
+Attempt 2 of 3 failed.
+Search state remains resumable.
+Diagnostic ID: NEO-20260731-184211

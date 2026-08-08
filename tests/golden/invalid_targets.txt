@@ -1,0 +1,10 @@
+Targets: 'twenty'
+  Invalid - enter a positive whole number.
+Targets: '0'
+  Invalid - targets must be greater than zero.
+Targets: '-3'
+  Invalid - targets must be greater than zero.
+Targets: 'abc123'
+  Invalid - enter a positive whole number.
+Targets: ''
+  Required - enter a positive whole number.

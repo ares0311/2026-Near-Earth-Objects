@@ -60,7 +60,17 @@ def test_packaging_and_readme_demote_shadow_product_paths() -> None:
     assert {"hunter_commands", "hunter_config", "hunter_state", "hunter_logging"} <= (
         packaged_modules
     )
-    assert pyproject["tool"]["setuptools"]["packages"] == ["Skills"]
+    # The intent is that no shadow product path is packaged -- not that the list
+    # can never grow. Skills.hunter_ux is the CLI/UX interaction layer required
+    # by docs/CLI_UX_SPEC.md and must ship; setuptools does not recurse into
+    # subpackages of an explicit package list, so it is enumerated explicitly.
+    packaged_packages = set(pyproject["tool"]["setuptools"]["packages"])
+    assert packaged_packages == {"Skills", "Skills.hunter_ux"}
+    # Development-only trees must never be packaged as product.
+    assert not any(
+        name.split(".")[0] in {"tests", "benchmarks", "docs", "Logs"}
+        for name in packaged_packages
+    )
     packaged_data = pyproject["tool"]["setuptools"]["data-files"]
     assert "models" in packaged_data
     assert "data_selection/ranking_policies" in packaged_data

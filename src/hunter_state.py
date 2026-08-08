@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 import sqlite3
 from contextlib import closing
@@ -26,7 +27,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = "3"
+SCHEMA_VERSION = "5"
+IDENTITY_CONTRACT_VERSION = "hunter-identity-history-1.0.0"
+PRODUCING_PROJECT = "NEOHunter"
+MANIFEST_CONTRACT_VERSION = "hunter-frozen-manifest-1.0.0"
 
 _SEARCH_MODES = {"new", "follow_up"}
 _MANIFEST_STATUSES = {"pending", "executed", "expired"}
@@ -59,6 +63,171 @@ def _non_empty(value: str, field_name: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{field_name} must be a non-empty string")
     return value.strip()
+
+
+def _target_identity_evidence(
+    *,
+    target_id: str,
+    canonical_id: str,
+    primary_survey_id: str,
+    survey: str,
+) -> tuple[str, list[str], list[dict[str, str]]]:
+    """Build the structured identity carried by every durable history event."""
+    canonical = canonical_id.strip() or target_id
+    aliases = [target_id]
+    alias_provenance = [
+        {
+            "alias": target_id,
+            "kind": "hunter_target_id",
+            "source": PRODUCING_PROJECT,
+        }
+    ]
+    primary = primary_survey_id.strip()
+    if primary and primary not in aliases and primary != canonical:
+        aliases.append(primary)
+        alias_provenance.append(
+            {
+                "alias": primary,
+                "kind": "primary_survey_id",
+                "source": survey.strip() or PRODUCING_PROJECT,
+            }
+        )
+    return canonical, aliases, alias_provenance
+
+
+def _source_watermark(
+    coverage_inventory_id: str | None,
+    coverage_provenance: dict[str, Any],
+) -> str:
+    """Return an observed upstream watermark without inventing source state."""
+    for key in (
+        "source_watermark",
+        "watermark",
+        "source_sha256",
+        "manifest_sha256",
+        "inventory_sha256",
+    ):
+        value = coverage_provenance.get(key)
+        if isinstance(value, str) and value.strip():
+            return f"{key}:{value.strip()}"
+    if coverage_inventory_id and coverage_inventory_id.strip():
+        return f"coverage_inventory_id:{coverage_inventory_id.strip()}"
+    return ""
+
+
+def _observation_time(nights: list[str]) -> str | None:
+    observed = sorted(value.strip() for value in nights if value.strip())
+    return observed[0] if observed else None
+
+
+def _history_completeness(
+    *,
+    canonical_id: str,
+    aliases: list[str],
+    alias_provenance: list[dict[str, str]],
+    source_watermark: str,
+    provenance: dict[str, Any],
+) -> str:
+    required = (
+        canonical_id,
+        aliases,
+        alias_provenance,
+        source_watermark,
+        provenance,
+    )
+    return "complete" if all(required) else "incomplete"
+
+
+def _decode_manifest_target(row: sqlite3.Row | dict[str, Any]) -> dict[str, Any]:
+    target = dict(row)
+    target["coverage_provenance"] = _loads(
+        target.pop("coverage_provenance_json")
+    )
+    target["prior_search_provenance"] = _loads(
+        target.pop("prior_search_provenance_json")
+    )
+    target["scientific_metrics"] = _loads(target.pop("scientific_metrics_json"))
+    return target
+
+
+def _manifest_sha256(
+    *,
+    search_id: str,
+    mode: str,
+    requested_n: int,
+    actual_n_selected: int,
+    ranking_policy_path: str,
+    ranking_policy_digest: str,
+    discovery_pool_size_explored: int,
+    sufficiency_met: bool,
+    config: dict[str, Any],
+    targets: list[dict[str, Any]],
+) -> str:
+    """Checksum every immutable field in the exact ordered execution manifest."""
+    fields = (
+        "rank",
+        "target_id",
+        "ra_deg",
+        "dec_deg",
+        "score",
+        "selection_reason",
+        "coverage_inventory_id",
+        "coverage_provenance",
+        "validity_state",
+        "primary_survey_id",
+        "canonical_id",
+        "target_kind",
+        "survey",
+        "prior_search_count",
+        "prior_search_provenance",
+        "estimated_storage_mb",
+        "estimated_compute_seconds",
+        "scientific_metrics",
+    )
+    normalized_targets: list[dict[str, Any]] = []
+    for target in targets:
+        normalized = {field: target.get(field) for field in fields}
+        normalized["rank"] = int(normalized["rank"])
+        normalized["ra_deg"] = float(normalized["ra_deg"])
+        normalized["dec_deg"] = float(normalized["dec_deg"])
+        normalized["score"] = float(normalized["score"])
+        normalized["prior_search_count"] = int(normalized["prior_search_count"])
+        normalized["estimated_storage_mb"] = float(
+            normalized["estimated_storage_mb"]
+        )
+        normalized["estimated_compute_seconds"] = float(
+            normalized["estimated_compute_seconds"]
+        )
+        normalized_targets.append(normalized)
+    payload = {
+        "contract_version": MANIFEST_CONTRACT_VERSION,
+        "search_id": search_id,
+        "mode": mode,
+        "requested_n": requested_n,
+        "actual_n_selected": actual_n_selected,
+        "ranking_policy_path": ranking_policy_path,
+        "ranking_policy_digest": ranking_policy_digest,
+        "discovery_pool_size_explored": discovery_pool_size_explored,
+        "sufficiency_met": bool(sufficiency_met),
+        "config": config,
+        "targets": normalized_targets,
+    }
+    return hashlib.sha256(
+        _json(_canonicalize_for_hash(payload)).encode("utf-8")
+    ).hexdigest()
+
+
+def _canonicalize_for_hash(value: Any) -> Any:
+    """Normalize JSON-equivalent values SQLite may round-trip differently."""
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise ValueError("manifest checksum fields must contain finite numbers")
+        return 0.0 if value == 0 else value
+    if isinstance(value, dict):
+        return {key: _canonicalize_for_hash(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_canonicalize_for_hash(item) for item in value]
+    return value
 
 
 def target_id_from_radec(ra_deg: float, dec_deg: float) -> str:
@@ -137,10 +306,20 @@ def init_db(db_path: Path) -> None:
                 discovery_pool_size_explored INTEGER NOT NULL,
                 sufficiency_met INTEGER NOT NULL,
                 config_json TEXT NOT NULL,
+                manifest_sha256 TEXT NOT NULL,
                 status TEXT NOT NULL
             )
             """
         )
+        search_manifest_columns = {
+            row["name"]
+            for row in conn.execute("PRAGMA table_info(search_manifests)").fetchall()
+        }
+        if "manifest_sha256" not in search_manifest_columns:
+            conn.execute(
+                "ALTER TABLE search_manifests "
+                "ADD COLUMN manifest_sha256 TEXT NOT NULL DEFAULT ''"
+            )
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS search_manifest_targets (
@@ -197,6 +376,32 @@ def init_db(db_path: Path) -> None:
                 conn.execute(
                     f"ALTER TABLE search_manifest_targets ADD COLUMN {column} {definition}"
                 )
+        unhashed_manifests = conn.execute(
+            "SELECT * FROM search_manifests WHERE manifest_sha256 = ''"
+        ).fetchall()
+        for manifest_row in unhashed_manifests:
+            target_rows = conn.execute(
+                "SELECT * FROM search_manifest_targets WHERE search_id = ? ORDER BY rank",
+                (manifest_row["search_id"],),
+            ).fetchall()
+            checksum = _manifest_sha256(
+                search_id=manifest_row["search_id"],
+                mode=manifest_row["mode"],
+                requested_n=manifest_row["requested_n"],
+                actual_n_selected=manifest_row["actual_n_selected"],
+                ranking_policy_path=manifest_row["ranking_policy_path"],
+                ranking_policy_digest=manifest_row["ranking_policy_digest"],
+                discovery_pool_size_explored=manifest_row[
+                    "discovery_pool_size_explored"
+                ],
+                sufficiency_met=bool(manifest_row["sufficiency_met"]),
+                config=_loads(manifest_row["config_json"]),
+                targets=[_decode_manifest_target(row) for row in target_rows],
+            )
+            conn.execute(
+                "UPDATE search_manifests SET manifest_sha256 = ? WHERE search_id = ?",
+                (checksum, manifest_row["search_id"]),
+            )
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_manifest_targets_search "
             "ON search_manifest_targets(search_id)"
@@ -236,19 +441,58 @@ def init_db(db_path: Path) -> None:
             """
             CREATE TABLE IF NOT EXISTS target_search_history (
                 history_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                contract_version TEXT NOT NULL,
+                event_id TEXT NOT NULL,
                 target_id TEXT NOT NULL,
+                canonical_id TEXT NOT NULL,
+                aliases_json TEXT NOT NULL,
+                alias_provenance_json TEXT NOT NULL,
+                producing_project TEXT NOT NULL,
                 search_id TEXT NOT NULL REFERENCES search_manifests(search_id),
                 run_id TEXT,
                 mode TEXT NOT NULL,
                 status TEXT NOT NULL,
+                observation_time TEXT,
                 occurred_at TEXT NOT NULL,
+                recorded_at TEXT NOT NULL,
                 source TEXT NOT NULL,
+                source_watermark TEXT NOT NULL,
+                search_state TEXT NOT NULL,
+                result_state TEXT NOT NULL,
+                disposition TEXT NOT NULL,
+                freshness_state TEXT NOT NULL,
+                completeness_state TEXT NOT NULL,
                 nights_json TEXT NOT NULL,
                 provenance_json TEXT NOT NULL,
                 UNIQUE(search_id, target_id, status)
             )
             """
         )
+        history_columns = {
+            row["name"]
+            for row in conn.execute("PRAGMA table_info(target_search_history)").fetchall()
+        }
+        history_additions = {
+            "contract_version": f"TEXT NOT NULL DEFAULT '{IDENTITY_CONTRACT_VERSION}'",
+            "event_id": "TEXT NOT NULL DEFAULT ''",
+            "canonical_id": "TEXT NOT NULL DEFAULT ''",
+            "aliases_json": "TEXT NOT NULL DEFAULT '[]'",
+            "alias_provenance_json": "TEXT NOT NULL DEFAULT '[]'",
+            "producing_project": f"TEXT NOT NULL DEFAULT '{PRODUCING_PROJECT}'",
+            "observation_time": "TEXT",
+            "recorded_at": "TEXT NOT NULL DEFAULT ''",
+            "source_watermark": "TEXT NOT NULL DEFAULT ''",
+            "search_state": "TEXT NOT NULL DEFAULT 'unknown'",
+            "result_state": "TEXT NOT NULL DEFAULT 'unknown'",
+            "disposition": "TEXT NOT NULL DEFAULT ''",
+            "freshness_state": "TEXT NOT NULL DEFAULT 'unknown'",
+            "completeness_state": "TEXT NOT NULL DEFAULT 'unknown'",
+        }
+        for column, definition in history_additions.items():
+            if column not in history_columns:
+                conn.execute(
+                    f"ALTER TABLE target_search_history ADD COLUMN {column} {definition}"
+                )
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_target_history_target "
             "ON target_search_history(target_id, occurred_at)"
@@ -322,11 +566,20 @@ def init_db(db_path: Path) -> None:
         conn.execute(
             """
             INSERT OR IGNORE INTO target_search_history(
-                target_id, search_id, run_id, mode, status, occurred_at,
-                source, nights_json, provenance_json
+                contract_version, event_id, target_id, canonical_id,
+                aliases_json, alias_provenance_json, producing_project,
+                search_id, run_id, mode, status, observation_time, occurred_at,
+                recorded_at, source, source_watermark, search_state, result_state,
+                disposition, freshness_state, completeness_state,
+                nights_json, provenance_json
             )
-            SELECT t.target_id, m.search_id, NULL, m.mode, 'legacy_manifest_import',
-                   m.created_at, 'hunter_state_schema_v2_migration', '[]',
+            SELECT ?, 'manifest:' || m.search_id || ':' || t.target_id || ':legacy',
+                   t.target_id,
+                   CASE WHEN t.canonical_id = '' THEN t.target_id ELSE t.canonical_id END,
+                   '[]', '[]', ?, m.search_id, NULL, m.mode,
+                   'legacy_manifest_import', NULL, m.created_at, m.created_at,
+                   'hunter_state_schema_v2_migration', '', 'executed',
+                   'not_executed', m.mode, t.validity_state, 'unknown', '[]',
                    '{"migration":"manifest-target-backfill"}'
             FROM search_manifest_targets AS t
             JOIN search_manifests AS m ON m.search_id = t.search_id
@@ -334,8 +587,102 @@ def init_db(db_path: Path) -> None:
                 SELECT 1 FROM target_search_history AS h
                 WHERE h.search_id = t.search_id AND h.target_id = t.target_id
             )
-            """
+            """,
+            (IDENTITY_CONTRACT_VERSION, PRODUCING_PROJECT),
         )
+        history_rows = conn.execute(
+            """
+            SELECT h.history_id, h.event_id, h.target_id, h.search_id, h.run_id,
+                   h.mode, h.status, h.occurred_at, h.recorded_at, h.observation_time,
+                   h.canonical_id, h.aliases_json, h.alias_provenance_json,
+                   h.source_watermark, h.search_state, h.result_state, h.disposition,
+                   h.freshness_state, h.completeness_state, h.nights_json,
+                   h.provenance_json, t.canonical_id AS manifest_canonical_id,
+                   t.primary_survey_id, t.survey, t.coverage_inventory_id,
+                   t.coverage_provenance_json, t.validity_state
+            FROM target_search_history AS h
+            LEFT JOIN search_manifest_targets AS t
+              ON t.search_id = h.search_id AND t.target_id = h.target_id
+            """
+        ).fetchall()
+        for row in history_rows:
+            coverage = _loads(row["coverage_provenance_json"] or "{}")
+            provenance = _loads(row["provenance_json"])
+            nights = _loads(row["nights_json"])
+            stored_aliases = _loads(row["aliases_json"])
+            stored_alias_provenance = _loads(row["alias_provenance_json"])
+            if not isinstance(stored_aliases, list):
+                raise ValueError("target history aliases_json must contain a JSON list")
+            if not isinstance(stored_alias_provenance, list):
+                raise ValueError(
+                    "target history alias_provenance_json must contain a JSON list"
+                )
+            canonical, derived_aliases, derived_alias_provenance = (
+                _target_identity_evidence(
+                target_id=row["target_id"],
+                canonical_id=row["manifest_canonical_id"] or row["canonical_id"],
+                primary_survey_id=row["primary_survey_id"] or "",
+                survey=row["survey"] or "",
+            )
+            )
+            aliases = stored_aliases or derived_aliases
+            alias_provenance = stored_alias_provenance or derived_alias_provenance
+            watermark = _source_watermark(row["coverage_inventory_id"], coverage)
+            search_state = (
+                "pending" if row["status"] == "selected_pending" else "executed"
+            )
+            result_state = (
+                "not_executed"
+                if row["status"] in {"selected_pending", "legacy_manifest_import"}
+                else row["status"]
+            )
+            completeness = _history_completeness(
+                canonical_id=canonical,
+                aliases=aliases,
+                alias_provenance=alias_provenance,
+                source_watermark=watermark,
+                provenance=provenance,
+            )
+            event_id = row["event_id"] or (
+                f"run:{row['run_id']}:{row['target_id']}:{row['status']}"
+                if row["run_id"]
+                else f"manifest:{row['search_id']}:{row['target_id']}:{row['status']}"
+            )
+            conn.execute(
+                """
+                UPDATE target_search_history SET
+                    contract_version=?, event_id=?, canonical_id=?, aliases_json=?,
+                    alias_provenance_json=?, producing_project=?,
+                    observation_time=COALESCE(observation_time, ?),
+                    recorded_at=CASE WHEN recorded_at='' THEN ? ELSE recorded_at END,
+                    source_watermark=CASE WHEN source_watermark='' THEN ? ELSE source_watermark END,
+                    search_state=CASE WHEN search_state='unknown' THEN ? ELSE search_state END,
+                    result_state=CASE WHEN result_state='unknown' THEN ? ELSE result_state END,
+                    disposition=CASE WHEN disposition='' THEN ? ELSE disposition END,
+                    freshness_state=CASE
+                        WHEN freshness_state='unknown' THEN ? ELSE freshness_state END,
+                    completeness_state=CASE
+                        WHEN completeness_state='unknown' THEN ? ELSE completeness_state END
+                WHERE history_id=?
+                """,
+                (
+                    IDENTITY_CONTRACT_VERSION,
+                    event_id,
+                    canonical,
+                    _json(aliases),
+                    _json(alias_provenance),
+                    PRODUCING_PROJECT,
+                    _observation_time(nights),
+                    row["occurred_at"],
+                    watermark,
+                    search_state,
+                    result_state,
+                    row["mode"],
+                    row["validity_state"] or "unknown",
+                    completeness,
+                    row["history_id"],
+                ),
+            )
         conn.execute(
             """
             INSERT INTO hunter_state_metadata(key, value, updated_at)
@@ -369,6 +716,15 @@ class ManifestTarget:
 
 
 @dataclass(frozen=True)
+class OperatorState:
+    """Read-only durable state needed by the installed operator shell."""
+
+    pending_search_ids: tuple[str, ...] = ()
+    open_follow_up_count: int = 0
+    last_result_count: int = 0
+
+
+@dataclass(frozen=True)
 class CatalogTarget:
     target_id: str
     primary_survey_id: str
@@ -383,6 +739,54 @@ class CatalogTarget:
     estimated_compute_seconds: float
     scientific_metrics: dict[str, Any]
     source_provenance: dict[str, Any]
+
+
+def _selection_history_values(
+    *,
+    target: ManifestTarget,
+    search_id: str,
+    mode: str,
+    now: str,
+    ranking_policy_digest: str,
+) -> tuple[Any, ...]:
+    canonical, aliases, alias_provenance = _target_identity_evidence(
+        target_id=target.target_id,
+        canonical_id=target.canonical_id,
+        primary_survey_id=target.primary_survey_id,
+        survey=target.survey,
+    )
+    coverage = target.coverage_provenance or {}
+    watermark = _source_watermark(target.coverage_inventory_id, coverage)
+    provenance = {
+        "coverage_provenance": coverage,
+        "ranking_policy_digest": ranking_policy_digest,
+        "selection_reason": target.selection_reason,
+    }
+    completeness = _history_completeness(
+        canonical_id=canonical,
+        aliases=aliases,
+        alias_provenance=alias_provenance,
+        source_watermark=watermark,
+        provenance=provenance,
+    )
+    return (
+        IDENTITY_CONTRACT_VERSION,
+        f"manifest:{search_id}:{target.target_id}:selected_pending",
+        target.target_id,
+        canonical,
+        _json(aliases),
+        _json(alias_provenance),
+        PRODUCING_PROJECT,
+        search_id,
+        mode,
+        now,
+        now,
+        watermark,
+        mode,
+        target.validity_state,
+        completeness,
+        _json(provenance),
+    )
 
 
 def upsert_target_catalog(
@@ -520,14 +924,49 @@ def create_search_manifest(
 
     init_db(db_path)
     now = _utc_now()
+    checksum_targets = [
+        {
+            "rank": rank,
+            "target_id": target.target_id,
+            "ra_deg": target.ra_deg,
+            "dec_deg": target.dec_deg,
+            "score": target.score,
+            "selection_reason": target.selection_reason,
+            "coverage_inventory_id": target.coverage_inventory_id,
+            "coverage_provenance": target.coverage_provenance or {},
+            "validity_state": target.validity_state,
+            "primary_survey_id": target.primary_survey_id,
+            "canonical_id": target.canonical_id,
+            "target_kind": target.target_kind,
+            "survey": target.survey,
+            "prior_search_count": target.prior_search_count,
+            "prior_search_provenance": target.prior_search_provenance or [],
+            "estimated_storage_mb": target.estimated_storage_mb,
+            "estimated_compute_seconds": target.estimated_compute_seconds,
+            "scientific_metrics": target.scientific_metrics or {},
+        }
+        for rank, target in enumerate(targets, start=1)
+    ]
+    manifest_sha256 = _manifest_sha256(
+        search_id=search_id,
+        mode=mode,
+        requested_n=requested_n,
+        actual_n_selected=len(targets),
+        ranking_policy_path=ranking_policy_path,
+        ranking_policy_digest=ranking_policy_digest,
+        discovery_pool_size_explored=discovery_pool_size_explored,
+        sufficiency_met=sufficiency_met,
+        config=config,
+        targets=checksum_targets,
+    )
     with closing(connect(db_path)) as conn:
         conn.execute(
             """
             INSERT INTO search_manifests(
                 search_id, created_at, mode, requested_n, actual_n_selected,
                 ranking_policy_path, ranking_policy_digest, discovery_pool_size_explored,
-                sufficiency_met, config_json, status
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+                sufficiency_met, config_json, manifest_sha256, status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
             """,
             (
                 search_id,
@@ -540,6 +979,7 @@ def create_search_manifest(
                 discovery_pool_size_explored,
                 int(sufficiency_met),
                 _json(config),
+                manifest_sha256,
             ),
         )
         for rank, target in enumerate(targets, start=1):
@@ -589,22 +1029,22 @@ def create_search_manifest(
             conn.execute(
                 """
                 INSERT INTO target_search_history(
-                    target_id, search_id, run_id, mode, status, occurred_at,
-                    source, nights_json, provenance_json
-                ) VALUES (?, ?, NULL, ?, 'selected_pending', ?,
-                          'hunter_manifest_selection', '[]', ?)
+                    contract_version, event_id, target_id, canonical_id,
+                    aliases_json, alias_provenance_json, producing_project,
+                    search_id, run_id, mode, status, observation_time, occurred_at,
+                    recorded_at, source, source_watermark, search_state, result_state,
+                    disposition, freshness_state, completeness_state,
+                    nights_json, provenance_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 'selected_pending', NULL,
+                          ?, ?, 'hunter_manifest_selection', ?, 'pending',
+                          'not_executed', ?, ?, ?, '[]', ?)
                 """,
-                (
-                    target.target_id,
-                    search_id,
-                    mode,
-                    now,
-                    _json(
-                        {
-                            "ranking_policy_digest": ranking_policy_digest,
-                            "selection_reason": target.selection_reason,
-                        }
-                    ),
+                _selection_history_values(
+                    target=target,
+                    search_id=search_id,
+                    mode=mode,
+                    now=now,
+                    ranking_policy_digest=ranking_policy_digest,
                 ),
             )
         conn.commit()
@@ -625,17 +1065,24 @@ def get_search_manifest(db_path: Path, search_id: str) -> dict[str, Any]:
     manifest = dict(manifest_row)
     manifest["config"] = _loads(manifest.pop("config_json"))
     manifest["sufficiency_met"] = bool(manifest["sufficiency_met"])
-    manifest["targets"] = []
-    for row in target_rows:
-        target = dict(row)
-        target["coverage_provenance"] = _loads(
-            target.pop("coverage_provenance_json")
+    manifest["targets"] = [_decode_manifest_target(row) for row in target_rows]
+    calculated_checksum = _manifest_sha256(
+        search_id=manifest["search_id"],
+        mode=manifest["mode"],
+        requested_n=manifest["requested_n"],
+        actual_n_selected=manifest["actual_n_selected"],
+        ranking_policy_path=manifest["ranking_policy_path"],
+        ranking_policy_digest=manifest["ranking_policy_digest"],
+        discovery_pool_size_explored=manifest["discovery_pool_size_explored"],
+        sufficiency_met=manifest["sufficiency_met"],
+        config=manifest["config"],
+        targets=manifest["targets"],
+    )
+    if manifest["manifest_sha256"] != calculated_checksum:
+        raise ValueError(
+            f"search manifest {search_id!r} checksum mismatch: persisted "
+            f"{manifest['manifest_sha256']!r}, calculated {calculated_checksum!r}"
         )
-        target["prior_search_provenance"] = _loads(
-            target.pop("prior_search_provenance_json")
-        )
-        target["scientific_metrics"] = _loads(target.pop("scientific_metrics_json"))
-        manifest["targets"].append(target)
     return manifest
 
 
@@ -656,6 +1103,40 @@ def get_latest_pending_manifest(db_path: Path, mode: str | None = None) -> dict[
     if row is None:
         raise ValueError("no pending search manifest exists")
     return get_search_manifest(db_path, row["search_id"])
+
+
+def get_operator_state(db_path: Path) -> OperatorState:
+    """Project durable lifecycle state into the shell's availability model.
+
+    A missing database represents a fresh installation. An existing but malformed
+    database is allowed to fail loudly instead of being misreported as empty state.
+    """
+    if not db_path.is_file():
+        return OperatorState()
+    with closing(connect(db_path)) as conn:
+        pending_rows = conn.execute(
+            "SELECT search_id FROM search_manifests WHERE status = 'pending' "
+            "ORDER BY created_at DESC, search_id"
+        ).fetchall()
+        follow_up_row = conn.execute(
+            "SELECT COUNT(*) AS n FROM follow_up_registry WHERE status = 'open'"
+        ).fetchone()
+        result_row = conn.execute(
+            """
+            SELECT COUNT(*) AS n
+            FROM search_run_targets
+            WHERE run_id = (
+                SELECT run_id FROM search_runs
+                ORDER BY started_at DESC, run_id
+                LIMIT 1
+            )
+            """
+        ).fetchone()
+    return OperatorState(
+        pending_search_ids=tuple(str(row["search_id"]) for row in pending_rows),
+        open_follow_up_count=int(follow_up_row["n"]),
+        last_result_count=int(result_row["n"]),
+    )
 
 
 def get_latest_run_for_search(db_path: Path, search_id: str) -> dict[str, Any] | None:
@@ -853,24 +1334,75 @@ def commit_target_result(
     init_db(db_path)
     now = _utc_now()
     with closing(connect(db_path)) as conn:
+        manifest_target = conn.execute(
+            "SELECT * FROM search_manifest_targets WHERE search_id = ? AND target_id = ?",
+            (search_id, target_id),
+        ).fetchone()
+        if manifest_target is None:
+            raise ValueError(
+                f"target {target_id!r} is not in frozen manifest {search_id!r}"
+            )
+        coverage = _loads(manifest_target["coverage_provenance_json"])
+        canonical, aliases, alias_provenance = _target_identity_evidence(
+            target_id=target_id,
+            canonical_id=manifest_target["canonical_id"],
+            primary_survey_id=manifest_target["primary_survey_id"],
+            survey=manifest_target["survey"],
+        )
+        watermark = _source_watermark(
+            manifest_target["coverage_inventory_id"], coverage
+        )
+        completeness = _history_completeness(
+            canonical_id=canonical,
+            aliases=aliases,
+            alias_provenance=alias_provenance,
+            source_watermark=watermark,
+            provenance=provenance,
+        )
         conn.execute(
             """
             INSERT INTO target_search_history(
-                target_id, search_id, run_id, mode, status, occurred_at,
-                source, nights_json, provenance_json
-            ) VALUES (?, ?, ?, ?, ?, ?, 'hunter_run_execution', ?, ?)
+                contract_version, event_id, target_id, canonical_id,
+                aliases_json, alias_provenance_json, producing_project,
+                search_id, run_id, mode, status, observation_time, occurred_at,
+                recorded_at, source, source_watermark, search_state, result_state,
+                disposition, freshness_state, completeness_state,
+                nights_json, provenance_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                      'hunter_run_execution', ?, 'executed', ?, ?, ?, ?, ?, ?)
             ON CONFLICT(search_id, target_id, status) DO UPDATE SET
                 run_id=excluded.run_id,
+                event_id=excluded.event_id,
+                observation_time=excluded.observation_time,
+                recorded_at=excluded.recorded_at,
+                search_state=excluded.search_state,
+                result_state=excluded.result_state,
+                disposition=excluded.disposition,
+                freshness_state=excluded.freshness_state,
+                completeness_state=excluded.completeness_state,
                 nights_json=excluded.nights_json,
                 provenance_json=excluded.provenance_json
             """,
             (
+                IDENTITY_CONTRACT_VERSION,
+                f"run:{run_id}:{target_id}:{execution_status}",
                 _non_empty(target_id, "target_id"),
+                canonical,
+                _json(aliases),
+                _json(alias_provenance),
+                PRODUCING_PROJECT,
                 _non_empty(search_id, "search_id"),
                 _non_empty(run_id, "run_id"),
                 mode,
                 execution_status,
+                _observation_time(nights_acquired),
                 now,
+                now,
+                watermark,
+                execution_status,
+                mode,
+                manifest_target["validity_state"],
+                completeness,
                 _json(nights_acquired),
                 _json(provenance),
             ),
@@ -917,6 +1449,8 @@ def list_target_history(
     result: list[dict[str, Any]] = []
     for row in rows:
         item = dict(row)
+        item["aliases"] = _loads(item.pop("aliases_json"))
+        item["alias_provenance"] = _loads(item.pop("alias_provenance_json"))
         item["nights"] = _loads(item.pop("nights_json"))
         item["provenance"] = _loads(item.pop("provenance_json"))
         result.append(item)

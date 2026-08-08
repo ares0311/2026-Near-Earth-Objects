@@ -25,6 +25,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TextIO
 
+import hunter_state
 from hunter_config import get_hunter_paths
 
 if __package__:
@@ -49,11 +50,22 @@ FieldReader = Callable[[registry.ParamSpec, str], object]
 
 # Asks the operator to confirm a resolved action before a search is frozen.
 Confirmer = Callable[[list[str]], bool]
+StateProvider = Callable[[], registry.ShellState]
 
 # Subcommands that freeze a durable manifest. Specification section 8 requires a
 # resolved-action preview before this happens, so the operator can confirm, edit,
 # or cancel while it is still free to do so.
 _FREEZING_SUBCOMMANDS = frozenset({"create-new-search"})
+
+
+def _durable_shell_state() -> registry.ShellState:
+    """Hydrate command availability from the durable lifecycle database."""
+    state = hunter_state.get_operator_state(get_hunter_paths().hunter_db)
+    return registry.ShellState(
+        pending_search_ids=state.pending_search_ids,
+        open_follow_up_count=state.open_follow_up_count,
+        last_result_count=state.last_result_count,
+    )
 
 
 def _resolved_action_for(
@@ -318,6 +330,7 @@ def run_interactive(
     err: TextIO,
     history_path: Path,
     capabilities: theme.Capabilities,
+    state_provider: StateProvider = _durable_shell_state,
 ) -> int:
     """Run the persistent shell until ``/Exit`` or end of input."""
     history_enabled = _configure_history(history_path, err)
@@ -363,6 +376,7 @@ def run_interactive(
                 stream=stream,
                 err=err,
                 capabilities=capabilities,
+                state=state_provider(),
                 read_field=_read_field,
                 confirm=_confirm,
             )
@@ -430,6 +444,7 @@ def main(
     input_function: InputFunction | None = None,
     stream: TextIO = sys.stdout,
     err: TextIO = sys.stderr,
+    state_provider: StateProvider = _durable_shell_state,
 ) -> int:
     args = build_parser().parse_args(argv)
     capabilities = theme.detect(
@@ -450,6 +465,7 @@ def main(
                     stream=stream,
                     err=err,
                     capabilities=capabilities,
+                    state=state_provider(),
                 )
                 if should_exit:
                     return 0
@@ -463,6 +479,7 @@ def main(
             err=err,
             history_path=args.history_file,
             capabilities=capabilities,
+            state_provider=state_provider,
         )
     finally:
         theme.restore(stream, capabilities)

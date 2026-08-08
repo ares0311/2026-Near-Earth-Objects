@@ -11,6 +11,9 @@ env = { NEO_MCP_OFFLINE_DEFAULT = "1" }
 [mcp_servers.neo_project_files.tools.read_project_file]
 approval_mode = "approve"
 
+[mcp_servers.neo_project_files.tools.list_project_files]
+approval_mode = "approve"
+
 [mcp_servers.neo_git_read]
 command = ".venv/bin/python"
 args = ["Skills/neo_mcp_server.py", "--server", "git_read"]

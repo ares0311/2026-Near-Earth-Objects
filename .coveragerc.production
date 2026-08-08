@@ -1,0 +1,48 @@
+# Coverage denominator for the NEOHunter production runtime.
+#
+# Hunter contract rule CLAIM-02 forbids claiming "100% production coverage"
+# unless every production runtime package is measured -- explicitly including
+# the shell, router, orchestrator, persistence, configuration, entry points, and
+# production code outside src/. Field blocker NEO-FIELD-02 was exactly this:
+# coverage was reported against src/ alone while the canonical orchestrator and
+# operator shell live under Skills/.
+#
+# This configuration names that denominator. It deliberately does NOT include
+# all of Skills/: that directory also holds ~100 single-purpose research and
+# operations scripts which are not part of the installed product's runtime path.
+# Including them would inflate the denominator with code the product never
+# executes, which would be just as misleading as excluding the shell.
+#
+# The production runtime is:
+#   src/**                    -- schemas, pipeline stages, persistence,
+#                                configuration, and console entry points
+#   Skills/hunter_cli.py      -- the canonical orchestrator and router
+#   Skills/hunter_shell.py    -- the operator shell
+#   Skills/hunter_ux/**       -- the interaction and presentation layer
+#
+# Usage:
+#   pytest --cov-config=.coveragerc.production --cov=src --cov=Skills \
+#          --cov-report=term-missing --cov-fail-under=100
+
+[run]
+branch = False
+parallel = True
+relative_files = True
+
+[report]
+# Only these paths count toward the production denominator.
+include =
+    src/*
+    src/**/*
+    Skills/hunter_cli.py
+    Skills/hunter_shell.py
+    Skills/hunter_ux/*
+
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.:
+    raise AssertionError
+    if TYPE_CHECKING:
+
+show_missing = True
+skip_covered = False

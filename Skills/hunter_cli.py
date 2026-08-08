@@ -33,6 +33,7 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
 from datetime import UTC, datetime
 from pathlib import Path
+from statistics import median
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -466,6 +467,86 @@ def _searched_by_sibling(
     return False
 
 
+def _top_n_stability(
+    previous: list[str] | None,
+    current: list[str],
+    round_number: int,
+) -> tuple[bool, dict[str, Any] | None, dict[str, Any] | None]:
+    if previous is None:
+        return False, None, None
+    previous_ranks = {target_id: rank for rank, target_id in enumerate(previous, 1)}
+    current_ranks = {target_id: rank for rank, target_id in enumerate(current, 1)}
+    shared = previous_ranks.keys() & current_ranks.keys()
+    max_rank_shift = max(
+        (abs(previous_ranks[target_id] - current_ranks[target_id]) for target_id in shared),
+        default=0,
+    )
+    entered = [target_id for target_id in current if target_id not in previous_ranks]
+    left = [target_id for target_id in previous if target_id not in current_ranks]
+    unchanged = previous == current
+    churn = {
+        "round": round_number,
+        "entered": entered,
+        "left": left,
+        "membership_changed": bool(entered or left),
+    }
+    stability = {
+        "round": round_number,
+        "ordered_top_n_unchanged": unchanged,
+        "shared_members": len(shared),
+        "max_rank_shift": max_rank_shift,
+    }
+    return unchanged, churn, stability
+
+
+def _discovery_source_evidence(
+    combined: dict[tuple[float, float], dict[str, Any]],
+) -> tuple[list[str], list[dict[str, str]]]:
+    identities = {"deterministic-ranked-planning-grid"}
+    watermarks: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for field in combined.values():
+        provenance = field.get("coverage_provenance") or {}
+        source = str(provenance.get("source") or "IRSA ZTF coverage metadata")
+        identities.add(source)
+        for key in (
+            "raw_response_sha256",
+            "source_watermark",
+            "batch_manifest_sha256",
+            "inventory_sha256",
+        ):
+            value = field.get(key) or provenance.get(key)
+            if not isinstance(value, str) or not value.strip():
+                continue
+            marker = (key, value.strip())
+            if marker in seen:
+                continue
+            seen.add(marker)
+            watermarks.append(
+                {
+                    "source": source,
+                    "kind": key,
+                    "value": value.strip(),
+                }
+            )
+    return sorted(identities), watermarks
+
+
+def _quality_distribution(
+    eligible: list[dict[str, Any]], requested_n: int
+) -> dict[str, Any]:
+    scores = [float(row["score"]) for row in eligible]
+    selected_scores = scores[:requested_n]
+    return {
+        "eligible_count": len(scores),
+        "minimum_score": min(scores) if scores else None,
+        "median_score": median(scores) if scores else None,
+        "maximum_score": max(scores) if scores else None,
+        "selected_minimum_score": min(selected_scores) if selected_scores else None,
+        "selected_maximum_score": max(selected_scores) if selected_scores else None,
+    }
+
+
 def discover_new_targets(
     jd: float,
     neo_class: str,
@@ -515,15 +596,21 @@ def discover_new_targets(
     cross_project_identities = hunter_state.cross_project_searched_identities(db_path)
     cross_project_validity = hunter_state.cross_project_history_validity(db_path)
     eligible: list[dict[str, Any]] = []
+    ranked_candidates: list[dict[str, Any]] = []
     working_inventory_path = out_dir / "working_coverage_inventory.json"
     round_index = 0
     universe_exhausted = False
     exploration_limited = False
+    termination_reason = "not_terminated"
+    expansion_rounds: list[dict[str, Any]] = []
+    top_n_membership_churn: list[dict[str, Any]] = []
+    rank_stability: list[dict[str, Any]] = []
+    previous_top_ids: list[str] | None = None
 
     while True:
         if combined:
             _write_combined_inventory(combined, working_inventory_path)
-            eligible = field_selector.select_fields(
+            ranked_candidates = field_selector.select_fields(
                 jd=jd,
                 mode=neo_class,
                 top_n=max(requested_n, len(combined)),
@@ -534,11 +621,36 @@ def discover_new_targets(
             )
             eligible = [
                 row
-                for row in eligible
+                for row in ranked_candidates
                 if hunter_state.target_id_from_radec(row["ra_deg"], row["dec_deg"])
                 not in governing_history
                 and not _searched_by_sibling(row, cross_project_identities)
             ]
+        else:
+            ranked_candidates = []
+            eligible = []
+
+        top_ids = [
+            hunter_state.target_id_from_radec(row["ra_deg"], row["dec_deg"])
+            for row in eligible[:requested_n]
+        ]
+        top_unchanged, churn, stability = _top_n_stability(
+            previous_top_ids, top_ids, len(expansion_rounds)
+        )
+        if churn is not None and stability is not None:
+            top_n_membership_churn.append(churn)
+            rank_stability.append(stability)
+        if expansion_rounds and "eligible_count" not in expansion_rounds[-1]:
+            expansion_rounds[-1].update(
+                {
+                    "discovered_count": len(combined),
+                    "eligible_count": len(eligible),
+                    "top_n": top_ids,
+                    "top_n_unchanged": top_unchanged,
+                }
+            )
+        previous_top_ids = top_ids
+
         if len(eligible) >= requested_n:
             stale_selected = [
                 row
@@ -559,6 +671,15 @@ def discover_new_targets(
                         for row in chunk
                     ]
                     merged = _live_coverage_check(fields, "hunter_selected_refresh")
+                    expansion_rounds.append(
+                        {
+                            "round": len(expansion_rounds) + 1,
+                            "kind": "selected_source_refresh",
+                            "batch_id": merged["batch_id"],
+                            "candidates_requested": len(fields),
+                            "candidates_added": len(merged["field_results"]),
+                        }
+                    )
                     refreshed = field_selector.load_coverage_inventory(
                         _COVERAGE_INVENTORY_DIR / f"{merged['batch_id']}.json"
                     )
@@ -568,9 +689,16 @@ def discover_new_targets(
                         )
                         combined[key] = field
                 continue
-            break
+            # Sufficiency alone is not a stopping rule. Require an actual
+            # expansion beyond the initial convenience segment and an unchanged
+            # ordered top-N before freezing. If a later candidate displaces a
+            # selected target, continue until stability or source exhaustion.
+            if top_unchanged and round_index > 0:
+                termination_reason = "ordered_top_n_stable_after_expansion"
+                break
         if max_pool is not None and len(checked_coords) >= max_pool:
             exploration_limited = True
+            termination_reason = "operator_max_pool_reached"
             break
 
         batch_size = max(3 * requested_n, 10) * (2**round_index)
@@ -581,6 +709,7 @@ def discover_new_targets(
         )
         if not candidates:
             universe_exhausted = True
+            termination_reason = "planning_source_exhausted"
             break
 
         round_index += 1
@@ -588,11 +717,72 @@ def discover_new_targets(
             (_field_id_from_radec(f"hx{round_index}", ra, dec), ra, dec)
             for ra, dec in candidates
         ]
-        merged = _live_coverage_check(fields, f"hunter_expand_{neo_class}_r{round_index}")
-        for field in merged["field_results"]:
-            key = field_selector._coordinate_key(field["ra_deg"], field["dec_deg"])
-            combined[key] = field
-            checked_coords.add(key)
+        added = 0
+        batch_ids: list[str] = []
+        for offset in range(0, len(fields), coverage_inventory.MAX_FIELDS):
+            chunk = fields[offset : offset + coverage_inventory.MAX_FIELDS]
+            batch_number = (offset // coverage_inventory.MAX_FIELDS) + 1
+            merged = _live_coverage_check(
+                chunk,
+                f"hunter_expand_{neo_class}_r{round_index}_b{batch_number}",
+            )
+            batch_ids.append(merged["batch_id"])
+            for field in merged["field_results"]:
+                key = field_selector._coordinate_key(
+                    field["ra_deg"], field["dec_deg"]
+                )
+                if key not in combined:
+                    added += 1
+                combined[key] = field
+                checked_coords.add(key)
+        expansion_rounds.append(
+            {
+                "round": len(expansion_rounds) + 1,
+                "kind": "planning_expansion",
+                "batch_id": batch_ids[0],
+                "batch_ids": batch_ids,
+                "candidates_requested": len(candidates),
+                "candidates_added": added,
+            }
+        )
+
+    insufficient_coverage = sum(
+        not bool(field.get("passes_min_distinct_nights"))
+        for field in combined.values()
+    )
+    locally_rejected = 0
+    sibling_rejected = 0
+    for row in ranked_candidates:
+        target_id = hunter_state.target_id_from_radec(row["ra_deg"], row["dec_deg"])
+        if target_id in governing_history:
+            locally_rejected += 1
+        elif _searched_by_sibling(row, cross_project_identities):
+            sibling_rejected += 1
+    selector_rejected = max(
+        0, len(combined) - insufficient_coverage - len(ranked_candidates)
+    )
+    source_identities, source_watermarks = _discovery_source_evidence(combined)
+    limitations: list[str] = []
+    if cross_project_validity != "valid":
+        limitations.append(
+            f"cross-project imported history validity is {cross_project_validity}"
+        )
+    if termination_reason == "ordered_top_n_stable_after_expansion":
+        limitations.append(
+            "the exact count of lower-ranked unexplored planning candidates was not "
+            "materialized after ordered top-N stability"
+        )
+    if exploration_limited:
+        limitations.append(
+            f"operator --max-pool limited exploration to {max_pool} coordinates"
+        )
+    remaining_unexplored_universe: int | str
+    if universe_exhausted:
+        remaining_unexplored_universe = 0
+    elif exploration_limited:
+        remaining_unexplored_universe = "not_explored_due_to_operator_max_pool"
+    else:
+        remaining_unexplored_universe = "not_enumerated_after_top_n_stability"
 
     return {
         "eligible": eligible,
@@ -600,6 +790,27 @@ def discover_new_targets(
         "sufficiency_met": len(eligible) >= requested_n,
         "universe_exhausted": universe_exhausted,
         "exploration_limited": exploration_limited,
+        "requested_n": requested_n,
+        "discovered_count": len(combined),
+        "eligible_count": len(eligible),
+        "rejection_counts": {
+            "insufficient_coverage": insufficient_coverage,
+            "selector_or_queue_ineligible": selector_rejected,
+            "local_search_history": locally_rejected,
+            "cross_project_history": sibling_rejected,
+        },
+        "source_identities": source_identities,
+        "source_watermarks": source_watermarks,
+        "expansion_rounds": expansion_rounds,
+        "top_n_membership_churn": top_n_membership_churn,
+        "rank_stability": rank_stability,
+        "exhausted_sources": (
+            ["deterministic-ranked-planning-grid"] if universe_exhausted else []
+        ),
+        "remaining_unexplored_universe": remaining_unexplored_universe,
+        "termination_reason": termination_reason,
+        "quality_distribution": _quality_distribution(eligible, requested_n),
+        "limitations": limitations,
         # Cross-project novelty evidence (IDENT-03, IDENT-04, DISC-02). Persisted
         # rather than merely consulted: a novelty decision made against history
         # that was 'unknown' or 'stale-but-usable' is not authoritative, and a
@@ -900,60 +1111,99 @@ def _exact_target_feasibility(
         Path(exact_report["raw_response_path"]).read_text(encoding="utf-8")
     )
     allowed_nights = set(broad_nights)
-    obsjds = sorted(float(value) for value in exact_table["obsjd"])
     from astropy.time import Time
 
-    first_obsjd_by_night: dict[str, float] = {}
-    for obsjd in obsjds:
+    def exposure_key(index: int) -> tuple[float, int, int, int, int]:
+        item = exact_table[index]
+        return (
+            float(item["obsjd"]),
+            int(item["field"]),
+            int(item["ccdid"]),
+            int(item["qid"]),
+            int(item["pid"]),
+        )
+
+    first_exposures_by_night: dict[str, list[int]] = {}
+    for index in sorted(range(len(exact_table)), key=exposure_key):
+        obsjd = float(exact_table[index]["obsjd"])
         night = Time(obsjd, format="jd").datetime.strftime("%Y%m%d")
-        if night in allowed_nights:
-            first_obsjd_by_night.setdefault(night, obsjd)
+        if night not in allowed_nights:
+            continue
+        candidates = first_exposures_by_night.setdefault(night, [])
+        if not candidates or obsjd == float(exact_table[candidates[0]]["obsjd"]):
+            candidates.append(index)
 
     verified: list[dict[str, Any]] = []
-    misses: list[dict[str, str]] = []
-    for night, target_jd in first_obsjd_by_night.items():
+    misses: list[dict[str, Any]] = []
+    simultaneous_product_assessments: list[dict[str, Any]] = []
+    for night, candidate_indices in first_exposures_by_night.items():
         if len(verified) >= min_observations:
             break
-        epsilon = 1.0 / 1440.0
-        for _ in range(4):
-            start_jd, end_jd = target_jd - epsilon, target_jd + epsilon
-            if sum(1 for obsjd in obsjds if start_jd < obsjd < end_jd) == 1:
+        assessed: list[dict[str, Any]] = []
+        selected_report: dict[str, Any] | None = None
+        selected_identifiers: dict[str, Any] | None = None
+        for index in candidate_indices:
+            item = exact_table[index]
+            identifiers = {
+                "pid": int(item["pid"]),
+                "obsjd": float(item["obsjd"]),
+                "field": int(item["field"]),
+                "ccdid": int(item["ccdid"]),
+                "qid": int(item["qid"]),
+            }
+            report = bounded_ingest.preflight_motion_product_rows(
+                exact_table[[index]],
+                query=exact_report["query"],
+                raw_metadata_sha256=exact_report["raw_response_sha256"],
+                out_dir=(
+                    root
+                    / "product_preflight"
+                    / night
+                    / f"pid_{identifiers['pid']}"
+                ),
+                workers=1,
+            )
+            preflight = report["motion_product_preflight"]
+            assessment = {
+                **identifiers,
+                "status": preflight["status"],
+                "all_required_products_available": preflight[
+                    "all_required_products_available"
+                ],
+                "motion_product_manifest_path": report[
+                    "motion_product_manifest_path"
+                ],
+            }
+            assessed.append(assessment)
+            if preflight["all_required_products_available"]:
+                selected_report = report
+                selected_identifiers = identifiers
                 break
-            epsilon /= 10.0
-        else:
-            raise RuntimeError(
-                f"could not isolate one exact exposure at JD={target_jd}"
+        simultaneous_product_assessments.append(
+            {
+                "night_yyyymmdd": night,
+                "ordered_products": assessed,
+                "selected_pid": (
+                    selected_identifiers["pid"] if selected_identifiers else None
+                ),
+            }
+        )
+        if selected_report is None or selected_identifiers is None:
+            misses.append(
+                {
+                    "night": night,
+                    "reason": "no simultaneous product had every required product available",
+                    "ordered_products": assessed,
+                }
             )
-        try:
-            report = bounded_ingest.run_bounded_ingest(
-                ra=row["ra_deg"],
-                dec=row["dec_deg"],
-                size_deg=_DEFAULT_SIZE_DEG,
-                start_jd=start_jd,
-                end_jd=end_jd,
-                out_dir=root / "product_preflight" / night,
-                emit_motion_product_manifest=True,
-                preflight_motion_products=True,
-                max_preflight_exposures=1,
-                preflight_workers=1,
-            )
-        except RuntimeError as exc:
-            message = str(exc)
-            if not (
-                message.startswith("no exposure found")
-                or message.startswith("motion-product preflight failed")
-            ):
-                raise
-            misses.append({"night": night, "reason": message})
             continue
-        manifest_path = Path(report["motion_product_manifest_path"])
+        manifest_path = Path(selected_report["motion_product_manifest_path"])
         product_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         verified.append(
             {
                 "night_yyyymmdd": night,
-                "start_jd": start_jd,
-                "end_jd": end_jd,
-                "metadata_sha256": report["raw_response_sha256"],
+                "selected_product": selected_identifiers,
+                "metadata_sha256": selected_report["raw_response_sha256"],
                 "product_manifest_sha256": hashlib.sha256(
                     manifest_path.read_bytes()
                 ).hexdigest(),
@@ -971,16 +1221,18 @@ def _exact_target_feasibility(
         "retrieved_at_utc": datetime.now(UTC).isoformat(),
         "transformations": [
             "exact 0.01-degree metadata query",
-            "single-exposure window isolation",
+            "deterministic simultaneous-product ordering by obsjd, field, ccdid, qid, pid",
+            "first complete required-product preflight selected",
             "difference-image, mask, and PSF HEAD availability preflight",
         ],
         "validity_state": "valid" if len(verified) >= min_observations else "invalid",
         "size_deg": _DEFAULT_SIZE_DEG,
         "exact_inventory_rows": len(exact_table),
-        "exact_inventory_distinct_nights": len(first_obsjd_by_night),
+        "exact_inventory_distinct_nights": len(first_exposures_by_night),
         "minimum_nights": min_observations,
         "verified_nights": verified,
         "exact_misses": misses,
+        "simultaneous_product_assessments": simultaneous_product_assessments,
         "passes": len(verified) >= min_observations,
     }
 
@@ -1733,6 +1985,17 @@ def run_search(
 
     existing_run = hunter_state.get_latest_run_for_search(db_path, search_id)
     if existing_run is not None and existing_run["status"] != "completed":
+        prior_manifest_sha256 = existing_run["model_versions"].get(
+            "manifest_sha256"
+        )
+        if (
+            prior_manifest_sha256 is not None
+            and prior_manifest_sha256 != manifest["manifest_sha256"]
+        ):
+            raise ValueError(
+                f"run {existing_run['run_id']} belongs to manifest checksum "
+                f"{prior_manifest_sha256}, not {manifest['manifest_sha256']}"
+            )
         prior_contract = existing_run["model_versions"].get("execution_contract")
         if prior_contract is not None and prior_contract != execution_contract:
             raise ValueError(
@@ -1740,9 +2003,14 @@ def run_search(
                 f"workers={prior_contract.get('configured_workers')}; resume with the "
                 "same --workers value to preserve its execution contract"
             )
-        if prior_contract is None:
+        if prior_contract is None or prior_manifest_sha256 is None:
             hunter_state.update_search_run_model_versions(
-                db_path, existing_run["run_id"], {"execution_contract": execution_contract}
+                db_path,
+                existing_run["run_id"],
+                {
+                    "execution_contract": execution_contract,
+                    "manifest_sha256": manifest["manifest_sha256"],
+                },
             )
         # "running" (interrupted mid-execution) or "partial"/"failed" (a prior
         # pass finished but some targets still need retrying) are both resumed
@@ -1761,6 +2029,7 @@ def run_search(
             git_provenance["commit"],
             model_versions={
                 "ranking_policy_digest": manifest["ranking_policy_digest"],
+                "manifest_sha256": manifest["manifest_sha256"],
                 "known_object_policy": adversarial_review._KNOWN_OBJECT_POLICY_VERSION,
                 "pipeline_git": git_provenance,
                 "execution_contract": execution_contract,

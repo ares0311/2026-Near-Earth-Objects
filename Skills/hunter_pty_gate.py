@@ -96,6 +96,9 @@ KEY_ENTER = b"\r"
 KEY_TAB = b"\t"
 KEY_CTRL_C = b"\x03"
 
+CURSOR_HIDE = b"\x1b[?25l"
+CURSOR_SHOW = b"\x1b[?25h"
+
 ANSI_PATTERN = re.compile(rb"\x1b\[[0-9;?]*[A-Za-z]|\x1b\][^\x07]*\x07|\x1b[()][B0]")
 
 # Prompt the shell renders once startup is complete.
@@ -105,6 +108,17 @@ PROMPT_MARKER = b"NEOHunter>"
 def strip_ansi(raw: bytes) -> str:
     """Plain text as a human reading the terminal would perceive it."""
     return ANSI_PATTERN.sub(b"", raw).decode("utf-8", errors="replace")
+
+
+def cursor_visibility_restored(raw: bytes) -> bool:
+    """True when the terminal finishes with the cursor visible.
+
+    A session that never hides the cursor is already conforming. When the
+    application does hide it, the last visibility control must be SHOW.
+    """
+    hidden_at = raw.rfind(CURSOR_HIDE)
+    shown_at = raw.rfind(CURSOR_SHOW)
+    return hidden_at < 0 or shown_at > hidden_at
 
 
 class PtyUnavailable(RuntimeError):
@@ -139,11 +153,15 @@ class PtySession:
 
     argv: list[str]
     cwd: str
+    state_root: str
     columns: int = 100
     rows: int = 30
     buffer: bytes = b""
     _master: int = -1
+    _control: int = -1
     _process: subprocess.Popen[bytes] | None = None
+    _initial_termios: list[Any] | None = None
+    _last_termios: list[Any] | None = None
     transcript_marks: list[int] = field(default_factory=list)
 
     def __enter__(self) -> PtySession:
@@ -163,6 +181,12 @@ class PtySession:
         # Set a deterministic window size before the child starts, so width
         # behaviour is a property of the test rather than of the host terminal.
         fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", self.rows, self.columns, 0, 0))
+        # PTY masters retain readable termios state after the child exits;
+        # duplicated slave descriptors become ENOTTY when the session leader
+        # closes. The gate must therefore observe restoration through master.
+        self._control = master
+        self._initial_termios = termios.tcgetattr(self._control)
+        self._last_termios = self._initial_termios
 
         environment = {
             **os.environ,
@@ -171,6 +195,7 @@ class PtySession:
             "TERM": "xterm-256color",
             "COLUMNS": str(self.columns),
             "LINES": str(self.rows),
+            "NEOHUNTER_HOME": self.state_root,
         }
         environment.pop("NO_COLOR", None)
 
@@ -197,6 +222,7 @@ class PtySession:
                 os.close(self._master)
             except OSError:
                 pass
+            self._control = -1
 
     # --- terminal I/O -------------------------------------------------------
 
@@ -209,6 +235,7 @@ class PtySession:
         start_length = len(self.buffer)
         deadline = time.monotonic() + seconds
         while time.monotonic() < deadline:
+            self._capture_terminal_state()
             readable, _, _ = select.select([self._master], [], [], 0.05)
             if not readable:
                 continue
@@ -245,10 +272,50 @@ class PtySession:
 
     def wait_exit(self, timeout: float) -> int | None:
         assert self._process is not None
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            self._capture_terminal_state()
+            status = self._process.poll()
+            if status is not None:
+                self._capture_terminal_state()
+                return status
+            time.sleep(0.005)
+        return None
+
+    def _capture_terminal_state(self) -> None:
+        """Retain the last readable PTY attributes before session teardown."""
+        import termios
+
+        if self._control < 0:
+            return
         try:
-            return self._process.wait(timeout=timeout)
-        except subprocess.TimeoutExpired:
-            return None
+            self._last_termios = termios.tcgetattr(self._control)
+        except termios.error:
+            return
+
+    def terminal_mode_restored(self) -> tuple[bool, str]:
+        """Compare the PTY's actual termios state with its pre-launch state."""
+        import termios
+
+        if self._control < 0 or self._initial_termios is None:
+            return False, "terminal state was not captured"
+        try:
+            current = termios.tcgetattr(self._control)
+        except termios.error:
+            current = self._last_termios
+        if current is None:
+            return False, "terminal state could not be sampled before teardown"
+        changed = [
+            index
+            for index, pair in enumerate(zip(self._initial_termios, current))
+            if pair[0] != pair[1]
+        ]
+        return (
+            not changed,
+            "termios flags and control characters match the pre-launch state"
+            if not changed
+            else f"termios fields changed after exit: {changed}",
+        )
 
 
 def _resolved_executable() -> Path:
@@ -280,14 +347,16 @@ def _distinct_animation_frames(raw: bytes) -> list[str]:
     return frames
 
 
-def _run_interactive_suite(executable: Path, workdir: str) -> list[Assertion]:
+def _run_interactive_suite(
+    executable: Path, workdir: str, state_root: str
+) -> list[Assertion]:
     """Drive one full interactive session and return every assertion's outcome."""
     results: list[Assertion] = []
 
     def record(assertion_id: str, requirements: tuple[str, ...], ok: bool, detail: str) -> None:
         results.append(Assertion(assertion_id, requirements, PASS if ok else FAIL, detail))
 
-    with PtySession([str(executable)], cwd=workdir) as session:
+    with PtySession([str(executable)], cwd=workdir, state_root=state_root) as session:
         # --- startup presentation ------------------------------------------
         started = session.wait_for(PROMPT_MARKER, timeout=45)
         startup_raw = session.buffer
@@ -379,24 +448,8 @@ def _run_interactive_suite(executable: Path, workdir: str) -> list[Assertion]:
             else f"palette showed no descriptions: {palette_text[-300:]!r}",
         )
 
-        # --- keyboard navigation changes the visible selection -------------
-        nav_mark = session.mark()
-        session.send(KEY_DOWN)
-        session.pump(1.5)
-        session.send(KEY_DOWN)
-        nav_raw = session.since(nav_mark)
-        session.pump(1.0)
-        nav_raw = session.since(nav_mark)
-        record(
-            "palette-keyboard-navigation",
-            ("UX-CMD-03",),
-            len(nav_raw.strip()) > 0 and b"\x1b[" in nav_raw,
-            f"arrow keys repainted the palette selection ({len(nav_raw)} bytes redrawn)"
-            if nav_raw.strip()
-            else "arrow keys produced no visible change in the palette",
-        )
-
-        # Escape closes the palette (UX-CMD-03).
+        # Escape closes the palette (UX-CMD-03). A dedicated session below
+        # proves that arrow navigation changes the command Enter selects.
         session.send(KEY_ESC)
         session.pump(1.0)
         session.send(KEY_CTRL_C)
@@ -496,11 +549,29 @@ def _run_interactive_suite(executable: Path, workdir: str) -> list[Assertion]:
             status == 0,
             f"/Exit terminated the session with status {status}",
         )
+        mode_ok, mode_detail = session.terminal_mode_restored()
+        record(
+            "terminal-mode-restored",
+            ("UX-A11Y-01", "LAUNCH-04"),
+            mode_ok,
+            mode_detail,
+        )
+        cursor_ok = cursor_visibility_restored(session.buffer)
+        record(
+            "cursor-restored",
+            ("UX-A11Y-01", "LAUNCH-04"),
+            cursor_ok,
+            "the final cursor visibility control leaves the cursor visible"
+            if cursor_ok
+            else "the final cursor visibility control leaves the cursor hidden",
+        )
 
     return results
 
 
-def run_slash_palette_probe(executable: Path, workdir: str) -> list[Assertion]:
+def run_slash_palette_probe(
+    executable: Path, workdir: str, state_root: str
+) -> list[Assertion]:
     """The single narrowest useful question: does ``/`` open the palette?
 
     One terminal session. One keystroke. Two assertions -- the prompt appeared,
@@ -513,7 +584,7 @@ def run_slash_palette_probe(executable: Path, workdir: str) -> list[Assertion]:
     and it can be answered on its own.
     """
     results: list[Assertion] = []
-    with PtySession([str(executable)], cwd=workdir) as session:
+    with PtySession([str(executable)], cwd=workdir, state_root=state_root) as session:
         started = session.wait_for(PROMPT_MARKER, timeout=45)
         results.append(
             Assertion(
@@ -559,11 +630,86 @@ def run_slash_palette_probe(executable: Path, workdir: str) -> list[Assertion]:
     return results
 
 
-def _run_width_suite(executable: Path, workdir: str) -> list[Assertion]:
+def _run_navigation_suite(
+    executable: Path, workdir: str, state_root: str
+) -> list[Assertion]:
+    """Prove arrow navigation changes the command selected, not merely repainting."""
+    results: list[Assertion] = []
+    with PtySession(
+        [str(executable)], cwd=workdir, state_root=state_root
+    ) as session:
+        started = session.wait_for(PROMPT_MARKER, timeout=45)
+        if not started:
+            return [
+                Assertion(
+                    "palette-navigation-changes-selection",
+                    ("UX-CMD-03",),
+                    FAIL,
+                    "prompt did not appear for the navigation control",
+                )
+            ]
+
+        session.send(b"/")
+        deadline = time.monotonic() + 8.0
+        while time.monotonic() < deadline:
+            session.pump(0.2)
+            if all(command in strip_ansi(session.buffer) for command in REQUIRED_COMMANDS):
+                break
+
+        mark = session.mark()
+        # Two Down presses move away from the initially highlighted first item
+        # whether prompt_toolkit starts with the first completion selected or
+        # with the menu open but no current completion.
+        session.send(KEY_DOWN)
+        session.send(KEY_DOWN)
+        session.pump(1.5)
+        redraw = session.since(mark)
+        session.send(KEY_ENTER)
+        session.pump(0.5)
+        session.send(KEY_ENTER)
+        session.pump(4.0)
+        outcome = strip_ansi(session.since(mark))
+        mode_match = re.search(r"\bMode\s+(new|follow-up)\b", outcome)
+        selected_mode = mode_match.group(1) if mode_match else ""
+        nondefault_selected = selected_mode == "follow-up"
+        visible_redraw = bool(redraw.strip()) and b"\x1b[" in redraw
+        ok = visible_redraw and nondefault_selected
+        results.append(
+            Assertion(
+                "palette-navigation-changes-selection",
+                ("UX-CMD-03",),
+                PASS if ok else FAIL,
+                "arrow keys visibly repainted the menu and Enter chose a non-default command"
+                if ok
+                else (
+                    "navigation did not visibly select a non-default command; "
+                    f"redraw_bytes={len(redraw)}; selected_mode={selected_mode!r}; "
+                    f"outcome={outcome[-500:]!r}"
+                ),
+            )
+        )
+        session.send(KEY_ESC)
+        session.send(KEY_CTRL_C)
+        session.pump(0.5)
+        session.send(b"/Exit" + KEY_ENTER)
+        session.pump(2.0)
+        session.wait_exit(15)
+    return results
+
+
+def _run_width_suite(
+    executable: Path, workdir: str, state_root: str
+) -> list[Assertion]:
     """Startup must stay inside the terminal at narrow, normal, and wide sizes."""
     results: list[Assertion] = []
     for width in (40, 100, 200):
-        with PtySession([str(executable)], cwd=workdir, columns=width) as session:
+        width_state = Path(state_root) / f"width-{width}"
+        with PtySession(
+            [str(executable)],
+            cwd=workdir,
+            state_root=str(width_state),
+            columns=width,
+        ) as session:
             session.wait_for(PROMPT_MARKER, timeout=45)
             session.send(b"/Exit" + KEY_ENTER)
             session.pump(2.0)
@@ -587,14 +733,18 @@ def _run_width_suite(executable: Path, workdir: str) -> list[Assertion]:
     return results
 
 
-def _run_non_tty_suite(executable: Path, workdir: str) -> list[Assertion]:
+def _run_non_tty_suite(
+    executable: Path, workdir: str, state_root: str
+) -> list[Assertion]:
     """Redirected and machine-readable output must carry no animation or ANSI."""
     results: list[Assertion] = []
+    redirected_state = str(Path(state_root) / "redirected")
+    machine_state = str(Path(state_root) / "machine")
 
     completed = subprocess.run(
         [str(executable), "--command", "/Help"],
         cwd=workdir,
-        env={**os.environ, "PYTHONPATH": ""},
+        env={**os.environ, "PYTHONPATH": "", "NEOHUNTER_HOME": redirected_state},
         capture_output=True,
         timeout=120,
         check=False,
@@ -613,7 +763,7 @@ def _run_non_tty_suite(executable: Path, workdir: str) -> list[Assertion]:
     machine = subprocess.run(
         [str(executable), "--json", "--command", "/Help"],
         cwd=workdir,
-        env={**os.environ, "PYTHONPATH": ""},
+        env={**os.environ, "PYTHONPATH": "", "NEOHUNTER_HOME": machine_state},
         capture_output=True,
         timeout=120,
         check=False,
@@ -652,13 +802,27 @@ def run_gate(runs: int = 1, *, probe: bool = False) -> dict[str, Any]:
     all_runs: list[dict[str, Any]] = []
     with tempfile.TemporaryDirectory(prefix="neohunter-pty-gate-") as workdir:
         for run_index in range(1, runs + 1):
+            run_root = Path(workdir) / f"run-{run_index}"
+            state_root = run_root / "state"
+            run_root.mkdir()
             try:
                 if probe:
-                    assertions = run_slash_palette_probe(executable, workdir)
+                    assertions = run_slash_palette_probe(
+                        executable, str(run_root), str(state_root / "probe")
+                    )
                 else:
-                    assertions = _run_interactive_suite(executable, workdir)
-                    assertions += _run_width_suite(executable, workdir)
-                    assertions += _run_non_tty_suite(executable, workdir)
+                    assertions = _run_interactive_suite(
+                        executable, str(run_root), str(state_root / "interactive")
+                    )
+                    assertions += _run_navigation_suite(
+                        executable, str(run_root), str(state_root / "navigation")
+                    )
+                    assertions += _run_width_suite(
+                        executable, str(run_root), str(state_root)
+                    )
+                    assertions += _run_non_tty_suite(
+                        executable, str(run_root), str(state_root)
+                    )
             except PtyUnavailable as exc:
                 return _report(
                     NOT_EXECUTED,
@@ -670,7 +834,8 @@ def run_gate(runs: int = 1, *, probe: bool = False) -> dict[str, Any]:
             all_runs.append(
                 {
                     "run": run_index,
-                    "working_directory": workdir,
+                    "working_directory": str(run_root),
+                    "state_root": str(state_root),
                     "assertions": [a.as_dict() for a in assertions],
                 }
             )

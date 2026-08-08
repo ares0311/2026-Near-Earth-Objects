@@ -6,10 +6,11 @@ target identity and complete cross-project search history decide what is eligibl
 as New (IDENT-01..04). This gate asserts that path exists in the *durable schema
 and production code*, not in documentation.
 
-It is deliberately written to fail against the current implementation. Contract
-requirements it checks are unimplemented today, and the execution directive
-requires a gate to reproduce a defect before the defect is repaired -- a gate
-authored after the fix cannot demonstrate it ever caught anything.
+The gate uses isolated durable state and the real production modules. It stubs no
+scientific or persistence behavior. Live-source acquisition is intentionally left
+to the separate Phase 5 gate; this phase proves routing, identity/history,
+eligibility, and the durable canonical lifecycle with an independent known-result
+oracle.
 
 Outcomes match the rest of the Hunter gates::
 
@@ -128,36 +129,19 @@ def check_identity_schema() -> Assertion:
 
 def check_cross_project_history() -> Assertion:
     """IDENT-02: sibling records must be consumed through a read-only contract."""
-    # A real mechanism has to appear somewhere in production code. Searching the
-    # production surface rather than the docs is the point: a documented contract
-    # with no implementation is exactly what IDENT-04 rejects as non-authoritative.
-    production = list((REPO_ROOT / "src").rglob("*.py")) + [
-        REPO_ROOT / "Skills" / "hunter_cli.py",
-        REPO_ROOT / "Skills" / "hunter_shell.py",
-    ]
-    markers = (
-        "sibling_history",
-        "cross_project_history",
-        "consume_sibling",
-        "sibling_records",
-        "interop_contract",
-    )
-    found: list[str] = []
-    for path in production:
-        if not path.is_file():
-            continue
-        text = path.read_text(encoding="utf-8", errors="replace")
-        for marker in markers:
-            if marker in text:
-                found.append(f"{path.relative_to(REPO_ROOT)}:{marker}")
+    import hunter_cross_project
+
+    state, detail = hunter_cross_project.require_decision_grade_history()
+    federation = hunter_cross_project.cross_project_history_federation_validity()
+    projects = set(federation[2])
+    expected = {"neo_hunter", "exo_hunter", "techno_hunter"}
 
     return Assertion(
         "cross-project-history-consumed",
         ("IDENT-02",),
-        PASS if found else FAIL,
-        f"sibling history consumed at: {found[:5]}" if found
-        else "no cross-project history mechanism exists in production code; "
-             "New-eligibility cannot consider what sibling Hunters have already searched",
+        PASS if state in hunter_cross_project.CROSS_PROJECT_DECISION_STATES and projects == expected
+        else FAIL,
+        f"federated history state={state}; projects={sorted(projects)}; {detail}",
     )
 
 
@@ -173,18 +157,101 @@ def check_local_novelty_exclusion() -> Assertion:
 
     with tempfile.TemporaryDirectory(prefix="hunter-pipeline-gate-") as raw:
         database = Path(raw) / "state.sqlite"
-        hunter_state.init_db(database)
-        before = hunter_state.searched_target_ids(database)
-        if before:
+        target = hunter_state.ManifestTarget(
+            target_id="radec_10.00_5.00",
+            ra_deg=10.0,
+            dec_deg=5.0,
+            score=0.9,
+            selection_reason="independent gate oracle",
+            coverage_inventory_id="gate-field",
+        )
+        hunter_state.create_search_manifest(
+            database, "search-first", "new", 1, "policy", "digest",
+            [target], 10, True, {},
+        )
+        searched = hunter_state.searched_target_ids(database)
+        try:
+            hunter_state.create_search_manifest(
+                database, "search-repeat", "new", 1, "policy", "digest",
+                [target], 10, True, {},
+            )
+        except ValueError as exc:
+            rejected = "already has governing search history" in str(exc)
+        else:
+            rejected = False
+        if target.target_id not in searched or not rejected:
             return Assertion(
                 "local-novelty-exclusion-enforced", ("IDENT-03",), FAIL,
-                f"a fresh database already reports searched targets: {sorted(before)[:3]}",
+                f"selected target recorded={target.target_id in searched}; "
+                f"repeat rejected={rejected}",
             )
     return Assertion(
         "local-novelty-exclusion-enforced", ("IDENT-03",), PASS,
-        "hunter_state.searched_target_ids() backs local novelty exclusion, and "
-        "hunter_cli refuses targets whose coverage validity_state is not 'valid' "
-        "(hunter_cli.py:490, :937, :1420) -- the local half of IDENT-03 fails closed",
+        "a real pending New manifest reserved its target in governing history and "
+        "a second New manifest for that exact target failed closed",
+    )
+
+
+def check_canonical_durable_pipeline() -> Assertion:
+    """PIPE-01/DUR-01..04: one durable lifecycle carries exact results to history."""
+    import hunter_state
+
+    with tempfile.TemporaryDirectory(prefix="hunter-pipeline-gate-") as raw:
+        database = Path(raw) / "state.sqlite"
+        target = hunter_state.ManifestTarget(
+            target_id="radec_42.00_-7.00",
+            ra_deg=42.0,
+            dec_deg=-7.0,
+            score=0.87,
+            selection_reason="known gate target",
+            coverage_inventory_id="gate-coverage",
+            canonical_id="icrs:42.00:-7.00:r2deg",
+            validity_state="valid",
+        )
+        hunter_state.create_search_manifest(
+            database, "search-gate", "new", 1, "policy-v1", "d" * 64,
+            [target], 100, True, {"requested_n": 1},
+        )
+        frozen = hunter_state.get_search_manifest(database, "search-gate")
+        hunter_state.create_search_run(
+            database, "run-gate", "search-gate", "gate-code", {"scorer": "gate-v1"}
+        )
+        hunter_state.commit_target_result(
+            database,
+            run_id="run-gate",
+            search_id="search-gate",
+            mode="new",
+            target_id=target.target_id,
+            execution_status="null_result",
+            candidate_ids=[],
+            error_message=None,
+            nights_acquired=["20240101", "20240102", "20240103"],
+            provenance={
+                "source": "independent-gate-oracle",
+                "ranking_policy_digest": frozen["ranking_policy_digest"],
+            },
+        )
+        hunter_state.complete_search_run(database, "run-gate", "completed")
+        hunter_state.mark_manifest_status(database, "search-gate", "executed")
+        final_manifest = hunter_state.get_search_manifest(database, "search-gate")
+        run_target = hunter_state.get_run_targets(database, "run-gate")[target.target_id]
+        history = hunter_state.list_target_history(database, target.target_id)
+
+    passed = (
+        [item["target_id"] for item in final_manifest["targets"]] == [target.target_id]
+        and final_manifest["ranking_policy_digest"] == frozen["ranking_policy_digest"]
+        and final_manifest["status"] == "executed"
+        and run_target["execution_status"] == "null_result"
+        and history[-1]["status"] == "null_result"
+        and history[-1]["provenance"]["ranking_policy_digest"]
+        == frozen["ranking_policy_digest"]
+    )
+    return Assertion(
+        "canonical-durable-pipeline",
+        ("PIPE-01", "DUR-01", "DUR-02", "DUR-03", "DUR-04"),
+        PASS if passed else FAIL,
+        "exact frozen target and policy digest survived run, result, and append-only history"
+        if passed else "durable lifecycle changed target/policy or lost result provenance",
     )
 
 
@@ -296,6 +363,7 @@ def check_no_shadow_selector() -> Assertion:
 def run_gate() -> dict[str, Any]:
     assertions = [
         check_no_shadow_selector(),
+        check_canonical_durable_pipeline(),
         check_identity_schema(),
         check_cross_project_history(),
         check_local_novelty_exclusion(),

@@ -463,6 +463,53 @@ def _preflight_motion_products(
     return manifest
 
 
+def preflight_motion_product_rows(
+    table: object,
+    *,
+    query: dict,
+    raw_metadata_sha256: str,
+    out_dir: Path,
+    workers: int = 1,
+) -> dict:
+    """HEAD-check an explicit metadata-row selection without another GET.
+
+    The caller owns row selection from an already persisted authoritative IRSA
+    response. This function preserves the selected product identifiers and every
+    HEAD outcome, while downloading no product bodies.
+    """
+    n_exposures = len(table)
+    if n_exposures < 1:
+        raise ValueError("explicit motion-product preflight requires at least one row")
+    manifest = _build_motion_product_manifest(table, query, raw_metadata_sha256)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    manifest = _preflight_motion_products(
+        manifest,
+        out_dir / "motion_product_preflight.json",
+        max_exposures=n_exposures,
+        workers=workers,
+    )
+    manifest_path = out_dir / "motion_product_manifest.json"
+    manifest_path.write_text(json.dumps(manifest, indent=2))
+    report = {
+        "schema_version": "ztf-dr24-explicit-product-preflight-v1",
+        "raw_response_sha256": raw_metadata_sha256,
+        "motion_product_manifest_path": str(manifest_path),
+        "motion_product_manifest_exposures": n_exposures,
+        "motion_product_preflight": manifest["preflight"],
+        "selected_products": [
+            {
+                key: exposure[key]
+                for key in ("pid", "obsjd", "field", "ccdid", "qid")
+            }
+            for exposure in manifest["exposures"]
+        ],
+    }
+    (out_dir / "explicit_product_preflight_report.json").write_text(
+        json.dumps(report, indent=2)
+    )
+    return report
+
+
 def _fetch_binary_with_retry(url: str) -> bytes:
     """GET a binary science product with the standard bounded retry schedule
     and return its raw body bytes. Used only by the single-exposure pixel-

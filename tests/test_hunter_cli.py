@@ -141,6 +141,11 @@ def _patch_dirs(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr(hunter_cli, "_EVENT_LOG", tmp_path / "hunter_events.jsonl")
     monkeypatch.setattr(hunter_cli.coverage_inventory, "REPO_ROOT", tmp_path)
     monkeypatch.setattr(
+        hunter_cli.hunter_cross_project,
+        "require_decision_grade_history",
+        lambda: ("valid", "isolated unit-test history federation"),
+    )
+    monkeypatch.setattr(
         hunter_cli,
         "_materialize_planning_catalog",
         lambda **kwargs: ("test-planning-catalog-v1", 30_000),
@@ -284,23 +289,27 @@ def test_exact_target_feasibility_requires_three_product_preflighted_nights(
     def fake_preflight(**kwargs):
         out_dir = kwargs["out_dir"]
         out_dir.mkdir(parents=True, exist_ok=True)
-        if not kwargs.get("preflight_motion_products"):
-            from astropy.time import Time
+        from astropy.time import Time
 
-            raw = out_dir / "exact.ipac"
-            raw.write_text(
-                _ipac_text(
-                    [
-                        float(Time(f"2024-01-0{day}T01:00:00", format="isot").jd)
-                        for day in (1, 2, 3)
-                    ]
-                ),
-                encoding="utf-8",
-            )
-            return {
-                "raw_response_path": str(raw),
-                "raw_response_sha256": "d" * 64,
-            }
+        raw = out_dir / "exact.ipac"
+        raw.write_text(
+            _ipac_text(
+                [
+                    float(Time(f"2024-01-0{day}T01:00:00", format="isot").jd)
+                    for day in (1, 2, 3)
+                ]
+            ),
+            encoding="utf-8",
+        )
+        return {
+            "query": {"source": "independent exact fixture"},
+            "raw_response_path": str(raw),
+            "raw_response_sha256": "d" * 64,
+        }
+
+    def fake_product_preflight(table, **kwargs):
+        out_dir = kwargs["out_dir"]
+        out_dir.mkdir(parents=True, exist_ok=True)
         manifest = out_dir / "motion_product_manifest.json"
         manifest.write_text(
             json.dumps(
@@ -314,10 +323,19 @@ def test_exact_target_feasibility_requires_three_product_preflighted_nights(
         return {
             "raw_response_sha256": "c" * 64,
             "motion_product_manifest_path": str(manifest),
+            "motion_product_preflight": {
+                "status": "passed",
+                "all_required_products_available": True,
+            },
         }
 
     monkeypatch.setattr(
         hunter_cli.bounded_ingest, "run_bounded_ingest", fake_preflight
+    )
+    monkeypatch.setattr(
+        hunter_cli.bounded_ingest,
+        "preflight_motion_product_rows",
+        fake_product_preflight,
     )
     monkeypatch.setattr(hunter_cli, "_WORKING_DIR", tmp_path / "working")
 
@@ -336,6 +354,81 @@ def test_exact_target_feasibility_requires_three_product_preflighted_nights(
     assert hunter_cli._estimated_storage_mb(
         {"coverage_provenance": {"exact_feasibility": result}}
     ) == 78.1
+
+
+def test_exact_target_feasibility_selects_first_complete_simultaneous_product(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from astropy.time import Time
+
+    obsjds = [
+        float(Time("2024-01-01T01:00:00", format="isot").jd),
+        float(Time("2024-01-01T01:00:00", format="isot").jd),
+        float(Time("2024-01-02T01:00:00", format="isot").jd),
+        float(Time("2024-01-03T01:00:00", format="isot").jd),
+    ]
+
+    def fake_inventory(**kwargs):
+        out_dir = kwargs["out_dir"]
+        out_dir.mkdir(parents=True, exist_ok=True)
+        raw = out_dir / "exact.ipac"
+        raw.write_text(_ipac_text(obsjds), encoding="utf-8")
+        return {
+            "query": {"source": "duplicate-obsjd fixture"},
+            "raw_response_path": str(raw),
+            "raw_response_sha256": "d" * 64,
+        }
+
+    assessed_pids: list[int] = []
+
+    def fake_product_preflight(table, **kwargs):
+        pid = int(table[0]["pid"])
+        assessed_pids.append(pid)
+        passed = pid != 1000
+        out_dir = kwargs["out_dir"]
+        out_dir.mkdir(parents=True, exist_ok=True)
+        manifest = out_dir / "motion_product_manifest.json"
+        manifest.write_text(
+            json.dumps(
+                {
+                    "preflight": {
+                        "total_content_bytes": 1024 if passed else 0,
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+        return {
+            "raw_response_sha256": "c" * 64,
+            "motion_product_manifest_path": str(manifest),
+            "motion_product_preflight": {
+                "status": "passed" if passed else "failed",
+                "all_required_products_available": passed,
+            },
+        }
+
+    monkeypatch.setattr(hunter_cli.bounded_ingest, "run_bounded_ingest", fake_inventory)
+    monkeypatch.setattr(
+        hunter_cli.bounded_ingest,
+        "preflight_motion_product_rows",
+        fake_product_preflight,
+    )
+    monkeypatch.setattr(hunter_cli, "_WORKING_DIR", tmp_path / "working")
+
+    result = hunter_cli._exact_target_feasibility(
+        {"ra_deg": 10.0, "dec_deg": 5.0},
+        ["20240101", "20240102", "20240103"],
+    )
+
+    assert result["passes"] is True
+    assert assessed_pids == [1000, 1001, 1002, 1003]
+    first_night = result["simultaneous_product_assessments"][0]
+    assert first_night["selected_pid"] == 1001
+    assert [item["status"] for item in first_night["ordered_products"]] == [
+        "failed",
+        "passed",
+    ]
+    assert result["verified_nights"][0]["selected_product"]["pid"] == 1001
 
 
 def test_exact_feasibility_replaces_a_higher_ranked_wide_only_candidate(
@@ -410,6 +503,9 @@ def test_discover_new_targets_sufficient_from_existing_inventory(
 
     monkeypatch.setattr(
         hunter_cli.coverage_inventory.bounded_ingest, "run_bounded_ingest", _fail_if_called
+    )
+    monkeypatch.setattr(
+        hunter_cli, "_next_uncovered_planning_candidates", lambda *a, **k: []
     )
 
     result = hunter_cli.discover_new_targets(
@@ -536,6 +632,78 @@ def test_discovery_finds_high_value_candidate_outside_initial_expansion(
     assert calls["live"] == 2
     assert result["pool_size_explored"] == 30
     assert result["eligible"][0]["score"] == 0.01
+    assert result["requested_n"] == 1
+    assert result["discovered_count"] == 30
+    assert result["eligible_count"] == 1
+    assert len(result["expansion_rounds"]) == 2
+    assert result["expansion_rounds"][1]["candidates_added"] == 20
+    assert result["termination_reason"] == "planning_source_exhausted"
+    assert result["remaining_unexplored_universe"] == 0
+    assert result["exhausted_sources"] == [
+        "deterministic-ranked-planning-grid"
+    ]
+    assert result["source_watermarks"]
+    assert result["quality_distribution"]["eligible_count"] == 1
+
+
+def test_adaptive_expansion_chunks_rounds_at_provider_limit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_dirs(monkeypatch, tmp_path)
+    queue = _write_empty_target_queue(tmp_path / "target_priority_queue.csv")
+    candidate_calls = 0
+    batch_sizes: list[int] = []
+
+    def _next_candidates(*args: object, **kwargs: object) -> list[tuple[float, float]]:
+        nonlocal candidate_calls
+        del args, kwargs
+        candidate_calls += 1
+        if candidate_calls == 1:
+            return [(float(index), 5.0) for index in range(1, 16)]
+        if candidate_calls == 2:
+            return [(float(index), 5.0) for index in range(16, 46)]
+        return []
+
+    def _live(fields, prefix):
+        del prefix
+        batch_sizes.append(len(fields))
+        assert len(fields) <= hunter_cli.coverage_inventory.MAX_FIELDS
+        results = []
+        for field_id, ra_deg, dec_deg in fields:
+            field = _coverage_field_result(field_id, ra_deg, dec_deg)
+            field.update(
+                {
+                    "n_distinct_nights": 0,
+                    "distinct_nights_yyyymmdd": [],
+                    "passes_min_distinct_nights": False,
+                }
+            )
+            results.append(field)
+        return {"batch_id": f"batch-{len(batch_sizes)}", "field_results": results}
+
+    monkeypatch.setattr(
+        hunter_cli, "_next_uncovered_planning_candidates", _next_candidates
+    )
+    monkeypatch.setattr(hunter_cli, "_live_coverage_check", _live)
+    monkeypatch.setattr(
+        hunter_cli.field_selector, "select_fields", lambda **kwargs: []
+    )
+
+    result = hunter_cli.discover_new_targets(
+        jd=2461000.5,
+        neo_class="all",
+        requested_n=5,
+        max_pool=None,
+        out_dir=tmp_path / "working",
+        target_queue_path=queue,
+        ranking_policy_path=field_selector._DEFAULT_RANKING_POLICY_PATH,
+        db_path=tmp_path / "hunter.sqlite",
+    )
+
+    assert batch_sizes == [15, 20, 10]
+    assert result["discovered_count"] == 45
+    assert result["termination_reason"] == "planning_source_exhausted"
+    assert result["expansion_rounds"][1]["batch_ids"] == ["batch-2", "batch-3"]
 
 
 def test_discover_new_targets_reports_insufficient_when_pool_exhausted(
@@ -645,6 +813,9 @@ def test_cmd_create_new_search_persists_manifest_and_prints_table(
         for i, row in enumerate(planning)
     ]
     _write_coverage_inventory(inv_dir / "seed.json", fields)
+    monkeypatch.setattr(
+        hunter_cli, "_next_uncovered_planning_candidates", lambda *a, **k: []
+    )
     target_queue_path = _write_empty_target_queue(tmp_path / "target_priority_queue.csv")
     db_path = tmp_path / "hunter_state.sqlite"
     args = argparse.Namespace(
@@ -669,6 +840,7 @@ def test_cmd_create_new_search_persists_manifest_and_prints_table(
     assert manifest["requested_n"] == 2
     assert len(manifest["targets"]) == 2
     assert manifest["status"] == "pending"
+    assert len(manifest["manifest_sha256"]) == 64
 
 
 def test_cmd_create_new_search_accepts_explicit_jd(
@@ -1738,7 +1910,9 @@ def test_run_search_rejects_malformed_legacy_manifest_before_run_creation(
             )
         connection.commit()
 
-    with pytest.raises(ValueError, match="search search-1 is incomplete"):
+    with pytest.raises(
+        ValueError, match="search search-1 is incomplete|checksum mismatch"
+    ):
         hunter_cli.run_search(
             db_path,
             tmp_path / "ledger.sqlite",
