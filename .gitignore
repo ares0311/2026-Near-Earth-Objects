@@ -1,0 +1,30 @@
+.DS_Store
+
+# Python environments
+.venv*/
+venv/
+
+# Python caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# General caches
+.cache/
+.uv-cache/
+
+# Coverage
+.coverage*
+htmlcov/
+
+# Build/package artifacts
+build/
+dist/
+*.egg-info/
+
+# Generated test/runtime debris
+matplotlib-*/
+pytest-of-*/
+torchinductor_*/
