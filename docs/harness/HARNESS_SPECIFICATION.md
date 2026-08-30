@@ -11,19 +11,31 @@ domains are method content inside that scope, not the definition of the harness.
 
 ## Objective-to-requirement traceability
 
-`configs/harness/traceability.json` binds all 15 operator requirements, 48
-accepted requirements, 16 incomplete requirements, and 16 open dependencies to
-stable NeoHunter workflow IDs, canonical output sets, evidence prerequisites, and
-acceptance-test families. `REQUIREMENT_TRACEABILITY.md` is the human-readable
-interpretation.
+HB-01 author reconstruction is complete and awaits independent review.
+`configs/harness/traceability.json` contains 95 individual bindings: 15 operator
+requirements, 48 accepted requirements, 16 incomplete requirements, and 16 open
+dependencies. Every binding names at least one NeoHunter product workflow,
+canonical output sets, exact prerequisite IDs or controlling source-register
+fields, and acceptance-test families.
 
-The binding incorporates exact normative text, dependency fields, closure
-evidence, and blocking scopes from the accepted registers rather than duplicating
-or weakening them. A scientific-domain requirement is actionable only through a
-mapped product workflow and only after its evidence prerequisites are
-independently validated. The current HB-01 mapping is an orchestrator-produced
-draft. It is not an author package and is not eligible for independent review;
-a separate author must reconstruct or independently adopt every binding first.
+Product workflows and subordinate scientific workflows are represented in
+separate fields. Point pixels, trails, association, tracklets, multi-night or
+cross-survey linking, historical recovery or precovery, and initial-orbit
+uncertainty can appear only under `/New Search`, `/Review Search Logs`,
+`/Follow-On Search`, evaluation, disposition, or another explicit product
+workflow. They cannot stand alone as roadmap phases or implementation authority.
+
+For accepted and incomplete requirements, the map materializes the exact source
+dependency IDs. For open dependencies, it binds the exact closure-evidence,
+blocking-scope, and specification-disposition fields. Empty prerequisite-ID
+arrays are fail-closed and never authorize later invention. The complete author
+derivation, draft differences, diagnostics, matched controls, and preservation
+result are in `evidence/HB01-traceability-author-v1.json` and interpreted in
+`REQUIREMENT_TRACEABILITY.md`.
+
+This is an author handoff, not independent acceptance. It closes no downstream
+requirement or dependency, does not start HB-02, and does not authorize
+implementation or scientific execution.
 
 ## Required final content
 

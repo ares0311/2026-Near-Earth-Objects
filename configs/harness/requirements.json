@@ -110,9 +110,11 @@
   ],
   "current_status": "HARNESS_CONSOLIDATION_INCOMPLETE",
   "hb01_traceability": {
+    "author_evidence": "docs/harness/evidence/HB01-traceability-author-v1.json",
     "machine_map": "configs/harness/traceability.json",
     "operator_map": "docs/harness/REQUIREMENT_TRACEABILITY.md",
-    "status": "ORCHESTRATOR_DRAFT_NOT_REVIEW_ELIGIBLE"
+    "review_status": "NOT_STARTED",
+    "status": "AUTHOR_COMPLETE_AWAITING_INDEPENDENT_REVIEW"
   },
   "operator_product_requirements": [
     {

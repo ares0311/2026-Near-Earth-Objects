@@ -1,0 +1,292 @@
+{
+  "schema": "neo-harness-hb01-traceability-author-evidence-v1",
+  "terminal_status": "HB01_AUTHOR_COMPLETE_AWAITING_INDEPENDENT_REVIEW",
+  "role": "AUTHOR_ONLY",
+  "execution_mode": "SINGLE_TOP_LEVEL_AGENT",
+  "repository": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Near Earth Objects",
+  "branch": "harness-rebuild",
+  "controlling_checkpoint_commit": "58f26ebd544a877fead7369d7f1f23e33d0621f0",
+  "assignment": {
+    "path": "docs/harness/assignments/HB01_TRACEABILITY_AUTHOR_RECONSTRUCTION.md",
+    "sha256": "a637ec5c6f69950978b1110adde1a0b5d28bdfe8667a208219bcba1b4464686d"
+  },
+  "author_commit_identity": "NON_SELF_REFERENTIAL_COMMIT_RECORDED_IN_AUTHOR_HANDOFF",
+  "coverage": {
+    "operator_requirements": 15,
+    "accepted_requirements": 48,
+    "incomplete_requirements": 16,
+    "open_dependencies": 16,
+    "total": 95
+  },
+  "differences_from_orchestrator_draft": {
+    "structural_differences": [
+      "Expanded 16 accepted-requirement groups into 48 independently addressable bindings.",
+      "Separated product workflows from subordinate scientific workflows and required a product workflow on every binding.",
+      "Added an exact source profile with path, ID field, and controlling-field list to every binding.",
+      "Materialized source dependency IDs on every REQ and IR binding and made empty-ID behavior fail closed.",
+      "Changed the author state from orchestrator draft to author complete awaiting independent review."
+    ],
+    "workflow_binding_changes": {
+      "count": 78,
+      "ids": [
+        "OPR-001",
+        "OPR-004",
+        "OPR-012",
+        "OPR-014",
+        "REQ-003",
+        "REQ-004",
+        "REQ-005",
+        "REQ-006",
+        "REQ-007",
+        "REQ-008",
+        "REQ-009",
+        "REQ-010",
+        "REQ-011",
+        "REQ-012",
+        "REQ-013",
+        "REQ-014",
+        "REQ-015",
+        "REQ-016",
+        "REQ-017",
+        "REQ-018",
+        "REQ-019",
+        "REQ-020",
+        "REQ-021",
+        "REQ-022",
+        "REQ-023",
+        "REQ-024",
+        "REQ-025",
+        "REQ-026",
+        "REQ-027",
+        "REQ-028",
+        "REQ-029",
+        "REQ-030",
+        "REQ-031",
+        "REQ-032",
+        "REQ-034",
+        "REQ-035",
+        "REQ-036",
+        "REQ-037",
+        "REQ-038",
+        "REQ-039",
+        "REQ-040",
+        "REQ-041",
+        "REQ-042",
+        "REQ-043",
+        "REQ-044",
+        "REQ-045",
+        "REQ-046",
+        "REQ-047",
+        "REQ-048",
+        "IR-001",
+        "IR-002",
+        "IR-003",
+        "IR-004",
+        "IR-005",
+        "IR-006",
+        "IR-007",
+        "IR-008",
+        "IR-009",
+        "IR-011",
+        "IR-012",
+        "IR-013",
+        "IR-014",
+        "IR-015",
+        "IR-016",
+        "OQ-01",
+        "OQ-02",
+        "OQ-03",
+        "OQ-04",
+        "OQ-05",
+        "OQ-06",
+        "OQ-07",
+        "OQ-08",
+        "OQ-09",
+        "OQ-10",
+        "OQ-12",
+        "OQ-13",
+        "OQ-14",
+        "OQ-15"
+      ]
+    },
+    "output_set_changes": {
+      "count": 16,
+      "ids": [
+        "REQ-003",
+        "REQ-017",
+        "REQ-026",
+        "REQ-027",
+        "REQ-028",
+        "REQ-029",
+        "REQ-030",
+        "REQ-031",
+        "REQ-032",
+        "REQ-037",
+        "REQ-038",
+        "REQ-044",
+        "REQ-045",
+        "REQ-046",
+        "OQ-04",
+        "OQ-06"
+      ]
+    },
+    "acceptance_test_changes": {
+      "count": 2,
+      "ids": [
+        "REQ-003",
+        "REQ-028"
+      ]
+    }
+  },
+  "diagnostics": {
+    "baseline_candidate_error_count": 0,
+    "unsafe_mutation_families_tested": 10,
+    "unsafe_mutations_rejected": 10,
+    "matched_legitimate_controls_tested": 10,
+    "matched_legitimate_controls_accepted": 10,
+    "cases": [
+      {
+        "family": "OMISSION",
+        "unsafe_mutation_rejected": true,
+        "diagnostic_codes": [
+          "coverage_or_order:operator_requirement_bindings",
+          "global_coverage_or_order",
+          "wrong_evidence_binding:OPR-015",
+          "wrong_output_binding:OPR-015",
+          "wrong_source_profile:OPR-015",
+          "wrong_test_binding:OPR-015",
+          "wrong_workflow_binding:OPR-015"
+        ],
+        "matched_legitimate_control": "UNMODIFIED_AUTHOR_CANDIDATE",
+        "matched_control_accepted": true
+      },
+      {
+        "family": "DUPLICATE",
+        "unsafe_mutation_rejected": true,
+        "diagnostic_codes": [
+          "coverage_or_order:open_dependency_bindings",
+          "duplicate_ids",
+          "global_coverage_or_order"
+        ],
+        "matched_legitimate_control": "UNMODIFIED_AUTHOR_CANDIDATE",
+        "matched_control_accepted": true
+      },
+      {
+        "family": "UNKNOWN_ID",
+        "unsafe_mutation_rejected": true,
+        "diagnostic_codes": [
+          "unknown_evidence_id:OPR-001",
+          "wrong_evidence_binding:OPR-001"
+        ],
+        "matched_legitimate_control": "UNMODIFIED_AUTHOR_CANDIDATE",
+        "matched_control_accepted": true
+      },
+      {
+        "family": "WRONG_WORKFLOW",
+        "unsafe_mutation_rejected": true,
+        "diagnostic_codes": [
+          "wrong_workflow_binding:REQ-001"
+        ],
+        "matched_legitimate_control": "UNMODIFIED_AUTHOR_CANDIDATE",
+        "matched_control_accepted": true
+      },
+      {
+        "family": "MISSING_EVIDENCE_DEPENDENCY",
+        "unsafe_mutation_rejected": true,
+        "diagnostic_codes": [
+          "missing_evidence_dependency:REQ-005"
+        ],
+        "matched_legitimate_control": "UNMODIFIED_AUTHOR_CANDIDATE",
+        "matched_control_accepted": true
+      },
+      {
+        "family": "MISSING_OUTPUT",
+        "unsafe_mutation_rejected": true,
+        "diagnostic_codes": [
+          "missing_or_unknown_output:IR-001",
+          "wrong_output_binding:IR-001"
+        ],
+        "matched_legitimate_control": "UNMODIFIED_AUTHOR_CANDIDATE",
+        "matched_control_accepted": true
+      },
+      {
+        "family": "MISSING_TEST",
+        "unsafe_mutation_rejected": true,
+        "diagnostic_codes": [
+          "missing_or_unknown_test:OQ-01",
+          "wrong_test_binding:OQ-01"
+        ],
+        "matched_legitimate_control": "UNMODIFIED_AUTHOR_CANDIDATE",
+        "matched_control_accepted": true
+      },
+      {
+        "family": "SCIENTIFIC_DOMAIN_PROMOTION",
+        "unsafe_mutation_rejected": true,
+        "diagnostic_codes": [
+          "wrong_product_workflow:OPR-001",
+          "wrong_workflow_binding:OPR-001"
+        ],
+        "matched_legitimate_control": "UNMODIFIED_AUTHOR_CANDIDATE",
+        "matched_control_accepted": true
+      },
+      {
+        "family": "EMPTY_EVIDENCE_INVENTION",
+        "unsafe_mutation_rejected": true,
+        "diagnostic_codes": [
+          "empty_evidence_invention"
+        ],
+        "matched_legitimate_control": "UNMODIFIED_AUTHOR_CANDIDATE",
+        "matched_control_accepted": true
+      },
+      {
+        "family": "STATUS_DRIFT",
+        "unsafe_mutation_rejected": true,
+        "diagnostic_codes": [
+          "status_drift"
+        ],
+        "matched_legitimate_control": "UNMODIFIED_AUTHOR_CANDIDATE",
+        "matched_control_accepted": true
+      }
+    ]
+  },
+  "source_preservation": {
+    "result": "PASS_EXACT_AUTHOR_SOURCES_AND_IMMUTABLE_CONTROL_PLANE_PRESERVED",
+    "exact_sha256_before_and_after": {
+      "docs/harness/OPERATOR_OBJECTIVE.md": "01ce88781674d64644ee1f3145ccd7dbee9f82c8dd69d6df97521a881564a83c",
+      "docs/harness/reference/accepted-specification-v3/requirements-register.csv": "f65fe063f9d20f852eeb47085bef378c7992100f87986778402b708d491d3719",
+      "docs/harness/reference/accepted-specification-v3/incomplete-requirements.csv": "0a768650e852f7292b677fb67e26bbc8de20831f8f7bbd99d38f42444d43ecb8",
+      "docs/harness/reference/accepted-specification-v3/unresolved-dependencies.csv": "1a059ddb87fb7e0d4c3758341417b409e0b9522b1d63d14f402770cd07d137a7"
+    },
+    "requirements_source_projection_sha256_before": "86373e66074bb4c9ecf19f1bd1148b84d2c52beada733c16f53f98972f271b5e",
+    "requirements_source_projection_sha256_candidate": "86373e66074bb4c9ecf19f1bd1148b84d2c52beada733c16f53f98972f271b5e",
+    "orchestrator_draft_sha256": "fe5e4e4bd4a8e49042b902561802ef55187449e31e9729f13fcc33c774fcd513",
+    "immutable_checksum_check": "PASS_BEFORE_AND_AFTER",
+    "immutable_tag_diff_check": "PASS_BEFORE_AND_AFTER",
+    "reference_subtree_edit_count": 0
+  },
+  "status_preservation": {
+    "overall_harness_status": "HARNESS_CONSOLIDATION_INCOMPLETE",
+    "hb02_status": "PENDING",
+    "open_requirement_state_changes": 0,
+    "open_dependency_state_changes": 0
+  },
+  "unresolved_decisions": {
+    "hb01_mapping_decisions_requiring_orchestrator_resolution": [],
+    "preserved_downstream": {
+      "operator_requirements_open_blocker": 13,
+      "operator_requirements_partial": 2,
+      "incomplete_requirements_open_blocker": 15,
+      "incomplete_requirements_intentionally_deferred": 1,
+      "open_dependencies": 16
+    }
+  },
+  "prohibited_actions_not_started": [
+    "INDEPENDENT_REVIEW",
+    "HB-02",
+    "PROJECT_IMPLEMENTATION",
+    "DATA_ACQUISITION",
+    "SCIENTIFIC_EXECUTION",
+    "ADDITIONAL_AGENT",
+    "PUSH"
+  ]
+}

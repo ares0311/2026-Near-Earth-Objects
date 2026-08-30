@@ -35,13 +35,14 @@
         "docs/harness/REQUIREMENT_TRACEABILITY.md"
       ],
       "evidence_locations": [
+        "docs/harness/evidence/HB01-traceability-author-v1.json",
         "docs/harness/OPERATOR_OBJECTIVE.md",
         "docs/harness/reference/accepted-specification-v3/requirements-register.csv",
         "docs/harness/reference/accepted-specification-v3/incomplete-requirements.csv",
         "docs/harness/reference/accepted-specification-v3/unresolved-dependencies.csv"
       ],
       "id": "HB-01",
-      "status": "IN_PROGRESS_AUTHOR_RECONSTRUCTION_REQUIRED"
+      "status": "AUTHOR_COMPLETE_AWAITING_INDEPENDENT_REVIEW"
     },
     {
       "canonical_locations": [

@@ -1,6 +1,68 @@
 {
+  "schema": "neo-harness-requirement-traceability-v2",
+  "current_status": "AUTHOR_COMPLETE_AWAITING_INDEPENDENT_REVIEW",
+  "macroscopic_objective": "Map every governing requirement and dependency to the requested NeoHunter product, evidence required before use, canonical harness outputs, and acceptance-test families without implementation or scientific execution.",
+  "workflow_definitions": {
+    "product_workflows": {
+      "WF-CONTROL": "Spec Prompt, context routing, authority, immutable inputs, roles, and stop gates.",
+      "WF-SHELL": "NeoHunter slash-command shell, autocomplete, terminal presentation, and command dispatch.",
+      "WF-NEW-SEARCH": "New Search planning, bounded source and method selection, execution-state creation, and progress presentation.",
+      "WF-REVIEW-LOGS": "Review Search Logs inspection, filtered-grid queries, evidence review, and operator selection.",
+      "WF-FOLLOW-ON": "Operator-selected Follow-On Search using retained evidence and explicit authorization.",
+      "WF-EXIT": "Safe CLI exit with state preservation and no hidden work.",
+      "WF-DATA-INTAKE": "Provider registry, access authorization, credential-reference interfaces, product identity, and normalized intake.",
+      "WF-PERSIST": "Search-result, intermediate-evidence, filter-query, run-state, and recovery persistence.",
+      "WF-OPS": "Deterministic non-LLM workers, shards, resources, telemetry, restart, retention, and recovery.",
+      "WF-EVALUATION": "Outcome-blind bounded comparison, metrics, uncertainty, adversarial review, and production-selection evidence.",
+      "WF-DISPOSITION": "Rejection, reclassification, follow-up, independent verification, and operator-gated packaging.",
+      "WF-HANDOFF": "Evidence-complete Codex CLI implementation assignment and later operator-gated disposition handoffs."
+    },
+    "subordinate_scientific_workflows": {
+      "WF-POINT": "Point-like pixel opportunity detection and evidence collection.",
+      "WF-TRAIL": "Trailed-source pixel opportunity detection and uncertainty propagation.",
+      "WF-ASSOCIATION": "Catalog or alert-record association with retained ambiguity and lineage.",
+      "WF-TRACKLET": "Single-night tracklet formation with two-detection and three-or-more strata.",
+      "WF-LINKING": "Multi-night and cross-survey linking with normalization, rare-regime retention, and multimodality.",
+      "WF-HISTORICAL": "Targeted historical recovery or precovery kept separate from blind archival discovery.",
+      "WF-ORBIT": "Initial-orbit family and uncertainty handling without impact disposition."
+    },
+    "subordination_rule": "EVERY_BINDING_HAS_AT_LEAST_ONE_PRODUCT_WORKFLOW; SCIENTIFIC_WORKFLOWS_NEVER_STAND_ALONE_OR_BECOME_ROADMAP_PHASES"
+  },
+  "output_sets": {
+    "OS-CONTROL": [
+      "AGENTS.md",
+      "configs/harness/harness-charter.json",
+      "configs/harness/roadmap.json",
+      "docs/runbook/HARNESS_BUILD_RUNBOOK.md"
+    ],
+    "OS-HANDOFF": [
+      "docs/harness/CODEX_CLI_HANDOFF.md"
+    ],
+    "OS-INDEX": [
+      "configs/harness/roadmap-index.json",
+      "docs/harness/HARNESS_INDEX.md",
+      "configs/harness/traceability.json",
+      "docs/harness/REQUIREMENT_TRACEABILITY.md"
+    ],
+    "OS-REVIEW": [
+      "docs/harness/ADVERSARIAL_REVIEW.md"
+    ],
+    "OS-SCHEMA": [
+      "configs/harness/schemas"
+    ],
+    "OS-SOURCE": [
+      "docs/harness/SOURCE_REGISTRY.csv"
+    ],
+    "OS-SPEC": [
+      "docs/harness/HARNESS_SPECIFICATION.md"
+    ],
+    "OS-STATUS": [
+      "configs/harness/requirements.json",
+      "docs/harness/HARNESS_STATUS.md"
+    ]
+  },
   "acceptance_test_families": {
-    "AT-CONTROL": "The exact repository, authority, role, immutable inputs, and prohibited-action boundaries are enforced before work.",
+    "AT-CONTROL": "Exact repository, authority, role, immutable inputs, and prohibited-action boundaries are enforced before work.",
     "AT-DATA": "The affected data interface has verified identity, fields, units, frames, missingness, access limits, and fail-closed behavior.",
     "AT-DISPOSITION": "Every candidate disposition preserves ambiguity, evidence, operator authority, and prohibited scientific or operational claims.",
     "AT-HANDOFF": "The implementation step is bound to closed requirements and prevalidated evidence and requires no research or invention.",
@@ -10,123 +72,180 @@
     "AT-OPERATIONS": "Resource, retry, retention, restart, telemetry, network, and failure behavior are deterministic and bounded.",
     "AT-PRODUCT": "The user-visible command or state transition has exact prerequisites, parameters, outputs, reason codes, recovery, and UX behavior.",
     "AT-REVIEW": "A fresh role-separated reviewer rejects novel unsafe in-family mutations and accepts matched legitimate controls without repairing the target.",
-    "AT-TRACE": "Every source ID appears exactly once in the binding map and resolves to workflows, output sets, evidence prerequisites, and acceptance-test families."
+    "AT-TRACE": "Every source ID appears exactly once and resolves to product workflows, subordinate scientific workflows, output sets, evidence prerequisites, and tests."
   },
-  "binding_rules": {
-    "accepted_requirement_dependencies": "READ_EXACT_DEPENDENCIES_FROM_DOCS_HARNESS_REFERENCE_ACCEPTED_SPECIFICATION_V3_REQUIREMENTS_REGISTER_CSV",
-    "incomplete_requirement_evidence": "READ_EXACT_DEPENDENCIES_BLOCKING_GATE_AND_COMPLETION_EVIDENCE_FROM_DOCS_HARNESS_REFERENCE_ACCEPTED_SPECIFICATION_V3_INCOMPLETE_REQUIREMENTS_CSV",
-    "open_dependency_evidence": "READ_EXACT_REQUIREMENT_AFFECTED_REGIMES_CLOSURE_EVIDENCE_BLOCKING_SCOPE_AND_DISPOSITION_FROM_DOCS_HARNESS_REFERENCE_ACCEPTED_SPECIFICATION_V3_UNRESOLVED_DEPENDENCIES_CSV",
-    "operator_requirement_evidence": "READ_STATUS_AND_TOPIC_FROM_CONFIGS_HARNESS_REQUIREMENTS_JSON_AND_APPLY_THE_EXPLICIT_BINDING_BELOW"
+  "source_profiles": {
+    "SP-OPR": {
+      "path": "configs/harness/requirements.json",
+      "id_field": "id",
+      "controlling_fields": [
+        "status",
+        "topic"
+      ]
+    },
+    "SP-REQ": {
+      "path": "docs/harness/reference/accepted-specification-v3/requirements-register.csv",
+      "id_field": "requirement_id",
+      "controlling_fields": [
+        "normative_requirement",
+        "status",
+        "dependencies",
+        "verification"
+      ]
+    },
+    "SP-IR": {
+      "path": "docs/harness/reference/accepted-specification-v3/incomplete-requirements.csv",
+      "id_field": "incomplete_id",
+      "controlling_fields": [
+        "requirement",
+        "status",
+        "dependencies",
+        "blocking_gate",
+        "completion_evidence"
+      ]
+    },
+    "SP-OQ": {
+      "path": "docs/harness/reference/accepted-specification-v3/unresolved-dependencies.csv",
+      "id_field": "dependency_id",
+      "controlling_fields": [
+        "topic",
+        "status",
+        "requirement",
+        "affected_regimes",
+        "closure_evidence",
+        "blocking_scope",
+        "specification_disposition"
+      ]
+    }
   },
-  "current_status": "ORCHESTRATOR_DRAFT_NOT_REVIEW_ELIGIBLE",
-  "macroscopic_objective": "Map every governing requirement and dependency to the NeoHunter product, canonical harness outputs, evidence needed before use, and acceptance-test families without implementing the product.",
-  "open_dependency_bindings": [
-    {"id":"OQ-01","workflows":["WF-ASSOCIATION","WF-LINKING","WF-HISTORICAL"],"output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA"],"tests":["AT-DATA","AT-LABEL","AT-TRACE"]},
-    {"id":"OQ-02","workflows":["WF-POINT","WF-TRAIL","WF-HISTORICAL"],"output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA"],"tests":["AT-DATA","AT-TRACE"]},
-    {"id":"OQ-03","workflows":["WF-ASSOCIATION","WF-TRACKLET","WF-LINKING","WF-ORBIT"],"output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA"],"tests":["AT-DATA","AT-METHOD","AT-METRIC","AT-TRACE"]},
-    {"id":"OQ-04","workflows":["WF-TRAIL","WF-TRACKLET"],"output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA"],"tests":["AT-METHOD","AT-METRIC","AT-TRACE"]},
-    {"id":"OQ-05","workflows":["WF-POINT","WF-TRAIL","WF-HISTORICAL","WF-EVALUATION"],"output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"tests":["AT-METRIC","AT-REVIEW","AT-TRACE"]},
-    {"id":"OQ-06","workflows":["WF-TRAIL","WF-EVALUATION"],"output_sets":["OS-SOURCE","OS-SPEC","OS-REVIEW"],"tests":["AT-LABEL","AT-METRIC","AT-REVIEW","AT-TRACE"]},
-    {"id":"OQ-07","workflows":["WF-ASSOCIATION","WF-TRACKLET","WF-LINKING","WF-ORBIT"],"output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA"],"tests":["AT-DATA","AT-METHOD","AT-TRACE"]},
-    {"id":"OQ-08","workflows":["WF-POINT","WF-TRAIL","WF-TRACKLET","WF-EVALUATION"],"output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"tests":["AT-METRIC","AT-OPERATIONS","AT-TRACE"]},
-    {"id":"OQ-09","workflows":["WF-ASSOCIATION","WF-LINKING","WF-HISTORICAL"],"output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA"],"tests":["AT-DATA","AT-METHOD","AT-TRACE"]},
-    {"id":"OQ-10","workflows":["WF-HISTORICAL","WF-DATA-INTAKE"],"output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA"],"tests":["AT-DATA","AT-METRIC","AT-TRACE"]},
-    {"id":"OQ-11","workflows":["WF-OPS","WF-TRACKLET","WF-LINKING","WF-ORBIT","WF-EVALUATION"],"output_sets":["OS-SPEC","OS-SCHEMA"],"tests":["AT-OPERATIONS","AT-METRIC","AT-TRACE"]},
-    {"id":"OQ-12","workflows":["WF-ASSOCIATION","WF-LINKING","WF-HISTORICAL","WF-ORBIT"],"output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"tests":["AT-LABEL","AT-REVIEW","AT-TRACE"]},
-    {"id":"OQ-13","workflows":["WF-LINKING","WF-ORBIT","WF-EVALUATION"],"output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"tests":["AT-LABEL","AT-METRIC","AT-TRACE"]},
-    {"id":"OQ-14","workflows":["WF-HISTORICAL","WF-DISPOSITION"],"output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"tests":["AT-METHOD","AT-DISPOSITION","AT-REVIEW","AT-TRACE"]},
-    {"id":"OQ-15","workflows":["WF-ORBIT","WF-EVALUATION","WF-DISPOSITION"],"output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"tests":["AT-METRIC","AT-DISPOSITION","AT-TRACE"]},
-    {"id":"OQ-16","workflows":["WF-CONTROL"],"output_sets":["OS-STATUS","OS-CONTROL"],"tests":["AT-CONTROL","AT-TRACE"]}
-  ],
-  "output_sets": {
-    "OS-CONTROL": ["AGENTS.md","configs/harness/harness-charter.json","configs/harness/roadmap.json","docs/runbook/HARNESS_BUILD_RUNBOOK.md"],
-    "OS-HANDOFF": ["docs/harness/CODEX_CLI_HANDOFF.md"],
-    "OS-INDEX": ["configs/harness/roadmap-index.json","docs/harness/HARNESS_INDEX.md","configs/harness/traceability.json","docs/harness/REQUIREMENT_TRACEABILITY.md"],
-    "OS-REVIEW": ["docs/harness/ADVERSARIAL_REVIEW.md"],
-    "OS-SCHEMA": ["configs/harness/schemas"],
-    "OS-SOURCE": ["docs/harness/SOURCE_REGISTRY.csv"],
-    "OS-SPEC": ["docs/harness/HARNESS_SPECIFICATION.md"],
-    "OS-STATUS": ["configs/harness/requirements.json","docs/harness/HARNESS_STATUS.md"]
+  "evidence_before_use_rule": {
+    "listed_ids": "ALL_LISTED_IDS_MUST_BE_CANONICAL_PRESENT_AND_INDEPENDENTLY_VALIDATED_BEFORE_AFFECTED_WORK",
+    "controlling_fields": "THE_EXACT NAMED SOURCE-RECORD FIELDS ARE NORMATIVE AND MAY NOT BE PARAPHRASED AWAY",
+    "empty_ids": "EMPTY IDS NEVER AUTHORIZE INVENTION; THE CONTROLLING SOURCE FIELDS AND A COMPLETE CANONICAL SPECIFICATION MUST GOVERN BEFORE WORK"
+  },
+  "source_registers": {
+    "operator_requirements": {
+      "path": "configs/harness/requirements.json",
+      "expected_count": 15,
+      "expected_ids": "OPR-001_THROUGH_OPR-015"
+    },
+    "accepted_requirements": {
+      "path": "docs/harness/reference/accepted-specification-v3/requirements-register.csv",
+      "expected_count": 48,
+      "expected_ids": "REQ-001_THROUGH_REQ-048"
+    },
+    "incomplete_requirements": {
+      "path": "docs/harness/reference/accepted-specification-v3/incomplete-requirements.csv",
+      "expected_count": 16,
+      "expected_ids": "IR-001_THROUGH_IR-016"
+    },
+    "open_dependencies": {
+      "path": "docs/harness/reference/accepted-specification-v3/unresolved-dependencies.csv",
+      "expected_count": 16,
+      "expected_ids": "OQ-01_THROUGH_OQ-16"
+    }
   },
   "operator_requirement_bindings": [
-    {"id":"OPR-001","workflows":["WF-CONTROL"],"output_sets":["OS-CONTROL","OS-INDEX","OS-HANDOFF"],"evidence":["harness-builder-control-v1"],"tests":["AT-CONTROL","AT-HANDOFF","AT-TRACE"]},
-    {"id":"OPR-002","workflows":["WF-DATA-INTAKE","WF-NEW-SEARCH","WF-FOLLOW-ON"],"output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA"],"evidence":["OQ-02","OQ-07","OQ-09","OQ-10","IR-015"],"tests":["AT-DATA","AT-REVIEW","AT-TRACE"]},
-    {"id":"OPR-003","workflows":["WF-DATA-INTAKE","WF-CONTROL"],"output_sets":["OS-SPEC","OS-SCHEMA"],"evidence":["IR-015"],"tests":["AT-DATA","AT-CONTROL","AT-TRACE"]},
-    {"id":"OPR-004","workflows":["WF-POINT","WF-TRAIL","WF-ASSOCIATION","WF-TRACKLET","WF-LINKING","WF-HISTORICAL","WF-ORBIT"],"output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence":["IR-002","IR-003","IR-004","IR-005","IR-006","IR-007","IR-009","IR-011","IR-012","IR-013","IR-014"],"tests":["AT-METHOD","AT-METRIC","AT-REVIEW","AT-TRACE"]},
-    {"id":"OPR-005","workflows":["WF-CONTROL"],"output_sets":["OS-CONTROL","OS-STATUS"],"evidence":["pre-harness-archive","f915bba","harness-builder-control-v1"],"tests":["AT-CONTROL","AT-TRACE"]},
-    {"id":"OPR-006","workflows":["WF-SHELL","WF-NEW-SEARCH","WF-REVIEW-LOGS","WF-FOLLOW-ON","WF-EXIT"],"output_sets":["OS-SPEC","OS-SCHEMA"],"evidence":[],"tests":["AT-PRODUCT","AT-TRACE"]},
-    {"id":"OPR-007","workflows":["WF-NEW-SEARCH","WF-REVIEW-LOGS","WF-FOLLOW-ON","WF-EXIT"],"output_sets":["OS-SPEC","OS-SCHEMA"],"evidence":[],"tests":["AT-PRODUCT","AT-TRACE"]},
-    {"id":"OPR-008","workflows":["WF-PERSIST","WF-REVIEW-LOGS","WF-FOLLOW-ON","WF-DISPOSITION"],"output_sets":["OS-SPEC","OS-SCHEMA"],"evidence":["OQ-08"],"tests":["AT-PRODUCT","AT-DATA","AT-TRACE"]},
-    {"id":"OPR-009","workflows":["WF-SHELL","WF-NEW-SEARCH","WF-REVIEW-LOGS","WF-FOLLOW-ON"],"output_sets":["OS-SPEC","OS-SCHEMA"],"evidence":[],"tests":["AT-PRODUCT","AT-TRACE"]},
-    {"id":"OPR-010","workflows":["WF-OPS","WF-NEW-SEARCH","WF-FOLLOW-ON"],"output_sets":["OS-SPEC","OS-SCHEMA"],"evidence":["OQ-11","IR-010"],"tests":["AT-OPERATIONS","AT-TRACE"]},
-    {"id":"OPR-011","workflows":["WF-OPS"],"output_sets":["OS-SPEC","OS-SCHEMA"],"evidence":["OQ-11","IR-010"],"tests":["AT-OPERATIONS","AT-TRACE"]},
-    {"id":"OPR-012","workflows":["WF-OPS","WF-PERSIST"],"output_sets":["OS-SPEC","OS-SCHEMA"],"evidence":["OQ-11","IR-010"],"tests":["AT-OPERATIONS","AT-PRODUCT","AT-TRACE"]},
-    {"id":"OPR-013","workflows":["WF-OPS","WF-PERSIST"],"output_sets":["OS-SPEC","OS-SCHEMA"],"evidence":["OQ-11","IR-010"],"tests":["AT-OPERATIONS","AT-TRACE"]},
-    {"id":"OPR-014","workflows":["WF-DISPOSITION","WF-EVALUATION"],"output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence":["OQ-05","OQ-08","OQ-14","OQ-15","IR-005","IR-008","IR-012","IR-013","IR-014"],"tests":["AT-DISPOSITION","AT-REVIEW","AT-METRIC","AT-TRACE"]},
-    {"id":"OPR-015","workflows":["WF-DISPOSITION","WF-HANDOFF"],"output_sets":["OS-SPEC","OS-SCHEMA","OS-HANDOFF"],"evidence":["IR-012","IR-015","IR-016"],"tests":["AT-DISPOSITION","AT-HANDOFF","AT-CONTROL","AT-TRACE"]}
+    {"id":"OPR-001","product_workflows":["WF-CONTROL","WF-HANDOFF"],"subordinate_scientific_workflows":[],"canonical_output_sets":["OS-CONTROL","OS-INDEX","OS-HANDOFF"],"evidence_prerequisite_ids":["harness-builder-control-v1"],"acceptance_test_families":["AT-CONTROL","AT-HANDOFF","AT-TRACE"],"source_profile":"SP-OPR"},
+    {"id":"OPR-002","product_workflows":["WF-DATA-INTAKE","WF-NEW-SEARCH","WF-FOLLOW-ON"],"subordinate_scientific_workflows":[],"canonical_output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA"],"evidence_prerequisite_ids":["OQ-02","OQ-07","OQ-09","OQ-10","IR-015"],"acceptance_test_families":["AT-DATA","AT-REVIEW","AT-TRACE"],"source_profile":"SP-OPR"},
+    {"id":"OPR-003","product_workflows":["WF-DATA-INTAKE","WF-CONTROL"],"subordinate_scientific_workflows":[],"canonical_output_sets":["OS-SPEC","OS-SCHEMA"],"evidence_prerequisite_ids":["IR-015"],"acceptance_test_families":["AT-DATA","AT-CONTROL","AT-TRACE"],"source_profile":"SP-OPR"},
+    {"id":"OPR-004","product_workflows":["WF-NEW-SEARCH","WF-FOLLOW-ON","WF-EVALUATION"],"subordinate_scientific_workflows":["WF-POINT","WF-TRAIL","WF-ASSOCIATION","WF-TRACKLET","WF-LINKING","WF-HISTORICAL","WF-ORBIT"],"canonical_output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":["IR-002","IR-003","IR-004","IR-005","IR-006","IR-007","IR-009","IR-011","IR-012","IR-013","IR-014"],"acceptance_test_families":["AT-METHOD","AT-METRIC","AT-REVIEW","AT-TRACE"],"source_profile":"SP-OPR"},
+    {"id":"OPR-005","product_workflows":["WF-CONTROL"],"subordinate_scientific_workflows":[],"canonical_output_sets":["OS-CONTROL","OS-STATUS"],"evidence_prerequisite_ids":["pre-harness-archive","f915bba","harness-builder-control-v1"],"acceptance_test_families":["AT-CONTROL","AT-TRACE"],"source_profile":"SP-OPR"},
+    {"id":"OPR-006","product_workflows":["WF-SHELL","WF-NEW-SEARCH","WF-REVIEW-LOGS","WF-FOLLOW-ON","WF-EXIT"],"subordinate_scientific_workflows":[],"canonical_output_sets":["OS-SPEC","OS-SCHEMA"],"evidence_prerequisite_ids":[],"acceptance_test_families":["AT-PRODUCT","AT-TRACE"],"source_profile":"SP-OPR"},
+    {"id":"OPR-007","product_workflows":["WF-NEW-SEARCH","WF-REVIEW-LOGS","WF-FOLLOW-ON","WF-EXIT"],"subordinate_scientific_workflows":[],"canonical_output_sets":["OS-SPEC","OS-SCHEMA"],"evidence_prerequisite_ids":[],"acceptance_test_families":["AT-PRODUCT","AT-TRACE"],"source_profile":"SP-OPR"},
+    {"id":"OPR-008","product_workflows":["WF-PERSIST","WF-REVIEW-LOGS","WF-FOLLOW-ON","WF-DISPOSITION"],"subordinate_scientific_workflows":[],"canonical_output_sets":["OS-SPEC","OS-SCHEMA"],"evidence_prerequisite_ids":["OQ-08"],"acceptance_test_families":["AT-PRODUCT","AT-DATA","AT-TRACE"],"source_profile":"SP-OPR"},
+    {"id":"OPR-009","product_workflows":["WF-SHELL","WF-NEW-SEARCH","WF-REVIEW-LOGS","WF-FOLLOW-ON"],"subordinate_scientific_workflows":[],"canonical_output_sets":["OS-SPEC","OS-SCHEMA"],"evidence_prerequisite_ids":[],"acceptance_test_families":["AT-PRODUCT","AT-TRACE"],"source_profile":"SP-OPR"},
+    {"id":"OPR-010","product_workflows":["WF-OPS","WF-NEW-SEARCH","WF-FOLLOW-ON"],"subordinate_scientific_workflows":[],"canonical_output_sets":["OS-SPEC","OS-SCHEMA"],"evidence_prerequisite_ids":["OQ-11","IR-010"],"acceptance_test_families":["AT-OPERATIONS","AT-TRACE"],"source_profile":"SP-OPR"},
+    {"id":"OPR-011","product_workflows":["WF-OPS"],"subordinate_scientific_workflows":[],"canonical_output_sets":["OS-SPEC","OS-SCHEMA"],"evidence_prerequisite_ids":["OQ-11","IR-010"],"acceptance_test_families":["AT-OPERATIONS","AT-TRACE"],"source_profile":"SP-OPR"},
+    {"id":"OPR-012","product_workflows":["WF-OPS","WF-PERSIST","WF-REVIEW-LOGS"],"subordinate_scientific_workflows":[],"canonical_output_sets":["OS-SPEC","OS-SCHEMA"],"evidence_prerequisite_ids":["OQ-11","IR-010"],"acceptance_test_families":["AT-OPERATIONS","AT-PRODUCT","AT-TRACE"],"source_profile":"SP-OPR"},
+    {"id":"OPR-013","product_workflows":["WF-OPS","WF-PERSIST"],"subordinate_scientific_workflows":[],"canonical_output_sets":["OS-SPEC","OS-SCHEMA"],"evidence_prerequisite_ids":["OQ-11","IR-010"],"acceptance_test_families":["AT-OPERATIONS","AT-TRACE"],"source_profile":"SP-OPR"},
+    {"id":"OPR-014","product_workflows":["WF-DISPOSITION","WF-EVALUATION","WF-FOLLOW-ON"],"subordinate_scientific_workflows":[],"canonical_output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":["OQ-05","OQ-08","OQ-14","OQ-15","IR-005","IR-008","IR-012","IR-013","IR-014"],"acceptance_test_families":["AT-DISPOSITION","AT-REVIEW","AT-METRIC","AT-TRACE"],"source_profile":"SP-OPR"},
+    {"id":"OPR-015","product_workflows":["WF-DISPOSITION","WF-HANDOFF"],"subordinate_scientific_workflows":[],"canonical_output_sets":["OS-SPEC","OS-SCHEMA","OS-HANDOFF"],"evidence_prerequisite_ids":["IR-012","IR-015","IR-016"],"acceptance_test_families":["AT-DISPOSITION","AT-HANDOFF","AT-CONTROL","AT-TRACE"],"source_profile":"SP-OPR"}
   ],
-  "requirement_binding_groups": [
-    {"ids":["REQ-001","REQ-002","REQ-036","REQ-047","REQ-048"],"workflows":["WF-CONTROL"],"output_sets":["OS-CONTROL","OS-STATUS"],"tests":["AT-CONTROL","AT-TRACE"]},
-    {"ids":["REQ-003","REQ-037","REQ-038","REQ-044","REQ-045","REQ-046"],"workflows":["WF-CONTROL","WF-HANDOFF"],"output_sets":["OS-CONTROL","OS-REVIEW","OS-HANDOFF"],"tests":["AT-CONTROL","AT-REVIEW","AT-HANDOFF","AT-TRACE"]},
-    {"ids":["REQ-004","REQ-005","REQ-006","REQ-007","REQ-008"],"workflows":["WF-NEW-SEARCH","WF-FOLLOW-ON","WF-POINT","WF-TRAIL","WF-ASSOCIATION","WF-TRACKLET","WF-LINKING","WF-HISTORICAL","WF-ORBIT"],"output_sets":["OS-SPEC","OS-SCHEMA"],"tests":["AT-PRODUCT","AT-METHOD","AT-TRACE"]},
-    {"ids":["REQ-009","REQ-010","REQ-011","REQ-012","REQ-013"],"workflows":["WF-DATA-INTAKE","WF-POINT","WF-TRAIL","WF-ASSOCIATION","WF-TRACKLET","WF-LINKING","WF-HISTORICAL","WF-ORBIT"],"output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA"],"tests":["AT-DATA","AT-TRACE"]},
-    {"ids":["REQ-014","REQ-015","REQ-016"],"workflows":["WF-EVALUATION","WF-POINT","WF-TRAIL","WF-ASSOCIATION","WF-LINKING","WF-HISTORICAL","WF-ORBIT"],"output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"tests":["AT-LABEL","AT-REVIEW","AT-TRACE"]},
-    {"ids":["REQ-017","REQ-031"],"workflows":["WF-HISTORICAL","WF-DISPOSITION"],"output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"tests":["AT-DATA","AT-LABEL","AT-DISPOSITION","AT-TRACE"]},
-    {"ids":["REQ-018","REQ-019"],"workflows":["WF-EVALUATION","WF-PERSIST"],"output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"tests":["AT-METHOD","AT-METRIC","AT-TRACE"]},
-    {"ids":["REQ-020","REQ-021","REQ-022","REQ-023","REQ-024","REQ-025"],"workflows":["WF-EVALUATION","WF-DISPOSITION"],"output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"tests":["AT-METRIC","AT-DISPOSITION","AT-REVIEW","AT-TRACE"]},
-    {"ids":["REQ-026"],"workflows":["WF-POINT","WF-EVALUATION"],"output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"tests":["AT-METHOD","AT-METRIC","AT-TRACE"]},
-    {"ids":["REQ-027"],"workflows":["WF-TRAIL","WF-TRACKLET","WF-EVALUATION"],"output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"tests":["AT-METHOD","AT-METRIC","AT-TRACE"]},
-    {"ids":["REQ-028"],"workflows":["WF-ASSOCIATION","WF-DISPOSITION"],"output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"tests":["AT-METHOD","AT-DISPOSITION","AT-TRACE"]},
-    {"ids":["REQ-029"],"workflows":["WF-TRACKLET","WF-EVALUATION"],"output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"tests":["AT-METHOD","AT-METRIC","AT-DISPOSITION","AT-TRACE"]},
-    {"ids":["REQ-030"],"workflows":["WF-LINKING","WF-EVALUATION"],"output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"tests":["AT-METHOD","AT-METRIC","AT-TRACE"]},
-    {"ids":["REQ-032"],"workflows":["WF-ORBIT","WF-DISPOSITION","WF-EVALUATION"],"output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"tests":["AT-METHOD","AT-METRIC","AT-DISPOSITION","AT-TRACE"]},
-    {"ids":["REQ-033","REQ-034","REQ-035"],"workflows":["WF-CONTROL","WF-DATA-INTAKE","WF-OPS","WF-EVALUATION"],"output_sets":["OS-CONTROL","OS-SPEC","OS-SCHEMA","OS-REVIEW"],"tests":["AT-CONTROL","AT-DATA","AT-OPERATIONS","AT-REVIEW","AT-TRACE"]},
-    {"ids":["REQ-039","REQ-040","REQ-041","REQ-042","REQ-043"],"workflows":["WF-OPS","WF-PERSIST","WF-EVALUATION"],"output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"tests":["AT-OPERATIONS","AT-CONTROL","AT-TRACE"]}
+  "accepted_requirement_bindings": [
+    {"id":"REQ-001","product_workflows":["WF-CONTROL"],"subordinate_scientific_workflows":[],"canonical_output_sets":["OS-CONTROL","OS-STATUS"],"evidence_prerequisite_ids":[],"acceptance_test_families":["AT-CONTROL","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-002","product_workflows":["WF-CONTROL"],"subordinate_scientific_workflows":[],"canonical_output_sets":["OS-CONTROL","OS-STATUS"],"evidence_prerequisite_ids":[],"acceptance_test_families":["AT-CONTROL","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-003","product_workflows":["WF-CONTROL","WF-DISPOSITION"],"subordinate_scientific_workflows":[],"canonical_output_sets":["OS-CONTROL","OS-STATUS","OS-REVIEW","OS-HANDOFF"],"evidence_prerequisite_ids":[],"acceptance_test_families":["AT-CONTROL","AT-DISPOSITION","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-004","product_workflows":["WF-NEW-SEARCH","WF-FOLLOW-ON","WF-EVALUATION"],"subordinate_scientific_workflows":["WF-POINT","WF-TRAIL","WF-ASSOCIATION"],"canonical_output_sets":["OS-SPEC","OS-SCHEMA"],"evidence_prerequisite_ids":["OQ-02"],"acceptance_test_families":["AT-PRODUCT","AT-METHOD","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-005","product_workflows":["WF-NEW-SEARCH","WF-FOLLOW-ON","WF-EVALUATION"],"subordinate_scientific_workflows":["WF-POINT","WF-TRAIL"],"canonical_output_sets":["OS-SPEC","OS-SCHEMA"],"evidence_prerequisite_ids":["OQ-04","OQ-05"],"acceptance_test_families":["AT-PRODUCT","AT-METHOD","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-006","product_workflows":["WF-NEW-SEARCH","WF-FOLLOW-ON","WF-EVALUATION"],"subordinate_scientific_workflows":["WF-TRACKLET","WF-LINKING"],"canonical_output_sets":["OS-SPEC","OS-SCHEMA"],"evidence_prerequisite_ids":["OQ-03","OQ-07","OQ-09"],"acceptance_test_families":["AT-PRODUCT","AT-METHOD","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-007","product_workflows":["WF-NEW-SEARCH","WF-FOLLOW-ON","WF-EVALUATION","WF-DISPOSITION"],"subordinate_scientific_workflows":["WF-HISTORICAL"],"canonical_output_sets":["OS-SPEC","OS-SCHEMA"],"evidence_prerequisite_ids":["OQ-01","OQ-14"],"acceptance_test_families":["AT-PRODUCT","AT-METHOD","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-008","product_workflows":["WF-CONTROL","WF-EVALUATION","WF-DISPOSITION"],"subordinate_scientific_workflows":["WF-POINT","WF-TRAIL","WF-ASSOCIATION","WF-TRACKLET","WF-LINKING","WF-HISTORICAL","WF-ORBIT"],"canonical_output_sets":["OS-SPEC","OS-SCHEMA"],"evidence_prerequisite_ids":["OQ-01","OQ-12"],"acceptance_test_families":["AT-PRODUCT","AT-METHOD","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-009","product_workflows":["WF-DATA-INTAKE","WF-NEW-SEARCH","WF-FOLLOW-ON","WF-EVALUATION"],"subordinate_scientific_workflows":["WF-POINT","WF-TRAIL","WF-ASSOCIATION","WF-HISTORICAL"],"canonical_output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA"],"evidence_prerequisite_ids":[],"acceptance_test_families":["AT-DATA","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-010","product_workflows":["WF-CONTROL","WF-DATA-INTAKE","WF-EVALUATION"],"subordinate_scientific_workflows":[],"canonical_output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA"],"evidence_prerequisite_ids":[],"acceptance_test_families":["AT-DATA","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-011","product_workflows":["WF-DATA-INTAKE","WF-NEW-SEARCH","WF-FOLLOW-ON","WF-EVALUATION"],"subordinate_scientific_workflows":["WF-POINT","WF-TRAIL","WF-HISTORICAL"],"canonical_output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA"],"evidence_prerequisite_ids":["OQ-02"],"acceptance_test_families":["AT-DATA","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-012","product_workflows":["WF-DATA-INTAKE","WF-NEW-SEARCH","WF-FOLLOW-ON","WF-EVALUATION"],"subordinate_scientific_workflows":["WF-ASSOCIATION","WF-TRACKLET","WF-LINKING","WF-ORBIT"],"canonical_output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA"],"evidence_prerequisite_ids":["OQ-03","OQ-07"],"acceptance_test_families":["AT-DATA","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-013","product_workflows":["WF-DATA-INTAKE","WF-NEW-SEARCH","WF-FOLLOW-ON","WF-EVALUATION"],"subordinate_scientific_workflows":["WF-POINT","WF-TRAIL","WF-ASSOCIATION","WF-TRACKLET","WF-LINKING","WF-HISTORICAL","WF-ORBIT"],"canonical_output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA"],"evidence_prerequisite_ids":[],"acceptance_test_families":["AT-DATA","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-014","product_workflows":["WF-EVALUATION","WF-DISPOSITION"],"subordinate_scientific_workflows":["WF-ASSOCIATION","WF-LINKING","WF-HISTORICAL"],"canonical_output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":["OQ-01","OQ-12"],"acceptance_test_families":["AT-LABEL","AT-REVIEW","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-015","product_workflows":["WF-EVALUATION"],"subordinate_scientific_workflows":["WF-POINT","WF-TRAIL","WF-ASSOCIATION","WF-TRACKLET","WF-LINKING","WF-HISTORICAL","WF-ORBIT"],"canonical_output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":["OQ-06","OQ-12"],"acceptance_test_families":["AT-LABEL","AT-REVIEW","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-016","product_workflows":["WF-REVIEW-LOGS","WF-EVALUATION","WF-DISPOSITION"],"subordinate_scientific_workflows":["WF-ASSOCIATION","WF-LINKING","WF-HISTORICAL","WF-ORBIT"],"canonical_output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":[],"acceptance_test_families":["AT-LABEL","AT-REVIEW","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-017","product_workflows":["WF-FOLLOW-ON","WF-EVALUATION","WF-DISPOSITION"],"subordinate_scientific_workflows":["WF-HISTORICAL"],"canonical_output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":["OQ-01","OQ-10","OQ-12"],"acceptance_test_families":["AT-DATA","AT-LABEL","AT-DISPOSITION","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-018","product_workflows":["WF-EVALUATION"],"subordinate_scientific_workflows":["WF-POINT","WF-TRAIL","WF-ASSOCIATION","WF-TRACKLET","WF-LINKING","WF-HISTORICAL","WF-ORBIT"],"canonical_output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":["OQ-11"],"acceptance_test_families":["AT-METHOD","AT-METRIC","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-019","product_workflows":["WF-PERSIST","WF-REVIEW-LOGS","WF-EVALUATION"],"subordinate_scientific_workflows":["WF-POINT","WF-TRAIL","WF-ASSOCIATION","WF-TRACKLET","WF-LINKING","WF-HISTORICAL","WF-ORBIT"],"canonical_output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":["OQ-05","OQ-08"],"acceptance_test_families":["AT-METHOD","AT-METRIC","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-020","product_workflows":["WF-REVIEW-LOGS","WF-EVALUATION"],"subordinate_scientific_workflows":["WF-POINT","WF-TRAIL","WF-ASSOCIATION","WF-TRACKLET","WF-LINKING","WF-HISTORICAL","WF-ORBIT"],"canonical_output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":["OQ-03","OQ-05","OQ-08","OQ-11","OQ-15"],"acceptance_test_families":["AT-METRIC","AT-DISPOSITION","AT-REVIEW","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-021","product_workflows":["WF-EVALUATION"],"subordinate_scientific_workflows":["WF-POINT","WF-TRAIL","WF-ASSOCIATION","WF-TRACKLET","WF-LINKING","WF-HISTORICAL","WF-ORBIT"],"canonical_output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":["OQ-05"],"acceptance_test_families":["AT-METRIC","AT-DISPOSITION","AT-REVIEW","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-022","product_workflows":["WF-CONTROL","WF-EVALUATION"],"subordinate_scientific_workflows":["WF-POINT","WF-TRAIL","WF-ASSOCIATION","WF-TRACKLET","WF-LINKING","WF-HISTORICAL","WF-ORBIT"],"canonical_output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":[],"acceptance_test_families":["AT-METRIC","AT-DISPOSITION","AT-REVIEW","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-023","product_workflows":["WF-EVALUATION"],"subordinate_scientific_workflows":["WF-POINT","WF-TRAIL","WF-ASSOCIATION","WF-TRACKLET","WF-LINKING","WF-HISTORICAL","WF-ORBIT"],"canonical_output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":["OQ-03","OQ-15"],"acceptance_test_families":["AT-METRIC","AT-DISPOSITION","AT-REVIEW","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-024","product_workflows":["WF-CONTROL","WF-EVALUATION"],"subordinate_scientific_workflows":["WF-POINT","WF-TRAIL","WF-ASSOCIATION","WF-TRACKLET","WF-LINKING","WF-HISTORICAL","WF-ORBIT"],"canonical_output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":["OQ-15"],"acceptance_test_families":["AT-METRIC","AT-DISPOSITION","AT-REVIEW","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-025","product_workflows":["WF-EVALUATION","WF-DISPOSITION"],"subordinate_scientific_workflows":["WF-POINT","WF-TRAIL","WF-ASSOCIATION","WF-TRACKLET","WF-LINKING","WF-HISTORICAL","WF-ORBIT"],"canonical_output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":[],"acceptance_test_families":["AT-METRIC","AT-DISPOSITION","AT-REVIEW","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-026","product_workflows":["WF-NEW-SEARCH","WF-REVIEW-LOGS","WF-FOLLOW-ON","WF-EVALUATION"],"subordinate_scientific_workflows":["WF-POINT"],"canonical_output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":["OQ-02","OQ-05","OQ-08"],"acceptance_test_families":["AT-METHOD","AT-METRIC","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-027","product_workflows":["WF-NEW-SEARCH","WF-REVIEW-LOGS","WF-FOLLOW-ON","WF-EVALUATION"],"subordinate_scientific_workflows":["WF-TRAIL","WF-TRACKLET"],"canonical_output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":["OQ-04","OQ-05"],"acceptance_test_families":["AT-METHOD","AT-METRIC","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-028","product_workflows":["WF-NEW-SEARCH","WF-REVIEW-LOGS","WF-FOLLOW-ON","WF-EVALUATION","WF-DISPOSITION"],"subordinate_scientific_workflows":["WF-ASSOCIATION"],"canonical_output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":["OQ-03","OQ-07"],"acceptance_test_families":["AT-METHOD","AT-METRIC","AT-DISPOSITION","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-029","product_workflows":["WF-NEW-SEARCH","WF-REVIEW-LOGS","WF-FOLLOW-ON","WF-EVALUATION"],"subordinate_scientific_workflows":["WF-TRACKLET"],"canonical_output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":["OQ-08","OQ-11"],"acceptance_test_families":["AT-METHOD","AT-METRIC","AT-DISPOSITION","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-030","product_workflows":["WF-NEW-SEARCH","WF-REVIEW-LOGS","WF-FOLLOW-ON","WF-EVALUATION"],"subordinate_scientific_workflows":["WF-LINKING","WF-ORBIT"],"canonical_output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":["OQ-07","OQ-09","OQ-13"],"acceptance_test_families":["AT-METHOD","AT-METRIC","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-031","product_workflows":["WF-REVIEW-LOGS","WF-FOLLOW-ON","WF-EVALUATION","WF-DISPOSITION"],"subordinate_scientific_workflows":["WF-HISTORICAL","WF-ORBIT"],"canonical_output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":["OQ-01","OQ-14"],"acceptance_test_families":["AT-DATA","AT-LABEL","AT-DISPOSITION","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-032","product_workflows":["WF-FOLLOW-ON","WF-EVALUATION","WF-DISPOSITION"],"subordinate_scientific_workflows":["WF-ORBIT"],"canonical_output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":["OQ-15"],"acceptance_test_families":["AT-METHOD","AT-METRIC","AT-DISPOSITION","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-033","product_workflows":["WF-CONTROL","WF-DATA-INTAKE","WF-OPS","WF-EVALUATION"],"subordinate_scientific_workflows":[],"canonical_output_sets":["OS-CONTROL","OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":[],"acceptance_test_families":["AT-CONTROL","AT-DATA","AT-OPERATIONS","AT-REVIEW","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-034","product_workflows":["WF-CONTROL","WF-OPS","WF-EVALUATION"],"subordinate_scientific_workflows":[],"canonical_output_sets":["OS-CONTROL","OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":[],"acceptance_test_families":["AT-CONTROL","AT-DATA","AT-OPERATIONS","AT-REVIEW","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-035","product_workflows":["WF-CONTROL","WF-DATA-INTAKE","WF-EVALUATION"],"subordinate_scientific_workflows":[],"canonical_output_sets":["OS-CONTROL","OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":[],"acceptance_test_families":["AT-CONTROL","AT-DATA","AT-OPERATIONS","AT-REVIEW","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-036","product_workflows":["WF-CONTROL","WF-DATA-INTAKE"],"subordinate_scientific_workflows":[],"canonical_output_sets":["OS-CONTROL","OS-STATUS"],"evidence_prerequisite_ids":[],"acceptance_test_families":["AT-CONTROL","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-037","product_workflows":["WF-CONTROL","WF-EVALUATION"],"subordinate_scientific_workflows":[],"canonical_output_sets":["OS-CONTROL","OS-REVIEW","OS-HANDOFF","OS-STATUS"],"evidence_prerequisite_ids":[],"acceptance_test_families":["AT-CONTROL","AT-REVIEW","AT-HANDOFF","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-038","product_workflows":["WF-CONTROL","WF-EVALUATION","WF-HANDOFF"],"subordinate_scientific_workflows":["WF-POINT","WF-TRAIL","WF-ASSOCIATION","WF-TRACKLET","WF-LINKING","WF-HISTORICAL","WF-ORBIT"],"canonical_output_sets":["OS-CONTROL","OS-SPEC","OS-STATUS","OS-HANDOFF"],"evidence_prerequisite_ids":["OQ-01","OQ-02","OQ-03","OQ-04","OQ-05","OQ-06","OQ-07","OQ-08","OQ-09","OQ-10","OQ-11","OQ-12","OQ-13","OQ-14","OQ-15","IR-001","IR-002","IR-003","IR-004","IR-005","IR-006","IR-007","IR-008","IR-009","IR-010","IR-011","IR-012","IR-013","IR-014","IR-015","IR-016"],"acceptance_test_families":["AT-CONTROL","AT-REVIEW","AT-HANDOFF","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-039","product_workflows":["WF-CONTROL","WF-DATA-INTAKE","WF-OPS","WF-DISPOSITION"],"subordinate_scientific_workflows":[],"canonical_output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":[],"acceptance_test_families":["AT-OPERATIONS","AT-CONTROL","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-040","product_workflows":["WF-OPS","WF-NEW-SEARCH","WF-FOLLOW-ON"],"subordinate_scientific_workflows":[],"canonical_output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":["OQ-11"],"acceptance_test_families":["AT-OPERATIONS","AT-CONTROL","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-041","product_workflows":["WF-CONTROL","WF-DATA-INTAKE","WF-OPS","WF-EVALUATION"],"subordinate_scientific_workflows":[],"canonical_output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":[],"acceptance_test_families":["AT-OPERATIONS","AT-CONTROL","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-042","product_workflows":["WF-CONTROL","WF-PERSIST","WF-OPS","WF-EVALUATION"],"subordinate_scientific_workflows":[],"canonical_output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":[],"acceptance_test_families":["AT-OPERATIONS","AT-CONTROL","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-043","product_workflows":["WF-REVIEW-LOGS","WF-OPS","WF-EVALUATION"],"subordinate_scientific_workflows":[],"canonical_output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":[],"acceptance_test_families":["AT-OPERATIONS","AT-CONTROL","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-044","product_workflows":["WF-CONTROL","WF-EVALUATION"],"subordinate_scientific_workflows":[],"canonical_output_sets":["OS-CONTROL","OS-REVIEW","OS-HANDOFF","OS-STATUS"],"evidence_prerequisite_ids":[],"acceptance_test_families":["AT-CONTROL","AT-REVIEW","AT-HANDOFF","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-045","product_workflows":["WF-CONTROL"],"subordinate_scientific_workflows":[],"canonical_output_sets":["OS-CONTROL","OS-REVIEW","OS-HANDOFF","OS-STATUS"],"evidence_prerequisite_ids":[],"acceptance_test_families":["AT-CONTROL","AT-REVIEW","AT-HANDOFF","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-046","product_workflows":["WF-CONTROL"],"subordinate_scientific_workflows":[],"canonical_output_sets":["OS-CONTROL","OS-REVIEW","OS-HANDOFF","OS-STATUS"],"evidence_prerequisite_ids":["OQ-16"],"acceptance_test_families":["AT-CONTROL","AT-REVIEW","AT-HANDOFF","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-047","product_workflows":["WF-CONTROL","WF-PERSIST","WF-EVALUATION"],"subordinate_scientific_workflows":[],"canonical_output_sets":["OS-CONTROL","OS-STATUS"],"evidence_prerequisite_ids":[],"acceptance_test_families":["AT-CONTROL","AT-TRACE"],"source_profile":"SP-REQ"},
+    {"id":"REQ-048","product_workflows":["WF-CONTROL","WF-DATA-INTAKE","WF-EVALUATION"],"subordinate_scientific_workflows":[],"canonical_output_sets":["OS-CONTROL","OS-STATUS"],"evidence_prerequisite_ids":[],"acceptance_test_families":["AT-CONTROL","AT-TRACE"],"source_profile":"SP-REQ"}
   ],
   "incomplete_requirement_bindings": [
-    {"id":"IR-001","workflows":["WF-DATA-INTAKE","WF-EVALUATION"],"output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA"],"tests":["AT-DATA","AT-METRIC","AT-TRACE"]},
-    {"id":"IR-002","workflows":["WF-POINT","WF-TRAIL","WF-HISTORICAL"],"output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA"],"tests":["AT-DATA","AT-TRACE"]},
-    {"id":"IR-003","workflows":["WF-ASSOCIATION","WF-TRACKLET","WF-LINKING","WF-ORBIT"],"output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA"],"tests":["AT-DATA","AT-METHOD","AT-TRACE"]},
-    {"id":"IR-004","workflows":["WF-TRAIL","WF-TRACKLET"],"output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"tests":["AT-METHOD","AT-METRIC","AT-TRACE"]},
-    {"id":"IR-005","workflows":["WF-POINT","WF-TRAIL","WF-HISTORICAL","WF-EVALUATION"],"output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"tests":["AT-METRIC","AT-REVIEW","AT-TRACE"]},
-    {"id":"IR-006","workflows":["WF-TRAIL","WF-EVALUATION"],"output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA","OS-REVIEW"],"tests":["AT-LABEL","AT-METRIC","AT-REVIEW","AT-TRACE"]},
-    {"id":"IR-007","workflows":["WF-ASSOCIATION","WF-TRACKLET","WF-LINKING","WF-ORBIT"],"output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA"],"tests":["AT-DATA","AT-METHOD","AT-TRACE"]},
-    {"id":"IR-008","workflows":["WF-POINT","WF-TRAIL","WF-TRACKLET","WF-EVALUATION"],"output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"tests":["AT-METRIC","AT-OPERATIONS","AT-TRACE"]},
-    {"id":"IR-009","workflows":["WF-ASSOCIATION","WF-LINKING","WF-HISTORICAL"],"output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA"],"tests":["AT-DATA","AT-METHOD","AT-TRACE"]},
-    {"id":"IR-010","workflows":["WF-OPS","WF-EVALUATION"],"output_sets":["OS-SPEC","OS-SCHEMA"],"tests":["AT-OPERATIONS","AT-METRIC","AT-TRACE"]},
-    {"id":"IR-011","workflows":["WF-LINKING","WF-ORBIT","WF-EVALUATION"],"output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"tests":["AT-LABEL","AT-METRIC","AT-TRACE"]},
-    {"id":"IR-012","workflows":["WF-HISTORICAL","WF-DISPOSITION"],"output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"tests":["AT-METHOD","AT-DISPOSITION","AT-REVIEW","AT-TRACE"]},
-    {"id":"IR-013","workflows":["WF-ORBIT","WF-EVALUATION"],"output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"tests":["AT-METHOD","AT-METRIC","AT-TRACE"]},
-    {"id":"IR-014","workflows":["WF-EVALUATION","WF-DISPOSITION"],"output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"tests":["AT-METRIC","AT-DISPOSITION","AT-REVIEW","AT-TRACE"]},
-    {"id":"IR-015","workflows":["WF-DATA-INTAKE","WF-OPS"],"output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA"],"tests":["AT-DATA","AT-OPERATIONS","AT-CONTROL","AT-TRACE"]},
-    {"id":"IR-016","workflows":["WF-EVALUATION","WF-HANDOFF"],"output_sets":["OS-SPEC","OS-HANDOFF","OS-STATUS"],"tests":["AT-HANDOFF","AT-METRIC","AT-CONTROL","AT-TRACE"]}
+    {"id":"IR-001","product_workflows":["WF-DATA-INTAKE","WF-EVALUATION"],"subordinate_scientific_workflows":["WF-POINT","WF-TRAIL","WF-ASSOCIATION","WF-TRACKLET","WF-LINKING","WF-HISTORICAL","WF-ORBIT"],"canonical_output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA"],"evidence_prerequisite_ids":["OQ-01","OQ-02","OQ-10"],"acceptance_test_families":["AT-DATA","AT-METRIC","AT-TRACE"],"source_profile":"SP-IR"},
+    {"id":"IR-002","product_workflows":["WF-DATA-INTAKE","WF-NEW-SEARCH","WF-FOLLOW-ON","WF-EVALUATION"],"subordinate_scientific_workflows":["WF-POINT","WF-TRAIL","WF-HISTORICAL"],"canonical_output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA"],"evidence_prerequisite_ids":["OQ-02"],"acceptance_test_families":["AT-DATA","AT-TRACE"],"source_profile":"SP-IR"},
+    {"id":"IR-003","product_workflows":["WF-DATA-INTAKE","WF-NEW-SEARCH","WF-FOLLOW-ON","WF-EVALUATION"],"subordinate_scientific_workflows":["WF-ASSOCIATION","WF-TRACKLET","WF-LINKING","WF-ORBIT"],"canonical_output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA"],"evidence_prerequisite_ids":["OQ-03"],"acceptance_test_families":["AT-DATA","AT-METHOD","AT-TRACE"],"source_profile":"SP-IR"},
+    {"id":"IR-004","product_workflows":["WF-NEW-SEARCH","WF-FOLLOW-ON","WF-EVALUATION"],"subordinate_scientific_workflows":["WF-TRAIL","WF-TRACKLET"],"canonical_output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":["OQ-04"],"acceptance_test_families":["AT-METHOD","AT-METRIC","AT-TRACE"],"source_profile":"SP-IR"},
+    {"id":"IR-005","product_workflows":["WF-NEW-SEARCH","WF-FOLLOW-ON","WF-EVALUATION"],"subordinate_scientific_workflows":["WF-POINT","WF-TRAIL","WF-HISTORICAL"],"canonical_output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":["OQ-05"],"acceptance_test_families":["AT-METRIC","AT-REVIEW","AT-TRACE"],"source_profile":"SP-IR"},
+    {"id":"IR-006","product_workflows":["WF-EVALUATION","WF-DISPOSITION"],"subordinate_scientific_workflows":["WF-TRAIL"],"canonical_output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":["OQ-06","OQ-12"],"acceptance_test_families":["AT-LABEL","AT-METRIC","AT-REVIEW","AT-TRACE"],"source_profile":"SP-IR"},
+    {"id":"IR-007","product_workflows":["WF-DATA-INTAKE","WF-NEW-SEARCH","WF-FOLLOW-ON","WF-EVALUATION"],"subordinate_scientific_workflows":["WF-ASSOCIATION","WF-TRACKLET","WF-LINKING","WF-ORBIT"],"canonical_output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA"],"evidence_prerequisite_ids":["OQ-07"],"acceptance_test_families":["AT-DATA","AT-METHOD","AT-TRACE"],"source_profile":"SP-IR"},
+    {"id":"IR-008","product_workflows":["WF-REVIEW-LOGS","WF-OPS","WF-EVALUATION"],"subordinate_scientific_workflows":["WF-POINT","WF-TRAIL","WF-TRACKLET"],"canonical_output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":["OQ-08"],"acceptance_test_families":["AT-METRIC","AT-OPERATIONS","AT-TRACE"],"source_profile":"SP-IR"},
+    {"id":"IR-009","product_workflows":["WF-DATA-INTAKE","WF-NEW-SEARCH","WF-FOLLOW-ON","WF-EVALUATION"],"subordinate_scientific_workflows":["WF-ASSOCIATION","WF-LINKING","WF-HISTORICAL"],"canonical_output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA"],"evidence_prerequisite_ids":["OQ-09"],"acceptance_test_families":["AT-DATA","AT-METHOD","AT-TRACE"],"source_profile":"SP-IR"},
+    {"id":"IR-010","product_workflows":["WF-OPS","WF-EVALUATION"],"subordinate_scientific_workflows":[],"canonical_output_sets":["OS-SPEC","OS-SCHEMA"],"evidence_prerequisite_ids":["OQ-11"],"acceptance_test_families":["AT-OPERATIONS","AT-METRIC","AT-TRACE"],"source_profile":"SP-IR"},
+    {"id":"IR-011","product_workflows":["WF-NEW-SEARCH","WF-FOLLOW-ON","WF-EVALUATION","WF-DISPOSITION"],"subordinate_scientific_workflows":["WF-LINKING","WF-ORBIT"],"canonical_output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":["OQ-13"],"acceptance_test_families":["AT-LABEL","AT-METRIC","AT-TRACE"],"source_profile":"SP-IR"},
+    {"id":"IR-012","product_workflows":["WF-REVIEW-LOGS","WF-FOLLOW-ON","WF-EVALUATION","WF-DISPOSITION"],"subordinate_scientific_workflows":["WF-HISTORICAL"],"canonical_output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":["OQ-14"],"acceptance_test_families":["AT-METHOD","AT-DISPOSITION","AT-REVIEW","AT-TRACE"],"source_profile":"SP-IR"},
+    {"id":"IR-013","product_workflows":["WF-FOLLOW-ON","WF-EVALUATION","WF-DISPOSITION"],"subordinate_scientific_workflows":["WF-ORBIT"],"canonical_output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":["OQ-15"],"acceptance_test_families":["AT-METHOD","AT-METRIC","AT-TRACE"],"source_profile":"SP-IR"},
+    {"id":"IR-014","product_workflows":["WF-CONTROL","WF-EVALUATION","WF-DISPOSITION"],"subordinate_scientific_workflows":["WF-POINT","WF-TRAIL","WF-ASSOCIATION","WF-TRACKLET","WF-LINKING","WF-HISTORICAL","WF-ORBIT"],"canonical_output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":["OQ-03","OQ-05","OQ-06","OQ-08","OQ-11","OQ-13","OQ-15"],"acceptance_test_families":["AT-METRIC","AT-DISPOSITION","AT-REVIEW","AT-TRACE"],"source_profile":"SP-IR"},
+    {"id":"IR-015","product_workflows":["WF-DATA-INTAKE","WF-OPS","WF-NEW-SEARCH","WF-FOLLOW-ON"],"subordinate_scientific_workflows":[],"canonical_output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA"],"evidence_prerequisite_ids":["OQ-02","OQ-10"],"acceptance_test_families":["AT-DATA","AT-OPERATIONS","AT-CONTROL","AT-TRACE"],"source_profile":"SP-IR"},
+    {"id":"IR-016","product_workflows":["WF-EVALUATION","WF-HANDOFF"],"subordinate_scientific_workflows":["WF-POINT","WF-TRAIL","WF-ASSOCIATION","WF-TRACKLET","WF-LINKING","WF-HISTORICAL","WF-ORBIT"],"canonical_output_sets":["OS-SPEC","OS-HANDOFF","OS-STATUS"],"evidence_prerequisite_ids":["OQ-01","OQ-02","OQ-03","OQ-04","OQ-05","OQ-06","OQ-07","OQ-08","OQ-09","OQ-10","OQ-11","OQ-12","OQ-13","OQ-14","OQ-15","IR-001","IR-002","IR-003","IR-004","IR-005","IR-006","IR-007","IR-008","IR-009","IR-010","IR-011","IR-012","IR-013","IR-014","IR-015"],"acceptance_test_families":["AT-HANDOFF","AT-METRIC","AT-CONTROL","AT-TRACE"],"source_profile":"SP-IR"}
   ],
-  "schema": "neo-harness-requirement-traceability-v1",
-  "source_registers": {
-    "accepted_requirements": {"expected_count":48,"expected_ids":"REQ-001_THROUGH_REQ-048","path":"docs/harness/reference/accepted-specification-v3/requirements-register.csv"},
-    "incomplete_requirements": {"expected_count":16,"expected_ids":"IR-001_THROUGH_IR-016","path":"docs/harness/reference/accepted-specification-v3/incomplete-requirements.csv"},
-    "open_dependencies": {"expected_count":16,"expected_ids":"OQ-01_THROUGH_OQ-16","path":"docs/harness/reference/accepted-specification-v3/unresolved-dependencies.csv"},
-    "operator_requirements": {"expected_count":15,"expected_ids":"OPR-001_THROUGH_OPR-015","path":"configs/harness/requirements.json"}
-  },
-  "workflow_definitions": {
-    "WF-ASSOCIATION": "Catalog or alert-record association with retained ambiguity and lineage.",
-    "WF-CONTROL": "Spec Prompt, context routing, authority, immutable inputs, roles, and stop gates.",
-    "WF-DATA-INTAKE": "Provider discovery, access authorization, credential reference, product identity, and normalized intake.",
-    "WF-DISPOSITION": "Rejection, reclassification, follow-up, independent verification, and operator-gated packaging.",
-    "WF-EVALUATION": "Outcome-blind bounded comparison, metrics, uncertainty, adversarial review, and production-selection evidence.",
-    "WF-EXIT": "Safe CLI exit with state preservation and no hidden work.",
-    "WF-FOLLOW-ON": "Operator-selected follow-on search using retained evidence and explicit authorization.",
-    "WF-HANDOFF": "Evidence-complete Codex CLI implementation assignment and later gated disposition handoffs.",
-    "WF-HISTORICAL": "Targeted historical recovery or precovery kept separate from blind archival discovery.",
-    "WF-LINKING": "Multi-night and cross-survey linking with normalization, rare-regime retention, and multimodality.",
-    "WF-NEW-SEARCH": "New Search planning, bounded source/method selection, execution-state creation, and progress presentation.",
-    "WF-OPS": "Deterministic non-LLM workers, shards, resources, telemetry, restart, retention, and recovery.",
-    "WF-ORBIT": "Initial-orbit family and uncertainty handling without impact disposition.",
-    "WF-PERSIST": "Search-result, intermediate-evidence, filter-query, run-state, and recovery persistence.",
-    "WF-POINT": "Point-like pixel opportunity detection and evidence collection.",
-    "WF-REVIEW-LOGS": "Search-log inspection, filtered-grid queries, evidence review, and operator selection.",
-    "WF-SHELL": "NeoHunter slash-command shell, autocomplete, terminal presentation, and command dispatch.",
-    "WF-TRACKLET": "Single-night tracklet formation with two-detection and three-or-more strata.",
-    "WF-TRAIL": "Trailed-source pixel opportunity detection and uncertainty propagation."
-  }
+  "open_dependency_bindings": [
+    {"id":"OQ-01","product_workflows":["WF-DATA-INTAKE","WF-FOLLOW-ON","WF-EVALUATION","WF-DISPOSITION"],"subordinate_scientific_workflows":["WF-ASSOCIATION","WF-LINKING","WF-HISTORICAL"],"canonical_output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA"],"evidence_prerequisite_ids":[],"acceptance_test_families":["AT-DATA","AT-LABEL","AT-TRACE"],"source_profile":"SP-OQ"},
+    {"id":"OQ-02","product_workflows":["WF-DATA-INTAKE","WF-NEW-SEARCH","WF-FOLLOW-ON","WF-EVALUATION"],"subordinate_scientific_workflows":["WF-POINT","WF-TRAIL","WF-HISTORICAL"],"canonical_output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA"],"evidence_prerequisite_ids":[],"acceptance_test_families":["AT-DATA","AT-TRACE"],"source_profile":"SP-OQ"},
+    {"id":"OQ-03","product_workflows":["WF-DATA-INTAKE","WF-NEW-SEARCH","WF-FOLLOW-ON","WF-EVALUATION"],"subordinate_scientific_workflows":["WF-ASSOCIATION","WF-TRACKLET","WF-LINKING","WF-ORBIT"],"canonical_output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA"],"evidence_prerequisite_ids":[],"acceptance_test_families":["AT-DATA","AT-METHOD","AT-METRIC","AT-TRACE"],"source_profile":"SP-OQ"},
+    {"id":"OQ-04","product_workflows":["WF-NEW-SEARCH","WF-FOLLOW-ON","WF-EVALUATION"],"subordinate_scientific_workflows":["WF-TRAIL","WF-TRACKLET"],"canonical_output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":[],"acceptance_test_families":["AT-METHOD","AT-METRIC","AT-TRACE"],"source_profile":"SP-OQ"},
+    {"id":"OQ-05","product_workflows":["WF-NEW-SEARCH","WF-FOLLOW-ON","WF-EVALUATION"],"subordinate_scientific_workflows":["WF-POINT","WF-TRAIL","WF-HISTORICAL"],"canonical_output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":[],"acceptance_test_families":["AT-METRIC","AT-REVIEW","AT-TRACE"],"source_profile":"SP-OQ"},
+    {"id":"OQ-06","product_workflows":["WF-EVALUATION","WF-DISPOSITION"],"subordinate_scientific_workflows":["WF-TRAIL"],"canonical_output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":[],"acceptance_test_families":["AT-LABEL","AT-METRIC","AT-REVIEW","AT-TRACE"],"source_profile":"SP-OQ"},
+    {"id":"OQ-07","product_workflows":["WF-DATA-INTAKE","WF-NEW-SEARCH","WF-FOLLOW-ON","WF-EVALUATION"],"subordinate_scientific_workflows":["WF-ASSOCIATION","WF-TRACKLET","WF-LINKING","WF-ORBIT"],"canonical_output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA"],"evidence_prerequisite_ids":[],"acceptance_test_families":["AT-DATA","AT-METHOD","AT-TRACE"],"source_profile":"SP-OQ"},
+    {"id":"OQ-08","product_workflows":["WF-REVIEW-LOGS","WF-OPS","WF-EVALUATION"],"subordinate_scientific_workflows":["WF-POINT","WF-TRAIL","WF-TRACKLET"],"canonical_output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":[],"acceptance_test_families":["AT-METRIC","AT-OPERATIONS","AT-TRACE"],"source_profile":"SP-OQ"},
+    {"id":"OQ-09","product_workflows":["WF-DATA-INTAKE","WF-NEW-SEARCH","WF-FOLLOW-ON","WF-EVALUATION"],"subordinate_scientific_workflows":["WF-ASSOCIATION","WF-LINKING","WF-HISTORICAL"],"canonical_output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA"],"evidence_prerequisite_ids":[],"acceptance_test_families":["AT-DATA","AT-METHOD","AT-TRACE"],"source_profile":"SP-OQ"},
+    {"id":"OQ-10","product_workflows":["WF-DATA-INTAKE","WF-FOLLOW-ON","WF-EVALUATION"],"subordinate_scientific_workflows":["WF-HISTORICAL"],"canonical_output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA"],"evidence_prerequisite_ids":[],"acceptance_test_families":["AT-DATA","AT-METRIC","AT-TRACE"],"source_profile":"SP-OQ"},
+    {"id":"OQ-11","product_workflows":["WF-OPS","WF-EVALUATION"],"subordinate_scientific_workflows":["WF-TRACKLET","WF-LINKING","WF-ORBIT"],"canonical_output_sets":["OS-SPEC","OS-SCHEMA"],"evidence_prerequisite_ids":[],"acceptance_test_families":["AT-OPERATIONS","AT-METRIC","AT-TRACE"],"source_profile":"SP-OQ"},
+    {"id":"OQ-12","product_workflows":["WF-CONTROL","WF-EVALUATION","WF-DISPOSITION"],"subordinate_scientific_workflows":["WF-ASSOCIATION","WF-LINKING","WF-HISTORICAL","WF-ORBIT"],"canonical_output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":[],"acceptance_test_families":["AT-LABEL","AT-REVIEW","AT-TRACE"],"source_profile":"SP-OQ"},
+    {"id":"OQ-13","product_workflows":["WF-EVALUATION","WF-DISPOSITION"],"subordinate_scientific_workflows":["WF-LINKING","WF-ORBIT"],"canonical_output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":[],"acceptance_test_families":["AT-LABEL","AT-METRIC","AT-TRACE"],"source_profile":"SP-OQ"},
+    {"id":"OQ-14","product_workflows":["WF-REVIEW-LOGS","WF-FOLLOW-ON","WF-EVALUATION","WF-DISPOSITION"],"subordinate_scientific_workflows":["WF-HISTORICAL"],"canonical_output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":[],"acceptance_test_families":["AT-METHOD","AT-DISPOSITION","AT-REVIEW","AT-TRACE"],"source_profile":"SP-OQ"},
+    {"id":"OQ-15","product_workflows":["WF-FOLLOW-ON","WF-EVALUATION","WF-DISPOSITION"],"subordinate_scientific_workflows":["WF-ORBIT"],"canonical_output_sets":["OS-SPEC","OS-SCHEMA","OS-REVIEW"],"evidence_prerequisite_ids":[],"acceptance_test_families":["AT-METRIC","AT-DISPOSITION","AT-TRACE"],"source_profile":"SP-OQ"},
+    {"id":"OQ-16","product_workflows":["WF-CONTROL"],"subordinate_scientific_workflows":[],"canonical_output_sets":["OS-STATUS","OS-CONTROL"],"evidence_prerequisite_ids":[],"acceptance_test_families":["AT-CONTROL","AT-TRACE"],"source_profile":"SP-OQ"}
+  ]
 }
