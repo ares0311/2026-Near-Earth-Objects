@@ -1,0 +1,31 @@
+{
+  "current_status": "SCHEMA_SET_INCOMPLETE",
+  "required_schema_families": [
+    "spec-prompt-context-route",
+    "cli-command-and-parameter",
+    "data-source-and-access-interface",
+    "credential-keychain-reference",
+    "search-run-and-resume-state",
+    "search-result-and-filter-query",
+    "worker-shard-and-resource-telemetry",
+    "immutable-input-envelope",
+    "pixel-opportunity",
+    "trail-opportunity",
+    "detection-record",
+    "association-hypothesis",
+    "tracklet",
+    "linkage-hypothesis",
+    "historical-cutoff-packet",
+    "label-and-split",
+    "orbit-family-and-uncertainty",
+    "metric-and-denominator",
+    "resource-envelope",
+    "state-transition-and-reason-code",
+    "run-evidence",
+    "adversarial-review-result",
+    "detection-disposition-and-follow-up",
+    "submission-and-publication-package"
+  ],
+  "schema": "neo-harness-schema-index-v1",
+  "schemas_complete": 0
+}

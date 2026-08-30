@@ -1,0 +1,134 @@
+{
+  "control_plane_tag": "harness-builder-control-v1",
+  "current_state": "HARNESS_CONSOLIDATION_INCOMPLETE",
+  "current_work_package": "HB-01",
+  "index_policy": {
+    "allowed_agent_changes": "UPDATE_LOCATIONS_STATUSES_EVIDENCE_REFERENCES_AND_BLOCKERS_ONLY",
+    "may_change_immutable_runbook": false,
+    "may_redefine_completion": false,
+    "may_reorder_dependencies": false
+  },
+  "schema": "neo-harness-build-roadmap-index-v1",
+  "updated_date": "2026-08-30",
+  "work_packages": [
+    {
+      "canonical_locations": [
+        "AGENTS.md",
+        "configs/harness/harness-charter.json",
+        "configs/harness/roadmap.json",
+        "docs/harness/OPERATOR_OBJECTIVE.md",
+        "docs/runbook/HARNESS_BUILD_RUNBOOK.md",
+        "docs/runbook/HARNESS_BUILD_ROADMAP.md"
+      ],
+      "evidence_locations": [
+        "docs/harness/reference/accepted-specification-v3/PROVENANCE.md"
+      ],
+      "id": "HB-00",
+      "status": "COMPLETE"
+    },
+    {
+      "canonical_locations": [
+        "configs/harness/requirements.json",
+        "docs/harness/HARNESS_STATUS.md",
+        "docs/harness/HARNESS_SPECIFICATION.md"
+      ],
+      "evidence_locations": [
+        "docs/harness/OPERATOR_OBJECTIVE.md",
+        "docs/harness/reference/accepted-specification-v3/requirements-register.csv",
+        "docs/harness/reference/accepted-specification-v3/incomplete-requirements.csv",
+        "docs/harness/reference/accepted-specification-v3/unresolved-dependencies.csv"
+      ],
+      "id": "HB-01",
+      "status": "IN_PROGRESS"
+    },
+    {
+      "canonical_locations": [
+        "docs/harness/SOURCE_REGISTRY.csv",
+        "configs/harness/requirements.json"
+      ],
+      "evidence_locations": [
+        "docs/harness/reference/accepted-specification-v3/neo003-independent-source-checks.csv"
+      ],
+      "id": "HB-02",
+      "status": "PENDING"
+    },
+    {
+      "canonical_locations": [
+        "docs/harness/HARNESS_SPECIFICATION.md",
+        "configs/harness/schemas"
+      ],
+      "evidence_locations": [],
+      "id": "HB-03",
+      "status": "PENDING"
+    },
+    {
+      "canonical_locations": [
+        "docs/harness/HARNESS_SPECIFICATION.md",
+        "configs/harness/schemas"
+      ],
+      "evidence_locations": [],
+      "id": "HB-04",
+      "status": "PENDING"
+    },
+    {
+      "canonical_locations": [
+        "docs/harness/HARNESS_SPECIFICATION.md",
+        "docs/harness/SOURCE_REGISTRY.csv",
+        "configs/harness/schemas"
+      ],
+      "evidence_locations": [],
+      "id": "HB-05",
+      "status": "PENDING"
+    },
+    {
+      "canonical_locations": [
+        "configs/harness/schemas",
+        "configs/harness/requirements.json",
+        "docs/harness/HARNESS_SPECIFICATION.md"
+      ],
+      "evidence_locations": [],
+      "id": "HB-06",
+      "status": "PENDING"
+    },
+    {
+      "canonical_locations": [
+        "docs/harness/HARNESS_SPECIFICATION.md",
+        "configs/harness/schemas"
+      ],
+      "evidence_locations": [],
+      "id": "HB-07",
+      "status": "PENDING"
+    },
+    {
+      "canonical_locations": [
+        "docs/harness/ADVERSARIAL_REVIEW.md",
+        "configs/harness/requirements.json",
+        "configs/harness/schemas"
+      ],
+      "evidence_locations": [],
+      "id": "HB-08",
+      "status": "PENDING"
+    },
+    {
+      "canonical_locations": [
+        "docs/harness/HARNESS_STATUS.md",
+        "docs/harness/HARNESS_SPECIFICATION.md",
+        "docs/harness/SOURCE_REGISTRY.csv",
+        "docs/harness/ADVERSARIAL_REVIEW.md",
+        "configs/harness/requirements.json",
+        "configs/harness/schemas"
+      ],
+      "evidence_locations": [],
+      "id": "HB-09",
+      "status": "PENDING"
+    },
+    {
+      "canonical_locations": [
+        "docs/harness/CODEX_CLI_HANDOFF.md"
+      ],
+      "evidence_locations": [],
+      "id": "HB-10",
+      "status": "BLOCKED"
+    }
+  ]
+}

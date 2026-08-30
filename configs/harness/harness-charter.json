@@ -1,0 +1,122 @@
+{
+  "accepted_source": {
+    "digest_record_sha256": "9ac8fa3c7e55ffc6f6364cb8a673de2a119be01880b3ad676e8920aa6c02570b",
+    "independent_review_manifest_sha256": "c2d3de93f2df2b24b04bce60df8f39112e9d4fe3df001d09520a8853e2c57789",
+    "manifest_sha256": "6825a1cce0c649ae7151f9dcda4a6725bc82ff7235a97f89f3212cff90d902fb",
+    "role": "REFERENCE_INPUT_NOT_CURRENT_HARNESS",
+    "source_name": "NEO Harness Specification v3"
+  },
+  "allowed_work": [
+    "CONSOLIDATE_SPECIFICATION",
+    "DEFINE_MATHEMATICS",
+    "DEFINE_SCHEMAS",
+    "DEFINE_BUSINESS_LOGIC",
+    "DEFINE_ACCEPTANCE_TESTS",
+    "DEFINE_ADVERSARIAL_REVIEW",
+    "PREPARE_CODEX_CLI_HANDOFF",
+    "VERIFY_PUBLIC_PRIMARY_DOCUMENTATION",
+    "STATICALLY_VALIDATE_HARNESS_ARTIFACTS"
+  ],
+  "canonical_deliverables": [
+    "docs/harness/OPERATOR_OBJECTIVE.md",
+    "docs/harness/HARNESS_STATUS.md",
+    "docs/harness/HARNESS_SPECIFICATION.md",
+    "docs/harness/SOURCE_REGISTRY.csv",
+    "docs/harness/ADVERSARIAL_REVIEW.md",
+    "docs/harness/CODEX_CLI_HANDOFF.md",
+    "configs/harness/harness-charter.json",
+    "configs/harness/roadmap.json",
+    "configs/harness/roadmap-index.json",
+    "configs/harness/requirements.json",
+    "configs/harness/schemas",
+    "docs/runbook/HARNESS_BUILD_ROADMAP.md",
+    "docs/harness/HARNESS_INDEX.md"
+  ],
+  "completion_definition": [
+    "Every required method and calculation has exact equations, symbols, units, domains, invalid-input behavior, and justified sources or derivations.",
+    "Every external factual claim and URL is represented in the canonical source registry with demonstrated context and transfer limits.",
+    "Every input, intermediate, output, configuration, error, and evidence record needed by the coding agent has a machine-readable schema.",
+    "Every business rule has explicit triggers, state transitions, reason codes, retained evidence, and fail-closed behavior.",
+    "Every unresolved item is either closed by verified evidence or remains an explicit blocker that prevents the affected coding work.",
+    "The adversarial-review contract covers semantic attacks and matched legitimate controls without allowing the reviewer to repair the target.",
+    "The exact canonical harness bytes pass a fresh independent review.",
+    "The Codex CLI handoff references only canonical repository files and requires no unverified scientific or product decision from the coding agent.",
+    "Every implementation step has a machine-readable prerequisite map, and all required evidence is independently validated and available before the coding agent reaches that step."
+  ],
+  "current_status": "HARNESS_CONSOLIDATION_INCOMPLETE",
+  "control_plane": {
+    "base_commit": "f915bba",
+    "immutable_tag": "harness-builder-control-v1",
+    "roadmap": "configs/harness/roadmap.json",
+    "roadmap_index": "configs/harness/roadmap-index.json",
+    "tag_policy": "NEVER_MOVE_DELETE_OR_REUSE"
+  },
+  "harness_layers": [
+    "AGENT_CONTROL_AND_SPEC_PROMPT",
+    "PRODUCT_CLI_AND_UX",
+    "DATA_SOURCES_ACCESS_AND_CREDENTIAL_INTERFACES",
+    "SCIENTIFIC_CLASSICAL_AND_FRONTIER_AI_METHODS",
+    "PERSISTENCE_RESOURCES_AND_OPERATIONS",
+    "ADVERSARIAL_SCIENTIFIC_AND_SOFTWARE_VALIDATION",
+    "DETECTION_DISPOSITION_AND_OPERATOR_GATED_PACKAGING",
+    "CODEX_CLI_IMPLEMENTATION_HANDOFF"
+  ],
+  "macroscopic_objective": "Produce a complete specification and prompt harness for the NEO project, then hand that harness to the coding agent without implementing or executing the project during harness construction.",
+  "evidence_policy": {
+    "affected_work_when_evidence_is_missing": "BLOCK_BEFORE_WORK_STARTS",
+    "canonical_admission": "FRESH_INDEPENDENT_ADVERSARIAL_VALIDATION_REQUIRED",
+    "coding_agent_may_invent_or_research_missing_evidence": false,
+    "evidence_before_use_required": true,
+    "matched_legitimate_control_required": true,
+    "public_primary_source_research": "ALLOWED",
+    "required_validation_dimensions": [
+      "SOURCE_IDENTITY_AND_METADATA",
+      "EXACT_CLAIM_SUPPORT",
+      "DEMONSTRATED_CONTEXT",
+      "EVIDENCE_GRADE",
+      "TRANSFER_LIMIT",
+      "PROHIBITED_INFERENCE"
+    ]
+  },
+  "permitted_terminal_states": [
+    "HARNESS_CONSOLIDATION_INCOMPLETE",
+    "HARNESS_AWAITING_INDEPENDENT_REVIEW",
+    "HARNESS_READY_FOR_CODEX_CLI_HANDOFF",
+    "REVISIONS_REQUIRED",
+    "BLOCKED_WRONG_WORKSPACE",
+    "BLOCKED_MISSING_VERIFIED_DECISION"
+  ],
+  "prohibited_work": [
+    "WRITE_PROJECT_IMPLEMENTATION",
+    "ACQUIRE_SCIENTIFIC_DATA",
+    "EXECUTE_PROVIDER_DATA_QUERY",
+    "EXECUTE_PIPELINE",
+    "RUN_BASELINE_OR_CANDIDATE",
+    "RUN_BENCHMARK",
+    "TRAIN_MODEL",
+    "CREATE_RUNSEAL",
+    "EXECUTE_G1_TO_G10",
+    "DEPLOY_OR_RUN_PRODUCTION_SEARCH",
+    "SUBMIT_OR_CONTACT_AUTHORITY",
+    "MAKE_DISCOVERY_IMPACT_OR_OPERATIONAL_CLAIM"
+  ],
+  "repository": {
+    "branch": "harness-rebuild",
+    "root": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Near Earth Objects",
+    "startup_failure_status": "BLOCKED_WRONG_WORKSPACE"
+  },
+  "scientific_method_domains": {
+    "authority": "SUBORDINATE_CONTENT_NOT_HARNESS_PHASES",
+    "domains": [
+      "POINT_SOURCE_PIXEL_DETECTION",
+      "TRAILED_SOURCE_PIXEL_DETECTION",
+      "CATALOG_ASSOCIATION",
+      "SINGLE_NIGHT_TRACKLET_FORMATION",
+      "MULTI_NIGHT_AND_CROSS_SURVEY_LINKING",
+      "HISTORICAL_RECOVERY_AND_PRECOVERY",
+      "INITIAL_ORBIT_AND_UNCERTAINTY_HANDLING"
+    ],
+    "inclusion_rule": "INCLUDE_ONLY_WHERE_VERIFIED_RESEARCH_MAPS_THE_DOMAIN_TO_A_NEOHUNTER_PRODUCT_WORKFLOW"
+  },
+  "schema": "neo-harness-build-charter-v1"
+}

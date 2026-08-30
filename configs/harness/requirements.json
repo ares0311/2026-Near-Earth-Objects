@@ -1,0 +1,213 @@
+{
+  "accepted_source_counts": {
+    "open_questions": {
+      "UNRESOLVED": 15,
+      "UNRESOLVED_HISTORICAL_PROVENANCE_LIMITATION": 1
+    },
+    "requirements": {
+      "SPECIFIED_COMPLETE": 34,
+      "SPECIFIED_INCOMPLETE": 14
+    },
+    "requirements_total": 48
+  },
+  "blocking_normative_requirement_ids": [
+    "REQ-011",
+    "REQ-012",
+    "REQ-014",
+    "REQ-017",
+    "REQ-020",
+    "REQ-023",
+    "REQ-024",
+    "REQ-026",
+    "REQ-027",
+    "REQ-028",
+    "REQ-030",
+    "REQ-031",
+    "REQ-032",
+    "REQ-040"
+  ],
+  "consolidation_requirements": [
+    {
+      "id": "IR-001",
+      "status": "OPEN_BLOCKER",
+      "topic": "exact checksum-frozen benchmark corpora and bounded slices"
+    },
+    {
+      "id": "IR-002",
+      "status": "OPEN_BLOCKER",
+      "topic": "file-level pixel ancillary schemas and missingness"
+    },
+    {
+      "id": "IR-003",
+      "status": "OPEN_BLOCKER",
+      "topic": "per-product detection covariance or weighting models"
+    },
+    {
+      "id": "IR-004",
+      "status": "OPEN_BLOCKER",
+      "topic": "trail endpoint and centroid uncertainty propagation"
+    },
+    {
+      "id": "IR-005",
+      "status": "OPEN_BLOCKER",
+      "topic": "multidimensional injection and recovery design"
+    },
+    {
+      "id": "IR-006",
+      "status": "OPEN_BLOCKER",
+      "topic": "cutoff-safe labels and measured transfer behavior"
+    },
+    {
+      "id": "IR-007",
+      "status": "OPEN_BLOCKER",
+      "topic": "time observer and frame normalization test vectors"
+    },
+    {
+      "id": "IR-008",
+      "status": "OPEN_BLOCKER",
+      "topic": "candidate and false-detection denominators"
+    },
+    {
+      "id": "IR-009",
+      "status": "OPEN_BLOCKER",
+      "topic": "cross-survey calibration and duplicate rules"
+    },
+    {
+      "id": "IR-010",
+      "status": "OPEN_BLOCKER",
+      "topic": "numerical resource and access budgets"
+    },
+    {
+      "id": "IR-011",
+      "status": "OPEN_BLOCKER",
+      "topic": "rare-regime definitions and retention"
+    },
+    {
+      "id": "IR-012",
+      "status": "OPEN_BLOCKER",
+      "topic": "independent precovery identity confirmation"
+    },
+    {
+      "id": "IR-013",
+      "status": "OPEN_BLOCKER",
+      "topic": "short-arc uncertainty calibration and multimodality"
+    },
+    {
+      "id": "IR-014",
+      "status": "OPEN_BLOCKER",
+      "topic": "numerical thresholds power multiplicity and uncertainty"
+    },
+    {
+      "id": "IR-015",
+      "status": "OPEN_BLOCKER",
+      "topic": "access licensing redistribution and download authorization"
+    },
+    {
+      "id": "IR-016",
+      "status": "INTENTIONALLY_DEFERRED_POST_G10",
+      "topic": "final production method and architecture selection"
+    }
+  ],
+  "current_status": "HARNESS_CONSOLIDATION_INCOMPLETE",
+  "operator_product_requirements": [
+    {
+      "id": "OPR-001",
+      "status": "PARTIAL",
+      "topic": "minimal Spec Prompt and hierarchical Markdown TOML JSON YAML control system"
+    },
+    {
+      "id": "OPR-002",
+      "status": "OPEN_BLOCKER",
+      "topic": "exhaustive applicable astrometric source registry with verified interfaces"
+    },
+    {
+      "id": "OPR-003",
+      "status": "OPEN_BLOCKER",
+      "topic": "credential acquisition and macOS Keychain interface specification"
+    },
+    {
+      "id": "OPR-004",
+      "status": "OPEN_BLOCKER",
+      "topic": "per-source classical and frontier-AI quantitative methods"
+    },
+    {
+      "id": "OPR-005",
+      "status": "PARTIAL",
+      "topic": "clean baseline archive and reusable-work migration policy"
+    },
+    {
+      "id": "OPR-006",
+      "status": "OPEN_BLOCKER",
+      "topic": "NeoHunter slash-command CLI product and autocomplete contract"
+    },
+    {
+      "id": "OPR-007",
+      "status": "OPEN_BLOCKER",
+      "topic": "New Search Review Search Logs Follow-On Search and Exit business logic"
+    },
+    {
+      "id": "OPR-008",
+      "status": "OPEN_BLOCKER",
+      "topic": "search-result database filtered-grid queries and retention"
+    },
+    {
+      "id": "OPR-009",
+      "status": "OPEN_BLOCKER",
+      "topic": "dark terminal pastel grid graphics and progress-table UX"
+    },
+    {
+      "id": "OPR-010",
+      "status": "OPEN_BLOCKER",
+      "topic": "runtime operation without LLM involvement"
+    },
+    {
+      "id": "OPR-011",
+      "status": "OPEN_BLOCKER",
+      "topic": "minimum worker shard capacity and hardware-aware limits"
+    },
+    {
+      "id": "OPR-012",
+      "status": "OPEN_BLOCKER",
+      "topic": "stoppable restartable long-running work with telemetry and ETA"
+    },
+    {
+      "id": "OPR-013",
+      "status": "OPEN_BLOCKER",
+      "topic": "100 GB active project storage ceiling"
+    },
+    {
+      "id": "OPR-014",
+      "status": "OPEN_BLOCKER",
+      "topic": "detection rejection follow-up and second-order adversarial validation"
+    },
+    {
+      "id": "OPR-015",
+      "status": "OPEN_BLOCKER",
+      "topic": "operator-gated independent-verification submission and publication packaging"
+    }
+  ],
+  "open_dependency_ids": [
+    "OQ-01",
+    "OQ-02",
+    "OQ-03",
+    "OQ-04",
+    "OQ-05",
+    "OQ-06",
+    "OQ-07",
+    "OQ-08",
+    "OQ-09",
+    "OQ-10",
+    "OQ-11",
+    "OQ-12",
+    "OQ-13",
+    "OQ-14",
+    "OQ-15",
+    "OQ-16"
+  ],
+  "reference_registers": [
+    "docs/harness/reference/accepted-specification-v3/requirements-register.csv",
+    "docs/harness/reference/accepted-specification-v3/incomplete-requirements.csv",
+    "docs/harness/reference/accepted-specification-v3/unresolved-dependencies.csv"
+  ],
+  "schema": "neo-harness-requirement-consolidation-v1"
+}

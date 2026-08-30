@@ -1,0 +1,225 @@
+{
+  "baseline": {
+    "base_commit": "f915bba",
+    "branch": "harness-rebuild",
+    "control_plane_tag": "harness-builder-control-v1",
+    "tag_policy": "NEVER_MOVE_DELETE_OR_REUSE"
+  },
+  "completion_state": "HARNESS_READY_FOR_CODEX_CLI_HANDOFF",
+  "macroscopic_progress_measure": "CODING_AGENT_DECISIONS_REMOVED_BY_CANONICAL_INDEPENDENTLY_VALIDATED_EVIDENCE",
+  "roadmap_rules": {
+    "implementation_during_harness_construction": false,
+    "independent_adversarial_validation_required": true,
+    "missing_evidence_behavior": "BLOCK_AFFECTED_WORK_BEFORE_IMPLEMENTATION",
+    "one_canonical_state_transition_per_assignment": true,
+    "scientific_domains_are_roadmap_phases": false,
+    "status_authority": "GIT_COMMIT_PLUS_CONFIGS_HARNESS_ROADMAP_INDEX_JSON_PLUS_DOCS_HARNESS_HARNESS_INDEX_MD"
+  },
+  "schema": "neo-harness-build-roadmap-v1",
+  "work_packages": [
+    {
+      "canonical_outputs": [
+        "AGENTS.md",
+        "configs/harness/harness-charter.json",
+        "configs/harness/roadmap.json",
+        "docs/harness/OPERATOR_OBJECTIVE.md",
+        "docs/runbook/HARNESS_BUILD_RUNBOOK.md",
+        "docs/runbook/HARNESS_BUILD_ROADMAP.md"
+      ],
+      "completion_criteria": [
+        "The real repository, branch, objective, authority hierarchy, prohibited work, accepted reference inputs, and completion test are explicit.",
+        "The control plane is committed and anchored by the immutable annotated tag harness-builder-control-v1."
+      ],
+      "depends_on": [],
+      "id": "HB-00",
+      "name": "Control plane and accepted-reference intake",
+      "initial_status": "COMPLETE"
+    },
+    {
+      "canonical_outputs": [
+        "configs/harness/requirements.json",
+        "docs/harness/HARNESS_STATUS.md",
+        "docs/harness/HARNESS_SPECIFICATION.md"
+      ],
+      "completion_criteria": [
+        "Every operator product requirement and accepted scientific requirement maps to a stable ID, product workflow, canonical deliverable, evidence prerequisites, and acceptance test.",
+        "The seven scientific domains remain subordinate method content and are included only when connected to a NeoHunter workflow."
+      ],
+      "depends_on": [
+        "HB-00"
+      ],
+      "id": "HB-01",
+      "name": "Operator-objective and requirement traceability",
+      "initial_status": "IN_PROGRESS"
+    },
+    {
+      "canonical_outputs": [
+        "docs/harness/SOURCE_REGISTRY.csv",
+        "configs/harness/requirements.json"
+      ],
+      "completion_criteria": [
+        "Every normative external claim has an exact primary URL or immutable local identity, demonstrated context, claim boundary, evidence grade, transfer limit, and prohibited inference.",
+        "Every newly admitted claim passes a fresh independent adversarial review and matched legitimate control before canonical use."
+      ],
+      "depends_on": [
+        "HB-01"
+      ],
+      "id": "HB-02",
+      "name": "Source registry and evidence admission",
+      "initial_status": "PENDING"
+    },
+    {
+      "canonical_outputs": [
+        "docs/harness/HARNESS_SPECIFICATION.md",
+        "configs/harness/schemas"
+      ],
+      "completion_criteria": [
+        "Every applicable data source has a verified access URL, product identity, schema, applicability rule, rate and storage boundary, missingness behavior, and licensing constraint.",
+        "Credential acquisition and macOS Keychain interactions are fully specified but not executed."
+      ],
+      "depends_on": [
+        "HB-01",
+        "HB-02"
+      ],
+      "id": "HB-03",
+      "name": "Data, access, and credential interface specification",
+      "initial_status": "PENDING"
+    },
+    {
+      "canonical_outputs": [
+        "docs/harness/HARNESS_SPECIFICATION.md",
+        "configs/harness/schemas"
+      ],
+      "completion_criteria": [
+        "NeoHunter commands, parameters, autocomplete, search-log review, follow-on search, exit behavior, database behavior, filtered-grid presentation, and dark-terminal UX are deterministic.",
+        "Every product transition has prerequisites, outputs, reason codes, recovery behavior, and acceptance tests."
+      ],
+      "depends_on": [
+        "HB-01"
+      ],
+      "id": "HB-04",
+      "name": "Product CLI, UX, persistence, and business logic",
+      "initial_status": "PENDING"
+    },
+    {
+      "canonical_outputs": [
+        "docs/harness/HARNESS_SPECIFICATION.md",
+        "docs/harness/SOURCE_REGISTRY.csv",
+        "configs/harness/schemas"
+      ],
+      "completion_criteria": [
+        "Every applicable source and workflow has exact classical and frontier-AI method specifications or an explicit branch blocker.",
+        "Every calculation defines equations, symbols, units, frames, valid domains, ordering, uncertainty propagation, invalid-input behavior, numerical tolerances, and validated evidence boundaries."
+      ],
+      "depends_on": [
+        "HB-01",
+        "HB-02",
+        "HB-03"
+      ],
+      "id": "HB-05",
+      "name": "Scientific methods and mathematics",
+      "initial_status": "PENDING"
+    },
+    {
+      "canonical_outputs": [
+        "configs/harness/schemas",
+        "configs/harness/requirements.json",
+        "docs/harness/HARNESS_SPECIFICATION.md"
+      ],
+      "completion_criteria": [
+        "Every input, intermediate, output, configuration, error, evidence, and authority record has a strict machine-readable schema.",
+        "Every future implementation step has a topologically ordered prerequisite map proving independently validated evidence is available before use."
+      ],
+      "depends_on": [
+        "HB-03",
+        "HB-04",
+        "HB-05"
+      ],
+      "id": "HB-06",
+      "name": "Schema, reason-code, and evidence-dependency closure",
+      "initial_status": "PENDING"
+    },
+    {
+      "canonical_outputs": [
+        "docs/harness/HARNESS_SPECIFICATION.md",
+        "configs/harness/schemas"
+      ],
+      "completion_criteria": [
+        "Worker and shard behavior, deterministic non-LLM runtime, stop and restart semantics, telemetry, ETA, retries, retention, and failure recovery are specified.",
+        "Resource contracts enforce the 100 GB active-project ceiling and define evidence for later runtime validation without running the project now."
+      ],
+      "depends_on": [
+        "HB-03",
+        "HB-04",
+        "HB-05"
+      ],
+      "id": "HB-07",
+      "name": "Operations, resources, restartability, and telemetry",
+      "initial_status": "PENDING"
+    },
+    {
+      "canonical_outputs": [
+        "docs/harness/ADVERSARIAL_REVIEW.md",
+        "configs/harness/requirements.json",
+        "configs/harness/schemas"
+      ],
+      "completion_criteria": [
+        "Every requirement family has unsafe attacks, matched legitimate controls, retained regressions, and a role-separated acceptance rule.",
+        "The harness specifies second-order validation for reviewer and validator defects and detection-specific independent verification."
+      ],
+      "depends_on": [
+        "HB-02",
+        "HB-03",
+        "HB-04",
+        "HB-05",
+        "HB-06",
+        "HB-07"
+      ],
+      "id": "HB-08",
+      "name": "Adversarial validation and detection disposition",
+      "initial_status": "PENDING"
+    },
+    {
+      "canonical_outputs": [
+        "docs/harness/HARNESS_STATUS.md",
+        "docs/harness/HARNESS_SPECIFICATION.md",
+        "docs/harness/SOURCE_REGISTRY.csv",
+        "docs/harness/ADVERSARIAL_REVIEW.md",
+        "configs/harness/requirements.json",
+        "configs/harness/schemas"
+      ],
+      "completion_criteria": [
+        "Canonical prose, machine configuration, source claims, schemas, requirements, and tests reconcile exactly.",
+        "A fresh independent reviewer accepts the exact committed harness bytes with no unresolved coding-agent invention."
+      ],
+      "depends_on": [
+        "HB-01",
+        "HB-02",
+        "HB-03",
+        "HB-04",
+        "HB-05",
+        "HB-06",
+        "HB-07",
+        "HB-08"
+      ],
+      "id": "HB-09",
+      "name": "Canonical reconciliation and independent harness acceptance",
+      "initial_status": "PENDING"
+    },
+    {
+      "canonical_outputs": [
+        "docs/harness/CODEX_CLI_HANDOFF.md"
+      ],
+      "completion_criteria": [
+        "The handoff binds the exact accepted commit and maps each implementation module and test to closed requirements, equations, schemas, sources, business rules, and prerequisite evidence.",
+        "The Codex CLI agent is told to implement the harness without redesigning, researching, or inventing unresolved decisions; blocked branches remain blocked."
+      ],
+      "depends_on": [
+        "HB-09"
+      ],
+      "id": "HB-10",
+      "name": "Codex CLI implementation handoff",
+      "initial_status": "BLOCKED"
+    }
+  ]
+}
