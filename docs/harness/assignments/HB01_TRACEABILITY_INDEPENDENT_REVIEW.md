@@ -1,5 +1,12 @@
 # HB-01 Traceability Independent Review Assignment
 
+Status: `VOID_ROLE_BOUNDARY_VIOLATION`
+
+Do not execute this assignment. The target was constructed by the orchestrator
+instead of a separate author agent and is not review-eligible. It is retained only
+as audit evidence. A replacement reviewer assignment may be issued only after a
+separate author returns a valid HB-01 author handoff.
+
 Act as one fresh top-level independent reviewer. Do not create, fork, message, or
 delegate to another agent. Do not repair the target or begin HB-02.
 

@@ -21,8 +21,9 @@ The binding incorporates exact normative text, dependency fields, closure
 evidence, and blocking scopes from the accepted registers rather than duplicating
 or weakening them. A scientific-domain requirement is actionable only through a
 mapped product workflow and only after its evidence prerequisites are
-independently validated. HB-01 is author-complete but remains awaiting fresh
-independent review.
+independently validated. The current HB-01 mapping is an orchestrator-produced
+draft. It is not an author package and is not eligible for independent review;
+a separate author must reconstruct or independently adopt every binding first.
 
 ## Required final content
 

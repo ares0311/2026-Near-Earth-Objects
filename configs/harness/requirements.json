@@ -112,7 +112,7 @@
   "hb01_traceability": {
     "machine_map": "configs/harness/traceability.json",
     "operator_map": "docs/harness/REQUIREMENT_TRACEABILITY.md",
-    "status": "AUTHOR_COMPLETE_AWAITING_INDEPENDENT_REVIEW"
+    "status": "ORCHESTRATOR_DRAFT_NOT_REVIEW_ELIGIBLE"
   },
   "operator_product_requirements": [
     {

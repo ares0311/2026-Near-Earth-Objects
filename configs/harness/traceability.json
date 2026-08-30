@@ -18,7 +18,7 @@
     "open_dependency_evidence": "READ_EXACT_REQUIREMENT_AFFECTED_REGIMES_CLOSURE_EVIDENCE_BLOCKING_SCOPE_AND_DISPOSITION_FROM_DOCS_HARNESS_REFERENCE_ACCEPTED_SPECIFICATION_V3_UNRESOLVED_DEPENDENCIES_CSV",
     "operator_requirement_evidence": "READ_STATUS_AND_TOPIC_FROM_CONFIGS_HARNESS_REQUIREMENTS_JSON_AND_APPLY_THE_EXPLICIT_BINDING_BELOW"
   },
-  "current_status": "HB01_AUTHOR_COMPLETE_AWAITING_INDEPENDENT_REVIEW",
+  "current_status": "ORCHESTRATOR_DRAFT_NOT_REVIEW_ELIGIBLE",
   "macroscopic_objective": "Map every governing requirement and dependency to the NeoHunter product, canonical harness outputs, evidence needed before use, and acceptance-test families without implementing the product.",
   "open_dependency_bindings": [
     {"id":"OQ-01","workflows":["WF-ASSOCIATION","WF-LINKING","WF-HISTORICAL"],"output_sets":["OS-SOURCE","OS-SPEC","OS-SCHEMA"],"tests":["AT-DATA","AT-LABEL","AT-TRACE"]},

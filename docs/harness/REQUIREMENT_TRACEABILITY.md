@@ -1,6 +1,6 @@
 # NEO Harness Requirement Traceability
 
-Status: `HB01_AUTHOR_COMPLETE_AWAITING_INDEPENDENT_REVIEW`
+Status: `ORCHESTRATOR_DRAFT_NOT_REVIEW_ELIGIBLE`
 
 The machine authority for this mapping is `configs/harness/traceability.json`.
 This document explains how it keeps the harness connected to the requested
@@ -52,8 +52,9 @@ HB-01 does not claim those downstream tests are complete.
 
 ## Current conclusion
 
-The objective-to-requirement connection is author-complete: no governing source
-ID is omitted, duplicated, or left without a workflow, output set, and test
-family. This is not independent acceptance. HB-01 remains the active package
-until a fresh reviewer validates the exact committed bytes. HB-02 and all later
-work packages remain unstarted by this result.
+The objective-to-requirement connection is present only as an orchestrator draft.
+It has not been independently reconstructed or adopted by an author agent, so it
+must not proceed to review. HB-01 remains active until a separate author verifies
+every governing source ID, workflow, output set, evidence prerequisite, and test
+family and returns an author-only handoff. HB-02 and all later work packages
+remain unstarted.
