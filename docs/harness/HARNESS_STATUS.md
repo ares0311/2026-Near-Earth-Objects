@@ -9,20 +9,21 @@ Branch: `harness-rebuild`
 Control-plane baseline tag: `harness-builder-control-v1` — immutable; never move,
 delete, or reuse.
 
-Current roadmap work package: `HB-01` — operator-objective and requirement
-traceability.
+Current roadmap work package: `HB-02` — source registry and evidence admission.
 
-HB-01 status: `AUTHOR_COMPLETE_AWAITING_INDEPENDENT_REVIEW`. A separate
-`AUTHOR_ONLY` agent independently reconstructed all 95 bindings: 15 operator
+HB-01 status: `COMPLETE`. A separate `AUTHOR_ONLY` agent independently
+reconstructed all 95 bindings: 15 operator
 requirements, 48 accepted requirements, 16 incomplete requirements, and 16 open
 dependencies. The machine map is `configs/harness/traceability.json`, the
 operator interpretation is `docs/harness/REQUIREMENT_TRACEABILITY.md`, and the
 derivation, draft differences, diagnostics, matched controls, and preservation
 result are in `docs/harness/evidence/HB01-traceability-author-v1.json`.
 
-The author result is not independent acceptance. It changes no open requirement
-or dependency state and does not authorize HB-02. HB-02 remains `PENDING` until a
-fresh role-separated review accepts the exact committed HB-01 bytes.
+Fresh role-separated review at
+`docs/harness/reviews/HB01-traceability-independent-review-v2/` accepted the
+exact author commit with 12/12 unsafe attacks rejected and 12/12 matched controls
+accepted. This closes traceability only: no OPR, REQ, IR, or OQ content state
+changed. HB-02 is now awaiting its author assignment.
 
 Roadmap authority: `configs/harness/roadmap.json`; operator view:
 `docs/runbook/HARNESS_BUILD_ROADMAP.md`.

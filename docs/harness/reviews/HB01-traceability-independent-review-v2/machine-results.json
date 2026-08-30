@@ -1,0 +1,262 @@
+{
+  "schema": "neo-harness-hb01-independent-review-machine-results-v2",
+  "verdict": "HB01_TRACEABILITY_ACCEPTED_AFTER_INDEPENDENT_REVIEW",
+  "role": "INDEPENDENT_REVIEWER_ONLY",
+  "execution_mode": "SINGLE_TOP_LEVEL_AGENT",
+  "repository_root": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Near Earth Objects",
+  "branch": "harness-rebuild",
+  "review_root": "/Users/Rome/Library/CloudStorage/Dropbox/Rome's Stuff/Doc.Root/Personal Docs/Astrometrics/2026 Near Earth Objects/docs/harness/reviews/HB01-traceability-independent-review-v2",
+  "target_commit": "edd72a5599671b58c6abd29cd4fbbad6965a2619",
+  "target_commit_object_sha256": "de3e720b606781f28578d7b051a324f9e92287e258d0250d4570cfd437bae9a3",
+  "assignment": {
+    "path": "docs/harness/assignments/HB01_TRACEABILITY_INDEPENDENT_REVIEW_V2.md",
+    "sha256": "d01d86c084465163381c520c652292af6d8ad40ec2b006342fee0f85155947c5"
+  },
+  "launch_gates": {
+    "repository_root_exact": true,
+    "branch": "harness-rebuild",
+    "working_tree_clean": true,
+    "author_target_is_ancestor": true,
+    "only_committed_post_target_difference": "docs/harness/assignments/HB01_TRACEABILITY_INDEPENDENT_REVIEW_V2.md",
+    "review_root_absent_at_launch": true,
+    "target_files_match_author_commit": true,
+    "canonical_commit_object_sha256": "de3e720b606781f28578d7b051a324f9e92287e258d0250d4570cfd437bae9a3",
+    "review_assignment_sha256": "d01d86c084465163381c520c652292af6d8ad40ec2b006342fee0f85155947c5",
+    "author_assignment_sha256": "a637ec5c6f69950978b1110adde1a0b5d28bdfe8667a208219bcba1b4464686d",
+    "immutable_checksum_entries_verified": 9,
+    "immutable_tag_diff": "CLEAN"
+  },
+  "tested_scope": {
+    "strict_json_files": [
+      "configs/harness/traceability.json",
+      "configs/harness/requirements.json",
+      "configs/harness/roadmap-index.json",
+      "docs/harness/evidence/HB01-traceability-author-v1.json",
+      "configs/harness/harness-charter.json",
+      "configs/harness/roadmap.json"
+    ],
+    "strict_json_file_count": 6,
+    "source_registers": [
+      "configs/harness/requirements.json",
+      "docs/harness/reference/accepted-specification-v3/requirements-register.csv",
+      "docs/harness/reference/accepted-specification-v3/incomplete-requirements.csv",
+      "docs/harness/reference/accepted-specification-v3/unresolved-dependencies.csv"
+    ],
+    "coverage": {
+      "OPR": 15,
+      "REQ": 48,
+      "IR": 16,
+      "OQ": 16,
+      "total": 95
+    },
+    "source_register_checks": {
+      "OPR": {
+        "count": 15,
+        "ids": [
+          "OPR-001",
+          "OPR-002",
+          "OPR-003",
+          "OPR-004",
+          "OPR-005",
+          "OPR-006",
+          "OPR-007",
+          "OPR-008",
+          "OPR-009",
+          "OPR-010",
+          "OPR-011",
+          "OPR-012",
+          "OPR-013",
+          "OPR-014",
+          "OPR-015"
+        ]
+      },
+      "REQ": {
+        "count": 48,
+        "ids": [
+          "REQ-001",
+          "REQ-002",
+          "REQ-003",
+          "REQ-004",
+          "REQ-005",
+          "REQ-006",
+          "REQ-007",
+          "REQ-008",
+          "REQ-009",
+          "REQ-010",
+          "REQ-011",
+          "REQ-012",
+          "REQ-013",
+          "REQ-014",
+          "REQ-015",
+          "REQ-016",
+          "REQ-017",
+          "REQ-018",
+          "REQ-019",
+          "REQ-020",
+          "REQ-021",
+          "REQ-022",
+          "REQ-023",
+          "REQ-024",
+          "REQ-025",
+          "REQ-026",
+          "REQ-027",
+          "REQ-028",
+          "REQ-029",
+          "REQ-030",
+          "REQ-031",
+          "REQ-032",
+          "REQ-033",
+          "REQ-034",
+          "REQ-035",
+          "REQ-036",
+          "REQ-037",
+          "REQ-038",
+          "REQ-039",
+          "REQ-040",
+          "REQ-041",
+          "REQ-042",
+          "REQ-043",
+          "REQ-044",
+          "REQ-045",
+          "REQ-046",
+          "REQ-047",
+          "REQ-048"
+        ],
+        "headers": [
+          "requirement_id",
+          "category",
+          "normative_requirement",
+          "status",
+          "dependencies",
+          "verification"
+        ]
+      },
+      "IR": {
+        "count": 16,
+        "ids": [
+          "IR-001",
+          "IR-002",
+          "IR-003",
+          "IR-004",
+          "IR-005",
+          "IR-006",
+          "IR-007",
+          "IR-008",
+          "IR-009",
+          "IR-010",
+          "IR-011",
+          "IR-012",
+          "IR-013",
+          "IR-014",
+          "IR-015",
+          "IR-016"
+        ],
+        "headers": [
+          "incomplete_id",
+          "requirement",
+          "status",
+          "dependencies",
+          "blocking_gate",
+          "completion_evidence"
+        ]
+      },
+      "OQ": {
+        "count": 16,
+        "ids": [
+          "OQ-01",
+          "OQ-02",
+          "OQ-03",
+          "OQ-04",
+          "OQ-05",
+          "OQ-06",
+          "OQ-07",
+          "OQ-08",
+          "OQ-09",
+          "OQ-10",
+          "OQ-11",
+          "OQ-12",
+          "OQ-13",
+          "OQ-14",
+          "OQ-15",
+          "OQ-16"
+        ],
+        "headers": [
+          "dependency_id",
+          "topic",
+          "status",
+          "requirement",
+          "affected_regimes",
+          "closure_evidence",
+          "blocking_scope",
+          "specification_disposition"
+        ]
+      }
+    },
+    "semantic_bindings_reviewed_against_operator_objective_and_exact_source_row": 95,
+    "semantic_projection_sha256": "b494633ffabd72c669cfecdfdb5ee49c4e599aec0b51c23350f054447a4f00c7",
+    "materialized_dependency_checks": {
+      "REQ_source_dependencies_materialized": 80,
+      "IR_source_dependencies_materialized": 55,
+      "OQ_controlling_field_bindings": 16
+    },
+    "existing_canonical_output_sets_referenced": [
+      "OS-CONTROL",
+      "OS-HANDOFF",
+      "OS-INDEX",
+      "OS-REVIEW",
+      "OS-SCHEMA",
+      "OS-SOURCE",
+      "OS-SPEC",
+      "OS-STATUS"
+    ],
+    "acceptance_test_families_referenced": [
+      "AT-CONTROL",
+      "AT-DATA",
+      "AT-DISPOSITION",
+      "AT-HANDOFF",
+      "AT-LABEL",
+      "AT-METHOD",
+      "AT-METRIC",
+      "AT-OPERATIONS",
+      "AT-PRODUCT",
+      "AT-REVIEW",
+      "AT-TRACE"
+    ],
+    "evidence_before_use_fail_closed": true,
+    "status_reconciliation_checked": true,
+    "hb02_preservation_checked": true,
+    "immutable_and_reference_preservation_checked": true
+  },
+  "baseline_diagnostics": [],
+  "baseline_pass": true,
+  "attack_control_summary": {
+    "attacks_rejected": 12,
+    "attacks_total": 12,
+    "controls_accepted": 12,
+    "controls_total": 12
+  },
+  "preservation_result": "PASS_EXACT_TARGET_CONTROL_REFERENCE_AND_SOURCE_PRESERVATION",
+  "findings": [],
+  "unresolved_risks": [
+    "Acceptance is limited to HB-01 objective-to-requirement traceability and closes no OPR, REQ, IR, or OQ content.",
+    "The harness remains HARNESS_CONSOLIDATION_INCOMPLETE; HB-02 remains PENDING and is not authorized by this review.",
+    "Thirteen operator product requirements remain OPEN_BLOCKER and two remain PARTIAL.",
+    "IR-001 through IR-015 remain OPEN_BLOCKER; IR-016 remains intentionally deferred post-G10; OQ-01 through OQ-16 remain unresolved at their recorded scopes.",
+    "Empty prerequisite lists remain fail-closed and require controlling source fields plus complete canonical specification before affected work.",
+    "No implementation, acquisition, G1-G10 execution, submission, authority contact, discovery, impact, or operational claim is authorized."
+  ],
+  "claim_boundary": "HB01_TRACEABILITY_ONLY_NO_CONTENT_CLOSURE_NO_DOWNSTREAM_AUTHORITY",
+  "downstream_task_or_agent_started": false,
+  "prohibited_actions_not_performed": [
+    "TARGET_REPAIR",
+    "HB-02",
+    "PROJECT_IMPLEMENTATION",
+    "DATA_ACQUISITION",
+    "SCIENTIFIC_EXECUTION",
+    "SUBMISSION",
+    "AUTHORITY_CONTACT",
+    "ADDITIONAL_AGENT",
+    "COMMIT",
+    "PUSH"
+  ]
+}

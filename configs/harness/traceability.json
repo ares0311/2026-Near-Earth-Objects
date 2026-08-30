@@ -1,6 +1,6 @@
 {
   "schema": "neo-harness-requirement-traceability-v2",
-  "current_status": "AUTHOR_COMPLETE_AWAITING_INDEPENDENT_REVIEW",
+  "current_status": "HB01_TRACEABILITY_ACCEPTED_AFTER_INDEPENDENT_REVIEW",
   "macroscopic_objective": "Map every governing requirement and dependency to the requested NeoHunter product, evidence required before use, canonical harness outputs, and acceptance-test families without implementation or scientific execution.",
   "workflow_definitions": {
     "product_workflows": {

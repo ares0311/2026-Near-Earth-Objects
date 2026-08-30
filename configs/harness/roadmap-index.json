@@ -1,7 +1,7 @@
 {
   "control_plane_tag": "harness-builder-control-v1",
   "current_state": "HARNESS_CONSOLIDATION_INCOMPLETE",
-  "current_work_package": "HB-01",
+  "current_work_package": "HB-02",
   "index_policy": {
     "allowed_agent_changes": "UPDATE_LOCATIONS_STATUSES_EVIDENCE_REFERENCES_AND_BLOCKERS_ONLY",
     "may_change_immutable_runbook": false,
@@ -36,13 +36,14 @@
       ],
       "evidence_locations": [
         "docs/harness/evidence/HB01-traceability-author-v1.json",
+        "docs/harness/reviews/HB01-traceability-independent-review-v2",
         "docs/harness/OPERATOR_OBJECTIVE.md",
         "docs/harness/reference/accepted-specification-v3/requirements-register.csv",
         "docs/harness/reference/accepted-specification-v3/incomplete-requirements.csv",
         "docs/harness/reference/accepted-specification-v3/unresolved-dependencies.csv"
       ],
       "id": "HB-01",
-      "status": "AUTHOR_COMPLETE_AWAITING_INDEPENDENT_REVIEW"
+      "status": "COMPLETE"
     },
     {
       "canonical_locations": [
@@ -53,7 +54,7 @@
         "docs/harness/reference/accepted-specification-v3/neo003-independent-source-checks.csv"
       ],
       "id": "HB-02",
-      "status": "PENDING"
+      "status": "PENDING_AUTHOR_ASSIGNMENT"
     },
     {
       "canonical_locations": [

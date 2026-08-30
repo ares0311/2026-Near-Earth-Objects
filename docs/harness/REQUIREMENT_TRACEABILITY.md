@@ -1,6 +1,6 @@
 # NEO Harness Requirement Traceability
 
-Status: `AUTHOR_COMPLETE_AWAITING_INDEPENDENT_REVIEW`
+Status: `HB01_TRACEABILITY_ACCEPTED_AFTER_INDEPENDENT_REVIEW`
 
 The machine authority for this mapping is `configs/harness/traceability.json`.
 This document is the author interpretation of the independently reconstructed
@@ -91,8 +91,9 @@ The exact changed-ID lists are recorded in the author evidence JSON.
 
 ## Author conclusion
 
-The source registers support an unambiguous HB-01 mapping. No HB-01 mapping
-decision requires orchestrator resolution. This author result does not close any
-open operator requirement, incomplete requirement, or dependency; does not
-advance HB-02; and is not independent acceptance. HB-01 now awaits a fresh
-role-separated review of the exact committed bytes.
+The source registers support an unambiguous HB-01 mapping. Fresh role-separated
+review at `reviews/HB01-traceability-independent-review-v2/` accepted the exact
+author commit after complete 95-record review and 12 attack/control pairs. HB-01
+is complete. This acceptance does not close any open operator requirement,
+incomplete requirement, or dependency; HB-02 remains the next separate work
+package.

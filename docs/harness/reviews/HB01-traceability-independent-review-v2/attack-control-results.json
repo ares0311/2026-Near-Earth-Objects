@@ -1,0 +1,174 @@
+{
+  "schema": "neo-harness-hb01-attack-control-results-v2",
+  "execution_mode": "SINGLE_TOP_LEVEL_AGENT",
+  "unsafe_attack_families_tested": 12,
+  "unsafe_attacks_rejected_for_intended_family": 12,
+  "matched_legitimate_controls_tested": 12,
+  "matched_legitimate_controls_accepted": 12,
+  "all_pairs_pass": true,
+  "cases": [
+    {
+      "number": 1,
+      "family": "omitted ID",
+      "unsafe_case": "Remove OPR-015 from the complete map.",
+      "intended_diagnostic_prefix": "E01_OMITTED_ID",
+      "unsafe_rejected_for_intended_family": true,
+      "unsafe_diagnostics": [
+        "E01_OMITTED_ID:global_exact_once_coverage",
+        "E01_OMITTED_ID:operator_requirement_bindings:OPR-015"
+      ],
+      "matched_legitimate_control": "Retain every OPR exactly once while changing only non-normative binding order.",
+      "control_accepted": true,
+      "control_diagnostics": []
+    },
+    {
+      "number": 2,
+      "family": "duplicated, aliased, or unknown ID",
+      "unsafe_case": "Alias OQ-16 as unknown OQ-016.",
+      "intended_diagnostic_prefix": "E02_UNKNOWN_DUPLICATED_OR_ALIASED_ID",
+      "unsafe_rejected_for_intended_family": true,
+      "unsafe_diagnostics": [
+        "E01_OMITTED_ID:global_exact_once_coverage",
+        "E01_OMITTED_ID:open_dependency_bindings:OQ-16",
+        "E02_UNKNOWN_DUPLICATED_OR_ALIASED_ID:open_dependency_bindings:OQ-016"
+      ],
+      "matched_legitimate_control": "Retain the exact OQ-01 through OQ-16 identity set in a different order.",
+      "control_accepted": true,
+      "control_diagnostics": []
+    },
+    {
+      "number": 3,
+      "family": "wrong source profile or controlling fields",
+      "unsafe_case": "Remove the verification controlling field from SP-REQ.",
+      "intended_diagnostic_prefix": "E03_WRONG_SOURCE_PROFILE_OR_CONTROLLING_FIELDS",
+      "unsafe_rejected_for_intended_family": true,
+      "unsafe_diagnostics": [
+        "E03_WRONG_SOURCE_PROFILE_OR_CONTROLLING_FIELDS:definitions"
+      ],
+      "matched_legitimate_control": "Retain every exact source profile while changing only object-member order.",
+      "control_accepted": true,
+      "control_diagnostics": []
+    },
+    {
+      "number": 4,
+      "family": "wrong NeoHunter product workflow",
+      "unsafe_case": "Map the slash-command CLI requirement OPR-006 only to evaluation.",
+      "intended_diagnostic_prefix": "E04_WRONG_NEOHUNTER_PRODUCT_WORKFLOW",
+      "unsafe_rejected_for_intended_family": true,
+      "unsafe_diagnostics": [
+        "E04_WRONG_NEOHUNTER_PRODUCT_WORKFLOW:independently_audited_projection"
+      ],
+      "matched_legitimate_control": "Retain OPR-006's exact product workflow set in a different order.",
+      "control_accepted": true,
+      "control_diagnostics": []
+    },
+    {
+      "number": 5,
+      "family": "standalone scientific workflow or domain promoted to roadmap phase",
+      "unsafe_case": "Leave REQ-026 with WF-POINT but no product workflow.",
+      "intended_diagnostic_prefix": "E05_SCIENTIFIC_STANDALONE_OR_ROADMAP_PROMOTION",
+      "unsafe_rejected_for_intended_family": true,
+      "unsafe_diagnostics": [
+        "E04_WRONG_NEOHUNTER_PRODUCT_WORKFLOW:REQ-026",
+        "E04_WRONG_NEOHUNTER_PRODUCT_WORKFLOW:independently_audited_projection",
+        "E05_SCIENTIFIC_STANDALONE_OR_ROADMAP_PROMOTION:REQ-026"
+      ],
+      "matched_legitimate_control": "Keep WF-POINT subordinate to the exact REQ-026 product workflow set.",
+      "control_accepted": true,
+      "control_diagnostics": []
+    },
+    {
+      "number": 6,
+      "family": "missing required dependency",
+      "unsafe_case": "Remove source-required OQ-05 from REQ-020.",
+      "intended_diagnostic_prefix": "E06_MISSING_REQUIRED_DEPENDENCY",
+      "unsafe_rejected_for_intended_family": true,
+      "unsafe_diagnostics": [
+        "E06_MISSING_REQUIRED_DEPENDENCY:REQ-020:OQ-05"
+      ],
+      "matched_legitimate_control": "Retain all REQ-020 dependencies while changing only dependency order.",
+      "control_accepted": true,
+      "control_diagnostics": []
+    },
+    {
+      "number": 7,
+      "family": "added unsupported dependency or invented evidence",
+      "unsafe_case": "Add unsupported OQ-16 evidence to REQ-020.",
+      "intended_diagnostic_prefix": "E07_UNSUPPORTED_DEPENDENCY_OR_INVENTED_EVIDENCE",
+      "unsafe_rejected_for_intended_family": true,
+      "unsafe_diagnostics": [
+        "E07_UNSUPPORTED_DEPENDENCY_OR_INVENTED_EVIDENCE:REQ-020:OQ-16"
+      ],
+      "matched_legitimate_control": "Use only the exact source-required REQ-020 dependencies in a different order.",
+      "control_accepted": true,
+      "control_diagnostics": []
+    },
+    {
+      "number": 8,
+      "family": "empty evidence interpreted permissively",
+      "unsafe_case": "Replace the fail-closed empty-evidence rule with permission to invent.",
+      "intended_diagnostic_prefix": "E08_EMPTY_EVIDENCE_INTERPRETED_PERMISSIVELY",
+      "unsafe_rejected_for_intended_family": true,
+      "unsafe_diagnostics": [
+        "E08_EMPTY_EVIDENCE_INTERPRETED_PERMISSIVELY"
+      ],
+      "matched_legitimate_control": "Retain a legitimate empty dependency list under the exact fail-closed rule.",
+      "control_accepted": true,
+      "control_diagnostics": []
+    },
+    {
+      "number": 9,
+      "family": "missing or unknown output set",
+      "unsafe_case": "Replace IR-001 canonical outputs with OS-UNKNOWN.",
+      "intended_diagnostic_prefix": "E09_MISSING_OR_UNKNOWN_OUTPUT_SET",
+      "unsafe_rejected_for_intended_family": true,
+      "unsafe_diagnostics": [
+        "E09_MISSING_OR_UNKNOWN_OUTPUT_SET:IR-001",
+        "E09_MISSING_OR_UNKNOWN_OUTPUT_SET:independently_audited_projection"
+      ],
+      "matched_legitimate_control": "Retain every IR-001 canonical output set in a different order.",
+      "control_accepted": true,
+      "control_diagnostics": []
+    },
+    {
+      "number": 10,
+      "family": "missing or unknown acceptance-test family",
+      "unsafe_case": "Replace OQ-01 tests with AT-UNKNOWN and omit AT-TRACE.",
+      "intended_diagnostic_prefix": "E10_MISSING_OR_UNKNOWN_ACCEPTANCE_TEST_FAMILY",
+      "unsafe_rejected_for_intended_family": true,
+      "unsafe_diagnostics": [
+        "E10_MISSING_OR_UNKNOWN_ACCEPTANCE_TEST_FAMILY:OQ-01",
+        "E10_MISSING_OR_UNKNOWN_ACCEPTANCE_TEST_FAMILY:independently_audited_projection"
+      ],
+      "matched_legitimate_control": "Retain every OQ-01 test family in a different order.",
+      "control_accepted": true,
+      "control_diagnostics": []
+    },
+    {
+      "number": 11,
+      "family": "status drift, false closure, or HB-02 advancement",
+      "unsafe_case": "Advance HB-02 to IN_PROGRESS before HB-01 independent acceptance is recorded canonically.",
+      "intended_diagnostic_prefix": "E11_STATUS_DRIFT_FALSE_CLOSURE_OR_HB02_ADVANCEMENT",
+      "unsafe_rejected_for_intended_family": true,
+      "unsafe_diagnostics": [
+        "E11_STATUS_DRIFT_FALSE_CLOSURE_OR_HB02_ADVANCEMENT"
+      ],
+      "matched_legitimate_control": "Keep overall status incomplete, HB-01 awaiting review, and HB-02 pending.",
+      "control_accepted": true,
+      "control_diagnostics": []
+    },
+    {
+      "number": 12,
+      "family": "immutable-control or accepted-reference mutation",
+      "unsafe_case": "Present a changed accepted-reference/control snapshot to preservation enforcement.",
+      "intended_diagnostic_prefix": "E12_IMMUTABLE_CONTROL_OR_ACCEPTED_REFERENCE_MUTATION",
+      "unsafe_rejected_for_intended_family": true,
+      "unsafe_diagnostics": [
+        "E12_IMMUTABLE_CONTROL_OR_ACCEPTED_REFERENCE_MUTATION"
+      ],
+      "matched_legitimate_control": "Present exact before/after no-follow snapshots with no byte/type/mode drift.",
+      "control_accepted": true,
+      "control_diagnostics": []
+    }
+  ]
+}

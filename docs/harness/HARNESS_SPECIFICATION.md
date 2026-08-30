@@ -11,7 +11,8 @@ domains are method content inside that scope, not the definition of the harness.
 
 ## Objective-to-requirement traceability
 
-HB-01 author reconstruction is complete and awaits independent review.
+HB-01 traceability is accepted after fresh independent review at
+`reviews/HB01-traceability-independent-review-v2/`.
 `configs/harness/traceability.json` contains 95 individual bindings: 15 operator
 requirements, 48 accepted requirements, 16 incomplete requirements, and 16 open
 dependencies. Every binding names at least one NeoHunter product workflow,
@@ -33,9 +34,9 @@ derivation, draft differences, diagnostics, matched controls, and preservation
 result are in `evidence/HB01-traceability-author-v1.json` and interpreted in
 `REQUIREMENT_TRACEABILITY.md`.
 
-This is an author handoff, not independent acceptance. It closes no downstream
-requirement or dependency, does not start HB-02, and does not authorize
-implementation or scientific execution.
+This acceptance closes only the HB-01 mapping work package. It closes no
+downstream requirement or dependency and does not authorize implementation or
+scientific execution. HB-02 is the next work package.
 
 ## Required final content
 

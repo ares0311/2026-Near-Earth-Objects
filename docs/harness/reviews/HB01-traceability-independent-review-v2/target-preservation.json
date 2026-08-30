@@ -1,0 +1,95 @@
+{
+  "schema": "neo-harness-hb01-target-preservation-v2",
+  "result": "PASS_EXACT_TARGET_CONTROL_REFERENCE_AND_SOURCE_PRESERVATION",
+  "method": "complete no-follow lstat snapshots with path, type, mode, size, regular-file SHA-256, and symlink target",
+  "before": {
+    "target_files": {
+      "manifest_sha256": "a051ed6f6c914165ca80780e83f65e0b315b6b6ae3ccdc3fcc8dbe6ced49a9f8",
+      "entry_count": 8,
+      "type_counts": {
+        "regular": 8
+      },
+      "regular_file_bytes": 78571
+    },
+    "immutable_control_plane": {
+      "manifest_sha256": "144e84244b0b779eae0f90042021476ee6cbabaafb51adc157adc4ddfcf1cf55",
+      "entry_count": 10,
+      "type_counts": {
+        "regular": 10
+      },
+      "regular_file_bytes": 45642
+    },
+    "accepted_reference_subtree": {
+      "manifest_sha256": "d8e7cfa9e92c42422bd78263e75f12d1ff5e4b9ed2dbc9af59eb65d6d57a2a9e",
+      "entry_count": 9,
+      "type_counts": {
+        "directory": 1,
+        "regular": 8
+      },
+      "regular_file_bytes": 74397
+    },
+    "source_registers": {
+      "manifest_sha256": "259589faba1f5b7d8bd40191558da74f8670b28e5f48fa2995b4aede648d0973",
+      "entry_count": 4,
+      "type_counts": {
+        "regular": 4
+      },
+      "regular_file_bytes": 23026
+    },
+    "assignments": {
+      "manifest_sha256": "5fd3662da0569c4e91bfdff0726eb1e2751496a10d4049776987b00ad81bb6c0",
+      "entry_count": 2,
+      "type_counts": {
+        "regular": 2
+      },
+      "regular_file_bytes": 7957
+    }
+  },
+  "after": {
+    "target_files": {
+      "manifest_sha256": "a051ed6f6c914165ca80780e83f65e0b315b6b6ae3ccdc3fcc8dbe6ced49a9f8",
+      "entry_count": 8,
+      "type_counts": {
+        "regular": 8
+      },
+      "regular_file_bytes": 78571
+    },
+    "immutable_control_plane": {
+      "manifest_sha256": "144e84244b0b779eae0f90042021476ee6cbabaafb51adc157adc4ddfcf1cf55",
+      "entry_count": 10,
+      "type_counts": {
+        "regular": 10
+      },
+      "regular_file_bytes": 45642
+    },
+    "accepted_reference_subtree": {
+      "manifest_sha256": "d8e7cfa9e92c42422bd78263e75f12d1ff5e4b9ed2dbc9af59eb65d6d57a2a9e",
+      "entry_count": 9,
+      "type_counts": {
+        "directory": 1,
+        "regular": 8
+      },
+      "regular_file_bytes": 74397
+    },
+    "source_registers": {
+      "manifest_sha256": "259589faba1f5b7d8bd40191558da74f8670b28e5f48fa2995b4aede648d0973",
+      "entry_count": 4,
+      "type_counts": {
+        "regular": 4
+      },
+      "regular_file_bytes": 23026
+    },
+    "assignments": {
+      "manifest_sha256": "5fd3662da0569c4e91bfdff0726eb1e2751496a10d4049776987b00ad81bb6c0",
+      "entry_count": 2,
+      "type_counts": {
+        "regular": 2
+      },
+      "regular_file_bytes": 7957
+    }
+  },
+  "all_manifest_digests_identical": true,
+  "target_files_match_author_commit_after_review": true,
+  "hb02_preserved_pending": true,
+  "reference_subtree_edit_count": 0
+}
