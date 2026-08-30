@@ -29,8 +29,10 @@
     {
       "canonical_locations": [
         "configs/harness/requirements.json",
+        "configs/harness/traceability.json",
         "docs/harness/HARNESS_STATUS.md",
-        "docs/harness/HARNESS_SPECIFICATION.md"
+        "docs/harness/HARNESS_SPECIFICATION.md",
+        "docs/harness/REQUIREMENT_TRACEABILITY.md"
       ],
       "evidence_locations": [
         "docs/harness/OPERATOR_OBJECTIVE.md",
@@ -39,7 +41,7 @@
         "docs/harness/reference/accepted-specification-v3/unresolved-dependencies.csv"
       ],
       "id": "HB-01",
-      "status": "IN_PROGRESS"
+      "status": "AUTHOR_COMPLETE_AWAITING_INDEPENDENT_REVIEW"
     },
     {
       "canonical_locations": [

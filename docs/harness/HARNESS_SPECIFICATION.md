@@ -9,6 +9,21 @@ starting source, not a substitute for this completed document.
 The controlling product scope is `OPERATOR_OBJECTIVE.md`. Scientific-processing
 domains are method content inside that scope, not the definition of the harness.
 
+## Objective-to-requirement traceability
+
+`configs/harness/traceability.json` binds all 15 operator requirements, 48
+accepted requirements, 16 incomplete requirements, and 16 open dependencies to
+stable NeoHunter workflow IDs, canonical output sets, evidence prerequisites, and
+acceptance-test families. `REQUIREMENT_TRACEABILITY.md` is the human-readable
+interpretation.
+
+The binding incorporates exact normative text, dependency fields, closure
+evidence, and blocking scopes from the accepted registers rather than duplicating
+or weakening them. A scientific-domain requirement is actionable only through a
+mapped product workflow and only after its evidence prerequisites are
+independently validated. HB-01 is author-complete but remains awaiting fresh
+independent review.
+
 ## Required final content
 
 The completed specification will contain one normative definition for each of

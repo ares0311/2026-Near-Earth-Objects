@@ -12,6 +12,11 @@ delete, or reuse.
 Current roadmap work package: `HB-01` — operator-objective and requirement
 traceability.
 
+HB-01 author status: `AUTHOR_COMPLETE_AWAITING_INDEPENDENT_REVIEW`. The exact
+15 operator requirements, 48 accepted requirements, 16 incomplete requirements,
+and 16 open dependencies are bound in `configs/harness/traceability.json` and
+`docs/harness/REQUIREMENT_TRACEABILITY.md`. HB-02 has not started.
+
 Roadmap authority: `configs/harness/roadmap.json`; operator view:
 `docs/runbook/HARNESS_BUILD_ROADMAP.md`.
 
