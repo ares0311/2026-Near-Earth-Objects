@@ -23,7 +23,8 @@ Fresh role-separated review at
 `docs/harness/reviews/HB01-traceability-independent-review-v2/` accepted the
 exact author commit with 12/12 unsafe attacks rejected and 12/12 matched controls
 accepted. This closes traceability only: no OPR, REQ, IR, or OQ content state
-changed. HB-02 is now awaiting its author assignment.
+changed. The HB-02 author assignment is ready at
+`docs/harness/assignments/HB02_SOURCE_REGISTRY_AUTHOR_V1.md`.
 
 Roadmap authority: `configs/harness/roadmap.json`; operator view:
 `docs/runbook/HARNESS_BUILD_ROADMAP.md`.
